@@ -2,7 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ROLES, ROUTES, accessFor, canOpen, hrefFor, landingFor, matchRoute, navFor, routeById, type Access, type RouteId } from "./registry";
+import { ROLES, ROUTES, accessFor, accessForPath, canOpen, hrefFor, landingFor, matchRoute, navFor, routeById, type Access, type RouteId } from "./registry";
 import type { FirmRole } from "@/lib/schemas/enums";
 import { isInScope } from "./scope";
 
@@ -171,5 +171,21 @@ describe("access table (docs/07 §2.2)", () => {
 
   it("marks dev routes dev-only", () => {
     for (const id of DEV_ROUTES) expect(routeById(id).devOnly).toBe(true);
+  });
+});
+
+describe("accessForPath (fails closed)", () => {
+  it("is none for a path that matches no route, for every role", () => {
+    for (const role of ROLES) {
+      for (const path of ["/nope", "/candidates/cand_01/extra", "/admin", "/settings/unknown", "/dashboard/x"]) {
+        expect(accessForPath(path, role), `${role} ${path}`).toEqual({ route: null, access: "none" });
+      }
+    }
+  });
+
+  it("returns the route's own access for registered paths, ignoring query and hash", () => {
+    expect(accessForPath("/analytics?range=7d", "BDE")).toEqual({ route: routeById("analytics"), access: "none" });
+    expect(accessForPath("/candidates/cand_01#notes", "BDE").access).toBe("assigned");
+    expect(accessForPath("/resumes/new", "VIEWER").access).toBe("read");
   });
 });

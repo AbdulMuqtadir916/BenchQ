@@ -145,6 +145,15 @@ export function accessFor(route: RouteDef, role: FirmRole): Access {
   return route.access === "public" ? "full" : route.access[role];
 }
 
+/**
+ * The route a pathname belongs to and the role's access to it. Fails closed: a path that matches
+ * no registry entry is `none`, so nothing renders for it until it is registered (docs/07 A2.6).
+ */
+export function accessForPath(pathname: string, role: FirmRole): { route: RouteDef | null; access: Access } {
+  const route = matchRoute(pathname);
+  return { route, access: route ? accessFor(route, role) : "none" };
+}
+
 export function canOpen(route: RouteDef, role: FirmRole): boolean {
   if (route.devOnly && !devRoutesEnabled()) return false;
   return accessFor(route, role) !== "none";
