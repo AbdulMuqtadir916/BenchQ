@@ -7,6 +7,7 @@ import { useUiStore } from "@/lib/stores/ui-store";
 import { useGlobalShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { CommandPalette } from "@/components/command/command-palette";
 import { KeyboardHintSheet } from "@/components/command/keyboard-hint-sheet";
+import { RouteGuard } from "@/components/routes/route-guard";
 
 /**
  * AppShell — Sidebar + Topbar + main. Docs/04 §1.1.
@@ -32,7 +33,7 @@ export function AppShell({ children, modal }: { children: React.ReactNode, modal
       <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       <div className="bq-workspace">
         <Topbar />
-        <main id="main-content" className="min-w-0">{children}</main>
+        <main id="main-content" className="min-w-0"><RouteGuard>{children}</RouteGuard></main>
       </div>
       </div>
       <CommandPalette />
