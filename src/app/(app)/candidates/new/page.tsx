@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useHref } from "@/lib/routes/use-href";
 
 export default function NewCandidatePage() {
+  const toHref = useHref();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -17,7 +19,7 @@ export default function NewCandidatePage() {
     setLoading(true);
     // simulate submit
     setTimeout(() => {
-      router.push("/candidates");
+      router.push(toHref("candidates"));
     }, 1500);
   };
 

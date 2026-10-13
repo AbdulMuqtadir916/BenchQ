@@ -12,8 +12,10 @@ import { rankJobsForCandidate } from "@/lib/derive";
 import { MatchScore } from "@/components/app/match-score";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
+import { useHref } from "@/lib/routes/use-href";
 
 export default function FocusModePage() {
+  const toHref = useHref();
   const { user } = useSession();
   const candidatesQuery = useCandidates();
   const jobsQuery = useJobs({ limit: 400 });
@@ -84,7 +86,7 @@ export default function FocusModePage() {
           {!finished && queue.length > 0 ? <span className="tabular">job {Math.min(index + 1, queue.length)} of {queue.length}</span> : null}
           <span className="tabular inline-flex items-center gap-1 text-[var(--color-text-3)]"><Clock size={13} aria-hidden />{mm}:{ss}</span>
         </div>
-        <Button asChild variant="ghost" size="sm"><Link href="/dashboard"><X size={14} aria-hidden />Esc exit</Link></Button>
+        <Button asChild variant="ghost" size="sm"><Link href={toHref("dashboard")}><X size={14} aria-hidden />Esc exit</Link></Button>
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 items-center justify-center">
@@ -103,7 +105,7 @@ export default function FocusModePage() {
                 </div>
               ))}
             </div>
-            <Button asChild className="mt-6 w-full"><Link href="/dashboard">Back to dashboard</Link></Button>
+            <Button asChild className="mt-6 w-full"><Link href={toHref("dashboard")}>Back to dashboard</Link></Button>
           </motion.div>
         ) : (
           <AnimatePresence mode="wait">

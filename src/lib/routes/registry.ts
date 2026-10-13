@@ -46,7 +46,7 @@ export const ROLES: readonly FirmRole[] = ["OWNER", "MANAGER", "BDE", "VIEWER"];
 const everyone = (access: Access): RoleAccess => ({ OWNER: access, MANAGER: access, BDE: access, VIEWER: access });
 const roles = (OWNER: Access, MANAGER: Access, BDE: Access, VIEWER: Access): RoleAccess => ({ OWNER, MANAGER, BDE, VIEWER });
 
-export const ROUTES: readonly RouteDef[] = [
+const ROUTE_DEFS = [
   // Auth and onboarding
   { id: "root", path: "/", title: "BenchQ", shell: "auth", access: "public" },
   { id: "sign-in", path: "/sign-in", title: "Sign in", shell: "auth", access: "public" },
@@ -78,14 +78,42 @@ export const ROUTES: readonly RouteDef[] = [
   { id: "settings.team", path: "/settings/team", title: "Team", shell: "app", access: roles("full", "full", "none", "none"), nav: { section: "settings", order: 2, icon: Users }, palette: true },
   { id: "settings.templates", path: "/settings/templates", title: "Templates", shell: "app", access: roles("full", "full", "none", "none"), nav: { section: "settings", order: 3, icon: FileText }, palette: true },
   { id: "settings.preferences", path: "/settings/preferences", title: "Preferences", shell: "app", access: everyone("full"), nav: { section: "settings", order: 4, icon: SlidersHorizontal }, palette: true },
-];
+] as const satisfies readonly RouteDef[];
 
-const BY_ID = new Map(ROUTES.map((route) => [route.id, route]));
+/** Every registered route id. A mistyped id fails the typecheck instead of failing at render time. */
+export type RouteId = (typeof ROUTE_DEFS)[number]["id"];
+
+export const ROUTES: readonly RouteDef[] = ROUTE_DEFS;
+
+const BY_ID = new Map<string, RouteDef>(ROUTES.map((route) => [route.id, route]));
 
 export function routeById(id: string): RouteDef {
   const route = BY_ID.get(id);
   if (!route) throw new Error(`Unknown route id: ${id}`);
   return route;
+}
+
+export type RouteParams = Record<string, string | number>;
+export type RouteQuery = Record<string, string | number | undefined>;
+
+/**
+ * The URL for a route id (or a route from the registry): `[param]` segments are filled from `params`, `query` is appended
+ * (undefined values are skipped). The only place a path string is turned into a link.
+ * Throws if a param is missing. Phase T (docs/07) adds the `[firm]` segment here and in `useHref()`.
+ */
+export function hrefFor(target: RouteId | RouteDef, params: RouteParams = {}, query?: RouteQuery): string {
+  const route = typeof target === "string" ? routeById(target) : target;
+  const path = route.path.replace(/\[([^\]]+)\]/g, (_, name: string) => {
+    const value = params[name];
+    if (value === undefined) throw new Error(`hrefFor("${route.id}") is missing the "${name}" param`);
+    return encodeURIComponent(String(value));
+  });
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== undefined) search.set(key, String(value));
+  }
+  const queryString = search.toString();
+  return queryString ? `${path}?${queryString}` : path;
 }
 
 export function devRoutesEnabled(): boolean {

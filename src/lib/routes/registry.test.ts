@@ -2,7 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ROLES, ROUTES, accessFor, canOpen, landingFor, matchRoute, navFor, routeById } from "./registry";
+import { ROLES, ROUTES, accessFor, canOpen, hrefFor, landingFor, matchRoute, navFor, routeById, type RouteId } from "./registry";
 import { isInScope } from "./scope";
 
 const APP_DIR = fileURLToPath(new URL("../../app", import.meta.url));
@@ -77,5 +77,40 @@ describe("record scope", () => {
     expect(isInScope("own", "u1", { ownerUserId: "u2" })).toBe(false);
     expect(isInScope("read", "u1", {})).toBe(true);
     expect(isInScope("none", "u1", { ownerUserId: "u1" })).toBe(false);
+  });
+});
+
+describe("hrefFor", () => {
+  it("returns the path for static routes", () => {
+    expect(hrefFor("dashboard")).toBe("/dashboard");
+    expect(hrefFor("candidates.new")).toBe("/candidates/new");
+    expect(hrefFor("settings.preferences")).toBe("/settings/preferences");
+  });
+
+  it("fills [param] segments and encodes them", () => {
+    expect(hrefFor("candidates.detail", { id: "cand_01" })).toBe("/candidates/cand_01");
+    expect(hrefFor("resumes.studio", { id: "new" })).toBe("/resumes/new");
+    expect(hrefFor("jobs.detail", { id: "a/b" })).toBe("/jobs/a%2Fb");
+  });
+
+  it("appends a query string and skips undefined values", () => {
+    expect(hrefFor("candidates.detail", { id: "cand_01" }, { tab: "inbox" })).toBe("/candidates/cand_01?tab=inbox");
+    expect(hrefFor("jobs", {}, { candidate: "cand_01", q: undefined })).toBe("/jobs?candidate=cand_01");
+    expect(hrefFor("applications", {}, { bde: undefined })).toBe("/applications");
+  });
+
+  it("throws when a param is missing", () => {
+    expect(() => hrefFor("candidates.detail")).toThrow(/missing the "id" param/);
+  });
+
+  it("accepts a route object, as the sidebar and palette hold", () => {
+    expect(hrefFor(routeById("followups"))).toBe("/followups");
+  });
+
+  it("round-trips: every route's link matches back to the same route", () => {
+    for (const route of ROUTES) {
+      const params = Object.fromEntries([...route.path.matchAll(/\[([^\]]+)\]/g)].map((m) => [m[1]!, "sample"]));
+      expect(matchRoute(hrefFor(route.id as RouteId, params))?.id).toBe(route.id);
+    }
   });
 });

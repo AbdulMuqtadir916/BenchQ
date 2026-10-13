@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { useUiStore } from "@/lib/stores/ui-store";
 import { useSession, type FirmRole } from "@/lib/stores/session-store";
-import { canOpen, paletteRoutesFor, routeById } from "@/lib/routes/registry";
+import { canOpen, paletteRoutesFor, routeById, type RouteId } from "@/lib/routes/registry";
+import { useHref } from "@/lib/routes/use-href";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { cn } from "@/lib/cn";
@@ -32,8 +33,8 @@ interface Command {
   icon: LucideIcon;
   keywords?: string;
   /** Registry id of the page this command opens; hidden from roles that can't open it. */
-  routeId?: string;
-  run: (router: ReturnType<typeof useRouter>) => void;
+  routeId?: RouteId;
+  run: (router: ReturnType<typeof useRouter>, toHref: ReturnType<typeof useHref>) => void;
 }
 
 const STATIC_COMMANDS: Command[] = [
@@ -44,7 +45,7 @@ const STATIC_COMMANDS: Command[] = [
     icon: Plus,
     keywords: "add create",
     routeId: "candidates.new",
-    run: (r) => r.push("/candidates/new"),
+    run: (r, toHref) => r.push(toHref("candidates.new")),
   },
   {
     id: "action-capture-job",
@@ -53,7 +54,7 @@ const STATIC_COMMANDS: Command[] = [
     icon: Plus,
     keywords: "add paste",
     routeId: "jobs.capture",
-    run: (r) => r.push("/jobs/capture"),
+    run: (r, toHref) => r.push(toHref("jobs.capture")),
   },
   {
     id: "action-focus-mode",
@@ -62,7 +63,7 @@ const STATIC_COMMANDS: Command[] = [
     icon: Zap,
     keywords: "queue run",
     routeId: "focus",
-    run: (r) => r.push("/focus"),
+    run: (r, toHref) => r.push(toHref("focus")),
   },
 ];
 
@@ -74,7 +75,7 @@ function staticCommandsFor(role: FirmRole): Command[] {
     group: "Navigation",
     label: route.id.startsWith("settings.") ? `Settings · ${route.title}` : route.title,
     icon: route.nav?.icon ?? Settings,
-    run: (r) => r.push(route.path),
+    run: (r, toHref) => r.push(toHref(route)),
   }));
   return [...actions, ...navigation];
 }
@@ -87,6 +88,7 @@ export function useCommandPalette() {
 
 export function CommandPalette() {
   const router = useRouter();
+  const toHref = useHref();
   const isOpen = useUiStore((s) => s.commandPaletteOpen);
   const close = useUiStore((s) => s.closeCommandPalette);
   const [query, setQuery] = useState("");
@@ -118,7 +120,7 @@ export function CommandPalette() {
         label: c.fullName,
         icon: UserCircle,
         keywords: c.primaryRole ?? "",
-        run: (r) => r.push(`/candidates/${c.id}`)
+        run: (r, toHref) => r.push(toHref("candidates.detail", { id: c.id }))
       });
     });
 
@@ -129,7 +131,7 @@ export function CommandPalette() {
         label: j.title,
         icon: Building2,
         keywords: j.company.name,
-        run: (r) => r.push(`/jobs/${j.id}`)
+        run: (r, toHref) => r.push(toHref("jobs.detail", { id: j.id }))
       });
     });
 
@@ -154,7 +156,7 @@ export function CommandPalette() {
 
   function run(command: Command) {
     close();
-    command.run(router);
+    command.run(router, toHref);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {

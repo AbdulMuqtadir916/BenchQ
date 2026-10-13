@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/lib/stores/session-store";
 import { navFor } from "@/lib/routes/registry";
+import { useHref } from "@/lib/routes/use-href";
 import { PageHeader } from "@/components/app/page-header";
 import { cn } from "@/lib/cn";
 
 /** Settings sections from the route registry: each role sees only the sections it may open. */
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const toHref = useHref();
   const role = useSession((s) => s.user.role);
   const sections = navFor(role, "settings");
 
@@ -24,7 +26,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             return (
               <Link
                 key={route.id}
-                href={route.path}
+                href={toHref(route)}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-left text-sm",

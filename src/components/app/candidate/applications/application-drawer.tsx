@@ -17,6 +17,7 @@ import { NEXT_STATUS, STATUS_LABEL, STATUS_TONE, isClosed, stageRank } from "@/c
 import { ResumeSent } from "@/components/app/applications/resume-sent";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
+import { useHref } from "@/lib/routes/use-href";
 
 const STEPS: ApplicationStatus[] = ["APPLIED", "RESPONSE", "SCREENING", "INTERVIEW", "OFFER", "PLACED"];
 
@@ -72,6 +73,7 @@ export function ApplicationDrawer({ ws, applicationId, canAct, actions, onMove, 
 }
 
 function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { app: Application; ws: CandidateWorkspace; canAct: boolean; actions: CandidateActions; onMove: (id: string, to: ApplicationStatus) => void; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
+  const toHref = useHref();
   const emails = ws.messages.filter((m) => m.applicationId === app.id);
   const suggestion = ws.suggestions.find((s) => s.applicationId === app.id);
   const next = NEXT_STATUS[app.status];
@@ -159,7 +161,7 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
       </div>
 
       <footer className="border-t border-[var(--color-border)] p-3">
-        <Link href={`/applications/${app.id}`} className="inline-flex items-center gap-1 text-sm text-[var(--color-primary-subtle-fg)] hover:underline">
+        <Link href={toHref("applications.detail", { id: app.id })} className="inline-flex items-center gap-1 text-sm text-[var(--color-primary-subtle-fg)] hover:underline">
           Open full application <ArrowUpRight size={13} aria-hidden />
         </Link>
       </footer>

@@ -21,6 +21,7 @@ import { Tag, type TagTone } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/format/timezone";
 import { CandidateStatusSelect, type CandidateStatusFilter } from "@/components/app/candidate-status-select";
+import { useHref } from "@/lib/routes/use-href";
 
 const STATUS_TONE: Record<CandidateStatus, TagTone> = {
   ON_BENCH: "blue",
@@ -74,6 +75,7 @@ type Row = {
 };
 
 export default function CandidatesPage() {
+  const toHref = useHref();
   const router = useRouter();
   const { user } = useSession();
   const candidatesQuery = useCandidates();
@@ -177,7 +179,7 @@ export default function CandidatesPage() {
         actions={
           canCreate ? (
             <Button asChild>
-              <Link href="/candidates/new"><Plus size={14} aria-hidden />New candidate</Link>
+              <Link href={toHref("candidates.new")}><Plus size={14} aria-hidden />New candidate</Link>
             </Button>
           ) : undefined
         }
@@ -201,7 +203,7 @@ export default function CandidatesPage() {
           getRowId={(r) => r.candidate.id}
           isLoading={candidatesQuery.isLoading}
           error={candidatesQuery.error as Error | null}
-          onRowClick={(r) => router.push(`/candidates/${r.candidate.id}`)}
+          onRowClick={(r) => router.push(toHref("candidates.detail", { id: r.candidate.id }))}
           searchPlaceholder="Search candidates…"
           storageKey="candidates-list"
           pagination

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUiStore } from "@/lib/stores/ui-store";
 import { useSession } from "@/lib/stores/session-store";
 import { shortcutsFor } from "@/lib/routes/registry";
+import { useHref } from "@/lib/routes/use-href";
 
 /**
  * Global keyboard system per docs/04 §1.3.
@@ -30,6 +31,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 export function useGlobalShortcuts() {
   const router = useRouter();
+  const toHref = useHref();
   const openCommandPalette = useUiStore((s) => s.openCommandPalette);
   const closeCommandPalette = useUiStore((s) => s.closeCommandPalette);
   const openHintSheet = useUiStore((s) => s.openHintSheet);
@@ -74,7 +76,7 @@ export function useGlobalShortcuts() {
         if (target) {
           e.preventDefault();
           gPressedAt.current = 0;
-          router.push(target.route.path);
+          router.push(toHref(target.route));
         }
       }
     }
@@ -83,6 +85,7 @@ export function useGlobalShortcuts() {
     return () => window.removeEventListener("keydown", onKey);
   }, [
     router,
+    toHref,
     role,
     openCommandPalette,
     closeCommandPalette,

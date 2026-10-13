@@ -13,6 +13,7 @@ import { Tag } from "@/components/ui/tag";
 import { FunnelBars } from "@/components/app/charts/funnel-bars";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { PageHeader } from "@/components/app/page-header";
+import { useHref } from "@/lib/routes/use-href";
 
 const EMPTY: never[] = [];
 
@@ -29,6 +30,7 @@ export function ManagerDashboard({ role = "MANAGER" }: { role?: "MANAGER" | "OWN
 }
 
 export function FloorContent() {
+  const toHref = useHref();
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
   const followupsQuery = useFollowups();
@@ -118,7 +120,7 @@ export function FloorContent() {
                     return (
                       <tr key={b.userId} className="hover:bg-[var(--color-surface-2)]">
                         <td className="px-4 py-3">
-                          <Link href={`/applications?bde=${b.userId}`} className="text-body-strong hover:underline">
+                          <Link href={toHref("applications", {}, { bde: b.userId })} className="text-body-strong hover:underline">
                             {b.userName}
                           </Link>
                         </td>
@@ -159,7 +161,7 @@ export function FloorContent() {
               <ul className="divide-y divide-[var(--color-border)]">
                 {atRisk.slice(0, 6).map(({ candidate, stats }) => (
                   <li key={candidate.id}>
-                    <Link href={`/candidates/${candidate.id}`} className="flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-[var(--color-surface-2)]">
+                    <Link href={toHref("candidates.detail", { id: candidate.id })} className="flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-[var(--color-surface-2)]">
                       <span className="text-sm text-[var(--color-text)] truncate">{candidate.fullName}</span>
                       <span className="flex items-center gap-2 text-caption text-[var(--color-text-3)]">
                         {stats.applicationsSubmitted} apps

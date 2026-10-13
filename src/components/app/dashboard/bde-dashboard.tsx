@@ -19,12 +19,14 @@ import { EmptyState } from "@/components/app/empty-state";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { PageHeader } from "@/components/app/page-header";
 import { Users } from "lucide-react";
+import { useHref } from "@/lib/routes/use-href";
 
 const EMPTY: never[] = [];
 
 const NIGHTLY_TARGET = 40;
 
 export function BdeDashboard() {
+  const toHref = useHref();
   const { user } = useSession();
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
@@ -77,7 +79,7 @@ export function BdeDashboard() {
         subtitle="Your queue, your candidates, what needs a nudge before the shift ends."
         actions={
           <Button asChild>
-            <Link href="/focus">
+            <Link href={toHref("focus")}>
               <Play size={14} aria-hidden />
               Start a run
             </Link>
@@ -104,7 +106,7 @@ export function BdeDashboard() {
         <Card className="p-0">
           <CardHeader className="p-4">
             <CardTitle>My candidates ({myCandidates.length})</CardTitle>
-            <Link href="/candidates" className="text-sm text-[var(--color-primary)] hover:underline">
+            <Link href={toHref("candidates")} className="text-sm text-[var(--color-primary)] hover:underline">
               View all
             </Link>
           </CardHeader>
@@ -119,7 +121,7 @@ export function BdeDashboard() {
                 const momentum = Math.min(5, Math.round(stats.responseRatePct / 20) + (stats.interviewsScheduled > 0 ? 1 : 0));
                 return (
                   <li key={c.id}>
-                    <Link href={`/candidates/${c.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]">
+                    <Link href={toHref("candidates.detail", { id: c.id })} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-body-strong truncate">{c.fullName}</span>
@@ -143,7 +145,7 @@ export function BdeDashboard() {
         <Card className="p-0">
           <CardHeader className="p-4">
             <CardTitle>Queue — top matches{topCandidate ? ` · ${topCandidate.fullName}` : ""}</CardTitle>
-            <Link href="/jobs" className="text-sm text-[var(--color-primary)] hover:underline">
+            <Link href={toHref("jobs")} className="text-sm text-[var(--color-primary)] hover:underline">
               All jobs
             </Link>
           </CardHeader>
@@ -156,7 +158,7 @@ export function BdeDashboard() {
               {queue.map(({ job, score }) => (
                 <li key={job.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]">
                   <div className="min-w-0 flex-1">
-                    <Link href={`/jobs/${job.id}`} className="text-body-strong truncate hover:underline block">
+                    <Link href={toHref("jobs.detail", { id: job.id })} className="text-body-strong truncate hover:underline block">
                       {job.title}
                     </Link>
                     <div className="flex items-center gap-2 text-caption text-[var(--color-text-3)]">
@@ -167,13 +169,13 @@ export function BdeDashboard() {
                   <MatchScore score={score} className="hidden sm:flex" />
                   <div className="flex shrink-0 items-center gap-1">
                     <Button asChild variant="ghost" size="icon" aria-label="Tailor resume">
-                      <Link href={`/jobs/${job.id}`}><Sparkles size={15} aria-hidden /></Link>
+                      <Link href={toHref("jobs.detail", { id: job.id })}><Sparkles size={15} aria-hidden /></Link>
                     </Button>
                     <Button asChild variant="ghost" size="icon" aria-label="Mark applied">
-                      <Link href={`/jobs/${job.id}`}><Send size={15} aria-hidden /></Link>
+                      <Link href={toHref("jobs.detail", { id: job.id })}><Send size={15} aria-hidden /></Link>
                     </Button>
                     <Button asChild variant="ghost" size="icon" aria-label="Open outreach">
-                      <Link href="/outreach"><Mail size={15} aria-hidden /></Link>
+                      <Link href={toHref("outreach")}><Mail size={15} aria-hidden /></Link>
                     </Button>
                   </div>
                 </li>
@@ -182,7 +184,7 @@ export function BdeDashboard() {
           )}
           <div className="border-t border-[var(--color-border)] p-3">
             <Button asChild variant="secondary" size="sm" className="w-full">
-              <Link href="/focus">
+              <Link href={toHref("focus")}>
                 Work the queue in focus mode
                 <ArrowRight size={14} aria-hidden />
               </Link>

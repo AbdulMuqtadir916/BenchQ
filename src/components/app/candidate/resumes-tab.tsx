@@ -9,9 +9,11 @@ import { ErrorState } from "@/components/app/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ResumeCard } from "@/components/app/resumes/resume-card";
+import { useHref } from "@/lib/routes/use-href";
 
 /** This candidate's resumes — same cards as the Resume Builder library, plus a quick start. */
 export function ResumesTab({ candidate, resumes, isLoading, error, onRetry, canAct }: { candidate: Candidate; resumes: Resume[]; isLoading: boolean; error: Error | null; onRetry: () => void; canAct: boolean }) {
+  const toHref = useHref();
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
   if (isLoading) {
     return (
@@ -21,7 +23,7 @@ export function ResumesTab({ candidate, resumes, isLoading, error, onRetry, canA
     );
   }
   if (resumes.length === 0) {
-    return <EmptyState icon={FileText} title="No resumes yet" description="Build one from the verified profile — it fills itself in." action={canAct ? <Button asChild><Link href="/resumes/new">Build resume</Link></Button> : undefined} />;
+    return <EmptyState icon={FileText} title="No resumes yet" description="Build one from the verified profile — it fills itself in." action={canAct ? <Button asChild><Link href={toHref("resumes.studio", { id: "new" })}>Build resume</Link></Button> : undefined} />;
   }
   const ordered = [...resumes].sort((a, b) => Number(b.isMaster) - Number(a.isMaster));
   const master = ordered.find((r) => r.isMaster);
@@ -37,7 +39,7 @@ export function ResumesTab({ candidate, resumes, isLoading, error, onRetry, canA
         {ordered.map((r) => <li key={r.id} className="flex"><ResumeCard resume={r} candidate={candidate} /></li>)}
         {canAct ? (
           <li className="flex">
-            <Link href="/resumes/new" className="flex w-full flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-strong)] p-6 text-center text-sm text-[var(--color-text-3)] transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)] hover:text-[var(--color-primary-subtle-fg)]">
+            <Link href={toHref("resumes.studio", { id: "new" })} className="flex w-full flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-strong)] p-6 text-center text-sm text-[var(--color-text-3)] transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)] hover:text-[var(--color-primary-subtle-fg)]">
               <FilePlus2 size={20} aria-hidden />
               <span className="text-body-strong">New resume</span>
               <span>Tailor a copy for a specific role</span>

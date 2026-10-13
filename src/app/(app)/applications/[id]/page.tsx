@@ -27,6 +27,7 @@ import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
 import { ResumeSent } from "@/components/app/applications/resume-sent";
 import { StatusTimeline } from "@/components/app/applications/status-timeline";
 import { NEXT_STATUS, STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
+import { useHref } from "@/lib/routes/use-href";
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -39,6 +40,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 
 /** One submission end to end: its status history, the resume the client received, and the recruiter's emails. */
 export default function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const toHref = useHref();
   const { id } = use(params);
   const { user } = useSession();
   const appQuery = useApplication(id);
@@ -60,13 +62,13 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
   if (appQuery.error || !app) {
     return (
       <div className="bq-page">
-        <Link href="/applications" className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]"><ArrowLeft size={14} aria-hidden /> Applications</Link>
+        <Link href={toHref("applications")} className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]"><ArrowLeft size={14} aria-hidden /> Applications</Link>
         <ErrorState variant="page" error={appQuery.error ?? new Error("Application not found.")} onRetry={() => void appQuery.refetch()} />
       </div>
     );
   }
   if (!isInScope(access, user.id, { ownerUserId: app.submittedByUserId })) {
-    return <NotFoundState title="Application not found" description="This application doesn't exist or isn't available to you." backHref="/applications" backLabel="Back to applications" />;
+    return <NotFoundState title="Application not found" description="This application doesn't exist or isn't available to you." backHref={toHref("applications")} backLabel="Back to applications" />;
   }
 
   const candidate = candidateQuery.data;
@@ -105,7 +107,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
             {!inboxQuery.data?.connection ? (
               <p className="px-4 py-4 text-sm text-[var(--color-text-3)]">
                 The candidate&apos;s inbox isn&apos;t connected.{" "}
-                {candidate ? <Link href={`/candidates/${candidate.id}?tab=inbox`} className="text-[var(--color-primary-subtle-fg)] hover:underline">Connect it</Link> : null} to see recruiter replies here.
+                {candidate ? <Link href={toHref("candidates.detail", { id: candidate.id }, { tab: "inbox" })} className="text-[var(--color-primary-subtle-fg)] hover:underline">Connect it</Link> : null} to see recruiter replies here.
               </p>
             ) : emails.length === 0 ? (
               <p className="px-4 py-4 text-sm text-[var(--color-text-3)]">No recruiter emails matched to this application yet.</p>
@@ -135,9 +137,9 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
           <Card>
             <h2 className="mb-3 text-h3 text-[var(--color-text)]">Details</h2>
             <dl className="space-y-3">
-              <Detail label="Candidate">{candidate ? <Link href={`/candidates/${candidate.id}`} className="hover:underline">{candidate.fullName}</Link> : "—"}</Detail>
+              <Detail label="Candidate">{candidate ? <Link href={toHref("candidates.detail", { id: candidate.id })} className="hover:underline">{candidate.fullName}</Link> : "—"}</Detail>
               <Detail label="Job">
-                <Link href={`/jobs/${app.jobId}`} className="hover:underline">{app.jobTitleAtApply}</Link>
+                <Link href={toHref("jobs.detail", { id: app.jobId })} className="hover:underline">{app.jobTitleAtApply}</Link>
                 <span className="block text-sm text-[var(--color-text-3)]">{app.companyNameAtApply}</span>
               </Detail>
               <Detail label="Match score">{candidate && job ? <MatchScore score={deriveMatchScore(candidate, job)} /> : "—"}</Detail>

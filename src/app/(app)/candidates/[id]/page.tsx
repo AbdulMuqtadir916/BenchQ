@@ -26,8 +26,10 @@ import { InboxTab } from "@/components/app/candidate/inbox/inbox-tab";
 import { ResumesTab } from "@/components/app/candidate/resumes-tab";
 import { ActivityTab } from "@/components/app/candidate/activity-tab";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
+import { useHref } from "@/lib/routes/use-href";
 
 export default function CandidateDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const toHref = useHref();
   const { id } = use(params);
   const { user } = useSession();
   const router = useRouter();
@@ -104,7 +106,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   }
   const candidate = ws.candidate;
   if (!isInScope(access, user.id, { assignedUserIds: candidate.assignedUserIds })) {
-    return <NotFoundState title="Candidate not found" description="This candidate doesn't exist or isn't available to you." backHref="/candidates" backLabel="Back to candidates" />;
+    return <NotFoundState title="Candidate not found" description="This candidate doesn't exist or isn't available to you." backHref={toHref("candidates")} backLabel="Back to candidates" />;
   }
   const resumes = ws.resumesQuery.data ?? [];
 
@@ -116,7 +118,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         ownerName={ws.ownerName}
         showOwner={user.role === "MANAGER" || user.role === "OWNER"}
         canAct={canAct}
-        resumeHref={`/resumes/${resumes[0]?.id ?? "new"}`}
+        resumeHref={toHref("resumes.studio", { id: resumes[0]?.id ?? "new" })}
         onFindJobs={actions.findJobs}
         onOpenTab={setTab}
       />
