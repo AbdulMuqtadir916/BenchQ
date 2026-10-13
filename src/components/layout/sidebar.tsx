@@ -3,61 +3,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Users,
-  Briefcase,
-  Send,
-  Mail,
-  Bell,
-  BarChart3,
-  ScrollText,
-  FileText,
-  Settings,
-  SwatchBook,
-  PanelLeftClose,
-  PanelLeftOpen,
-  type LucideIcon,
-} from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useSession, type FirmRole } from "@/lib/stores/session-store";
+import { useSession } from "@/lib/stores/session-store";
+import { navFor, type RouteDef } from "@/lib/routes/registry";
 import { EASE_OUT } from "@/lib/motion";
 
 /**
  * Frosted navigation: 208px expanded, 60px collapsed, 48px mobile rail.
- *
- * Permission rendering rule: "A control the current role cannot use is not
- * rendered at all." Every item below shows for all four roles EXCEPT the two
- * the docs table marks with a bare dash — Analytics is BDE-invisible,
- * Follow-ups is VIEWER-invisible. Everything else differs in *scope* within
- * the page (own/assigned/all, read-only), not in nav visibility.
+ * Items come from the route registry: a route the role can't open isn't rendered.
  */
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  badge?: number;
-  /** Omit to show for every role. */
-  hiddenFor?: FirmRole[];
-}
-
-const PRIMARY: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/candidates", label: "Candidates", icon: Users },
-  { href: "/jobs", label: "Jobs", icon: Briefcase },
-  { href: "/applications", label: "Applications", icon: Send },
-  { href: "/resumes", label: "Resume Builder", icon: FileText },
-  { href: "/outreach", label: "Outreach", icon: Mail },
-  { href: "/followups", label: "Follow-ups", icon: Bell, hiddenFor: ["VIEWER"] },
-  { href: "/analytics", label: "Analytics", icon: BarChart3, hiddenFor: ["BDE"] },
-  { href: "/ledger", label: "Ledger", icon: ScrollText },
-];
-
-const SECONDARY: NavItem[] = [
-  { href: "/design-system", label: "Design system", icon: SwatchBook },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
 
 export function Sidebar({
   collapsed,
@@ -68,8 +23,8 @@ export function Sidebar({
 }) {
   const role = useSession((s) => s.user.role);
   const reduceMotion = useReducedMotion() ?? false;
-  const primary = PRIMARY.filter((item) => !item.hiddenFor?.includes(role));
-  const secondary = SECONDARY.filter((item) => !item.hiddenFor?.includes(role));
+  const primary = navFor(role, "workspace");
+  const secondary = navFor(role, "preferences");
   const fade = { duration: reduceMotion ? 0 : 0.14, ease: EASE_OUT };
 
   // Width, padding and label opacity transition in CSS (.bq-sidebar in globals.css), so the
@@ -126,16 +81,16 @@ export function Sidebar({
       <nav className="flex-1 overflow-y-auto overflow-x-hidden">
         <p className="sidebar-label mb-2 px-2.5 text-caption text-[var(--color-text-3)]" aria-hidden={collapsed}>Workspace</p>
         <ul className="space-y-0.5">
-          {primary.map((item) => (
-            <SidebarItem key={item.href} item={item} />
+          {primary.map((route) => (
+            <SidebarItem key={route.id} route={route} />
           ))}
         </ul>
 
         <div className="my-5" />
         <p className="sidebar-label mb-2 px-2.5 text-caption text-[var(--color-text-3)]" aria-hidden={collapsed}>Preferences</p>
         <ul className="space-y-0.5">
-          {secondary.map((item) => (
-            <SidebarItem key={item.href} item={item} />
+          {secondary.map((route) => (
+            <SidebarItem key={route.id} route={route} />
           ))}
         </ul>
       </nav>
@@ -143,28 +98,22 @@ export function Sidebar({
   );
 }
 
-function SidebarItem({ item }: { item: NavItem }) {
+function SidebarItem({ route }: { route: RouteDef }) {
   const pathname = usePathname();
-  const Icon = item.icon;
-  const isActive =
-    pathname === item.href || pathname?.startsWith(item.href + "/");
+  const Icon = route.nav?.icon;
+  const isActive = pathname === route.path || pathname?.startsWith(route.path + "/");
 
   return (
     <li>
       <Link
-        href={item.href}
+        href={route.path}
         aria-current={isActive ? "page" : undefined}
-        title={item.label}
-        aria-label={item.label}
+        title={route.title}
+        aria-label={route.title}
         className="bq-nav-item text-body"
       >
-        <Icon size={16} aria-hidden="true" className="shrink-0" />
-        <span className="sidebar-label flex-1 truncate">{item.label}</span>
-        {item.badge && item.badge > 0 ? (
-          <span className="sidebar-label tabular text-caption font-[600] rounded-[var(--radius-full)] bg-[var(--color-danger-fg)] text-white px-1.5 min-w-5 h-5 inline-flex items-center justify-center">
-            {item.badge > 99 ? "99+" : item.badge}
-          </span>
-        ) : null}
+        {Icon ? <Icon size={16} aria-hidden="true" className="shrink-0" /> : null}
+        <span className="sidebar-label flex-1 truncate">{route.title}</span>
       </Link>
     </li>
   );

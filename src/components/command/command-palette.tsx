@@ -4,15 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
-  LayoutDashboard,
-  Users,
-  Briefcase,
-  Send,
-  Mail,
-  Bell,
-  BarChart3,
-  ScrollText,
-  FileText,
   Settings,
   Plus,
   Zap,
@@ -22,6 +13,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useUiStore } from "@/lib/stores/ui-store";
+import { useSession, type FirmRole } from "@/lib/stores/session-store";
+import { canOpen, paletteRoutesFor, routeById } from "@/lib/routes/registry";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { cn } from "@/lib/cn";
@@ -38,6 +31,8 @@ interface Command {
   group: "Actions" | "Navigation" | "Candidates" | "Jobs";
   icon: LucideIcon;
   keywords?: string;
+  /** Registry id of the page this command opens; hidden from roles that can't open it. */
+  routeId?: string;
   run: (router: ReturnType<typeof useRouter>) => void;
 }
 
@@ -48,6 +43,7 @@ const STATIC_COMMANDS: Command[] = [
     label: "New candidate",
     icon: Plus,
     keywords: "add create",
+    routeId: "candidates.new",
     run: (r) => r.push("/candidates/new"),
   },
   {
@@ -56,6 +52,7 @@ const STATIC_COMMANDS: Command[] = [
     label: "Capture job",
     icon: Plus,
     keywords: "add paste",
+    routeId: "jobs.capture",
     run: (r) => r.push("/jobs/capture"),
   },
   {
@@ -64,19 +61,23 @@ const STATIC_COMMANDS: Command[] = [
     label: "Start a run — focus mode",
     icon: Zap,
     keywords: "queue run",
+    routeId: "focus",
     run: (r) => r.push("/focus"),
   },
-  { id: "nav-dashboard", group: "Navigation", label: "Dashboard", icon: LayoutDashboard, run: (r) => r.push("/dashboard") },
-  { id: "nav-candidates", group: "Navigation", label: "Candidates", icon: Users, run: (r) => r.push("/candidates") },
-  { id: "nav-jobs", group: "Navigation", label: "Jobs", icon: Briefcase, run: (r) => r.push("/jobs") },
-  { id: "nav-applications", group: "Navigation", label: "Applications", icon: Send, run: (r) => r.push("/applications") },
-  { id: "nav-resumes", group: "Navigation", label: "Resume Builder", icon: FileText, run: (r) => r.push("/resumes") },
-  { id: "nav-outreach", group: "Navigation", label: "Outreach", icon: Mail, run: (r) => r.push("/outreach") },
-  { id: "nav-followups", group: "Navigation", label: "Follow-ups", icon: Bell, run: (r) => r.push("/followups") },
-  { id: "nav-analytics", group: "Navigation", label: "Analytics", icon: BarChart3, run: (r) => r.push("/analytics") },
-  { id: "nav-ledger", group: "Navigation", label: "Ledger", icon: ScrollText, run: (r) => r.push("/ledger") },
-  { id: "nav-settings", group: "Navigation", label: "Settings", icon: Settings, run: (r) => r.push("/settings") },
 ];
+
+/** Actions the role can open plus one Navigation entry per palette route in the registry. */
+function staticCommandsFor(role: FirmRole): Command[] {
+  const actions = STATIC_COMMANDS.filter((command) => !command.routeId || canOpen(routeById(command.routeId), role));
+  const navigation = paletteRoutesFor(role).map<Command>((route) => ({
+    id: `nav-${route.id}`,
+    group: "Navigation",
+    label: route.id.startsWith("settings.") ? `Settings · ${route.title}` : route.title,
+    icon: route.nav?.icon ?? Settings,
+    run: (r) => r.push(route.path),
+  }));
+  return [...actions, ...navigation];
+}
 
 export function useCommandPalette() {
   const open = useUiStore((s) => s.openCommandPalette);
@@ -105,6 +106,7 @@ export function CommandPalette() {
   const candidatesQuery = useCandidates();
   const jobsQuery = useJobs();
   const reduceMotion = useReducedMotion() ?? false;
+  const role = useSession((s) => s.user.role);
 
   const results = useMemo(() => {
     const dynamicCommands: Command[] = [];
@@ -131,14 +133,14 @@ export function CommandPalette() {
       });
     });
 
-    const allCommands = [...STATIC_COMMANDS, ...dynamicCommands];
+    const allCommands = [...staticCommandsFor(role), ...dynamicCommands];
     
     const q = query.trim().toLowerCase();
     if (!q) return allCommands.slice(0, 50); // limit empty state
     return allCommands.filter((c) =>
       `${c.label} ${c.keywords ?? ""}`.toLowerCase().includes(q),
     ).slice(0, 50);
-  }, [query, candidatesQuery.data, jobsQuery.data]);
+  }, [query, role, candidatesQuery.data, jobsQuery.data]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, Command[]> = {};

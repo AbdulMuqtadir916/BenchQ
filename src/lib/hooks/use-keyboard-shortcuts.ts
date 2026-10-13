@@ -3,12 +3,14 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUiStore } from "@/lib/stores/ui-store";
+import { useSession } from "@/lib/stores/session-store";
+import { shortcutsFor } from "@/lib/routes/registry";
 
 /**
  * Global keyboard system per docs/04 §1.3.
  *
  *   ⌘K / Ctrl+K   command palette
- *   g d/c/j/a/f   navigate (dashboard, candidates, jobs, applications, follow-ups)
+ *   g <key>       navigate — keys come from the route registry, only for routes the role can open
  *   ?             open keyboard hint sheet
  *   Esc           close palette / hint sheet
  *
@@ -32,6 +34,7 @@ export function useGlobalShortcuts() {
   const closeCommandPalette = useUiStore((s) => s.closeCommandPalette);
   const openHintSheet = useUiStore((s) => s.openHintSheet);
   const closeHintSheet = useUiStore((s) => s.closeHintSheet);
+  const role = useSession((s) => s.user.role);
 
   const gPressedAt = useRef<number>(0);
 
@@ -67,18 +70,11 @@ export function useGlobalShortcuts() {
       }
 
       if (now - gPressedAt.current < G_PREFIX_MS) {
-        const map: Record<string, string> = {
-          d: "/dashboard",
-          c: "/candidates",
-          j: "/jobs",
-          a: "/applications",
-          f: "/followups",
-        };
-        const href = map[e.key.toLowerCase()];
-        if (href) {
+        const target = shortcutsFor(role).find((shortcut) => shortcut.key === e.key.toLowerCase());
+        if (target) {
           e.preventDefault();
           gPressedAt.current = 0;
-          router.push(href);
+          router.push(target.route.path);
         }
       }
     }
@@ -87,6 +83,7 @@ export function useGlobalShortcuts() {
     return () => window.removeEventListener("keydown", onKey);
   }, [
     router,
+    role,
     openCommandPalette,
     closeCommandPalette,
     openHintSheet,
