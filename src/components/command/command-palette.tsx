@@ -13,7 +13,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useUiStore } from "@/lib/stores/ui-store";
-import { useSession, type FirmRole } from "@/lib/stores/session-store";
+import { useSession } from "@/lib/stores/session-store";
+import type { FirmRole } from "@/lib/schemas/enums";
 import { canOpen, paletteRoutesFor, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { useCandidates } from "@/lib/hooks/use-candidates";

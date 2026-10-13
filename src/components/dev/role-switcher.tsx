@@ -3,7 +3,9 @@
 import { useState, useRef, useEffect, useId } from "react";
 import { BriefcaseBusiness, ChevronDown, Crown, Eye, ShieldUser, UsersRound, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useSession, type FirmRole } from "@/lib/stores/session-store";
+import { useSession } from "@/lib/stores/session-store";
+import type { FirmRole } from "@/lib/schemas/enums";
+import { ROLES } from "@/lib/routes/registry";
 import { cn } from "@/lib/cn";
 import { CONTENT_EXIT, POPOVER_TRANSITION } from "@/lib/motion";
 
@@ -13,7 +15,6 @@ import { CONTENT_EXIT, POPOVER_TRANSITION } from "@/lib/motion";
  * render correctly.
  */
 
-const ROLES: FirmRole[] = ["OWNER", "MANAGER", "BDE", "VIEWER"];
 const ROLE_DETAILS: Record<FirmRole, { label: string; description: string }> = {
   OWNER: { label: "Owner", description: "Business overview" },
   MANAGER: { label: "Manager", description: "Team performance" },

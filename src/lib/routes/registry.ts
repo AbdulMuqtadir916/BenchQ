@@ -14,7 +14,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import type { FirmRole } from "@/lib/stores/session-store";
+import { FirmRole } from "@/lib/schemas/enums";
 
 /**
  * The single list of routes and who may open them (docs/07-ROUTES-AND-RBAC.md §2).
@@ -41,7 +41,7 @@ export interface RouteDef {
   devOnly?: boolean;
 }
 
-export const ROLES: readonly FirmRole[] = ["OWNER", "MANAGER", "BDE", "VIEWER"];
+export const ROLES: readonly FirmRole[] = FirmRole.options;
 
 const everyone = (access: Access): RoleAccess => ({ OWNER: access, MANAGER: access, BDE: access, VIEWER: access });
 const roles = (OWNER: Access, MANAGER: Access, BDE: Access, VIEWER: Access): RoleAccess => ({ OWNER, MANAGER, BDE, VIEWER });
