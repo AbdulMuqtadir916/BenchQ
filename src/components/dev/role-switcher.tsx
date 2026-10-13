@@ -10,7 +10,8 @@ import { cn } from "@/lib/cn";
 import { CONTENT_EXIT, POPOVER_TRANSITION } from "@/lib/motion";
 
 /**
- * RoleSwitcher — dev-only, behind NEXT_PUBLIC_SHOW_ROLE_SWITCHER.
+ * RoleSwitcher — dev-only. Rendered only when NEXT_PUBLIC_SHOW_DEV_TOOLS="true"; off by default,
+ * so it never ships in a production build unless someone sets the flag on purpose.
  * docs/01 §7: use it constantly to verify that role-dependent surfaces
  * render correctly.
  */
@@ -30,7 +31,7 @@ const ROLE_ICONS: Record<FirmRole, LucideIcon> = {
 };
 
 export function RoleSwitcher({ align = "end" }: { align?: "start" | "end" }) {
-  const show = process.env.NEXT_PUBLIC_SHOW_ROLE_SWITCHER !== "false";
+  const show = process.env.NEXT_PUBLIC_SHOW_DEV_TOOLS === "true";
   const role = useSession((s) => s.user.role);
   const setRole = useSession((s) => s.setRole);
   const [open, setOpen] = useState(false);
