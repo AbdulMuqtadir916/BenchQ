@@ -3,7 +3,7 @@
 Visual specification update: `../design.md` v3 is authoritative. Existing shared
 components now use 13px body text, 32px controls, 36px default rows, fine neutral
 borders, contact shadows, gradient actions, and colored monospace tags. The live
-`/design-system` route is the implemented specimen; the inventory below also
+`/dev/design-system` route is the implemented specimen; the inventory below also
 contains future components and is not a statement that all are implemented.
 
 **Project:** BenchQ · frontend only

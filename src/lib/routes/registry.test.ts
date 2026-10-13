@@ -169,8 +169,14 @@ describe("access table (docs/07 §2.2)", () => {
     }
   });
 
-  it("marks dev routes dev-only", () => {
-    for (const id of DEV_ROUTES) expect(routeById(id).devOnly).toBe(true);
+  it("marks dev routes dev-only, under /dev, and closed to every role outside development", () => {
+    for (const id of DEV_ROUTES) {
+      const route = routeById(id);
+      expect(route.devOnly).toBe(true);
+      expect(route.path.startsWith("/dev/")).toBe(true);
+      // vitest runs with NODE_ENV=test and no NEXT_PUBLIC_SHOW_DEV_ROUTES
+      for (const role of ROLES) expect(canOpen(route, role)).toBe(false);
+    }
   });
 });
 

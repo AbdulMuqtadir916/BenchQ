@@ -2,7 +2,7 @@
 
 ## Current design system
 
-Run `pnpm dev` and open `http://localhost:3000/design-system`.
+Run `pnpm dev` and open `http://localhost:3000/dev/design-system`.
 The v3 system uses a frosted collapsible shell, rounded white workspace, compact
 tables/forms, raised gradient primary buttons, and colored monospace tags.
 Overview, Foundations, Patterns, and Interactive lab show the working components.

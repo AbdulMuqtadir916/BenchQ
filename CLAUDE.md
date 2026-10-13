@@ -4,7 +4,7 @@ Instructions for Claude Code working in this repository. **Read this before any 
 
 Visual baseline: `design.md` v3 (Sept 23, 2026) supersedes earlier visual specs — compact frosted
 shell, white workspace, monospace tags, subtly raised gradient primary buttons, as shown at
-`/design-system` (moving to `/dev/design-system` in 07 Phase A2).
+`/dev/design-system`.
 
 ---
 

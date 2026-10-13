@@ -72,7 +72,7 @@ const ROUTE_DEFS = [
   { id: "focus", path: "/focus", title: "Focus mode", shell: "focus", access: roles("full", "full", "full", "none") },
 
   // Preferences
-  { id: "design-system", path: "/design-system", title: "Design system", shell: "app", access: everyone("full"), nav: { section: "preferences", order: 1, icon: SwatchBook }, devOnly: true },
+  { id: "design-system", path: "/dev/design-system", title: "Design system", shell: "app", access: everyone("full"), nav: { section: "preferences", order: 1, icon: SwatchBook }, devOnly: true },
   { id: "settings", path: "/settings", title: "Settings", shell: "app", access: everyone("full"), nav: { section: "preferences", order: 2, icon: Settings }, palette: true },
   { id: "settings.firm", path: "/settings/firm", title: "Firm", shell: "app", access: roles("full", "none", "none", "none"), nav: { section: "settings", order: 1, icon: Building2 }, palette: true },
   { id: "settings.team", path: "/settings/team", title: "Team", shell: "app", access: roles("full", "full", "none", "none"), nav: { section: "settings", order: 2, icon: Users }, palette: true },
