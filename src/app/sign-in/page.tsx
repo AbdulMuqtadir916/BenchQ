@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,10 @@ export default function SignInPage() {
             {loading ? "Signing in..." : "Sign in"}
           </Button>
         </form>
+
+        <p className="mt-6 text-center text-caption text-[var(--color-text-3)]">
+          New to BenchQ? <Link href="/sign-up" className="text-[var(--color-primary)]">Create an account</Link>
+        </p>
       </Card>
     </PageTransition>
   );
