@@ -31,6 +31,14 @@ describe("route registry", () => {
     expect(registered).toEqual(pages);
   });
 
+  it("keeps every URL when pages sit in route groups ((workspace), (manage), (app), (studio))", () => {
+    const pages = pagePaths();
+    expect(pages.some((path) => path.includes("(") || path.includes(")"))).toBe(false);
+    for (const url of ["/dashboard", "/candidates", "/candidates/[id]", "/jobs", "/applications", "/resumes", "/outreach", "/followups", "/analytics", "/ledger", "/settings/team"]) {
+      expect(pages, url).toContain(url);
+    }
+  });
+
   it("has unique ids and paths", () => {
     expect(new Set(ROUTES.map((r) => r.id)).size).toBe(ROUTES.length);
     expect(new Set(ROUTES.map((r) => r.path)).size).toBe(ROUTES.length);
