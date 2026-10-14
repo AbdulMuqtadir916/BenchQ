@@ -282,14 +282,21 @@ error / loading screens, record scope → not-found, settings split, `/sign-up`,
       `shortcutsFor`)
 - [x] Every route × role **access value** matches the §2.2 table (22 routes × 4 roles in
       `registry.test.ts`, mutation-checked)
-- [ ] For every route × role, a direct URL **renders** the page, a read-only page, or the Forbidden
-      screen as the table says. Checked for **BDE only**, from the server-rendered HTML of a
-      production build: Forbidden on `/analytics`, `/settings/{firm,team,templates}`; none on the 13
-      routes BDE may open. OWNER, MANAGER and VIEWER renders are **not** checked (the browser tool
-      could not reach a local server, so the RoleSwitcher could not be driven)
-- [ ] A BDE opening an unassigned candidate / someone else's application → not-found. The code path
-      exists (`isInScope` in `candidates/[id]`, `applications/[id]`, `open-resume.tsx`) and
-      `isInScope` is unit-tested; the screens themselves were **not** run
+- [x] For every route × role, a direct URL **renders** the page, a read-only page, or the Forbidden
+      screen as the table says. Checked in Chrome against `pnpm dev`, switching role with the real
+      RoleSwitcher and navigating client-side (no reload): OWNER, MANAGER, VIEWER and BDE × the 22
+      firm routes plus `/dev/design-system` and sample record ids — all as the table says
+      (Forbidden on exactly the "—" cells; `/welcome` and `/settings` redirect to the landing /
+      first allowed section; `/settings` → `firm` for OWNER, `team` for MANAGER, `preferences` for
+      BDE and VIEWER). Read-only: for VIEWER the actions are absent where they are buttons or
+      links (`New candidate`, `Capture job`, `Upload resume` / `New resume`, `Send email`, and on
+      detail pages `Find jobs` / `Build resume` / `Edit`, `Tailor` / `Mark applied` / `Save`,
+      `Move to …`). **Not checked:** that the application board's drag-and-drop is disabled for
+      VIEWER (it is a prop, not a button)
+- [x] A BDE opening an unassigned candidate / someone else's application → not-found. Checked in
+      Chrome as BDE (user `user_adnan`): `/candidates/cand_09`, `/applications/app_009` and
+      `/resumes/resume_cand_09_master` show the not-found state, while `cand_01`, `app_001` and
+      `resume_cand_01_master` render. OWNER, MANAGER and VIEWER open all of them
 - [x] Unknown URL → not-found (HTTP 404 on `/nope`, `/candidates/cand_01/extra`, `/admin`,
       `/design-system`)
 - [ ] A thrown error → error card with retry (not exercised)
@@ -323,7 +330,7 @@ switcher hidden in `pnpm build && pnpm start`; Phase A exit criteria ticked; che
 | No path literals outside `src/lib/routes/` | Met. 60 literals replaced; `no-path-literals.test.ts` enforces it (mutation-checked). `[firm]` is not assumed anywhere |
 | Table test covers every firm route × role | Met. 22 routes × 4 roles, plus `onDenied`, public and dev routes; fails if a route has no row |
 | Switcher hidden in `pnpm build && pnpm start` | Met, with a positive control (absent from HTML and chunks when `NEXT_PUBLIC_SHOW_DEV_TOOLS` is unset; present when `true`) |
-| Phase A exit criteria ticked | Partly. Ticked only where checked (see Phase A) |
+| Phase A exit criteria ticked | Partly. Role × route renders, record scope, unknown URL and the checks are ticked; the error card, both themes and the three widths are not (see Phase A) |
 | Checks green | Met. typecheck, lint, test (54), build all exit 0 |
 
 Notes for Phase T: the active-link checks in `sidebar.tsx` and `settings/layout.tsx` still compare
