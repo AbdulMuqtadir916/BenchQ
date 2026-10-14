@@ -1,9 +1,9 @@
 "use client";
 
 import { useSession } from "@/lib/stores/session-store";
-import { BdeDashboard } from "@/components/app/dashboard/bde-dashboard";
-import { ManagerDashboard } from "@/components/app/dashboard/manager-dashboard";
-import { OwnerDashboard } from "@/components/app/dashboard/owner-dashboard";
+import { BdeDashboard } from "@/features/dashboard/bde-dashboard";
+import { ManagerDashboard } from "@/features/dashboard/manager-dashboard";
+import { OwnerDashboard } from "@/features/dashboard/owner-dashboard";
 
 /**
  * /dashboard — one route, four compositions by role (docs/04 §3).
