@@ -139,7 +139,7 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["ledger", "full", "full", "own", "read"],
   ["settings", "full", "full", "full", "full"], // index: redirects to the first allowed section
   ["settings.firm", "full", "none", "none", "none"],
-  ["settings.team", "full", "full", "none", "none"],
+  ["settings.team", "full", "full", "none", "none"], // MANAGER: openable; read-only + assign is a Phase C can() rule (Q15)
   ["settings.templates", "full", "full", "none", "none"],
   ["settings.preferences", "full", "full", "full", "full"],
 ];
