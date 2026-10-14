@@ -50,7 +50,6 @@ const ROUTE_DEFS = [
   // Auth and onboarding
   { id: "root", path: "/", title: "BenchQ", shell: "auth", access: "public" },
   { id: "sign-in", path: "/sign-in", title: "Sign in", shell: "auth", access: "public" },
-  { id: "sign-up", path: "/sign-up", title: "Create account", shell: "auth", access: "public" },
   { id: "welcome", path: "/welcome", title: "Welcome", shell: "auth", access: roles("full", "none", "none", "none"), onDenied: "landing" },
 
   // Workspace

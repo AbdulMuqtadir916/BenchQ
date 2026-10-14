@@ -27,7 +27,7 @@ All decisions live here. Change a decision here first, then the sections below.
 | Q8 | Where the firm lives | **In the URL**: `/[firm]/…`, where `[firm]` is `Firm.slug` | 2026-10-13 |
 | Q9 | Users in several firms | **No.** A firm user belongs to exactly one firm. No firm picker | 2026-10-13 |
 | Q10 | Super Admin access to a firm's workspace | **Read-only support view**: opens the firm's real screens with every action hidden, a persistent banner, and audit entries the firm can see. No impersonation, no writes | 2026-10-13 |
-| Q11 | Public sign-up | **Invite-only.** Firms are created by Super Admin in `/admin/firms/new`; the owner and every member join through `/invite/[token]`; `/sign-up` is removed (Phase T) | 2026-10-14 |
+| Q11 | Public sign-up | **Invite-only.** Firms are created by Super Admin in `/admin/firms/new`; the owner and every member join through `/invite/[token]`; `/sign-up` is removed (done in T0, 2026-10-14) | 2026-10-14 |
 | Q12 | Who sets a firm's slug | Super Admin, at firm creation; editable only by Super Admin. Reserved words (§2.4) are rejected | 2026-10-13 |
 | Q13 | Company records | Global reference data (not firm-scoped). Every other business record is firm-scoped | 2026-10-13 |
 | Q14 | Role-specific routes | **No role in the URL.** A URL names the thing (`/acme/candidates`), the same for every role. Readability comes from (a) route groups by purpose — `(workspace)` for daily work, `(manage)` for oversight — which don't change URLs, (b) one view file per role where a screen really differs (`src/features/<area>/<role>-<view>.tsx`), and (c) one permission table (`permissions.ts`). See §6 | 2026-10-14 |
@@ -375,7 +375,7 @@ Needs §7 contracts signed off first.
 | T4 | Session store → `Principal`; dev principal switcher lists every fixture principal |
 | T5 | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it |
 | T6 | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path |
-| T6b | Remove `/sign-up` and its link from `/sign-in` (Q11) |
+| T6b | ~~Remove `/sign-up` and its link from `/sign-in` (Q11)~~ — done early in T0 |
 | T7 | `/` landing per principal; `/[firm]/welcome` for OWNER first run |
 | T8 | Tests: a firm-A principal can't read firm-B data through any hook (mock layer); slug → firm resolution; §2.5 table |
 

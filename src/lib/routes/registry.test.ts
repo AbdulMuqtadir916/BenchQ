@@ -137,7 +137,7 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
 ];
 
 /** Routes outside the firm table: public pages, and the dev-only design system (docs/07 §2.1, §2.4). */
-const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in", "sign-up"];
+const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in"];
 const DEV_ROUTES: readonly RouteId[] = ["design-system"];
 
 describe("access table (docs/07 §2.2)", () => {
@@ -193,5 +193,14 @@ describe("accessForPath (fails closed)", () => {
     expect(accessForPath("/analytics?range=7d", "BDE")).toEqual({ route: routeById("analytics"), access: "none" });
     expect(accessForPath("/candidates/cand_01#notes", "BDE").access).toBe("assigned");
     expect(accessForPath("/resumes/new", "VIEWER").access).toBe("read");
+  });
+});
+
+describe("no public sign-up (docs/07 Q11)", () => {
+  it("has no /sign-up route: unregistered, closed to every role, and no page for it", () => {
+    expect(matchRoute("/sign-up")).toBeNull();
+    expect(ROUTES.some((route) => route.id === "sign-up" || route.path === "/sign-up")).toBe(false);
+    for (const role of ROLES) expect(accessForPath("/sign-up", role)).toEqual({ route: null, access: "none" });
+    expect(pagePaths()).not.toContain("/sign-up");
   });
 });
