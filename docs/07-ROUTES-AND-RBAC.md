@@ -1,7 +1,7 @@
 # 07 — Routes, tenancy and RBAC (production)
 
 **Project:** BenchQ · **Version:** 2.0 (2026-10-13) — supersedes v1 (2026-10-06)
-**Status:** Phase A done and committed (`feat/routes`) · Phase A2 done (`feat/routes-a2`) · next: **Phase T**, which needs the §7 sign-off
+**Status:** Phase A done and committed (`feat/routes`) · Phase A2 done (`feat/routes-a2`) · Q11, Q14, Q15 decided (2026-10-14) · next: **Phase T**, which needs the §7 sign-off (changes requested 2026-10-14)
 **Facts about the code** come from `docs/CURRENT_STATE.md` (2026-10-13). If the code has moved on,
 trust the code and update this file.
 
@@ -27,9 +27,11 @@ All decisions live here. Change a decision here first, then the sections below.
 | Q8 | Where the firm lives | **In the URL**: `/[firm]/…`, where `[firm]` is `Firm.slug` | 2026-10-13 |
 | Q9 | Users in several firms | **No.** A firm user belongs to exactly one firm. No firm picker | 2026-10-13 |
 | Q10 | Super Admin access to a firm's workspace | **Read-only support view**: opens the firm's real screens with every action hidden, a persistent banner, and audit entries the firm can see. No impersonation, no writes | 2026-10-13 |
-| Q11 | Public sign-up | **Open — product owner.** Recommendation: invite-only for v1. Firms are created by Super Admin; owners and members join through `/invite/[token]`; `/sign-up` is removed | — |
+| Q11 | Public sign-up | **Invite-only.** Firms are created by Super Admin in `/admin/firms/new`; the owner and every member join through `/invite/[token]`; `/sign-up` is removed (Phase T) | 2026-10-14 |
 | Q12 | Who sets a firm's slug | Super Admin, at firm creation; editable only by Super Admin. Reserved words (§2.4) are rejected | 2026-10-13 |
 | Q13 | Company records | Global reference data (not firm-scoped). Every other business record is firm-scoped | 2026-10-13 |
+| Q14 | Role-specific routes | **No role in the URL.** A URL names the thing (`/acme/candidates`), the same for every role. Readability comes from (a) route groups by purpose — `(workspace)` for daily work, `(manage)` for oversight — which don't change URLs, (b) one view file per role where a screen really differs (`src/features/<area>/<role>-<view>.tsx`), and (c) one permission table (`permissions.ts`). See §6 | 2026-10-14 |
+| Q15 | Who manages firm members | **OWNER only** invites, removes, deactivates members and changes roles. MANAGER sees the team read-only and **assigns candidates to BDEs**. BDE and VIEWER don't see the team page | 2026-10-14 |
 
 ---
 
@@ -68,7 +70,7 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | `/forgot-password` | Request a reset link | **new**; always shows "if the email exists, we sent a link" |
 | `/reset-password/[token]` | Set a new password | **new**; invalid/expired token state |
 | `/invite/[token]` | Accept an invite: shows firm name and offered role, set name + password | **new** (open in v1 Phase A); invalid, expired, already-accepted states |
-| `/sign-up` | — | **Removed if Q11 = invite-only** |
+| `/sign-up` | — | **Removed** (Q11 invite-only); the sign-in page's sign-up link goes too |
 
 ### 2.2 Firm tier — `/[firm]/…`
 
@@ -91,7 +93,7 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | `/[firm]/ledger` | app | full | full | own | read | read |
 | `/[firm]/settings` | app | → first allowed | → first allowed | → first allowed | → first allowed | → `firm` |
 | `/[firm]/settings/firm` | app | full | — | — | — | read |
-| `/[firm]/settings/team` | app | full | full | — | — | read |
+| `/[firm]/settings/team` | app | full | read + assign (Q15) | — | — | read |
 | `/[firm]/settings/templates` | app | full | full | — | — | read |
 | `/[firm]/settings/preferences` | app | full | full | full | full | — (personal) |
 | `/[firm]/design-system` | — | moves to `/dev/design-system` (§2.4), dev builds only | | | | |
@@ -237,14 +239,34 @@ src/app/
     page.tsx · firms/… · plans · audit · system · team
   [firm]/
     layout.tsx                     → resolve slug, membership, status, support banner (§2.5)
-    welcome/
-    (app)/  dashboard · candidates · jobs · applications · resumes · outreach · followups
-            analytics · ledger · settings/… · @modal/…
+    welcome/                       → OWNER first run
+    (app)/                         → app shell (sidebar + topbar); groups below don't change URLs
+      (workspace)/                 → daily work, every role
+        dashboard · candidates · jobs · applications · resumes · outreach · followups
+      (manage)/                    → oversight, OWNER + MANAGER (+ VIEWER read)
+        analytics · ledger
+      settings/                    → sections gated per §2.2
+        firm (OWNER) · team (OWNER manages, MANAGER read + assign) · templates · preferences
+      @modal/                      → intercepts for candidates/new, jobs/capture
     (studio)/resumes/[id]
     focus/
   dev/design-system/
   not-found.tsx · global-error.tsx
+
+src/features/                      → screen logic, one folder per area
+  dashboard/  owner-dashboard.tsx · manager-dashboard.tsx · bde-dashboard.tsx · viewer-dashboard.tsx
+  team/       team-table.tsx · invite-member-dialog.tsx (OWNER) · assign-candidates-panel.tsx (OWNER, MANAGER)
+  …           other areas get role files only when a screen really differs by role
+
+src/lib/auth/permissions.ts        → the one role × action table (Phase C)
 ```
+
+Rules (Q14):
+- `page.tsx` stays thin: read params, pick the view, render. Role → view choice is the only
+  branching allowed in a page, and it goes through `can()` / a principal helper, not `role ===`.
+- A role file exists only when the screen's **layout** differs by role (today: dashboard).
+  Differences in which buttons show are handled by `<Can>` inside one shared view, not by copies.
+- Group placement is documentation for humans; access is still decided only by the registry.
 
 Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 
@@ -256,6 +278,7 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 |---|---|---|---|
 | **A** | Route foundation — registry, guards, access/error screens, settings split | — | Done (committed) |
 | **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod | A | Done (A2.2–A2.9; see result below) |
+| **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2 | In progress (`feat/routes-t0`) |
 | **T** | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys | A2 + §7 sign-off | Planned |
 | **P** | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view | T | Planned |
 | **C** | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks | T, P | Planned |
@@ -351,7 +374,8 @@ Needs §7 contracts signed off first.
 | T3 | Fixtures: add `firmId` to every firm-scoped fixture; add a **second firm** (small: 3 users, 5 candidates) and one platform admin, so isolation is testable |
 | T4 | Session store → `Principal`; dev principal switcher lists every fixture principal |
 | T5 | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it |
-| T6 | Move firm routes under `src/app/[firm]/` (§6); firm layout implements §2.5; registry paths gain `[firm]` |
+| T6 | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path |
+| T6b | Remove `/sign-up` and its link from `/sign-in` (Q11) |
 | T7 | `/` landing per principal; `/[firm]/welcome` for OWNER first run |
 | T8 | Tests: a firm-A principal can't read firm-B data through any hook (mock layer); slug → firm resolution; §2.5 table |
 
@@ -387,6 +411,9 @@ As v1 Phase C, typed on `Principal`:
   matrix as a table at the top. Platform actions added: `firm.create`, `firm.edit`,
   `firm.suspend`, `firm.viewWorkspace`, `plan.edit`, `invite.resend`, `invite.revoke`,
   `platformTeam.manage`. Support view → every firm action `false`.
+- Firm team actions (Q15): `member.invite`, `member.remove`, `member.changeRole`,
+  `member.deactivate` → **OWNER only**; `candidate.assign` (assign / unassign BDEs on a
+  candidate) → OWNER and MANAGER; `team.view` → OWNER and MANAGER.
 - `useCan`, `<Can>`; scope helpers `scopeCandidates`, `scopeApplications`, `scopeLedger`,
   `scopeFollowups`.
 - Replace the **11** `role !== "VIEWER"` checks and **8** BDE filters (file:line list in
