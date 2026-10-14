@@ -153,6 +153,18 @@ export function accessForPath(pathname: string, role: FirmRole): { route: RouteD
   return { route, access: route ? accessFor(route, role) : "none" };
 }
 
+/**
+ * Is `routeId` the page at `pathname`, or an ancestor of it? Matches on route ids, never on raw
+ * paths, so it keeps working when paths gain `[firm]` (docs/07 Phase T). A dotted id is a child of
+ * the id before its last dot: `candidates.detail` is under `candidates`, `settings.team` under
+ * `settings` (registry.test.ts enforces that every dotted id has a registered parent).
+ */
+export function isRouteActive(routeId: RouteId, pathname: string): boolean {
+  const current = matchRoute(pathname);
+  if (!current) return false;
+  return current.id === routeId || current.id.startsWith(`${routeId}.`);
+}
+
 export function canOpen(route: RouteDef, role: FirmRole): boolean {
   if (route.devOnly && !devRoutesEnabled()) return false;
   return accessFor(route, role) !== "none";

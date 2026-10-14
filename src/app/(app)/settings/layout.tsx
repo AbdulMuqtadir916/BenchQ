@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/lib/stores/session-store";
-import { navFor } from "@/lib/routes/registry";
+import { isRouteActive, navFor, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { PageHeader } from "@/components/app/page-header";
 import { cn } from "@/lib/cn";
@@ -22,7 +22,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         <nav aria-label="Settings sections" className="space-y-1 lg:sticky lg:top-4 lg:self-start">
           {sections.map((route) => {
             const Icon = route.nav?.icon;
-            const isActive = pathname === route.path;
+            const isActive = isRouteActive(route.id as RouteId, pathname ?? "");
             return (
               <Link
                 key={route.id}

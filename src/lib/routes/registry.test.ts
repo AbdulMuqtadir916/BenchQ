@@ -2,7 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ROLES, ROUTES, accessFor, accessForPath, canOpen, hrefFor, landingFor, matchRoute, navFor, routeById, type Access, type RouteId } from "./registry";
+import { ROLES, ROUTES, accessFor, accessForPath, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, routeById, type Access, type RouteId } from "./registry";
 import type { FirmRole } from "@/lib/schemas/enums";
 import { isInScope } from "./scope";
 
@@ -210,5 +210,52 @@ describe("no public sign-up (docs/07 Q11)", () => {
     expect(ROUTES.some((route) => route.id === "sign-up" || route.path === "/sign-up")).toBe(false);
     for (const role of ROLES) expect(accessForPath("/sign-up", role)).toEqual({ route: null, access: "none" });
     expect(pagePaths()).not.toContain("/sign-up");
+  });
+});
+
+describe("isRouteActive (matches on route ids, not paths)", () => {
+  it("is active on the route itself and on its children", () => {
+    expect(isRouteActive("candidates", "/candidates")).toBe(true);
+    expect(isRouteActive("candidates", "/candidates/new")).toBe(true);
+    expect(isRouteActive("candidates", "/candidates/cand_01")).toBe(true);
+    expect(isRouteActive("candidates", "/candidates/cand_01?tab=inbox")).toBe(true);
+    expect(isRouteActive("jobs", "/jobs/capture")).toBe(true);
+    expect(isRouteActive("applications", "/applications/app_001")).toBe(true);
+    expect(isRouteActive("resumes", "/resumes/res_9")).toBe(true);
+    expect(isRouteActive("settings", "/settings/team")).toBe(true);
+  });
+
+  it("is not active elsewhere, including on siblings that share a name prefix", () => {
+    expect(isRouteActive("candidates", "/jobs")).toBe(false);
+    expect(isRouteActive("jobs", "/candidates/cand_01")).toBe(false);
+    expect(isRouteActive("settings.team", "/settings/firm")).toBe(false);
+    expect(isRouteActive("settings.team", "/settings/team")).toBe(true);
+    expect(isRouteActive("settings.team", "/settings")).toBe(false);
+    expect(isRouteActive("applications", "/applications-archive")).toBe(false);
+  });
+
+  it("is never active on a path that is not a registered route", () => {
+    for (const id of ROUTES.map((route) => route.id as RouteId)) {
+      expect(isRouteActive(id, "/nope")).toBe(false);
+      expect(isRouteActive(id, "/candidates/cand_01/extra")).toBe(false);
+    }
+  });
+
+  it("gives each sidebar item exactly one active route on every registered page", () => {
+    for (const page of ROUTES) {
+      const params = Object.fromEntries([...page.path.matchAll(/\[([^\]]+)\]/g)].map((m) => [m[1]!, "x"]));
+      const url = hrefFor(page.id as RouteId, params);
+      const items = ROUTES.filter((route) => route.nav?.section === "workspace" || route.nav?.section === "preferences");
+      const active = items.filter((route) => isRouteActive(route.id as RouteId, url)).map((route) => route.id);
+      expect(active.length, `${url} -> ${active.join(",")}`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("relies on a naming convention: every dotted id has a registered parent id", () => {
+    const ids = new Set(ROUTES.map((route) => route.id));
+    for (const id of ids) {
+      if (!id.includes(".")) continue;
+      expect(ids.has(id.slice(0, id.lastIndexOf("."))), `${id} has no parent route`).toBe(true);
+    }
   });
 });
