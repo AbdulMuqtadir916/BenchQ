@@ -15,23 +15,23 @@ shapes by `docs/02-DATA-CONTRACTS.md`.
 
 All decisions live here. Change a decision here first, then the sections below.
 
-| # | Question | Decision | Date |
-|---|---|---|---|
-| Q1 | Settings URL structure | Split into `firm`, `team`, `templates`, `preferences`; the index redirects to the first section the role may open | 2026-10-06 |
-| Q2 | Forbidden route | Forbidden screen in place, no redirect | 2026-10-06 |
-| Q3 | Focus mode | OWNER, MANAGER, BDE; not VIEWER | 2026-10-06 |
-| Q4 | `/welcome` onboarding | OWNER only, first run; everyone else → landing | 2026-10-06 |
-| Q5 | Platform tier | **Reopened and in scope.** Built UI-first under `/admin` (supersedes "deferred") | 2026-10-13 |
-| Q6 | Record outside a user's scope | Not-found state, never confirm existence | 2026-10-06 |
-| Q7 | Platform role name | Code identifier **`PLATFORM_ADMIN`** (already in `docs/02` and `LedgerEntrySchema.actorType`). UI label **"Super Admin"** | 2026-10-13 |
-| Q8 | Where the firm lives | **In the URL**: `/[firm]/…`, where `[firm]` is `Firm.slug` | 2026-10-13 |
-| Q9 | Users in several firms | **No.** A firm user belongs to exactly one firm. No firm picker | 2026-10-13 |
-| Q10 | Super Admin access to a firm's workspace | **Read-only support view**: opens the firm's real screens with every action hidden, a persistent banner, and audit entries the firm can see. No impersonation, no writes | 2026-10-13 |
-| Q11 | Public sign-up | **Invite-only.** Firms are created by Super Admin in `/admin/firms/new`; the owner and every member join through `/invite/[token]`; `/sign-up` is removed (done in T0, 2026-10-14) | 2026-10-14 |
-| Q12 | Who sets a firm's slug | Super Admin, at firm creation; editable only by Super Admin. Reserved words (§2.4) are rejected | 2026-10-13 |
-| Q13 | Company records | Global reference data (not firm-scoped). Every other business record is firm-scoped | 2026-10-13 |
-| Q14 | Role-specific routes | **No role in the URL.** A URL names the thing (`/acme/candidates`), the same for every role. Readability comes from (a) route groups by purpose — `(workspace)` for daily work, `(manage)` for oversight — which don't change URLs, (b) one view file per role where a screen really differs (`src/features/<area>/<role>-<view>.tsx`), and (c) one permission table (`permissions.ts`). See §6 | 2026-10-14 |
-| Q15 | Who manages firm members | **OWNER only** invites, removes, deactivates members and changes roles. MANAGER sees the team read-only and **assigns candidates to BDEs**. BDE and VIEWER don't see the team page | 2026-10-14 |
+| #   | Question                                 | Decision                                                                                                                                                                                                                                                                                                                                                                                        | Date       |
+| --- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Q1  | Settings URL structure                   | Split into `firm`, `team`, `templates`, `preferences`; the index redirects to the first section the role may open                                                                                                                                                                                                                                                                               | 2026-10-06 |
+| Q2  | Forbidden route                          | Forbidden screen in place, no redirect                                                                                                                                                                                                                                                                                                                                                          | 2026-10-06 |
+| Q3  | Focus mode                               | OWNER, MANAGER, BDE; not VIEWER                                                                                                                                                                                                                                                                                                                                                                 | 2026-10-06 |
+| Q4  | `/welcome` onboarding                    | OWNER only, first run; everyone else → landing                                                                                                                                                                                                                                                                                                                                                  | 2026-10-06 |
+| Q5  | Platform tier                            | **Reopened and in scope.** Built UI-first under `/admin` (supersedes "deferred")                                                                                                                                                                                                                                                                                                                | 2026-10-13 |
+| Q6  | Record outside a user's scope            | Not-found state, never confirm existence                                                                                                                                                                                                                                                                                                                                                        | 2026-10-06 |
+| Q7  | Platform role name                       | Code identifier **`PLATFORM_ADMIN`** (already in `docs/02` and `LedgerEntrySchema.actorType`). UI label **"Super Admin"**                                                                                                                                                                                                                                                                       | 2026-10-13 |
+| Q8  | Where the firm lives                     | **In the URL**: `/[firm]/…`, where `[firm]` is `Firm.slug`                                                                                                                                                                                                                                                                                                                                      | 2026-10-13 |
+| Q9  | Users in several firms                   | **No.** A firm user belongs to exactly one firm. No firm picker                                                                                                                                                                                                                                                                                                                                 | 2026-10-13 |
+| Q10 | Super Admin access to a firm's workspace | **Read-only support view**: opens the firm's real screens with every action hidden, a persistent banner, and audit entries the firm can see. No impersonation, no writes                                                                                                                                                                                                                        | 2026-10-13 |
+| Q11 | Public sign-up                           | **Invite-only.** Firms are created by Super Admin in `/admin/firms/new`; the owner and every member join through `/invite/[token]`; `/sign-up` is removed (done in T0, 2026-10-14)                                                                                                                                                                                                              | 2026-10-14 |
+| Q12 | Who sets a firm's slug                   | Super Admin, at firm creation; editable only by Super Admin. Reserved words (§2.4) are rejected                                                                                                                                                                                                                                                                                                 | 2026-10-13 |
+| Q13 | Company records                          | Global reference data (not firm-scoped). Every other business record is firm-scoped                                                                                                                                                                                                                                                                                                             | 2026-10-13 |
+| Q14 | Role-specific routes                     | **No role in the URL.** A URL names the thing (`/acme/candidates`), the same for every role. Readability comes from (a) route groups by purpose — `(workspace)` for daily work, `(manage)` for oversight — which don't change URLs, (b) one view file per role where a screen really differs (`src/features/<area>/<role>-<view>.tsx`), and (c) one permission table (`permissions.ts`). See §6 | 2026-10-14 |
+| Q15 | Who manages firm members                 | **OWNER only** invites, removes, deactivates members and changes roles. MANAGER sees the team read-only and **assigns candidates to BDEs**. BDE and VIEWER don't see the team page                                                                                                                                                                                                              | 2026-10-14 |
 
 ---
 
@@ -63,40 +63,40 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 
 ### 2.1 Public (no firm, no sign-in required)
 
-| Route | Purpose | Notes |
-|---|---|---|
-| `/` | Landing redirect | signed out → `/sign-in`; firm user → `/{slug}/dashboard` (OWNER first run → `/{slug}/welcome`); platform admin → `/admin` |
-| `/sign-in` | Email + password | `?returnTo=` honoured only for same-origin paths |
-| `/forgot-password` | Request a reset link | **new**; always shows "if the email exists, we sent a link" |
-| `/reset-password/[token]` | Set a new password | **new**; invalid/expired token state |
-| `/invite/[token]` | Accept an invite: shows firm name and offered role, set name + password | **new** (open in v1 Phase A); invalid, expired, already-accepted states |
-| `/sign-up` | — | **Removed** (Q11 invite-only); the sign-in page's sign-up link goes too |
+| Route                     | Purpose                                                                 | Notes                                                                                                                     |
+| ------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `/`                       | Landing redirect                                                        | signed out → `/sign-in`; firm user → `/{slug}/dashboard` (OWNER first run → `/{slug}/welcome`); platform admin → `/admin` |
+| `/sign-in`                | Email + password                                                        | `?returnTo=` honoured only for same-origin paths                                                                          |
+| `/forgot-password`        | Request a reset link                                                    | **new**; always shows "if the email exists, we sent a link"                                                               |
+| `/reset-password/[token]` | Set a new password                                                      | **new**; invalid/expired token state                                                                                      |
+| `/invite/[token]`         | Accept an invite: shows firm name and offered role, set name + password | **new** (open in v1 Phase A); invalid, expired, already-accepted states                                                   |
+| `/sign-up`                | —                                                                       | **Removed** (Q11 invite-only); the sign-in page's sign-up link goes too                                                   |
 
 ### 2.2 Firm tier — `/[firm]/…`
 
-| Route | Shell | OWNER | MANAGER | BDE | VIEWER | Support |
-|---|---|---|---|---|---|---|
-| `/[firm]/welcome` | auth | full (first run) | → landing | → landing | → landing | → landing |
-| `/[firm]/dashboard` | app | full | full | full | read | read (OWNER composition) |
-| `/[firm]/candidates` | app | full | full | assigned | read | read |
-| `/[firm]/candidates/new` | app / modal | full | full | full | — | — |
-| `/[firm]/candidates/[id]` | app | full | full | assigned | read | read |
-| `/[firm]/jobs`, `/[firm]/jobs/[id]` | app | full | full | full | read | read |
-| `/[firm]/jobs/capture` | app / modal | full | full | full | — | — |
-| `/[firm]/applications`, `/[firm]/applications/[id]` | app | full | full | own | read | read |
-| `/[firm]/resumes` | app | full | full | assigned | read | read |
-| `/[firm]/resumes/[id]` | studio | full | full | assigned | read (view mode) | read (view mode) |
-| `/[firm]/outreach` | app | full | full | own | read | read |
-| `/[firm]/followups` | app | full | full | own | — | read |
-| `/[firm]/focus` | focus | full | full | full | — | — |
-| `/[firm]/analytics` | app | full | full | — | read | read |
-| `/[firm]/ledger` | app | full | full | own | read | read |
-| `/[firm]/settings` | app | → first allowed | → first allowed | → first allowed | → first allowed | → `firm` |
-| `/[firm]/settings/firm` | app | full | — | — | — | read |
-| `/[firm]/settings/team` | app | full | read + assign (Q15) | — | — | read |
-| `/[firm]/settings/templates` | app | full | full | — | — | read |
-| `/[firm]/settings/preferences` | app | full | full | full | full | — (personal) |
-| `/[firm]/design-system` | — | moves to `/dev/design-system` (§2.4), dev builds only | | | | |
+| Route                                               | Shell       | OWNER                                                 | MANAGER             | BDE             | VIEWER           | Support                  |
+| --------------------------------------------------- | ----------- | ----------------------------------------------------- | ------------------- | --------------- | ---------------- | ------------------------ |
+| `/[firm]/welcome`                                   | auth        | full (first run)                                      | → landing           | → landing       | → landing        | → landing                |
+| `/[firm]/dashboard`                                 | app         | full                                                  | full                | full            | read             | read (OWNER composition) |
+| `/[firm]/candidates`                                | app         | full                                                  | full                | assigned        | read             | read                     |
+| `/[firm]/candidates/new`                            | app / modal | full                                                  | full                | full            | —                | —                        |
+| `/[firm]/candidates/[id]`                           | app         | full                                                  | full                | assigned        | read             | read                     |
+| `/[firm]/jobs`, `/[firm]/jobs/[id]`                 | app         | full                                                  | full                | full            | read             | read                     |
+| `/[firm]/jobs/capture`                              | app / modal | full                                                  | full                | full            | —                | —                        |
+| `/[firm]/applications`, `/[firm]/applications/[id]` | app         | full                                                  | full                | own             | read             | read                     |
+| `/[firm]/resumes`                                   | app         | full                                                  | full                | assigned        | read             | read                     |
+| `/[firm]/resumes/[id]`                              | studio      | full                                                  | full                | assigned        | read (view mode) | read (view mode)         |
+| `/[firm]/outreach`                                  | app         | full                                                  | full                | own             | read             | read                     |
+| `/[firm]/followups`                                 | app         | full                                                  | full                | own             | —                | read                     |
+| `/[firm]/focus`                                     | focus       | full                                                  | full                | full            | —                | —                        |
+| `/[firm]/analytics`                                 | app         | full                                                  | full                | —               | read             | read                     |
+| `/[firm]/ledger`                                    | app         | full                                                  | full                | own             | read             | read                     |
+| `/[firm]/settings`                                  | app         | → first allowed                                       | → first allowed     | → first allowed | → first allowed  | → `firm`                 |
+| `/[firm]/settings/firm`                             | app         | full                                                  | —                   | —               | —                | read                     |
+| `/[firm]/settings/team`                             | app         | full                                                  | read + assign (Q15) | —               | —                | read                     |
+| `/[firm]/settings/templates`                        | app         | full                                                  | full                | —               | —                | read                     |
+| `/[firm]/settings/preferences`                      | app         | full                                                  | full                | full            | full             | — (personal)             |
+| `/[firm]/design-system`                             | —           | moves to `/dev/design-system` (§2.4), dev builds only |                     |                 |                  |                          |
 
 Modal intercepts follow the access of the route they intercept.
 **Support** is derived, not hand-written per route: `read` wherever OWNER has access, except
@@ -105,19 +105,19 @@ routes (`settings/preferences`), which are `—`.
 
 ### 2.3 Platform tier — `/admin/…` (`PLATFORM_ADMIN` only; everyone else → not-found)
 
-| Route | Purpose |
-|---|---|
-| `/admin` | Overview: firm count by status, seats used vs. sold, active users, AI spend (all derived) |
-| `/admin/firms` | Firms list: name, slug, status, plan, seats used/limit, owner, created, last activity; search + status filter in the URL |
-| `/admin/firms/new` | Create firm: name, slug (live reserved/taken check), plan, seat & candidate limits, timezones, owner name + email → creates the firm and the owner's invite |
-| `/admin/firms/[firmId]` | Firm overview: profile, status, plan, usage, owner; actions: edit, suspend / reactivate, **View workspace** (starts support view) |
-| `/admin/firms/[firmId]/users` | Firm members + pending invites; resend / revoke invite; deactivate user |
-| `/admin/firms/[firmId]/plan` | Plan, seat and candidate limits, change history |
-| `/admin/firms/[firmId]/activity` | That firm's audit trail, incl. every support view |
-| `/admin/plans` | Plan catalogue (name, limits, features). UI only — no billing (CLAUDE.md) |
-| `/admin/audit` | Platform audit log: firm created/suspended, plan changed, support views, admin sign-ins |
-| `/admin/system` | Backend health, scraper runs, AI spend by firm/model |
-| `/admin/team` | BenchQ staff with `PLATFORM_ADMIN`; invite / deactivate |
+| Route                            | Purpose                                                                                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/admin`                         | Overview: firm count by status, seats used vs. sold, active users, AI spend (all derived)                                                                   |
+| `/admin/firms`                   | Firms list: name, slug, status, plan, seats used/limit, owner, created, last activity; search + status filter in the URL                                    |
+| `/admin/firms/new`               | Create firm: name, slug (live reserved/taken check), plan, seat & candidate limits, timezones, owner name + email → creates the firm and the owner's invite |
+| `/admin/firms/[firmId]`          | Firm overview: profile, status, plan, usage, owner; actions: edit, suspend / reactivate, **View workspace** (starts support view)                           |
+| `/admin/firms/[firmId]/users`    | Firm members + pending invites; resend / revoke invite; deactivate user                                                                                     |
+| `/admin/firms/[firmId]/plan`     | Plan, seat and candidate limits, change history                                                                                                             |
+| `/admin/firms/[firmId]/activity` | That firm's audit trail, incl. every support view                                                                                                           |
+| `/admin/plans`                   | Plan catalogue (name, limits, features). UI only — no billing (CLAUDE.md)                                                                                   |
+| `/admin/audit`                   | Platform audit log: firm created/suspended, plan changed, support views, admin sign-ins                                                                     |
+| `/admin/system`                  | Backend health, scraper runs, AI spend by firm/model                                                                                                        |
+| `/admin/team`                    | BenchQ staff with `PLATFORM_ADMIN`; invite / deactivate                                                                                                     |
 
 Admin URLs use `firmId` (stable), firm URLs use `slug` (readable).
 
@@ -125,8 +125,8 @@ Admin URLs use `firmId` (stable), firm URLs use `slug` (readable).
 
 - **Reserved slugs** (rejected at firm creation; checked by a registry test against every
   top-level segment): `admin, api, health, sign-in, sign-up, forgot-password, reset-password,
-  invite, dev, _next, static, assets, favicon.ico, robots.txt, sitemap.xml, www, app, support,
-  help, status, settings, new`.
+invite, dev, _next, static, assets, favicon.ico, robots.txt, sitemap.xml, www, app, support,
+help, status, settings, new`.
 - **Dev routes** live under `/dev/…` (`/dev/design-system`), `devOnly: true`, not-found unless
   `devRoutesEnabled()`.
 
@@ -134,15 +134,15 @@ Admin URLs use `firmId` (stable), firm URLs use `slug` (readable).
 
 `src/app/[firm]/layout.tsx` resolves the slug and decides, before any page renders:
 
-| Condition | Result |
-|---|---|
-| Signed out | redirect `/sign-in?returnTo=<path>` |
-| Slug unknown | not-found |
-| Firm user, different firm | not-found |
+| Condition                                     | Result                                                                                                                   |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Signed out                                    | redirect `/sign-in?returnTo=<path>`                                                                                      |
+| Slug unknown                                  | not-found                                                                                                                |
+| Firm user, different firm                     | not-found                                                                                                                |
 | Platform admin, no support view for this firm | **Support interstitial**: "Open a read-only support view of {firm}?" + required reason → starts the view. Not a redirect |
-| Firm status `SUSPENDED`, firm user | "Workspace suspended — contact your BenchQ account manager" screen on every route |
-| Firm status `SUSPENDED`, support view | renders normally (read-only) |
-| Otherwise | page, subject to the route's access level |
+| Firm status `SUSPENDED`, firm user            | "Workspace suspended — contact your BenchQ account manager" screen on every route                                        |
+| Firm status `SUSPENDED`, support view         | renders normally (read-only)                                                                                             |
+| Otherwise                                     | page, subject to the route's access level                                                                                |
 
 ---
 
@@ -153,10 +153,21 @@ The session holds a **principal**, not a user + role. Proposed contract (goes in
 
 ```ts
 type Principal =
-  | { kind: "firm";     userId: string; firmId: string; role: FirmRole }
-  | { kind: "platform"; userId: string; role: "PLATFORM_ADMIN"; support: SupportView | null };
+  | { kind: "firm"; userId: string; firmId: string; role: FirmRole }
+  | {
+      kind: "platform";
+      userId: string;
+      role: "PLATFORM_ADMIN";
+      support: SupportView | null;
+    };
 
-type SupportView = { id: string; firmId: string; reason: string; startedAt: string; expiresAt: string };
+type SupportView = {
+  id: string;
+  firmId: string;
+  reason: string;
+  startedAt: string;
+  expiresAt: string;
+};
 ```
 
 - `FirmRole` has **one** declaration: the Zod enum in `src/lib/schemas/enums.ts`. The duplicate in
@@ -174,15 +185,15 @@ type SupportView = { id: string; firmId: string; reason: string; startedAt: stri
 
 ## 4. Read-only support view (Q10)
 
-| Rule | Detail |
-|---|---|
-| Entry | `/admin/firms/[firmId]` → **View workspace**, or the firm-layout interstitial. A reason is required (free text, min. 10 chars) |
-| Start | creates a `SupportView` (60-minute expiry) and a ledger entry `ADMIN_ACCESS` (actor `PLATFORM_ADMIN`, `firmId` set) — visible in the firm's own `/[firm]/ledger` |
-| While active | persistent banner on every firm page: "Support view of {firm} · read-only · started {time} by {admin} · Exit". Banner can't be dismissed |
-| Permissions | `can()` returns `false` for **every** action. Route access per §2.2 "Support" column. Data scope: whole firm |
-| Exit | Exit button, expiry, or sign-out → ends the view, writes `ADMIN_ACCESS_END`, returns to `/admin/firms/[firmId]` |
-| Isolation | one support view at a time; starting a view of firm B ends firm A's |
-| Never | impersonating a user, writing firm data, exporting resumes, sending outreach |
+| Rule         | Detail                                                                                                                                                           |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entry        | `/admin/firms/[firmId]` → **View workspace**, or the firm-layout interstitial. A reason is required (free text, min. 10 chars)                                   |
+| Start        | creates a `SupportView` (60-minute expiry) and a ledger entry `ADMIN_ACCESS` (actor `PLATFORM_ADMIN`, `firmId` set) — visible in the firm's own `/[firm]/ledger` |
+| While active | persistent banner on every firm page: "Support view of {firm} · read-only · started {time} by {admin} · Exit". Banner can't be dismissed                         |
+| Permissions  | `can()` returns `false` for **every** action. Route access per §2.2 "Support" column. Data scope: whole firm                                                     |
+| Exit         | Exit button, expiry, or sign-out → ends the view, writes `ADMIN_ACCESS_END`, returns to `/admin/firms/[firmId]`                                                  |
+| Isolation    | one support view at a time; starting a view of firm B ends firm A's                                                                                              |
+| Never        | impersonating a user, writing firm data, exporting resumes, sending outreach                                                                                     |
 
 ---
 
@@ -194,20 +205,24 @@ type SupportView = { id: string; firmId: string; reason: string; startedAt: stri
 type Area = "public" | "firm" | "platform" | "dev";
 
 interface RouteDef {
-  id: string;                              // "candidates.detail", "admin.firms.detail"
-  path: string;                            // "/[firm]/candidates/[id]", "/admin/firms/[firmId]"
+  id: string; // "candidates.detail", "admin.firms.detail"
+  path: string; // "/[firm]/candidates/[id]", "/admin/firms/[firmId]"
   title: string;
   area: Area;
   shell: "auth" | "app" | "studio" | "focus" | "admin";
-  access:                                  // by area
+  access: // by area
     | { kind: "public" }
-    | { kind: "firm"; roles: Record<FirmRole, Access>; support?: Access }  // support defaults per §2.2
-    | { kind: "platform" };                // PLATFORM_ADMIN only
+    | { kind: "firm"; roles: Record<FirmRole, Access>; support?: Access } // support defaults per §2.2
+    | { kind: "platform" }; // PLATFORM_ADMIN only
   onDenied?: "forbidden" | "landing";
-  nav?: { section: "workspace" | "settings" | "preferences" | "admin"; order: number; icon?: LucideIcon };
+  nav?: {
+    section: "workspace" | "settings" | "preferences" | "admin";
+    order: number;
+    icon?: LucideIcon;
+  };
   shortcut?: string;
   palette?: boolean;
-  parent?: string;                         // breadcrumbs / back
+  parent?: string; // breadcrumbs / back
   devOnly?: boolean;
 }
 ```
@@ -217,6 +232,7 @@ Helpers, all typed on `Principal` (not `FirmRole`): `matchRoute`, `accessFor(rou
 **`hrefFor(id, params)`** — fills `[firm]` from params; `useHref()` fills it from the current URL.
 
 Registry tests (extend `registry.test.ts`):
+
 - page ↔ entry parity (already exists; must understand `[firm]` and `admin`);
 - **the full access table in §2 as a table test**, every route × every principal kind — replaces
   the 7 spot checks;
@@ -262,6 +278,7 @@ src/lib/auth/permissions.ts        → the one role × action table (Phase C)
 ```
 
 Rules (Q14):
+
 - `page.tsx` stays thin: read params, pick the view, render. Role → view choice is the only
   branching allowed in a page, and it goes through `can()` / a principal helper, not `role ===`.
 - A role file exists only when the screen's **layout** differs by role (today: dashboard).
@@ -274,17 +291,17 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 
 ## Phases
 
-| Phase | What | Depends on | Status |
-|---|---|---|---|
-| **A** | Route foundation — registry, guards, access/error screens, settings split | — | Done (committed) |
-| **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod | A | Done (A2.2–A2.9; see result below) |
-| **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2 | In progress (`feat/routes-t0`) |
-| **T** | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys | A2 + §7 sign-off | Planned |
-| **P** | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view | T | Planned |
-| **C** | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks | T, P | Planned |
-| **B** | UI completion audit — every route × principal against `docs/04` | C | Planned |
-| **S** | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit, system | P, B | Planned |
-| **D** | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks | backend D1/D2 | Later |
+| Phase  | What                                                                                                                                                                                       | Depends on       | Status                             |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- | ---------------------------------- |
+| **A**  | Route foundation — registry, guards, access/error screens, settings split                                                                                                                  | —                | Done (committed)                   |
+| **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod                                                                                                | A                | Done (A2.2–A2.9; see result below) |
+| **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2               | In progress (`feat/routes-t0`)     |
+| **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | Planned                            |
+| **P**  | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view                                                                                                    | T                | Planned                            |
+| **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | Planned                            |
+| **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
+| **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit, system                                                                                                   | P, B             | Planned                            |
+| **D**  | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks                                                                                                           | backend D1/D2    | Later                              |
 
 **Why C moves before B (change from v1):** the audit checks that controls a principal can't use
 aren't rendered. Auditing before the policy exists means auditing twice.
@@ -331,30 +348,30 @@ error / loading screens, record scope → not-found, settings split, `/sign-up`,
 
 ## Phase A2 — Hardening (done)
 
-| # | Task | Why |
-|---|---|---|
-| A2.1 | Commit Phase A on `feat/routes`; open PR | 39 uncommitted changes |
+| #    | Task                                                                                                                                                           | Why                                                            |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| A2.1 | Commit Phase A on `feat/routes`; open PR                                                                                                                       | 39 uncommitted changes                                         |
 | A2.2 | Add `hrefFor(id, params)` + `useHref()` to the registry. Replace all **39** `href="/…"`, **5** `router.push/replace("/…")` and **1** `redirect("/…")` literals | Phase T moves every URL; this makes the move a one-file change |
-| A2.3 | Add the grep test from §5 | stops new literals |
-| A2.4 | Replace the 7 spot checks with the full §2.2 table test (firm roles only for now) | the test is the spec |
-| A2.5 | One `FirmRole`: keep the Zod enum, delete the store's copy, re-type helpers | two declarations |
-| A2.6 | `useRouteAccess`: unregistered path → `none` (not `full`) | fail closed |
-| A2.7 | RoleSwitcher behind `NEXT_PUBLIC_SHOW_DEV_TOOLS=true`, off by default; add to `.env.example` | it ships to production today |
-| A2.8 | Move `/design-system` to `/dev/design-system` | frees the top level for firm slugs |
-| A2.9 | Fix the stale `iconsax-react` comment in `next.config.ts` | hygiene |
+| A2.3 | Add the grep test from §5                                                                                                                                      | stops new literals                                             |
+| A2.4 | Replace the 7 spot checks with the full §2.2 table test (firm roles only for now)                                                                              | the test is the spec                                           |
+| A2.5 | One `FirmRole`: keep the Zod enum, delete the store's copy, re-type helpers                                                                                    | two declarations                                               |
+| A2.6 | `useRouteAccess`: unregistered path → `none` (not `full`)                                                                                                      | fail closed                                                    |
+| A2.7 | RoleSwitcher behind `NEXT_PUBLIC_SHOW_DEV_TOOLS=true`, off by default; add to `.env.example`                                                                   | it ships to production today                                   |
+| A2.8 | Move `/design-system` to `/dev/design-system`                                                                                                                  | frees the top level for firm slugs                             |
+| A2.9 | Fix the stale `iconsax-react` comment in `next.config.ts`                                                                                                      | hygiene                                                        |
 
 **Exit:** no path literals outside `src/lib/routes/`; table test covers every firm route × role;
 switcher hidden in `pnpm build && pnpm start`; Phase A exit criteria ticked; checks green.
 
 **Result (2026-10-13), one commit per task on `feat/routes-a2`:**
 
-| Exit criterion | State |
-|---|---|
-| No path literals outside `src/lib/routes/` | Met. 60 literals replaced; `no-path-literals.test.ts` enforces it (mutation-checked). `[firm]` is not assumed anywhere |
-| Table test covers every firm route × role | Met. 22 routes × 4 roles, plus `onDenied`, public and dev routes; fails if a route has no row |
-| Switcher hidden in `pnpm build && pnpm start` | Met, with a positive control (absent from HTML and chunks when `NEXT_PUBLIC_SHOW_DEV_TOOLS` is unset; present when `true`) |
-| Phase A exit criteria ticked | Partly. Role × route renders, record scope, unknown URL and the checks are ticked; the error card, both themes and the three widths are not (see Phase A) |
-| Checks green | Met. typecheck, lint, test (54), build all exit 0 |
+| Exit criterion                                | State                                                                                                                                                     |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No path literals outside `src/lib/routes/`    | Met. 60 literals replaced; `no-path-literals.test.ts` enforces it (mutation-checked). `[firm]` is not assumed anywhere                                    |
+| Table test covers every firm route × role     | Met. 22 routes × 4 roles, plus `onDenied`, public and dev routes; fails if a route has no row                                                             |
+| Switcher hidden in `pnpm build && pnpm start` | Met, with a positive control (absent from HTML and chunks when `NEXT_PUBLIC_SHOW_DEV_TOOLS` is unset; present when `true`)                                |
+| Phase A exit criteria ticked                  | Partly. Role × route renders, record scope, unknown URL and the checks are ticked; the error card, both themes and the three widths are not (see Phase A) |
+| Checks green                                  | Met. typecheck, lint, test (54), build all exit 0                                                                                                         |
 
 Notes for Phase T: the active-link checks in `sidebar.tsx` and `settings/layout.tsx` still compare
 the pathname with `route.path`, which will not match once paths gain `[firm]`. `useHref()` is a plain
@@ -367,17 +384,17 @@ function today and is where the firm segment is added. Moving a route makes `tsc
 
 Needs §7 contracts signed off first.
 
-| # | Task |
-|---|---|
-| T1 | Contracts in `docs/02`: `Principal`, `SupportView`, `Firm` (+ `status`, `planId`, `seatLimit`, `candidateLimit`, `createdAt`), `Plan`, `Invite`, `PlatformUser`; `firmId` on Job, Application, Resume, Record, Document, Inbox, Followup, LedgerEntry (`firmId: string \| null` — null = platform event) |
-| T2 | Zod schemas from T1; `SessionSchema` limits move to `Firm` and become derived usage (`seatsUsed` = active users count) |
-| T3 | Fixtures: add `firmId` to every firm-scoped fixture; add a **second firm** (small: 3 users, 5 candidates) and one platform admin, so isolation is testable |
-| T4 | Session store → `Principal`; dev principal switcher lists every fixture principal |
-| T5 | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it |
-| T6 | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path |
-| T6b | ~~Remove `/sign-up` and its link from `/sign-in` (Q11)~~ — done early in T0 |
-| T7 | `/` landing per principal; `/[firm]/welcome` for OWNER first run |
-| T8 | Tests: a firm-A principal can't read firm-B data through any hook (mock layer); slug → firm resolution; §2.5 table |
+| #   | Task                                                                                                                                                                                                                                                                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | Contracts in `docs/02`: `Principal`, `SupportView`, `Firm` (+ `status`, `planId`, `seatLimit`, `candidateLimit`, `createdAt`), `Plan`, `Invite`, `PlatformUser`; `firmId` on Job, Application, Resume, Record, Document, Inbox, Followup, LedgerEntry (`firmId: string \| null` — null = platform event)                    |
+| T2  | Zod schemas from T1; `SessionSchema` limits move to `Firm` and become derived usage (`seatsUsed` = active users count)                                                                                                                                                                                                      |
+| T3  | Fixtures: add `firmId` to every firm-scoped fixture; add a **second firm** (small: 3 users, 5 candidates) and one platform admin, so isolation is testable                                                                                                                                                                  |
+| T4  | Session store → `Principal`; dev principal switcher lists every fixture principal                                                                                                                                                                                                                                           |
+| T5  | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it                                                                                                                                                        |
+| T6  | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path |
+| T6b | ~~Remove `/sign-up` and its link from `/sign-in` (Q11)~~ — done early in T0                                                                                                                                                                                                                                                 |
+| T7  | `/` landing per principal; `/[firm]/welcome` for OWNER first run                                                                                                                                                                                                                                                            |
+| T8  | Tests: a firm-A principal can't read firm-B data through any hook (mock layer); slug → firm resolution; §2.5 table                                                                                                                                                                                                          |
 
 **Exit:** every firm URL carries the slug; switching principal between firm A and B never shows
 the other firm's data (checked on every list screen); query keys all include `firmId`; checks green.
@@ -386,14 +403,14 @@ the other firm's data (checked on every list screen); query keys all include `fi
 
 ## Phase P — Platform tier routes
 
-| # | Task |
-|---|---|
-| P1 | Registry v2 (§5): `area`, `access` union, `admin` shell and nav section, helpers on `Principal` |
-| P2 | `src/app/admin/layout.tsx`: admin shell (same frosted shell, admin nav), platform guard → not-found for others |
-| P3 | Every route in §2.3 with real layout and skeleton / empty / error (and not-found for `[firmId]`), on mock adapters `platformApi` (`firms`, `plans`, `audit`, `system`, `team`) |
-| P4 | Support view (§4): start / exit / expiry, interstitial, banner, ledger entries, support access column |
-| P5 | ⌘K for admins: firms search, "View workspace", admin nav; firm-scoped commands hidden outside a firm |
-| P6 | Tests: platform table test rows, support view grants no actions, non-admin → `/admin` not-found |
+| #   | Task                                                                                                                                                                           |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1  | Registry v2 (§5): `area`, `access` union, `admin` shell and nav section, helpers on `Principal`                                                                                |
+| P2  | `src/app/admin/layout.tsx`: admin shell (same frosted shell, admin nav), platform guard → not-found for others                                                                 |
+| P3  | Every route in §2.3 with real layout and skeleton / empty / error (and not-found for `[firmId]`), on mock adapters `platformApi` (`firms`, `plans`, `audit`, `system`, `team`) |
+| P4  | Support view (§4): start / exit / expiry, interstitial, banner, ledger entries, support access column                                                                          |
+| P5  | ⌘K for admins: firms search, "View workspace", admin nav; firm-scoped commands hidden outside a firm                                                                           |
+| P6  | Tests: platform table test rows, support view grants no actions, non-admin → `/admin` not-found                                                                                |
 
 Screens are functional skeletons here; visual polish is Phase S. `docs/04-SCREENS.md` gets an
 "Admin" section before P3 (UI-first: the screen spec comes first).
@@ -455,12 +472,12 @@ invites, plans, suspend/reactivate, audit, system. Out of scope until then.
 These are new contracts (CLAUDE.md: no new entity without product sign-off). Approve, change or
 reject each, then record the date in §0.
 
-| Contract | Fields (proposed) |
-|---|---|
-| `Principal`, `SupportView` | §3 |
-| `Firm` additions | `status: "ONBOARDING" \| "ACTIVE" \| "SUSPENDED"`, `planId`, `seatLimit`, `candidateLimit`, `createdAt` |
-| `Plan` | `id, name, seatLimit, candidateLimit, features: string[], isActive` (no prices — no billing) |
-| `Invite` | `id, firmId \| null (null = platform team), email, role, invitedByUserId, status: "PENDING" \| "ACCEPTED" \| "REVOKED" \| "EXPIRED", expiresAt, createdAt` |
-| `PlatformUser` | `id, name, email, role: "PLATFORM_ADMIN", isActive, lastActiveAt` |
-| `firmId` on records | Job, Application, Resume, Record, Document, Inbox, Followup; LedgerEntry nullable. Company stays global (Q13) |
-| Ledger actions | add `ADMIN_ACCESS_END`, `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `PLAN_CHANGED`, `INVITE_SENT`, `INVITE_ACCEPTED`, `INVITE_REVOKED` |
+| Contract                   | Fields (proposed)                                                                                                                                          |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Principal`, `SupportView` | §3                                                                                                                                                         |
+| `Firm` additions           | `status: "ONBOARDING" \| "ACTIVE" \| "SUSPENDED"`, `planId`, `seatLimit`, `candidateLimit`, `createdAt`                                                    |
+| `Plan`                     | `id, name, seatLimit, candidateLimit, features: string[], isActive` (no prices — no billing)                                                               |
+| `Invite`                   | `id, firmId \| null (null = platform team), email, role, invitedByUserId, status: "PENDING" \| "ACCEPTED" \| "REVOKED" \| "EXPIRED", expiresAt, createdAt` |
+| `PlatformUser`             | `id, name, email, role: "PLATFORM_ADMIN", isActive, lastActiveAt`                                                                                          |
+| `firmId` on records        | Job, Application, Resume, Record, Document, Inbox, Followup; LedgerEntry nullable. Company stays global (Q13)                                              |
+| Ledger actions             | add `ADMIN_ACCESS_END`, `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `PLAN_CHANGED`, `INVITE_SENT`, `INVITE_ACCEPTED`, `INVITE_REVOKED`           |
