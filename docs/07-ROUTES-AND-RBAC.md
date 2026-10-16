@@ -1,7 +1,7 @@
 # 07 — Routes, tenancy and RBAC (production)
 
-**Project:** BenchQ · **Version:** 2.0 (2026-10-13) — supersedes v1 (2026-10-06)
-**Status:** Phase A done and committed (`feat/routes`) · Phase A2 done (`feat/routes-a2`) · Q11, Q14, Q15 decided (2026-10-14) · next: **Phase T**, which needs the §7 sign-off (changes requested 2026-10-14)
+**Project:** BenchQ · **Version:** 2.1 (2026-10-14) — supersedes v2.0 (2026-10-13) and v1 (2026-10-06)
+**Status:** Phase A done and committed (`feat/routes`) · Phase A2 done (`feat/routes-a2`) · Phase T0 in progress (`feat/routes-t0`) · Q11, Q14, Q15 decided and **§7 contracts approved 2026-10-14 (Q16–Q21)** · next: **Phase T**, now unblocked
 **Facts about the code** come from `docs/CURRENT_STATE.md` (2026-10-13). If the code has moved on,
 trust the code and update this file.
 
@@ -32,6 +32,12 @@ All decisions live here. Change a decision here first, then the sections below.
 | Q13 | Company records                          | Global reference data (not firm-scoped). Every other business record is firm-scoped                                                                                                                                                                                                                                                                                                             | 2026-10-13 |
 | Q14 | Role-specific routes                     | **No role in the URL.** A URL names the thing (`/acme/candidates`), the same for every role. Readability comes from (a) route groups by purpose — `(workspace)` for daily work, `(manage)` for oversight — which don't change URLs, (b) one view file per role where a screen really differs (`src/features/<area>/<role>-<view>.tsx`), and (c) one permission table (`permissions.ts`). See §6 | 2026-10-14 |
 | Q15 | Who manages firm members                 | **OWNER only** invites, removes, deactivates members and changes roles. MANAGER sees the team read-only and **assigns candidates to BDEs**. BDE and VIEWER don't see the team page                                                                                                                                                                                                              | 2026-10-14 |
+| Q16 | Tenancy contracts (§7) | **Approved** with the answers recorded in Q17–Q21. The shapes are in `docs/02` §3.1 (the source of truth; `docs/02` numbers the owner's answers A1–A17). Phase T implements them; nothing before it may | 2026-10-14 |
+| Q17 | Seats and limits (A1–A4) | **Seat** = every active firm user (OWNER, MANAGER, BDE, VIEWER); pending invites reserve a seat; `seatsUsed` is derived. **Active candidate** = `ON_BENCH`, `INTERVIEWING` or `OFFER` (derived). A **Plan is a template**: its limits are *copied* onto `Firm` when the plan is assigned, `Firm.seatLimit` / `candidateLimit` are the effective limits, and editing a plan never changes existing firms. **Over a limit**: block new additions (invite, new candidate, reactivating a user or candidate) with a message naming the limit; never auto-remove or deactivate; existing users and candidates keep working after a downgrade; the admin firms list shows a derived "over limit" flag | 2026-10-14 |
+| Q18 | Firm lifecycle and profile (A5–A8, A16) | No `TRIAL` until billing. `ONBOARDING` → `ACTIVE` automatically when the OWNER accepts their invite; only Super Admin suspends or reactivates. `planId` is required in every status. `Firm` gains only `contactPhone: string \| null` (the owner is the primary contact, derived; GST, billing email and address wait for billing). **Slug**: lowercase a–z, 0–9 and hyphens; 3–32 characters; starts with a letter; no leading, trailing or double hyphens; not reserved; unique; Super Admin may change it behind a confirm dialog that warns old links break; no alias or redirect table. Users of a suspended firm can still sign in and see the "Workspace suspended" screen | 2026-10-14 |
+| Q19 | Invites (A9–A11) | Lifetime **7 days**. Resend keeps the same `Invite` row, issues a new token (the old one stops working) and resets `expiresAt` to +7 days; the frontend may treat `PENDING` past `expiresAt` as `EXPIRED`. **Exactly one OWNER per firm**; an OWNER invites MANAGER, BDE or VIEWER, not OWNER; transferring ownership is a Super Admin action, out of scope; no VIEWER cap beyond seats. Any `PLATFORM_ADMIN` can invite platform staff and it is the only platform role; schema refinement: `firmId` null ⇔ role `PLATFORM_ADMIN` | 2026-10-14 |
+| Q20 | Support view and audit (A12–A14) | Support view is a **fixed 60 minutes, no extension**: to continue, start a new view (new reason, new ledger entry). The firm sees the admin's **name** and the **reason as written**, never the email. **Any event about a firm carries its `firmId`** and shows in that firm's `/[firm]/ledger`: `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `PLAN_CHANGED`, firm invites, `ADMIN_ACCESS`, `ADMIN_ACCESS_END`. `firmId` is null only for platform-only events (admin sign-ins, platform-team invites, plan catalogue edits); `/admin/audit` shows everything. **No `PlanChange` entity**: plan history is derived from `PLAN_CHANGED` entries whose summary states before and after (e.g. "Starter → Growth, seats 5 → 10") | 2026-10-14 |
+| Q21 | Smaller points (A15, A17) | `Plan.features` is display labels only; no feature flags until something gates on them. Agent and tailoring runs are firm-scoped (`firmId`), because `/admin/system` needs AI spend by firm and joins are fragile | 2026-10-14 |
 
 ---
 
@@ -108,11 +114,11 @@ routes (`settings/preferences`), which are `—`.
 | Route                            | Purpose                                                                                                                                                     |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/admin`                         | Overview: firm count by status, seats used vs. sold, active users, AI spend (all derived)                                                                   |
-| `/admin/firms`                   | Firms list: name, slug, status, plan, seats used/limit, owner, created, last activity; search + status filter in the URL                                    |
-| `/admin/firms/new`               | Create firm: name, slug (live reserved/taken check), plan, seat & candidate limits, timezones, owner name + email → creates the firm and the owner's invite |
+| `/admin/firms`                   | Firms list: name, slug, status, plan, seats used/limit, **over-limit flag (derived)**, owner, created, last activity; search + status filter in the URL                                    |
+| `/admin/firms/new`               | Create firm: name, slug (live reserved/taken check; rules in Q18), plan (its limits are copied onto the firm), timezones, contact phone (optional), owner name + email → creates the firm (`ONBOARDING`) and the OWNER's invite |
 | `/admin/firms/[firmId]`          | Firm overview: profile, status, plan, usage, owner; actions: edit, suspend / reactivate, **View workspace** (starts support view)                           |
-| `/admin/firms/[firmId]/users`    | Firm members + pending invites; resend / revoke invite; deactivate user                                                                                     |
-| `/admin/firms/[firmId]/plan`     | Plan, seat and candidate limits, change history                                                                                                             |
+| `/admin/firms/[firmId]/users`    | Firm members + pending invites; resend (new token, +7 days) / revoke invite; deactivate user                                                                                     |
+| `/admin/firms/[firmId]/plan`     | Plan, seat and candidate limits, change history (derived from `PLAN_CHANGED` ledger entries; no separate entity)                                                                                                             |
 | `/admin/firms/[firmId]/activity` | That firm's audit trail, incl. every support view                                                                                                           |
 | `/admin/plans`                   | Plan catalogue (name, limits, features). UI only — no billing (CLAUDE.md)                                                                                   |
 | `/admin/audit`                   | Platform audit log: firm created/suspended, plan changed, support views, admin sign-ins                                                                     |
@@ -148,8 +154,8 @@ help, status, settings, new`.
 
 ## 3. Who is signed in — the principal
 
-The session holds a **principal**, not a user + role. Proposed contract (goes into
-`docs/02-DATA-CONTRACTS.md` — **needs sign-off**, see §7):
+The session holds a **principal**, not a user + role. Contract (approved 2026-10-14; the Zod
+shapes are in `docs/02-DATA-CONTRACTS.md` §3.1, see §7):
 
 ```ts
 type Principal =
@@ -193,6 +199,8 @@ type SupportView = {
 | Permissions  | `can()` returns `false` for **every** action. Route access per §2.2 "Support" column. Data scope: whole firm                                                     |
 | Exit         | Exit button, expiry, or sign-out → ends the view, writes `ADMIN_ACCESS_END`, returns to `/admin/firms/[firmId]`                                                  |
 | Isolation    | one support view at a time; starting a view of firm B ends firm A's                                                                                              |
+| Length       | **fixed 60 minutes, no extension.** To continue, start a new view: new reason, new `SupportView`, new `ADMIN_ACCESS` ledger entry (Q20) |
+| What the firm sees | the admin's **name** and the **reason as written**, never the admin's email (Q20) |
 | Never        | impersonating a user, writing firm data, exporting resumes, sending outreach                                                                                     |
 
 ---
@@ -296,7 +304,7 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | **A**  | Route foundation — registry, guards, access/error screens, settings split                                                                                                                  | —                | Done (committed)                   |
 | **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod                                                                                                | A                | Done (A2.2–A2.9; see result below) |
 | **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2               | In progress (`feat/routes-t0`)     |
-| **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | Planned                            |
+| **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | Unblocked (§7 approved 2026-10-14) |
 | **P**  | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view                                                                                                    | T                | Planned                            |
 | **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | Planned                            |
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
@@ -382,13 +390,13 @@ function today and is where the firm segment is added. Moving a route makes `tsc
 
 ## Phase T — Tenancy in the frontend
 
-Needs §7 contracts signed off first.
+§7 contracts were **approved on 2026-10-14** (Q16–Q21); the approved shapes are in `docs/02` §3.1. Phase T implements them, and nothing earlier may.
 
 | #   | Task                                                                                                                                                                                                                                                                                                                        |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | Contracts in `docs/02`: `Principal`, `SupportView`, `Firm` (+ `status`, `planId`, `seatLimit`, `candidateLimit`, `createdAt`), `Plan`, `Invite`, `PlatformUser`; `firmId` on Job, Application, Resume, Record, Document, Inbox, Followup, LedgerEntry (`firmId: string \| null` — null = platform event)                    |
-| T2  | Zod schemas from T1; `SessionSchema` limits move to `Firm` and become derived usage (`seatsUsed` = active users count)                                                                                                                                                                                                      |
-| T3  | Fixtures: add `firmId` to every firm-scoped fixture; add a **second firm** (small: 3 users, 5 candidates) and one platform admin, so isolation is testable                                                                                                                                                                  |
+| T1  | ~~Contracts in `docs/02`~~ — **done**: drafted in T0, approved 2026-10-14, now `docs/02` §3.1 (drop the "not yet implemented" note there when T2 lands) |
+| T2  | Zod schemas from `docs/02` §3.1 (slug pattern, `Invite` refinement `firmId` null ⇔ `PLATFORM_ADMIN`). `SessionSchema` limits move to `Firm` (copied from the `Plan`) and usage becomes **derived**: `seatsUsed` = active users + pending unexpired invites; `activeCandidates` = `ON_BENCH` / `INTERVIEWING` / `OFFER`; over-limit flags; block new additions over a limit (Q17) |
+| T3  | Fixtures: add `firmId` to every firm-scoped fixture, **including agent and tailoring runs** (Q21); add a **second firm** (small: 3 users, 5 candidates), a platform admin, and a few invites (pending, expired, accepted) so isolation and limits are testable |
 | T4  | Session store → `Principal`; dev principal switcher lists every fixture principal                                                                                                                                                                                                                                           |
 | T5  | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it                                                                                                                                                        |
 | T6  | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path |
@@ -467,17 +475,19 @@ invites, plans, suspend/reactivate, audit, system. Out of scope until then.
 
 ---
 
-## 7. Sign-off needed before Phase T
+## 7. Contract sign-off — approved 2026-10-14
 
-These are new contracts (CLAUDE.md: no new entity without product sign-off). Approve, change or
-reject each, then record the date in §0.
+These new contracts (CLAUDE.md: no new entity without product sign-off) were **approved on
+2026-10-14** with the answers in §0 Q16–Q21. The shapes, one line per field, are in
+`docs/02-DATA-CONTRACTS.md` §3.1. This table is only the index; if the two disagree, `docs/02` wins.
 
-| Contract                   | Fields (proposed)                                                                                                                                          |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Principal`, `SupportView` | §3                                                                                                                                                         |
-| `Firm` additions           | `status: "ONBOARDING" \| "ACTIVE" \| "SUSPENDED"`, `planId`, `seatLimit`, `candidateLimit`, `createdAt`                                                    |
-| `Plan`                     | `id, name, seatLimit, candidateLimit, features: string[], isActive` (no prices — no billing)                                                               |
-| `Invite`                   | `id, firmId \| null (null = platform team), email, role, invitedByUserId, status: "PENDING" \| "ACCEPTED" \| "REVOKED" \| "EXPIRED", expiresAt, createdAt` |
-| `PlatformUser`             | `id, name, email, role: "PLATFORM_ADMIN", isActive, lastActiveAt`                                                                                          |
-| `firmId` on records        | Job, Application, Resume, Record, Document, Inbox, Followup; LedgerEntry nullable. Company stays global (Q13)                                              |
-| Ledger actions             | add `ADMIN_ACCESS_END`, `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `PLAN_CHANGED`, `INVITE_SENT`, `INVITE_ACCEPTED`, `INVITE_REVOKED`           |
+| Contract                   | Fields (approved)                                                                                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Principal`, `SupportView` | §3. `SupportView`: fixed 60 minutes, no extension (Q20)                                                                                                                                                            |
+| `Firm` additions           | `status: "ONBOARDING" \| "ACTIVE" \| "SUSPENDED"`, `planId` (required), `seatLimit`, `candidateLimit` (effective, copied from the plan), `contactPhone: string \| null`, `createdAt`; slug rules in Q18               |
+| `Plan`                     | `id, name, seatLimit, candidateLimit, features: string[] (display labels), isActive` (no prices — no billing). A template: limits are copied onto a firm when assigned                                             |
+| `Invite`                   | `id, firmId \| null (null = platform team), email, role, invitedByUserId, status: "PENDING" \| "ACCEPTED" \| "REVOKED" \| "EXPIRED", expiresAt (+7 days), createdAt`; refinement `firmId` null ⇔ `PLATFORM_ADMIN` |
+| `PlatformUser`             | `id, name, email, role: "PLATFORM_ADMIN", isActive, lastActiveAt`                                                                                                                                                  |
+| `firmId` on records        | Job, Application, Resume, Record, Document, Inbox, Followup, **agent and tailoring runs**; LedgerEntry nullable (null only for platform-only events, Q20). Company stays global (Q13)                              |
+| Ledger actions             | add `ADMIN_ACCESS_END`, `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `PLAN_CHANGED`, `INVITE_SENT`, `INVITE_ACCEPTED`, `INVITE_REVOKED`. No `PlanChange` entity                                           |
+| Derived, never stored      | `seatsUsed`, `activeCandidates`, over-limit flags (Q17)                                                                                                                                                            |
