@@ -283,5 +283,4 @@ limits are *copied* onto the firm; over a limit, block new additions and never a
 and `contactPhone` only on `Firm`; invites last 7 days, exactly one OWNER per firm, `firmId` null ⇔
 `PLATFORM_ADMIN`; support view is 60 minutes with no extension; firm events carry `firmId`; no
 `PlanChange` entity; agent and tailoring runs are firm-scoped.
-**Still open:** nothing blocks Phase T. The five "implications to confirm" at the end of `docs/02` §3.1
-are drafted as the obvious reading and need a yes or no, but don't block.
+**Still open:** nothing. The five implied rules at the end of `docs/02` §3.1 were approved on 2026-10-16.

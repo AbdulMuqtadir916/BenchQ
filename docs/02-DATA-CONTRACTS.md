@@ -163,8 +163,8 @@ export type Session = z.infer<typeof SessionSchema>;
 > the answers in the decision table at the end of this section; recorded in `docs/07` §0 as Q16–Q21).
 > **Nothing here exists in code yet.** Phase T (07) turns these into Zod schemas, fixtures, the
 > `Principal` session and `firmId`-scoped query keys. Until then, no schema, fixture, session type
-> or query key may be changed to match this section. Where a line below goes beyond what the owner
-> decided, it is marked **(implied)** and listed under *Implications to confirm*.
+> or query key may be changed to match this section. Five rules the owner did not state
+> but approved on 2026-10-16 are marked **(approved 2026-10-16)** and listed under *Implications*.
 > **Numbering.** **A1–A17** are the owner's 17 answers (decision table at the end of this section).
 > **`07 Qn`** is always a decision in `docs/07` §0. Both are recorded there as Q16–Q21.
 > Shapes follow this file's conventions (Zod, ISO datetimes as `z.string().datetime()`).
@@ -233,7 +233,7 @@ slug: z.string()
 
 | Value | Definition |
 |---|---|
-| `seatsUsed` | number of **active users** (OWNER, MANAGER, BDE and VIEWER all count) **+ pending invites** (A1). Per A9, an invite that is `PENDING` but past `expiresAt` is treated as `EXPIRED` and does not reserve a seat **(implied)** |
+| `seatsUsed` | number of **active users** (OWNER, MANAGER, BDE and VIEWER all count) **+ pending invites** (A1). Per A9, an invite that is `PENDING` but past `expiresAt` is treated as `EXPIRED` and does not reserve a seat **(approved 2026-10-16)** |
 | `activeCandidates` | candidates whose status is `ON_BENCH`, `INTERVIEWING` or `OFFER`. `PLACED`, `PAUSED` and `INACTIVE` do not count (A2) |
 | `isOverSeatLimit` / `isOverCandidateLimit` | `seatsUsed > seatLimit` / `activeCandidates > candidateLimit` |
 | `isOverLimit` | either of the two above. Shown as a flag on the admin firms list (A4) |
@@ -242,7 +242,8 @@ slug: z.string()
 the session: usage is derived, and the two limits live on `Firm` (07 T2).
 
 **Over-limit rule (A4).** Once at or over a limit, **block new additions**: sending an invite,
-creating a candidate, reactivating a user, reactivating a candidate. The message names the limit
+creating a candidate, reactivating a user, reactivating a candidate. ("Reactivating" here means a
+*user* or a *candidate*, never the firm: reactivating a suspended firm is not blocked by a limit.) The message names the limit
 ("Your plan allows 10 seats; 10 are in use."). **Never auto-remove or deactivate anything.** After
 a downgrade, existing users and candidates keep working.
 
@@ -290,7 +291,7 @@ export const InviteSchema = z.object({
 | Resend | keeps the **same `Invite` row**, issues a **new token** (the old one stops working) and resets `expiresAt` to now + 7 days (A9) |
 | Expiry in the UI | the frontend may treat `PENDING` with `expiresAt` in the past as `EXPIRED` (A9) |
 | One OWNER | **exactly one OWNER per firm** (A10). Transferring ownership is a Super Admin action, out of scope for now |
-| Who invites whom | an OWNER can invite `MANAGER`, `BDE` or `VIEWER`, **not** `OWNER` (A10). The firm's single OWNER is invited by a Super Admin when the firm is created **(implied)**. No cap on VIEWERs beyond seats (A10) |
+| Who invites whom | an OWNER can invite `MANAGER`, `BDE` or `VIEWER`, **not** `OWNER` (A10). The firm's single OWNER is invited by a Super Admin when the firm is created **(approved 2026-10-16)**. No cap on VIEWERs beyond seats (A10) |
 | Platform staff | any `PLATFORM_ADMIN` can invite platform staff; `PLATFORM_ADMIN` is the only platform role (A11) |
 | Seats | a `PENDING`, unexpired firm invite reserves a seat (A1) |
 
@@ -366,10 +367,10 @@ entries.
 | 16 | `planId` | required in every status, ONBOARDING included | `Firm` |
 | 17 | Agent / tailoring runs | firm-scoped: add `firmId` | `firmId` table |
 
-#### Implications to confirm (not blocking Phase T)
+#### Implications — approved 2026-10-16
 
 These follow from the answers above but the owner did not state them. Each is drafted as the
-obvious reading and marked **(implied)** where it appears. Tell me if any is wrong.
+obvious reading and marked **(approved 2026-10-16)** where it appears. Tell me if any is wrong.
 
 1. **Expired invites free their seat.** A1 says pending invites reserve a seat and A9 says a past-due
    PENDING invite may be treated as EXPIRED, so an expired invite stops reserving one.
@@ -380,8 +381,8 @@ obvious reading and marked **(implied)** where it appears. Tell me if any is wro
    `UPDATE` actions with `entityType: 'Plan'`; no new action was requested.
 4. **An unexpired PENDING invite blocks the one-OWNER rule too:** a firm cannot hold both an active
    OWNER and a pending OWNER invite.
-5. **Reactivating a firm** (SUSPENDED → ACTIVE) is not blocked by over-limit; the A4 block applies to
-   new additions only.
+5. **Reactivating a firm** (SUSPENDED → ACTIVE) is not blocked by over-limit. In A4, "reactivating"
+   means a **user or candidate**, never the firm; the block applies to new additions only.
 
 ---
 
