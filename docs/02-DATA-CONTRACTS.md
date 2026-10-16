@@ -1,7 +1,7 @@
 # 02 — Data Contracts
 
 **Project:** BenchQ · frontend only
-**Version:** 1.0 · September 2026
+**Version:** 1.1 · 2026-10-14
 
 Zod schemas are the single source of truth. Types are **inferred**, never written twice.
 Everything here lives under `src/lib/schemas/`.

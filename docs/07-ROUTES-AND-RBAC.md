@@ -102,7 +102,6 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | `/[firm]/settings/team`                             | app         | full                                                  | read + assign (Q15) | —               | —                | read                     |
 | `/[firm]/settings/templates`                        | app         | full                                                  | full                | —               | —                | read                     |
 | `/[firm]/settings/preferences`                      | app         | full                                                  | full                | full            | full             | — (personal)             |
-| `/[firm]/design-system`                             | —           | moves to `/dev/design-system` (§2.4), dev builds only |                     |                 |                  |                          |
 
 Modal intercepts follow the access of the route they intercept.
 **Support** is derived, not hand-written per route: `read` wherever OWNER has access, except
@@ -184,8 +183,7 @@ type SupportView = {
   equal the URL firm's id, otherwise not-found.
 - **Dev principal switcher** replaces the RoleSwitcher: pick any fixture principal (each role in
   firm A, a user in firm B, a platform admin). Rendered only when
-  `NEXT_PUBLIC_SHOW_DEV_TOOLS=true`; **off by default and in production builds** (today it is on
-  by default — fix in Phase A2).
+  `NEXT_PUBLIC_SHOW_DEV_TOOLS=true`; **off by default and in production builds**.
 
 ---
 
@@ -395,8 +393,8 @@ function today and is where the firm segment is added. Moving a route makes `tsc
 | #   | Task                                                                                                                                                                                                                                                                                                                        |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | T1  | ~~Contracts in `docs/02`~~ — **done**: drafted in T0, approved 2026-10-14, now `docs/02` §3.1 (drop the "not yet implemented" note there when T2 lands) |
-| T2  | Zod schemas from `docs/02` §3.1 (slug pattern, `Invite` refinement `firmId` null ⇔ `PLATFORM_ADMIN`). `SessionSchema` limits move to `Firm` (copied from the `Plan`) and usage becomes **derived**: `seatsUsed` = active users + pending unexpired invites; `activeCandidates` = `ON_BENCH` / `INTERVIEWING` / `OFFER`; over-limit flags; block new additions over a limit (Q17) |
-| T3  | Fixtures: add `firmId` to every firm-scoped fixture, **including agent and tailoring runs** (Q21); add a **second firm** (small: 3 users, 5 candidates), a platform admin, and a few invites (pending, expired, accepted) so isolation and limits are testable |
+| T2  | Zod schemas from `docs/02` §3.1 (slug pattern, `Invite` refinement `firmId` null ⇔ `PLATFORM_ADMIN`). `SessionSchema` limits move to `Firm` (copied from the `Plan`) and usage becomes **derived**: `seatsUsed` = active users + pending unexpired invites; `activeCandidates` = `ON_BENCH` / `INTERVIEWING` / `OFFER`; over-limit flags; block new additions over a limit (Q17); also derive **`canAddSeat` / `canAddCandidate` = usage < limit**, which drive the block, separately from the `isOver*` flags (usage > limit). Define `InviteSchema`'s **base object separately** and apply the `superRefine` on top, so `.extend` / `.pick` still work on the base |
+| T3  | Fixtures: add `firmId` to every firm-scoped fixture, **including agent and tailoring runs** (Q21); add a **second firm** (small: 3 users, 5 candidates), a platform admin, and a few invites (pending, expired, accepted) so isolation and limits are testable. Besides the second active firm, add **two tiny firms**: one `SUSPENDED` and one `ONBOARDING` (owner invite pending, no users). T8 and Phase P need both statuses |
 | T4  | Session store → `Principal`; dev principal switcher lists every fixture principal                                                                                                                                                                                                                                           |
 | T5  | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it                                                                                                                                                        |
 | T6  | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path |
@@ -461,6 +459,14 @@ dangling `·` when `promptVersion` is null; full settings UIs.
 
 Planned separately once P and B are done: screen specs in `docs/04`, then polish of create firm,
 invites, plans, suspend/reactivate, audit, system. Out of scope until then.
+
+**Open questions for Phase S** (product owner; decide before building the invite and suspend flows):
+
+1. **Opening an invite to a `SUSPENDED` firm.** What does `/invite/[token]` do when the firm is
+   suspended? Owner leans towards **blocking it** with the "Workspace suspended" message.
+2. **Seats held by pending invites of a suspended firm.** Do pending invites to a `SUSPENDED` firm
+   still reserve seats (Q17 says pending invites reserve a seat), or are they released while it is
+   suspended?
 
 ---
 
