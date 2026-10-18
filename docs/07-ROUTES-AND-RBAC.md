@@ -41,6 +41,7 @@ All decisions live here. Change a decision here first, then the sections below.
 | Q22 | Slug-less URLs from before firm URLs (e.g. `/candidates`) | **Not-found, no redirect** (decided 2026-10-18): no such links exist outside the prototype demo. If old links ever appear, a redirect can prepend the signed-in user's slug and match the result against the same registry (`matchRoute`), so no second route list is needed |
 | Q23 | Where the firm-side invite flow lives | **Phase M, after Phase S** (approved 2026-10-18): OWNER invites / resends / revokes on settings/team (Q15) and firm pages read pending invites. Depends on C (`member.*` through `can()`) and S (shared invite adapter, `/invite/[token]`, the suspended-firm invite answers that change seat counts) |
 | Q24 | How a resend is logged | **Another `INVITE_SENT`** in the firm's ledger, summary **"Invite resent to <email>"** (approved 2026-10-18). No new ledger action, no contract change |
+| Q25 | How people sign in until real auth | **Through `/sign-in` only** (decided 2026-10-19): email + password against **seeded dummy accounts** in the mock layer, one per fixture user plus the Super Admin, one shared demo password (`docs/03` §3.2). The **dev principal switcher is removed** in development and production. Dummy data stays per firm (the existing fixtures). Still mock auth, not security; real enforcement stays Phase D. Implemented in **Phase L**, before P3 |
 
 ---
 
@@ -184,9 +185,11 @@ type SupportView = {
   (`User`, `Firm`, `Principal`).
 - The firm in context comes from the URL (§1.3). For a firm principal, `principal.firmId` must
   equal the URL firm's id, otherwise not-found.
-- **Dev principal switcher** replaces the RoleSwitcher: pick any fixture principal (each role in
-  firm A, a user in firm B, a platform admin). Rendered only when
-  `NEXT_PUBLIC_SHOW_DEV_TOOLS=true`; **off by default and in production builds**.
+- **Signing in (Q25):** everyone signs in on `/sign-in` with email + password against the seeded
+  accounts in the mock layer (`docs/03` §3.2): every fixture firm user and the Super Admin, one
+  shared demo password. There is **no principal switcher**, in development or production: to act as
+  someone else, sign out (user menu) and sign in as them. Mock auth, not security (Phase D).
+  *Until Phase L lands, the dev principal switcher from T4 is still in the code.*
 
 ---
 
@@ -306,10 +309,11 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod                                                                                                | A                | Done (A2.2–A2.9; see result below) |
 | **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2               | Done                               |
 | **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | Done (PRs 1–4; exit check recorded below) |
-| **P**  | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view                                                                                                    | T                | In progress — P1–P2; P3 waits for the docs/04 Admin section |
+| **P**  | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view                                                                                                    | T, L (from P3)   | In progress — P1–P2 done (#12, #13); P3 waits for Phase L and the docs/04 Admin section |
 | **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | Planned                            |
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
 | **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit, system                                                                                                   | P, B             | Planned                            |
+| **L**  | Sign-in with seeded accounts (Q25) — `/sign-in` against the mock layer's seeded accounts; dev principal switcher removed; user-menu sign-out; mock session kept per tab   | T, P1–P2         | Proposed (2026-10-19) — before P3  |
 | **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Planned (Q23)                      |
 | **D**  | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks                                                                                                           | backend D1/D2    | Later                              |
 
@@ -366,7 +370,7 @@ error / loading screens, record scope → not-found, settings split, `/sign-up`,
 | A2.4 | Replace the 7 spot checks with the full §2.2 table test (firm roles only for now)                                                                              | the test is the spec                                           |
 | A2.5 | One `FirmRole`: keep the Zod enum, delete the store's copy, re-type helpers                                                                                    | two declarations                                               |
 | A2.6 | `useRouteAccess`: unregistered path → `none` (not `full`)                                                                                                      | fail closed                                                    |
-| A2.7 | RoleSwitcher behind `NEXT_PUBLIC_SHOW_DEV_TOOLS=true`, off by default; add to `.env.example`                                                                   | it ships to production today                                   |
+| A2.7 | RoleSwitcher behind `NEXT_PUBLIC_SHOW_DEV_TOOLS=true`, off by default; add to `.env.example`                                                                   | it ships to production today *(Superseded by Q25: the switcher is removed in Phase L.)* |
 | A2.8 | Move `/design-system` to `/dev/design-system`                                                                                                                  | frees the top level for firm slugs                             |
 | A2.9 | Fix the stale `iconsax-react` comment in `next.config.ts`                                                                                                      | hygiene                                                        |
 
@@ -379,7 +383,7 @@ switcher hidden in `pnpm build && pnpm start`; Phase A exit criteria ticked; che
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | No path literals outside `src/lib/routes/`    | Met. 60 literals replaced; `no-path-literals.test.ts` enforces it (mutation-checked). `[firm]` is not assumed anywhere                                    |
 | Table test covers every firm route × role     | Met. 22 routes × 4 roles, plus `onDenied`, public and dev routes; fails if a route has no row                                                             |
-| Switcher hidden in `pnpm build && pnpm start` | Met, with a positive control (absent from HTML and chunks when `NEXT_PUBLIC_SHOW_DEV_TOOLS` is unset; present when `true`)                                |
+| Switcher hidden in `pnpm build && pnpm start` | Met, with a positive control (absent from HTML and chunks when `NEXT_PUBLIC_SHOW_DEV_TOOLS` is unset; present when `true`) *(Moot after Phase L: the switcher is removed, Q25.)* |
 | Phase A exit criteria ticked                  | Partly. Role × route renders, record scope, unknown URL and the checks are ticked; the error card, both themes and the three widths are not (see Phase A) |
 | Checks green                                  | Met. typecheck, lint, test (54), build all exit 0                                                                                                         |
 
@@ -399,7 +403,7 @@ function today and is where the firm segment is added. Moving a route makes `tsc
 | T1  | ~~Contracts in `docs/02`~~ — **done**: drafted in T0, approved 2026-10-14, now `docs/02` §3.1 (drop the "not yet implemented" note there when T2 lands) |
 | T2  | Zod schemas from `docs/02` §3.1 (slug pattern, `Invite` refinement `firmId` null ⇔ `PLATFORM_ADMIN`). `SessionSchema` limits move to `Firm` (copied from the `Plan`) and usage becomes **derived**: `seatsUsed` = active users + pending unexpired invites; `activeCandidates` = `ON_BENCH` / `INTERVIEWING` / `OFFER`; over-limit flags; block new additions over a limit (Q17); also derive **`canAddSeat` / `canAddCandidate` = usage < limit**, which drive the block, separately from the `isOver*` flags (usage > limit). Define `InviteSchema`'s **base object separately** and apply the `superRefine` on top, so `.extend` / `.pick` still work on the base — **done in PR 1** (`feat/tenancy`) |
 | T3  | Fixtures: add `firmId` to every firm-scoped fixture, **including agent and tailoring runs** (Q21); add a **second firm** (small: 3 users, 5 candidates), a platform admin, and a few invites (pending, expired, accepted) so isolation and limits are testable. Besides the second active firm, add **two tiny firms**: one `SUSPENDED` and one `ONBOARDING` (owner invite pending, no users). T8 and Phase P need both statuses — **done in PR 1** (`feat/tenancy`) |
-| T4  | Session store → `Principal`; dev principal switcher lists every fixture principal — **done in PR 2** (`feat/tenancy-session`) |
+| T4  | Session store → `Principal`; dev principal switcher lists every fixture principal — **done in PR 2** (`feat/tenancy-session`) *(Superseded by Q25: the switcher is removed in Phase L.)* |
 | T5  | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it — **done in PR 2** (`feat/tenancy-session`) |
 | T6  | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path. **The firm comes from the URL:** `useFirmId()` reads the `[firm]` segment through the firm layout's context, the session store no longer holds a firm, and a firm principal whose `firmId` doesn't match the URL firm gets not-found (§2.5) — **done in PR 3** (`feat/tenancy-urls`): the firm gate (`src/components/routes/firm-gate.tsx`) runs `firmOutcome()` (`src/lib/tenancy/firm-outcome.ts`, tested for every fixture principal × every slug); `useHref()` fills the slug from the URL firm, or, off a firm page, from the signed-in user's own firm. **Slug-less URLs from before T6** (`/candidates`, …) are **not-found, not redirected** (Q22): there are no such links in the wild (the prototype was only demoed), a redirect would be a second route list, and principle 4 stays simple. The platform support interstitial (§2.5 row 4) waits for Phase P |
 | T6b | ~~Remove `/sign-up` and its link from `/sign-in` (Q11)~~ — done early in T0                                                                                                                                                                                                                                                 |
@@ -429,7 +433,7 @@ the other firm's data (checked on every list screen); query keys all include `fi
 | P5  | ⌘K for admins: firms search, "View workspace", admin nav; firm-scoped commands hidden outside a firm                                                                           |
 | P6  | Tests: platform table test rows, support view grants no actions, non-admin → `/admin` not-found; **the §2.5 platform-admin rows**: no support view for this firm → support interstitial (reason required, not a redirect), and a support view of a `SUSPENDED` firm renders normally (read-only), added to `src/lib/tenancy/firm-outcome.test.ts` |
 
-Screens are functional skeletons here; visual polish is Phase S. `docs/04-SCREENS.md` gets an
+**P3–P6 come after Phase L** (Q25): they are built and checked signed in as the seeded Super Admin. Screens are functional skeletons here; visual polish is Phase S. `docs/04-SCREENS.md` gets an
 "Admin" section before P3 (UI-first: the screen spec comes first). **P3 waits for that section** (product owner drafting it, 2026-10-18).
 
 **Fixture dates (do in P3, before any admin screen shows invites next to the ledger):** invite dates
@@ -469,7 +473,7 @@ As v1 Phase C, typed on `Principal`:
 
 As v1 Phase B (per-route checklist), with the audit board extended to the platform tier and the
 Support column. Known gaps carried over: ledger BDE "own" filter + filters + diff expander; the
-dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: **sign-out in the user menu for normal users** (today only the dev switcher and the suspended screen have it); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates"). From PR 4: outreach has no skeleton or empty state for its thread list; the candidates search box is squeezed at 390 px. (The dashboards' missing error states were fixed before Phase P: docs/04 §13.) The OWNER rollup is labelled "Active users" until firm pages read pending invites (Phase M).
+dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: sign-out in the user menu moved to Phase L (L3: without the switcher it is the only way to change accounts); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates"). From PR 4: outreach has no skeleton or empty state for its thread list; the candidates search box is squeezed at 390 px. (The dashboards' missing error states were fixed before Phase P: docs/04 §13.) The OWNER rollup is labelled "Active users" until firm pages read pending invites (Phase M).
 
 ---
 
@@ -488,11 +492,82 @@ invites, plans, suspend/reactivate, audit, system. Out of scope until then.
 
 ---
 
+## Phase L — Sign-in with seeded accounts (Q25) — proposed 2026-10-19
+
+Everyone signs in through `/sign-in` (email + password) against seeded dummy accounts in the mock
+layer; the dev principal switcher goes, in development and production. Accounts, password and
+landings: `docs/03` §3.2. Mock auth, not security: real enforcement stays Phase D.
+
+**Where it sits: after P1–P2, before P3.** P3's admin screens and P4's support view are built and
+checked as a signed-in Super Admin; building them on the switcher would mean re-checking them once it
+is gone, and P4's "exit support view → back to `/admin`" and P6's "non-admin → not-found" are exactly
+the flows a real sign-in exercises. P1–P2 already made platform sessions real, so this step is small.
+
+| #   | Task |
+| --- | ---- |
+| L1  | Mock sign-in: `sessionApi.signIn(email, password)` checks the seeded accounts (`docs/03` §3.2); a wrong password, an unknown email and an inactive account all get the same "Email or password is incorrect" (no account enumeration). Firm users' and the Super Admin's fixture emails move to the seed pattern, and so do invite emails (accepted OWNER invites must keep matching their user, `fixtures.test.ts`). Passwords live only in the mock layer, never on the `User` contract |
+| L2  | `/sign-in` signs in for real (no pre-filled default user) and keeps `returnTo` (same-origin only); the app **starts signed out** (no default session) |
+| L3  | User menu in the topbar (firm and admin shells, the suspended and support-required screens): name, role, firm, **Sign out**. Moved from the Phase B gaps: without the switcher it is the only way to change accounts |
+| L4  | The mock session survives a reload in every build: the signed-in account id in this tab's `sessionStorage` (a stand-in for the session cookie until Phase D). Replaces the dev-only `DevSessionRestore`; mock data still resets on reload |
+| L5  | Remove the switcher and everything that exists only for it: see the inventory below. `NEXT_PUBLIC_SHOW_DEV_TOOLS` goes from `.env.example` and `docs/01` if nothing else reads it |
+| L6  | Tests sign in through the same path (a test helper calling `sessionApi.signIn` with the seed email and demo password); a sign-in test per seeded account checks its landing (the §3.2 table); wrong password / unknown email / inactive → the same error; `returnTo` honoured; reload keeps the session; sign-out clears it. Browser check: sign in as each seeded account |
+
+**Exit:** no switcher anywhere (code, chunks, docs other than history); every seeded account signs in
+on `/sign-in` and lands where `docs/03` §3.2 says; sign-out works from every shell; checks green.
+
+**Open (product owner):**
+
+1. **`/welcome` in the browser.** It needs a never-active OWNER, and the only one is GSC's, whose
+   invite is still pending; the switcher was what accepted it. Options: (a) leave `/welcome` to unit
+   tests until `/invite/[token]` arrives in Phase S (recommended: no early UI); (b) bring a minimal
+   mock `/invite/[token]` forward into Phase L.
+2. **Session lifetime.** Proposed: per tab (`sessionStorage`), so two tabs can be two accounts and
+   closing the tab signs you out. The alternative, `localStorage`, shares one account across tabs.
+
+**What depends on the switcher today** (to change or delete in L5–L6):
+
+| File | What it does with the switcher |
+| ---- | ------------------------------ |
+| `src/components/dev/principal-switcher.tsx` | The switcher itself (`NEXT_PUBLIC_SHOW_DEV_TOOLS`) — delete |
+| `src/components/layout/topbar.tsx` | Renders it — becomes the user menu (L3) |
+| `src/components/app/suspended-state.tsx` | Renders it above the message — remove (it already has Sign out) |
+| `src/components/routes/support-required-state.tsx` | Renders it above the message — replace with the user menu's sign-out |
+| `src/components/dev/dev-session-restore.tsx` | Remembers the switcher's principal across reloads — replaced by L4 |
+| `src/app/providers.tsx` | Mounts `DevSessionRestore` — mounts L4's restore instead |
+| `src/app/sign-in/page.tsx` | Signs in as the default user via `useDevSignInAs`; pre-filled fake email — real sign-in (L2) |
+| `src/lib/hooks/use-session.ts` | `useDevPrincipals`, `useDevSignInAs` (with `navigateTo` / pending) — becomes `useSignIn`; `useCommitPendingSession` stays (sign-in → `returnTo`) |
+| `src/lib/api/session.ts` | `devPrincipals`, `devSignInAs` — become `signIn(email, password)` |
+| `src/mocks/session.ts` | `devPrincipals`, `devSignInAs`, `DEV_INVITE_ACCEPTANCES` (the GSC acceptance) — delete; `signIn` checks the seeds |
+| `src/mocks/auth.ts` | `signInAs(userId)`, starts signed in as `DEFAULT_USER_ID` — starts signed out; sign-in by credentials |
+| `src/lib/schemas/session.ts` | `DevPrincipalOptionSchema` (dev-only shape) — delete |
+| `src/lib/query/keys.ts` | `session.devPrincipals()` key — delete |
+| `src/lib/stores/session-store.ts` | `DEFAULT_SESSION` as the initial (signed-in) state; `restoring` for the dev restore — initial state signed out; `DEFAULT_SESSION` stays only as a test fixture if still needed |
+| `.env.example`, `docs/01` §auth | `NEXT_PUBLIC_SHOW_DEV_TOOLS` — remove if unused |
+
+| Test | Uses |
+| ---- | ---- |
+| `src/lib/stores/session-store.test.ts` | lists dev principals, `devSignInAs` (firm user, Super Admin), default session |
+| `src/lib/query/principal-boundary.test.ts` | `devSignInAs` to switch OWNER → BDE and across firms; `DEFAULT_SESSION` |
+| `src/lib/tenancy/firm-outcome.test.ts` | `devSignInAs` for every fixture principal × slug (§2.5) |
+| `src/lib/routes/landing.test.ts` | `devSignInAs` for every firm user's landing |
+| `src/mocks/membership.test.ts` | `devSignInAs` as firm A / firm B owners |
+| `src/mocks/isolation.test.ts` | `devSignInAs` as a member of each firm |
+| `src/mocks/invites.test.ts` | accepts the GSC invite through `devSignInAs("inv_gsc_owner")` — becomes a direct `acceptInvite` test |
+| `src/lib/query/keys.test.ts` | the `session.devPrincipals` key |
+| `src/features/dashboard/dashboard-errors.test.ts` | `DEFAULT_SESSION.firm` as the fixture firm (not the switcher; unaffected unless `DEFAULT_SESSION` goes) |
+
+Docs that also mention the switcher, to update with L (not history files): `docs/01` (auth section,
+env var), `docs/05` (topbar contents), `docs/04` §1 (topbar diagram: `[role] [me]`), `docs/03`
+(§3.1 notes), `docs/integration/05-analytics.md` (its check says "via the role switcher").
+History (`docs/06`, `docs/CURRENT_STATE.md`, `docs/archive/`, the A/A2/T rows above) stays as written.
+
+---
+
 ## Phase M — Firm members and invites (firm side) — approved 2026-10-18 (Q23)
 
 The firm half of the invite flow. Today only the Super Admin side is planned (S: the OWNER's invite
-when a firm is created, resend / revoke on `/admin/firms/[firmId]/users`), and the dev switcher
-stands in for accepting.
+when a firm is created, resend / revoke on `/admin/firms/[firmId]/users`). Until `/invite/[token]`
+arrives (S), nothing in the UI accepts an invite: the dev switcher did, and it goes in Phase L.
 
 | #   | Task |
 | --- | ---- |
@@ -527,7 +602,9 @@ stands in for accepting.
 2. Server-readable session cookie; the frontend reads the principal server-side.
 3. `src/proxy.ts` for optimistic redirects only (signed out → `/sign-in`).
 4. `forbidden()` + `forbidden.tsx`; firm and admin layouts check the principal on the server. Until then the gates run in the browser, so a not-found under `/[firm]/…` or `/admin/…` (unknown slug, another firm, a non-admin at `/admin`, an unknown admin URL) answers **HTTP 200** with the not-found screen; the 404 status arrives with this step.
-5. Client `scope*` helpers deleted; the dev principal switcher deleted.
+5. Client `scope*` helpers deleted. The mock sign-in (seeded accounts, demo password, the session kept
+   in `sessionStorage`) is replaced by the backend's users, passwords and session cookie. (The dev
+   principal switcher was already removed in Phase L, Q25.)
 
 ---
 
