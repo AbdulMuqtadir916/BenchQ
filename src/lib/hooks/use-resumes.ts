@@ -2,23 +2,28 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { resumesApi } from "@/lib/api/resumes";
+import { queryKeys } from "@/lib/query/keys";
+import { useFirmId } from "@/lib/stores/session-store";
 
 export function useAllResumes() {
-  return useQuery({ queryKey: ["resumes"], queryFn: () => resumesApi.list() });
+  const firmId = useFirmId();
+  return useQuery({ queryKey: queryKeys.resumes.list(firmId), queryFn: () => resumesApi.list(firmId) });
 }
 
 export function useResumes(candidateId: string) {
+  const firmId = useFirmId();
   return useQuery({
-    queryKey: ["resumes", candidateId],
-    queryFn: () => resumesApi.byCandidate(candidateId),
+    queryKey: queryKeys.resumes.byCandidate(firmId, candidateId),
+    queryFn: () => resumesApi.byCandidate(firmId, candidateId),
     enabled: !!candidateId,
   });
 }
 
 export function useResume(id: string) {
+  const firmId = useFirmId();
   return useQuery({
-    queryKey: ["resume", id],
-    queryFn: () => resumesApi.byId(id),
+    queryKey: queryKeys.resumes.detail(firmId, id),
+    queryFn: () => resumesApi.byId(firmId, id),
     enabled: !!id,
   });
 }

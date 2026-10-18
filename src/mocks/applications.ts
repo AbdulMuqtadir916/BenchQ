@@ -3,30 +3,25 @@ import { ApplicationSchema, FollowUpTaskSchema, type Application, type FollowUpT
 import { UpdateApplicationStatusSchema, type UpdateApplicationStatus } from "@/lib/schemas/inbox";
 import applicationsSeed from "./data/applications.json";
 import followupsSeed from "./data/followups.json";
-import { currentUser } from "./team";
-import { inDevFirm, mockResult, notFound } from "./_shared";
+import { currentUser } from "./auth";
+import { findInFirm, inFirm, mockResult } from "./_shared";
 
 export const allApplications: Application[] = arrayOf(ApplicationSchema).parse(applicationsSeed);
 export const allFollowups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
-const applications: Application[] = inDevFirm(allApplications);
-const followups: FollowUpTask[] = inDevFirm(allFollowups);
 
 const CLOSED_STATUSES = ["PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
 
 export const applicationsMock = {
-  list: (params?: { candidateId?: string }): Promise<Application[]> =>
-    mockResult(
-      params?.candidateId
-        ? applications.filter((application) => application.candidateId === params.candidateId)
-        : applications,
-    ),
+  list: (firmId: string, params?: { candidateId?: string }): Promise<Application[]> => {
+    const applications = inFirm(allApplications, firmId);
+    return mockResult(params?.candidateId ? applications.filter((application) => application.candidateId === params.candidateId) : applications);
+  },
 
-  byId: (id: string): Promise<Application> =>
-    mockResult(applications.find((item) => item.id === id) ?? notFound("Application", id)),
+  byId: (firmId: string, id: string): Promise<Application> => mockResult(findInFirm(allApplications, firmId, id, "Application")),
 
   // Stand-in for the backend's status-transition rules; delete with this module.
-  updateStatus: (id: string, body: UpdateApplicationStatus): Promise<Application> => {
-    const application = applications.find((item) => item.id === id) ?? notFound("Application", id);
+  updateStatus: (firmId: string, id: string, body: UpdateApplicationStatus): Promise<Application> => {
+    const application = findInFirm(allApplications, firmId, id, "Application");
     const update = UpdateApplicationStatusSchema.parse(body);
     const now = new Date().toISOString();
 
@@ -50,8 +45,8 @@ export const applicationsMock = {
 };
 
 export const followupsMock = {
-  list: (params?: { userId?: string }): Promise<FollowUpTask[]> =>
-    mockResult(
-      params?.userId ? followups.filter((followup) => followup.assignedToUserId === params.userId) : followups,
-    ),
+  list: (firmId: string, params?: { userId?: string }): Promise<FollowUpTask[]> => {
+    const followups = inFirm(allFollowups, firmId);
+    return mockResult(params?.userId ? followups.filter((followup) => followup.assignedToUserId === params.userId) : followups);
+  },
 };

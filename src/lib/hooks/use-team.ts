@@ -2,10 +2,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { teamApi } from "@/lib/api/team";
+import { queryKeys } from "@/lib/query/keys";
+import { useFirmId } from "@/lib/stores/session-store";
 
 export function useTeam() {
+  const firmId = useFirmId();
   return useQuery({
-    queryKey: ["team"],
-    queryFn: () => teamApi.list(),
+    queryKey: queryKeys.team.list(firmId),
+    queryFn: () => teamApi.list(firmId),
   });
 }

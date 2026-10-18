@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allCandidates, candidates } from "./candidates";
+import { allCandidates } from "./candidates";
 import { allJobs } from "./jobs";
 import { allApplications, allFollowups } from "./applications";
 import { allResumes } from "./resumes";
@@ -7,9 +7,8 @@ import { allRecords } from "./records";
 import { allDocuments } from "./documents";
 import { allMessages } from "./inbox";
 import { allLedger } from "./ledger";
-import { allUsers, firms, users } from "./team";
+import { allUsers, firms } from "./team";
 import { FIXTURE_NOW, invitesAt, plans, platformUsers } from "./tenancy";
-import { DEV_FIRM_ID } from "./_shared";
 
 /**
  * Tenancy integrity of the fixtures (docs/07 T3). Every firm-scoped record belongs to a known firm,
@@ -124,11 +123,10 @@ describe("firmId on every firm-scoped record", () => {
   });
 });
 
-describe("transitional single-firm view (until Phase T PR 2)", () => {
-  it("serves only firm A, exactly as before the other firms existed", () => {
-    expect(DEV_FIRM_ID).toBe("firm_hts");
-    expect(candidates).toHaveLength(24);
-    expect(candidates.every((candidate) => candidate.firmId === DEV_FIRM_ID)).toBe(true);
-    expect(users.map((user) => user.id)).toEqual(["user_imran", "user_fatima", "user_adnan", "user_sneha", "user_vikram"]);
+describe("principals the dev switcher can offer (docs/07 §3)", () => {
+  it("has every firm role in firm A, and users in another firm", () => {
+    const rolesA = new Set(allUsers.filter((user) => user.firmId === "firm_hts").map((user) => user.role));
+    expect([...rolesA].sort()).toEqual(["BDE", "MANAGER", "OWNER", "VIEWER"]);
+    expect(allUsers.some((user) => user.firmId === "firm_stl")).toBe(true);
   });
 });

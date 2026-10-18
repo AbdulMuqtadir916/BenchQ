@@ -25,13 +25,15 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     if (shouldLeave) router.replace(landingFor(role));
   }, [shouldLeave, role, router]);
 
-  // docs/04 §12: a role switch mid-flight refetches instead of leaving the previous role's data on screen.
-  const previousRole = useRef(role);
+  // docs/04 §12: switching who is signed in refetches instead of leaving the previous principal's data
+  // on screen. Firm data is keyed by firm already; this covers user-specific lists (scopes, follow-ups).
+  const userId = useSession((s) => s.principal.userId);
+  const previousUser = useRef(userId);
   useEffect(() => {
-    if (previousRole.current === role) return;
-    previousRole.current = role;
+    if (previousUser.current === userId) return;
+    previousUser.current = userId;
     void queryClient.invalidateQueries();
-  }, [role, queryClient]);
+  }, [userId, queryClient]);
 
   if (shouldLeave) return null;
   // Not a route we know: render nothing of the page, and don't pretend it exists (docs/07 principle 4).

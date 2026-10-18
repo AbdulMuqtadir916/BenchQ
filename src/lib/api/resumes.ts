@@ -2,10 +2,11 @@ import type { Resume } from "@/lib/schemas/resume";
 
 const mock = () => import("@/mocks/resumes").then((m) => m.resumesMock);
 
+/** Firm-scoped (docs/07 T5): every call names the firm, and the backend/mock serves only that firm's rows. */
 export const resumesApi = {
-  list: async (): Promise<Resume[]> => (await mock()).list(),
+  list: async (firmId: string): Promise<Resume[]> => (await mock()).list(firmId),
 
-  byCandidate: async (candidateId: string): Promise<Resume[]> => (await mock()).byCandidate(candidateId),
+  byCandidate: async (firmId: string, candidateId: string): Promise<Resume[]> => (await mock()).byCandidate(firmId, candidateId),
 
-  byId: async (id: string): Promise<Resume> => (await mock()).byId(id),
+  byId: async (firmId: string, id: string): Promise<Resume> => (await mock()).byId(firmId, id),
 };

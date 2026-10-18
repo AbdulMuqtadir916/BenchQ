@@ -16,8 +16,8 @@ const usageOf = (firmId: string) => {
 };
 
 describe("deriveFirmUsage on the fixture firms (A1–A4)", () => {
-  it("firm A (ACTIVE, Growth): 5 users + 1 pending invite; the expired invite frees its seat", () => {
-    expect(usageOf("firm_hts")).toMatchObject({ seatsUsed: 6, seatLimit: 10, activeCandidates: 21, candidateLimit: 100, canAddSeat: true, canAddCandidate: true, isOverLimit: false });
+  it("firm A (ACTIVE, Growth): 6 users (every role) + 1 pending invite; the expired invite frees its seat", () => {
+    expect(usageOf("firm_hts")).toMatchObject({ seatsUsed: 7, seatLimit: 10, activeCandidates: 21, candidateLimit: 100, canAddSeat: true, canAddCandidate: true, isOverLimit: false });
   });
 
   it("second firm (ACTIVE, Starter): exactly at the seat limit, so it can't add a seat but is not over", () => {
