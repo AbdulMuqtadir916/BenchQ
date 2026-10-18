@@ -12,36 +12,53 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
 import { FunnelBars } from "@/components/app/charts/funnel-bars";
 import { SkeletonCard } from "@/components/app/skeleton-card";
+import { ErrorState } from "@/components/app/error-state";
+import { GroupBody, GroupRowError } from "@/components/app/card-group";
+import { hasPageFailed, queryGroup } from "@/lib/query/query-group";
 import { PageHeader } from "@/components/app/page-header";
 import { useHref } from "@/lib/routes/use-href";
 
 const EMPTY: never[] = [];
 
 export function ManagerDashboard({ role = "MANAGER" }: { role?: "MANAGER" | "OWNER" | "VIEWER" }) {
+  const queries = useFloorQueries();
+  const header = <PageHeader title={role === "OWNER" ? "The business" : "The floor"} subtitle="Who is working on what, at which stage, right now." />;
+  // docs/04 §13: everything failed → one page-level error, not one per card.
+  if (hasPageFailed(...queries)) {
+    const page = queryGroup(...queries);
+    return (
+      <div className="bq-page">
+        {header}
+        <ErrorState variant="page" error={page.error ?? new Error("The request failed.")} onRetry={page.retry} />
+      </div>
+    );
+  }
   return (
     <div className="bq-page">
-      <PageHeader
-        title={role === "OWNER" ? "The business" : "The floor"}
-        subtitle="Who is working on what, at which stage, right now."
-      />
+      {header}
       <FloorContent />
     </div>
   );
 }
 
+/** The floor's queries (shared cache entries): candidates, applications, follow-ups, team. */
+function useFloorQueries() {
+  return [useCandidates(), useApplications(), useFollowups(), useTeam()] as const;
+}
+
 export function FloorContent() {
   const toHref = useHref();
-  const candidatesQuery = useCandidates();
-  const applicationsQuery = useApplications();
-  const followupsQuery = useFollowups();
-  const teamQuery = useTeam();
+  const [candidatesQuery, applicationsQuery, followupsQuery, teamQuery] = useFloorQueries();
+  // docs/04 §13: one group per set of cards that read the same queries.
+  const throughput = queryGroup(candidatesQuery, applicationsQuery, teamQuery);
+  const performance = queryGroup(teamQuery, candidatesQuery, applicationsQuery, followupsQuery);
+  const pipeline = queryGroup(applicationsQuery);
+  const risk = queryGroup(candidatesQuery, applicationsQuery);
 
   const candidates = candidatesQuery.data ?? EMPTY;
   const applications = applicationsQuery.data ?? EMPTY;
   const followups = followupsQuery.data ?? EMPTY;
   const team = teamQuery.data ?? EMPTY;
-
-  const isLoading = candidatesQuery.isLoading || applicationsQuery.isLoading || teamQuery.isLoading;
 
   const perBde = useMemo(
     () => deriveBdePerformance(team, candidates, applications),
@@ -81,7 +98,9 @@ export function FloorContent() {
   return (
     <>
       <section aria-label="Throughput" className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
+        {throughput.status === "error" ? (
+          <GroupRowError group={throughput} />
+        ) : throughput.status === "pending" ? (
           <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
         ) : (
           <>
@@ -99,9 +118,7 @@ export function FloorContent() {
             <CardTitle>Per-BDE performance</CardTitle>
             <span className="text-caption text-[var(--color-text-3)]">click a row to filter the tracker</span>
           </CardHeader>
-          {isLoading ? (
-            <div className="p-4"><SkeletonCard /></div>
-          ) : (
+          <GroupBody group={performance} skeleton={<div className="p-4"><SkeletonCard /></div>}>{() => (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
@@ -137,13 +154,13 @@ export function FloorContent() {
                 </tbody>
               </table>
             </div>
-          )}
+          )}</GroupBody>
         </Card>
 
         <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle>Pipeline funnel</CardTitle><span className="text-caption text-[var(--color-text-3)]">reached each stage</span></CardHeader>
-            {isLoading ? <SkeletonCard /> : <FunnelBars stages={funnel} />}
+            <GroupBody group={pipeline} skeleton={<SkeletonCard />}>{() => <FunnelBars stages={funnel} />}</GroupBody>
           </Card>
 
           <Card className="p-0">
@@ -153,9 +170,7 @@ export function FloorContent() {
                 At-risk candidates
               </CardTitle>
             </CardHeader>
-            {isLoading ? (
-              <div className="p-4"><SkeletonCard /></div>
-            ) : atRisk.length === 0 ? (
+            <GroupBody group={risk} skeleton={<div className="p-4"><SkeletonCard /></div>}>{() => atRisk.length === 0 ? (
               <p className="px-4 pb-4 text-sm text-[var(--color-text-3)]">No candidates are stalled. Nice.</p>
             ) : (
               <ul className="divide-y divide-[var(--color-border)]">
@@ -171,7 +186,7 @@ export function FloorContent() {
                   </li>
                 ))}
               </ul>
-            )}
+            )}</GroupBody>
           </Card>
         </div>
       </div>

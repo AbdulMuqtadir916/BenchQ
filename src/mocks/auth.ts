@@ -1,7 +1,7 @@
 import { ApiError } from "@/lib/api/client";
 import type { FirmPrincipal } from "@/lib/schemas/tenancy";
 import type { Firm, User } from "@/lib/schemas/session";
-import { allUsers, firms } from "./team";
+import { allUsers, firms } from "./team-data";
 
 /**
  * The mock backend's sign-in state: who the "server" thinks is signed in. A real backend reads this

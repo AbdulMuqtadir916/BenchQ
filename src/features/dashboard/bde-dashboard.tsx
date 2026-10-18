@@ -17,6 +17,9 @@ import { ResponseDots } from "@/components/app/response-dots";
 import { MatchScore } from "@/components/app/match-score";
 import { EmptyState } from "@/components/app/empty-state";
 import { SkeletonCard } from "@/components/app/skeleton-card";
+import { ErrorState } from "@/components/app/error-state";
+import { GroupBody, GroupRowError } from "@/components/app/card-group";
+import { hasPageFailed, queryGroup } from "@/lib/query/query-group";
 import { PageHeader } from "@/components/app/page-header";
 import { Users } from "lucide-react";
 import { useHref } from "@/lib/routes/use-href";
@@ -32,6 +35,11 @@ export function BdeDashboard() {
   const applicationsQuery = useApplications();
   const followupsQuery = useFollowups(user.id);
   const jobsQuery = useJobs({ limit: 300 });
+  // docs/04 §13: one group per set of cards that read the same queries.
+  const numbers = queryGroup(candidatesQuery, applicationsQuery, followupsQuery);
+  const mine = queryGroup(candidatesQuery, applicationsQuery);
+  const queueGroup = queryGroup(candidatesQuery, applicationsQuery, jobsQuery);
+  const page = queryGroup(candidatesQuery, applicationsQuery, followupsQuery, jobsQuery);
 
   const candidates = candidatesQuery.data ?? EMPTY;
   const applications = applicationsQuery.data ?? EMPTY;
@@ -70,25 +78,38 @@ export function BdeDashboard() {
     return rankJobsForCandidate(topCandidate, jobs, appliedJobIds, 6);
   }, [topCandidate, jobs, applications]);
 
-  const isLoading = candidatesQuery.isLoading || applicationsQuery.isLoading;
+  const header = (
+    <PageHeader
+      title="Tonight"
+      subtitle="Your queue, your candidates, what needs a nudge before the shift ends."
+      actions={
+        <Button asChild>
+          <Link href={toHref("focus")}>
+            <Play size={14} aria-hidden />
+            Start a run
+          </Link>
+        </Button>
+      }
+    />
+  );
+
+  if (hasPageFailed(candidatesQuery, applicationsQuery, followupsQuery, jobsQuery)) {
+    return (
+      <div className="bq-page">
+        {header}
+        <ErrorState variant="page" error={page.error ?? new Error("The request failed.")} onRetry={page.retry} />
+      </div>
+    );
+  }
 
   return (
     <div className="bq-page">
-      <PageHeader
-        title="Tonight"
-        subtitle="Your queue, your candidates, what needs a nudge before the shift ends."
-        actions={
-          <Button asChild>
-            <Link href={toHref("focus")}>
-              <Play size={14} aria-hidden />
-              Start a run
-            </Link>
-          </Button>
-        }
-      />
+      {header}
 
       <section aria-label="Tonight's numbers" className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
+        {numbers.status === "error" ? (
+          <GroupRowError group={numbers} />
+        ) : numbers.status === "pending" ? (
           <>
             <SkeletonCard /> <SkeletonCard /> <SkeletonCard /> <SkeletonCard />
           </>
@@ -105,14 +126,12 @@ export function BdeDashboard() {
       <div className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
         <Card className="p-0">
           <CardHeader className="p-4">
-            <CardTitle>My candidates ({myCandidates.length})</CardTitle>
+            <CardTitle>My candidates{mine.status === "success" ? ` (${myCandidates.length})` : ""}</CardTitle>
             <Link href={toHref("candidates")} className="text-sm text-[var(--color-primary)] hover:underline">
               View all
             </Link>
           </CardHeader>
-          {isLoading ? (
-            <div className="p-4"><SkeletonCard /></div>
-          ) : myCandidates.length === 0 ? (
+          <GroupBody group={mine} skeleton={<div className="p-4"><SkeletonCard /></div>}>{() => myCandidates.length === 0 ? (
             <EmptyState icon={Users} title="No candidates assigned" description="Your manager assigns candidates to your bench." variant="first-run" />
           ) : (
             <ul className="divide-y divide-[var(--color-border)]">
@@ -139,19 +158,17 @@ export function BdeDashboard() {
                 );
               })}
             </ul>
-          )}
+          )}</GroupBody>
         </Card>
 
         <Card className="p-0">
           <CardHeader className="p-4">
-            <CardTitle>Queue — top matches{topCandidate ? ` · ${topCandidate.fullName}` : ""}</CardTitle>
+            <CardTitle>Queue — top matches{queueGroup.status === "success" && topCandidate ? ` · ${topCandidate.fullName}` : ""}</CardTitle>
             <Link href={toHref("jobs")} className="text-sm text-[var(--color-primary)] hover:underline">
               All jobs
             </Link>
           </CardHeader>
-          {isLoading ? (
-            <div className="p-4"><SkeletonCard /></div>
-          ) : queue.length === 0 ? (
+          <GroupBody group={queueGroup} skeleton={<div className="p-4"><SkeletonCard /></div>}>{() => queue.length === 0 ? (
             <EmptyState icon={Users} title="Queue is clear" description="No unapplied matches for this candidate right now." variant="filtered" />
           ) : (
             <ul className="divide-y divide-[var(--color-border)]">
@@ -181,7 +198,7 @@ export function BdeDashboard() {
                 </li>
               ))}
             </ul>
-          )}
+          )}</GroupBody>
           <div className="border-t border-[var(--color-border)] p-3">
             <Button asChild variant="secondary" size="sm" className="w-full">
               <Link href={toHref("focus")}>
