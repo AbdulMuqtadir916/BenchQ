@@ -24,8 +24,14 @@ describe("deriveFirmUsage on the fixture firms (A1–A4)", () => {
     expect(usageOf("firm_stl")).toMatchObject({ seatsUsed: 4, seatLimit: 4, canAddSeat: false, isOverSeatLimit: false, activeCandidates: 3, canAddCandidate: true });
   });
 
-  it("suspended firm, downgraded to Starter: 4 users + 1 pending invite = 5 of 4 seats, so it is over the limit", () => {
-    expect(usageOf("firm_cbw")).toMatchObject({ seatsUsed: 5, seatLimit: 4, canAddSeat: false, isOverSeatLimit: true, isOverLimit: true, activeCandidates: 1, canAddCandidate: true, isOverCandidateLimit: false });
+  it("suspended firm, downgraded to Starter: 5 users + 1 pending invite = 6 of 4 seats, so it is over the limit", () => {
+    expect(usageOf("firm_cbw")).toMatchObject({ seatsUsed: 6, seatLimit: 4, canAddSeat: false, isOverSeatLimit: true, isOverLimit: true, activeCandidates: 1, canAddCandidate: true, isOverCandidateLimit: false });
+  });
+
+  it("suspended firm is over its seat limit on active users alone, whatever Phase S decides about its pending invites", () => {
+    const cbw = firms.find((item) => item.id === "firm_cbw")!;
+    const withoutInvites = deriveFirmUsage(cbw, { users: allUsers, invites: [], candidates: allCandidates }, NOW);
+    expect(withoutInvites).toMatchObject({ seatsUsed: 5, seatLimit: 4, isOverSeatLimit: true, isOverLimit: true });
   });
 
   it("onboarding firm: no users, the owner's pending invite reserves one seat", () => {
