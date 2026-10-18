@@ -9,6 +9,7 @@ import { useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { EASE_OUT } from "@/lib/motion";
 import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
+import { isNotFoundError } from "@/lib/api/client";
 import { useRouteAccess } from "@/lib/routes/use-route-access";
 import { isInScope } from "@/lib/routes/scope";
 import { SkeletonCard } from "@/components/app/skeleton-card";
@@ -101,12 +102,15 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const finishMatch = useCallback(() => setMatchDone(matchRun), [matchRun]);
 
   if (ws.candidateQuery.isLoading) return <div className="bq-page space-y-4"><SkeletonCard /><SkeletonCard /></div>;
+  // A missing record and a record outside the user's scope look the same: not-found, never confirm existence (07 Q6).
+  const notFoundState = <NotFoundState title="Candidate not found" description="This candidate doesn't exist or isn't available to you." backHref={toHref("candidates")} backLabel="Back to candidates" />;
+  if (isNotFoundError(ws.candidateQuery.error)) return notFoundState;
   if (ws.candidateQuery.error || !ws.candidate) {
     return <div className="bq-page"><ErrorState variant="page" error={ws.candidateQuery.error ?? new Error("Candidate not found.")} onRetry={() => void ws.candidateQuery.refetch()} /></div>;
   }
   const candidate = ws.candidate;
   if (!isInScope(access, user.id, { assignedUserIds: candidate.assignedUserIds })) {
-    return <NotFoundState title="Candidate not found" description="This candidate doesn't exist or isn't available to you." backHref={toHref("candidates")} backLabel="Back to candidates" />;
+    return notFoundState;
   }
   const resumes = ws.resumesQuery.data ?? [];
 
