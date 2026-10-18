@@ -233,9 +233,12 @@ try/catch, with a working default when storage is unavailable.
 
 ## 7. Role simulation
 
-There is no auth. A **role switcher in the topbar** (development only, behind
-`NEXT_PUBLIC_SHOW_DEV_TOOLS=true`, off by default) flips the current user between `OWNER`, `MANAGER`, `BDE` and
-`VIEWER`. Every permission-dependent surface reads from the Zustand `useSession` store.
+There is no auth. A **dev principal switcher in the topbar** (development only, behind
+`NEXT_PUBLIC_SHOW_DEV_TOOLS=true`, off by default) signs in as any fixture principal: every role in firm A
+(`OWNER`, `MANAGER`, `BDE`, `VIEWER`), the users of the other fixture firms, and the platform admin
+(listed, selectable from Phase P). It signs the mock backend in too (`src/mocks/auth.ts`), so mutations
+are attributed to the right person. Every permission-dependent surface reads from the Zustand
+`useSession` store (principal, user, firm); firm data reads `useFirmId()`.
 
 This matters more than it sounds: it's how you verify that a BDE never sees `/analytics`, that a
 VIEWER has no mutating controls in the DOM at all, and that a BDE sees only their assigned

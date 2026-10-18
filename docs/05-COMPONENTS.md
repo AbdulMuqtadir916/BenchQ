@@ -58,7 +58,7 @@ defaults will not match the BenchQ palette and must not be left as-is.
 { children: ReactNode }
 ```
 Sidebar + topbar + content. Reads sidebar collapse from `useUiStore`. Renders `CommandPalette`,
-`ShiftClock`, `RoleSwitcher` (dev only) and the toast viewport.
+`ShiftClock`, `PrincipalSwitcher` (dev only; replaced the RoleSwitcher in Phase T) and the toast viewport.
 
 ### `Sidebar`
 ```ts
@@ -71,7 +71,7 @@ collapsed. Active route from `usePathname`.
 ```ts
 { }
 ```
-Firm switcher, command trigger, `ShiftClock`, role switcher, user menu.
+Firm switcher, command trigger, `ShiftClock`, dev principal switcher, user menu.
 
 ### `DetailShell`
 ```ts
