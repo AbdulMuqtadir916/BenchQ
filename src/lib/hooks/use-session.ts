@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { sessionApi } from "@/lib/api/session";
 import { queryKeys } from "@/lib/query/keys";
 import { useSession } from "@/lib/stores/session-store";
@@ -12,17 +12,13 @@ export function useDevPrincipals(enabled: boolean) {
 
 /**
  * DEV ONLY: sign in as another fixture user. The mock backend switches who is signed in, then the
- * client session follows. Cached data is keyed by firm, but user-specific lists (follow-ups, scopes)
- * change with the user too, so everything is refetched.
+ * client session follows. Setting the session clears the whole query cache and remounts the app
+ * (src/lib/query/principal-boundary.ts), so nothing of the previous principal's data can render.
  */
 export function useDevSignInAs() {
-  const queryClient = useQueryClient();
   const setSession = useSession((s) => s.setSession);
   return useMutation({
     mutationFn: (userId: string) => sessionApi.devSignInAs(userId),
-    onSuccess: (session) => {
-      setSession(session);
-      void queryClient.invalidateQueries();
-    },
+    onSuccess: (session) => setSession(session),
   });
 }

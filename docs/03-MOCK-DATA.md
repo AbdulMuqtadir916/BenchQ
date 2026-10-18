@@ -110,6 +110,13 @@ PR 1 every firm-scoped row carries `firmId`, and there are four firms, one per s
 | `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 5 (OWNER, 3 BDE, VIEWER) | 1 (1) | **over** its seat limit, 6/4 (5 users + 1 pending invite), and over on users alone (5/4), so it stays over whatever Phase S decides about a suspended firm's pending invites: the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
 | `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin |
 
+Firm A's users, one per role at least, so the dev principal switcher can sign in as every firm role:
+`user_imran` Imran Shaikh (OWNER), `user_fatima` Fatima Reddy (MANAGER), `user_adnan` Adnan Khan
+(BDE, the default session), `user_sneha` Sneha Rao (BDE), `user_vikram` Vikram Desai (BDE) and
+**`user_rohan` Rohan Kapoor (VIEWER)**, who was added in Phase T PR 2 because firm A had no VIEWER.
+He is active, counts as a seat (that is why firm A's seats are 7/10) and is assigned no candidates:
+a VIEWER reads the firm's data but works no bench.
+
 Plus `plans.json` (Starter, Growth, Scale), `invites.json` (pending, expired, accepted, revoked, the
 accepted OWNER invites of STL and CBW, the onboarding owner's pending invite and one platform-team
 invite) and `platform-users.json` (one Super Admin). **Invite dates are relative to load time**: they
