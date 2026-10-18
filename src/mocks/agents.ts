@@ -1,4 +1,5 @@
 import { mockResult, wait } from "./_shared";
+import { firmScoped } from "./membership";
 import { AgentDraftSchema, TailorResumeInputSchema, type AgentDraft, type TailorResumeInput } from "@/lib/schemas/agent";
 import { RewriteInputSchema, type RewriteInput, type RewriteResult, RewriteResultSchema } from "@/lib/schemas/resume-document";
 import { ResumeClaimSchema, type ResumeClaim } from "@/lib/schemas/resume";
@@ -112,17 +113,20 @@ export const agentsMock = {
     return mockResult(rewriteText(input), signal);
   },
 
-  tailorResume: async (firmId: string, rawInput: TailorResumeInput, signal?: AbortSignal): Promise<AgentDraft> => {
-    const input = TailorResumeInputSchema.parse(rawInput);
-    await wait(2_000, signal);
-    return mockResult(AgentDraftSchema.parse({
-      runId: `run_${input.resumeVersionId}_${input.jobId}`,
-      firmId,
-      resumeVersionId: input.resumeVersionId,
-      jobId: input.jobId,
-      stages,
-      claims: draftClaims(input.resumeVersionId),
-      generatedAt: new Date().toISOString(),
-    }), signal);
-  },
+  // Firm-scoped: a tailoring run belongs to a firm (Q21). `rewrite` works on text alone.
+  ...firmScoped("agents", {
+    tailorResume: async (firmId: string, rawInput: TailorResumeInput, signal?: AbortSignal): Promise<AgentDraft> => {
+      const input = TailorResumeInputSchema.parse(rawInput);
+      await wait(2_000, signal);
+      return mockResult(AgentDraftSchema.parse({
+        runId: `run_${input.resumeVersionId}_${input.jobId}`,
+        firmId,
+        resumeVersionId: input.resumeVersionId,
+        jobId: input.jobId,
+        stages,
+        claims: draftClaims(input.resumeVersionId),
+        generatedAt: new Date().toISOString(),
+      }), signal);
+    },
+  }),
 };

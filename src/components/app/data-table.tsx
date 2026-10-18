@@ -31,6 +31,8 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   isLoading?: boolean;
   error?: Error | null;
+  /** Shown as Retry on the error state; a list without it leaves the user stuck (docs/05 §5). */
+  onRetry?: () => void;
   emptyState?: React.ReactNode;
   virtualise?: boolean;
   density?: Density;
@@ -65,6 +67,7 @@ export function DataTable<TData, TValue>({
   data,
   isLoading = false,
   error = null,
+  onRetry,
   emptyState,
   virtualise = false,
   density = "default",
@@ -180,7 +183,7 @@ export function DataTable<TData, TValue>({
   }
 
   if (isLoading) return <SkeletonTable columns={columns.length + 1} />;
-  if (error) return <ErrorState error={error} />;
+  if (error) return <ErrorState error={error} onRetry={onRetry} />;
 
   const renderRow = (row: Row<TData>, index: number, style?: React.CSSProperties) => (
     <tr

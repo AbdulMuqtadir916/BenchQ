@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/cn";
+import { ErrorState } from "@/components/app/error-state";
 
 const TEMPLATES = [
   {
@@ -31,6 +32,7 @@ export default function OutreachPage() {
   const user = useSignedInUser();
   const applicationsQuery = useApplications();
   const candidatesQuery = useCandidates();
+  const loadError = (applicationsQuery.error ?? candidatesQuery.error) as Error | null;
   const canAct = user.role !== "VIEWER";
 
   const candidateName = useMemo(() => {
@@ -66,6 +68,16 @@ export default function OutreachPage() {
   function send(channel: string) {
     if (!active) return;
     setSent((prev) => [{ id: `${active.id}_${Date.now()}`, channel, at: new Date().toISOString() }, ...prev]);
+  }
+
+  // An error must never read as "no threads" (CLAUDE.md: three states, always).
+  if (loadError) {
+    return (
+      <div className="bq-page">
+        <PageHeader title="Outreach" subtitle="Templated, merge-filled, and checked for unverified claims before it goes out." />
+        <ErrorState error={loadError} onRetry={() => { void applicationsQuery.refetch(); void candidatesQuery.refetch(); }} />
+      </div>
+    );
   }
 
   return (

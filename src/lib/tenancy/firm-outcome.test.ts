@@ -84,3 +84,18 @@ describe("firmOutcome edges", () => {
     expect(firmOutcome(principal, { status: "success", firm: firm({ status: "ACTIVE" }) }).kind).toBe("open");
   });
 });
+
+describe("slug → firm resolution (docs/07 T8)", () => {
+  it("resolves each firm's exact slug to that firm, for its members", async () => {
+    for (const [userId, firmId] of [["user_imran", "firm_hts"], ["user_lakshmi", "firm_stl"], ["user_naveen", "firm_cbw"]] as const) {
+      await sessionApi.devSignInAs(userId);
+      const slug = firms.find((firm) => firm.id === firmId)!.slug;
+      expect((await sessionApi.firmBySlug(slug)).id).toBe(firmId);
+    }
+  });
+
+  it.each(["Hyderabad-Tech-Staffing", "hyderabad-tech-staffing-", "hyderabad", " hyderabad-tech-staffing", "hyderabad-tech-staffing/", "firm_hts"])("matches only the exact slug: %j is not-found", async (slug) => {
+    await sessionApi.devSignInAs("user_imran");
+    await expect(sessionApi.firmBySlug(slug)).rejects.toMatchObject({ status: 404 });
+  });
+});

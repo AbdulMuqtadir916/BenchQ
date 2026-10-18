@@ -15,6 +15,7 @@ import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { EmptyState } from "@/components/app/empty-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { BellOff } from "lucide-react";
+import { ErrorState } from "@/components/app/error-state";
 
 const KIND_META: Record<FollowUpKind, { label: string; Icon: typeof Mail }> = {
   DAY_3_LINKEDIN: { label: "Day-3 LinkedIn", Icon: Link2 },
@@ -67,7 +68,9 @@ export default function FollowupsPage() {
     <div className="bq-page">
       <PageHeader title="Follow-ups" subtitle="Day-3 LinkedIn, day-7 email — generated when an application is sent." />
 
-      {followupsQuery.isLoading ? (
+      {followupsQuery.error ? (
+        <ErrorState error={followupsQuery.error} onRetry={() => void followupsQuery.refetch()} />
+      ) : followupsQuery.isLoading ? (
         <Card className="p-0"><SkeletonList rows={6} /></Card>
       ) : pending.length === 0 ? (
         <EmptyState icon={BellOff} title="Nothing due" description="Every follow-up is handled. New ones appear as applications go out." variant="first-run" />

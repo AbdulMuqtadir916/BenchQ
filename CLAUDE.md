@@ -265,7 +265,7 @@ A stopped task with a clear question beats a confident wrong implementation.
 | 07 Phase A — registry, guards, access/error screens, settings split | Done |
 | 07 Phase A2 — `hrefFor` everywhere, full access table test, one `FirmRole`, dev switcher off in prod | Done |
 | 07 Phase T0 — no-contract groundwork: remove `/sign-up` (Q11), route groups (Q14), role views out of pages, active links by route id, team-access TODO (Q15), draft §7 contracts in `docs/02` | Done |
-| 07 Phase T — tenancy in the frontend: schemas from the approved contracts (07 §7, `docs/02` §3.1), `Principal` session, `/[firm]` URLs, firm-scoped mocks + query keys | **In progress**: PR 1 (T1–T3) and PR 2 (T4–T5) merged; PR 3 (T6–T7: `/[firm]` URLs, firm gate per §2.5, firm from the URL, landing, returnTo, sign-out) on `feat/tenancy-urls`, awaiting review; T8 next |
+| 07 Phase T — tenancy in the frontend: schemas from the approved contracts (07 §7, `docs/02` §3.1), `Principal` session, `/[firm]` URLs, firm-scoped mocks + query keys | **In progress**: PRs 1–3 (T1–T7) merged; PR 4 (T8: mock-backend membership check + isolation tests, Phase T exit check, Phase A error-card and themes/widths checks) on `feat/tenancy-tests`, awaiting review. After it: Phase P |
 | 07 Phase P — `/admin/*` routes, admin shell, read-only support view | Planned |
 | 07 Phase C — permission policy, scope helpers, remove inline role checks | Planned |
 | 07 Phase B — UI completion audit (route × principal) | Planned |

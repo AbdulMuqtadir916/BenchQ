@@ -63,7 +63,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   if (isNotFoundError(jobQuery.error)) {
     return <NotFoundState title="Job not found" description="This job doesn't exist or isn't available to you." backHref={toHref("jobs")} backLabel="Back to jobs" />;
   }
-  if (jobQuery.error || !jobQuery.data) return <div className="bq-page"><ErrorState error={jobQuery.error as Error} /></div>;
+  if (jobQuery.error || !jobQuery.data) return <div className="bq-page"><ErrorState error={jobQuery.error as Error} onRetry={() => void jobQuery.refetch()} /></div>;
 
   const job: Job = jobQuery.data;
   const score = context ? deriveMatchScore(context, job) : null;

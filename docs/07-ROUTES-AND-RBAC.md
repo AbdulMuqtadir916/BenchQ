@@ -346,10 +346,10 @@ error / loading screens, record scope → not-found, settings split, `/sign-up`,
       `resume_cand_01_master` render. OWNER, MANAGER and VIEWER open all of them
 - [x] Unknown URL → not-found (HTTP 404 on `/nope`, `/candidates/cand_01/extra`, `/admin`,
       `/design-system`)
-- [ ] A thrown error → error card with retry (not exercised)
+- [x] A thrown error → error card with retry. Checked 2026-10-18 (Phase T PR 4) in Chrome with the dev fault switch (`window.__BENCHQ_MOCK_FAIL__`, docs/03 §3.1): on each main list screen (candidates, jobs, applications, resumes, outreach, follow-ups, analytics, ledger, settings/team) the main call failed → card shown after the client's 2 retries (~3 s), Retry present, fault cleared → Retry recovered the screen; light and dark. Found and fixed on the way: `DataTable` and `jobs/[id]` had no Retry; applications, follow-ups, outreach and analytics had no error state at all (an error read as empty, "Nothing due" or zeros). **Not covered:** the dashboards (Phase B gap)
 - [x] `pnpm typecheck`, `pnpm lint`, `pnpm test` clean (at the A2 tip: 54 tests; `pnpm build` also
       passes)
-- [ ] Both themes; 1440 / 1024 / 390 px (not checked)
+- [x] Both themes; 1440 / 1024 / 390 px. Checked 2026-10-18 (Phase T PR 4) in Chrome on the nine main list screens and the suspended screen: the app in a same-origin iframe of exactly that width (the window can't be resized on this machine), page-level horizontal overflow measured at each width: 0 px on all 30 (390 measured at 386 px, stricter); screenshots in light and dark at each width for a sample (390: candidates, applications, suspended; 1024: ledger, outreach; 1440: follow-ups, analytics). Wide tables scroll inside their own container at 390, as intended. Cosmetic: the candidates search box is squeezed at 390 (Phase B)
 
 ---
 
@@ -401,10 +401,17 @@ function today and is where the firm segment is added. Moving a route makes `tsc
 | T6  | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path. **The firm comes from the URL:** `useFirmId()` reads the `[firm]` segment through the firm layout's context, the session store no longer holds a firm, and a firm principal whose `firmId` doesn't match the URL firm gets not-found (§2.5) — **done in PR 3** (`feat/tenancy-urls`): the firm gate (`src/components/routes/firm-gate.tsx`) runs `firmOutcome()` (`src/lib/tenancy/firm-outcome.ts`, tested for every fixture principal × every slug); `useHref()` fills the slug from the URL firm, or, off a firm page, from the signed-in user's own firm. **Slug-less URLs from before T6** (`/candidates`, …) are **not-found, not redirected** (Q22): there are no such links in the wild (the prototype was only demoed), a redirect would be a second route list, and principle 4 stays simple. The platform support interstitial (§2.5 row 4) waits for Phase P |
 | T6b | ~~Remove `/sign-up` and its link from `/sign-in` (Q11)~~ — done early in T0                                                                                                                                                                                                                                                 |
 | T7  | `/` landing per principal; `/[firm]/welcome` for OWNER first run — **done in PR 3**: `/` is `src/components/routes/landing.tsx`; **first run = the user has never been active** (`lastActiveAt` null, true right after an OWNER accepts the firm's invite; no new field). **Leaving `/welcome` sets it** (`useFinishFirstRun` → `sessionApi.finishFirstRun`; the page has one exit today, and any later skip or setup step must use the same hook). The dev switcher lists the **GSC owner's pending invite** ("Sunita Rao"): picking it accepts the invite in the mock (user created never-active, firm `ONBOARDING` → `ACTIVE`, `INVITE_ACCEPTED` in its ledger) and lands on `/welcome`. Sign-in honours `?returnTo=` for same-origin paths only (`safeReturnTo`); the platform admin → `/admin` arrives with Phase P |
-| T8  | Tests: a firm-A principal can't read firm-B data through any hook (mock layer); slug → firm resolution; §2.5 table                                                                                                                                                                                                          |
+| T8  | Tests: a firm-A principal can't read firm-B data through any hook (mock layer); slug → firm resolution; §2.5 table — **done in PR 4** (`feat/tenancy-tests`): the mock backend now checks membership on every firm-scoped call (`src/mocks/membership.ts`: another firm → 404 like a missing firm, signed out → 401); `src/mocks/membership.test.ts` calls every firm-scoped adapter method a hook can reach as a firm-A member with firm B's own valid ids (all 404; firm B's member gets through; writes leave B untouched; a new mock method without a row fails the test); slug → firm resolution in `firm-outcome.test.ts` (exact slug only); §2.5 table from PR 3 |
 
 **Exit:** every firm URL carries the slug; switching principal between firm A and B never shows
 the other firm's data (checked on every list screen); query keys all include `firmId`; checks green.
+
+**Exit check (2026-10-18, PR 4):**
+
+- [x] Every firm URL carries the slug: registry test (firm routes are exactly the `/[firm]/` paths), `no-path-literals.test.ts` (no app path in any string literal), and in Chrome every `href` on the 10 list screens of firm A and firm B as their OWNER: all carry the page's own slug (the only other link is the sidebar's `/dev/design-system`)
+- [x] Switching principal between firm A and firm B never shows the other firm's data: in Chrome on all 10 list screens (dashboard, candidates, jobs, applications, resumes, outreach, follow-ups, analytics, ledger, settings/team), both directions (Imran Shaikh ↔ Lakshmi Iyer), the screen sampled every 50 ms from the switch until the target firm's same screen settled: 0 samples with the other firm's names or record ids out of 53–69 per run; every run ended on its own firm's data
+- [x] Query keys all include `firmId`: `keys.test.ts` (every firm key starts with the firm id; no literal keys in hooks) and `firm-boundary.test.ts` (hooks get the firm only from `useFirmId()`)
+- [x] Checks green: typecheck, lint, tests, build
 
 ---
 
@@ -459,7 +466,7 @@ As v1 Phase C, typed on `Principal`:
 
 As v1 Phase B (per-route checklist), with the audit board extended to the platform tier and the
 Support column. Known gaps carried over: ledger BDE "own" filter + filters + diff expander; the
-dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: **sign-out in the user menu for normal users** (today only the dev switcher and the suspended screen have it); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates").
+dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: **sign-out in the user menu for normal users** (today only the dev switcher and the suspended screen have it); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates"). From PR 4: **the dashboards have no error state** — with their data failing they show real-looking zeros ("Placements 0", "Seats used 0 / 10"), which breaks "every number is derived" in spirit: fix first; outreach has no skeleton or empty state for its thread list; the candidates search box is squeezed at 390 px.
 
 ---
 
