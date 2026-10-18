@@ -7,6 +7,7 @@ export const agentsApi = {
   rewrite: async (input: RewriteInput, signal?: AbortSignal): Promise<RewriteResult> =>
     (await mock()).rewrite(input, signal),
 
-  tailorResume: async (input: TailorResumeInput, signal?: AbortSignal): Promise<AgentDraft> =>
-    (await mock()).tailorResume(input, signal),
+  /** Agent runs are firm-scoped (A17): the run is recorded against the firm. */
+  tailorResume: async (firmId: string, input: TailorResumeInput, signal?: AbortSignal): Promise<AgentDraft> =>
+    (await mock()).tailorResume(firmId, input, signal),
 };

@@ -117,6 +117,16 @@
       "lastActiveAt": "2026-10-01T00:17:52.943Z"
     },
     {
+      "id": "user_rohan",
+      "firmId": "firm_hts",
+      "name": "Rohan Kapoor",
+      "email": "rohan@htsstaffing.com",
+      "role": "VIEWER",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-30T06:00:00.000Z"
+    },
+    {
       "id": "user_lakshmi",
       "firmId": "firm_stl",
       "name": "Lakshmi Iyer",
@@ -185,6 +195,16 @@
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "user_farida",
+      "firmId": "firm_cbw",
+      "name": "Farida Sheikh",
+      "email": "farida@cbworks.in",
+      "role": "BDE",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-26T10:00:00.000Z"
     }
   ]
 }

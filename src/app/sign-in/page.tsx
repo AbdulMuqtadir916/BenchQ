@@ -6,13 +6,14 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
-import { useSession } from "@/lib/stores/session-store";
+import { DEFAULT_SESSION } from "@/lib/stores/session-store";
+import { useDevSignInAs } from "@/lib/hooks/use-session";
 import { useHref } from "@/lib/routes/use-href";
 
 export default function SignInPage() {
   const toHref = useHref();
   const router = useRouter();
-  const setRole = useSession((s) => s.setRole);
+  const signIn = useDevSignInAs();
   const [email, setEmail] = useState("adnan@techcorp.com");
   const [password, setPassword] = useState("password");
   const [loading, setLoading] = useState(false);
@@ -20,10 +21,8 @@ export default function SignInPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setRole("BDE");
-      router.push(toHref("welcome"));
-    }, 800);
+    // No real auth yet: signing in means "the default fixture user" (mock backend and client session).
+    signIn.mutate(DEFAULT_SESSION.user.id, { onSettled: () => router.push(toHref("welcome")) });
   };
 
   return (

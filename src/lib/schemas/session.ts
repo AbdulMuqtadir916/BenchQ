@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { FirmRole } from "./enums";
-import { FirmStatus, SlugSchema } from "./tenancy";
+import { FirmPrincipalSchema, FirmStatus, PlatformPrincipalSchema, PlatformUserSchema, SlugSchema } from "./tenancy";
 
 export const FirmSchema = z.object({
   id: z.string(),
@@ -37,12 +37,43 @@ export const UserSchema = z.object({
 export type User = z.infer<typeof UserSchema>;
 
 /**
- * The limits now live on Firm and usage is derived (src/lib/derive/tenancy.ts), so the session no
- * longer stores seatsUsed / seatLimit / activeCandidates / candidateLimit. Phase T PR 2 replaces this
- * user + firm pair with a Principal.
+ * Who is signed in (docs/07 §3). The principal is the source of truth; `user` / `firm` are the records
+ * it points at, resolved by the session adapter so screens don't look them up. Usage (seats, active
+ * candidates) is derived, never part of the session.
  */
-export const SessionSchema = z.object({
+export const FirmSessionSchema = z.object({
+  principal: FirmPrincipalSchema,
   user: UserSchema,
   firm: FirmSchema,
 });
+export type FirmSession = z.infer<typeof FirmSessionSchema>;
+
+/** A platform admin's session: `firm` is the support-view firm, or null. Served from Phase P. */
+export const PlatformSessionSchema = z.object({
+  principal: PlatformPrincipalSchema,
+  platformUser: PlatformUserSchema,
+  firm: FirmSchema.nullable(),
+});
+export type PlatformSession = z.infer<typeof PlatformSessionSchema>;
+
+export const SessionSchema = z.union([FirmSessionSchema, PlatformSessionSchema]);
 export type Session = z.infer<typeof SessionSchema>;
+
+/**
+ * DEV ONLY: one entry in the dev principal switcher (docs/07 T4). `available: false` marks a
+ * principal the app can't sign in as yet (the platform admin until Phase P).
+ */
+export const DevPrincipalOptionSchema = z.object({
+  /** The user (or platform user) id: what the switcher signs in as. */
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(["firm", "platform"]),
+  role: z.union([FirmRole, z.literal("PLATFORM_ADMIN")]),
+  firmId: z.string().nullable(),
+  firmName: z.string().nullable(),
+  firmStatus: FirmStatus.nullable(),
+  available: z.boolean(),
+  /** Why it isn't available yet, when it isn't. */
+  note: z.string().nullable(),
+});
+export type DevPrincipalOption = z.infer<typeof DevPrincipalOptionSchema>;

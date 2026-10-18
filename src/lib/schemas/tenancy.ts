@@ -97,18 +97,23 @@ export const SupportViewSchema = z.object({
 });
 export type SupportView = z.infer<typeof SupportViewSchema>;
 
-export const PrincipalSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("firm"),
-    userId: z.string(),
-    firmId: z.string(),
-    role: FirmRole,
-  }),
-  z.object({
-    kind: z.literal("platform"),
-    userId: z.string(),
-    role: PlatformRole,
-    support: SupportViewSchema.nullable(),
-  }),
-]);
+export const FirmPrincipalSchema = z.object({
+  kind: z.literal("firm"),
+  userId: z.string(),
+  /** Must equal the URL firm's id once firm URLs land (T6), else not-found. */
+  firmId: z.string(),
+  role: FirmRole,
+});
+export type FirmPrincipal = z.infer<typeof FirmPrincipalSchema>;
+
+export const PlatformPrincipalSchema = z.object({
+  kind: z.literal("platform"),
+  userId: z.string(),
+  role: PlatformRole,
+  support: SupportViewSchema.nullable(),
+});
+export type PlatformPrincipal = z.infer<typeof PlatformPrincipalSchema>;
+
+/** Who is signed in: a firm user, or a platform admin (optionally inside a read-only support view). */
+export const PrincipalSchema = z.discriminatedUnion("kind", [FirmPrincipalSchema, PlatformPrincipalSchema]);
 export type Principal = z.infer<typeof PrincipalSchema>;

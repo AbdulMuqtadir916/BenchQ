@@ -105,9 +105,9 @@ PR 1 every firm-scoped row carries `firmId`, and there are four firms, one per s
 
 | Firm | Status | Plan (seats / candidates) | Users | Candidates (active) | Notes |
 |---|---|---|---|---|---|
-| `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 5 | 24 (21) | the original firm; the only one the UI shows until PR 2. Seats 6/10 |
+| `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 6 (every role; the VIEWER, Rohan Kapoor, was added in Phase T PR 2) | 24 (21) | the original firm and the default session's. Seats 7/10 |
 | `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 3 (OWNER, BDE, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 users + 1 pending invite): can't add a seat, not over |
-| `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 4 (OWNER, 2 BDE, VIEWER) | 1 (1) | **over** its seat limit, 5/4 (4 users + 1 pending invite): the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
+| `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 5 (OWNER, 3 BDE, VIEWER) | 1 (1) | **over** its seat limit, 6/4 (5 users + 1 pending invite), and over on users alone (5/4), so it stays over whatever Phase S decides about a suspended firm's pending invites: the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
 | `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin |
 
 Plus `plans.json` (Starter, Growth, Scale), `invites.json` (pending, expired, accepted, revoked, the

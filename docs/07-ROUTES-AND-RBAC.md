@@ -302,7 +302,7 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | **A**  | Route foundation — registry, guards, access/error screens, settings split                                                                                                                  | —                | Done (committed)                   |
 | **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod                                                                                                | A                | Done (A2.2–A2.9; see result below) |
 | **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2               | In progress (`feat/routes-t0`)     |
-| **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | In progress — PR 1 of 4 (T1–T3) done, awaiting review |
+| **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | In progress — PR 1 (T1–T3) merged; PR 2 (T4–T5) awaiting review |
 | **P**  | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view                                                                                                    | T                | Planned                            |
 | **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | Planned                            |
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
@@ -395,8 +395,8 @@ function today and is where the firm segment is added. Moving a route makes `tsc
 | T1  | ~~Contracts in `docs/02`~~ — **done**: drafted in T0, approved 2026-10-14, now `docs/02` §3.1 (drop the "not yet implemented" note there when T2 lands) |
 | T2  | Zod schemas from `docs/02` §3.1 (slug pattern, `Invite` refinement `firmId` null ⇔ `PLATFORM_ADMIN`). `SessionSchema` limits move to `Firm` (copied from the `Plan`) and usage becomes **derived**: `seatsUsed` = active users + pending unexpired invites; `activeCandidates` = `ON_BENCH` / `INTERVIEWING` / `OFFER`; over-limit flags; block new additions over a limit (Q17); also derive **`canAddSeat` / `canAddCandidate` = usage < limit**, which drive the block, separately from the `isOver*` flags (usage > limit). Define `InviteSchema`'s **base object separately** and apply the `superRefine` on top, so `.extend` / `.pick` still work on the base — **done in PR 1** (`feat/tenancy`) |
 | T3  | Fixtures: add `firmId` to every firm-scoped fixture, **including agent and tailoring runs** (Q21); add a **second firm** (small: 3 users, 5 candidates), a platform admin, and a few invites (pending, expired, accepted) so isolation and limits are testable. Besides the second active firm, add **two tiny firms**: one `SUSPENDED` and one `ONBOARDING` (owner invite pending, no users). T8 and Phase P need both statuses — **done in PR 1** (`feat/tenancy`) |
-| T4  | Session store → `Principal`; dev principal switcher lists every fixture principal                                                                                                                                                                                                                                           |
-| T5  | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it                                                                                                                                                        |
+| T4  | Session store → `Principal`; dev principal switcher lists every fixture principal — **done in PR 2** (`feat/tenancy-session`) |
+| T5  | Query key factory `src/lib/query/keys.ts`; every firm key starts with `firmId`; hooks read `firmId` from firm context; adapters take `firmId` and mocks filter by it — **done in PR 2** (`feat/tenancy-session`) |
 | T6  | Move firm routes under `src/app/[firm]/` with the `(workspace)` / `(manage)` groups (§6, Q14); move the four dashboards into `src/features/dashboard/`; firm layout implements §2.5; registry paths gain `[firm]`; fix the active-link checks in `sidebar.tsx` and `settings/layout.tsx` to match on route id, not raw path |
 | T6b | ~~Remove `/sign-up` and its link from `/sign-in` (Q11)~~ — done early in T0                                                                                                                                                                                                                                                 |
 | T7  | `/` landing per principal; `/[firm]/welcome` for OWNER first run                                                                                                                                                                                                                                                            |
@@ -420,6 +420,13 @@ the other firm's data (checked on every list screen); query keys all include `fi
 
 Screens are functional skeletons here; visual polish is Phase S. `docs/04-SCREENS.md` gets an
 "Admin" section before P3 (UI-first: the screen spec comes first).
+
+**Fixture dates (do in P3, before any admin screen shows invites next to the ledger):** invite dates
+are relative to load time (`invitesAt(now)` in `src/mocks/tenancy.ts` shifts them from
+`FIXTURE_NOW`), but ledger fixture dates are still fixed. Shift the ledger entries about invites
+(`INVITE_SENT`, `INVITE_ACCEPTED`, `INVITE_REVOKED`) by the same offset, so each entry's date matches
+its invite's `createdAt` (sent) or acceptance. Add a fixture test that ties every invite ledger entry
+to its invite's date.
 
 **Exit:** a platform admin can list firms, open one, start a support view, browse the firm
 read-only with the banner, exit, and see the visit in both audit logs.

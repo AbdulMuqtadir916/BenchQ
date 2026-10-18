@@ -6,19 +6,18 @@ import {
   type UploadDocument,
 } from "@/lib/schemas/document";
 import documentsSeed from "./data/documents.json";
-import { candidates } from "./candidates";
-import { currentUser } from "./team";
-import { inDevFirm, mockResult, notFound } from "./_shared";
+import { allCandidates } from "./candidates";
+import { currentUser } from "./auth";
+import { findInFirm, inFirm, mockResult } from "./_shared";
 
 export const allDocuments: CandidateDocument[] = arrayOf(CandidateDocumentSchema).parse(documentsSeed);
-const documents: CandidateDocument[] = inDevFirm(allDocuments);
 
 export const documentsMock = {
-  byCandidate: (candidateId: string): Promise<CandidateDocument[]> =>
-    mockResult(documents.filter((document) => document.candidateId === candidateId)),
+  byCandidate: (firmId: string, candidateId: string): Promise<CandidateDocument[]> =>
+    mockResult(inFirm(allDocuments, firmId).filter((document) => document.candidateId === candidateId)),
 
-  upload: (candidateId: string, body: UploadDocument): Promise<CandidateDocument> => {
-    const candidate = candidates.find((item) => item.id === candidateId) ?? notFound("Candidate", candidateId);
+  upload: (firmId: string, candidateId: string, body: UploadDocument): Promise<CandidateDocument> => {
+    const candidate = findInFirm(allCandidates, firmId, candidateId, "Candidate");
     const id = `doc_local_${Date.now().toString(36)}`;
     const document = CandidateDocumentSchema.parse({
       ...UploadDocumentSchema.parse(body),
@@ -29,14 +28,13 @@ export const documentsMock = {
       uploadedByUserId: currentUser().id,
       shareUrl: `https://files.benchq.app/s/${id}`,
     });
-    documents.unshift(document);
+    allDocuments.unshift(document);
     return mockResult(document);
   },
 
-  remove: (id: string): Promise<CandidateDocument> => {
-    const index = documents.findIndex((document) => document.id === id);
-    if (index < 0) return notFound("Document", id);
-    const [removed] = documents.splice(index, 1);
-    return mockResult(removed!);
+  remove: (firmId: string, id: string): Promise<CandidateDocument> => {
+    const document = findInFirm(allDocuments, firmId, id, "Document");
+    allDocuments.splice(allDocuments.indexOf(document), 1);
+    return mockResult(document);
   },
 };

@@ -28,15 +28,17 @@ export async function mockResult<T>(value: T, signal?: AbortSignal): Promise<T> 
   return structuredClone(value);
 }
 
-/**
- * TRANSITIONAL (Phase T PR 1 → PR 2). The fixtures now hold several firms, but the session, hooks and
- * query keys stay single-firm until T4–T5. Until then each mock serves only this firm, so the UI shows
- * exactly what it showed before. T5 replaces this with a firmId argument on every adapter; delete it then.
- */
-export const DEV_FIRM_ID = "firm_hts";
+/** Rows that belong to one firm. Every firm-scoped mock call filters through this (docs/07 T5). */
+export function inFirm<T extends { firmId: string | null }>(rows: readonly T[], firmId: string): T[] {
+  return rows.filter((row) => row.firmId === firmId);
+}
 
-export function inDevFirm<T extends { firmId: string | null }>(rows: T[]): T[] {
-  return rows.filter((row) => row.firmId === DEV_FIRM_ID);
+/**
+ * One row of a firm by id. A row of another firm is a 404, exactly like a missing one, so a caller can
+ * never learn that a record exists in someone else's firm (docs/07 principle 4).
+ */
+export function findInFirm<T extends { id: string; firmId: string | null }>(rows: readonly T[], firmId: string, id: string, resource: string): T {
+  return rows.find((row) => row.id === id && row.firmId === firmId) ?? notFound(resource, id);
 }
 
 export function notFound(resource: string, id: string): never {
