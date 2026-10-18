@@ -102,7 +102,6 @@ benchq-frontend/
 │   │   ├── layout.tsx               root: providers, theme, fonts
 │   │   ├── (auth)/
 │   │   │   ├── sign-in/page.tsx
-│   │   │   ├── sign-up/page.tsx
 │   │   │   └── invite/[token]/page.tsx
 │   │   ├── (onboarding)/
 │   │   │   └── welcome/page.tsx     4-step wizard
@@ -222,7 +221,7 @@ Four shells, defined in `src/components/layout/`:
 
 | Shell | Used by | Structure |
 |---|---|---|
-| `AuthShell` | sign-in, sign-up, invite | Centred card, no chrome |
+| `AuthShell` | sign-in, invite | Centred card, no chrome |
 | `AppShell` | everything under `(app)` | Collapsible sidebar + topbar + content |
 | `DetailShell` | candidate, job, application detail | Sticky header block + tabs + content |
 | `ThreePaneShell` | resume builder | Resizable panes, widths persisted |

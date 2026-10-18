@@ -262,9 +262,10 @@ A stopped task with a clear question beats a confident wrong implementation.
 | UI build phases 0–8 (`docs/06`) — all screens on mocks | Done |
 | Integration Module 00 Part A — backend in repo, proxy verified | Done |
 | Repo snapshot `docs/CURRENT_STATE.md` (2026-10-13) | Done |
-| 07 Phase A — registry, guards, access/error screens, settings split | Done — **uncommitted on `feat/routes`; commit first** |
-| 07 Phase A2 — `hrefFor` everywhere, full access table test, one `FirmRole`, dev switcher off in prod | **Next** |
-| 07 Phase T — contracts (07 §7, needs sign-off), principal, `/[firm]` URLs, firm-scoped mocks + query keys | Planned |
+| 07 Phase A — registry, guards, access/error screens, settings split | Done (committed on `feat/routes`) |
+| 07 Phase A2 — `hrefFor` everywhere, full access table test, one `FirmRole`, dev switcher off in prod | Done (`feat/routes-a2`) |
+| 07 Phase T0 — no-contract groundwork: remove `/sign-up` (Q11), route groups (Q14), role views out of pages, active links by route id, team-access TODO (Q15), draft §7 contracts in `docs/02` | **In progress** (`feat/routes-t0`) |
+| 07 Phase T — tenancy in the frontend: schemas from the approved contracts (07 §7, `docs/02` §3.1), `Principal` session, `/[firm]` URLs, firm-scoped mocks + query keys | **Unblocked** — contracts approved 2026-10-14; starts after T0 is merged |
 | 07 Phase P — `/admin/*` routes, admin shell, read-only support view | Planned |
 | 07 Phase C — permission policy, scope helpers, remove inline role checks | Planned |
 | 07 Phase B — UI completion audit (route × principal) | Planned |
@@ -273,6 +274,13 @@ A stopped task with a clear question beats a confident wrong implementation.
 | Backend tenancy + real auth (D1/D2), 07 Phase D, then Modules 02–05 with `firmId` | Later |
 
 **Decided (07 §0):** firm in the URL (Q8); one firm per user (Q9); read-only support view, no
-impersonation (Q10); role name `PLATFORM_ADMIN`, label "Super Admin" (Q7).
-**Still open:** Q11 (public sign-up vs. invite-only) and the §7 contract sign-off, which blocks
-Phase T. Do not build anything that depends on them until they are recorded in 07 §0.
+impersonation (Q10); role name `PLATFORM_ADMIN`, label "Super Admin" (Q7); invite-only, no public
+sign-up (Q11); no role in URLs — route groups `(workspace)` / `(manage)` plus per-role view files
+(Q14); only OWNER manages members, MANAGER reads the team and assigns candidates (Q15).
+**Contracts approved 2026-10-14 (07 §0 Q16–Q21; shapes in `docs/02` §3.1):** seat = every active user
+plus pending invites; active candidate = `ON_BENCH` / `INTERVIEWING` / `OFFER`; a plan is a template whose
+limits are *copied* onto the firm; over a limit, block new additions and never auto-remove; slug rules
+and `contactPhone` only on `Firm`; invites last 7 days, exactly one OWNER per firm, `firmId` null ⇔
+`PLATFORM_ADMIN`; support view is 60 minutes with no extension; firm events carry `firmId`; no
+`PlanChange` entity; agent and tailoring runs are firm-scoped.
+**Still open:** nothing. The five implied rules at the end of `docs/02` §3.1 were approved on 2026-10-16.

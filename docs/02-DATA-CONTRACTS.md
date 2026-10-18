@@ -1,7 +1,7 @@
 # 02 — Data Contracts
 
 **Project:** BenchQ · frontend only
-**Version:** 1.0 · September 2026
+**Version:** 1.1 · 2026-10-14
 
 Zod schemas are the single source of truth. Types are **inferred**, never written twice.
 Everything here lives under `src/lib/schemas/`.
@@ -156,6 +156,233 @@ export const SessionSchema = z.object({
 
 export type Session = z.infer<typeof SessionSchema>;
 ```
+
+### 3.1 Tenancy contracts — APPROVED 2026-10-14 (not yet implemented)
+
+> **Status: signed off by the product owner on 2026-10-14** (changes requested, then approved with
+> the answers in the decision table at the end of this section; recorded in `docs/07` §0 as Q16–Q21).
+> **Nothing here exists in code yet.** Phase T (07) turns these into Zod schemas, fixtures, the
+> `Principal` session and `firmId`-scoped query keys. Until then, no schema, fixture, session type
+> or query key may be changed to match this section. Five rules the owner did not state
+> but approved on 2026-10-16 are marked **(approved 2026-10-16)** and listed under *Implications*.
+> **Numbering.** **A1–A17** are the owner's 17 answers (decision table at the end of this section).
+> **`07 Qn`** is always a decision in `docs/07` §0. Both are recorded there as Q16–Q21.
+> Shapes follow this file's conventions (Zod, ISO datetimes as `z.string().datetime()`).
+
+#### Principal and SupportView — who is signed in (07 §3)
+
+```ts
+// src/lib/schemas/session.ts (replaces the user + role pair in the client session store)
+export const SupportViewSchema = z.object({
+  id: z.string(),                         // support-view id; also the `entityId` on its ledger entries
+  firmId: z.string(),                     // the one firm being viewed (one view at a time, 07 §4)
+  reason: z.string().min(10),              // required free text; the firm sees it exactly as written
+  startedAt: z.string().datetime(),
+  expiresAt: z.string().datetime(),        // always startedAt + 60 minutes. No extension (A12)
+});
+
+export const PrincipalSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('firm'),
+    userId: z.string(),                    // → User.id
+    firmId: z.string(),                    // must equal the URL firm's id, else not-found (07 §3)
+    role: FirmRole,                        // OWNER | MANAGER | BDE | VIEWER (unchanged)
+  }),
+  z.object({
+    kind: z.literal('platform'),
+    userId: z.string(),                    // → PlatformUser.id
+    role: z.literal('PLATFORM_ADMIN'),     // code name (07 Q7); UI label "Super Admin"
+    support: SupportViewSchema.nullable(), // null = not inside a firm; at most one view at a time
+  }),
+]);
+```
+
+To keep a support view going past 60 minutes the admin starts a **new** view: new reason, new
+`SupportView`, new `ADMIN_ACCESS` ledger entry. The firm sees the **admin's name** and the **reason
+as written**, never the admin's email (the ledger entry carries `actorName`, and the reason is in
+its `summary`).
+
+#### Firm — additions to the existing `FirmSchema` (07 §7)
+
+```ts
+// existing fields unchanged: id, name, slug, logoUrl, primaryTimezone, clientTimezone,
+// truthGuardMode, applicationExpiryDays
+status: z.enum(['ONBOARDING', 'ACTIVE', 'SUSPENDED']),
+  // ONBOARDING → ACTIVE automatically when the OWNER accepts their invite (A5).
+  // Only Super Admin suspends or reactivates (A5). No TRIAL state until billing exists.
+  // SUSPENDED: firm users can still sign in and see "Workspace suspended" on every route (A8, 07 §2.5).
+planId: z.string(),                       // → Plan.id. REQUIRED in every status, ONBOARDING included (A16)
+seatLimit: z.number().int(),              // EFFECTIVE limit. Copied from Plan.seatLimit when the plan is assigned (A3)
+candidateLimit: z.number().int(),         // EFFECTIVE limit. Copied from Plan.candidateLimit when assigned (A3)
+contactPhone: z.string().nullable(),      // the only new profile field (A6). The OWNER is the primary
+                                          // contact: derived, not stored. GST, billing email and address
+                                          // wait for billing work
+createdAt: z.string().datetime(),
+
+// slug (A7). Pattern + length + reserved + unique, all four:
+//   lowercase a-z, 0-9 and hyphens; 3 to 32 characters; starts with a letter;
+//   no leading, trailing or double hyphens; not a reserved word (07 §2.4); unique across firms.
+slug: z.string()
+  .regex(/^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){2,31}$/)   // tested: 3-32 chars, letter first, no -- and no trailing -
+  .refine((s) => !RESERVED_SLUGS.includes(s)),          // uniqueness is checked by the backend / mock store
+// Super Admin may change a slug after creation, behind a confirm dialog that warns old links
+// break. No alias or redirect table for now (A7).
+```
+
+**Derived, never stored** (computed from the records, per CLAUDE.md "every number is derived"):
+
+| Value | Definition |
+|---|---|
+| `seatsUsed` | number of **active users** (OWNER, MANAGER, BDE and VIEWER all count) **+ pending invites** (A1). Per A9, an invite that is `PENDING` but past `expiresAt` is treated as `EXPIRED` and does not reserve a seat **(approved 2026-10-16)** |
+| `activeCandidates` | candidates whose status is `ON_BENCH`, `INTERVIEWING` or `OFFER`. `PLACED`, `PAUSED` and `INACTIVE` do not count (A2) |
+| `isOverSeatLimit` / `isOverCandidateLimit` | `seatsUsed > seatLimit` / `activeCandidates > candidateLimit` |
+| `isOverLimit` | either of the two above. Shown as a flag on the admin firms list (A4) |
+
+`SessionSchema.seatsUsed`, `seatLimit`, `activeCandidates` and `candidateLimit` stop being stored in
+the session: usage is derived, and the two limits live on `Firm` (07 T2).
+
+**Over-limit rule (A4).** Once at or over a limit, **block new additions**: sending an invite,
+creating a candidate, reactivating a user, reactivating a candidate. ("Reactivating" here means a
+*user* or a *candidate*, never the firm: reactivating a suspended firm is not blocked by a limit.) The message names the limit
+("Your plan allows 10 seats; 10 are in use."). **Never auto-remove or deactivate anything.** After
+a downgrade, existing users and candidates keep working.
+
+#### Plan — a template, no billing (07 §7)
+
+```ts
+export const PlanSchema = z.object({
+  id: z.string(),
+  name: z.string(),                        // e.g. "Starter"
+  seatLimit: z.number().int(),             // copied onto Firm.seatLimit when the plan is assigned (A3)
+  candidateLimit: z.number().int(),        // copied onto Firm.candidateLimit when assigned (A3)
+  features: z.array(z.string()),           // display labels only; no feature flags until something gates on them (A15)
+  isActive: z.boolean(),                   // false = hidden from new firms, kept for existing ones
+});                                        // no price fields: no billing in the frontend (CLAUDE.md)
+```
+
+**Copy, don't override (A3).** A plan is a template. Editing a plan **never changes existing firms**;
+only assigning (or re-assigning) a plan copies its limits onto the firm. `Firm.seatLimit` and
+`candidateLimit` are the limits that apply.
+
+#### Invite — how every user joins (07 Q11)
+
+```ts
+export const InviteSchema = z.object({
+  id: z.string(),
+  firmId: z.string().nullable(),           // null = invite to the BenchQ platform team
+  email: z.string().email(),               // who is invited; the token is sent here
+  role: z.union([FirmRole, z.literal('PLATFORM_ADMIN')]),
+  invitedByUserId: z.string(),             // a firm user or a PlatformUser id
+  status: z.enum(['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED']),
+  expiresAt: z.string().datetime(),        // createdAt + 7 days (A9)
+  createdAt: z.string().datetime(),
+}).superRefine((invite, ctx) => {
+  // A11: firmId is null  ⇔  role is PLATFORM_ADMIN
+  if ((invite.firmId === null) !== (invite.role === 'PLATFORM_ADMIN')) {
+    ctx.addIssue({ code: 'custom', message: 'firmId is null if and only if role is PLATFORM_ADMIN' });
+  }
+});                                        // the `[token]` in /invite/[token] is an opaque secret the
+                                           // backend owns: it is not a field here and never in a fixture
+```
+
+| Rule | Decision |
+|---|---|
+| Lifetime | 7 days (A9) |
+| Resend | keeps the **same `Invite` row**, issues a **new token** (the old one stops working) and resets `expiresAt` to now + 7 days (A9) |
+| Expiry in the UI | the frontend may treat `PENDING` with `expiresAt` in the past as `EXPIRED` (A9) |
+| One OWNER | **exactly one OWNER per firm** (A10). Transferring ownership is a Super Admin action, out of scope for now |
+| Who invites whom | an OWNER can invite `MANAGER`, `BDE` or `VIEWER`, **not** `OWNER` (A10). The firm's single OWNER is invited by a Super Admin when the firm is created **(approved 2026-10-16)**. No cap on VIEWERs beyond seats (A10) |
+| Platform staff | any `PLATFORM_ADMIN` can invite platform staff; `PLATFORM_ADMIN` is the only platform role (A11) |
+| Seats | a `PENDING`, unexpired firm invite reserves a seat (A1) |
+
+*Who may send an invite* is a permission, decided in Phase C (`member.invite`: OWNER only for firm
+roles; any `PLATFORM_ADMIN` for platform staff). The schema only constrains the shape above.
+
+#### PlatformUser — BenchQ staff (07 §7)
+
+```ts
+export const PlatformUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  role: z.literal('PLATFORM_ADMIN'),       // the only platform role (A11)
+  isActive: z.boolean(),
+  lastActiveAt: z.string().datetime().nullable(),
+});                                        // no firmId: platform users belong to no firm (07 Q9)
+```
+
+#### `firmId` on records (07 §7, 07 Q13, A17)
+
+| Record | Change | Note |
+|---|---|---|
+| Candidate, User | none | already have `firmId` |
+| Job, Application, Resume, Record (candidate record), Document, Inbox (`CandidateInbox`, `InboxMessage`, `MailboxConnection`), Followup (`FollowUpTask`) | add `firmId: z.string()` | required; every fixture gets one in Phase T (T3) |
+| **Agent and tailoring runs** | add `firmId: z.string()` | **required** (A17): `/admin/system` needs AI spend by firm, and deriving it through joins is fragile |
+| LedgerEntry | add `firmId: z.string().nullable()` | rule below |
+| Company (and `CompanyVerification`) | none | global reference data (07 Q13) |
+
+**Ledger `firmId` rule (A13).** Any event *about a firm* carries that firm's `firmId`; `null` only for
+platform-only events.
+
+| `firmId` set (appears in that firm's `/[firm]/ledger`) | `firmId` null (only in `/admin/audit`) |
+|---|---|
+| `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `PLAN_CHANGED`, firm invites (`INVITE_SENT` / `INVITE_ACCEPTED` / `INVITE_REVOKED` with a firm), `ADMIN_ACCESS`, `ADMIN_ACCESS_END` | admin sign-ins, platform-team invites, plan **catalogue** edits |
+
+`/admin/audit` shows everything, null and non-null.
+
+#### Ledger actions and actors (07 §4)
+
+```ts
+// LedgerEntrySchema.action — existing values kept, these added:
+'ADMIN_ACCESS_END',    // a support view ended (exit, expiry or sign-out)
+'FIRM_CREATED', 'FIRM_SUSPENDED', 'FIRM_REACTIVATED',
+'PLAN_CHANGED',        // a firm's plan or limits changed. `summary` states before and after
+                       // (A14), e.g. "Starter → Growth, seats 5 → 10"
+'INVITE_SENT', 'INVITE_ACCEPTED', 'INVITE_REVOKED',
+// `actorType` already has 'PLATFORM_ADMIN'; `ADMIN_ACCESS` (support view started) and `LOGIN` already exist
+```
+
+**No `PlanChange` entity (A14).** A firm's plan history is *derived* from its `PLAN_CHANGED` ledger
+entries.
+
+#### Decisions — answers to the 17 open questions (2026-10-14)
+
+| A# | Topic | Decision | Lands in |
+|---|---|---|---|
+| 1 | Seat | every active firm user counts; pending invites reserve a seat; `seatsUsed` = active users + pending invites, derived | *Derived* table |
+| 2 | Active candidate | status `ON_BENCH`, `INTERVIEWING` or `OFFER`; derived | *Derived* table |
+| 3 | Plan vs firm limits | copy, don't override; `Firm` holds the effective limits; editing a plan never changes existing firms | `Plan`, `Firm` |
+| 4 | Over limit | block new additions with a message naming the limit; never auto-remove; downgrades leave existing users working; admin list shows a derived "over limit" flag | Over-limit rule |
+| 5 | Trial / lifecycle | no TRIAL now (add with billing); ONBOARDING → ACTIVE when the owner accepts; only Super Admin suspends or reactivates | `Firm.status` |
+| 6 | Firm profile | add `contactPhone: string \| null` only; owner = primary contact, derived; GST, billing email, address deferred | `Firm` |
+| 7 | Slug | rules in `Firm`; Super Admin may change it behind a confirm dialog; no alias or redirect table | `Firm.slug` |
+| 8 | Suspended firm | users can still sign in and see the suspended screen | `Firm.status`, 07 §2.5 |
+| 9 | Invite lifetime | 7 days; resend keeps the row, new token, `expiresAt` + 7 days; UI may treat past-due PENDING as EXPIRED | `Invite` |
+| 10 | Owner and roles | exactly one OWNER per firm; an OWNER invites MANAGER, BDE or VIEWER, not OWNER; ownership transfer is Super Admin, out of scope; no VIEWER cap beyond seats | `Invite` |
+| 11 | Platform staff | any `PLATFORM_ADMIN` invites staff; only platform role; refinement `firmId` null ⇔ `PLATFORM_ADMIN` | `Invite` |
+| 12 | Support view | fixed 60 minutes, no extension (start a new view); firm sees admin's name and the reason as written, not the email | `SupportView` |
+| 13 | Ledger `firmId` | firm events carry the firm's id and show in `/[firm]/ledger`; null only for platform-only events; `/admin/audit` shows all | Ledger rule |
+| 14 | Plan history | no `PlanChange` entity; derived from `PLAN_CHANGED` entries whose summary has before and after | Ledger actions |
+| 15 | `Plan.features` | display labels only | `Plan` |
+| 16 | `planId` | required in every status, ONBOARDING included | `Firm` |
+| 17 | Agent / tailoring runs | firm-scoped: add `firmId` | `firmId` table |
+
+#### Implications — approved 2026-10-16
+
+These follow from the answers above but the owner did not state them. Each is drafted as the
+obvious reading and marked **(approved 2026-10-16)** where it appears. Tell me if any is wrong.
+
+1. **Expired invites free their seat.** A1 says pending invites reserve a seat and A9 says a past-due
+   PENDING invite may be treated as EXPIRED, so an expired invite stops reserving one.
+2. **The one OWNER is invited by a Super Admin** at firm creation (A10 says an OWNER cannot invite an
+   OWNER, and A5 says the firm turns ACTIVE when the owner accepts). So `Invite.role = 'OWNER'` with a
+   `PlatformUser` as `invitedByUserId` is valid, and the "not OWNER" rule applies to firm-user inviters.
+3. **Plan catalogue edits** (create or edit a `Plan`, `firmId` null) use the existing `CREATE` /
+   `UPDATE` actions with `entityType: 'Plan'`; no new action was requested.
+4. **An unexpired PENDING invite blocks the one-OWNER rule too:** a firm cannot hold both an active
+   OWNER and a pending OWNER invite.
+5. **Reactivating a firm** (SUSPENDED → ACTIVE) is not blocked by over-limit. In A4, "reactivating"
+   means a **user or candidate**, never the firm; the block applies to new additions only.
 
 ---
 

@@ -18,6 +18,13 @@ Anything not confirmed is marked **(unverified)**.
 > the RoleSwitcher renders only when `NEXT_PUBLIC_SHOW_DEV_TOOLS=true` (section 4); `/design-system`
 > is now `/dev/design-system` (section 2); the `iconsax-react` comment is fixed (section 8). The
 > test suite is now 54 tests across 4 files. Everything else below is unchanged.
+>
+> **Update 2026-10-14:** the tenancy contracts (Principal, SupportView, Firm additions, Plan, Invite,
+> PlatformUser, `firmId` on records, new ledger actions) are **approved** in `docs/02` §3.1 and
+> `docs/07` §0 Q16–Q21, but still **not in code**: section 6 and the blockers in section 9 describe the
+> code as it is today. Phase T0 (`feat/routes-t0`) also removed `/sign-up`, added the `(workspace)` and
+> `(manage)` route groups, moved the dashboards to `src/features/dashboard/`, and added
+> `isRouteActive()`.
 
 ---
 

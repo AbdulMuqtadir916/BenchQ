@@ -50,7 +50,6 @@ const ROUTE_DEFS = [
   // Auth and onboarding
   { id: "root", path: "/", title: "BenchQ", shell: "auth", access: "public" },
   { id: "sign-in", path: "/sign-in", title: "Sign in", shell: "auth", access: "public" },
-  { id: "sign-up", path: "/sign-up", title: "Create account", shell: "auth", access: "public" },
   { id: "welcome", path: "/welcome", title: "Welcome", shell: "auth", access: roles("full", "none", "none", "none"), onDenied: "landing" },
 
   // Workspace
@@ -75,6 +74,10 @@ const ROUTE_DEFS = [
   { id: "design-system", path: "/dev/design-system", title: "Design system", shell: "app", access: everyone("full"), nav: { section: "preferences", order: 1, icon: SwatchBook }, devOnly: true },
   { id: "settings", path: "/settings", title: "Settings", shell: "app", access: everyone("full"), nav: { section: "preferences", order: 2, icon: Settings }, palette: true },
   { id: "settings.firm", path: "/settings/firm", title: "Firm", shell: "app", access: roles("full", "none", "none", "none"), nav: { section: "settings", order: 1, icon: Building2 }, palette: true },
+  // TODO(Phase C, docs/07 Q15): OWNER manages the team (invite / remove / deactivate / change role); MANAGER may open this
+  // page but it is read-only for them, plus assigning candidates to BDEs. `full` here only means "openable": the per-control
+  // rules belong in can() (member.invite, member.remove, member.changeRole, member.deactivate, candidate.assign, team.view).
+  // The page has no management controls today, so there is nothing to hide yet.
   { id: "settings.team", path: "/settings/team", title: "Team", shell: "app", access: roles("full", "full", "none", "none"), nav: { section: "settings", order: 2, icon: Users }, palette: true },
   { id: "settings.templates", path: "/settings/templates", title: "Templates", shell: "app", access: roles("full", "full", "none", "none"), nav: { section: "settings", order: 3, icon: FileText }, palette: true },
   { id: "settings.preferences", path: "/settings/preferences", title: "Preferences", shell: "app", access: everyone("full"), nav: { section: "settings", order: 4, icon: SlidersHorizontal }, palette: true },
@@ -152,6 +155,18 @@ export function accessFor(route: RouteDef, role: FirmRole): Access {
 export function accessForPath(pathname: string, role: FirmRole): { route: RouteDef | null; access: Access } {
   const route = matchRoute(pathname);
   return { route, access: route ? accessFor(route, role) : "none" };
+}
+
+/**
+ * Is `routeId` the page at `pathname`, or an ancestor of it? Matches on route ids, never on raw
+ * paths, so it keeps working when paths gain `[firm]` (docs/07 Phase T). A dotted id is a child of
+ * the id before its last dot: `candidates.detail` is under `candidates`, `settings.team` under
+ * `settings` (registry.test.ts enforces that every dotted id has a registered parent).
+ */
+export function isRouteActive(routeId: RouteId, pathname: string): boolean {
+  const current = matchRoute(pathname);
+  if (!current) return false;
+  return current.id === routeId || current.id.startsWith(`${routeId}.`);
 }
 
 export function canOpen(route: RouteDef, role: FirmRole): boolean {

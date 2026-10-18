@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSession } from "@/lib/stores/session-store";
-import { navFor, type RouteDef } from "@/lib/routes/registry";
+import { isRouteActive, navFor, type RouteDef, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { EASE_OUT } from "@/lib/motion";
 
@@ -103,7 +103,7 @@ function SidebarItem({ route }: { route: RouteDef }) {
   const pathname = usePathname();
   const toHref = useHref();
   const Icon = route.nav?.icon;
-  const isActive = pathname === route.path || pathname?.startsWith(route.path + "/");
+  const isActive = isRouteActive(route.id as RouteId, pathname ?? "");
 
   return (
     <li>

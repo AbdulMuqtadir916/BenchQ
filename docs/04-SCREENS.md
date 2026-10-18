@@ -123,14 +123,14 @@ keep it accurate — it's the cheapest documentation in the product.
 
 ## 2. Auth and onboarding
 
-### 2.1 `/sign-in`, `/sign-up`, `/invite/[token]`
+### 2.1 `/sign-in`, `/invite/[token]`
 
 `AuthShell`: centred card, product mark, no sidebar. There is no real auth in this repo — the form
 validates with Zod, shows the error state on a deliberately wrong password (`wrong@benchq.io`), and
 on success writes a session into the Zustand store and routes to `/dashboard`.
 
 Build the states properly anyway: field-level validation, a submit-pending state, a form-level
-error banner, and a "check your email" confirmation on sign-up. These are cheap now and expensive
+error banner, and a "check your email" confirmation on the forgot-password request. These are cheap now and expensive
 to retrofit.
 
 `/invite/[token]` shows the inviting firm's name and the role being offered before the accept
