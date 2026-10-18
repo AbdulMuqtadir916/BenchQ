@@ -421,6 +421,13 @@ the other firm's data (checked on every list screen); query keys all include `fi
 Screens are functional skeletons here; visual polish is Phase S. `docs/04-SCREENS.md` gets an
 "Admin" section before P3 (UI-first: the screen spec comes first).
 
+**Fixture dates (do in P3, before any admin screen shows invites next to the ledger):** invite dates
+are relative to load time (`invitesAt(now)` in `src/mocks/tenancy.ts` shifts them from
+`FIXTURE_NOW`), but ledger fixture dates are still fixed. Shift the ledger entries about invites
+(`INVITE_SENT`, `INVITE_ACCEPTED`, `INVITE_REVOKED`) by the same offset, so each entry's date matches
+its invite's `createdAt` (sent) or acceptance. Add a fixture test that ties every invite ledger entry
+to its invite's date.
+
 **Exit:** a platform admin can list firms, open one, start a support view, browse the firm
 read-only with the banner, exit, and see the visit in both audit logs.
 
