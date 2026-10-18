@@ -1,8 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import type { FirmSession, User } from "@/lib/schemas/session";
-import type { FirmPrincipal } from "@/lib/schemas/tenancy";
+import type { FirmSession, Session, User } from "@/lib/schemas/session";
+import type { PlatformUser, Principal } from "@/lib/schemas/tenancy";
 
 /**
  * Who is signed in, on the client (docs/07 §3, T4): the principal and its user, or nobody. It holds no
@@ -45,31 +45,37 @@ export const DEFAULT_SESSION: FirmSession = {
 };
 
 interface SessionState {
-  /** null = signed out. */
-  principal: FirmPrincipal | null;
+  /** null = signed out. A firm user or a platform admin (docs/07 §3). */
+  principal: Principal | null;
+  /** The firm user, when the principal is a firm principal. */
   user: User | null;
+  /** The platform admin, when the principal is a platform principal. */
+  platformUser: PlatformUser | null;
   /** Replace the session (sign-in, the dev principal switcher). Only who is signed in is kept: the firm a page shows comes from its URL (docs/07 §1.3, T6). */
-  setSession: (session: FirmSession) => void;
+  setSession: (session: Session) => void;
   /**
    * DEV ONLY: a switch to another firm's user, waiting for the navigation to `path` to land before the
    * session changes (SessionCommitter). Switching first would turn the page you are leaving into a
    * not-found for the new principal for as long as the navigation takes.
    */
-  pending: { session: FirmSession; path: string } | null;
-  setPending: (pending: { session: FirmSession; path: string } | null) => void;
+  pending: { session: Session; path: string } | null;
+  setPending: (pending: { session: Session; path: string } | null) => void;
   signOut: () => void;
   /** Back to the default fixture user (tests). */
   reset: () => void;
 }
 
-const signedIn = (session: FirmSession) => ({ principal: session.principal, user: session.user });
+const signedIn = (session: Session) =>
+  "user" in session
+    ? { principal: session.principal, user: session.user, platformUser: null }
+    : { principal: session.principal, user: null, platformUser: session.platformUser };
 
 export const useSession = create<SessionState>((set) => ({
   ...signedIn(DEFAULT_SESSION),
   pending: null,
   setSession: (session) => set({ ...signedIn(session), pending: null }),
   setPending: (pending) => set({ pending }),
-  signOut: () => set({ principal: null, user: null, pending: null }),
+  signOut: () => set({ principal: null, user: null, platformUser: null, pending: null }),
   reset: () => set({ ...signedIn(DEFAULT_SESSION), pending: null }),
 }));
 
@@ -79,6 +85,24 @@ export const useSession = create<SessionState>((set) => ({
  */
 export function useSignedInUser(): User {
   const user = useSession((s) => s.user);
-  if (!user) throw new Error("useSignedInUser() rendered while signed out: it belongs under the firm or dev layout.");
+  if (!user) throw new Error("useSignedInUser() rendered without a signed-in firm user: it belongs under the firm layout.");
   return user;
 }
+
+/** Who is signed in, for pages that render only when someone is (the firm, admin and dev layouts). */
+export function useSignedInPrincipal(): Principal {
+  const principal = useSession((s) => s.principal);
+  if (!principal) throw new Error("useSignedInPrincipal() rendered while signed out: it belongs under a signed-in layout.");
+  return principal;
+}
+
+/** The signed-in person's display name and role label, whichever tier they are on. */
+export function useSignedInIdentity(): { name: string; roleLabel: string } {
+  const user = useSession((s) => s.user);
+  const admin = useSession((s) => s.platformUser);
+  if (admin) return { name: admin.name, roleLabel: "Super Admin" };
+  if (user) return { name: user.name, roleLabel: ROLE_LABEL[user.role] };
+  throw new Error("useSignedInIdentity() rendered while signed out.");
+}
+
+const ROLE_LABEL: Record<User["role"], string> = { OWNER: "Owner", MANAGER: "Manager", BDE: "BDE", VIEWER: "Viewer" };

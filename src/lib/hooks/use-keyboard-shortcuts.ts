@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUiStore } from "@/lib/stores/ui-store";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { shortcutsFor } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 
@@ -11,7 +11,7 @@ import { useHref } from "@/lib/routes/use-href";
  * Global keyboard system per docs/04 §1.3.
  *
  *   ⌘K / Ctrl+K   command palette
- *   g <key>       navigate — keys come from the route registry, only for routes the role can open
+ *   g <key>       navigate — keys come from the route registry, only for routes the principal can open
  *   ?             open keyboard hint sheet
  *   Esc           close palette / hint sheet
  *
@@ -36,7 +36,7 @@ export function useGlobalShortcuts() {
   const closeCommandPalette = useUiStore((s) => s.closeCommandPalette);
   const openHintSheet = useUiStore((s) => s.openHintSheet);
   const closeHintSheet = useUiStore((s) => s.closeHintSheet);
-  const role = useSignedInUser().role;
+  const principal = useSignedInPrincipal();
 
   const gPressedAt = useRef<number>(0);
 
@@ -72,7 +72,7 @@ export function useGlobalShortcuts() {
       }
 
       if (now - gPressedAt.current < G_PREFIX_MS) {
-        const target = shortcutsFor(role).find((shortcut) => shortcut.key === e.key.toLowerCase());
+        const target = shortcutsFor(principal).find((shortcut) => shortcut.key === e.key.toLowerCase());
         if (target) {
           e.preventDefault();
           gPressedAt.current = 0;
@@ -86,7 +86,7 @@ export function useGlobalShortcuts() {
   }, [
     router,
     toHref,
-    role,
+    principal,
     openCommandPalette,
     closeCommandPalette,
     openHintSheet,

@@ -10,7 +10,8 @@ import { currentPrincipal } from "./auth";
  */
 export function requireMember(firmId: string): void {
   const principal = currentPrincipal();
-  if (principal.firmId !== firmId) throw new ApiError("Not found.", "NOT_FOUND", 404);
+  // A platform admin isn't a member of any firm; reading one needs a support view (P4).
+  if (principal.kind !== "firm" || principal.firmId !== firmId) throw new ApiError("Not found.", "NOT_FOUND", 404);
 }
 
 /**

@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { isRouteActive, navFor, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { PageHeader } from "@/components/app/page-header";
 import { cn } from "@/lib/cn";
 
-/** Settings sections from the route registry: each role sees only the sections it may open. */
+/** Settings sections from the route registry: each principal sees only the sections it may open. */
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const toHref = useHref();
-  const role = useSignedInUser().role;
-  const sections = navFor(role, "settings");
+  const principal = useSignedInPrincipal();
+  const sections = navFor(principal, "settings");
 
   return (
     <div className="bq-page">

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { sessionApi } from "@/lib/api/session";
 import type { Firm } from "@/lib/schemas/session";
-import type { FirmPrincipal } from "@/lib/schemas/tenancy";
+import type { FirmPrincipal, Principal } from "@/lib/schemas/tenancy";
 import { DEFAULT_SESSION } from "@/lib/stores/session-store";
 import { allUsers, firms } from "@/mocks/team";
 import { firmOutcome, type FirmLookup } from "./firm-outcome";
@@ -23,7 +23,7 @@ async function lookup(slug: string): Promise<FirmLookup> {
   }
 }
 
-async function outcomesFor(principal: FirmPrincipal | null): Promise<Record<string, string>> {
+async function outcomesFor(principal: Principal | null): Promise<Record<string, string>> {
   const row: Record<string, string> = {};
   for (const slug of slugs) row[slug] = firmOutcome(principal, await lookup(slug)).kind;
   return row;
@@ -41,6 +41,14 @@ describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every
     const own = firms.find((firm) => firm.id === firmId)!;
     const expected = Object.fromEntries(slugs.map((slug) => [slug, slug === own.slug ? (own.status === "SUSPENDED" ? "suspended" : "open") : "not-found"]));
     expect(await outcomesFor(principal)).toEqual(expected);
+  });
+
+  it("platform admin without a support view: every slug, known or not, is the support interstitial (§2.5 row 4), and no firm is looked up", async () => {
+    const { principal } = await sessionApi.devSignInAs("padm_sana");
+    expect(principal.kind).toBe("platform");
+    expect(Object.values(await outcomesFor(principal))).toEqual(slugs.map(() => "support-required"));
+    // The lookup itself refuses a non-member (the gate doesn't even ask): a support view is P4.
+    await expect(sessionApi.firmBySlug(firms[0]!.slug)).rejects.toMatchObject({ status: 404 });
   });
 
   it("covers a user of every firm that has users, including the suspended one", () => {

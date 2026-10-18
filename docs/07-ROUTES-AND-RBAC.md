@@ -420,15 +420,15 @@ the other firm's data (checked on every list screen); query keys all include `fi
 
 | #   | Task                                                                                                                                                                           |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P1  | Registry v2 (§5): `area`, `access` union, `admin` shell and nav section, helpers on `Principal`                                                                                |
-| P2  | `src/app/admin/layout.tsx`: admin shell (same frosted shell, admin nav), platform guard → not-found for others                                                                 |
+| P1  | Registry v2 (§5): `area`, `access` union, `admin` shell and nav section, helpers on `Principal` — **done in PR 12** (`feat/platform-shell`): `RouteAccess` union, `area: "platform"`, `admin` shell / nav section; every helper (`accessFor`, `accessForPath`, `canOpen`, `navFor`, `paletteRoutesFor`, `shortcutsFor`, `landingFor`) takes a `Principal`; the Support column is derived (`supportAccess`: read where OWNER has access, `none` on `welcome`, `candidates/new`, `jobs/capture`, `focus`, `settings/preferences`) and table-tested against §2.2. Platform sessions are real: the mock backend, the session store (`principal`, `user` or `platformUser`) and the dev switcher sign in as a Super Admin; the membership check refuses a platform admin on every firm call (404) until P4 |
+| P2  | `src/app/admin/layout.tsx`: admin shell (same frosted shell, admin nav), platform guard → not-found for others — **done in PR 12**: `src/app/admin/layout.tsx` → `PlatformGate` (signed out → sign-in with returnTo; any non-admin → not-found, no shell) → `AppShell variant="admin"` (admin nav, no firm notifications). `/admin` is a placeholder page until P3. The tab title names a platform route only to a platform admin (principle 4). A platform admin on a firm URL gets `support-required` (§2.5 row 4) — a plain screen with "Back to admin" until P4 builds the interstitial; ⌘K for an admin already lists only platform routes (P5 adds firms search and "View workspace") |
 | P3  | Every route in §2.3 with real layout and skeleton / empty / error (and not-found for `[firmId]`), on mock adapters `platformApi` (`firms`, `plans`, `audit`, `system`, `team`) |
 | P4  | Support view (§4): start / exit / expiry, interstitial, banner, ledger entries, support access column                                                                          |
 | P5  | ⌘K for admins: firms search, "View workspace", admin nav; firm-scoped commands hidden outside a firm                                                                           |
 | P6  | Tests: platform table test rows, support view grants no actions, non-admin → `/admin` not-found; **the §2.5 platform-admin rows**: no support view for this firm → support interstitial (reason required, not a redirect), and a support view of a `SUSPENDED` firm renders normally (read-only), added to `src/lib/tenancy/firm-outcome.test.ts` |
 
 Screens are functional skeletons here; visual polish is Phase S. `docs/04-SCREENS.md` gets an
-"Admin" section before P3 (UI-first: the screen spec comes first).
+"Admin" section before P3 (UI-first: the screen spec comes first). **P3 waits for that section** (product owner drafting it, 2026-10-18).
 
 **Fixture dates (do in P3, before any admin screen shows invites next to the ledger):** invite dates
 are relative to load time (`invitesAt(now)` in `src/mocks/tenancy.ts` shifts them from

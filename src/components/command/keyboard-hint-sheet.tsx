@@ -1,7 +1,7 @@
 "use client";
 
 import { useUiStore } from "@/lib/stores/ui-store";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { shortcutsFor } from "@/lib/routes/registry";
 import { cn } from "@/lib/cn";
 
@@ -17,13 +17,13 @@ type Shortcut = { keys: string[]; label: string };
 export function KeyboardHintSheet() {
   const isOpen = useUiStore((s) => s.hintSheetOpen);
   const close = useUiStore((s) => s.closeHintSheet);
-  const role = useSignedInUser().role;
+  const principal = useSignedInPrincipal();
 
   if (!isOpen) return null;
 
   const shortcuts: Shortcut[] = [
     { keys: ["⌘", "K"], label: "Open command palette" },
-    ...shortcutsFor(role).map(({ key, route }) => ({ keys: ["g", key], label: `Go to ${route.title}` })),
+    ...shortcutsFor(principal).map(({ key, route }) => ({ keys: ["g", key], label: `Go to ${route.title}` })),
     { keys: ["?"], label: "Open this shortcut sheet" },
     { keys: ["Esc"], label: "Close panel / clear selection" },
   ];

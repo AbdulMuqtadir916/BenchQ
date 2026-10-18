@@ -11,6 +11,7 @@ import { useSession } from "@/lib/stores/session-store";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firmOutcome, type FirmLookup, type FirmOutcome } from "@/lib/tenancy/firm-outcome";
 import { GateScreen, GateSkeleton } from "./gate-screen";
+import { SupportRequiredState } from "./support-required-state";
 
 /**
  * The firm layout's gate (docs/07 §2.5): resolves the URL's slug and renders the page only for a
@@ -38,6 +39,12 @@ export function FirmGate({ slug, children }: { slug: string; children: ReactNode
       return <GateSkeleton label="Opening sign-in" />;
     case "resolving":
       return <GateSkeleton label="Opening workspace" />;
+    case "support-required":
+      return (
+        <GateScreen>
+          <SupportRequiredState />
+        </GateScreen>
+      );
     case "not-found":
       return (
         <GateScreen>

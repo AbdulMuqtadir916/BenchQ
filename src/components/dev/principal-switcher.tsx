@@ -1,12 +1,14 @@
 "use client";
 
 import { Fragment, useEffect, useId, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { BriefcaseBusiness, ChevronDown, Crown, Eye, LogOut, ShieldCheck, ShieldUser, UsersRound, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInIdentity, useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useCurrentSession, useDevPrincipals, useDevSignInAs, useSignOut } from "@/lib/hooks/use-session";
 import { landingHref } from "@/lib/routes/landing";
+import { matchRoute } from "@/lib/routes/registry";
+import type { Session } from "@/lib/schemas/session";
 import type { DevPrincipalOption } from "@/lib/schemas/session";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/cn";
@@ -15,8 +17,10 @@ import { CONTENT_EXIT, POPOVER_TRANSITION } from "@/lib/motion";
 /**
  * Dev principal switcher (docs/07 §3, T4): sign in as any fixture principal — every role in firm A,
  * the users of the other firms, and the platform admin (listed, not selectable until Phase P).
- * A switch to a user of the firm in the URL stays on the page; a switch to another firm's user goes to
- * that user's landing (staying would be a not-found, docs/07 §2.5). Sign out is at the end.
+ * A switch that the current page still fits stays on it (a user of the firm in the URL); otherwise it
+ * goes to the new principal's landing: another firm's user or a platform admin from a firm page
+ * (staying would be a not-found, §2.5), a firm user from /admin (not-found for them, §2.3). Sign out
+ * is at the end.
  * Rendered only when NEXT_PUBLIC_SHOW_DEV_TOOLS="true". Role simulation, not security.
  */
 
@@ -35,19 +39,28 @@ const ROLE_ICON: Record<DevPrincipalOption["role"], LucideIcon> = {
   PLATFORM_ADMIN: ShieldCheck,
 };
 
+/** Can the new session stay on the current page? Off the firm and admin areas (/dev) it always can. */
+function pageFits(session: Session, area: string | null, urlSlug: string | null): boolean {
+  if (area === "firm") return session.principal.kind === "firm" && session.firm?.slug === urlSlug;
+  if (area === "platform") return session.principal.kind === "platform";
+  return true;
+}
+
 /** Group label for an option: its firm, or the platform team. */
 const groupOf = (option: DevPrincipalOption) => option.firmName ?? "BenchQ platform";
 
 export function PrincipalSwitcher({ align = "end" }: { align?: "start" | "end" }) {
   const show = process.env.NEXT_PUBLIC_SHOW_DEV_TOOLS === "true";
   const urlSlug = useParams<{ firm?: string }>()?.firm ?? null;
-  const user = useSignedInUser();
-  // The signed-in user's own firm, which is not necessarily the URL's (e.g. on /dev).
-  const firmName = useCurrentSession().data?.firm.name ?? "";
+  const area = matchRoute(usePathname() ?? "/")?.area ?? null;
+  const principal = useSignedInPrincipal();
+  const identity = useSignedInIdentity();
+  // The signed-in user's own firm, which is not necessarily the URL's (e.g. on /dev); none for an admin.
+  const firmName = useCurrentSession().data?.firm?.name ?? (principal.kind === "platform" ? "BenchQ platform" : "");
   const [open, setOpen] = useState(false);
   const principals = useDevPrincipals(show && open);
   const signInAs = useDevSignInAs({
-    navigateTo: (session) => (urlSlug && session.firm.slug !== urlSlug ? landingHref(session) : null),
+    navigateTo: (session) => (pageFits(session, area, urlSlug) ? null : landingHref(session)),
   });
   const signOut = useSignOut();
   const reduceMotion = useReducedMotion() ?? false;
@@ -90,8 +103,8 @@ export function PrincipalSwitcher({ align = "end" }: { align?: "start" | "end" }
         )}
       >
         <ShieldUser size={14} aria-hidden="true" className="shrink-0" />
-        <span className="truncate font-[550]">{user.name}</span>
-        <span className="hidden truncate text-[var(--color-text-3)] sm:inline">· {ROLE_LABEL[user.role]}{firmName ? ` · ${firmName}` : ""}</span>
+        <span className="truncate font-[550]">{identity.name}</span>
+        <span className="hidden truncate text-[var(--color-text-3)] sm:inline">· {identity.roleLabel}{firmName ? ` · ${firmName}` : ""}</span>
         <ChevronDown size={14} aria-hidden="true" className={cn("shrink-0 transition-transform", open && "rotate-180")} />
       </button>
       <AnimatePresence initial={false}>
@@ -117,7 +130,7 @@ export function PrincipalSwitcher({ align = "end" }: { align?: "start" | "end" }
             {principals.error ? <li className="px-2.5 py-2 text-sm text-[var(--color-danger-fg)]">Couldn&apos;t load principals.</li> : null}
             {options.map((option, index) => {
               const isGroupStart = index === 0 || groupOf(options[index - 1]!) !== groupOf(option);
-              const isSelected = option.id === user.id;
+              const isSelected = option.id === principal.userId;
               const Icon = ROLE_ICON[option.role];
               return (
                 <Fragment key={option.id}>

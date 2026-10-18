@@ -1,9 +1,10 @@
-import type { FirmSession } from "@/lib/schemas/session";
+import type { Session } from "@/lib/schemas/session";
 import { hrefFor, landingFor } from "./registry";
 
-/** Where a signed-in firm user lands (docs/07 §2.1, T7): their own firm's landing route. */
-export function landingHref(session: FirmSession): string {
-  const route = landingFor(session.principal.role, { isFirstRun: session.user.lastActiveAt === null });
+/** Where a signed-in principal lands (docs/07 §2.1, T7): a firm user in their own firm, a platform admin at /admin. */
+export function landingHref(session: Session): string {
+  if (!("user" in session)) return hrefFor(landingFor(session.principal));
+  const route = landingFor(session.principal, { isFirstRun: session.user.lastActiveAt === null });
   return hrefFor(route, { firm: session.firm.slug });
 }
 
