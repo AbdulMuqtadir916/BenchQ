@@ -83,8 +83,10 @@ function devPrincipals(): DevPrincipalOption[] {
 function firmBySlug(slug: string): Firm {
   const principal = currentPrincipal();
   const firm = firms.find((item) => item.slug === slug);
-  // A platform admin opens a firm only through a support view (P4), never as a member.
-  if (!firm || principal.kind !== "firm" || firm.id !== principal.firmId) throw new ApiError("Not found.", "NOT_FOUND", 404);
+  if (!firm) throw new ApiError("Not found.", "NOT_FOUND", 404);
+  // A platform admin knows every firm (it's their job in /admin); reading its data still needs a support view (P4).
+  if (principal.kind === "platform") return FirmSchema.parse(firm);
+  if (firm.id !== principal.firmId) throw new ApiError("Not found.", "NOT_FOUND", 404);
   return FirmSchema.parse(firm);
 }
 

@@ -54,7 +54,7 @@ describe("dev principals and sign-in (docs/07 T4)", () => {
 describe("session store: signed out, and a switch waiting for its page (docs/07 T6)", () => {
   it("holds no firm: only who is signed in", () => {
     useSession.getState().reset();
-    expect(Object.keys(useSession.getState()).filter((key) => typeof useSession.getState()[key as keyof ReturnType<typeof useSession.getState>] !== "function").sort()).toEqual(["pending", "platformUser", "principal", "user"]);
+    expect(Object.keys(useSession.getState()).filter((key) => typeof useSession.getState()[key as keyof ReturnType<typeof useSession.getState>] !== "function").sort()).toEqual(["pending", "platformUser", "principal", "restoring", "user"]);
   });
 
   it("signs out to no principal and no user", () => {

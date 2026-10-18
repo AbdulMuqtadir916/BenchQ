@@ -7,7 +7,7 @@ import { NotFoundState } from "@/components/app/not-found-state";
 import { SuspendedState } from "@/components/app/suspended-state";
 import { useFirmBySlug } from "@/lib/hooks/use-session";
 import { hrefFor } from "@/lib/routes/registry";
-import { useSession } from "@/lib/stores/session-store";
+import { useIsSessionSettling, useSession } from "@/lib/stores/session-store";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firmOutcome, type FirmLookup, type FirmOutcome } from "@/lib/tenancy/firm-outcome";
 import { GateScreen, GateSkeleton } from "./gate-screen";
@@ -23,7 +23,7 @@ export function FirmGate({ slug, children }: { slug: string; children: ReactNode
   const router = useRouter();
   const principal = useSession((s) => s.principal);
   // A sign-in or cross-firm switch is landing on this URL: its session commits right after this render.
-  const isSessionPending = useSession((s) => s.pending !== null);
+  const isSessionPending = useIsSessionSettling();
   const query = useFirmBySlug(slug);
   const lookup: FirmLookup = query.isSuccess ? { status: "success", firm: query.data } : query.isError ? { status: "error", error: query.error } : { status: "pending" };
   const outcome: FirmOutcome = isSessionPending ? { kind: "resolving" } : firmOutcome(principal, lookup);

@@ -18,12 +18,15 @@ const S = "acme";
 /** A firm URL: `f("/candidates")` is "/acme/candidates". */
 const f = (path: string) => `/${S}${path}`;
 
-/** Every page.tsx under src/app as a route path, skipping parallel (@slot) and intercepting ((.)) routes. */
+/**
+ * Every page.tsx under src/app as a route path, skipping parallel (@slot) and intercepting ((.)) routes
+ * and catch-alls ([...x]): those only exist to render a not-found inside an area's layout.
+ */
 function pagePaths(dir = APP_DIR): string[] {
   return readdirSync(dir).flatMap((name) => {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) {
-      if (name.startsWith("@") || name.startsWith("(.)")) return [];
+      if (name.startsWith("@") || name.startsWith("(.)") || name.startsWith("[...")) return [];
       return pagePaths(full);
     }
     if (name !== "page.tsx") return [];

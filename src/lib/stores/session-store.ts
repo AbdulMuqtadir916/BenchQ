@@ -60,6 +60,9 @@ interface SessionState {
    */
   pending: { session: Session; path: string } | null;
   setPending: (pending: { session: Session; path: string } | null) => void;
+  /** DEV ONLY: the remembered dev-switcher principal is being signed back in after a full page load (DevSessionRestore). */
+  restoring: boolean;
+  setRestoring: (restoring: boolean) => void;
   signOut: () => void;
   /** Back to the default fixture user (tests). */
   reset: () => void;
@@ -73,8 +76,10 @@ const signedIn = (session: Session) =>
 export const useSession = create<SessionState>((set) => ({
   ...signedIn(DEFAULT_SESSION),
   pending: null,
+  restoring: false,
   setSession: (session) => set({ ...signedIn(session), pending: null }),
   setPending: (pending) => set({ pending }),
+  setRestoring: (restoring) => set({ restoring }),
   signOut: () => set({ principal: null, user: null, platformUser: null, pending: null }),
   reset: () => set({ ...signedIn(DEFAULT_SESSION), pending: null }),
 }));
@@ -87,6 +92,15 @@ export function useSignedInUser(): User {
   const user = useSession((s) => s.user);
   if (!user) throw new Error("useSignedInUser() rendered without a signed-in firm user: it belongs under the firm layout.");
   return user;
+}
+
+/**
+ * Is the session about to change (a sign-in or cross-firm switch landing on this URL, or the dev
+ * session being restored after a reload)? Gates show their skeleton meanwhile instead of judging the
+ * principal that is on its way out.
+ */
+export function useIsSessionSettling(): boolean {
+  return useSession((s) => s.pending !== null || s.restoring);
 }
 
 /** Who is signed in, for pages that render only when someone is (the firm, admin and dev layouts). */

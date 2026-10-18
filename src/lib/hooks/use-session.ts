@@ -18,11 +18,14 @@ export function useCurrentSession() {
   return useQuery({ queryKey: queryKeys.session.current(), queryFn: () => sessionApi.current(), enabled: isSignedIn, staleTime: Infinity });
 }
 
-/** The firm a URL slug names, for the firm layout (docs/07 §2.5). 404 for an unknown slug and another firm's alike. */
+/**
+ * The firm a URL slug names, for the firm layout (docs/07 §2.5). For a firm user: 404 for an unknown
+ * slug and another firm's alike. For a platform admin: the firm if it exists (they manage every firm),
+ * 404 only for an unknown slug.
+ */
 export function useFirmBySlug(slug: string) {
-  // Only a firm user looks a firm up by slug; a platform admin goes through a support view (P4).
-  const isFirmUser = useSession((s) => s.principal?.kind === "firm");
-  return useQuery({ queryKey: queryKeys.session.firmBySlug(slug), queryFn: () => sessionApi.firmBySlug(slug), enabled: isFirmUser, staleTime: Infinity });
+  const isSignedIn = useSession((s) => s.principal !== null);
+  return useQuery({ queryKey: queryKeys.session.firmBySlug(slug), queryFn: () => sessionApi.firmBySlug(slug), enabled: isSignedIn, staleTime: Infinity });
 }
 
 /** DEV ONLY: every fixture principal, for the dev principal switcher. */
