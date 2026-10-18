@@ -9,8 +9,8 @@ export function principalKey(principal: Principal | null): string {
 }
 
 /**
- * Clear the WHOLE query cache the moment the principal changes: the dev switcher, sign-in and sign-out
- * all go through the session store, so this one subscription covers them. It runs synchronously inside
+ * Clear the WHOLE query cache the moment the principal changes: sign-in, sign-out and another tab's
+ * change all go through the session store, so this one subscription covers them. It runs synchronously inside
  * the store update, before React renders the new principal, so no screen can read the previous
  * person's data. (Same-firm switches matter most: OWNER → BDE keeps the same firm keys.) The provider
  * also remounts the app under the new principal, so mounted queries start from this empty cache.

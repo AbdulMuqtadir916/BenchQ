@@ -58,22 +58,3 @@ export type PlatformSession = z.infer<typeof PlatformSessionSchema>;
 
 export const SessionSchema = z.union([FirmSessionSchema, PlatformSessionSchema]);
 export type Session = z.infer<typeof SessionSchema>;
-
-/**
- * DEV ONLY: one entry in the dev principal switcher (docs/07 T4). `available: false` marks a
- * principal the app can't sign in as yet (the platform admin until Phase P).
- */
-export const DevPrincipalOptionSchema = z.object({
-  /** The user (or platform user) id: what the switcher signs in as. */
-  id: z.string(),
-  name: z.string(),
-  kind: z.enum(["firm", "platform"]),
-  role: z.union([FirmRole, z.literal("PLATFORM_ADMIN")]),
-  firmId: z.string().nullable(),
-  firmName: z.string().nullable(),
-  firmStatus: FirmStatus.nullable(),
-  available: z.boolean(),
-  /** Shown under the name: why it isn't available yet, or what picking it does. */
-  note: z.string().nullable(),
-});
-export type DevPrincipalOption = z.infer<typeof DevPrincipalOptionSchema>;

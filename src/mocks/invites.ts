@@ -9,7 +9,7 @@ import { invites } from "./tenancy";
  * The mock backend's side of accepting an invite (docs/02 §3.1, Q18): the user is created (never
  * active yet, so an OWNER's landing is /welcome), the invite becomes ACCEPTED, an ONBOARDING firm
  * becomes ACTIVE when its OWNER accepts, and the firm's ledger gets INVITE_ACCEPTED. The
- * /invite/[token] page that drives it arrives with Phase S; until then the dev switcher does.
+ * /invite/[token] page that drives it arrives in P4 (docs/07 Q26); until then only tests call it.
  */
 export function acceptInvite(inviteId: string, person: { userId: string; name: string }, now = new Date()): User {
   const index = invites.findIndex((invite) => invite.id === inviteId);

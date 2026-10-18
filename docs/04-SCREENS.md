@@ -40,7 +40,7 @@ supplies a count.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ Topbar  [logo] [firm switcher]      [⌘K search]    [shift clock] [role] [me] │
+│ Topbar  [account menu]    [⌘K search]   [shift clock] [notifications] [theme]│
 ├────────────┬─────────────────────────────────────────────────────────────────┤
 │  Sidebar   │                                                                 │
 │  Dashboard │                     route content                               │

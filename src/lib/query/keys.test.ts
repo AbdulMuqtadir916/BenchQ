@@ -47,7 +47,7 @@ describe("query key factory (docs/07 T5, principle 7)", () => {
   });
 
   it("keeps global data out of any firm: companies (Q13) and the session", () => {
-    for (const key of [queryKeys.companies.all(), queryKeys.companies.detail("comp_01"), queryKeys.session.current(), queryKeys.session.devPrincipals()]) {
+    for (const key of [queryKeys.companies.all(), queryKeys.companies.detail("comp_01"), queryKeys.session.current()]) {
       expect(String(key[0]).startsWith("firm_")).toBe(false);
     }
   });

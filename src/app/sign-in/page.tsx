@@ -1,14 +1,13 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useId, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
-import { DEFAULT_SESSION } from "@/lib/stores/session-store";
-import { useDevSignInAs } from "@/lib/hooks/use-session";
-import { hrefFor } from "@/lib/routes/registry";
+import { ApiError } from "@/lib/api/client";
+import { useSignIn } from "@/lib/hooks/use-session";
 import { safeReturnTo } from "@/lib/routes/landing";
 
 /** useSearchParams needs a Suspense boundary for the static build. */
@@ -20,22 +19,33 @@ export default function SignInPage() {
   );
 }
 
+/** Any failed sign-in reads the same, so the page never reveals which emails have an account (docs/07 L1). */
+const INVALID = "Email or password is incorrect.";
+
+/**
+ * /sign-in (docs/07 §2.1, Phase L): email + password against the seeded accounts (docs/03 §3.2; mock
+ * auth until Phase D). On success: back to the same-origin `returnTo`, or the principal's landing.
+ */
 function SignInForm() {
   const returnTo = safeReturnTo(useSearchParams().get("returnTo"));
-  // Navigate first, then the session changes (the change remounts the app, which would drop a
-  // callback passed to mutate()).
-  const signIn = useDevSignInAs({ navigateTo: () => returnTo ?? hrefFor("root") });
-  const [email, setEmail] = useState("adnan@techcorp.com");
-  const [password, setPassword] = useState("password");
-  const [loading, setLoading] = useState(false);
+  const signIn = useSignIn(returnTo);
+  const errorId = useId();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    // No real auth yet: signing in means "the default fixture user" (mock backend and client session).
-    // Then back to where the firm gate sent us from, or the landing (docs/07 §2.1).
-    signIn.mutate(DEFAULT_SESSION.user.id, { onError: () => setLoading(false) });
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    signIn.mutate({ email, password });
   };
+
+  // The generic credential error for a refused sign-in; a different message only when the service
+  // itself failed, which says nothing about the account.
+  const error = signIn.isError
+    ? signIn.error instanceof ApiError && signIn.error.status !== 401
+      ? "Couldn't sign in right now. Try again."
+      : INVALID
+    : null;
+  const isBusy = signIn.isPending || signIn.isSuccess;
 
   return (
     <PageTransition className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-4">
@@ -44,21 +54,46 @@ function SignInForm() {
           <h1 className="text-display text-[var(--color-text)]">BenchQ</h1>
           <p className="text-body text-[var(--color-text-3)] mt-2">Sign in to your account</p>
         </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="space-y-2">
             <label className="text-label text-[var(--color-text-2)]" htmlFor="email">Email</label>
-            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required className="bq-input" />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              aria-invalid={error === INVALID || undefined}
+              aria-describedby={error ? errorId : undefined}
+              className="bq-input"
+            />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-label text-[var(--color-text-2)]" htmlFor="password">Password</label>
               <a href="#" className="text-caption text-[var(--color-primary)]">Forgot password?</a>
             </div>
-            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required className="bq-input" />
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              aria-invalid={error === INVALID || undefined}
+              aria-describedby={error ? errorId : undefined}
+              className="bq-input"
+            />
           </div>
-          <Button type="submit" className="bq-primary w-full mt-4" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+          {error ? (
+            <p id={errorId} role="alert" className="text-sm text-[var(--color-danger-fg)]">
+              {error}
+            </p>
+          ) : null}
+          <Button type="submit" className="bq-primary w-full mt-4" disabled={isBusy || !email || !password}>
+            {isBusy ? "Signing in..." : "Sign in"}
           </Button>
         </form>
       </Card>

@@ -10,9 +10,9 @@ import { inboxApi } from "@/lib/api/inbox";
 import { ledgerApi } from "@/lib/api/analytics";
 import { teamApi } from "@/lib/api/team";
 import { sessionApi } from "@/lib/api/session";
-import { DEFAULT_SESSION } from "@/lib/stores/session-store";
 import { allLedger } from "./ledger";
 import { inFirm } from "./_shared";
+import { signInAs } from "@/mocks/sign-in-as";
 
 /**
  * Firm isolation at the adapter boundary (docs/07 T5): what a firm asks for is all it gets, and a
@@ -25,9 +25,9 @@ const A = "firm_hts";
 const B = "firm_stl";
 /** Sign the mock backend in as an OWNER of the firm, so calls naming it pass the membership check. */
 const MEMBER: Record<string, string> = { firm_hts: "user_imran", firm_stl: "user_lakshmi", firm_cbw: "user_naveen" };
-const as = (firmId: string) => sessionApi.devSignInAs(MEMBER[firmId]!);
+const as = (firmId: string) => signInAs(MEMBER[firmId]!);
 afterEach(async () => {
-  await sessionApi.devSignInAs(DEFAULT_SESSION.user.id);
+  await sessionApi.signOut();
 });
 const onlyFirm = (rows: readonly { firmId: string | null }[], firmId: string) => rows.length > 0 && rows.every((row) => row.firmId === firmId);
 const is404 = async (promise: Promise<unknown>) => {

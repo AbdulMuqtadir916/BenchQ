@@ -4,7 +4,7 @@ import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/empty-state";
-import { PrincipalSwitcher } from "@/components/dev/principal-switcher";
+import { UserMenu } from "@/components/layout/user-menu";
 import { hrefFor } from "@/lib/routes/registry";
 
 /**
@@ -16,7 +16,7 @@ export function SupportRequiredState() {
   return (
     <div className="w-full max-w-lg">
       <div className="mb-4 flex justify-center">
-        <PrincipalSwitcher />
+        <UserMenu align="start" />
       </div>
       <EmptyState
         icon={LifeBuoy}

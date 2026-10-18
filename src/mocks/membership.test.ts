@@ -11,7 +11,6 @@ import { ledgerApi } from "@/lib/api/analytics";
 import { teamApi } from "@/lib/api/team";
 import { agentsApi } from "@/lib/api/agents";
 import { sessionApi } from "@/lib/api/session";
-import { DEFAULT_SESSION } from "@/lib/stores/session-store";
 import { allCandidates, candidatesMock } from "./candidates";
 import { allJobs, jobsMock } from "./jobs";
 import { allApplications, applicationsMock, followupsMock } from "./applications";
@@ -23,6 +22,7 @@ import { ledgerMock } from "./ledger";
 import { teamMock } from "./team";
 import { agentsMock } from "./agents";
 import { FIRM_SCOPED_RESOURCES } from "./membership";
+import { signInAs } from "@/mocks/sign-in-as";
 
 /**
  * docs/07 T8: a firm-A principal can't read or change firm-B data through any hook. Every hook calls
@@ -87,7 +87,7 @@ const UNSCOPED = new Set(["agents.rewrite"]);
 const status = (promise: Promise<unknown>) => promise.then(() => 200, (error: unknown) => (error instanceof ApiError ? error.status : -1));
 
 afterEach(async () => {
-  await sessionApi.devSignInAs(DEFAULT_SESSION.user.id);
+  await sessionApi.signOut();
 });
 
 describe("membership: a firm-A principal can't reach firm B through any adapter a hook calls (docs/07 T8)", () => {
@@ -98,22 +98,22 @@ describe("membership: a firm-A principal can't reach firm B through any adapter 
 
   it.each(CALLS.map(([resource, name, call, isWrite]) => [`${resource}.${name}`, call, isWrite] as const))("%s: firm A member → firm B is 404; firm B's own member gets through", async (_name, call, isWrite) => {
     const ids = idsOf(B);
-    await sessionApi.devSignInAs("user_imran"); // OWNER of firm A: the widest firm-A role
+    await signInAs("user_imran"); // OWNER of firm A: the widest firm-A role
     expect(await status(call(B, ids))).toBe(404);
     if (isWrite) return; // writes aren't replayed for real; their "nothing changed" is checked below
-    await sessionApi.devSignInAs("user_lakshmi"); // OWNER of firm B
+    await signInAs("user_lakshmi"); // OWNER of firm B
     expect(await status(call(B, ids))).toBe(200);
   });
 
   it("leaves firm B's records untouched after every refused write", async () => {
     const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages].map((rows) => rows.filter((row) => row.firmId === B)));
-    await sessionApi.devSignInAs("user_imran");
+    await signInAs("user_imran");
     for (const [, , call, isWrite] of CALLS) if (isWrite) await status(call(B, idsOf(B)));
     expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
   });
 
   it("answers another firm exactly like a firm that doesn't exist", async () => {
-    await sessionApi.devSignInAs("user_imran");
+    await signInAs("user_imran");
     const errors = await Promise.all([B, "firm_nope"].map((firmId) => candidatesApi.list(firmId).catch((error: ApiError) => [error.status, error.code, error.message])));
     expect(errors[0]).toEqual(errors[1]);
   });

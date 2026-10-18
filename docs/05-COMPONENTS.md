@@ -58,7 +58,7 @@ defaults will not match the BenchQ palette and must not be left as-is.
 { children: ReactNode }
 ```
 Sidebar + topbar + content. Reads sidebar collapse from `useUiStore`. Renders `CommandPalette`,
-`ShiftClock`, `PrincipalSwitcher` (dev only; replaced the RoleSwitcher in Phase T) and the toast viewport.
+`ShiftClock` and the toast viewport. `variant="admin"` is the platform tier's shell (admin nav, no firm notifications).
 
 ### `Sidebar`
 ```ts
@@ -71,7 +71,7 @@ collapsed. Active route from `usePathname`.
 ```ts
 { }
 ```
-Firm switcher, command trigger, `ShiftClock`, dev principal switcher, user menu.
+`UserMenu` (who is signed in, role, firm, **Sign out**; docs/07 L3), command trigger, `ShiftClock`, notifications (firm shell only), theme toggle. There is no principal switcher (docs/07 Q25).
 
 ### `DetailShell`
 ```ts
