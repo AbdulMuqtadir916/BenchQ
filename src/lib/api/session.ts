@@ -12,11 +12,14 @@ export const sessionApi = {
    */
   firmBySlug: async (slug: string): Promise<Firm> => (await mock()).firmBySlug(slug),
 
+  /** The signed-in user finished or skipped /welcome: from now on they land on the dashboard (docs/07 T7). */
+  finishFirstRun: async (): Promise<FirmSession> => (await mock()).finishFirstRun(),
+
   signOut: async (): Promise<null> => (await mock()).signOut(),
 
   /** DEV ONLY: every fixture principal, for the dev principal switcher. */
   devPrincipals: async (): Promise<DevPrincipalOption[]> => (await mock()).devPrincipals(),
 
-  /** DEV ONLY: sign in as a fixture firm user. */
+  /** DEV ONLY: sign in as a fixture firm user, or accept a listed pending invite and sign in as its new user. */
   devSignInAs: async (userId: string): Promise<FirmSession> => (await mock()).devSignInAs(userId),
 };

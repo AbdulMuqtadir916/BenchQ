@@ -73,7 +73,7 @@ export const DevPrincipalOptionSchema = z.object({
   firmName: z.string().nullable(),
   firmStatus: FirmStatus.nullable(),
   available: z.boolean(),
-  /** Why it isn't available yet, when it isn't. */
+  /** Shown under the name: why it isn't available yet, or what picking it does. */
   note: z.string().nullable(),
 });
 export type DevPrincipalOption = z.infer<typeof DevPrincipalOptionSchema>;

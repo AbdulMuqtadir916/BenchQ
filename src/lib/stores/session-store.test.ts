@@ -14,11 +14,13 @@ describe("client session defaults", () => {
 });
 
 describe("dev principals and sign-in (docs/07 T4)", () => {
-  it("lists every fixture firm user, grouped by firm, plus the platform admin as not yet available", async () => {
+  it("lists every fixture firm user, grouped by firm, the GSC owner's pending invite, and the platform admin as not yet available", async () => {
     const options = await sessionApi.devPrincipals();
-    expect(options.filter((option) => option.kind === "firm").map((option) => option.id).sort()).toEqual(allUsers.map((user) => user.id).sort());
+    const firmOptions = options.filter((option) => option.kind === "firm").map((option) => option.id);
+    expect(firmOptions.filter((id) => !id.startsWith("inv_")).sort()).toEqual(allUsers.map((user) => user.id).sort());
+    expect(firmOptions.filter((id) => id.startsWith("inv_"))).toEqual(["inv_gsc_owner"]); // accept it to test /welcome (T7)
     const firmOrder = [...new Set(options.filter((o) => o.firmId).map((o) => o.firmId))];
-    expect(firmOrder).toEqual(["firm_hts", "firm_stl", "firm_cbw"]); // firm_gsc has no users yet
+    expect(firmOrder).toEqual(["firm_hts", "firm_stl", "firm_cbw", "firm_gsc"]);
     const admin = options.find((option) => option.kind === "platform");
     expect(admin).toMatchObject({ role: "PLATFORM_ADMIN", available: false });
   });

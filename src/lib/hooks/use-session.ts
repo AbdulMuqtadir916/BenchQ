@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { landingHref } from "@/lib/routes/landing";
 import { sessionApi } from "@/lib/api/session";
 import { queryKeys } from "@/lib/query/keys";
 import type { FirmSession } from "@/lib/schemas/session";
@@ -71,4 +72,22 @@ export function useCommitPendingSession() {
   useEffect(() => {
     if (pending && pathname === pending.path.split(/[?#]/)[0]) setSession(pending.session);
   }, [pending, pathname, setSession]);
+}
+
+/**
+ * Finish (or skip) an OWNER's first run on /welcome (docs/07 T7): the backend marks the user active,
+ * the client session and the cached session follow, then on to the landing, now the dashboard.
+ */
+export function useFinishFirstRun() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const setSession = useSession((s) => s.setSession);
+  return useMutation({
+    mutationFn: () => sessionApi.finishFirstRun(),
+    onSuccess: (session) => {
+      setSession(session);
+      queryClient.setQueryData(queryKeys.session.current(), session);
+      router.replace(landingHref(session));
+    },
+  });
 }

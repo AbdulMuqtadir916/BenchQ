@@ -1,15 +1,17 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
 import { CheckCircle2 } from "lucide-react";
-import { useHref } from "@/lib/routes/use-href";
+import { useFinishFirstRun } from "@/lib/hooks/use-session";
 
+/**
+ * An OWNER's first run (docs/07 T7). Leaving it marks the user active (lastActiveAt), so from then on
+ * they land on the dashboard. Any later way out of this page (a skip, a setup step) uses the same hook.
+ */
 export default function WelcomePage() {
-  const toHref = useHref();
-  const router = useRouter();
+  const finish = useFinishFirstRun();
 
   return (
     <PageTransition className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-4">
@@ -25,9 +27,12 @@ export default function WelcomePage() {
           Your account is set up. You can now start managing candidates, finding matching jobs, and tracking applications.
         </p>
         
-        <Button onClick={() => router.push(toHref("dashboard"))} className="bq-primary w-full max-w-[200px]">
-          Go to Dashboard
+        <Button onClick={() => finish.mutate()} disabled={finish.isPending} className="bq-primary w-full max-w-[200px]">
+          {finish.isPending ? "Opening…" : "Go to Dashboard"}
         </Button>
+        {finish.isError ? (
+          <p role="alert" className="mt-4 text-sm text-[var(--color-danger-fg)]">Couldn&apos;t finish setup. Try again.</p>
+        ) : null}
       </Card>
     </PageTransition>
   );
