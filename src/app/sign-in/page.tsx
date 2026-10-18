@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
 import { useSession } from "@/lib/stores/session-store";
+import { useHref } from "@/lib/routes/use-href";
 
 export default function SignInPage() {
+  const toHref = useHref();
   const router = useRouter();
   const setRole = useSession((s) => s.setRole);
   const [email, setEmail] = useState("adnan@techcorp.com");
@@ -21,7 +23,7 @@ export default function SignInPage() {
     setLoading(true);
     setTimeout(() => {
       setRole("BDE");
-      router.push("/welcome");
+      router.push(toHref("welcome"));
     }, 800);
   };
 
@@ -51,7 +53,7 @@ export default function SignInPage() {
         </form>
 
         <p className="mt-6 text-center text-caption text-[var(--color-text-3)]">
-          New to BenchQ? <Link href="/sign-up" className="text-[var(--color-primary)]">Create an account</Link>
+          New to BenchQ? <Link href={toHref("sign-up")} className="text-[var(--color-primary)]">Create an account</Link>
         </p>
       </Card>
     </PageTransition>

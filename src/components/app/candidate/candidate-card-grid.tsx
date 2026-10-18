@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { WorkAuthChip } from "@/components/app/work-auth-chip";
 import { CandidateAvatar } from "@/components/app/candidate-avatar";
+import { useHref } from "@/lib/routes/use-href";
 
 export interface CandidateCardRow {
   candidate: Candidate;
@@ -36,6 +37,7 @@ interface GridProps {
 
 /** Card view of the bench — one card per candidate, whole card opens the profile. */
 export function CandidateCardGrid({ rows, isLoading, error, onRetry, showBde, status, toolbar }: GridProps) {
+  const toHref = useHref();
   const reduce = useReducedMotion() ?? false;
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -70,7 +72,7 @@ export function CandidateCardGrid({ rows, isLoading, error, onRetry, showBde, st
             const c = r.candidate;
             return (
               <motion.li key={c.id} className="flex" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: Math.min(i, 9) * 0.03, ease: EASE_OUT }}>
-                <Link href={`/candidates/${c.id}`} className="bq-card flex w-full flex-col gap-3 p-4 transition-shadow hover:shadow-[var(--shadow-md)]">
+                <Link href={toHref("candidates.detail", { id: c.id })} className="bq-card flex w-full flex-col gap-3 p-4 transition-shadow hover:shadow-[var(--shadow-md)]">
                   <div className="flex items-start gap-3">
                     <CandidateAvatar name={c.fullName} colorKey={c.id} />
                     <div className="min-w-0 flex-1">

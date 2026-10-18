@@ -1,14 +1,13 @@
 "use client";
 
 import { create } from "zustand";
+import type { FirmRole } from "@/lib/schemas/enums";
 
 /**
  * Session store. There is no real auth in this repo. A fixture session is
  * loaded on mount; the dev-only RoleSwitcher flips `user.role`.
  * Every permission-dependent surface reads from this store.
  */
-
-export type FirmRole = "OWNER" | "MANAGER" | "BDE" | "VIEWER";
 
 export interface SessionUser {
   id: string;

@@ -5,6 +5,7 @@ import type { Resume } from "@/lib/schemas/resume";
 import { formatIst } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { Tag } from "@/components/ui/tag";
+import { useHref } from "@/lib/routes/use-href";
 
 /** Find the resume and version a submission went out with. */
 export function findResumeVersion(resumes: Resume[], versionId: string | null) {
@@ -24,6 +25,7 @@ export function findResumeVersion(resumes: Resume[], versionId: string | null) {
  * when the resume has been edited since — the client saw the older one.
  */
 export function ResumeSent({ application, resumes, isLoading = false, className }: { application: Application; resumes: Resume[]; isLoading?: boolean; className?: string }) {
+  const toHref = useHref();
   const sent = findResumeVersion(resumes, application.resumeVersionId);
 
   if (!application.resumeVersionId) {
@@ -56,7 +58,7 @@ export function ResumeSent({ application, resumes, isLoading = false, className 
           </div>
           {application.appliedAt ? <p className="mt-1.5 text-caption text-[var(--color-text-3)]">Sent {formatIst(application.appliedAt, "MMM d, yyyy")}</p> : null}
         </div>
-        <Link href={`/resumes/${sent.resume.id}?mode=view`} className="bq-secondary inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 text-sm" aria-label={`View ${sent.resume.name}`}>
+        <Link href={toHref("resumes.studio", { id: sent.resume.id }, { mode: "view" })} className="bq-secondary inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 text-sm" aria-label={`View ${sent.resume.name}`}>
           <Eye size={13} aria-hidden />View
         </Link>
       </div>

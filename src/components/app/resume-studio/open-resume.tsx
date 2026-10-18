@@ -12,6 +12,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { useRouteAccess } from "@/lib/routes/use-route-access";
 import { isInScope } from "@/lib/routes/scope";
+import { useHref } from "@/lib/routes/use-href";
 import { ResumeStudio } from "./resume-studio";
 import { StudioFrame, StudioSkeleton } from "./studio-states";
 import { useStudio, type StudioMode } from "./studio-store";
@@ -19,13 +20,15 @@ import { useStudio, type StudioMode } from "./studio-store";
 /** Close = go back to wherever the user opened the resume from, or the library on a direct visit. */
 export function useCloseStudio() {
   const router = useRouter();
+  const toHref = useHref();
   return useCallback(() => {
     if (window.history.length > 1) router.back();
-    else router.push("/resumes");
-  }, [router]);
+    else router.push(toHref("resumes"));
+  }, [router, toHref]);
 }
 
 export function OpenResume({ id, initialMode, review = false }: { id: string; initialMode: StudioMode; review?: boolean }) {
+  const toHref = useHref();
   const { user } = useSession();
   const close = useCloseStudio();
   const resumeQuery = useResume(id);
@@ -76,7 +79,7 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
   if (!inScope) {
     return (
       <StudioFrame onClose={close}>
-        <NotFoundState title="Resume not found" description="This resume doesn't exist or isn't available to you." backHref="/resumes" backLabel="Back to resumes" />
+        <NotFoundState title="Resume not found" description="This resume doesn't exist or isn't available to you." backHref={toHref("resumes")} backLabel="Back to resumes" />
       </StudioFrame>
     );
   }

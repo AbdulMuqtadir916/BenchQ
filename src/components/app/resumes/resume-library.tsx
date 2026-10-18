@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { PageHeader } from "@/components/app/page-header";
 import { ResumeCard } from "./resume-card";
+import { useHref } from "@/lib/routes/use-href";
 
 type Kind = "all" | "master" | "tailored";
 type Upload = { name: string; status: "parsing" | "done" };
@@ -38,6 +39,7 @@ export function ResumeLibrary({
   onRetry: () => void;
   canEdit: boolean;
 }) {
+  const toHref = useHref();
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<Kind>("all");
   const [candidateId, setCandidateId] = useState("all");
@@ -97,7 +99,7 @@ export function ResumeLibrary({
                 onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }}
               />
               <Button variant="secondary" onClick={() => fileRef.current?.click()}><Upload size={14} aria-hidden />Upload resume</Button>
-              <Button asChild><Link href="/resumes/new"><Plus size={14} aria-hidden />New resume</Link></Button>
+              <Button asChild><Link href={toHref("resumes.studio", { id: "new" })}><Plus size={14} aria-hidden />New resume</Link></Button>
             </>
           ) : undefined
         }
@@ -110,7 +112,7 @@ export function ResumeLibrary({
             <span className="truncate">{upload.status === "parsing" ? `Reading ${upload.name}…` : `${upload.name} parsed. Every line comes in unverified until you confirm it.`}</span>
           </span>
           <span className="flex shrink-0 items-center gap-1">
-            {upload.status === "done" ? <Button asChild size="sm"><Link href={`/resumes/new?upload=${encodeURIComponent(upload.name)}`}>Open in builder</Link></Button> : null}
+            {upload.status === "done" ? <Button asChild size="sm"><Link href={toHref("resumes.studio", { id: "new" }, { upload: upload.name })}>Open in builder</Link></Button> : null}
             <Button variant="ghost" size="icon" aria-label="Dismiss" onClick={() => setUpload(null)}><X size={14} aria-hidden /></Button>
           </span>
         </div>
@@ -144,7 +146,7 @@ export function ResumeLibrary({
         isFiltered ? (
           <EmptyState variant="filtered" icon={Search} title="No resumes match" description="Try a different search or clear the filters." action={<Button variant="secondary" onClick={reset}>Clear filters</Button>} />
         ) : (
-          <EmptyState icon={FileText} title="No resumes yet" description="Create a resume from scratch or upload an existing one to start verifying claims." action={canEdit ? <Button asChild><Link href="/resumes/new"><Plus size={14} aria-hidden />New resume</Link></Button> : undefined} />
+          <EmptyState icon={FileText} title="No resumes yet" description="Create a resume from scratch or upload an existing one to start verifying claims." action={canEdit ? <Button asChild><Link href={toHref("resumes.studio", { id: "new" })}><Plus size={14} aria-hidden />New resume</Link></Button> : undefined} />
         )
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

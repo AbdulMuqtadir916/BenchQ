@@ -5,8 +5,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
 import { CheckCircle2 } from "lucide-react";
+import { useHref } from "@/lib/routes/use-href";
 
 export default function WelcomePage() {
+  const toHref = useHref();
   const router = useRouter();
 
   return (
@@ -23,7 +25,7 @@ export default function WelcomePage() {
           Your account is set up. You can now start managing candidates, finding matching jobs, and tracking applications.
         </p>
         
-        <Button onClick={() => router.push("/dashboard")} className="bq-primary w-full max-w-[200px]">
+        <Button onClick={() => router.push(toHref("dashboard"))} className="bq-primary w-full max-w-[200px]">
           Go to Dashboard
         </Button>
       </Card>

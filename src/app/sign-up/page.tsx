@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
+import { useHref } from "@/lib/routes/use-href";
 
 /** docs/04 §2.1. No real auth yet (Module 00 Part C): submission is simulated. */
 
@@ -23,6 +24,7 @@ type FieldErrors = Partial<Record<keyof SignUpForm, string>>;
 const TAKEN_EMAIL = "taken@benchq.io";
 
 export default function SignUpPage() {
+  const toHref = useHref();
   const [form, setForm] = useState<SignUpForm>({ fullName: "", email: "", firmName: "", password: "" });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export default function SignUpPage() {
             We sent a confirmation link to <span className="text-body-strong">{sentTo}</span>. Open it to finish setting up your firm.
           </p>
           <Button asChild variant="secondary" className="mt-6">
-            <Link href="/sign-in">Back to sign in</Link>
+            <Link href={toHref("sign-in")}>Back to sign in</Link>
           </Button>
         </Card>
       </PageTransition>
@@ -110,7 +112,7 @@ export default function SignUpPage() {
         </form>
 
         <p className="mt-6 text-center text-caption text-[var(--color-text-3)]">
-          Already have an account? <Link href="/sign-in" className="text-[var(--color-primary)]">Sign in</Link>
+          Already have an account? <Link href={toHref("sign-in")} className="text-[var(--color-primary)]">Sign in</Link>
         </p>
       </Card>
     </PageTransition>

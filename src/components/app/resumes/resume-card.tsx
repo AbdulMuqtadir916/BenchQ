@@ -6,9 +6,11 @@ import { deriveExportGate } from "@/lib/derive";
 import { formatRelative } from "@/lib/format/timezone";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/cn";
+import { useHref } from "@/lib/routes/use-href";
 
 /** One resume as a card — name, candidate, role, and identifying metadata. */
 export function ResumeCard({ resume, candidate }: { resume: Resume; candidate: Candidate | undefined }) {
+  const toHref = useHref();
   const version = resume.versions.find((v) => v.id === resume.latestVersionId) ?? resume.versions[0];
   if (!version) return null;
   const gate = deriveExportGate(version);
@@ -33,7 +35,7 @@ export function ResumeCard({ resume, candidate }: { resume: Resume; candidate: C
           <h3 className="truncate text-h3 text-[var(--color-text)]">
             {/* Stretched link: the whole card opens the builder. */}
             <Link
-              href={`/resumes/${resume.id}`}
+              href={toHref("resumes.studio", { id: resume.id })}
               className="after:absolute after:inset-0 after:rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[var(--color-focus-ring)]"
             >
               {resume.name}
@@ -43,7 +45,7 @@ export function ResumeCard({ resume, candidate }: { resume: Resume; candidate: C
           <p className="truncate text-caption text-[var(--color-text-3)]">{candidate?.primaryRole ?? "No role set"}</p>
         </div>
         <Link
-          href={`/resumes/${resume.id}?mode=view`}
+          href={toHref("resumes.studio", { id: resume.id }, { mode: "view" })}
           aria-label={`View ${resume.name} for ${candidate?.fullName ?? "candidate"}`}
           title="View the resume"
           className="bq-secondary relative z-10 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 text-sm"

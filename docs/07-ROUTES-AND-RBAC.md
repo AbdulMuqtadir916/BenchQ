@@ -1,7 +1,7 @@
 # 07 — Routes, tenancy and RBAC (production)
 
 **Project:** BenchQ · **Version:** 2.0 (2026-10-13) — supersedes v1 (2026-10-06)
-**Status:** Phase A done (uncommitted on `feat/routes`) · next: **Phase A2**
+**Status:** Phase A done and committed (`feat/routes`) · Phase A2 done (`feat/routes-a2`) · next: **Phase T**, which needs the §7 sign-off
 **Facts about the code** come from `docs/CURRENT_STATE.md` (2026-10-13). If the code has moved on,
 trust the code and update this file.
 
@@ -254,8 +254,8 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 
 | Phase | What | Depends on | Status |
 |---|---|---|---|
-| **A** | Route foundation — registry, guards, access/error screens, settings split | — | Done (commit it) |
-| **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod | A | **Next** |
+| **A** | Route foundation — registry, guards, access/error screens, settings split | — | Done (committed) |
+| **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod | A | Done (A2.2–A2.9; see result below) |
 | **T** | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys | A2 + §7 sign-off | Planned |
 | **P** | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view | T | Planned |
 | **C** | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks | T, P | Planned |
@@ -275,12 +275,38 @@ Delivered as recorded in v1: registry + helpers + tests (`src/lib/routes/`), `Ro
 error / loading screens, record scope → not-found, settings split, `/sign-up`, dev-only
 `/design-system`.
 
-**Open:** the work is uncommitted on `feat/routes` (39 changes). Commit it before A2. The exit
-criteria were never ticked — tick them during A2's verification.
+**Exit criteria** (from v1; ticked 2026-10-13 only where checked, with how):
+
+- [x] Registry tests pass; no hardcoded route lists remain in the sidebar, palette or shortcuts
+      (registry tests; `no-path-literals.test.ts`; those files read `navFor`, `paletteRoutesFor`,
+      `shortcutsFor`)
+- [x] Every route × role **access value** matches the §2.2 table (22 routes × 4 roles in
+      `registry.test.ts`, mutation-checked)
+- [x] For every route × role, a direct URL **renders** the page, a read-only page, or the Forbidden
+      screen as the table says. Checked in Chrome against `pnpm dev`, switching role with the real
+      RoleSwitcher and navigating client-side (no reload): OWNER, MANAGER, VIEWER and BDE × the 22
+      firm routes plus `/dev/design-system` and sample record ids — all as the table says
+      (Forbidden on exactly the "—" cells; `/welcome` and `/settings` redirect to the landing /
+      first allowed section; `/settings` → `firm` for OWNER, `team` for MANAGER, `preferences` for
+      BDE and VIEWER). Read-only: for VIEWER the actions are absent where they are buttons or
+      links (`New candidate`, `Capture job`, `Upload resume` / `New resume`, `Send email`, and on
+      detail pages `Find jobs` / `Build resume` / `Edit`, `Tailor` / `Mark applied` / `Save`,
+      `Move to …`). **Not checked:** that the application board's drag-and-drop is disabled for
+      VIEWER (it is a prop, not a button)
+- [x] A BDE opening an unassigned candidate / someone else's application → not-found. Checked in
+      Chrome as BDE (user `user_adnan`): `/candidates/cand_09`, `/applications/app_009` and
+      `/resumes/resume_cand_09_master` show the not-found state, while `cand_01`, `app_001` and
+      `resume_cand_01_master` render. OWNER, MANAGER and VIEWER open all of them
+- [x] Unknown URL → not-found (HTTP 404 on `/nope`, `/candidates/cand_01/extra`, `/admin`,
+      `/design-system`)
+- [ ] A thrown error → error card with retry (not exercised)
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm test` clean (at the A2 tip: 54 tests; `pnpm build` also
+      passes)
+- [ ] Both themes; 1440 / 1024 / 390 px (not checked)
 
 ---
 
-## Phase A2 — Hardening (next)
+## Phase A2 — Hardening (done)
 
 | # | Task | Why |
 |---|---|---|
@@ -296,6 +322,21 @@ criteria were never ticked — tick them during A2's verification.
 
 **Exit:** no path literals outside `src/lib/routes/`; table test covers every firm route × role;
 switcher hidden in `pnpm build && pnpm start`; Phase A exit criteria ticked; checks green.
+
+**Result (2026-10-13), one commit per task on `feat/routes-a2`:**
+
+| Exit criterion | State |
+|---|---|
+| No path literals outside `src/lib/routes/` | Met. 60 literals replaced; `no-path-literals.test.ts` enforces it (mutation-checked). `[firm]` is not assumed anywhere |
+| Table test covers every firm route × role | Met. 22 routes × 4 roles, plus `onDenied`, public and dev routes; fails if a route has no row |
+| Switcher hidden in `pnpm build && pnpm start` | Met, with a positive control (absent from HTML and chunks when `NEXT_PUBLIC_SHOW_DEV_TOOLS` is unset; present when `true`) |
+| Phase A exit criteria ticked | Partly. Role × route renders, record scope, unknown URL and the checks are ticked; the error card, both themes and the three widths are not (see Phase A) |
+| Checks green | Met. typecheck, lint, test (54), build all exit 0 |
+
+Notes for Phase T: the active-link checks in `sidebar.tsx` and `settings/layout.tsx` still compare
+the pathname with `route.path`, which will not match once paths gain `[firm]`. `useHref()` is a plain
+function today and is where the firm segment is added. Moving a route makes `tsc` fail until
+`.next/types` is regenerated (`pnpm build` or delete `.next`).
 
 ---
 

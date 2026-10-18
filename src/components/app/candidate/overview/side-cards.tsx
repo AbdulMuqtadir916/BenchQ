@@ -8,18 +8,20 @@ import { Card } from "@/components/ui/card";
 import { MatchScore } from "@/components/app/match-score";
 import { PortalLogo } from "@/components/app/jobs/portal-logo";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
+import { useHref } from "@/lib/routes/use-href";
 
 /**
  * How ready the master resume is to send. It's the verified source every
  * tailored copy reuses, so verifying a claim here clears it everywhere.
  */
 export function ResumeReadiness({ master, reviewHref }: { master: CandidateWorkspace["master"]; reviewHref: string | null }) {
+  const toHref = useHref();
   if (!master) {
     return (
       <Card>
         <h2 className="mb-1 text-h3 text-[var(--color-text)]">Resume readiness</h2>
         <p className="text-sm text-[var(--color-text-2)]">No master resume yet. Build one — tailored copies reuse its verified claims.</p>
-        <Button asChild size="sm" className="mt-3"><Link href="/resumes/new">Build master resume</Link></Button>
+        <Button asChild size="sm" className="mt-3"><Link href={toHref("resumes.studio", { id: "new" })}>Build master resume</Link></Button>
       </Card>
     );
   }
@@ -48,13 +50,14 @@ export function ResumeReadiness({ master, reviewHref }: { master: CandidateWorks
 }
 
 export function TopMatches({ matches, onFindJobs }: { matches: Array<{ job: Job; score: number }>; onFindJobs: () => void }) {
+  const toHref = useHref();
   return (
     <Card className="p-0">
       <h2 className="border-b border-[var(--color-border)] px-4 py-3 text-h3 text-[var(--color-text)]">Best new matches</h2>
       <ul className="divide-y divide-[var(--color-border)]">
         {matches.map(({ job, score }) => (
           <li key={job.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-            <Link href={`/jobs/${job.id}`} className="flex min-w-0 items-center gap-2.5 hover:underline">
+            <Link href={toHref("jobs.detail", { id: job.id })} className="flex min-w-0 items-center gap-2.5 hover:underline">
               <PortalLogo portal="COMPANY" domain={job.company.domain} size={28} />
               <span className="min-w-0">
                 <span className="block truncate text-sm text-[var(--color-text)]">{job.title}</span>

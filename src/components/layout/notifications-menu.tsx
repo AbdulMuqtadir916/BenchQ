@@ -6,13 +6,16 @@ import { Bell, BriefcaseBusiness, MessageSquareText, TimerReset, type LucideIcon
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { CONTENT_EXIT, POPOVER_TRANSITION } from "@/lib/motion";
+import type { RouteId, RouteQuery } from "@/lib/routes/registry";
+import { useHref } from "@/lib/routes/use-href";
 
 type Notification = {
   id: string;
   title: string;
   detail: string;
   time: string;
-  href: string;
+  route: RouteId;
+  query?: RouteQuery;
   icon: LucideIcon;
   tone: "blue" | "green" | "amber";
 };
@@ -23,7 +26,7 @@ const NOTIFICATIONS: Notification[] = [
     title: "4 follow-ups are overdue",
     detail: "Start with Priya Raman and Amit Patel.",
     time: "Now",
-    href: "/followups",
+    route: "followups",
     icon: TimerReset,
     tone: "amber",
   },
@@ -32,7 +35,8 @@ const NOTIFICATIONS: Notification[] = [
     title: "New 98% job match",
     detail: "Senior Java Developer at Brillio LLC.",
     time: "12m",
-    href: "/jobs?candidate=cand_01",
+    route: "jobs",
+    query: { candidate: "cand_01" },
     icon: BriefcaseBusiness,
     tone: "green",
   },
@@ -41,7 +45,7 @@ const NOTIFICATIONS: Notification[] = [
     title: "Candidate response received",
     detail: "Rajesh replied to your latest outreach.",
     time: "38m",
-    href: "/outreach",
+    route: "outreach",
     icon: MessageSquareText,
     tone: "blue",
   },
@@ -54,6 +58,7 @@ const TONE_CLASS: Record<Notification["tone"], string> = {
 };
 
 export function NotificationsMenu() {
+  const toHref = useHref();
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const reduceMotion = useReducedMotion() ?? false;
@@ -135,7 +140,7 @@ export function NotificationsMenu() {
                 return (
                   <Link
                     key={notification.id}
-                    href={notification.href}
+                    href={toHref(notification.route, {}, notification.query)}
                     role="menuitem"
                     onClick={() => markRead(notification.id)}
                     className={cn(
@@ -160,7 +165,7 @@ export function NotificationsMenu() {
             </div>
 
             <div className="border-t border-[var(--color-border)] p-2">
-              <Link href="/followups" role="menuitem" className="flex h-8 items-center justify-center rounded-[var(--radius-md)] text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]">
+              <Link href={toHref("followups")} role="menuitem" className="flex h-8 items-center justify-center rounded-[var(--radius-md)] text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]">
                 View all follow-ups
               </Link>
             </div>

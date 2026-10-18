@@ -20,6 +20,7 @@ import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { AgentRunPanel, useAgentRun } from "@/components/app/ai";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { ErrorState } from "@/components/app/error-state";
+import { useHref } from "@/lib/routes/use-href";
 
 const ANALYSIS_STAGES = [
   "Reading the job description",
@@ -39,6 +40,7 @@ function matchRequirement(req: JobRequirement, candidate: Candidate | null): Req
 }
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const toHref = useHref();
   const { id } = use(params);
   const { user } = useSession();
   const jobQuery = useJob(id);
@@ -64,7 +66,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="bq-page">
-      <Link href="/jobs" className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
+      <Link href={toHref("jobs")} className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
         <ArrowLeft size={14} aria-hidden /> Jobs
       </Link>
 
@@ -160,7 +162,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <div className="grid grid-cols-2 gap-2">
               <Button asChild><Link href={context ? `/resumes/new` : "/resumes/new"}><Sparkles size={14} aria-hidden />Tailor</Link></Button>
               <Button variant="secondary"><Send size={14} aria-hidden />Mark applied</Button>
-              <Button asChild variant="secondary"><Link href="/outreach"><Mail size={14} aria-hidden />Outreach</Link></Button>
+              <Button asChild variant="secondary"><Link href={toHref("outreach")}><Mail size={14} aria-hidden />Outreach</Link></Button>
               <Button variant="ghost"><Bookmark size={14} aria-hidden />Save</Button>
             </div>
           ) : null}

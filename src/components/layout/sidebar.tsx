@@ -7,6 +7,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSession } from "@/lib/stores/session-store";
 import { navFor, type RouteDef } from "@/lib/routes/registry";
+import { useHref } from "@/lib/routes/use-href";
 import { EASE_OUT } from "@/lib/motion";
 
 /**
@@ -100,13 +101,14 @@ export function Sidebar({
 
 function SidebarItem({ route }: { route: RouteDef }) {
   const pathname = usePathname();
+  const toHref = useHref();
   const Icon = route.nav?.icon;
   const isActive = pathname === route.path || pathname?.startsWith(route.path + "/");
 
   return (
     <li>
       <Link
-        href={route.path}
+        href={toHref(route)}
         aria-current={isActive ? "page" : undefined}
         title={route.title}
         aria-label={route.title}

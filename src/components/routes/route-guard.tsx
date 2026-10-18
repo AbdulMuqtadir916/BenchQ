@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { ForbiddenState } from "@/components/app/forbidden-state";
+import { NotFoundState } from "@/components/app/not-found-state";
 import { landingFor } from "@/lib/routes/registry";
 import { useRouteAccess } from "@/lib/routes/use-route-access";
 import { useSession } from "@/lib/stores/session-store";
@@ -33,6 +34,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   }, [role, queryClient]);
 
   if (shouldLeave) return null;
-  if (isDenied) return <ForbiddenState role={role} pageTitle={route?.title ?? "This page"} />;
+  // Not a route we know: render nothing of the page, and don't pretend it exists (docs/07 principle 4).
+  if (!route) return <NotFoundState />;
+  if (isDenied) return <ForbiddenState role={role} pageTitle={route.title} />;
   return <>{children}</>;
 }

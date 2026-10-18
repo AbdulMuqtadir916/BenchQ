@@ -2,7 +2,8 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ROLES, ROUTES, accessFor, canOpen, landingFor, matchRoute, navFor, routeById } from "./registry";
+import { ROLES, ROUTES, accessFor, accessForPath, canOpen, hrefFor, landingFor, matchRoute, navFor, routeById, type Access, type RouteId } from "./registry";
+import type { FirmRole } from "@/lib/schemas/enums";
 import { isInScope } from "./scope";
 
 const APP_DIR = fileURLToPath(new URL("../../app", import.meta.url));
@@ -51,16 +52,6 @@ describe("route registry", () => {
     expect(matchRoute("/nope")).toBeNull();
   });
 
-  it("matches the access table in docs/07", () => {
-    expect(accessFor(routeById("analytics"), "BDE")).toBe("none");
-    expect(accessFor(routeById("followups"), "VIEWER")).toBe("none");
-    expect(accessFor(routeById("candidates.detail"), "BDE")).toBe("assigned");
-    expect(accessFor(routeById("applications.detail"), "BDE")).toBe("own");
-    expect(accessFor(routeById("settings.firm"), "MANAGER")).toBe("none");
-    expect(accessFor(routeById("focus"), "VIEWER")).toBe("none");
-    expect(routeById("welcome").onDenied).toBe("landing");
-  });
-
   it("only shows nav items a role can open", () => {
     expect(navFor("BDE", "workspace").map((r) => r.id)).not.toContain("analytics");
     expect(navFor("VIEWER", "workspace").map((r) => r.id)).not.toContain("followups");
@@ -77,5 +68,130 @@ describe("record scope", () => {
     expect(isInScope("own", "u1", { ownerUserId: "u2" })).toBe(false);
     expect(isInScope("read", "u1", {})).toBe(true);
     expect(isInScope("none", "u1", { ownerUserId: "u1" })).toBe(false);
+  });
+});
+
+describe("hrefFor", () => {
+  it("returns the path for static routes", () => {
+    expect(hrefFor("dashboard")).toBe("/dashboard");
+    expect(hrefFor("candidates.new")).toBe("/candidates/new");
+    expect(hrefFor("settings.preferences")).toBe("/settings/preferences");
+  });
+
+  it("fills [param] segments and encodes them", () => {
+    expect(hrefFor("candidates.detail", { id: "cand_01" })).toBe("/candidates/cand_01");
+    expect(hrefFor("resumes.studio", { id: "new" })).toBe("/resumes/new");
+    expect(hrefFor("jobs.detail", { id: "a/b" })).toBe("/jobs/a%2Fb");
+  });
+
+  it("appends a query string and skips undefined values", () => {
+    expect(hrefFor("candidates.detail", { id: "cand_01" }, { tab: "inbox" })).toBe("/candidates/cand_01?tab=inbox");
+    expect(hrefFor("jobs", {}, { candidate: "cand_01", q: undefined })).toBe("/jobs?candidate=cand_01");
+    expect(hrefFor("applications", {}, { bde: undefined })).toBe("/applications");
+  });
+
+  it("throws when a param is missing", () => {
+    expect(() => hrefFor("candidates.detail")).toThrow(/missing the "id" param/);
+  });
+
+  it("accepts a route object, as the sidebar and palette hold", () => {
+    expect(hrefFor(routeById("followups"))).toBe("/followups");
+  });
+
+  it("round-trips: every route's link matches back to the same route", () => {
+    for (const route of ROUTES) {
+      const params = Object.fromEntries([...route.path.matchAll(/\[([^\]]+)\]/g)].map((m) => [m[1]!, "sample"]));
+      expect(matchRoute(hrefFor(route.id as RouteId, params))?.id).toBe(route.id);
+    }
+  });
+});
+
+/**
+ * docs/07 §2.2, firm roles only. One row per route, columns OWNER · MANAGER · BDE · VIEWER.
+ * The path column drops `/[firm]`: Phase T adds it. "→ landing" and "—" are `none`.
+ * This table is the spec: change docs/07 first, then this table, then the registry.
+ */
+const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Access]> = [
+  ["welcome", "full", "none", "none", "none"], // OWNER first run; others → landing
+  ["dashboard", "full", "full", "full", "read"],
+  ["candidates", "full", "full", "assigned", "read"],
+  ["candidates.new", "full", "full", "full", "none"],
+  ["candidates.detail", "full", "full", "assigned", "read"],
+  ["jobs", "full", "full", "full", "read"],
+  ["jobs.detail", "full", "full", "full", "read"],
+  ["jobs.capture", "full", "full", "full", "none"],
+  ["applications", "full", "full", "own", "read"],
+  ["applications.detail", "full", "full", "own", "read"],
+  ["resumes", "full", "full", "assigned", "read"],
+  ["resumes.studio", "full", "full", "assigned", "read"],
+  ["outreach", "full", "full", "own", "read"],
+  ["followups", "full", "full", "own", "none"],
+  ["focus", "full", "full", "full", "none"],
+  ["analytics", "full", "full", "none", "read"],
+  ["ledger", "full", "full", "own", "read"],
+  ["settings", "full", "full", "full", "full"], // index: redirects to the first allowed section
+  ["settings.firm", "full", "none", "none", "none"],
+  ["settings.team", "full", "full", "none", "none"],
+  ["settings.templates", "full", "full", "none", "none"],
+  ["settings.preferences", "full", "full", "full", "full"],
+];
+
+/** Routes outside the firm table: public pages, and the dev-only design system (docs/07 §2.1, §2.4). */
+const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in", "sign-up"];
+const DEV_ROUTES: readonly RouteId[] = ["design-system"];
+
+describe("access table (docs/07 §2.2)", () => {
+  it("has a row for every firm route, and only for routes that exist", () => {
+    const covered = new Set<string>([...FIRM_TABLE.map(([id]) => id), ...PUBLIC_ROUTES, ...DEV_ROUTES]);
+    expect(ROUTES.filter((route) => !covered.has(route.id)).map((route) => route.id)).toEqual([]);
+    expect(FIRM_TABLE.filter(([id]) => !ROUTES.some((route) => route.id === id)).map(([id]) => id)).toEqual([]);
+    expect(new Set(FIRM_TABLE.map(([id]) => id)).size).toBe(FIRM_TABLE.length);
+  });
+
+  it.each(FIRM_TABLE)("%s: OWNER %s · MANAGER %s · BDE %s · VIEWER %s", (id, ...expected) => {
+    const route = routeById(id);
+    const actual = ROLES.map((role: FirmRole) => accessFor(route, role));
+    expect(actual).toEqual(expected);
+    // Every role is covered, and canOpen agrees with "none".
+    ROLES.forEach((role, index) => expect(canOpen(route, role)).toBe(expected[index] !== "none"));
+  });
+
+  it("sends a denied role to the landing route only for /welcome; everywhere else the Forbidden screen shows in place (Q2, Q4)", () => {
+    for (const [id] of FIRM_TABLE) {
+      expect(routeById(id).onDenied, id).toBe(id === "welcome" ? "landing" : undefined);
+    }
+  });
+
+  it("leaves public routes open to every role", () => {
+    for (const id of PUBLIC_ROUTES) {
+      expect(routeById(id).access).toBe("public");
+      for (const role of ROLES) expect(accessFor(routeById(id), role)).toBe("full");
+    }
+  });
+
+  it("marks dev routes dev-only, under /dev, and closed to every role outside development", () => {
+    for (const id of DEV_ROUTES) {
+      const route = routeById(id);
+      expect(route.devOnly).toBe(true);
+      expect(route.path.startsWith("/dev/")).toBe(true);
+      // vitest runs with NODE_ENV=test and no NEXT_PUBLIC_SHOW_DEV_ROUTES
+      for (const role of ROLES) expect(canOpen(route, role)).toBe(false);
+    }
+  });
+});
+
+describe("accessForPath (fails closed)", () => {
+  it("is none for a path that matches no route, for every role", () => {
+    for (const role of ROLES) {
+      for (const path of ["/nope", "/candidates/cand_01/extra", "/admin", "/settings/unknown", "/dashboard/x"]) {
+        expect(accessForPath(path, role), `${role} ${path}`).toEqual({ route: null, access: "none" });
+      }
+    }
+  });
+
+  it("returns the route's own access for registered paths, ignoring query and hash", () => {
+    expect(accessForPath("/analytics?range=7d", "BDE")).toEqual({ route: routeById("analytics"), access: "none" });
+    expect(accessForPath("/candidates/cand_01#notes", "BDE").access).toBe("assigned");
+    expect(accessForPath("/resumes/new", "VIEWER").access).toBe("read");
   });
 });

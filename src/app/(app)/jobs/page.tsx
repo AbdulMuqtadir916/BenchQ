@@ -15,8 +15,10 @@ import { ErrorState } from "@/components/app/error-state";
 import { JobExplorer } from "@/components/app/jobs/job-explorer";
 import { JobMatchIntro } from "@/components/app/jobs/job-match-intro";
 import { JobCaptureDialogTrigger } from "@/components/app/jobs/job-capture-form";
+import { useHref } from "@/lib/routes/use-href";
 
 function JobsContent() {
+  const toHref = useHref();
   const { user } = useSession();
   const focusId = useSearchParams().get("candidate");
   const reduce = useReducedMotion() ?? false;
@@ -41,7 +43,7 @@ function JobsContent() {
   return (
     <div className="bq-page bq-page-wide">
       {focus ? (
-        <Link href={`/candidates/${focus.id}`} className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
+        <Link href={toHref("candidates.detail", { id: focus.id })} className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
           <ArrowLeft size={14} aria-hidden /> {focus.fullName}
         </Link>
       ) : null}

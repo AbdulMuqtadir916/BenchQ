@@ -11,6 +11,14 @@ Anything not confirmed is marked **(unverified)**.
 | Read for this snapshot | `CLAUDE.md` (current on-disk version), `docs/07-ROUTES-AND-RBAC.md`, then the code |
 | Not read | `.env.local` (access denied by the session; live-module setting is therefore unverified) |
 
+> **Changed since this snapshot (Phase A2, branch `feat/routes-a2`):** `hrefFor(id | route, params, query)` and
+> `useHref()` now exist and no path literals remain outside `src/lib/routes/` (section 2 item 6 and
+> section 9 firm-routing blocker 4 are resolved); `FirmRole` has one declaration, the Zod enum
+> (section 3, section 4); `useRouteAccess` fails closed for unregistered paths (section 2 item 8);
+> the RoleSwitcher renders only when `NEXT_PUBLIC_SHOW_DEV_TOOLS=true` (section 4); `/design-system`
+> is now `/dev/design-system` (section 2); the `iconsax-react` comment is fixed (section 8). The
+> test suite is now 54 tests across 4 files. Everything else below is unchanged.
+
 ---
 
 ## 1. Stack

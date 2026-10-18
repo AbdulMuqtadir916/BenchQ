@@ -235,7 +235,7 @@ try/catch, with a working default when storage is unavailable.
 ## 7. Role simulation
 
 There is no auth. A **role switcher in the topbar** (development only, behind
-`NEXT_PUBLIC_SHOW_ROLE_SWITCHER`) flips the current user between `OWNER`, `MANAGER`, `BDE` and
+`NEXT_PUBLIC_SHOW_DEV_TOOLS=true`, off by default) flips the current user between `OWNER`, `MANAGER`, `BDE` and
 `VIEWER`. Every permission-dependent surface reads from the Zustand `useSession` store.
 
 This matters more than it sounds: it's how you verify that a BDE never sees `/analytics`, that a
@@ -264,7 +264,7 @@ Virtualise with `@tanstack/react-virtual` on the job feed, the tracker table and
 
 ```bash
 NEXT_PUBLIC_API_MOCKING=enabled        # MSW on. 'disabled' points at a real API later.
-NEXT_PUBLIC_SHOW_ROLE_SWITCHER=true    # dev-only role simulation
+NEXT_PUBLIC_SHOW_DEV_TOOLS=true        # dev-only role simulation (off unless 'true')
 NEXT_PUBLIC_MOCK_LATENCY_MS=300        # simulated network delay
 NEXT_PUBLIC_MOCK_AI_LATENCY_MS=2500    # simulated agent delay — see 03-MOCK-DATA.md §5
 NEXT_PUBLIC_MOCK_ERROR_RATE=0          # 0–1, injects failures to exercise error states

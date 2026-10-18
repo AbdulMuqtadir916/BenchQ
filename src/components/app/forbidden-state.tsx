@@ -5,7 +5,7 @@ import { ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/empty-state";
 import { landingFor } from "@/lib/routes/registry";
-import type { FirmRole } from "@/lib/stores/session-store";
+import type { FirmRole } from "@/lib/schemas/enums";
 
 const ROLE_LABEL: Record<FirmRole, string> = { OWNER: "Owner", MANAGER: "Manager", BDE: "BDE", VIEWER: "Viewer" };
 

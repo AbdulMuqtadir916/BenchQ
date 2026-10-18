@@ -12,6 +12,7 @@ import { WorkAuthChip } from "@/components/app/work-auth-chip";
 import { AvatarStack } from "@/components/app/avatar-stack";
 import { CandidateAvatar } from "@/components/app/candidate-avatar";
 import type { CandidateTabId } from "./candidate-tabs";
+import { useHref } from "@/lib/routes/use-href";
 
 const STATUS: Record<CandidateStatus, { label: string; tone: TagTone }> = {
   ON_BENCH: { label: "On bench", tone: "blue" },
@@ -36,6 +37,7 @@ interface CandidateHeaderProps {
 
 /** Who this is, where they stand, and the two actions a BDE takes most. Every number opens the rows behind it. */
 export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct, resumeHref, onFindJobs, onOpenTab }: CandidateHeaderProps) {
+  const toHref = useHref();
   const reduce = useReducedMotion() ?? false;
   const place = [candidate.city, candidate.state].filter(Boolean).join(", ");
   const isAvailable = !candidate.availableFrom || new Date(candidate.availableFrom) <= new Date();
@@ -54,7 +56,7 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
 
   return (
     <header className="mb-5">
-      <Link href="/candidates" className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
+      <Link href={toHref("candidates")} className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
         <ArrowLeft size={14} aria-hidden /> Candidates
       </Link>
 
