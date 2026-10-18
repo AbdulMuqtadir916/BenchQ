@@ -108,7 +108,7 @@ PR 1 every firm-scoped row carries `firmId`, and there are four firms, one per s
 | `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 6 (every role; the VIEWER, Rohan Kapoor, was added in Phase T PR 2) | 24 (21) | the original firm and the default session's. Seats 7/10 |
 | `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 3 (OWNER, BDE, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 users + 1 pending invite): can't add a seat, not over |
 | `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 5 (OWNER, 3 BDE, VIEWER) | 1 (1) | **over** its seat limit, 6/4 (5 users + 1 pending invite), and over on users alone (5/4), so it stays over whatever Phase S decides about a suspended firm's pending invites: the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
-| `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin; until Phase L the dev switcher lists it as "Sunita Rao" and picking it accepts the invite in the running mock (never-active OWNER, firm → ACTIVE, `INVITE_ACCEPTED`) so `/welcome` can be tested; with the switcher gone (Q25) nothing in the UI accepts it until `/invite/[token]` (Phase S). A reload restores the pending invite |
+| `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin; until Phase L the dev switcher lists it as "Sunita Rao" and picking it accepts the invite in the running mock (never-active OWNER, firm → ACTIVE, `INVITE_ACCEPTED`) so `/welcome` can be tested; with the switcher gone (Q25) nothing in the UI accepts it until `/invite/[token]` arrives in P4 (Q26), where `/welcome` gets its browser check. A reload restores the pending invite |
 
 Firm A's users, one per role at least, so every firm role has a seed account (§3.2):
 `user_imran` Imran Shaikh (OWNER), `user_fatima` Fatima Reddy (MANAGER), `user_adnan` Adnan Khan
@@ -137,13 +137,13 @@ they read (`sessionApi.devSignInAs` until Phase L; then a test helper that signs
 `["*"]`), then load the screen with an empty cache (e.g. after a principal switch); set it to `[]`
 and press Retry to recover. Inert in production builds.
 
-**Until Phase L — dev session survives a full page load** (dev builds only, `src/components/dev/dev-session-restore.tsx`; Phase L replaces it with the signed-in session kept per tab in every build, L4):
+**Until Phase L — dev session survives a full page load** (dev builds only, `src/components/dev/dev-session-restore.tsx`; Phase L replaces it with the signed-in session in `localStorage`, shared across tabs, in every build, L4 / Q27):
 the dev switcher's principal is remembered in this tab's `sessionStorage` (`benchq.dev.principal`), so
 a typed URL, a reload or an unknown route keeps who you were signed in as; sign-out forgets it. Mock
 data still resets on reload, so a principal the fresh data doesn't have (a dev-accepted invite's
 user) is dropped and the default user (Adnan) stays. Absent from production builds.
 
-### 3.2 Seed accounts (Q25, Phase L) — proposed 2026-10-19
+### 3.2 Seed accounts (Q25–Q27, Phase L) — approved 2026-10-19
 
 Everyone signs in on `/sign-in` with one of these accounts; there is no principal switcher (docs/07
 Q25). Mock auth, not security: the accounts and the password exist only in the mock layer (never on
@@ -157,7 +157,11 @@ the `User` contract) until the backend has real users (Phase D).
   sign in with is the one the app shows. Invite emails move to the same pattern, keeping each accepted
   OWNER invite equal to its user's email (`fixtures.test.ts` checks it).
 - **Landing** follows docs/07 §2.1 (T7): every fixture firm user has been active before, so none lands
-  on `/welcome`.
+  on `/welcome` (it stays covered by unit tests until `/invite/[token]` in P4, Q26).
+- **One account per browser profile** (Q27): the session lives in `localStorage` and is shared by
+  every tab, like the production cookie will be. Signing out, or in as someone else, in any tab
+  applies to all open tabs. **To use two accounts at once** (e.g. a BDE and their OWNER side by side),
+  use a private window or a second browser profile. Mock data still resets on every full page load.
 
 | Name | Sign-in email | Firm | Role | Lands on | Current fixture email |
 | ---- | ------------- | ---- | ---- | -------- | --------------------- |
@@ -181,7 +185,7 @@ All 15 accounts are active; an inactive account would be refused with the same e
 password. Every role signs in at least once: firm A has OWNER, MANAGER, three BDEs and VIEWER; STL has
 OWNER, BDE, VIEWER; CBW (suspended) has OWNER, three BDEs and VIEWER, all of whom land on the
 suspended screen. **No account for the GSC owner:** Gachibowli Staffing has no users until its OWNER's
-invite is accepted (see docs/07 Phase L, open question 1, for `/welcome`).
+invite is accepted on `/invite/[token]`, which arrives in P4 (docs/07 Q26).
 
 Invite emails, same pattern (the invites are not accounts; nothing signs in with them):
 
