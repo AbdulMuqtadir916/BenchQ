@@ -3,7 +3,8 @@ import type { Principal } from "@/lib/schemas/tenancy";
 import { useSession } from "@/lib/stores/session-store";
 
 /** Who is signed in, as one string: a change means a different person (or firm) is looking. */
-export function principalKey(principal: Principal): string {
+export function principalKey(principal: Principal | null): string {
+  if (!principal) return "signed-out";
   return principal.kind === "firm" ? `firm:${principal.firmId}:${principal.userId}` : `platform:${principal.userId}:${principal.support?.firmId ?? "-"}`;
 }
 

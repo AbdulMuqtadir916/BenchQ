@@ -11,7 +11,8 @@ import { allUsers, firms } from "./team";
  */
 export const DEFAULT_USER_ID = "user_adnan";
 
-let signedInUserId = DEFAULT_USER_ID;
+/** null = signed out: every call that needs a user then fails with 401, as a real backend would. */
+let signedInUserId: string | null = DEFAULT_USER_ID;
 
 export function userById(userId: string): User {
   const user = allUsers.find((item) => item.id === userId);
@@ -25,13 +26,23 @@ export function firmById(firmId: string): Firm {
   return firm;
 }
 
+export function isSignedIn(): boolean {
+  return signedInUserId !== null;
+}
+
 export function currentUser(): User {
+  if (signedInUserId === null) throw new ApiError("Sign in to continue.", "UNAUTHENTICATED", 401);
   return userById(signedInUserId);
 }
 
 export function currentPrincipal(): FirmPrincipal {
   const user = currentUser();
   return { kind: "firm", userId: user.id, firmId: user.firmId, role: user.role };
+}
+
+/** End the mock backend's session. */
+export function signOut(): void {
+  signedInUserId = null;
 }
 
 /** DEV ONLY: sign the mock backend in as a fixture firm user. */

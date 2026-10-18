@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
-import { hrefFor } from "@/lib/routes/registry";
+import { Landing } from "@/components/routes/landing";
 
 export default function RootPage() {
-  redirect(hrefFor("dashboard"));
+  return <Landing />;
 }

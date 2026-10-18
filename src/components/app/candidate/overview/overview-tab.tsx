@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { rankJobsForCandidate } from "@/lib/derive";
+import { useHref } from "@/lib/routes/use-href";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { AttentionCard } from "./attention-card";
@@ -11,8 +12,8 @@ import { SubmissionFacts } from "./submission-facts";
 import { ResumeReadiness, TopMatches } from "./side-cards";
 
 /** Link into the master resume builder, landing on the first unverified claim. */
-export function masterReviewHref(master: CandidateWorkspace["master"]): string | null {
-  return master ? `/resumes/${master.resume.id}?review=1` : null;
+export function masterReviewHref(master: CandidateWorkspace["master"], toHref: ReturnType<typeof useHref>): string | null {
+  return master ? toHref("resumes.studio", { id: master.resume.id }, { review: 1 }) : null;
 }
 
 /**
@@ -20,6 +21,7 @@ export function masterReviewHref(master: CandidateWorkspace["master"]): string |
  * news (where things stand), with the submission facts always to hand.
  */
 export function OverviewTab({ ws, actions, canAct, onNotify }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; onNotify: (message: string) => void }) {
+  const toHref = useHref();
   const candidate = ws.candidate!;
   const matches = useMemo(
     () => rankJobsForCandidate(candidate, ws.jobsQuery.data ?? [], new Set(ws.applications.map((a) => a.jobId)), 3),
@@ -38,7 +40,7 @@ export function OverviewTab({ ws, actions, canAct, onNotify }: { ws: CandidateWo
       <div className="space-y-5">
         <TopMatches matches={matches} onFindJobs={actions.findJobs} />
         <SubmissionFacts candidate={candidate} canEdit={canAct} onSaved={() => onNotify("Submission facts updated")} />
-        <ResumeReadiness master={ws.master} reviewHref={masterReviewHref(ws.master)} />
+        <ResumeReadiness master={ws.master} reviewHref={masterReviewHref(ws.master, toHref)} />
       </div>
     </div>
   );

@@ -1,19 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
 import { DEFAULT_SESSION } from "@/lib/stores/session-store";
 import { useDevSignInAs } from "@/lib/hooks/use-session";
-import { useHref } from "@/lib/routes/use-href";
+import { hrefFor } from "@/lib/routes/registry";
+import { safeReturnTo } from "@/lib/routes/landing";
 
+/** useSearchParams needs a Suspense boundary for the static build. */
 export default function SignInPage() {
-  const toHref = useHref();
-  const router = useRouter();
-  const signIn = useDevSignInAs();
+  return (
+    <Suspense>
+      <SignInForm />
+    </Suspense>
+  );
+}
+
+function SignInForm() {
+  const returnTo = safeReturnTo(useSearchParams().get("returnTo"));
+  // Navigate first, then the session changes (the change remounts the app, which would drop a
+  // callback passed to mutate()).
+  const signIn = useDevSignInAs({ navigateTo: () => returnTo ?? hrefFor("root") });
   const [email, setEmail] = useState("adnan@techcorp.com");
   const [password, setPassword] = useState("password");
   const [loading, setLoading] = useState(false);
@@ -22,7 +33,8 @@ export default function SignInPage() {
     e.preventDefault();
     setLoading(true);
     // No real auth yet: signing in means "the default fixture user" (mock backend and client session).
-    signIn.mutate(DEFAULT_SESSION.user.id, { onSettled: () => router.push(toHref("welcome")) });
+    // Then back to where the firm gate sent us from, or the landing (docs/07 §2.1).
+    signIn.mutate(DEFAULT_SESSION.user.id, { onError: () => setLoading(false) });
   };
 
   return (

@@ -3,10 +3,16 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ROLES, ROUTES, accessFor, accessForPath, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, routeById, type Access, type RouteId } from "./registry";
+import { RESERVED_SLUGS } from "@/lib/schemas/tenancy";
 import type { FirmRole } from "@/lib/schemas/enums";
 import { isInScope } from "./scope";
 
 const APP_DIR = fileURLToPath(new URL("../../app", import.meta.url));
+
+/** A firm slug for building URLs in tests. */
+const S = "acme";
+/** A firm URL: `f("/candidates")` is "/acme/candidates". */
+const f = (path: string) => `/${S}${path}`;
 
 /** Every page.tsx under src/app as a route path, skipping parallel (@slot) and intercepting ((.)) routes. */
 function pagePaths(dir = APP_DIR): string[] {
@@ -34,8 +40,28 @@ describe("route registry", () => {
   it("keeps every URL when pages sit in route groups ((workspace), (manage), (app), (studio))", () => {
     const pages = pagePaths();
     expect(pages.some((path) => path.includes("(") || path.includes(")"))).toBe(false);
-    for (const url of ["/dashboard", "/candidates", "/candidates/[id]", "/jobs", "/applications", "/resumes", "/outreach", "/followups", "/analytics", "/ledger", "/settings/team"]) {
-      expect(pages, url).toContain(url);
+    for (const url of ["/dashboard", "/candidates", "/candidates/[id]", "/jobs", "/applications", "/resumes", "/resumes/[id]", "/outreach", "/followups", "/analytics", "/ledger", "/settings/team", "/focus", "/welcome"]) {
+      expect(pages, url).toContain(`/[firm]${url}`);
+    }
+  });
+
+  it("puts every firm route under /[firm]/ and nothing else there (docs/07 §2.2, T6)", () => {
+    for (const route of ROUTES) {
+      expect(route.path.startsWith("/[firm]/"), route.id).toBe(route.area === "firm");
+    }
+    expect(ROUTES.filter((route) => route.area === "public").map((route) => route.path)).toEqual(["/", "/sign-in"]);
+  });
+
+  it("reserves every top-level static segment, so no firm slug can shadow a route (docs/07 §2.4)", () => {
+    const topLevel = new Set(pagePaths().map((path) => path.split("/")[1]!).filter((segment) => segment && !segment.startsWith("[")));
+    expect([...topLevel].sort()).toEqual(["dev", "sign-in"]);
+    for (const segment of topLevel) expect(RESERVED_SLUGS as readonly string[], segment).toContain(segment);
+  });
+
+  it("matches no slug-less URL from before T6: /candidates and the rest are not-found, not redirected", () => {
+    for (const route of ROUTES.filter((item) => item.area === "firm")) {
+      const old = route.path.replace("/[firm]", "").replace(/\[[^\]]+\]/g, "x");
+      expect(matchRoute(old), old).toBeNull();
     }
   });
 
@@ -44,20 +70,29 @@ describe("route registry", () => {
     expect(new Set(ROUTES.map((r) => r.path)).size).toBe(ROUTES.length);
   });
 
-  it("gives every role a landing route it can open", () => {
+  it("gives every role a landing route it can open, in its firm; an OWNER's first run opens welcome (T7)", () => {
     for (const role of ROLES) {
-      const landing = matchRoute(landingFor(role));
-      expect(landing && canOpen(landing, role)).toBe(true);
+      for (const isFirstRun of [false, true]) {
+        const landing = routeById(landingFor(role, { isFirstRun }));
+        expect(landing.area).toBe("firm");
+        expect(canOpen(landing, role), `${role} ${isFirstRun}`).toBe(true);
+      }
     }
+    expect(landingFor("OWNER", { isFirstRun: true })).toBe("welcome");
+    expect(landingFor("OWNER")).toBe("dashboard");
+    expect(ROLES.filter((role) => role !== "OWNER").map((role) => landingFor(role, { isFirstRun: true }))).toEqual(["dashboard", "dashboard", "dashboard"]);
   });
 
   it("prefers static segments over dynamic ones", () => {
-    expect(matchRoute("/candidates/new")?.id).toBe("candidates.new");
-    expect(matchRoute("/candidates/cand_01")?.id).toBe("candidates.detail");
-    expect(matchRoute("/jobs/capture")?.id).toBe("jobs.capture");
-    expect(matchRoute("/resumes/new")?.id).toBe("resumes.studio");
-    expect(matchRoute("/settings/team?x=1")?.id).toBe("settings.team");
+    expect(matchRoute(f("/candidates/new"))?.id).toBe("candidates.new");
+    expect(matchRoute(f("/candidates/cand_01"))?.id).toBe("candidates.detail");
+    expect(matchRoute(f("/jobs/capture"))?.id).toBe("jobs.capture");
+    expect(matchRoute(f("/resumes/new"))?.id).toBe("resumes.studio");
+    expect(matchRoute(f("/settings/team?x=1"))?.id).toBe("settings.team");
+    expect(matchRoute("/sign-in")?.id).toBe("sign-in");
+    expect(matchRoute("/dev/design-system")?.id).toBe("design-system");
     expect(matchRoute("/nope")).toBeNull();
+    expect(matchRoute(f(""))).toBeNull();
   });
 
   it("only shows nav items a role can open", () => {
@@ -80,30 +115,33 @@ describe("record scope", () => {
 });
 
 describe("hrefFor", () => {
-  it("returns the path for static routes", () => {
-    expect(hrefFor("dashboard")).toBe("/dashboard");
-    expect(hrefFor("candidates.new")).toBe("/candidates/new");
-    expect(hrefFor("settings.preferences")).toBe("/settings/preferences");
+  it("returns the path for public and dev routes, which have no firm", () => {
+    expect(hrefFor("root")).toBe("/");
+    expect(hrefFor("sign-in", {}, { returnTo: "/acme/jobs?x=1" })).toBe("/sign-in?returnTo=%2Facme%2Fjobs%3Fx%3D1");
+    expect(hrefFor("design-system")).toBe("/dev/design-system");
   });
 
-  it("fills [param] segments and encodes them", () => {
-    expect(hrefFor("candidates.detail", { id: "cand_01" })).toBe("/candidates/cand_01");
-    expect(hrefFor("resumes.studio", { id: "new" })).toBe("/resumes/new");
-    expect(hrefFor("jobs.detail", { id: "a/b" })).toBe("/jobs/a%2Fb");
+  it("fills [firm] and [param] segments and encodes them", () => {
+    expect(hrefFor("dashboard", { firm: S })).toBe("/acme/dashboard");
+    expect(hrefFor("settings.preferences", { firm: S })).toBe("/acme/settings/preferences");
+    expect(hrefFor("candidates.detail", { firm: S, id: "cand_01" })).toBe("/acme/candidates/cand_01");
+    expect(hrefFor("resumes.studio", { firm: S, id: "new" })).toBe("/acme/resumes/new");
+    expect(hrefFor("jobs.detail", { firm: S, id: "a/b" })).toBe("/acme/jobs/a%2Fb");
   });
 
   it("appends a query string and skips undefined values", () => {
-    expect(hrefFor("candidates.detail", { id: "cand_01" }, { tab: "inbox" })).toBe("/candidates/cand_01?tab=inbox");
-    expect(hrefFor("jobs", {}, { candidate: "cand_01", q: undefined })).toBe("/jobs?candidate=cand_01");
-    expect(hrefFor("applications", {}, { bde: undefined })).toBe("/applications");
+    expect(hrefFor("candidates.detail", { firm: S, id: "cand_01" }, { tab: "inbox" })).toBe("/acme/candidates/cand_01?tab=inbox");
+    expect(hrefFor("jobs", { firm: S }, { candidate: "cand_01", q: undefined })).toBe("/acme/jobs?candidate=cand_01");
+    expect(hrefFor("applications", { firm: S }, { bde: undefined })).toBe("/acme/applications");
   });
 
-  it("throws when a param is missing", () => {
-    expect(() => hrefFor("candidates.detail")).toThrow(/missing the "id" param/);
+  it("throws when a param is missing, the firm included: a firm link is never slug-less", () => {
+    expect(() => hrefFor("candidates.detail", { firm: S })).toThrow(/missing the "id" param/);
+    expect(() => hrefFor("dashboard")).toThrow(/missing the "firm" param/);
   });
 
   it("accepts a route object, as the sidebar and palette hold", () => {
-    expect(hrefFor(routeById("followups"))).toBe("/followups");
+    expect(hrefFor(routeById("followups"), { firm: S })).toBe("/acme/followups");
   });
 
   it("round-trips: every route's link matches back to the same route", () => {
@@ -116,7 +154,7 @@ describe("hrefFor", () => {
 
 /**
  * docs/07 §2.2, firm roles only. One row per route, columns OWNER · MANAGER · BDE · VIEWER.
- * The path column drops `/[firm]`: Phase T adds it. "→ landing" and "—" are `none`.
+ * Paths are under `/[firm]` (T6). "→ landing" and "—" are `none`.
  * This table is the spec: change docs/07 first, then this table, then the registry.
  */
 const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Access]> = [
@@ -191,16 +229,16 @@ describe("access table (docs/07 §2.2)", () => {
 describe("accessForPath (fails closed)", () => {
   it("is none for a path that matches no route, for every role", () => {
     for (const role of ROLES) {
-      for (const path of ["/nope", "/candidates/cand_01/extra", "/admin", "/settings/unknown", "/dashboard/x"]) {
+      for (const path of ["/nope", "/candidates", f("/candidates/cand_01/extra"), "/admin", f("/settings/unknown"), f("/dashboard/x"), f("")]) {
         expect(accessForPath(path, role), `${role} ${path}`).toEqual({ route: null, access: "none" });
       }
     }
   });
 
   it("returns the route's own access for registered paths, ignoring query and hash", () => {
-    expect(accessForPath("/analytics?range=7d", "BDE")).toEqual({ route: routeById("analytics"), access: "none" });
-    expect(accessForPath("/candidates/cand_01#notes", "BDE").access).toBe("assigned");
-    expect(accessForPath("/resumes/new", "VIEWER").access).toBe("read");
+    expect(accessForPath(f("/analytics?range=7d"), "BDE")).toEqual({ route: routeById("analytics"), access: "none" });
+    expect(accessForPath(f("/candidates/cand_01#notes"), "BDE").access).toBe("assigned");
+    expect(accessForPath(f("/resumes/new"), "VIEWER").access).toBe("read");
   });
 });
 
@@ -215,29 +253,30 @@ describe("no public sign-up (docs/07 Q11)", () => {
 
 describe("isRouteActive (matches on route ids, not paths)", () => {
   it("is active on the route itself and on its children", () => {
-    expect(isRouteActive("candidates", "/candidates")).toBe(true);
-    expect(isRouteActive("candidates", "/candidates/new")).toBe(true);
-    expect(isRouteActive("candidates", "/candidates/cand_01")).toBe(true);
-    expect(isRouteActive("candidates", "/candidates/cand_01?tab=inbox")).toBe(true);
-    expect(isRouteActive("jobs", "/jobs/capture")).toBe(true);
-    expect(isRouteActive("applications", "/applications/app_001")).toBe(true);
-    expect(isRouteActive("resumes", "/resumes/res_9")).toBe(true);
-    expect(isRouteActive("settings", "/settings/team")).toBe(true);
+    expect(isRouteActive("candidates", f("/candidates"))).toBe(true);
+    expect(isRouteActive("candidates", f("/candidates/new"))).toBe(true);
+    expect(isRouteActive("candidates", f("/candidates/cand_01"))).toBe(true);
+    expect(isRouteActive("candidates", f("/candidates/cand_01?tab=inbox"))).toBe(true);
+    expect(isRouteActive("jobs", f("/jobs/capture"))).toBe(true);
+    expect(isRouteActive("applications", f("/applications/app_001"))).toBe(true);
+    expect(isRouteActive("resumes", f("/resumes/res_9"))).toBe(true);
+    expect(isRouteActive("settings", f("/settings/team"))).toBe(true);
   });
 
   it("is not active elsewhere, including on siblings that share a name prefix", () => {
-    expect(isRouteActive("candidates", "/jobs")).toBe(false);
-    expect(isRouteActive("jobs", "/candidates/cand_01")).toBe(false);
-    expect(isRouteActive("settings.team", "/settings/firm")).toBe(false);
-    expect(isRouteActive("settings.team", "/settings/team")).toBe(true);
-    expect(isRouteActive("settings.team", "/settings")).toBe(false);
-    expect(isRouteActive("applications", "/applications-archive")).toBe(false);
+    expect(isRouteActive("candidates", f("/jobs"))).toBe(false);
+    expect(isRouteActive("jobs", f("/candidates/cand_01"))).toBe(false);
+    expect(isRouteActive("settings.team", f("/settings/firm"))).toBe(false);
+    expect(isRouteActive("settings.team", f("/settings/team"))).toBe(true);
+    expect(isRouteActive("settings.team", f("/settings"))).toBe(false);
+    expect(isRouteActive("applications", f("/applications-archive"))).toBe(false);
   });
 
   it("is never active on a path that is not a registered route", () => {
     for (const id of ROUTES.map((route) => route.id as RouteId)) {
       expect(isRouteActive(id, "/nope")).toBe(false);
-      expect(isRouteActive(id, "/candidates/cand_01/extra")).toBe(false);
+      expect(isRouteActive(id, f("/candidates/cand_01/extra"))).toBe(false);
+      expect(isRouteActive(id, "/candidates")).toBe(false);
     }
   });
 

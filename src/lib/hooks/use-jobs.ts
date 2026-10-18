@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { jobsApi } from "@/lib/api/jobs";
 import { queryKeys } from "@/lib/query/keys";
-import { useFirmId } from "@/lib/stores/session-store";
+import { useFirmId } from "@/lib/tenancy/firm-context";
 
 export function useJobs(params?: { limit?: number; offset?: number }) {
   const firmId = useFirmId();

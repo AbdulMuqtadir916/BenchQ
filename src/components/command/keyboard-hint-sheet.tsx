@@ -1,7 +1,7 @@
 "use client";
 
 import { useUiStore } from "@/lib/stores/ui-store";
-import { useSession } from "@/lib/stores/session-store";
+import { useSignedInUser } from "@/lib/stores/session-store";
 import { shortcutsFor } from "@/lib/routes/registry";
 import { cn } from "@/lib/cn";
 
@@ -17,7 +17,7 @@ type Shortcut = { keys: string[]; label: string };
 export function KeyboardHintSheet() {
   const isOpen = useUiStore((s) => s.hintSheetOpen);
   const close = useUiStore((s) => s.closeHintSheet);
-  const role = useSession((s) => s.user.role);
+  const role = useSignedInUser().role;
 
   if (!isOpen) return null;
 

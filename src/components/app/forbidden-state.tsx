@@ -5,12 +5,14 @@ import { ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/empty-state";
 import { landingFor } from "@/lib/routes/registry";
+import { useHref } from "@/lib/routes/use-href";
 import type { FirmRole } from "@/lib/schemas/enums";
 
 const ROLE_LABEL: Record<FirmRole, string> = { OWNER: "Owner", MANAGER: "Manager", BDE: "BDE", VIEWER: "Viewer" };
 
 /** Shown in place of a page the current role can't open (docs/04 §12: no redirect). */
 export function ForbiddenState({ role, pageTitle }: { role: FirmRole; pageTitle: string }) {
+  const toHref = useHref();
   return (
     <div className="bq-page">
       <EmptyState
@@ -20,7 +22,7 @@ export function ForbiddenState({ role, pageTitle }: { role: FirmRole; pageTitle:
         description={`${pageTitle} isn't available to the ${ROLE_LABEL[role]} role. If you need it, ask your firm's owner.`}
         action={
           <Button asChild variant="secondary">
-            <Link href={landingFor(role)}>Go to dashboard</Link>
+            <Link href={toHref(landingFor(role))}>Go to dashboard</Link>
           </Button>
         }
       />

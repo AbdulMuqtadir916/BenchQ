@@ -1,9 +1,9 @@
 import { ApiError } from "@/lib/api/client";
-import { DevPrincipalOptionSchema, FirmSessionSchema, type DevPrincipalOption, type FirmSession } from "@/lib/schemas/session";
-import { currentPrincipal, currentUser, firmById, signInAs } from "./auth";
+import { DevPrincipalOptionSchema, FirmSchema, FirmSessionSchema, type DevPrincipalOption, type Firm, type FirmSession } from "@/lib/schemas/session";
+import { currentPrincipal, currentUser, firmById, isSignedIn, signInAs, signOut } from "./auth";
 import { allUsers, firms } from "./team";
 import { platformUsers } from "./tenancy";
-import { mockResult } from "./_shared";
+import { mockResult, wait } from "./_shared";
 
 function sessionNow(): FirmSession {
   const principal = currentPrincipal();
@@ -44,8 +44,31 @@ function devPrincipals(): DevPrincipalOption[] {
   return [...firmUsers, ...admins].map((option) => DevPrincipalOptionSchema.parse(option));
 }
 
+/**
+ * The firm a URL slug names, for the firm layout (docs/07 §2.5). Only the signed-in user's own firm
+ * resolves: an unknown slug and another firm's slug are the same 404, so a URL never confirms that a
+ * firm exists (principle 4).
+ */
+function firmBySlug(slug: string): Firm {
+  const principal = currentPrincipal();
+  const firm = firms.find((item) => item.slug === slug);
+  if (!firm || firm.id !== principal.firmId) throw new ApiError("Not found.", "NOT_FOUND", 404);
+  return FirmSchema.parse(firm);
+}
+
 export const sessionMock = {
-  current: (): Promise<FirmSession> => mockResult(sessionNow()),
+  /** Who is signed in, or null when signed out. */
+  current: (): Promise<FirmSession | null> => mockResult(isSignedIn() ? sessionNow() : null),
+
+  firmBySlug: async (slug: string): Promise<Firm> => {
+    await wait();
+    return structuredClone(firmBySlug(slug));
+  },
+
+  signOut: async (): Promise<null> => {
+    signOut();
+    return mockResult(null);
+  },
 
   devPrincipals: (): Promise<DevPrincipalOption[]> => mockResult(devPrincipals()),
 

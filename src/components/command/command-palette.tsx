@@ -13,12 +13,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useUiStore } from "@/lib/stores/ui-store";
-import { useSession } from "@/lib/stores/session-store";
+import { useSignedInUser } from "@/lib/stores/session-store";
 import type { FirmRole } from "@/lib/schemas/enums";
 import { canOpen, paletteRoutesFor, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
-import { useCandidates } from "@/lib/hooks/use-candidates";
-import { useJobs } from "@/lib/hooks/use-jobs";
+import { usePaletteRecords } from "@/lib/hooks/use-palette-records";
 import { cn } from "@/lib/cn";
 import { CONTENT_EXIT, EASE_OUT, SPRING_PANEL } from "@/lib/motion";
 
@@ -106,15 +105,14 @@ export function CommandPalette() {
     }
   }, [isOpen]);
 
-  const candidatesQuery = useCandidates();
-  const jobsQuery = useJobs();
+  const records = usePaletteRecords();
   const reduceMotion = useReducedMotion() ?? false;
-  const role = useSession((s) => s.user.role);
+  const role = useSignedInUser().role;
 
   const results = useMemo(() => {
     const dynamicCommands: Command[] = [];
     
-    (candidatesQuery.data ?? []).forEach(c => {
+    records.candidates.forEach(c => {
       dynamicCommands.push({
         id: `candidate-${c.id}`,
         group: "Candidates",
@@ -125,7 +123,7 @@ export function CommandPalette() {
       });
     });
 
-    (jobsQuery.data ?? []).forEach(j => {
+    records.jobs.forEach(j => {
       dynamicCommands.push({
         id: `job-${j.id}`,
         group: "Jobs",
@@ -143,7 +141,7 @@ export function CommandPalette() {
     return allCommands.filter((c) =>
       `${c.label} ${c.keywords ?? ""}`.toLowerCase().includes(q),
     ).slice(0, 50);
-  }, [query, role, candidatesQuery.data, jobsQuery.data]);
+  }, [query, role, records.candidates, records.jobs]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, Command[]> = {};

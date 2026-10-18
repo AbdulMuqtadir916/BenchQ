@@ -30,8 +30,11 @@ function matches(files: string[], pattern: RegExp): string[] {
   );
 }
 
-/** Reading the firm (or the principal, which carries firmId) from the session store. */
-const SESSION_FIRM_READ = /useSession\s*(?:\(\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1|\.getState\(\s*\))\s*\.\s*(?:firm|principal)\b/;
+/**
+ * Reading a firm from the session store: `.firm`, `.principal.firmId`, or the whole principal (which
+ * carries firmId). Asking only whether someone is signed in (`s.principal !== null`) is fine.
+ */
+const SESSION_FIRM_READ = /useSession\s*(?:\(\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1|\.getState\(\s*\))\s*\.\s*(?:firm\b|principal\??\.firmId\b|principal\s*(?:\)|;|$))/;
 /** Any static or dynamic import of a mock module. */
 const MOCK_IMPORT = /(?:from\s+|import\(\s*)["'](?:@\/mocks|(?:\.\.?\/)+(?:[\w-]+\/)*mocks)(?:\/[\w./-]*)?["']/;
 
@@ -54,7 +57,8 @@ describe("firm and mock boundaries", () => {
       "useSession.getState().firm.id",
       "useSession.getState().principal",
     ]) expect(SESSION_FIRM_READ.test(bad), bad).toBe(true);
-    for (const ok of ["const firmId = useFirmId();", "const role = useSession((s) => s.user.role);", "const setSession = useSession((s) => s.setSession);"]) {
+    expect(SESSION_FIRM_READ.test("const id = useSession((s) => s.principal?.firmId);")).toBe(true);
+    for (const ok of ["const firmId = useFirmId();", "const role = useSession((s) => s.user.role);", "const setSession = useSession((s) => s.setSession);", "const isSignedIn = useSession((s) => s.principal !== null);"]) {
       expect(SESSION_FIRM_READ.test(ok), ok).toBe(false);
     }
     for (const bad of ['import { currentUser } from "@/mocks/auth";', 'import("@/mocks/candidates")', 'import { firms } from "../../mocks/team";', 'from "@/mocks"']) {

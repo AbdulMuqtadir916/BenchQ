@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useSession } from "@/lib/stores/session-store";
+import { useSignedInUser } from "@/lib/stores/session-store";
 import { isRouteActive, navFor, type RouteDef, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { EASE_OUT } from "@/lib/motion";
@@ -22,7 +22,7 @@ export function Sidebar({
   collapsed: boolean;
   onToggle: () => void;
 }) {
-  const role = useSession((s) => s.user.role);
+  const role = useSignedInUser().role;
   const reduceMotion = useReducedMotion() ?? false;
   const primary = navFor(role, "workspace");
   const secondary = navFor(role, "preferences");
