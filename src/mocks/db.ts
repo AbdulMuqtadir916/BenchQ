@@ -71,15 +71,36 @@ function readSnapshot(): Snapshot | null {
   }
 }
 
-let warnedFull = false;
+/**
+ * Whether the last save failed because storage is full (or blocked). The change itself is kept in
+ * memory, so this tab still shows it; it is lost on reload unless a later save succeeds (every save
+ * writes all changed tables, so the next one retries). The app shows "Demo storage is full…" meanwhile.
+ */
+let storageFull = false;
+const storageListeners = new Set<(full: boolean) => void>();
+function setStorageFull(full: boolean): void {
+  if (storageFull === full) return;
+  storageFull = full;
+  for (const listener of storageListeners) listener(full);
+}
+
 function writeSnapshot(value: Snapshot): void {
+  const store = storage();
+  if (!store) return;
   try {
-    storage()?.setItem(STORAGE_KEY, JSON.stringify(value));
-  } catch (error) {
-    // Quota or blocked storage: changes live until the page reloads.
-    if (!warnedFull) console.warn("[demo data] couldn't save to localStorage; changes last until reload", error);
-    warnedFull = true;
+    store.setItem(STORAGE_KEY, JSON.stringify(value));
+    setStorageFull(false);
+  } catch {
+    // QuotaExceededError (or blocked storage): keep the change in memory and say so.
+    setStorageFull(true);
   }
+}
+
+/** Call `onChange(full)` now and whenever saving starts or stops failing for lack of space. */
+export function watchStorageFull(onChange: (full: boolean) => void): () => void {
+  storageListeners.add(onChange);
+  onChange(storageFull);
+  return () => storageListeners.delete(onChange);
 }
 
 const freshSnapshot = (): Snapshot => ({ version: FIXTURE_VERSION, seededAt: now().toISOString(), tables: {} });

@@ -1,5 +1,5 @@
 import { currentPlatformUser } from "./auth";
-import { resetDemoData, watchDemoData } from "./db";
+import { resetDemoData, watchDemoData, watchStorageFull } from "./db";
 import { mockResult } from "./_shared";
 
 /** The demo data's own controls (docs/03 §3.3). */
@@ -12,4 +12,6 @@ export const demoDataMock = {
   },
 
   watch: (onChange: () => void): (() => void) => watchDemoData(onChange),
+
+  watchStorageFull: (onChange: (full: boolean) => void): (() => void) => watchStorageFull(onChange),
 };

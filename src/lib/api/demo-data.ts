@@ -20,4 +20,20 @@ export const demoDataApi = {
       stop?.();
     };
   },
+
+  /**
+   * Call `onChange(full)` with whether saving the demo data fails because browser storage is full; now,
+   * and on every change. While full, changes are kept only until the page reloads.
+   */
+  watchStorageFull: (onChange: (full: boolean) => void): (() => void) => {
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void mock().then((m) => {
+      if (!cancelled) stop = m.watchStorageFull(onChange);
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  },
 };

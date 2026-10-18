@@ -347,8 +347,8 @@ error / loading screens, record scope → not-found, settings split, `/sign-up`,
       BDE and VIEWER). Read-only: for VIEWER the actions are absent where they are buttons or
       links (`New candidate`, `Capture job`, `Upload resume` / `New resume`, `Send email`, and on
       detail pages `Find jobs` / `Build resume` / `Edit`, `Tailor` / `Mark applied` / `Save`,
-      `Move to …`). **Not checked:** that the application board's drag-and-drop is disabled for
-      VIEWER (it is a prop, not a button)
+      `Move to …`). **Checked later (2026-10-19, with persistent demo data):** the application board's drag-and-drop for
+      VIEWER: nothing is rendered draggable (`application-board.test.ts`; in Chrome as Rohan: 0 of 263 cards draggable, a mouse drag and Space/arrows move nothing); the mock backend refuses a VIEWER's status change (403) and a BDE's change to someone else's application (404, like a missing one), by the registry's access table (`application-authorization.test.ts`); in Chrome as Adnan: his board shows only his 97 applications, a keyboard drag of his own persists, Sneha's application is not-found
 - [x] A BDE opening an unassigned candidate / someone else's application → not-found. Checked in
       Chrome as BDE (user `user_adnan`): `/candidates/cand_09`, `/applications/app_009` and
       `/resumes/resume_cand_09_master` show the not-found state, while `cand_01`, `app_001` and

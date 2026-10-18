@@ -225,3 +225,46 @@ describe("tests never read persisted data", () => {
     expect(browserStorage.getItem(KEY)).toContain("whatever"); // untouched: never read, never written
   });
 });
+
+describe("a full localStorage (docs/03 §3.3)", () => {
+  class FullStorage extends StubStorage {
+    full = false;
+    override setItem(key: string, value: string) {
+      if (this.full) throw Object.assign(new Error("The quota has been exceeded."), { name: "QuotaExceededError" });
+      super.setItem(key, value);
+    }
+  }
+
+  it("keeps the change in memory, says storage is full, and saves it once space is back", async () => {
+    const full = new FullStorage();
+    storage = full;
+    g.__BENCHQ_DEMO_STORAGE__ = full as unknown as Storage;
+    const m = await load(T0, ADNAN);
+    const states: boolean[] = [];
+    m.db.watchStorageFull((isFull) => states.push(isFull));
+
+    full.full = true;
+    await m.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "RESPONSE", note: "kept" });
+    m.db.flush();
+    expect(m.applications.allApplications.find((a) => a.id === "app_001")?.status).toBe("RESPONSE"); // not lost in this tab
+    expect(stored()!.tables).toEqual({}); // nothing reached storage
+    expect(states).toEqual([false, true]); // the app shows "Demo storage is full…"
+
+    full.full = false;
+    await m.applications.applicationsMock.updateStatus("firm_hts", "app_003", { status: "RESPONSE", note: null });
+    m.db.flush();
+    const saved = stored()!.tables.applications as { id: string; status: string }[];
+    expect(saved.find((a) => a.id === "app_001")?.status).toBe("RESPONSE"); // the earlier change made it after all
+    expect(saved.find((a) => a.id === "app_003")?.status).toBe("RESPONSE");
+    expect(states).toEqual([false, true, false]);
+  });
+
+  it("the notice says what to do", async () => {
+    const { renderToString } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { DemoStorageFullMessage } = await import("@/components/app/demo-storage-notice");
+    const html = renderToString(createElement(DemoStorageFullMessage));
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Demo storage is full. Ask a Super Admin to reset demo data.");
+  });
+});

@@ -228,6 +228,12 @@ account changes, for every account signed in on this browser. Code: `src/mocks/d
   Other browsers keep their own data. (It moves to `/admin/system` when P3 builds that page.)
 - **Tabs:** a change saved in one tab refreshes the tables of every other open tab (storage event) and
   they refetch, so two tabs can't overwrite each other's changes.
+- **Storage full:** if a save fails (the browser's `localStorage` quota is full, or storage is
+  blocked), the change is kept in memory, so the tab still shows it, and every shell shows **"Demo
+  storage is full. Ask a Super Admin to reset demo data."** plus "Your latest changes are kept in this
+  tab until you reload it." The next save retries with every changed table (so the earlier change is
+  saved too once there is room); the message goes when a save succeeds, e.g. after a reset. Tested
+  with a stand-in storage that throws (`db.test.ts`).
 - **Tests never use persisted data:** under the test runner storage is off, so every test runs on the
   fixtures. `db.test.ts` installs a stub storage and a pinned clock to test persistence itself.
 

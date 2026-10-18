@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { demoDataApi } from "@/lib/api/demo-data";
 import { sessionApi } from "@/lib/api/session";
@@ -24,4 +24,11 @@ export function useResetDemoData() {
     mutationFn: () => demoDataApi.reset(),
     onSuccess: () => afterDataChange(queryClient),
   });
+}
+
+/** Whether the demo data can't be saved because browser storage is full (docs/03 §3.3). */
+export function useDemoStorageFull(): boolean {
+  const [full, setFull] = useState(false);
+  useEffect(() => demoDataApi.watchStorageFull(setFull), []);
+  return full;
 }

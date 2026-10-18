@@ -59,6 +59,7 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
 
   function onDragEnd(event: DragEndEvent) {
     setActiveId(null);
+    if (!canAct) return; // nothing is draggable then; and the backend refuses a VIEWER's write anyway
     const app = apps.find((a) => a.id === String(event.active.id));
     const to = String(event.over?.id ?? "");
     if (!app || !PIPELINE.includes(to as ApplicationStatus) || to === app.status) return;
@@ -124,14 +125,16 @@ function BoardCard({ app, canDrag, onOpen, children }: { app: Application; canDr
       ref={setNodeRef}
       className={cn("bq-card p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]", canDrag ? "bq-board-card" : "cursor-pointer")}
       data-dragging={isDragging || undefined}
-      {...listeners}
-      {...attributes}
+      // Only a card that can move carries the drag handles and "draggable" semantics: for anyone who
+      // can't act (a VIEWER) the card is just a button that opens the application.
+      {...(canDrag ? listeners : {})}
+      {...(canDrag ? attributes : { role: "button" })}
       tabIndex={0}
       aria-label={`${app.jobTitleAtApply} at ${app.companyNameAtApply}, ${STATUS_LABEL[app.status]}. Enter to open${canDrag ? ", Space to move" : ""}.`}
       onClick={() => onOpen?.(app.id)}
       onKeyDown={(e) => {
         if (e.key === "Enter") onOpen?.(app.id);
-        listeners?.onKeyDown?.(e);
+        if (canDrag) listeners?.onKeyDown?.(e);
       }}
     >
       {children}
