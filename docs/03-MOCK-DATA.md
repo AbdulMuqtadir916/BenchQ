@@ -105,13 +105,17 @@ PR 1 every firm-scoped row carries `firmId`, and there are four firms, one per s
 
 | Firm | Status | Plan (seats / candidates) | Users | Candidates (active) | Notes |
 |---|---|---|---|---|---|
-| `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 5 | 24 (21) | the original firm; the only one the UI shows until PR 2 |
-| `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 3 (OWNER, BDE, VIEWER) | 5 (3) | exactly at its seat limit (3 users + 1 pending invite) |
-| `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 2 | 1 (1) | ledger: created, plan changed, suspended |
+| `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 5 | 24 (21) | the original firm; the only one the UI shows until PR 2. Seats 6/10 |
+| `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 3 (OWNER, BDE, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 users + 1 pending invite): can't add a seat, not over |
+| `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 4 (OWNER, 2 BDE, VIEWER) | 1 (1) | **over** its seat limit, 5/4 (4 users + 1 pending invite): the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
 | `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin |
 
 Plus `plans.json` (Starter, Growth, Scale), `invites.json` (pending, expired, accepted, revoked, the
-onboarding owner's invite and one platform-team invite) and `platform-users.json` (one Super Admin).
+accepted OWNER invites of STL and CBW, the onboarding owner's pending invite and one platform-team
+invite) and `platform-users.json` (one Super Admin). **Invite dates are relative to load time**: they
+are written against `FIXTURE_NOW` and `invitesAt(now)` in `src/mocks/tenancy.ts` shifts them, so a
+pending invite stays pending (now + 5 days) and an expired one stays expired (now − 2 days) in the
+live UI. Tests call `invitesAt(FIXTURE_NOW)` for a fixed clock.
 Firm B and the suspended firm were cloned from a slice of firm A with every id, person and user
 re-pointed; `src/mocks/fixtures.test.ts` checks that nothing references another firm. Usage counts
 (seats, active candidates) are derived, never stored.

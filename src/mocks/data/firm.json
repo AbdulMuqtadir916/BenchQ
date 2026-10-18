@@ -165,6 +165,26 @@
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-30T09:00:00.000Z"
+    },
+    {
+      "id": "user_imtiaz",
+      "firmId": "firm_cbw",
+      "name": "Imtiaz Ali",
+      "email": "imtiaz@cbworks.in",
+      "role": "BDE",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-29T10:00:00.000Z"
+    },
+    {
+      "id": "user_swapna",
+      "firmId": "firm_cbw",
+      "name": "Swapna Das",
+      "email": "swapna@cbworks.in",
+      "role": "VIEWER",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-27T10:00:00.000Z"
     }
   ]
 }

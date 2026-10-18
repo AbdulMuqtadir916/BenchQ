@@ -8,7 +8,7 @@ import { allDocuments } from "./documents";
 import { allMessages } from "./inbox";
 import { allLedger } from "./ledger";
 import { allUsers, firms, users } from "./team";
-import { invites, plans, platformUsers } from "./tenancy";
+import { FIXTURE_NOW, invitesAt, plans, platformUsers } from "./tenancy";
 import { DEV_FIRM_ID } from "./_shared";
 
 /**
@@ -16,6 +16,7 @@ import { DEV_FIRM_ID } from "./_shared";
  * and nothing points across firms, so Phase T's isolation tests have clean data to work on.
  */
 
+const invites = invitesAt(FIXTURE_NOW);
 const firmIds = new Set(firms.map((firm) => firm.id));
 const byId = <T extends { id: string }>(rows: readonly T[]) => new Map(rows.map((row) => [row.id, row]));
 const candidateById = byId(allCandidates);
@@ -53,6 +54,18 @@ describe("firms, plans, users and invites", () => {
     const platformIds = new Set(platformUsers.map((user) => user.id));
     expect(ownerInvite).toMatchObject({ role: "OWNER", status: "PENDING" });
     expect(platformIds.has(ownerInvite!.invitedByUserId)).toBe(true);
+  });
+
+  it("records how each active firm's OWNER joined: an accepted OWNER invite from a Super Admin, plus INVITE_ACCEPTED in the firm's ledger", () => {
+    const platformIds = new Set(platformUsers.map((user) => user.id));
+    for (const firmId of ["firm_stl", "firm_cbw"]) {
+      const accepted = invites.find((invite) => invite.firmId === firmId && invite.role === "OWNER" && invite.status === "ACCEPTED");
+      expect(accepted, firmId).toBeDefined();
+      expect(platformIds.has(accepted!.invitedByUserId)).toBe(true);
+      const owner = allUsers.find((user) => user.firmId === firmId && user.role === "OWNER");
+      expect(accepted!.email).toBe(owner!.email);
+      expect(allLedger.some((entry) => entry.firmId === firmId && entry.action === "INVITE_ACCEPTED" && entry.entityId === accepted!.id)).toBe(true);
+    }
   });
 
   it("only lets firm users invite into their own firm (or a Super Admin anywhere), and never as OWNER", () => {

@@ -1851,5 +1851,39 @@
     "evidenceIds": [],
     "claimState": null,
     "createdAt": "2026-10-16T08:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_010",
+    "firmId": "firm_stl",
+    "actorUserId": "user_lakshmi",
+    "actorType": "USER",
+    "actorName": "Lakshmi Iyer",
+    "entityType": "invite",
+    "entityId": "inv_stl_owner",
+    "entityLabel": "lakshmi@stlabs.com",
+    "action": "INVITE_ACCEPTED",
+    "summary": "Lakshmi Iyer accepted the OWNER invite; firm is now active",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-08-12T09:15:00.000Z"
+  },
+  {
+    "id": "ledger_p_011",
+    "firmId": "firm_cbw",
+    "actorUserId": "user_naveen",
+    "actorType": "USER",
+    "actorName": "Naveen Reddy",
+    "entityType": "invite",
+    "entityId": "inv_cbw_owner",
+    "entityLabel": "naveen@cbworks.in",
+    "action": "INVITE_ACCEPTED",
+    "summary": "Naveen Reddy accepted the OWNER invite; firm is now active",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-07-20T11:40:00.000Z"
   }
 ]
