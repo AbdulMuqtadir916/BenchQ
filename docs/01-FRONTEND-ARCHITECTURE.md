@@ -231,18 +231,21 @@ try/catch, with a working default when storage is unavailable.
 
 ---
 
-## 7. Role simulation
+## 7. Signing in (mock auth)
 
-There is no auth. A **dev principal switcher in the topbar** (development only, behind
-`NEXT_PUBLIC_SHOW_DEV_TOOLS=true`, off by default) signs in as any fixture principal: every role in firm A
-(`OWNER`, `MANAGER`, `BDE`, `VIEWER`), the users of the other fixture firms, and the platform admin
-(listed, selectable from Phase P). It signs the mock backend in too (`src/mocks/auth.ts`), so mutations
-are attributed to the right person. Every permission-dependent surface reads from the Zustand
-`useSession` store (principal, user, firm); firm data reads `useFirmId()`.
+There is no real auth yet, and no principal switcher (docs/07 Q25). Everyone signs in on `/sign-in`
+with email + password against the **seeded accounts** of the mock layer (`docs/03` §3.2): every
+fixture firm user (each role in firm A, the second firm's and the suspended firm's users) and the
+Super Admin, all with one demo password. The mock backend (`src/mocks/auth.ts`) keeps the signed-in
+account in `localStorage`, standing in for the session cookie: it survives a reload and is shared by
+every tab, so signing out (user menu) or in as someone else in one tab reaches them all (Q27). Two
+accounts at once: a private window or a second browser profile. The app starts signed out; the
+client store (`useSession`: principal and user, never the firm) is filled from the session layer
+(`sessionApi`), and firm data reads `useFirmId()` from the URL.
 
-This matters more than it sounds: it's how you verify that a BDE never sees `/analytics`, that a
-VIEWER has no mutating controls in the DOM at all, and that a BDE sees only their assigned
-candidates. Build the switcher in Phase 0 and use it constantly.
+This is how you verify that a BDE never sees `/analytics`, that a VIEWER has no mutating controls in
+the DOM at all, and that a BDE sees only their assigned candidates: sign in as each seeded account.
+Mock auth is not security; real enforcement is docs/07 Phase D.
 
 ---
 
@@ -266,7 +269,6 @@ Virtualise with `@tanstack/react-virtual` on the job feed, the tracker table and
 
 ```bash
 NEXT_PUBLIC_API_MOCKING=enabled        # MSW on. 'disabled' points at a real API later.
-NEXT_PUBLIC_SHOW_DEV_TOOLS=true        # dev-only role simulation (off unless 'true')
 NEXT_PUBLIC_MOCK_LATENCY_MS=300        # simulated network delay
 NEXT_PUBLIC_MOCK_AI_LATENCY_MS=2500    # simulated agent delay — see 03-MOCK-DATA.md §5
 NEXT_PUBLIC_MOCK_ERROR_RATE=0          # 0–1, injects failures to exercise error states

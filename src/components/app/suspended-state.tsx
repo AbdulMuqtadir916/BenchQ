@@ -3,7 +3,6 @@
 import { Ban, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/empty-state";
-import { PrincipalSwitcher } from "@/components/dev/principal-switcher";
 import { useSignOut } from "@/lib/hooks/use-session";
 
 /**
@@ -14,9 +13,6 @@ export function SuspendedState({ firmName }: { firmName: string }) {
   const signOut = useSignOut();
   return (
     <div className="w-full max-w-lg">
-      <div className="mb-4 flex justify-center">
-        <PrincipalSwitcher />
-      </div>
       <EmptyState
         icon={Ban}
         variant="error"

@@ -108,7 +108,7 @@ PR 1 every firm-scoped row carries `firmId`, and there are four firms, one per s
 | `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 6 (every role; the VIEWER, Rohan Kapoor, was added in Phase T PR 2) | 24 (21) | the original firm and the default session's. Seats 7/10 |
 | `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 3 (OWNER, BDE, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 users + 1 pending invite): can't add a seat, not over |
 | `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 5 (OWNER, 3 BDE, VIEWER) | 1 (1) | **over** its seat limit, 6/4 (5 users + 1 pending invite), and over on users alone (5/4), so it stays over whatever Phase S decides about a suspended firm's pending invites: the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
-| `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin; until Phase L the dev switcher lists it as "Sunita Rao" and picking it accepts the invite in the running mock (never-active OWNER, firm → ACTIVE, `INVITE_ACCEPTED`) so `/welcome` can be tested; with the switcher gone (Q25) nothing in the UI accepts it until `/invite/[token]` arrives in P4 (Q26), where `/welcome` gets its browser check. A reload restores the pending invite |
+| `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin; nothing in the UI accepts it until `/invite/[token]` arrives in P4 (docs/07 Q26), where `/welcome` gets its browser check (the mock backend's acceptance is unit-tested, `invites.test.ts`) |
 
 Firm A's users, one per role at least, so every firm role has a seed account (§3.2):
 `user_imran` Imran Shaikh (OWNER), `user_fatima` Fatima Reddy (MANAGER), `user_adnan` Adnan Khan
@@ -130,20 +130,19 @@ re-pointed; `src/mocks/fixtures.test.ts` checks that nothing references another 
 **The mock backend checks membership** (`src/mocks/membership.ts`, T8): every firm-scoped mock call
 runs only for a member of the firm it names: another firm's id is a 404 (the same as a firm that
 doesn't exist), signed out is a 401, as a real server answers. Tests sign in as a member of the firm
-they read (`sessionApi.devSignInAs` until Phase L; then a test helper that signs in through `sessionApi.signIn` with the seed email and demo password, §3.2).
+they read, through `signInAs(accountId)` (`src/mocks/sign-in-as.ts`, tests only): `sessionApi.signIn` with the account's seed email and the demo password (§3.2), the same path `/sign-in` uses.
 
 **Dev fault switch:** to see an error state and its Retry without a backend, in the browser console
 `window.__BENCHQ_MOCK_FAIL__ = ["candidates.list"]` (any `resource.method` of a firm-scoped mock, or
 `["*"]`), then load the screen with an empty cache (e.g. after a principal switch); set it to `[]`
 and press Retry to recover. Inert in production builds.
 
-**Until Phase L — dev session survives a full page load** (dev builds only, `src/components/dev/dev-session-restore.tsx`; Phase L replaces it with the signed-in session in `localStorage`, shared across tabs, in every build, L4 / Q27):
-the dev switcher's principal is remembered in this tab's `sessionStorage` (`benchq.dev.principal`), so
-a typed URL, a reload or an unknown route keeps who you were signed in as; sign-out forgets it. Mock
-data still resets on reload, so a principal the fresh data doesn't have (a dev-accepted invite's
-user) is dropped and the default user (Adnan) stays. Absent from production builds.
+**The session survives a full page load** and is shared by tabs (docs/07 Q27): the mock backend keeps
+the signed-in account's id in `localStorage` (`benchq.session`), standing in for the session cookie. Mock
+data still resets on reload, so a stored account the fresh data doesn't have (e.g. a user created by
+accepting an invite in a previous page life) is dropped and the visitor is signed out.
 
-### 3.2 Seed accounts (Q25–Q27, Phase L) — approved 2026-10-19
+### 3.2 Seed accounts (Q25–Q27, Phase L) — in effect
 
 Everyone signs in on `/sign-in` with one of these accounts; there is no principal switcher (docs/07
 Q25). Mock auth, not security: the accounts and the password exist only in the mock layer (never on
@@ -152,7 +151,8 @@ the `User` contract) until the backend has real users (Phase D).
 - **Email pattern:** `firstname@<firm-slug>.benchq.test`, lowercase. The Super Admin uses the reserved
   slug `admin` (`sana@admin.benchq.test`), which can never be a firm's slug (docs/07 §2.4), so the two
   tiers can't collide. `.test` is a reserved top-level domain: no address here can reach a real mailbox.
-- **Password:** one shared demo password for every account: **`benchq-demo-2026`**.
+- **Password:** one shared demo password for every account: **`benchq-demo-2026`** (`DEMO_PASSWORD` in
+  `src/mocks/auth.ts`).
 - **Fixture emails change to the pattern** (`User.email`, `PlatformUser.email`), so the address you
   sign in with is the one the app shows. Invite emails move to the same pattern, keeping each accepted
   OWNER invite equal to its user's email (`fixtures.test.ts` checks it).

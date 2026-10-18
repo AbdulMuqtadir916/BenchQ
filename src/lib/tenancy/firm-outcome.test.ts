@@ -3,9 +3,9 @@ import { ApiError } from "@/lib/api/client";
 import { sessionApi } from "@/lib/api/session";
 import type { Firm } from "@/lib/schemas/session";
 import type { FirmPrincipal, Principal } from "@/lib/schemas/tenancy";
-import { DEFAULT_SESSION } from "@/lib/stores/session-store";
 import { allUsers, firms } from "@/mocks/team";
 import { firmOutcome, type FirmLookup } from "./firm-outcome";
+import { signInAs } from "@/mocks/sign-in-as";
 
 /**
  * docs/07 §2.5 for every fixture principal: sign the mock backend in, resolve each firm's slug (and
@@ -30,21 +30,21 @@ async function outcomesFor(principal: Principal | null): Promise<Record<string, 
 }
 
 afterEach(async () => {
-  await sessionApi.devSignInAs(DEFAULT_SESSION.user.id);
+  await sessionApi.signOut();
 });
 
 describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every firm slug", () => {
   const signedInUsers = allUsers.filter((user) => user.isActive);
 
   it.each(signedInUsers.map((user) => [user.id, user.role, user.firmId] as const))("%s (%s of %s): own firm opens (or is suspended); every other slug is not-found", async (userId, _role, firmId) => {
-    const { principal } = await sessionApi.devSignInAs(userId);
+    const { principal } = await signInAs(userId);
     const own = firms.find((firm) => firm.id === firmId)!;
     const expected = Object.fromEntries(slugs.map((slug) => [slug, slug === own.slug ? (own.status === "SUSPENDED" ? "suspended" : "open") : "not-found"]));
     expect(await outcomesFor(principal)).toEqual(expected);
   });
 
   it("platform admin without a support view: every existing firm is the support interstitial (§2.5 row 4); an unknown slug is not-found (row 2 comes first)", async () => {
-    const { principal } = await sessionApi.devSignInAs("padm_sana");
+    const { principal } = await signInAs("padm_sana");
     expect(principal.kind).toBe("platform");
     const expected = Object.fromEntries(slugs.map((slug) => [slug, slug === UNKNOWN_SLUG ? "not-found" : "support-required"]));
     expect(await outcomesFor(principal)).toEqual(expected);
@@ -64,7 +64,7 @@ describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every
   });
 
   it("answers an unknown slug and another firm's slug with the same 404, so a URL never confirms a firm exists", async () => {
-    await sessionApi.devSignInAs("user_adnan");
+    await signInAs("user_adnan");
     const otherFirm = firms.find((firm) => firm.id === "firm_stl")!.slug;
     expect(firms.some((firm) => firm.slug === UNKNOWN_SLUG)).toBe(false);
     const errors = await Promise.all([UNKNOWN_SLUG, otherFirm].map((slug) => sessionApi.firmBySlug(slug).catch((error: ApiError) => [error.status, error.code, error.message])));
@@ -75,7 +75,7 @@ describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every
 
 describe("firmOutcome edges", () => {
   const principal: FirmPrincipal = { kind: "firm", userId: "u", firmId: "firm_a", role: "BDE" };
-  const firm = (overrides: Partial<Firm>) => ({ ...DEFAULT_SESSION.firm, id: "firm_a", ...overrides }) as Firm;
+  const firm = (overrides: Partial<Firm>) => ({ ...firms.find((item) => item.id === "firm_hts")!, id: "firm_a", ...overrides }) as Firm;
 
   it("waits while the slug resolves, and shows the error state for anything but a 404", () => {
     expect(firmOutcome(principal, { status: "pending" }).kind).toBe("resolving");
@@ -106,14 +106,14 @@ describe("firmOutcome edges", () => {
 describe("slug → firm resolution (docs/07 T8)", () => {
   it("resolves each firm's exact slug to that firm, for its members", async () => {
     for (const [userId, firmId] of [["user_imran", "firm_hts"], ["user_lakshmi", "firm_stl"], ["user_naveen", "firm_cbw"]] as const) {
-      await sessionApi.devSignInAs(userId);
+      await signInAs(userId);
       const slug = firms.find((firm) => firm.id === firmId)!.slug;
       expect((await sessionApi.firmBySlug(slug)).id).toBe(firmId);
     }
   });
 
   it.each(["Hyderabad-Tech-Staffing", "hyderabad-tech-staffing-", "hyderabad", " hyderabad-tech-staffing", "hyderabad-tech-staffing/", "firm_hts"])("matches only the exact slug: %j is not-found", async (slug) => {
-    await sessionApi.devSignInAs("user_imran");
+    await signInAs("user_imran");
     await expect(sessionApi.firmBySlug(slug)).rejects.toMatchObject({ status: 404 });
   });
 });

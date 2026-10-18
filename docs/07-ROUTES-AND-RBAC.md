@@ -44,6 +44,7 @@ All decisions live here. Change a decision here first, then the sections below.
 | Q25 | How people sign in until real auth | **Through `/sign-in` only** (decided 2026-10-19): email + password against **seeded dummy accounts** in the mock layer, one per fixture user plus the Super Admin, one shared demo password (`docs/03` §3.2). The **dev principal switcher is removed** in development and production. Dummy data stays per firm (the existing fixtures). Still mock auth, not security; real enforcement stays Phase D. Implemented in **Phase L**, before P3 |
 | Q26 | `/welcome` and `/invite/[token]` without the switcher | **Phase L covers `/welcome` with unit tests only; no mock invite page** (decided 2026-10-19). The real **`/invite/[token]` moves from Phase S to P4**, alongside the support view: it is how a new firm's OWNER joins, and the browser check of `/welcome` happens there (accept GSC's pending OWNER invite → `/welcome`) |
 | Q27 | Where the mock session lives | **`localStorage`, shared across tabs** (decided 2026-10-19), like the production cookie session will be: one signed-in account per browser profile. Signing out (or in as someone else) in any tab applies to every open tab (`storage` event). Two accounts at once = a private window or a second browser profile |
+| Q28 | Opening `/invite/[token]` for a `SUSPENDED` firm | **Blocked** with the "Workspace suspended" message (decided 2026-10-19): the invite is **not accepted and stays `PENDING`**. Answers Phase S open question 1, needed before P4 builds the page. Whether a suspended firm's pending invites hold seats (Phase S question 2) still waits for Phase S |
 
 ---
 
@@ -78,7 +79,7 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | Route                     | Purpose                                                                 | Notes                                                                                                                     |
 | ------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `/`                       | Landing redirect                                                        | signed out → `/sign-in`; firm user → `/{slug}/dashboard` (OWNER first run → `/{slug}/welcome`); platform admin → `/admin` |
-| `/sign-in`                | Email + password                                                        | `?returnTo=` honoured only for same-origin paths                                                                          |
+| `/sign-in`                | Email + password                                                        | `?returnTo=` honoured only for same-origin paths, and only if the account signing in can open it (its own firm, an admin page for an admin); otherwise its landing (Phase L) |
 | `/forgot-password`        | Request a reset link                                                    | **new**; always shows "if the email exists, we sent a link"                                                               |
 | `/reset-password/[token]` | Set a new password                                                      | **new**; invalid/expired token state                                                                                      |
 | `/invite/[token]`         | Accept an invite: shows firm name and offered role, set name + password | **new** (open in v1 Phase A); invalid, expired, already-accepted states                                                   |
@@ -191,7 +192,6 @@ type SupportView = {
   accounts in the mock layer (`docs/03` §3.2): every fixture firm user and the Super Admin, one
   shared demo password. There is **no principal switcher**, in development or production: to act as
   someone else, sign out (user menu) and sign in as them. Mock auth, not security (Phase D).
-  *Until Phase L lands, the dev principal switcher from T4 is still in the code.*
 
 ---
 
@@ -315,7 +315,7 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | Planned                            |
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
 | **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit, system                                                                                                   | P, B             | Planned                            |
-| **L**  | Sign-in with seeded accounts (Q25–Q27) — `/sign-in` against the mock layer's seeded accounts; dev principal switcher removed; user-menu sign-out; mock session shared across tabs | T, P1–P2         | Approved (2026-10-19) — before P3  |
+| **L**  | Sign-in with seeded accounts (Q25–Q27) — `/sign-in` against the mock layer's seeded accounts; dev principal switcher removed; user-menu sign-out; mock session shared across tabs | T, P1–P2         | Built, in review — before P3       |
 | **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Planned (Q23)                      |
 | **D**  | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks                                                                                                           | backend D1/D2    | Later                              |
 
@@ -431,7 +431,7 @@ the other firm's data (checked on every list screen); query keys all include `fi
 | P1  | Registry v2 (§5): `area`, `access` union, `admin` shell and nav section, helpers on `Principal` — **done in PR 12** (`feat/platform-shell`): `RouteAccess` union, `area: "platform"`, `admin` shell / nav section; every helper (`accessFor`, `accessForPath`, `canOpen`, `navFor`, `paletteRoutesFor`, `shortcutsFor`, `landingFor`) takes a `Principal`; the Support column is derived (`supportAccess`: read where OWNER has access, `none` on `welcome`, `candidates/new`, `jobs/capture`, `focus`, `settings/preferences`) and table-tested against §2.2. Platform sessions are real: the mock backend, the session store (`principal`, `user` or `platformUser`) and the dev switcher sign in as a Super Admin; the membership check refuses a platform admin on every firm call (404) until P4 |
 | P2  | `src/app/admin/layout.tsx`: admin shell (same frosted shell, admin nav), platform guard → not-found for others — **done in PR 12**: `src/app/admin/layout.tsx` → `PlatformGate` (signed out → sign-in with returnTo; any non-admin → not-found, no shell) → `AppShell variant="admin"` (admin nav, no firm notifications). `/admin` is a placeholder page until P3. The tab title names a platform route only to a platform admin (principle 4). A platform admin on a firm URL gets `support-required` (§2.5 row 4) — a plain screen with "Back to admin" until P4 builds the interstitial; ⌘K for an admin already lists only platform routes (P5 adds firms search and "View workspace"). Follow-up PR: a platform admin on an **unknown** firm slug gets not-found (an existing one the interstitial); an unknown `/admin/…` URL renders not-found **inside the admin shell** (`admin/[...unknown]` catch-all + `admin/not-found.tsx`; catch-alls aren't registry routes) |
 | P3  | Every route in §2.3 with real layout and skeleton / empty / error (and not-found for `[firmId]`), on mock adapters `platformApi` (`firms`, `plans`, `audit`, `system`, `team`) |
-| P4  | Support view (§4): start / exit / expiry, interstitial, banner, ledger entries, support access column. **Plus `/invite/[token]` (Q26, moved from S):** shows the firm's name and the offered role, the person sets name + password, then is signed in; invalid / expired / revoked / already-accepted states (docs/04 §2.1); an OWNER accepting makes an `ONBOARDING` firm `ACTIVE` and logs `INVITE_ACCEPTED` (Q18), then lands on `/welcome` (T7). Browser check: accept GSC's pending OWNER invite → `/gachibowli-staffing/welcome` → finish → dashboard. The token is an opaque mock-only secret (docs/02), no contract change. **Needs Phase S open question 1 answered first** (an invite to a suspended firm) |
+| P4  | Support view (§4): start / exit / expiry, interstitial, banner, ledger entries, support access column. **Plus `/invite/[token]` (Q26, moved from S):** shows the firm's name and the offered role, the person sets name + password, then is signed in; invalid / expired / revoked / already-accepted states (docs/04 §2.1); an OWNER accepting makes an `ONBOARDING` firm `ACTIVE` and logs `INVITE_ACCEPTED` (Q18), then lands on `/welcome` (T7). Browser check: accept GSC's pending OWNER invite → `/gachibowli-staffing/welcome` → finish → dashboard. The token is an opaque mock-only secret (docs/02), no contract change. A `SUSPENDED` firm's invite is blocked with the "Workspace suspended" message and stays `PENDING` (Q28) |
 | P5  | ⌘K for admins: firms search, "View workspace", admin nav; firm-scoped commands hidden outside a firm                                                                           |
 | P6  | Tests: platform table test rows, support view grants no actions, non-admin → `/admin` not-found; **the §2.5 platform-admin rows**: no support view for this firm → support interstitial (reason required, not a redirect), and a support view of a `SUSPENDED` firm renders normally (read-only), added to `src/lib/tenancy/firm-outcome.test.ts` |
 
@@ -487,7 +487,7 @@ invites, plans, suspend/reactivate, audit, system. Out of scope until then.
 
 **Open questions for Phase S** (product owner; decide before building the invite and suspend flows):
 
-1. **Opening an invite to a `SUSPENDED` firm.** *(Now needed before P4, which builds `/invite/[token]`, Q26.)* What does `/invite/[token]` do when the firm is
+1. ~~**Opening an invite to a `SUSPENDED` firm.**~~ **Decided (Q28):** blocked with the "Workspace suspended" message; the invite stays `PENDING`. *(Original question:)* What does `/invite/[token]` do when the firm is
    suspended? Owner leans towards **blocking it** with the "Workspace suspended" message.
 2. **Seats held by pending invites of a suspended firm.** Do pending invites to a `SUSPENDED` firm
    still reserve seats (Q17 says pending invites reserve a seat), or are they released while it is
@@ -495,7 +495,7 @@ invites, plans, suspend/reactivate, audit, system. Out of scope until then.
 
 ---
 
-## Phase L — Sign-in with seeded accounts (Q25–Q27) — approved 2026-10-19
+## Phase L — Sign-in with seeded accounts (Q25–Q27) — built (PR on `feat/seeded-sign-in`, in review)
 
 Everyone signs in through `/sign-in` (email + password) against seeded dummy accounts in the mock
 layer; the dev principal switcher goes, in development and production. Accounts, password and
@@ -526,7 +526,15 @@ open tab; checks green.
 2. **Session** (Q27): `localStorage`, shared across tabs; sign-out in any tab signs out every tab.
    Two accounts at once need a private window or a second browser profile (`docs/03` §3.2).
 
-**What depends on the switcher today** (to change or delete in L5–L6):
+**As built:** sign-in is `sessionApi.signIn` (mock: `signInWithPassword` in `src/mocks/auth.ts`, one
+generic 401 for any failure); the session is the account id in `localStorage` (`benchq.session`), read
+only by the mock backend; `useSessionSync` (query provider) bootstraps it and follows other tabs
+through `sessionApi.watch`, applying changes with `applySession` → `setSession` / `signOut`, so the
+cache-clear-and-remount boundary is unchanged. After sign-in, `returnTo` is used only if the new account can open it (`signInTarget`): after a sign-out on a shared screen the next person may be from another firm. `UserMenu` sits in the firm and admin topbars and on the
+support-required screen (the suspended screen has its own Sign out). Tests sign in with
+`signInAs(accountId)` (`src/mocks/sign-in-as.ts`) through `sessionApi.signIn`.
+
+**What depended on the switcher** (all changed or deleted in L5–L6):
 
 | File | What it does with the switcher |
 | ---- | ------------------------------ |

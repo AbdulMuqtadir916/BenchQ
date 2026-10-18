@@ -44,7 +44,6 @@ export const queryKeys = {
   },
   session: {
     current: () => ["session", "current"] as const,
-    devPrincipals: () => ["session", "devPrincipals"] as const,
     /** The firm a URL slug names, as the signed-in principal sees it (docs/07 §2.5). Keyed by slug: the firm id is what it resolves. Cleared with the rest of the cache on every principal change. */
     firmBySlug: (slug: string) => ["session", "firmBySlug", slug] as const,
   },

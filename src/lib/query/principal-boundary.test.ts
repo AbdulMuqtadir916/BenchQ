@@ -2,9 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { candidatesApi } from "@/lib/api/candidates";
 import { sessionApi } from "@/lib/api/session";
-import { DEFAULT_SESSION, useSession } from "@/lib/stores/session-store";
+import { useSession } from "@/lib/stores/session-store";
 import { queryKeys } from "./keys";
 import { clearCacheOnPrincipalChange } from "./principal-boundary";
+import { signInAs } from "@/mocks/sign-in-as";
 
 const FIRM = "firm_hts";
 const key = queryKeys.candidates.list(FIRM);
@@ -16,20 +17,20 @@ const firstRender = (client: QueryClient) => new QueryObserver(client, query).ge
 
 afterEach(async () => {
   useSession.getState().reset();
-  await sessionApi.devSignInAs(DEFAULT_SESSION.user.id);
+  await sessionApi.signOut();
 });
 
-describe("principal change clears the query cache (dev switcher, sign-in, sign-out)", () => {
+describe("principal change clears the query cache (sign-in, sign-out, an account change in another tab)", () => {
   it("firm A OWNER loads candidates; after switching to firm A BDE the first render is not the OWNER's cache", async () => {
     const client = newClient();
     const unsubscribe = clearCacheOnPrincipalChange(client);
 
-    useSession.getState().setSession(await sessionApi.devSignInAs("user_imran")); // OWNER, firm A
+    useSession.getState().setSession(await signInAs("user_imran")); // OWNER, firm A
     const ownersList = await client.fetchQuery(query);
     expect(ownersList.length).toBe(24);
     expect(firstRender(client).data).toBe(ownersList); // the OWNER's cache is what a mount would show
 
-    useSession.getState().setSession(await sessionApi.devSignInAs("user_adnan")); // BDE, same firm: same key
+    useSession.getState().setSession(await signInAs("user_adnan")); // BDE, same firm: same key
     expect(client.getQueryCache().getAll()).toEqual([]);
     const first = firstRender(client);
     expect(first.data).toBeUndefined();
@@ -37,26 +38,28 @@ describe("principal change clears the query cache (dev switcher, sign-in, sign-o
     unsubscribe();
   });
 
-  it("clears on sign-out (reset to the default session) and on a switch to another firm", async () => {
+  it("clears on sign-out and on a sign-in to another firm", async () => {
     const client = newClient();
     const unsubscribe = clearCacheOnPrincipalChange(client);
-    useSession.getState().setSession(await sessionApi.devSignInAs("user_lakshmi"));
+    useSession.getState().setSession(await signInAs("user_lakshmi"));
     await client.fetchQuery({ queryKey: queryKeys.candidates.list("firm_stl"), queryFn: () => candidatesApi.list("firm_stl") });
-    useSession.getState().reset();
+    useSession.getState().signOut();
     expect(client.getQueryCache().getAll()).toEqual([]);
 
-    await sessionApi.devSignInAs(DEFAULT_SESSION.user.id); // the mock backend checks membership (T8)
+    useSession.getState().setSession(await signInAs("user_adnan")); // the mock backend checks membership (T8)
     await client.fetchQuery(query);
-    useSession.getState().setSession(await sessionApi.devSignInAs("user_kiran"));
+    useSession.getState().setSession(await signInAs("user_kiran"));
     expect(client.getQueryCache().getAll()).toEqual([]);
     unsubscribe();
   });
 
   it("keeps the cache when the same principal is set again (no needless refetch)", async () => {
     const client = newClient();
+    const session = await signInAs("user_adnan");
+    useSession.getState().setSession(session);
     const unsubscribe = clearCacheOnPrincipalChange(client);
     await client.fetchQuery(query);
-    useSession.getState().setSession(DEFAULT_SESSION);
+    useSession.getState().setSession(session);
     expect(firstRender(client).data?.length).toBe(24);
     unsubscribe();
   });

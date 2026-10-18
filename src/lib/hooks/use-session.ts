@@ -3,10 +3,11 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { landingHref } from "@/lib/routes/landing";
+import { landingHref, signInTarget } from "@/lib/routes/landing";
 import { sessionApi } from "@/lib/api/session";
 import { queryKeys } from "@/lib/query/keys";
 import type { Session } from "@/lib/schemas/session";
+import { principalKey } from "@/lib/query/principal-boundary";
 import { useSession } from "@/lib/stores/session-store";
 
 /**
@@ -28,46 +29,38 @@ export function useFirmBySlug(slug: string) {
   return useQuery({ queryKey: queryKeys.session.firmBySlug(slug), queryFn: () => sessionApi.firmBySlug(slug), enabled: isSignedIn, staleTime: Infinity });
 }
 
-/** DEV ONLY: every fixture principal, for the dev principal switcher. */
-export function useDevPrincipals(enabled: boolean) {
-  return useQuery({ queryKey: queryKeys.session.devPrincipals(), queryFn: () => sessionApi.devPrincipals(), enabled, staleTime: Infinity });
-}
-
 /**
- * DEV ONLY: sign in as another fixture user. The mock backend switches who is signed in, then the
- * client session follows. Setting the session clears the whole query cache and remounts the app
- * (src/lib/query/principal-boundary.ts), so nothing of the previous principal's data can render.
- *
- * `navigateTo` names a page to go to first (a switch to another firm's user: their landing). Then the
- * session changes only once that page's URL is in place (SessionCommitter), so the page being left
- * never re-renders under the new principal.
+ * Sign in on /sign-in (docs/07 L2) with email + password. On success it navigates first (to the
+ * same-origin `returnTo` if this account can open it, else its landing: signInTarget) and the session changes once that URL is in
+ * place (useCommitPendingSession): the change clears the cache and remounts the app, and doing it
+ * first would re-render /sign-in under the new principal. Any failure is the one generic error.
  */
-export function useDevSignInAs(options: { navigateTo?: (session: Session) => string | null } = {}) {
+export function useSignIn(returnTo: string | null) {
   const router = useRouter();
-  const setSession = useSession((s) => s.setSession);
   const setPending = useSession((s) => s.setPending);
-  const { navigateTo } = options;
   return useMutation({
-    mutationFn: (userId: string) => sessionApi.devSignInAs(userId),
-    // Mutation-level callbacks run even when the switch unmounts the caller.
+    mutationFn: (credentials: { email: string; password: string }) => sessionApi.signIn(credentials.email, credentials.password),
+    // Mutation-level callbacks run even when the change unmounts the caller.
     onSuccess: (session) => {
-      const path = navigateTo?.(session) ?? null;
-      if (!path) return setSession(session);
+      const path = signInTarget(session, returnTo);
       setPending({ session, path });
       router.replace(path);
     },
   });
 }
 
-/** Sign out: the backend first, then the client session (which clears the cache, principal-boundary.ts). */
+/**
+ * Sign out: the backend first, then the client session (which clears the cache, principal-boundary.ts).
+ * The session is shared by tabs (Q27), so every other open tab follows through useSessionSync.
+ */
 export function useSignOut() {
   const signOut = useSession((s) => s.signOut);
   return useMutation({ mutationFn: () => sessionApi.signOut(), onSuccess: () => signOut() });
 }
 
 /**
- * DEV ONLY: commits a pending cross-firm switch (useDevSignInAs) once the URL it waits for is in place.
- * Mounted once, above the per-principal remount, in the query provider.
+ * Commits a pending sign-in (useSignIn) once the URL it navigated to is in place. Mounted once, above
+ * the per-principal remount, in the query provider.
  */
 export function useCommitPendingSession() {
   const pathname = usePathname();
@@ -94,4 +87,42 @@ export function useFinishFirstRun() {
       router.replace(landingHref(session));
     },
   });
+}
+
+/**
+ * Bring the client session in line with the session layer: on start-up (the stored session, if any)
+ * and when another tab signs in, out or as someone else (Q27). A different principal goes through
+ * setSession, so the cache-clear-and-remount boundary applies exactly as for a sign-in here.
+ */
+export function applySession(session: Session | null): void {
+  const store = useSession.getState();
+  if (session === null) {
+    if (store.principal !== null) store.signOut();
+    store.setBootstrapped();
+    return;
+  }
+  if (principalKey(store.principal) !== principalKey(session.principal)) store.setSession(session);
+  else store.setBootstrapped();
+}
+
+/**
+ * Mounted once, above the per-principal remount (query provider): asks the session layer who is
+ * signed in on start-up, then follows other tabs. Until the first answer the store is bootstrapping
+ * and every gate shows its skeleton.
+ */
+export function useSessionSync() {
+  useEffect(() => {
+    let alive = true;
+    const refresh = () =>
+      sessionApi.current().then(
+        (session) => alive && applySession(session),
+        () => alive && applySession(null),
+      );
+    void refresh();
+    const stop = sessionApi.watch(() => void refresh());
+    return () => {
+      alive = false;
+      stop();
+    };
+  }, []);
 }

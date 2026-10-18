@@ -1,9 +1,20 @@
 import { createElement, type ComponentProps, type ComponentType } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+// renderToString reads a zustand store through its server snapshot, the store's *initial* state
+// (signed out: in the app the gates wait for the client). The BDE dashboard needs the signed-in user,
+// so in this server render it reads the live store instead. Everything else is real.
+vi.mock("@/lib/stores/session-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/stores/session-store")>();
+  return { ...actual, useSignedInUser: () => actual.useSession.getState().user! };
+});
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
-import { DEFAULT_SESSION } from "@/lib/stores/session-store";
+import { firms } from "@/mocks/team";
+import { sessionApi } from "@/lib/api/session";
+import { signInAs } from "@/mocks/sign-in-as";
+import { useSession } from "@/lib/stores/session-store";
 import { OwnerDashboard } from "./owner-dashboard";
 import { ManagerDashboard } from "./manager-dashboard";
 import { BdeDashboard } from "./bde-dashboard";
@@ -42,7 +53,7 @@ const fault = globalThis as { __BENCHQ_MOCK_FAIL__?: string[] };
 async function render(component: ComponentType, failing: Resource[]): Promise<string> {
   // retryOnMount off: a fresh render would otherwise report a failed query as loading again (it retries on mount).
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryOnMount: false, staleTime: Infinity } } });
-  const tree = () => renderToString(createElement(QueryClientProvider, { client }, createElement(FirmProvider, { firm: DEFAULT_SESSION.firm } as ComponentProps<typeof FirmProvider>, createElement(component))));
+  const tree = () => renderToString(createElement(QueryClientProvider, { client }, createElement(FirmProvider, { firm: firms.find((firm) => firm.id === "firm_hts")! } as ComponentProps<typeof FirmProvider>, createElement(component))));
   tree(); // creates the queries the dashboard reads
   fault.__BENCHQ_MOCK_FAIL__ = failing.map((resource) => `${resource}.list`);
   await Promise.all(client.getQueryCache().getAll().map((query) => query.fetch().catch(() => undefined)));
@@ -51,6 +62,15 @@ async function render(component: ComponentType, failing: Resource[]): Promise<st
 }
 const count = (html: string, text: string) => html.split(text).length - 1;
 
+// Signed in as a member of firm A, in the mock backend (it checks membership, T8) and in the client
+// store (the BDE dashboard reads the signed-in user), as the app is after /sign-in.
+beforeAll(async () => {
+  useSession.getState().setSession(await signInAs("user_adnan"));
+});
+afterAll(async () => {
+  useSession.getState().reset();
+  await sessionApi.signOut();
+});
 afterEach(() => {
   fault.__BENCHQ_MOCK_FAIL__ = [];
 });

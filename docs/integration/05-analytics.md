@@ -15,7 +15,7 @@ This module is a **verification pass** plus small fixes.
 ## Tasks
 
 - [ ] With `jobs,companies,applications` live, open `/analytics` and every dashboard role
-      (BDE / MANAGER / OWNER via the role switcher). Every number must match a manual count from
+      (BDE / MANAGER / OWNER: sign in as each seeded account, docs/03 §3.2). Every number must match a manual count from
       `GET /api/applications` and `GET /api/stats`
 - [ ] Funnel with four backend statuses: confirm `deriveFunnel` copes with empty `RESPONSE` /
       `SCREENING` / `PLACED` stages (empty bars, not crashes or NaN percentages). Fix in

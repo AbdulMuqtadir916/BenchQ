@@ -2,7 +2,7 @@
   {
     "id": "inv_hts_01",
     "firmId": "firm_hts",
-    "email": "nikhil@htsstaffing.com",
+    "email": "nikhil@hyderabad-tech-staffing.benchq.test",
     "role": "BDE",
     "invitedByUserId": "user_imran",
     "status": "PENDING",
@@ -12,7 +12,7 @@
   {
     "id": "inv_hts_02",
     "firmId": "firm_hts",
-    "email": "old.lead@htsstaffing.com",
+    "email": "old.lead@hyderabad-tech-staffing.benchq.test",
     "role": "VIEWER",
     "invitedByUserId": "user_imran",
     "status": "PENDING",
@@ -22,7 +22,7 @@
   {
     "id": "inv_hts_03",
     "firmId": "firm_hts",
-    "email": "vikram@htsstaffing.com",
+    "email": "vikram@hyderabad-tech-staffing.benchq.test",
     "role": "BDE",
     "invitedByUserId": "user_imran",
     "status": "ACCEPTED",
@@ -32,7 +32,7 @@
   {
     "id": "inv_hts_04",
     "firmId": "firm_hts",
-    "email": "contractor@htsstaffing.com",
+    "email": "contractor@hyderabad-tech-staffing.benchq.test",
     "role": "BDE",
     "invitedByUserId": "user_imran",
     "status": "REVOKED",
@@ -42,7 +42,7 @@
   {
     "id": "inv_stl_owner",
     "firmId": "firm_stl",
-    "email": "lakshmi@stlabs.com",
+    "email": "lakshmi@secunderabad-talent.benchq.test",
     "role": "OWNER",
     "invitedByUserId": "padm_sana",
     "status": "ACCEPTED",
@@ -52,7 +52,7 @@
   {
     "id": "inv_stl_01",
     "firmId": "firm_stl",
-    "email": "ravi@stlabs.com",
+    "email": "ravi@secunderabad-talent.benchq.test",
     "role": "BDE",
     "invitedByUserId": "user_lakshmi",
     "status": "PENDING",
@@ -62,7 +62,7 @@
   {
     "id": "inv_cbw_owner",
     "firmId": "firm_cbw",
-    "email": "naveen@cbworks.in",
+    "email": "naveen@cyberabad-bench.benchq.test",
     "role": "OWNER",
     "invitedByUserId": "padm_sana",
     "status": "ACCEPTED",
@@ -72,7 +72,7 @@
   {
     "id": "inv_cbw_01",
     "firmId": "firm_cbw",
-    "email": "new.bde@cbworks.in",
+    "email": "new.bde@cyberabad-bench.benchq.test",
     "role": "BDE",
     "invitedByUserId": "user_naveen",
     "status": "PENDING",
@@ -82,7 +82,7 @@
   {
     "id": "inv_gsc_owner",
     "firmId": "firm_gsc",
-    "email": "owner@gachibowlistaffing.com",
+    "email": "owner@gachibowli-staffing.benchq.test",
     "role": "OWNER",
     "invitedByUserId": "padm_sana",
     "status": "PENDING",
@@ -92,7 +92,7 @@
   {
     "id": "inv_platform_01",
     "firmId": null,
-    "email": "omar@benchq.io",
+    "email": "omar@admin.benchq.test",
     "role": "PLATFORM_ADMIN",
     "invitedByUserId": "padm_sana",
     "status": "PENDING",

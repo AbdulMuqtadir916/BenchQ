@@ -1,48 +1,18 @@
 "use client";
 
 import { create } from "zustand";
-import type { FirmSession, Session, User } from "@/lib/schemas/session";
+import type { Session, User } from "@/lib/schemas/session";
 import type { PlatformUser, Principal } from "@/lib/schemas/tenancy";
 
 /**
  * Who is signed in, on the client (docs/07 §3, T4): the principal and its user, or nobody. It holds no
  * firm: a page's firm is the `[firm]` URL segment, resolved by the firm layout (`useFirm()`,
- * `useFirmId()` in src/lib/tenancy/firm-context.tsx). Platform sessions (Super Admin) join in Phase P.
+ * `useFirmId()` in src/lib/tenancy/firm-context.tsx).
  *
- * There is no real auth yet: the session starts as the default fixture user and the dev principal
- * switcher replaces it. This store shapes the UI; it is not security (Phase D).
+ * The app starts signed out and **bootstrapping**: `useSessionSync` (query provider) asks the session
+ * layer who is signed in (a stored session survives reloads and is shared by tabs, Q27) and follows
+ * other tabs' changes. Mock auth: this store shapes the UI, it is not security (Phase D).
  */
-
-/** Must match the fixture records (src/mocks/data/firm.json); session-store.test.ts checks it. */
-export const DEFAULT_SESSION: FirmSession = {
-  principal: { kind: "firm", userId: "user_adnan", firmId: "firm_hts", role: "BDE" },
-  user: {
-    id: "user_adnan",
-    firmId: "firm_hts",
-    name: "Adnan Khan",
-    email: "adnan@htsstaffing.com",
-    role: "BDE",
-    avatarUrl: null,
-    isActive: true,
-    lastActiveAt: "2026-10-01T05:47:52.943Z",
-  },
-  firm: {
-    id: "firm_hts",
-    name: "Hyderabad Tech Staffing LLC",
-    slug: "hyderabad-tech-staffing",
-    logoUrl: null,
-    primaryTimezone: "Asia/Kolkata",
-    clientTimezone: "America/New_York",
-    truthGuardMode: "BALANCED",
-    applicationExpiryDays: 30,
-    status: "ACTIVE",
-    planId: "plan_growth",
-    seatLimit: 10,
-    candidateLimit: 100,
-    contactPhone: "+91 40 6600 1200",
-    createdAt: "2026-06-02T09:00:00.000Z",
-  },
-};
 
 interface SessionState {
   /** null = signed out. A firm user or a platform admin (docs/07 §3). */
@@ -51,7 +21,7 @@ interface SessionState {
   user: User | null;
   /** The platform admin, when the principal is a platform principal. */
   platformUser: PlatformUser | null;
-  /** Replace the session (sign-in, the dev principal switcher). Only who is signed in is kept: the firm a page shows comes from its URL (docs/07 §1.3, T6). */
+  /** Replace the session (sign-in, start-up, another tab's change). Only who is signed in is kept: the firm a page shows comes from its URL (docs/07 §1.3, T6). */
   setSession: (session: Session) => void;
   /**
    * DEV ONLY: a switch to another firm's user, waiting for the navigation to `path` to land before the
@@ -60,11 +30,11 @@ interface SessionState {
    */
   pending: { session: Session; path: string } | null;
   setPending: (pending: { session: Session; path: string } | null) => void;
-  /** DEV ONLY: the remembered dev-switcher principal is being signed back in after a full page load (DevSessionRestore). */
-  restoring: boolean;
-  setRestoring: (restoring: boolean) => void;
+  /** True until the session layer has said who is signed in (on start-up, after a reload). Gates wait. */
+  bootstrapping: boolean;
+  setBootstrapped: () => void;
   signOut: () => void;
-  /** Back to the default fixture user (tests). */
+  /** Signed out and bootstrapped (tests). */
   reset: () => void;
 }
 
@@ -73,15 +43,17 @@ const signedIn = (session: Session) =>
     ? { principal: session.principal, user: session.user, platformUser: null }
     : { principal: session.principal, user: null, platformUser: session.platformUser };
 
+const SIGNED_OUT = { principal: null, user: null, platformUser: null };
+
 export const useSession = create<SessionState>((set) => ({
-  ...signedIn(DEFAULT_SESSION),
+  ...SIGNED_OUT,
   pending: null,
-  restoring: false,
-  setSession: (session) => set({ ...signedIn(session), pending: null }),
+  bootstrapping: true,
+  setSession: (session) => set({ ...signedIn(session), pending: null, bootstrapping: false }),
   setPending: (pending) => set({ pending }),
-  setRestoring: (restoring) => set({ restoring }),
-  signOut: () => set({ principal: null, user: null, platformUser: null, pending: null }),
-  reset: () => set({ ...signedIn(DEFAULT_SESSION), pending: null }),
+  setBootstrapped: () => set({ bootstrapping: false }),
+  signOut: () => set({ ...SIGNED_OUT, pending: null }),
+  reset: () => set({ ...SIGNED_OUT, pending: null, bootstrapping: false }),
 }));
 
 /**
@@ -95,12 +67,11 @@ export function useSignedInUser(): User {
 }
 
 /**
- * Is the session about to change (a sign-in or cross-firm switch landing on this URL, or the dev
- * session being restored after a reload)? Gates show their skeleton meanwhile instead of judging the
- * principal that is on its way out.
+ * Is the session not yet known or about to change (start-up / reload, or a sign-in landing on this
+ * URL)? Gates show their skeleton meanwhile instead of judging a principal that isn't settled.
  */
 export function useIsSessionSettling(): boolean {
-  return useSession((s) => s.pending !== null || s.restoring);
+  return useSession((s) => s.pending !== null || s.bootstrapping);
 }
 
 /** Who is signed in, for pages that render only when someone is (the firm, admin and dev layouts). */
