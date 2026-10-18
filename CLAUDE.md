@@ -213,7 +213,7 @@ docker compose up -d db backend   # backend + Postgres (only for integration wor
 - [ ] Fully keyboard operable
 - [ ] Skeleton, empty, error (and not-found for detail routes) states present
 - [ ] New routes registered in the registry and covered by the table test; guard checked for each
-      principal with the dev switcher (firm roles, second firm, platform admin, support view)
+      principal, signed in as each seeded account (firm roles, second firm, platform admin, support view)
 - [ ] No inline role checks added; no hardcoded hrefs
 - [ ] No hardcoded colours, sizes or spacing; no `any`, no `@ts-ignore`
 - [ ] Works at 1440px, 1024px and 390px
@@ -232,8 +232,9 @@ docker compose up -d db backend   # backend + Postgres (only for integration wor
 - Produce a `VERIFIED` claim — in mock data or a mapper — without an `evidenceId`.
 - Bypass the export gate on resumes with unverified claims.
 - Store a derived counter as a literal.
-- Treat the RoleSwitcher / dev principal switcher / client session store as security, or ship it
-  enabled in production builds.
+- Treat the mock sign-in, the seeded accounts, the demo password or the client session store as
+  security (they are mock auth until Phase D), or bring back a principal switcher (Q25: everyone signs
+  in on `/sign-in`).
 - Give a platform admin any write path into a firm, or read the current firm from anywhere but the
   URL.
 - Add a dependency without checking `docs/01-FRONTEND-ARCHITECTURE.md §3`.
@@ -267,7 +268,8 @@ A stopped task with a clear question beats a confident wrong implementation.
 | 07 Phase T0 — no-contract groundwork: remove `/sign-up` (Q11), route groups (Q14), role views out of pages, active links by route id, team-access TODO (Q15), draft §7 contracts in `docs/02` | Done |
 | 07 Phase T — tenancy in the frontend: schemas from the approved contracts (07 §7, `docs/02` §3.1), `Principal` session, `/[firm]` URLs, firm-scoped mocks + query keys | Done (PRs 1–4, exit check recorded in 07) |
 | Dashboards error states — per-group errors, one page-level error when everything fails (docs/04 §13) | Done (#10) |
-| 07 Phase P — `/admin/*` routes, admin shell, read-only support view | **In progress**: P1 (registry v2, principal-typed helpers, platform sessions) + P2 (admin layout, platform guard, admin shell) on `feat/platform-shell`, awaiting review. P3 waits for the docs/04 Admin section |
+| 07 Phase L — sign-in with seeded accounts on `/sign-in`, dev principal switcher removed (Q25) | **Proposed** (docs only, awaiting review); before P3 |
+| 07 Phase P — `/admin/*` routes, admin shell, read-only support view | **In progress**: P1 (registry v2, principal-typed helpers, platform sessions) + P2 (admin layout, platform guard, admin shell) done (#12, #13). P3 waits for Phase L and the docs/04 Admin section |
 | 07 Phase C — permission policy, scope helpers, remove inline role checks | Planned |
 | 07 Phase B — UI completion audit (route × principal) | Planned |
 | 07 Phase S — Super Admin flow polish (UI-first) | Planned |

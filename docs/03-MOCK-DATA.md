@@ -108,9 +108,9 @@ PR 1 every firm-scoped row carries `firmId`, and there are four firms, one per s
 | `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 6 (every role; the VIEWER, Rohan Kapoor, was added in Phase T PR 2) | 24 (21) | the original firm and the default session's. Seats 7/10 |
 | `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 3 (OWNER, BDE, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 users + 1 pending invite): can't add a seat, not over |
 | `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 5 (OWNER, 3 BDE, VIEWER) | 1 (1) | **over** its seat limit, 6/4 (5 users + 1 pending invite), and over on users alone (5/4), so it stays over whatever Phase S decides about a suspended firm's pending invites: the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
-| `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin; the dev switcher lists it as "Sunita Rao": picking it accepts the invite in the running mock (never-active OWNER, firm → ACTIVE, `INVITE_ACCEPTED`), so `/welcome` can be tested. The fixture files are unchanged; a reload restores the pending invite |
+| `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin; until Phase L the dev switcher lists it as "Sunita Rao" and picking it accepts the invite in the running mock (never-active OWNER, firm → ACTIVE, `INVITE_ACCEPTED`) so `/welcome` can be tested; with the switcher gone (Q25) nothing in the UI accepts it until `/invite/[token]` (Phase S). A reload restores the pending invite |
 
-Firm A's users, one per role at least, so the dev principal switcher can sign in as every firm role:
+Firm A's users, one per role at least, so every firm role has a seed account (§3.2):
 `user_imran` Imran Shaikh (OWNER), `user_fatima` Fatima Reddy (MANAGER), `user_adnan` Adnan Khan
 (BDE, the default session), `user_sneha` Sneha Rao (BDE), `user_vikram` Vikram Desai (BDE) and
 **`user_rohan` Rohan Kapoor (VIEWER)**, who was added in Phase T PR 2 because firm A had no VIEWER.
@@ -130,18 +130,73 @@ re-pointed; `src/mocks/fixtures.test.ts` checks that nothing references another 
 **The mock backend checks membership** (`src/mocks/membership.ts`, T8): every firm-scoped mock call
 runs only for a member of the firm it names: another firm's id is a 404 (the same as a firm that
 doesn't exist), signed out is a 401, as a real server answers. Tests sign in as a member of the firm
-they read (`sessionApi.devSignInAs`).
+they read (`sessionApi.devSignInAs` until Phase L; then a test helper that signs in through `sessionApi.signIn` with the seed email and demo password, §3.2).
 
 **Dev fault switch:** to see an error state and its Retry without a backend, in the browser console
 `window.__BENCHQ_MOCK_FAIL__ = ["candidates.list"]` (any `resource.method` of a firm-scoped mock, or
 `["*"]`), then load the screen with an empty cache (e.g. after a principal switch); set it to `[]`
 and press Retry to recover. Inert in production builds.
 
-**Dev session survives a full page load** (dev builds only, `src/components/dev/dev-session-restore.tsx`):
+**Until Phase L — dev session survives a full page load** (dev builds only, `src/components/dev/dev-session-restore.tsx`; Phase L replaces it with the signed-in session kept per tab in every build, L4):
 the dev switcher's principal is remembered in this tab's `sessionStorage` (`benchq.dev.principal`), so
 a typed URL, a reload or an unknown route keeps who you were signed in as; sign-out forgets it. Mock
 data still resets on reload, so a principal the fresh data doesn't have (a dev-accepted invite's
 user) is dropped and the default user (Adnan) stays. Absent from production builds.
+
+### 3.2 Seed accounts (Q25, Phase L) — proposed 2026-10-19
+
+Everyone signs in on `/sign-in` with one of these accounts; there is no principal switcher (docs/07
+Q25). Mock auth, not security: the accounts and the password exist only in the mock layer (never on
+the `User` contract) until the backend has real users (Phase D).
+
+- **Email pattern:** `firstname@<firm-slug>.benchq.test`, lowercase. The Super Admin uses the reserved
+  slug `admin` (`sana@admin.benchq.test`), which can never be a firm's slug (docs/07 §2.4), so the two
+  tiers can't collide. `.test` is a reserved top-level domain: no address here can reach a real mailbox.
+- **Password:** one shared demo password for every account: **`benchq-demo-2026`**.
+- **Fixture emails change to the pattern** (`User.email`, `PlatformUser.email`), so the address you
+  sign in with is the one the app shows. Invite emails move to the same pattern, keeping each accepted
+  OWNER invite equal to its user's email (`fixtures.test.ts` checks it).
+- **Landing** follows docs/07 §2.1 (T7): every fixture firm user has been active before, so none lands
+  on `/welcome`.
+
+| Name | Sign-in email | Firm | Role | Lands on | Current fixture email |
+| ---- | ------------- | ---- | ---- | -------- | --------------------- |
+| Imran Shaikh | `imran@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | OWNER | `/hyderabad-tech-staffing/dashboard` | `imran@htsstaffing.com` |
+| Fatima Reddy | `fatima@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | MANAGER | `/hyderabad-tech-staffing/dashboard` | `fatima@htsstaffing.com` |
+| Adnan Khan | `adnan@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | BDE | `/hyderabad-tech-staffing/dashboard` | `adnan@htsstaffing.com` |
+| Sneha Rao | `sneha@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | BDE | `/hyderabad-tech-staffing/dashboard` | `sneha@htsstaffing.com` |
+| Vikram Desai | `vikram@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | BDE | `/hyderabad-tech-staffing/dashboard` | `vikram@htsstaffing.com` |
+| Rohan Kapoor | `rohan@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | VIEWER | `/hyderabad-tech-staffing/dashboard` | `rohan@htsstaffing.com` |
+| Lakshmi Iyer | `lakshmi@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | OWNER | `/secunderabad-talent/dashboard` | `lakshmi@stlabs.com` |
+| Kiran Varma | `kiran@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | BDE | `/secunderabad-talent/dashboard` | `kiran@stlabs.com` |
+| Meena Joshi | `meena@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | VIEWER | `/secunderabad-talent/dashboard` | `meena@stlabs.com` |
+| Naveen Reddy | `naveen@cyberabad-bench.benchq.test` | Cyberabad Bench Works | OWNER | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `naveen@cbworks.in` |
+| Rehana Begum | `rehana@cyberabad-bench.benchq.test` | Cyberabad Bench Works | BDE | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `rehana@cbworks.in` |
+| Imtiaz Ali | `imtiaz@cyberabad-bench.benchq.test` | Cyberabad Bench Works | BDE | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `imtiaz@cbworks.in` |
+| Swapna Das | `swapna@cyberabad-bench.benchq.test` | Cyberabad Bench Works | VIEWER | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `swapna@cbworks.in` |
+| Farida Sheikh | `farida@cyberabad-bench.benchq.test` | Cyberabad Bench Works | BDE | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `farida@cbworks.in` |
+| Sana Mirza | `sana@admin.benchq.test` | — (BenchQ platform) | PLATFORM_ADMIN ("Super Admin") | `/admin` | `sana@benchq.io` |
+
+All 15 accounts are active; an inactive account would be refused with the same error as a wrong
+password. Every role signs in at least once: firm A has OWNER, MANAGER, three BDEs and VIEWER; STL has
+OWNER, BDE, VIEWER; CBW (suspended) has OWNER, three BDEs and VIEWER, all of whom land on the
+suspended screen. **No account for the GSC owner:** Gachibowli Staffing has no users until its OWNER's
+invite is accepted (see docs/07 Phase L, open question 1, for `/welcome`).
+
+Invite emails, same pattern (the invites are not accounts; nothing signs in with them):
+
+| Invite | Role | Status | Current email | New email |
+| ------ | ---- | ------ | ------------- | --------- |
+| `inv_hts_01` | BDE | PENDING | `nikhil@htsstaffing.com` | `nikhil@hyderabad-tech-staffing.benchq.test` |
+| `inv_hts_02` | VIEWER | PENDING | `old.lead@htsstaffing.com` | `old.lead@hyderabad-tech-staffing.benchq.test` |
+| `inv_hts_03` | BDE | ACCEPTED | `vikram@htsstaffing.com` | `vikram@hyderabad-tech-staffing.benchq.test` |
+| `inv_hts_04` | BDE | REVOKED | `contractor@htsstaffing.com` | `contractor@hyderabad-tech-staffing.benchq.test` |
+| `inv_stl_owner` | OWNER | ACCEPTED | `lakshmi@stlabs.com` | `lakshmi@secunderabad-talent.benchq.test` |
+| `inv_stl_01` | BDE | PENDING | `ravi@stlabs.com` | `ravi@secunderabad-talent.benchq.test` |
+| `inv_cbw_owner` | OWNER | ACCEPTED | `naveen@cbworks.in` | `naveen@cyberabad-bench.benchq.test` |
+| `inv_cbw_01` | BDE | PENDING | `new.bde@cbworks.in` | `new.bde@cyberabad-bench.benchq.test` |
+| `inv_gsc_owner` | OWNER | PENDING | `owner@gachibowlistaffing.com` | `owner@gachibowli-staffing.benchq.test` |
+| `inv_platform_01` | PLATFORM_ADMIN | PENDING | `omar@benchq.io` | `omar@admin.benchq.test` |
 
 ---
 
