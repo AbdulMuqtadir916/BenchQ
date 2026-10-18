@@ -9,6 +9,9 @@ import { useSession } from "@/lib/stores/session-store";
 import { buildResumeDocument } from "@/lib/resume-doc/build";
 import { deriveDocumentGate } from "@/lib/derive";
 import { ErrorState } from "@/components/app/error-state";
+import { NotFoundState } from "@/components/app/not-found-state";
+import { useRouteAccess } from "@/lib/routes/use-route-access";
+import { isInScope } from "@/lib/routes/scope";
 import { ResumeStudio } from "./resume-studio";
 import { StudioFrame, StudioSkeleton } from "./studio-states";
 import { useStudio, type StudioMode } from "./studio-store";
@@ -32,11 +35,13 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
   const loadedId = useStudio((s) => s.doc?.resumeId);
   const load = useStudio((s) => s.load);
   const setMode = useStudio((s) => s.setMode);
+  const { access } = useRouteAccess();
+  const inScope = !candidateQuery.data || isInScope(access, user.id, { assignedUserIds: candidateQuery.data.assignedUserIds });
 
   useEffect(() => {
-    if (!resumeQuery.data || !candidateQuery.data || !recordQuery.data || loadedId === id) return;
+    if (!inScope || !resumeQuery.data || !candidateQuery.data || !recordQuery.data || loadedId === id) return;
     load(buildResumeDocument(resumeQuery.data, candidateQuery.data, recordQuery.data), initialMode);
-  }, [resumeQuery.data, candidateQuery.data, recordQuery.data, loadedId, id, initialMode, load]);
+  }, [inScope, resumeQuery.data, candidateQuery.data, recordQuery.data, loadedId, id, initialMode, load]);
 
   // Reopening the same resume keeps this session's edits but honours how it was opened (View vs card).
   useEffect(() => setMode(review ? "build" : initialMode), [id, initialMode, review, setMode]);
@@ -64,6 +69,14 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
             void recordQuery.refetch();
           }}
         />
+      </StudioFrame>
+    );
+  }
+
+  if (!inScope) {
+    return (
+      <StudioFrame onClose={close}>
+        <NotFoundState title="Resume not found" description="This resume doesn't exist or isn't available to you." backHref="/resumes" backLabel="Back to resumes" />
       </StudioFrame>
     );
   }

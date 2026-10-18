@@ -54,5 +54,7 @@ backend/.linkedin_api/
 .claude-flow/
 .swarm/
 ruvector.db
+agentdb.rvf
+agentdb.rvf.lock
 .claude/*
 !.claude/launch.json

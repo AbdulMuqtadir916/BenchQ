@@ -31,6 +31,7 @@ switches it to the backend. **Integrating a module? Start at
 | `docs/04-SCREENS.md` | Every route: layout, states, permissions, keyboard map | Building any screen |
 | `docs/05-COMPONENTS.md` | Component inventory with props and variants | Building any component |
 | `docs/06-IMPLEMENTATION-PLAN.md` | Nine phases with exit criteria | Starting work, closing a phase |
+| `docs/07-ROUTES-AND-RBAC.md` | Route registry, access per role, UI completion audit, then RBAC | Touching routes, navigation, permissions or role checks |
 | `docs/integration/` | Backend integration: data flow, per-module plans, open product decisions | Connecting any module to the backend |
 | `docs/archive/` | Backend endpoint reference (`BACKEND_API_FEATURES.md`) and the old JSON-migration notes | Looking up a backend endpoint |
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { notFound } from "next/navigation";
 import { Plus, Download, Check, X, SlidersHorizontal, ArrowUpRight } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable, type Density } from "@/components/app/data-table";
@@ -15,6 +16,7 @@ import { Tag } from "@/components/ui/tag";
 import { formatDueDate } from "@/lib/format/timezone";
 import { StageOneShowcase } from "@/components/dev/stage-one-showcase";
 import { DesignFoundations, DesignPatterns } from "@/components/dev/design-foundations";
+import { devRoutesEnabled } from "@/lib/routes/registry";
 
 type TaskRing = "todo" | "in-progress" | "done";
 type TaskRow = {
@@ -46,7 +48,13 @@ const COLUMNS: ColumnDef<TaskRow, unknown>[] = [
 const TABS = ["Overview", "Foundations", "Patterns", "Interactive lab"] as const;
 type Tab = typeof TABS[number];
 
-export default function ShowcasePage() {
+/** Dev-only (docs/07 A7): not found in production unless NEXT_PUBLIC_SHOW_DEV_ROUTES=true. */
+export default function DesignSystemPage() {
+  if (!devRoutesEnabled()) notFound();
+  return <ShowcasePage />;
+}
+
+function ShowcasePage() {
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const [density, setDensity] = useState<Density>("default");
   const [rows, setRows] = useState(INITIAL_ROWS);

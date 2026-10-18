@@ -18,6 +18,9 @@ import { Card } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { ErrorState } from "@/components/app/error-state";
+import { NotFoundState } from "@/components/app/not-found-state";
+import { useRouteAccess } from "@/lib/routes/use-route-access";
+import { isInScope } from "@/lib/routes/scope";
 import { MatchScore } from "@/components/app/match-score";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
@@ -40,6 +43,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
   const { user } = useSession();
   const appQuery = useApplication(id);
   const app = appQuery.data;
+  const { access } = useRouteAccess();
   const candidateQuery = useCandidate(app?.candidateId ?? "");
   const jobQuery = useJob(app?.jobId ?? "");
   const resumesQuery = useResumes(app?.candidateId ?? "");
@@ -60,6 +64,9 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
         <ErrorState variant="page" error={appQuery.error ?? new Error("Application not found.")} onRetry={() => void appQuery.refetch()} />
       </div>
     );
+  }
+  if (!isInScope(access, user.id, { ownerUserId: app.submittedByUserId })) {
+    return <NotFoundState title="Application not found" description="This application doesn't exist or isn't available to you." backHref="/applications" backLabel="Back to applications" />;
   }
 
   const candidate = candidateQuery.data;

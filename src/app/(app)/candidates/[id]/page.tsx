@@ -8,6 +8,9 @@ import { useSession } from "@/lib/stores/session-store";
 import { useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { EASE_OUT } from "@/lib/motion";
 import { ErrorState } from "@/components/app/error-state";
+import { NotFoundState } from "@/components/app/not-found-state";
+import { useRouteAccess } from "@/lib/routes/use-route-access";
+import { isInScope } from "@/lib/routes/scope";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { CandidateJobsTab } from "@/components/app/candidate/candidate-jobs-tab";
 import { CandidateHeader } from "@/components/app/candidate/candidate-header";
@@ -33,6 +36,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const tab: CandidateTabId = isCandidateTab(tabParam) ? tabParam : "overview";
   const reduce = useReducedMotion() ?? false;
   const ws = useCandidateWorkspace(id);
+  const { access } = useRouteAccess();
   const updateStatus = useUpdateApplicationStatus();
   const canAct = user.role !== "VIEWER";
 
@@ -99,6 +103,9 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     return <div className="bq-page"><ErrorState variant="page" error={ws.candidateQuery.error ?? new Error("Candidate not found.")} onRetry={() => void ws.candidateQuery.refetch()} /></div>;
   }
   const candidate = ws.candidate;
+  if (!isInScope(access, user.id, { assignedUserIds: candidate.assignedUserIds })) {
+    return <NotFoundState title="Candidate not found" description="This candidate doesn't exist or isn't available to you." backHref="/candidates" backLabel="Back to candidates" />;
+  }
   const resumes = ws.resumesQuery.data ?? [];
 
   return (
