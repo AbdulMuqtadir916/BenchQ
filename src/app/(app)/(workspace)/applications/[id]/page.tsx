@@ -19,6 +19,7 @@ import { Tag } from "@/components/ui/tag";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
+import { isNotFoundError } from "@/lib/api/client";
 import { useRouteAccess } from "@/lib/routes/use-route-access";
 import { isInScope } from "@/lib/routes/scope";
 import { MatchScore } from "@/components/app/match-score";
@@ -59,6 +60,9 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
   }, [teamQuery.data]);
 
   if (appQuery.isLoading) return <div className="bq-page space-y-4"><SkeletonCard /><SkeletonCard /></div>;
+  // A missing record and a record outside the user's scope look the same: not-found (07 Q6).
+  const notFoundState = <NotFoundState title="Application not found" description="This application doesn't exist or isn't available to you." backHref={toHref("applications")} backLabel="Back to applications" />;
+  if (isNotFoundError(appQuery.error)) return notFoundState;
   if (appQuery.error || !app) {
     return (
       <div className="bq-page">
@@ -67,9 +71,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
       </div>
     );
   }
-  if (!isInScope(access, user.id, { ownerUserId: app.submittedByUserId })) {
-    return <NotFoundState title="Application not found" description="This application doesn't exist or isn't available to you." backHref={toHref("applications")} backLabel="Back to applications" />;
-  }
+  if (!isInScope(access, user.id, { ownerUserId: app.submittedByUserId })) return notFoundState;
 
   const candidate = candidateQuery.data;
   const job = jobQuery.data;

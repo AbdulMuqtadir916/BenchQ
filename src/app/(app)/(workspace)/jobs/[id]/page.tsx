@@ -20,6 +20,8 @@ import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { AgentRunPanel, useAgentRun } from "@/components/app/ai";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { ErrorState } from "@/components/app/error-state";
+import { NotFoundState } from "@/components/app/not-found-state";
+import { isNotFoundError } from "@/lib/api/client";
 import { useHref } from "@/lib/routes/use-href";
 
 const ANALYSIS_STAGES = [
@@ -58,6 +60,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const canAct = user.role !== "VIEWER";
 
   if (jobQuery.isLoading) return <div className="bq-page"><SkeletonCard /></div>;
+  if (isNotFoundError(jobQuery.error)) {
+    return <NotFoundState title="Job not found" description="This job doesn't exist or isn't available to you." backHref={toHref("jobs")} backLabel="Back to jobs" />;
+  }
   if (jobQuery.error || !jobQuery.data) return <div className="bq-page"><ErrorState error={jobQuery.error as Error} /></div>;
 
   const job: Job = jobQuery.data;

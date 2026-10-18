@@ -10,6 +10,7 @@ import { buildResumeDocument } from "@/lib/resume-doc/build";
 import { deriveDocumentGate } from "@/lib/derive";
 import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
+import { isNotFoundError } from "@/lib/api/client";
 import { useRouteAccess } from "@/lib/routes/use-route-access";
 import { isInScope } from "@/lib/routes/scope";
 import { useHref } from "@/lib/routes/use-href";
@@ -60,6 +61,13 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
   }, [review, loadedId, id]);
 
   const error = resumeQuery.error ?? candidateQuery.error ?? recordQuery.error;
+  // A missing resume (or its candidate / record) and one outside the user's scope look the same: not-found (07 Q6).
+  const notFoundState = (
+    <StudioFrame onClose={close}>
+      <NotFoundState title="Resume not found" description="This resume doesn't exist or isn't available to you." backHref={toHref("resumes")} backLabel="Back to resumes" />
+    </StudioFrame>
+  );
+  if ([resumeQuery.error, candidateQuery.error, recordQuery.error].some(isNotFoundError)) return notFoundState;
   if (error) {
     return (
       <StudioFrame onClose={close}>
@@ -76,13 +84,7 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
     );
   }
 
-  if (!inScope) {
-    return (
-      <StudioFrame onClose={close}>
-        <NotFoundState title="Resume not found" description="This resume doesn't exist or isn't available to you." backHref={toHref("resumes")} backLabel="Back to resumes" />
-      </StudioFrame>
-    );
-  }
+  if (!inScope) return notFoundState;
 
   if (loadedId !== id) {
     return (
