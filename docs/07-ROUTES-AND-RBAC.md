@@ -302,12 +302,13 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- | ---------------------------------- |
 | **A**  | Route foundation — registry, guards, access/error screens, settings split                                                                                                                  | —                | Done (committed)                   |
 | **A2** | Hardening — `hrefFor` everywhere, full table test, one `FirmRole`, dev switcher off in prod                                                                                                | A                | Done (A2.2–A2.9; see result below) |
-| **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2               | In progress (`feat/routes-t0`)     |
-| **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | In progress — PR 1 (T1–T3) merged; PR 2 (T4–T5) awaiting review |
-| **P**  | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view                                                                                                    | T                | Planned                            |
+| **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2               | Done                               |
+| **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | Done (PRs 1–4; exit check recorded below) |
+| **P**  | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view                                                                                                    | T                | In progress — P1–P2; P3 waits for the docs/04 Admin section |
 | **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | Planned                            |
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
 | **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit, system                                                                                                   | P, B             | Planned                            |
+| **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Proposed (2026-10-18)              |
 | **D**  | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks                                                                                                           | backend D1/D2    | Later                              |
 
 **Why C moves before B (change from v1):** the audit checks that controls a principal can't use
@@ -466,7 +467,7 @@ As v1 Phase C, typed on `Principal`:
 
 As v1 Phase B (per-route checklist), with the audit board extended to the platform tier and the
 Support column. Known gaps carried over: ledger BDE "own" filter + filters + diff expander; the
-dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: **sign-out in the user menu for normal users** (today only the dev switcher and the suspended screen have it); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates"). From PR 4: outreach has no skeleton or empty state for its thread list; the candidates search box is squeezed at 390 px. (The dashboards' missing error states were fixed before Phase P: docs/04 §13.) The OWNER rollup "Seats used" counts active users only: pending invites (A1) aren't served to firm pages until Phase S.
+dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: **sign-out in the user menu for normal users** (today only the dev switcher and the suspended screen have it); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates"). From PR 4: outreach has no skeleton or empty state for its thread list; the candidates search box is squeezed at 390 px. (The dashboards' missing error states were fixed before Phase P: docs/04 §13.) The OWNER rollup is labelled "Active users" until firm pages read pending invites (Phase M).
 
 ---
 
@@ -482,6 +483,38 @@ invites, plans, suspend/reactivate, audit, system. Out of scope until then.
 2. **Seats held by pending invites of a suspended firm.** Do pending invites to a `SUSPENDED` firm
    still reserve seats (Q17 says pending invites reserve a seat), or are they released while it is
    suspended?
+
+---
+
+## Phase M — Firm members and invites (firm side) — proposed 2026-10-18
+
+The firm half of the invite flow. Today only the Super Admin side is planned (S: the OWNER's invite
+when a firm is created, resend / revoke on `/admin/firms/[firmId]/users`), and the dev switcher
+stands in for accepting.
+
+| #   | Task |
+| --- | ---- |
+| M1  | Firm-scoped invites adapter: list a firm's invites (with `effectiveInviteStatus`), create, resend (same row, new token, +7 days, Q19), revoke; mock behind the membership check |
+| M2  | `settings/team`: OWNER invites a member (email + role, never OWNER, A10), resends, revokes, sees pending / expired invites; blocked when `canAddSeat` is false (Q17). MANAGER sees the list read-only (Q15); BDE / VIEWER can't open the page |
+| M3  | Firm pages read pending invites: the OWNER card becomes **"Seats used x / seatLimit"** from `deriveFirmUsage` (A1), the same function and data `/admin` uses, so the two can't disagree; a test renders both from one fixture state |
+| M4  | Ledger, with the approved actions only (docs/02): `INVITE_SENT` on invite, `INVITE_REVOKED` on revoke, `INVITE_ACCEPTED` on acceptance, in the firm's own ledger (Q20). **Open:** a resend has no action of its own; logging it as another `INVITE_SENT` is the default, and a separate `INVITE_RESENT` would be a contract change (product decision) |
+| M5  | Tests: the Q15 matrix through `can()` (OWNER only for `member.*`), the seat block at the limit, resend keeps the row and resets `expiresAt`, a firm can't see or touch another firm's invites |
+
+**Why after S, depending on C and S:**
+
+- **C** supplies the rules the screen must obey: `member.invite / remove / changeRole / deactivate`
+  are OWNER only and MANAGER is read-only (Q15). Building the controls before `can()` would add the
+  inline role checks Phase C deletes.
+- **S** builds what both halves share: the invite adapter and its mock state, the `/invite/[token]`
+  acceptance page (invalid / expired / accepted states), and the answers to the two open Phase S
+  questions (invites to a suspended firm; whether their seats are held). Those answers change the
+  seat count M3 shows, so M can't settle it first.
+- **Not in P:** P is the platform tier on mock data; this is a firm screen with firm permissions.
+  **Not folded into S:** S is the Super Admin's flow and is planned with its own screen specs;
+  keeping the firm side separate keeps each phase reviewable, while M1 reuses S's adapter.
+- **Until M:** the OWNER card says "Active users" (a count, no limit) and nothing on a firm page
+  claims a seat count (asserted in `dashboard-errors.test.ts`), so firm and admin numbers can't
+  disagree.
 
 ---
 
