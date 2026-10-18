@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/stores/session-store";
 import { useCommitPendingSession, useSessionSync } from "@/lib/hooks/use-session";
+import { useDemoDataSync } from "@/lib/hooks/use-demo-data";
 import { clearCacheOnPrincipalChange, principalKey } from "./principal-boundary";
 
 /**
@@ -44,6 +45,7 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   useEffect(() => clearCacheOnPrincipalChange(client), [client]);
   useCommitPendingSession();
   useSessionSync();
+  useDemoDataSync(client);
 
   return (
     <QueryClientProvider client={client}>

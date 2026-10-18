@@ -4,6 +4,7 @@ import type { User } from "@/lib/schemas/session";
 import { allLedger } from "./ledger";
 import { allUsers, firms } from "./team";
 import { invites } from "./tenancy";
+import { changed } from "./db";
 
 /**
  * The mock backend's side of accepting an invite (docs/02 §3.1, Q18): the user is created (never
@@ -41,6 +42,7 @@ export function acceptInvite(inviteId: string, person: { userId: string; name: s
     claimState: null,
     createdAt: now.toISOString(),
   });
+  changed("users", "invites", "firms", "ledger");
   return user;
 }
 
@@ -49,5 +51,6 @@ export function markActive(userId: string, now = new Date()): User {
   const index = allUsers.findIndex((user) => user.id === userId);
   if (index < 0) throw new ApiError("That user can't sign in here.", "UNKNOWN_USER", 400);
   allUsers[index] = { ...allUsers[index]!, lastActiveAt: now.toISOString() };
+  changed("users");
   return allUsers[index]!;
 }

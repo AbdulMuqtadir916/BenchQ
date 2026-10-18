@@ -10,8 +10,9 @@ import { allCandidates } from "./candidates";
 import { currentUser } from "./auth";
 import { findInFirm, inFirm, mockResult } from "./_shared";
 import { firmScoped } from "./membership";
+import { changed, table } from "./db";
 
-export const allDocuments: CandidateDocument[] = arrayOf(CandidateDocumentSchema).parse(documentsSeed);
+export const allDocuments: CandidateDocument[] = table("documents", CandidateDocumentSchema, () => arrayOf(CandidateDocumentSchema).parse(documentsSeed));
 
 export const documentsMock = firmScoped("documents", {
   byCandidate: (firmId: string, candidateId: string): Promise<CandidateDocument[]> =>
@@ -30,12 +31,14 @@ export const documentsMock = firmScoped("documents", {
       shareUrl: `https://files.benchq.app/s/${id}`,
     });
     allDocuments.unshift(document);
+    changed("documents");
     return mockResult(document);
   },
 
   remove: (firmId: string, id: string): Promise<CandidateDocument> => {
     const document = findInFirm(allDocuments, firmId, id, "Document");
     allDocuments.splice(allDocuments.indexOf(document), 1);
+    changed("documents");
     return mockResult(document);
   },
 });

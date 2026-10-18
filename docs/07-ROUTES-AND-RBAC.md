@@ -435,7 +435,7 @@ the other firm's data (checked on every list screen); query keys all include `fi
 | P5  | ⌘K for admins: firms search, "View workspace", admin nav; firm-scoped commands hidden outside a firm                                                                           |
 | P6  | Tests: platform table test rows, support view grants no actions, non-admin → `/admin` not-found; **the §2.5 platform-admin rows**: no support view for this firm → support interstitial (reason required, not a redirect), and a support view of a `SUSPENDED` firm renders normally (read-only), added to `src/lib/tenancy/firm-outcome.test.ts` |
 
-**P3–P6 come after Phase L** (Q25): they are built and checked signed in as the seeded Super Admin. Screens are functional skeletons here; visual polish is Phase S. `docs/04-SCREENS.md` gets an
+**Demo data persists** in the browser (docs/03 §3.3); its **Reset demo data** sits on the `/admin` placeholder and **moves to `/admin/system` in P3**. **P3–P6 come after Phase L** (Q25): they are built and checked signed in as the seeded Super Admin. Screens are functional skeletons here; visual polish is Phase S. `docs/04-SCREENS.md` gets an
 "Admin" section before P3 (UI-first: the screen spec comes first). **P3 waits for that section** (product owner drafting it, 2026-10-18).
 
 **Fixture dates (do in P3, before any admin screen shows invites next to the ledger):** invite dates

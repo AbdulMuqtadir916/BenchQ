@@ -2,9 +2,11 @@ import { arrayOf } from "@/lib/api/client";
 import { LedgerEntrySchema, type LedgerEntry } from "@/lib/schemas/analytics";
 import ledgerSeed from "./data/ledger.json";
 import { inFirm, mockResult } from "./_shared";
+import { table } from "./db";
 import { firmScoped } from "./membership";
 
-export const allLedger: LedgerEntry[] = arrayOf(LedgerEntrySchema).parse(ledgerSeed);
+/** Persisted (src/mocks/db.ts); writers call `changed("ledger")`. */
+export const allLedger: LedgerEntry[] = table("ledger", LedgerEntrySchema, () => arrayOf(LedgerEntrySchema).parse(ledgerSeed));
 
 export const ledgerMock = firmScoped("ledger", {
   /** A firm's ledger: its own events only. Platform-only events (firmId null) belong to /admin/audit (Phase P). */

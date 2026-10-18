@@ -6,8 +6,9 @@ import followupsSeed from "./data/followups.json";
 import { currentUser } from "./auth";
 import { findInFirm, inFirm, mockResult } from "./_shared";
 import { firmScoped } from "./membership";
+import { changed, table } from "./db";
 
-export const allApplications: Application[] = arrayOf(ApplicationSchema).parse(applicationsSeed);
+export const allApplications: Application[] = table("applications", ApplicationSchema, () => arrayOf(ApplicationSchema).parse(applicationsSeed));
 export const allFollowups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
 
 const CLOSED_STATUSES = ["PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
@@ -41,6 +42,7 @@ export const applicationsMock = firmScoped("applications", {
     if (update.status === "INTERVIEW" && !application.interviewAt) application.interviewAt = now;
     if (update.status === "OFFER") application.offerAt = now;
     if (CLOSED_STATUSES.includes(update.status)) application.closedAt = now;
+    changed("applications");
     return mockResult(ApplicationSchema.parse(application));
   },
 });

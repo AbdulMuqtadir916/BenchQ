@@ -3,6 +3,7 @@ import { InviteSchema, PlanSchema, PlatformUserSchema, type Invite, type Plan, t
 import plansSeed from "./data/plans.json";
 import invitesSeed from "./data/invites.json";
 import platformUsersSeed from "./data/platform-users.json";
+import { seededAt, table } from "./db";
 
 /**
  * Platform-tier fixtures (docs/02 §3.1). No adapter serves them yet: the admin area arrives in
@@ -26,5 +27,9 @@ export function invitesAt(now: Date): Invite[] {
   return inviteSeed.map((invite) => InviteSchema.parse({ ...invite, createdAt: move(invite.createdAt), expiresAt: move(invite.expiresAt) }));
 }
 
-/** Invites as the live UI sees them, relative to when the app loaded. */
-export const invites: Invite[] = invitesAt(new Date());
+/**
+ * The invites table (persisted, src/mocks/db.ts). Seeded relative to the instant this browser's demo
+ * data was seeded (`seededAt`), once: from then on the dates are real, so a pending invite expires 5
+ * days after seeding like a real one, and a reset re-anchors them to the new "now" (docs/03 §3.3).
+ */
+export const invites: Invite[] = table("invites", InviteSchema, () => invitesAt(seededAt()));
