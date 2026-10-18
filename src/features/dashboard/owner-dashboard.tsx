@@ -49,8 +49,10 @@ export function OwnerDashboard() {
   }, [placements]);
 
   // Limits come from the firm (copied from its plan, A3); active = ON_BENCH / INTERVIEWING / OFFER (A2).
-  // Seats count active users only: pending invites (A1) aren't served to firm pages until Phase S.
-  const seatUsage = `${team.filter((u) => u.isActive).length} / ${firm.seatLimit}`;
+  // "Active users", not "Seats used": a seat also counts pending invites (A1), which firm pages can't
+  // read yet. Showing active users as seats would disagree with /admin. Phase M turns this card into
+  // "Seats used" (deriveFirmUsage, the same function /admin uses) once firm pages read invites.
+  const activeUsers = team.filter((u) => u.isActive).length;
   const candidateUsage = `${candidates.filter(isActiveCandidate).length} / ${firm.candidateLimit}`;
 
   if (hasPageFailed(applicationsQuery, candidatesQuery, teamQuery, followupsQuery)) {
@@ -75,7 +77,7 @@ export function OwnerDashboard() {
           <>
             <StatCard label="Placements" value={`${placedThisQuarter}`} delta="this quarter" trend="up" window="closed won" />
             <StatCard label="Time to place" value={`${avgTimeToPlace}d`} trend="neutral" window="apply → placed avg" />
-            <StatCard label="Seats used" value={seatUsage} window="of plan" />
+            <StatCard label="Active users" value={`${activeUsers}`} window="on the team" />
             <StatCard label="Active candidates" value={candidateUsage} window="of plan" />
           </>
         )}

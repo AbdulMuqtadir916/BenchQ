@@ -25,7 +25,7 @@ const floorGroups = {
 };
 
 const DASHBOARDS: Dashboard[] = [
-  { name: "OWNER", component: OwnerDashboard, queries: ["candidates", "applications", "followups", "team"], groups: { rollups: { reads: ["applications", "candidates", "team"], labels: ["Time to place", "Seats used", "Active candidates"] }, ...floorGroups } },
+  { name: "OWNER", component: OwnerDashboard, queries: ["candidates", "applications", "followups", "team"], groups: { rollups: { reads: ["applications", "candidates", "team"], labels: ["Time to place", "Active users", "Active candidates"] }, ...floorGroups } },
   { name: "MANAGER", component: () => createElement(ManagerDashboard, { role: "MANAGER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
   { name: "VIEWER", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
   { name: "BDE", component: BdeDashboard, queries: ["candidates", "applications", "followups", "jobs"], groups: {
@@ -59,6 +59,8 @@ describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 },
   it("renders every group, with no error, when the data loads", async () => {
     const html = await render(component, []);
     expect(count(html, ERROR)).toBe(0);
+    // Firm pages can't read pending invites yet, so no firm page may claim a seat count (A1): /admin's would differ.
+    expect(html).not.toContain("Seats used");
     for (const group of Object.values(groups)) for (const label of group.labels) expect(html, label).toContain(label);
   });
 
