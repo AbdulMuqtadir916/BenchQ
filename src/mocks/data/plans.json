@@ -1,0 +1,37 @@
+[
+  {
+    "id": "plan_starter",
+    "name": "Starter",
+    "seatLimit": 4,
+    "candidateLimit": 25,
+    "features": [
+      "Truth Guard",
+      "Resume Builder",
+      "Application tracking"
+    ],
+    "isActive": true
+  },
+  {
+    "id": "plan_growth",
+    "name": "Growth",
+    "seatLimit": 10,
+    "candidateLimit": 100,
+    "features": [
+      "Everything in Starter",
+      "Analytics",
+      "Outreach and follow-ups"
+    ],
+    "isActive": true
+  },
+  {
+    "id": "plan_scale",
+    "name": "Scale",
+    "seatLimit": 25,
+    "candidateLimit": 300,
+    "features": [
+      "Everything in Growth",
+      "Priority support"
+    ],
+    "isActive": true
+  }
+]

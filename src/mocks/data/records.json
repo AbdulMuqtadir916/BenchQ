@@ -1,6 +1,7 @@
 [
   {
     "id": "rec_cand_01",
+    "firmId": "firm_hts",
     "candidateId": "cand_01",
     "headline": "Senior Java Developer with 8+ years of experience",
     "summary": "Experienced senior java developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -297,6 +298,7 @@
   },
   {
     "id": "rec_cand_02",
+    "firmId": "firm_hts",
     "candidateId": "cand_02",
     "headline": "Data Engineer with 11+ years of experience",
     "summary": "Experienced data engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -583,6 +585,7 @@
   },
   {
     "id": "rec_cand_03",
+    "firmId": "firm_hts",
     "candidateId": "cand_03",
     "headline": ".NET Developer with 6+ years of experience",
     "summary": "Experienced .net developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -849,6 +852,7 @@
   },
   {
     "id": "rec_cand_04",
+    "firmId": "firm_hts",
     "candidateId": "cand_04",
     "headline": "QA Automation Engineer with 3+ years of experience",
     "summary": "Experienced qa automation engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -1090,6 +1094,7 @@
   },
   {
     "id": "rec_cand_05",
+    "firmId": "firm_hts",
     "candidateId": "cand_05",
     "headline": "Cloud Architect with 10+ years of experience",
     "summary": "Experienced cloud architect specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -1491,6 +1496,7 @@
   },
   {
     "id": "rec_cand_06",
+    "firmId": "firm_hts",
     "candidateId": "cand_06",
     "headline": "Salesforce Developer with 5+ years of experience",
     "summary": "Experienced salesforce developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -1791,6 +1797,7 @@
   },
   {
     "id": "rec_cand_07",
+    "firmId": "firm_hts",
     "candidateId": "cand_07",
     "headline": "SAP ABAP Developer with 9+ years of experience",
     "summary": "Experienced sap abap developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -2115,6 +2122,7 @@
   },
   {
     "id": "rec_cand_08",
+    "firmId": "firm_hts",
     "candidateId": "cand_08",
     "headline": "React Frontend Developer with 3+ years of experience",
     "summary": "Experienced react frontend developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -2321,6 +2329,7 @@
   },
   {
     "id": "rec_cand_09",
+    "firmId": "firm_hts",
     "candidateId": "cand_09",
     "headline": "Java Full Stack Developer with 12+ years of experience",
     "summary": "Experienced java full stack developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -2670,6 +2679,7 @@
   },
   {
     "id": "rec_cand_10",
+    "firmId": "firm_hts",
     "candidateId": "cand_10",
     "headline": "Business Analyst with 1+ years of experience",
     "summary": "Experienced business analyst specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -2832,6 +2842,7 @@
   },
   {
     "id": "rec_cand_11",
+    "firmId": "firm_hts",
     "candidateId": "cand_11",
     "headline": "Senior DevOps Engineer with 7+ years of experience",
     "summary": "Experienced senior devops engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -3120,6 +3131,7 @@
   },
   {
     "id": "rec_cand_12",
+    "firmId": "firm_hts",
     "candidateId": "cand_12",
     "headline": "Python/Django Developer with 6+ years of experience",
     "summary": "Experienced python/django developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -3389,6 +3401,7 @@
   },
   {
     "id": "rec_cand_13",
+    "firmId": "firm_hts",
     "candidateId": "cand_13",
     "headline": "React Frontend Developer with 2+ years of experience",
     "summary": "Experienced react frontend developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -3602,6 +3615,7 @@
   },
   {
     "id": "rec_cand_14",
+    "firmId": "firm_hts",
     "candidateId": "cand_14",
     "headline": "ServiceNow Developer with 9+ years of experience",
     "summary": "Experienced servicenow developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -3858,6 +3872,7 @@
   },
   {
     "id": "rec_cand_15",
+    "firmId": "firm_hts",
     "candidateId": "cand_15",
     "headline": "Java Full Stack Developer with 10+ years of experience",
     "summary": "Experienced java full stack developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -4260,6 +4275,7 @@
   },
   {
     "id": "rec_cand_16",
+    "firmId": "firm_hts",
     "candidateId": "cand_16",
     "headline": "QA Automation Engineer with 1+ years of experience",
     "summary": "Experienced qa automation engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -4461,6 +4477,7 @@
   },
   {
     "id": "rec_cand_17",
+    "firmId": "firm_hts",
     "candidateId": "cand_17",
     "headline": "Data Engineer with 7+ years of experience",
     "summary": "Experienced data engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -4820,6 +4837,7 @@
   },
   {
     "id": "rec_cand_18",
+    "firmId": "firm_hts",
     "candidateId": "cand_18",
     "headline": ".NET Developer with 5+ years of experience",
     "summary": "Experienced .net developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -5095,6 +5113,7 @@
   },
   {
     "id": "rec_cand_19",
+    "firmId": "firm_hts",
     "candidateId": "cand_19",
     "headline": "Cloud Architect with 14+ years of experience",
     "summary": "Experienced cloud architect specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -5459,6 +5478,7 @@
   },
   {
     "id": "rec_cand_20",
+    "firmId": "firm_hts",
     "candidateId": "cand_20",
     "headline": "Business Analyst with 2+ years of experience",
     "summary": "Experienced business analyst specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -5630,6 +5650,7 @@
   },
   {
     "id": "rec_cand_21",
+    "firmId": "firm_hts",
     "candidateId": "cand_21",
     "headline": "Senior DevOps Engineer with 8+ years of experience",
     "summary": "Experienced senior devops engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -6028,6 +6049,7 @@
   },
   {
     "id": "rec_cand_22",
+    "firmId": "firm_hts",
     "candidateId": "cand_22",
     "headline": "Python/Django Developer with 4+ years of experience",
     "summary": "Experienced python/django developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -6307,6 +6329,7 @@
   },
   {
     "id": "rec_cand_23",
+    "firmId": "firm_hts",
     "candidateId": "cand_23",
     "headline": "Java Developer with 1+ years of experience",
     "summary": "Experienced java developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -6487,6 +6510,7 @@
   },
   {
     "id": "rec_cand_24",
+    "firmId": "firm_hts",
     "candidateId": "cand_24",
     "headline": "Salesforce Developer with 9+ years of experience",
     "summary": "Experienced salesforce developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
@@ -6809,6 +6833,1946 @@
         "confirmedByUserId": "user_adnan",
         "confirmedAt": "2026-10-01T06:17:52.997Z",
         "source": "LINKEDIN_EXPORT"
+      }
+    ],
+    "lastVerifiedAt": null
+  },
+  {
+    "id": "rec_cand_stl02",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl02",
+    "headline": "Data Engineer with 11+ years of experience",
+    "summary": "Experienced data engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+    "summaryState": "UNVERIFIED",
+    "experiences": [
+      {
+        "id": "exp_rec_cand_stl02_0",
+        "company": "JP Morgan",
+        "title": "Data Engineer",
+        "location": "Dallas, TX",
+        "startDate": "2022-12-31T18:30:00.000Z",
+        "endDate": null,
+        "isCurrent": true,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl02_0_0",
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_0"
+          },
+          {
+            "id": "bul_rec_cand_stl02_0_1",
+            "text": "Implemented CI/CD pipeline improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_1"
+          },
+          {
+            "id": "bul_rec_cand_stl02_0_2",
+            "text": "Reduced bug count by 26% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_2"
+          },
+          {
+            "id": "bul_rec_cand_stl02_0_3",
+            "text": "Implemented test automation improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null
+          }
+        ],
+        "technologies": [
+          "Python",
+          "Snowflake",
+          "Spark"
+        ],
+        "sortOrder": 0,
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl02_1",
+        "company": "Infosys",
+        "title": "Analyst",
+        "location": "Remote",
+        "startDate": "2020-04-30T18:30:00.000Z",
+        "endDate": "2023-07-31T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl02_1_0",
+            "text": "Implemented test automation improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_3"
+          },
+          {
+            "id": "bul_rec_cand_stl02_1_1",
+            "text": "Implemented monitoring stack improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_4"
+          }
+        ],
+        "technologies": [
+          "Python",
+          "Snowflake",
+          "Spark",
+          "Airflow",
+          "SQL",
+          "dbt"
+        ],
+        "sortOrder": 1,
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      }
+    ],
+    "educations": [
+      {
+        "id": "edu_rec_cand_stl02_0",
+        "institution": "IIT Bombay",
+        "degree": "Bachelor of Technology",
+        "field": "Data Science",
+        "startDate": "2022-10-02T06:17:52.996Z",
+        "endDate": "2022-10-02T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill_rec_cand_stl02_0",
+        "name": "Python",
+        "canonicalName": "python",
+        "family": "Databases",
+        "yearsUsed": 5,
+        "lastUsedYear": 2024,
+        "proficiency": "ADVANCED",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_1",
+        "name": "Snowflake",
+        "canonicalName": "snowflake",
+        "family": null,
+        "yearsUsed": 7,
+        "lastUsedYear": 2025,
+        "proficiency": "INTERMEDIATE",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_2",
+        "name": "Spark",
+        "canonicalName": "spark",
+        "family": null,
+        "yearsUsed": 2,
+        "lastUsedYear": 2025,
+        "proficiency": "BEGINNER",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_3",
+        "name": "Airflow",
+        "canonicalName": "airflow",
+        "family": "Frameworks",
+        "yearsUsed": 6,
+        "lastUsedYear": 2025,
+        "proficiency": "BEGINNER",
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_4",
+        "name": "SQL",
+        "canonicalName": "sql",
+        "family": null,
+        "yearsUsed": 5,
+        "lastUsedYear": 2024,
+        "proficiency": "BEGINNER",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_5",
+        "name": "dbt",
+        "canonicalName": "dbt",
+        "family": null,
+        "yearsUsed": 6,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_6",
+        "name": "Kafka",
+        "canonicalName": "kafka",
+        "family": "Tools",
+        "yearsUsed": 8,
+        "lastUsedYear": 2024,
+        "proficiency": "ADVANCED",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_7",
+        "name": "AWS",
+        "canonicalName": "aws",
+        "family": "Frameworks",
+        "yearsUsed": 4,
+        "lastUsedYear": 2025,
+        "proficiency": "INTERMEDIATE",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_8",
+        "name": "Pandas",
+        "canonicalName": "pandas",
+        "family": "Databases",
+        "yearsUsed": 4,
+        "lastUsedYear": 2024,
+        "proficiency": "BEGINNER",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl02_9",
+        "name": "Databricks",
+        "canonicalName": "databricks",
+        "family": "Cloud",
+        "yearsUsed": 4,
+        "lastUsedYear": 2025,
+        "proficiency": "EXPERT",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      }
+    ],
+    "certificates": [
+      {
+        "id": "cert_rec_cand_stl02_0",
+        "name": "Salesforce Platform Developer I",
+        "issuer": "Salesforce",
+        "issueDate": "2025-01-04T06:17:52.996Z",
+        "expiryDate": null,
+        "credentialId": null,
+        "credentialUrl": null,
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      }
+    ],
+    "evidence": [
+      {
+        "id": "ev_rec_cand_stl02_0",
+        "recordId": "rec_cand_stl02",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl02_0",
+        "documentId": "doc_rec_cand_stl02_resume",
+        "excerpt": "Designed data warehouse processing 2TB daily",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-10-01T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_stl02_1",
+        "recordId": "rec_cand_stl02",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl02_0",
+        "documentId": "doc_rec_cand_stl02_resume",
+        "excerpt": "Managed a team of 12 engineers across 3 time zones",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-17T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_stl02_2",
+        "recordId": "rec_cand_stl02",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl02_0",
+        "documentId": null,
+        "excerpt": "Automated regression test suite covering 85% of codebase",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-25T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl02_3",
+        "recordId": "rec_cand_stl02",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl02_1",
+        "documentId": "doc_rec_cand_stl02_resume",
+        "excerpt": "Implemented CI/CD pipeline reducing deploy time by 60%",
+        "pageNumber": 1,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-14T06:17:52.996Z",
+        "source": "RESUME_UPLOAD"
+      },
+      {
+        "id": "ev_rec_cand_stl02_4",
+        "recordId": "rec_cand_stl02",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl02_1",
+        "documentId": null,
+        "excerpt": "Managed a team of 12 engineers across 3 time zones",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-02T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      }
+    ],
+    "lastVerifiedAt": "2026-09-23T06:17:52.996Z"
+  },
+  {
+    "id": "rec_cand_stl03",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl03",
+    "headline": ".NET Developer with 6+ years of experience",
+    "summary": "Experienced .net developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+    "summaryState": "UNVERIFIED",
+    "experiences": [
+      {
+        "id": "exp_rec_cand_stl03_0",
+        "company": "State Farm",
+        "title": ".NET Developer",
+        "location": "Bangalore, India",
+        "startDate": "2025-07-31T18:30:00.000Z",
+        "endDate": null,
+        "isCurrent": true,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl03_0_0",
+            "text": "Implemented monitoring stack improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_0"
+          },
+          {
+            "id": "bul_rec_cand_stl03_0_1",
+            "text": "Implemented security scanning improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_1"
+          },
+          {
+            "id": "bul_rec_cand_stl03_0_2",
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_2"
+          }
+        ],
+        "technologies": [
+          "C#",
+          ".NET Core",
+          "Azure",
+          "SQL Server"
+        ],
+        "sortOrder": 0,
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl03_1",
+        "company": "TCS",
+        "title": "Team Lead",
+        "location": "Hyderabad, India",
+        "startDate": "2022-04-30T18:30:00.000Z",
+        "endDate": "2025-10-31T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl03_1_0",
+            "text": "Implemented security scanning improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null
+          },
+          {
+            "id": "bul_rec_cand_stl03_1_1",
+            "text": "Reduced costs by 75% through automation",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_3"
+          }
+        ],
+        "technologies": [
+          "C#",
+          ".NET Core",
+          "Azure"
+        ],
+        "sortOrder": 1,
+        "source": "RESUME_UPLOAD",
+        "state": "UNVERIFIED"
+      }
+    ],
+    "educations": [
+      {
+        "id": "edu_rec_cand_stl03_0",
+        "institution": "Georgia Tech",
+        "degree": "Bachelor of Science",
+        "field": "Software Engineering",
+        "startDate": "2019-10-03T06:17:52.996Z",
+        "endDate": "2021-10-02T06:17:52.996Z",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill_rec_cand_stl03_0",
+        "name": "C#",
+        "canonicalName": "c#",
+        "family": "Cloud",
+        "yearsUsed": 4,
+        "lastUsedYear": 2025,
+        "proficiency": "BEGINNER",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl03_1",
+        "name": ".NET Core",
+        "canonicalName": ".net core",
+        "family": "Languages",
+        "yearsUsed": 7,
+        "lastUsedYear": 2025,
+        "proficiency": "BEGINNER",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl03_2",
+        "name": "Azure",
+        "canonicalName": "azure",
+        "family": "Cloud",
+        "yearsUsed": 6,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl03_3",
+        "name": "SQL Server",
+        "canonicalName": "sql server",
+        "family": "Tools",
+        "yearsUsed": 4,
+        "lastUsedYear": 2024,
+        "proficiency": "EXPERT",
+        "source": "MANUAL",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl03_4",
+        "name": "Entity Framework",
+        "canonicalName": "entity framework",
+        "family": "Databases",
+        "yearsUsed": 5,
+        "lastUsedYear": 2025,
+        "proficiency": "ADVANCED",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl03_5",
+        "name": "Blazor",
+        "canonicalName": "blazor",
+        "family": "Tools",
+        "yearsUsed": 1,
+        "lastUsedYear": 2025,
+        "proficiency": "BEGINNER",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl03_6",
+        "name": "xUnit",
+        "canonicalName": "xunit",
+        "family": null,
+        "yearsUsed": 1,
+        "lastUsedYear": 2025,
+        "proficiency": "INTERMEDIATE",
+        "source": "MANUAL",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl03_7",
+        "name": "Docker",
+        "canonicalName": "docker",
+        "family": "Frameworks",
+        "yearsUsed": 8,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl03_8",
+        "name": "Azure DevOps",
+        "canonicalName": "azure devops",
+        "family": "Cloud",
+        "yearsUsed": 5,
+        "lastUsedYear": 2025,
+        "proficiency": "EXPERT",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      }
+    ],
+    "certificates": [
+      {
+        "id": "cert_rec_cand_stl03_0",
+        "name": "Salesforce Platform Developer I",
+        "issuer": "Salesforce",
+        "issueDate": "2024-06-06T06:17:52.996Z",
+        "expiryDate": null,
+        "credentialId": "CRED-73411",
+        "credentialUrl": null,
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "cert_rec_cand_stl03_1",
+        "name": "Scrum Master",
+        "issuer": "Scrum Alliance",
+        "issueDate": "2024-02-02T06:17:52.996Z",
+        "expiryDate": "2029-09-09T06:17:52.996Z",
+        "credentialId": null,
+        "credentialUrl": null,
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      }
+    ],
+    "evidence": [
+      {
+        "id": "ev_rec_cand_stl03_0",
+        "recordId": "rec_cand_stl03",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl03_0",
+        "documentId": "doc_rec_cand_stl03_resume",
+        "excerpt": "Managed a team of 12 engineers across 3 time zones",
+        "pageNumber": 3,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-08T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl03_1",
+        "recordId": "rec_cand_stl03",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl03_0",
+        "documentId": "doc_rec_cand_stl03_resume",
+        "excerpt": null,
+        "pageNumber": 3,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-25T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_stl03_2",
+        "recordId": "rec_cand_stl03",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl03_0",
+        "documentId": "doc_rec_cand_stl03_resume",
+        "excerpt": "Designed data warehouse processing 2TB daily",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-16T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl03_3",
+        "recordId": "rec_cand_stl03",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl03_1",
+        "documentId": null,
+        "excerpt": "Managed a team of 12 engineers across 3 time zones",
+        "pageNumber": 1,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-28T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      }
+    ],
+    "lastVerifiedAt": "2026-09-26T06:17:52.996Z"
+  },
+  {
+    "id": "rec_cand_stl05",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl05",
+    "headline": "Cloud Architect with 10+ years of experience",
+    "summary": "Experienced cloud architect specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+    "summaryState": "VERIFIED",
+    "experiences": [
+      {
+        "id": "exp_rec_cand_stl05_0",
+        "company": "Microsoft",
+        "title": "Cloud Architect",
+        "location": "Remote",
+        "startDate": "2025-06-30T18:30:00.000Z",
+        "endDate": null,
+        "isCurrent": true,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl05_0_0",
+            "text": "Led team of 2 engineers on platform migration",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_0"
+          },
+          {
+            "id": "bul_rec_cand_stl05_0_1",
+            "text": "Developed and maintained REST APIs serving 21M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_1"
+          },
+          {
+            "id": "bul_rec_cand_stl05_0_2",
+            "text": "Developed and maintained microservices serving 20M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_2"
+          }
+        ],
+        "technologies": [
+          "AWS",
+          "Azure",
+          "GCP"
+        ],
+        "sortOrder": 0,
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl05_1",
+        "company": "Microsoft",
+        "title": "Team Lead",
+        "location": "New York, NY",
+        "startDate": "2022-03-31T18:30:00.000Z",
+        "endDate": "2025-11-30T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl05_1_0",
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null
+          },
+          {
+            "id": "bul_rec_cand_stl05_1_1",
+            "text": "Developed and maintained REST APIs serving 0M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_3"
+          }
+        ],
+        "technologies": [
+          "AWS",
+          "Azure",
+          "GCP",
+          "Terraform"
+        ],
+        "sortOrder": 1,
+        "source": "LINKEDIN_EXPORT",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl05_2",
+        "company": "Wipro",
+        "title": "Team Lead",
+        "location": "New York, NY",
+        "startDate": "2019-01-31T18:30:00.000Z",
+        "endDate": "2022-09-30T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl05_2_0",
+            "text": "Led team of 4 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_4"
+          },
+          {
+            "id": "bul_rec_cand_stl05_2_1",
+            "text": "Led team of 9 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_5"
+          },
+          {
+            "id": "bul_rec_cand_stl05_2_2",
+            "text": "Implemented monitoring stack improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_6"
+          },
+          {
+            "id": "bul_rec_cand_stl05_2_3",
+            "text": "Implemented test automation improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_7"
+          }
+        ],
+        "technologies": [
+          "AWS",
+          "Azure",
+          "GCP"
+        ],
+        "sortOrder": 2,
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl05_3",
+        "company": "Capital One",
+        "title": "Analyst",
+        "location": "Bangalore, India",
+        "startDate": "2015-01-31T18:30:00.000Z",
+        "endDate": "2019-04-30T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl05_3_0",
+            "text": "Developed and maintained REST APIs serving 18M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_8"
+          },
+          {
+            "id": "bul_rec_cand_stl05_3_1",
+            "text": "Developed and maintained data pipelines serving 25M+ users",
+            "state": "UNVERIFIED",
+            "evidenceId": null
+          }
+        ],
+        "technologies": [
+          "AWS",
+          "Azure",
+          "GCP",
+          "Terraform"
+        ],
+        "sortOrder": 3,
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      }
+    ],
+    "educations": [
+      {
+        "id": "edu_rec_cand_stl05_0",
+        "institution": "Rutgers University",
+        "degree": "Master of Science",
+        "field": "Software Engineering",
+        "startDate": "2019-10-03T06:17:52.996Z",
+        "endDate": "2023-10-02T06:17:52.996Z",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill_rec_cand_stl05_0",
+        "name": "AWS",
+        "canonicalName": "aws",
+        "family": "Languages",
+        "yearsUsed": 7,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_1",
+        "name": "Azure",
+        "canonicalName": "azure",
+        "family": "Frameworks",
+        "yearsUsed": 3,
+        "lastUsedYear": 2025,
+        "proficiency": "BEGINNER",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_2",
+        "name": "GCP",
+        "canonicalName": "gcp",
+        "family": "Languages",
+        "yearsUsed": 8,
+        "lastUsedYear": 2025,
+        "proficiency": "ADVANCED",
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_3",
+        "name": "Terraform",
+        "canonicalName": "terraform",
+        "family": null,
+        "yearsUsed": 2,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_4",
+        "name": "Kubernetes",
+        "canonicalName": "kubernetes",
+        "family": "Cloud",
+        "yearsUsed": 5,
+        "lastUsedYear": 2024,
+        "proficiency": "ADVANCED",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_5",
+        "name": "CloudFormation",
+        "canonicalName": "cloudformation",
+        "family": "Databases",
+        "yearsUsed": 4,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_6",
+        "name": "VPC",
+        "canonicalName": "vpc",
+        "family": "Languages",
+        "yearsUsed": 7,
+        "lastUsedYear": 2024,
+        "proficiency": "ADVANCED",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_7",
+        "name": "IAM",
+        "canonicalName": "iam",
+        "family": null,
+        "yearsUsed": 6,
+        "lastUsedYear": 2024,
+        "proficiency": "EXPERT",
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_8",
+        "name": "Docker",
+        "canonicalName": "docker",
+        "family": "Frameworks",
+        "yearsUsed": 8,
+        "lastUsedYear": 2024,
+        "proficiency": "EXPERT",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl05_9",
+        "name": "Datadog",
+        "canonicalName": "datadog",
+        "family": "Languages",
+        "yearsUsed": 2,
+        "lastUsedYear": 2024,
+        "proficiency": "BEGINNER",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      }
+    ],
+    "certificates": [
+      {
+        "id": "cert_rec_cand_stl05_0",
+        "name": "Azure Administrator Associate",
+        "issuer": "Microsoft",
+        "issueDate": "2024-01-21T06:17:52.996Z",
+        "expiryDate": "2029-08-17T06:17:52.996Z",
+        "credentialId": "CRED-496695",
+        "credentialUrl": null,
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      }
+    ],
+    "evidence": [
+      {
+        "id": "ev_rec_cand_stl05_0",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_0",
+        "documentId": null,
+        "excerpt": "Managed a team of 12 engineers across 3 time zones",
+        "pageNumber": 3,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-25T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl05_1",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_0",
+        "documentId": null,
+        "excerpt": "Implemented CI/CD pipeline reducing deploy time by 60%",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-12T06:17:52.996Z",
+        "source": "RESUME_UPLOAD"
+      },
+      {
+        "id": "ev_rec_cand_stl05_2",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_0",
+        "documentId": "doc_rec_cand_stl05_resume",
+        "excerpt": "Implemented CI/CD pipeline reducing deploy time by 60%",
+        "pageNumber": 1,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-29T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl05_3",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_1",
+        "documentId": null,
+        "excerpt": "Built REST APIs serving 10M requests/day",
+        "pageNumber": 1,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-09T06:17:52.996Z",
+        "source": "AI_EXTRACTED"
+      },
+      {
+        "id": "ev_rec_cand_stl05_4",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_2",
+        "documentId": "doc_rec_cand_stl05_resume",
+        "excerpt": "Managed a team of 12 engineers across 3 time zones",
+        "pageNumber": 1,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-05T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl05_5",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_2",
+        "documentId": "doc_rec_cand_stl05_resume",
+        "excerpt": "Automated regression test suite covering 85% of codebase",
+        "pageNumber": 2,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-27T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_stl05_6",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_2",
+        "documentId": "doc_rec_cand_stl05_resume",
+        "excerpt": "Designed data warehouse processing 2TB daily",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-23T06:17:52.996Z",
+        "source": "RESUME_UPLOAD"
+      },
+      {
+        "id": "ev_rec_cand_stl05_7",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_2",
+        "documentId": "doc_rec_cand_stl05_resume",
+        "excerpt": "Implemented CI/CD pipeline reducing deploy time by 60%",
+        "pageNumber": 3,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-28T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl05_8",
+        "recordId": "rec_cand_stl05",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl05_3",
+        "documentId": "doc_rec_cand_stl05_resume",
+        "excerpt": null,
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-11T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      }
+    ],
+    "lastVerifiedAt": null
+  },
+  {
+    "id": "rec_cand_stl15",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl15",
+    "headline": "Java Full Stack Developer with 10+ years of experience",
+    "summary": "Experienced java full stack developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+    "summaryState": "UNVERIFIED",
+    "experiences": [
+      {
+        "id": "exp_rec_cand_stl15_0",
+        "company": "State Farm",
+        "title": "Java Full Stack Developer",
+        "location": "Remote",
+        "startDate": "2025-07-31T18:30:00.000Z",
+        "endDate": null,
+        "isCurrent": true,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl15_0_0",
+            "text": "Led team of 5 engineers on greenfield project",
+            "state": "UNVERIFIED",
+            "evidenceId": null
+          },
+          {
+            "id": "bul_rec_cand_stl15_0_1",
+            "text": "Developed and maintained microservices serving 13M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_0"
+          },
+          {
+            "id": "bul_rec_cand_stl15_0_2",
+            "text": "Led team of 9 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_1"
+          },
+          {
+            "id": "bul_rec_cand_stl15_0_3",
+            "text": "Developed and maintained microservices serving 43M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_2"
+          }
+        ],
+        "technologies": [
+          "Java",
+          "Spring Boot",
+          "Angular",
+          "React",
+          "PostgreSQL",
+          "MongoDB"
+        ],
+        "sortOrder": 0,
+        "source": "MANUAL",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl15_1",
+        "company": "UnitedHealth",
+        "title": "Consultant",
+        "location": "Remote",
+        "startDate": "2021-08-31T18:30:00.000Z",
+        "endDate": "2025-09-30T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl15_1_0",
+            "text": "Developed and maintained data pipelines serving 21M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_3"
+          },
+          {
+            "id": "bul_rec_cand_stl15_1_1",
+            "text": "Developed and maintained frontend components serving 2M+ users",
+            "state": "CONTRADICTED",
+            "evidenceId": null
+          },
+          {
+            "id": "bul_rec_cand_stl15_1_2",
+            "text": "Reduced bug count by 75% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_4"
+          },
+          {
+            "id": "bul_rec_cand_stl15_1_3",
+            "text": "Reduced deployment time by 52% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_5"
+          }
+        ],
+        "technologies": [
+          "Java",
+          "Spring Boot",
+          "Angular",
+          "React",
+          "PostgreSQL",
+          "MongoDB"
+        ],
+        "sortOrder": 1,
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl15_2",
+        "company": "Wipro",
+        "title": "Software Engineer",
+        "location": "Remote",
+        "startDate": "2020-10-31T18:30:00.000Z",
+        "endDate": "2021-04-30T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl15_2_0",
+            "text": "Led team of 11 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_6"
+          },
+          {
+            "id": "bul_rec_cand_stl15_2_1",
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_7"
+          }
+        ],
+        "technologies": [
+          "Java",
+          "Spring Boot",
+          "Angular"
+        ],
+        "sortOrder": 2,
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl15_3",
+        "company": "JP Morgan",
+        "title": "Team Lead",
+        "location": "New York, NY",
+        "startDate": "2019-02-28T18:30:00.000Z",
+        "endDate": "2020-06-30T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl15_3_0",
+            "text": "Implemented security scanning improving coverage",
+            "state": "UNVERIFIED",
+            "evidenceId": null
+          },
+          {
+            "id": "bul_rec_cand_stl15_3_1",
+            "text": "Developed and maintained data pipelines serving 16M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_8"
+          },
+          {
+            "id": "bul_rec_cand_stl15_3_2",
+            "text": "Led team of 2 engineers on performance optimization",
+            "state": "UNVERIFIED",
+            "evidenceId": null
+          },
+          {
+            "id": "bul_rec_cand_stl15_3_3",
+            "text": "Led team of 7 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_9"
+          }
+        ],
+        "technologies": [
+          "Java",
+          "Spring Boot",
+          "Angular",
+          "React"
+        ],
+        "sortOrder": 3,
+        "source": "LINKEDIN_EXPORT",
+        "state": "UNVERIFIED"
+      }
+    ],
+    "educations": [
+      {
+        "id": "edu_rec_cand_stl15_0",
+        "institution": "University of Texas at Dallas",
+        "degree": "Master of Science",
+        "field": "Electrical Engineering",
+        "startDate": "2018-10-03T06:17:52.997Z",
+        "endDate": "2021-10-02T06:17:52.997Z",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill_rec_cand_stl15_0",
+        "name": "Java",
+        "canonicalName": "java",
+        "family": "Databases",
+        "yearsUsed": 1,
+        "lastUsedYear": 2024,
+        "proficiency": "BEGINNER",
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl15_1",
+        "name": "Spring Boot",
+        "canonicalName": "spring boot",
+        "family": "Databases",
+        "yearsUsed": 7,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl15_2",
+        "name": "Angular",
+        "canonicalName": "angular",
+        "family": "Tools",
+        "yearsUsed": 7,
+        "lastUsedYear": 2025,
+        "proficiency": "EXPERT",
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl15_3",
+        "name": "React",
+        "canonicalName": "react",
+        "family": null,
+        "yearsUsed": 1,
+        "lastUsedYear": 2024,
+        "proficiency": "EXPERT",
+        "source": "MANUAL",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl15_4",
+        "name": "PostgreSQL",
+        "canonicalName": "postgresql",
+        "family": "Tools",
+        "yearsUsed": 2,
+        "lastUsedYear": 2024,
+        "proficiency": "BEGINNER",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl15_5",
+        "name": "MongoDB",
+        "canonicalName": "mongodb",
+        "family": "Tools",
+        "yearsUsed": 1,
+        "lastUsedYear": 2025,
+        "proficiency": "BEGINNER",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl15_6",
+        "name": "Docker",
+        "canonicalName": "docker",
+        "family": "Tools",
+        "yearsUsed": 1,
+        "lastUsedYear": 2025,
+        "proficiency": "EXPERT",
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl15_7",
+        "name": "AWS",
+        "canonicalName": "aws",
+        "family": "Databases",
+        "yearsUsed": 4,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      }
+    ],
+    "certificates": [],
+    "evidence": [
+      {
+        "id": "ev_rec_cand_stl15_0",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_0",
+        "documentId": "doc_rec_cand_stl15_resume",
+        "excerpt": "Implemented CI/CD pipeline reducing deploy time by 60%",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-26T06:17:52.997Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_stl15_1",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_0",
+        "documentId": "doc_rec_cand_stl15_resume",
+        "excerpt": "Designed data warehouse processing 2TB daily",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-24T06:17:52.997Z",
+        "source": "RESUME_UPLOAD"
+      },
+      {
+        "id": "ev_rec_cand_stl15_2",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_0",
+        "documentId": "doc_rec_cand_stl15_resume",
+        "excerpt": null,
+        "pageNumber": 2,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-09T06:17:52.997Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl15_3",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_1",
+        "documentId": null,
+        "excerpt": "Automated regression test suite covering 85% of codebase",
+        "pageNumber": 3,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-02T06:17:52.997Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_stl15_4",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_1",
+        "documentId": "doc_rec_cand_stl15_resume",
+        "excerpt": "Led migration from monolith to microservices architecture",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-20T06:17:52.997Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_stl15_5",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_1",
+        "documentId": "doc_rec_cand_stl15_resume",
+        "excerpt": "Led migration from monolith to microservices architecture",
+        "pageNumber": 3,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-09T06:17:52.997Z",
+        "source": "AI_EXTRACTED"
+      },
+      {
+        "id": "ev_rec_cand_stl15_6",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_2",
+        "documentId": "doc_rec_cand_stl15_resume",
+        "excerpt": null,
+        "pageNumber": 2,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-25T06:17:52.997Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl15_7",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_2",
+        "documentId": null,
+        "excerpt": null,
+        "pageNumber": 2,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-26T06:17:52.997Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl15_8",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_3",
+        "documentId": "doc_rec_cand_stl15_resume",
+        "excerpt": "Implemented CI/CD pipeline reducing deploy time by 60%",
+        "pageNumber": 1,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-03T06:17:52.997Z",
+        "source": "AI_EXTRACTED"
+      },
+      {
+        "id": "ev_rec_cand_stl15_9",
+        "recordId": "rec_cand_stl15",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl15_3",
+        "documentId": "doc_rec_cand_stl15_resume",
+        "excerpt": "Managed a team of 12 engineers across 3 time zones",
+        "pageNumber": 1,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-26T06:17:52.997Z",
+        "source": "AI_EXTRACTED"
+      }
+    ],
+    "lastVerifiedAt": "2026-09-27T06:17:52.997Z"
+  },
+  {
+    "id": "rec_cand_stl22",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl22",
+    "headline": "Python/Django Developer with 4+ years of experience",
+    "summary": "Experienced python/django developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+    "summaryState": "VERIFIED",
+    "experiences": [
+      {
+        "id": "exp_rec_cand_stl22_0",
+        "company": "AT&T",
+        "title": "Python/Django Developer",
+        "location": "New York, NY",
+        "startDate": "2022-11-30T18:30:00.000Z",
+        "endDate": null,
+        "isCurrent": true,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl22_0_0",
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_0"
+          },
+          {
+            "id": "bul_rec_cand_stl22_0_1",
+            "text": "Reduced bug count by 79% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_1"
+          },
+          {
+            "id": "bul_rec_cand_stl22_0_2",
+            "text": "Developed and maintained frontend components serving 41M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_2"
+          }
+        ],
+        "technologies": [
+          "Python",
+          "Django",
+          "FastAPI",
+          "PostgreSQL",
+          "Celery",
+          "Redis"
+        ],
+        "sortOrder": 0,
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_stl22_1",
+        "company": "HCL",
+        "title": "Analyst",
+        "location": "Remote",
+        "startDate": "2020-12-31T18:30:00.000Z",
+        "endDate": "2022-07-31T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_stl22_1_0",
+            "text": "Reduced deployment time by 37% through refactoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_3"
+          },
+          {
+            "id": "bul_rec_cand_stl22_1_1",
+            "text": "Led team of 9 engineers on performance optimization",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_4"
+          },
+          {
+            "id": "bul_rec_cand_stl22_1_2",
+            "text": "Reduced deployment time by 71% through automation",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_5"
+          }
+        ],
+        "technologies": [
+          "Python",
+          "Django",
+          "FastAPI",
+          "PostgreSQL",
+          "Celery",
+          "Redis"
+        ],
+        "sortOrder": 1,
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      }
+    ],
+    "educations": [
+      {
+        "id": "edu_rec_cand_stl22_0",
+        "institution": "NIT Warangal",
+        "degree": "Master of Science",
+        "field": "Information Technology",
+        "startDate": "2017-10-03T06:17:52.997Z",
+        "endDate": "2023-10-02T06:17:52.997Z",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill_rec_cand_stl22_0",
+        "name": "Python",
+        "canonicalName": "python",
+        "family": "Databases",
+        "yearsUsed": 3,
+        "lastUsedYear": 2025,
+        "proficiency": "EXPERT",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl22_1",
+        "name": "Django",
+        "canonicalName": "django",
+        "family": "Databases",
+        "yearsUsed": 2,
+        "lastUsedYear": 2025,
+        "proficiency": "EXPERT",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl22_2",
+        "name": "FastAPI",
+        "canonicalName": "fastapi",
+        "family": "Frameworks",
+        "yearsUsed": 6,
+        "lastUsedYear": 2025,
+        "proficiency": "INTERMEDIATE",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl22_3",
+        "name": "PostgreSQL",
+        "canonicalName": "postgresql",
+        "family": "Cloud",
+        "yearsUsed": 3,
+        "lastUsedYear": 2025,
+        "proficiency": "EXPERT",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl22_4",
+        "name": "Celery",
+        "canonicalName": "celery",
+        "family": "Frameworks",
+        "yearsUsed": 5,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl22_5",
+        "name": "Redis",
+        "canonicalName": "redis",
+        "family": "Tools",
+        "yearsUsed": 2,
+        "lastUsedYear": 2025,
+        "proficiency": "INTERMEDIATE",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl22_6",
+        "name": "Docker",
+        "canonicalName": "docker",
+        "family": "Languages",
+        "yearsUsed": 1,
+        "lastUsedYear": 2024,
+        "proficiency": "EXPERT",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_stl22_7",
+        "name": "REST API",
+        "canonicalName": "rest api",
+        "family": "Frameworks",
+        "yearsUsed": 1,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      }
+    ],
+    "certificates": [
+      {
+        "id": "cert_rec_cand_stl22_0",
+        "name": "AWS Developer Associate",
+        "issuer": "Amazon Web Services",
+        "issueDate": "2024-02-11T06:17:52.997Z",
+        "expiryDate": null,
+        "credentialId": "CRED-332703",
+        "credentialUrl": null,
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      }
+    ],
+    "evidence": [
+      {
+        "id": "ev_rec_cand_stl22_0",
+        "recordId": "rec_cand_stl22",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl22_0",
+        "documentId": "doc_rec_cand_stl22_resume",
+        "excerpt": null,
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-09T06:17:52.997Z",
+        "source": "RESUME_UPLOAD"
+      },
+      {
+        "id": "ev_rec_cand_stl22_1",
+        "recordId": "rec_cand_stl22",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl22_0",
+        "documentId": null,
+        "excerpt": "Automated regression test suite covering 85% of codebase",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-20T06:17:52.997Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl22_2",
+        "recordId": "rec_cand_stl22",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl22_0",
+        "documentId": "doc_rec_cand_stl22_resume",
+        "excerpt": "Implemented CI/CD pipeline reducing deploy time by 60%",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-16T06:17:52.997Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_stl22_3",
+        "recordId": "rec_cand_stl22",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl22_1",
+        "documentId": null,
+        "excerpt": "Designed data warehouse processing 2TB daily",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-16T06:17:52.997Z",
+        "source": "RESUME_UPLOAD"
+      },
+      {
+        "id": "ev_rec_cand_stl22_4",
+        "recordId": "rec_cand_stl22",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl22_1",
+        "documentId": "doc_rec_cand_stl22_resume",
+        "excerpt": null,
+        "pageNumber": 1,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-09-09T06:17:52.997Z",
+        "source": "AI_EXTRACTED"
+      },
+      {
+        "id": "ev_rec_cand_stl22_5",
+        "recordId": "rec_cand_stl22",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_stl22_1",
+        "documentId": null,
+        "excerpt": "Led migration from monolith to microservices architecture",
+        "pageNumber": null,
+        "confirmedByUserId": "user_kiran",
+        "confirmedAt": "2026-10-01T06:17:52.997Z",
+        "source": "RESUME_UPLOAD"
+      }
+    ],
+    "lastVerifiedAt": "2026-09-28T06:17:52.997Z"
+  },
+  {
+    "id": "rec_cand_cbw06",
+    "firmId": "firm_cbw",
+    "candidateId": "cand_cbw06",
+    "headline": "Salesforce Developer with 5+ years of experience",
+    "summary": "Experienced salesforce developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+    "summaryState": "VERIFIED",
+    "experiences": [
+      {
+        "id": "exp_rec_cand_cbw06_0",
+        "company": "Infosys",
+        "title": "Salesforce Developer",
+        "location": "Remote",
+        "startDate": "2024-01-31T18:30:00.000Z",
+        "endDate": null,
+        "isCurrent": true,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_cbw06_0_0",
+            "text": "Led team of 10 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_0"
+          },
+          {
+            "id": "bul_rec_cand_cbw06_0_1",
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_1"
+          },
+          {
+            "id": "bul_rec_cand_cbw06_0_2",
+            "text": "Implemented CI/CD pipeline improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_2"
+          },
+          {
+            "id": "bul_rec_cand_cbw06_0_3",
+            "text": "Implemented test automation improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_3"
+          }
+        ],
+        "technologies": [
+          "Apex",
+          "Salesforce",
+          "LWC",
+          "SOQL"
+        ],
+        "sortOrder": 0,
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "exp_rec_cand_cbw06_1",
+        "company": "Wipro",
+        "title": "Team Lead",
+        "location": "Bangalore, India",
+        "startDate": "2022-10-31T18:30:00.000Z",
+        "endDate": "2023-12-31T18:30:00.000Z",
+        "isCurrent": false,
+        "bullets": [
+          {
+            "id": "bul_rec_cand_cbw06_1_0",
+            "text": "Reduced deployment time by 72% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_4"
+          },
+          {
+            "id": "bul_rec_cand_cbw06_1_1",
+            "text": "Developed and maintained data pipelines serving 10M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_5"
+          },
+          {
+            "id": "bul_rec_cand_cbw06_1_2",
+            "text": "Implemented test automation improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_6"
+          },
+          {
+            "id": "bul_rec_cand_cbw06_1_3",
+            "text": "Reduced bug count by 70% through refactoring",
+            "state": "UNVERIFIED",
+            "evidenceId": null
+          }
+        ],
+        "technologies": [
+          "Apex",
+          "Salesforce",
+          "LWC",
+          "SOQL",
+          "REST API",
+          "Flows"
+        ],
+        "sortOrder": 1,
+        "source": "RESUME_UPLOAD",
+        "state": "UNVERIFIED"
+      }
+    ],
+    "educations": [
+      {
+        "id": "edu_rec_cand_cbw06_0",
+        "institution": "IIT Bombay",
+        "degree": "Bachelor of Technology",
+        "field": "Software Engineering",
+        "startDate": "2021-10-02T06:17:52.996Z",
+        "endDate": "2023-10-02T06:17:52.996Z",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill_rec_cand_cbw06_0",
+        "name": "Apex",
+        "canonicalName": "apex",
+        "family": "Databases",
+        "yearsUsed": 3,
+        "lastUsedYear": 2025,
+        "proficiency": "EXPERT",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_cbw06_1",
+        "name": "Salesforce",
+        "canonicalName": "salesforce",
+        "family": "Frameworks",
+        "yearsUsed": 6,
+        "lastUsedYear": 2024,
+        "proficiency": "ADVANCED",
+        "source": "MANUAL",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_cbw06_2",
+        "name": "LWC",
+        "canonicalName": "lwc",
+        "family": "Frameworks",
+        "yearsUsed": 7,
+        "lastUsedYear": 2024,
+        "proficiency": "BEGINNER",
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_cbw06_3",
+        "name": "SOQL",
+        "canonicalName": "soql",
+        "family": null,
+        "yearsUsed": 6,
+        "lastUsedYear": 2025,
+        "proficiency": "BEGINNER",
+        "source": "AI_EXTRACTED",
+        "state": "UNVERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_cbw06_4",
+        "name": "REST API",
+        "canonicalName": "rest api",
+        "family": "Cloud",
+        "yearsUsed": 7,
+        "lastUsedYear": 2024,
+        "proficiency": "ADVANCED",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_cbw06_5",
+        "name": "Flows",
+        "canonicalName": "flows",
+        "family": "Cloud",
+        "yearsUsed": 2,
+        "lastUsedYear": 2025,
+        "proficiency": "INTERMEDIATE",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_cbw06_6",
+        "name": "Visualforce",
+        "canonicalName": "visualforce",
+        "family": null,
+        "yearsUsed": 6,
+        "lastUsedYear": 2024,
+        "proficiency": "EXPERT",
+        "source": "AI_EXTRACTED",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_cbw06_7",
+        "name": "Git",
+        "canonicalName": "git",
+        "family": "Frameworks",
+        "yearsUsed": 2,
+        "lastUsedYear": 2024,
+        "proficiency": "BEGINNER",
+        "source": "RESUME_UPLOAD",
+        "state": "VERIFIED"
+      },
+      {
+        "id": "skill_rec_cand_cbw06_8",
+        "name": "CI/CD",
+        "canonicalName": "ci/cd",
+        "family": "Databases",
+        "yearsUsed": 6,
+        "lastUsedYear": 2024,
+        "proficiency": "INTERMEDIATE",
+        "source": "LINKEDIN_EXPORT",
+        "state": "VERIFIED"
+      }
+    ],
+    "certificates": [],
+    "evidence": [
+      {
+        "id": "ev_rec_cand_cbw06_0",
+        "recordId": "rec_cand_cbw06",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_cbw06_0",
+        "documentId": "doc_rec_cand_cbw06_resume",
+        "excerpt": "Designed data warehouse processing 2TB daily",
+        "pageNumber": null,
+        "confirmedByUserId": "user_rehana",
+        "confirmedAt": "2026-09-17T06:17:52.996Z",
+        "source": "RESUME_UPLOAD"
+      },
+      {
+        "id": "ev_rec_cand_cbw06_1",
+        "recordId": "rec_cand_cbw06",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_cbw06_0",
+        "documentId": "doc_rec_cand_cbw06_resume",
+        "excerpt": "Led migration from monolith to microservices architecture",
+        "pageNumber": null,
+        "confirmedByUserId": "user_rehana",
+        "confirmedAt": "2026-09-14T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_cbw06_2",
+        "recordId": "rec_cand_cbw06",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_cbw06_0",
+        "documentId": null,
+        "excerpt": "Designed data warehouse processing 2TB daily",
+        "pageNumber": 2,
+        "confirmedByUserId": "user_rehana",
+        "confirmedAt": "2026-09-22T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_cbw06_3",
+        "recordId": "rec_cand_cbw06",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_cbw06_0",
+        "documentId": null,
+        "excerpt": "Managed a team of 12 engineers across 3 time zones",
+        "pageNumber": 3,
+        "confirmedByUserId": "user_rehana",
+        "confirmedAt": "2026-09-02T06:17:52.996Z",
+        "source": "LINKEDIN_EXPORT"
+      },
+      {
+        "id": "ev_rec_cand_cbw06_4",
+        "recordId": "rec_cand_cbw06",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_cbw06_1",
+        "documentId": "doc_rec_cand_cbw06_resume",
+        "excerpt": "Led migration from monolith to microservices architecture",
+        "pageNumber": 1,
+        "confirmedByUserId": "user_rehana",
+        "confirmedAt": "2026-09-18T06:17:52.996Z",
+        "source": "RESUME_UPLOAD"
+      },
+      {
+        "id": "ev_rec_cand_cbw06_5",
+        "recordId": "rec_cand_cbw06",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_cbw06_1",
+        "documentId": null,
+        "excerpt": "Designed data warehouse processing 2TB daily",
+        "pageNumber": null,
+        "confirmedByUserId": "user_rehana",
+        "confirmedAt": "2026-09-13T06:17:52.996Z",
+        "source": "MANUAL"
+      },
+      {
+        "id": "ev_rec_cand_cbw06_6",
+        "recordId": "rec_cand_cbw06",
+        "entityType": "experience",
+        "entityId": "exp_rec_cand_cbw06_1",
+        "documentId": "doc_rec_cand_cbw06_resume",
+        "excerpt": null,
+        "pageNumber": null,
+        "confirmedByUserId": "user_rehana",
+        "confirmedAt": "2026-09-10T06:17:52.996Z",
+        "source": "RESUME_UPLOAD"
       }
     ],
     "lastVerifiedAt": null

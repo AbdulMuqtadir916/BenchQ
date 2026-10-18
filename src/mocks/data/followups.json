@@ -1,6 +1,7 @@
 [
   {
     "id": "fu_001",
+    "firmId": "firm_hts",
     "applicationId": "app_009",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -15,6 +16,7 @@
   },
   {
     "id": "fu_002",
+    "firmId": "firm_hts",
     "applicationId": "app_011",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -29,6 +31,7 @@
   },
   {
     "id": "fu_003",
+    "firmId": "firm_hts",
     "applicationId": "app_012",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -43,6 +46,7 @@
   },
   {
     "id": "fu_004",
+    "firmId": "firm_hts",
     "applicationId": "app_013",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -57,6 +61,7 @@
   },
   {
     "id": "fu_005",
+    "firmId": "firm_hts",
     "applicationId": "app_015",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -71,6 +76,7 @@
   },
   {
     "id": "fu_006",
+    "firmId": "firm_hts",
     "applicationId": "app_020",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_3_LINKEDIN",
@@ -85,6 +91,7 @@
   },
   {
     "id": "fu_007",
+    "firmId": "firm_hts",
     "applicationId": "app_023",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -99,6 +106,7 @@
   },
   {
     "id": "fu_008",
+    "firmId": "firm_hts",
     "applicationId": "app_024",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -113,6 +121,7 @@
   },
   {
     "id": "fu_009",
+    "firmId": "firm_hts",
     "applicationId": "app_027",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -127,6 +136,7 @@
   },
   {
     "id": "fu_010",
+    "firmId": "firm_hts",
     "applicationId": "app_029",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -141,6 +151,7 @@
   },
   {
     "id": "fu_011",
+    "firmId": "firm_hts",
     "applicationId": "app_033",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -155,6 +166,7 @@
   },
   {
     "id": "fu_012",
+    "firmId": "firm_hts",
     "applicationId": "app_045",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -169,6 +181,7 @@
   },
   {
     "id": "fu_013",
+    "firmId": "firm_hts",
     "applicationId": "app_047",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -183,6 +196,7 @@
   },
   {
     "id": "fu_014",
+    "firmId": "firm_hts",
     "applicationId": "app_050",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -197,6 +211,7 @@
   },
   {
     "id": "fu_015",
+    "firmId": "firm_hts",
     "applicationId": "app_054",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -211,6 +226,7 @@
   },
   {
     "id": "fu_016",
+    "firmId": "firm_hts",
     "applicationId": "app_055",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -225,6 +241,7 @@
   },
   {
     "id": "fu_017",
+    "firmId": "firm_hts",
     "applicationId": "app_057",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -239,6 +256,7 @@
   },
   {
     "id": "fu_018",
+    "firmId": "firm_hts",
     "applicationId": "app_063",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_3_LINKEDIN",
@@ -253,6 +271,7 @@
   },
   {
     "id": "fu_019",
+    "firmId": "firm_hts",
     "applicationId": "app_069",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -267,6 +286,7 @@
   },
   {
     "id": "fu_020",
+    "firmId": "firm_hts",
     "applicationId": "app_070",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -281,6 +301,7 @@
   },
   {
     "id": "fu_021",
+    "firmId": "firm_hts",
     "applicationId": "app_074",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -295,6 +316,7 @@
   },
   {
     "id": "fu_022",
+    "firmId": "firm_hts",
     "applicationId": "app_077",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -309,6 +331,7 @@
   },
   {
     "id": "fu_023",
+    "firmId": "firm_hts",
     "applicationId": "app_078",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -323,6 +346,7 @@
   },
   {
     "id": "fu_024",
+    "firmId": "firm_hts",
     "applicationId": "app_080",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -337,6 +361,7 @@
   },
   {
     "id": "fu_025",
+    "firmId": "firm_hts",
     "applicationId": "app_082",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -351,6 +376,7 @@
   },
   {
     "id": "fu_026",
+    "firmId": "firm_hts",
     "applicationId": "app_084",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_7_EMAIL",
@@ -365,6 +391,7 @@
   },
   {
     "id": "fu_027",
+    "firmId": "firm_hts",
     "applicationId": "app_085",
     "assignedToUserId": "user_vikram",
     "kind": "CUSTOM",
@@ -379,6 +406,7 @@
   },
   {
     "id": "fu_028",
+    "firmId": "firm_hts",
     "applicationId": "app_086",
     "assignedToUserId": "user_vikram",
     "kind": "CUSTOM",
@@ -393,6 +421,7 @@
   },
   {
     "id": "fu_029",
+    "firmId": "firm_hts",
     "applicationId": "app_089",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -407,6 +436,7 @@
   },
   {
     "id": "fu_030",
+    "firmId": "firm_hts",
     "applicationId": "app_091",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -421,6 +451,7 @@
   },
   {
     "id": "fu_031",
+    "firmId": "firm_hts",
     "applicationId": "app_093",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -435,6 +466,7 @@
   },
   {
     "id": "fu_032",
+    "firmId": "firm_hts",
     "applicationId": "app_101",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -449,6 +481,7 @@
   },
   {
     "id": "fu_033",
+    "firmId": "firm_hts",
     "applicationId": "app_103",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -463,6 +496,7 @@
   },
   {
     "id": "fu_034",
+    "firmId": "firm_hts",
     "applicationId": "app_105",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -477,6 +511,7 @@
   },
   {
     "id": "fu_035",
+    "firmId": "firm_hts",
     "applicationId": "app_111",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -491,6 +526,7 @@
   },
   {
     "id": "fu_036",
+    "firmId": "firm_hts",
     "applicationId": "app_114",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -505,6 +541,7 @@
   },
   {
     "id": "fu_037",
+    "firmId": "firm_hts",
     "applicationId": "app_118",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -519,6 +556,7 @@
   },
   {
     "id": "fu_038",
+    "firmId": "firm_hts",
     "applicationId": "app_124",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -533,6 +571,7 @@
   },
   {
     "id": "fu_039",
+    "firmId": "firm_hts",
     "applicationId": "app_127",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -547,6 +586,7 @@
   },
   {
     "id": "fu_040",
+    "firmId": "firm_hts",
     "applicationId": "app_132",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_7_EMAIL",
@@ -561,6 +601,7 @@
   },
   {
     "id": "fu_041",
+    "firmId": "firm_hts",
     "applicationId": "app_137",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -575,6 +616,7 @@
   },
   {
     "id": "fu_042",
+    "firmId": "firm_hts",
     "applicationId": "app_140",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -589,6 +631,7 @@
   },
   {
     "id": "fu_043",
+    "firmId": "firm_hts",
     "applicationId": "app_142",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -603,6 +646,7 @@
   },
   {
     "id": "fu_044",
+    "firmId": "firm_hts",
     "applicationId": "app_143",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -617,6 +661,7 @@
   },
   {
     "id": "fu_045",
+    "firmId": "firm_hts",
     "applicationId": "app_144",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -631,6 +676,7 @@
   },
   {
     "id": "fu_046",
+    "firmId": "firm_hts",
     "applicationId": "app_150",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_7_EMAIL",
@@ -645,6 +691,7 @@
   },
   {
     "id": "fu_047",
+    "firmId": "firm_hts",
     "applicationId": "app_151",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_7_EMAIL",
@@ -659,6 +706,7 @@
   },
   {
     "id": "fu_048",
+    "firmId": "firm_hts",
     "applicationId": "app_154",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_7_EMAIL",
@@ -673,6 +721,7 @@
   },
   {
     "id": "fu_049",
+    "firmId": "firm_hts",
     "applicationId": "app_158",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -687,6 +736,7 @@
   },
   {
     "id": "fu_050",
+    "firmId": "firm_hts",
     "applicationId": "app_164",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -701,6 +751,7 @@
   },
   {
     "id": "fu_051",
+    "firmId": "firm_hts",
     "applicationId": "app_165",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -715,6 +766,7 @@
   },
   {
     "id": "fu_052",
+    "firmId": "firm_hts",
     "applicationId": "app_167",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -729,6 +781,7 @@
   },
   {
     "id": "fu_053",
+    "firmId": "firm_hts",
     "applicationId": "app_168",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -743,6 +796,7 @@
   },
   {
     "id": "fu_054",
+    "firmId": "firm_hts",
     "applicationId": "app_174",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_3_LINKEDIN",
@@ -757,6 +811,7 @@
   },
   {
     "id": "fu_055",
+    "firmId": "firm_hts",
     "applicationId": "app_176",
     "assignedToUserId": "user_vikram",
     "kind": "CUSTOM",
@@ -771,6 +826,7 @@
   },
   {
     "id": "fu_056",
+    "firmId": "firm_hts",
     "applicationId": "app_184",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -785,6 +841,7 @@
   },
   {
     "id": "fu_057",
+    "firmId": "firm_hts",
     "applicationId": "app_188",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -799,6 +856,7 @@
   },
   {
     "id": "fu_058",
+    "firmId": "firm_hts",
     "applicationId": "app_189",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -813,6 +871,7 @@
   },
   {
     "id": "fu_059",
+    "firmId": "firm_hts",
     "applicationId": "app_197",
     "assignedToUserId": "user_vikram",
     "kind": "CUSTOM",
@@ -827,6 +886,7 @@
   },
   {
     "id": "fu_060",
+    "firmId": "firm_hts",
     "applicationId": "app_198",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_3_LINKEDIN",
@@ -841,6 +901,7 @@
   },
   {
     "id": "fu_061",
+    "firmId": "firm_hts",
     "applicationId": "app_199",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -855,6 +916,7 @@
   },
   {
     "id": "fu_062",
+    "firmId": "firm_hts",
     "applicationId": "app_201",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -869,6 +931,7 @@
   },
   {
     "id": "fu_063",
+    "firmId": "firm_hts",
     "applicationId": "app_202",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -883,6 +946,7 @@
   },
   {
     "id": "fu_064",
+    "firmId": "firm_hts",
     "applicationId": "app_205",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -897,6 +961,7 @@
   },
   {
     "id": "fu_065",
+    "firmId": "firm_hts",
     "applicationId": "app_210",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -911,6 +976,7 @@
   },
   {
     "id": "fu_066",
+    "firmId": "firm_hts",
     "applicationId": "app_211",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -925,6 +991,7 @@
   },
   {
     "id": "fu_067",
+    "firmId": "firm_hts",
     "applicationId": "app_214",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -939,6 +1006,7 @@
   },
   {
     "id": "fu_068",
+    "firmId": "firm_hts",
     "applicationId": "app_217",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_7_EMAIL",
@@ -953,6 +1021,7 @@
   },
   {
     "id": "fu_069",
+    "firmId": "firm_hts",
     "applicationId": "app_218",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_7_EMAIL",
@@ -967,6 +1036,7 @@
   },
   {
     "id": "fu_070",
+    "firmId": "firm_hts",
     "applicationId": "app_224",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -981,6 +1051,7 @@
   },
   {
     "id": "fu_071",
+    "firmId": "firm_hts",
     "applicationId": "app_228",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -995,6 +1066,7 @@
   },
   {
     "id": "fu_072",
+    "firmId": "firm_hts",
     "applicationId": "app_235",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -1009,6 +1081,7 @@
   },
   {
     "id": "fu_073",
+    "firmId": "firm_hts",
     "applicationId": "app_236",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -1023,6 +1096,7 @@
   },
   {
     "id": "fu_074",
+    "firmId": "firm_hts",
     "applicationId": "app_244",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -1037,6 +1111,7 @@
   },
   {
     "id": "fu_075",
+    "firmId": "firm_hts",
     "applicationId": "app_245",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -1051,6 +1126,7 @@
   },
   {
     "id": "fu_076",
+    "firmId": "firm_hts",
     "applicationId": "app_246",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -1065,6 +1141,7 @@
   },
   {
     "id": "fu_077",
+    "firmId": "firm_hts",
     "applicationId": "app_251",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -1079,6 +1156,7 @@
   },
   {
     "id": "fu_078",
+    "firmId": "firm_hts",
     "applicationId": "app_256",
     "assignedToUserId": "user_sneha",
     "kind": "CUSTOM",
@@ -1093,6 +1171,7 @@
   },
   {
     "id": "fu_079",
+    "firmId": "firm_hts",
     "applicationId": "app_262",
     "assignedToUserId": "user_vikram",
     "kind": "CUSTOM",
@@ -1107,6 +1186,7 @@
   },
   {
     "id": "fu_080",
+    "firmId": "firm_hts",
     "applicationId": "app_267",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -1121,6 +1201,7 @@
   },
   {
     "id": "fu_081",
+    "firmId": "firm_hts",
     "applicationId": "app_268",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -1135,6 +1216,7 @@
   },
   {
     "id": "fu_082",
+    "firmId": "firm_hts",
     "applicationId": "app_276",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -1149,6 +1231,7 @@
   },
   {
     "id": "fu_083",
+    "firmId": "firm_hts",
     "applicationId": "app_283",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_3_LINKEDIN",
@@ -1163,6 +1246,7 @@
   },
   {
     "id": "fu_084",
+    "firmId": "firm_hts",
     "applicationId": "app_285",
     "assignedToUserId": "user_vikram",
     "kind": "CUSTOM",
@@ -1177,6 +1261,7 @@
   },
   {
     "id": "fu_085",
+    "firmId": "firm_hts",
     "applicationId": "app_286",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_3_LINKEDIN",
@@ -1191,6 +1276,7 @@
   },
   {
     "id": "fu_086",
+    "firmId": "firm_hts",
     "applicationId": "app_288",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -1205,6 +1291,7 @@
   },
   {
     "id": "fu_087",
+    "firmId": "firm_hts",
     "applicationId": "app_289",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -1219,6 +1306,7 @@
   },
   {
     "id": "fu_088",
+    "firmId": "firm_hts",
     "applicationId": "app_292",
     "assignedToUserId": "user_adnan",
     "kind": "CUSTOM",
@@ -1233,6 +1321,7 @@
   },
   {
     "id": "fu_089",
+    "firmId": "firm_hts",
     "applicationId": "app_295",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -1247,6 +1336,7 @@
   },
   {
     "id": "fu_090",
+    "firmId": "firm_hts",
     "applicationId": "app_299",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -1261,6 +1351,7 @@
   },
   {
     "id": "fu_091",
+    "firmId": "firm_hts",
     "applicationId": "app_300",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_3_LINKEDIN",
@@ -1275,6 +1366,7 @@
   },
   {
     "id": "fu_092",
+    "firmId": "firm_hts",
     "applicationId": "app_304",
     "assignedToUserId": "user_vikram",
     "kind": "CUSTOM",
@@ -1289,6 +1381,7 @@
   },
   {
     "id": "fu_093",
+    "firmId": "firm_hts",
     "applicationId": "app_305",
     "assignedToUserId": "user_vikram",
     "kind": "CUSTOM",
@@ -1303,6 +1396,7 @@
   },
   {
     "id": "fu_094",
+    "firmId": "firm_hts",
     "applicationId": "app_308",
     "assignedToUserId": "user_vikram",
     "kind": "DAY_3_LINKEDIN",
@@ -1317,6 +1411,7 @@
   },
   {
     "id": "fu_095",
+    "firmId": "firm_hts",
     "applicationId": "app_309",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -1331,6 +1426,7 @@
   },
   {
     "id": "fu_096",
+    "firmId": "firm_hts",
     "applicationId": "app_311",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_7_EMAIL",
@@ -1345,6 +1441,7 @@
   },
   {
     "id": "fu_097",
+    "firmId": "firm_hts",
     "applicationId": "app_313",
     "assignedToUserId": "user_adnan",
     "kind": "DAY_3_LINKEDIN",
@@ -1359,6 +1456,7 @@
   },
   {
     "id": "fu_098",
+    "firmId": "firm_hts",
     "applicationId": "app_318",
     "assignedToUserId": "user_sneha",
     "kind": "DAY_7_EMAIL",
@@ -1368,6 +1466,306 @@
     "snoozedUntil": null,
     "note": null,
     "candidateName": "Ananya Reddy",
+    "companyName": "Insight Global",
+    "jobTitle": "Business Analyst — Hybrid"
+  },
+  {
+    "id": "fu_stl005",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl015",
+    "assignedToUserId": "user_kiran",
+    "kind": "CUSTOM",
+    "dueAt": "2026-09-24T06:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Asha Pinto",
+    "companyName": "FedEx Services",
+    "jobTitle": "React Frontend Developer — Remote"
+  },
+  {
+    "id": "fu_stl008",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl024",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_3_LINKEDIN",
+    "dueAt": "2026-09-26T06:17:53.015Z",
+    "state": "CANCELLED",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Farhan Siddiqui",
+    "companyName": "Quantum Edge LLC",
+    "jobTitle": "Business Analyst"
+  },
+  {
+    "id": "fu_stl009",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl027",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-10-03T13:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Tarun Bose",
+    "companyName": "Fannie Mae",
+    "jobTitle": "QA Automation Engineer"
+  },
+  {
+    "id": "fu_stl013",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl047",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_3_LINKEDIN",
+    "dueAt": "2026-09-30T06:17:53.015Z",
+    "state": "DONE",
+    "completedAt": "2026-09-30T06:17:53.015Z",
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Bhavana Kulkarni",
+    "companyName": "Fidelity Investments",
+    "jobTitle": "Business Analyst"
+  },
+  {
+    "id": "fu_stl019",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl069",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_3_LINKEDIN",
+    "dueAt": "2026-09-23T06:17:53.015Z",
+    "state": "DONE",
+    "completedAt": "2026-09-23T06:17:53.015Z",
+    "snoozedUntil": null,
+    "note": "Send updated resume",
+    "candidateName": "Bhavana Kulkarni",
+    "companyName": "LTIMindtree",
+    "jobTitle": "DevOps Engineer"
+  },
+  {
+    "id": "fu_stl030",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl091",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_3_LINKEDIN",
+    "dueAt": "2026-10-01T18:30:00.000Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": "Send updated resume",
+    "candidateName": "Bhavana Kulkarni",
+    "companyName": "Wipro Limited",
+    "jobTitle": "ServiceNow Developer"
+  },
+  {
+    "id": "fu_stl031",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl093",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-10-01T18:30:00.000Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Tarun Bose",
+    "companyName": "Collabera Inc",
+    "jobTitle": "SAP ABAP Developer"
+  },
+  {
+    "id": "fu_stl033",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl103",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-10-04T09:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Asha Pinto",
+    "companyName": "Miraclesoft Inc",
+    "jobTitle": "React Frontend Developer — Remote"
+  },
+  {
+    "id": "fu_stl041",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl137",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-10-01T18:30:00.000Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": "Send updated resume",
+    "candidateName": "Tarun Bose",
+    "companyName": "Falcon Tech Solutions",
+    "jobTitle": ".NET Developer — Contract"
+  },
+  {
+    "id": "fu_stl062",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl201",
+    "assignedToUserId": "user_kiran",
+    "kind": "CUSTOM",
+    "dueAt": "2026-10-05T03:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Bhavana Kulkarni",
+    "companyName": "Lockton Companies",
+    "jobTitle": "Cloud Architect"
+  },
+  {
+    "id": "fu_stl072",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl235",
+    "assignedToUserId": "user_kiran",
+    "kind": "CUSTOM",
+    "dueAt": "2026-09-28T06:17:53.015Z",
+    "state": "DONE",
+    "completedAt": "2026-09-28T06:17:53.015Z",
+    "snoozedUntil": null,
+    "note": "Follow up on rate",
+    "candidateName": "Asha Pinto",
+    "companyName": "ByteForge Inc",
+    "jobTitle": "ServiceNow Developer"
+  },
+  {
+    "id": "fu_stl074",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl244",
+    "assignedToUserId": "user_kiran",
+    "kind": "CUSTOM",
+    "dueAt": "2026-10-08T22:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Farhan Siddiqui",
+    "companyName": "NexGen IT Corp",
+    "jobTitle": "QA Automation Engineer"
+  },
+  {
+    "id": "fu_stl075",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl245",
+    "assignedToUserId": "user_kiran",
+    "kind": "CUSTOM",
+    "dueAt": "2026-10-05T04:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Bhavana Kulkarni",
+    "companyName": "Cigna Healthcare",
+    "jobTitle": "Senior Java Developer"
+  },
+  {
+    "id": "fu_stl080",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl267",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-10-02T17:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": "Follow up on rate",
+    "candidateName": "Bhavana Kulkarni",
+    "companyName": "ByteForge Inc",
+    "jobTitle": "ServiceNow Developer"
+  },
+  {
+    "id": "fu_stl086",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl288",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-09-30T06:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Farhan Siddiqui",
+    "companyName": "Tech Mahindra",
+    "jobTitle": "React Frontend Developer — Long Term"
+  },
+  {
+    "id": "fu_stl087",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl289",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-09-27T06:17:53.015Z",
+    "state": "SNOOZED",
+    "completedAt": null,
+    "snoozedUntil": "2026-10-02T18:17:53.015Z",
+    "note": "Follow up on rate",
+    "candidateName": "Bhavana Kulkarni",
+    "companyName": "HCL Technologies",
+    "jobTitle": "Senior Java Developer"
+  },
+  {
+    "id": "fu_stl096",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl311",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-10-03T18:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Bhavana Kulkarni",
+    "companyName": "Syntel Inc",
+    "jobTitle": ".NET Developer — Contract"
+  },
+  {
+    "id": "fu_stl097",
+    "firmId": "firm_stl",
+    "applicationId": "app_stl313",
+    "assignedToUserId": "user_kiran",
+    "kind": "DAY_3_LINKEDIN",
+    "dueAt": "2026-09-28T06:17:53.015Z",
+    "state": "DONE",
+    "completedAt": "2026-09-28T06:17:53.015Z",
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Tarun Bose",
+    "companyName": "EY Technology",
+    "jobTitle": "Senior Java Developer"
+  },
+  {
+    "id": "fu_cbw014",
+    "firmId": "firm_cbw",
+    "applicationId": "app_cbw050",
+    "assignedToUserId": "user_rehana",
+    "kind": "DAY_7_EMAIL",
+    "dueAt": "2026-09-26T06:17:53.015Z",
+    "state": "SNOOZED",
+    "completedAt": null,
+    "snoozedUntil": "2026-10-03T22:17:53.015Z",
+    "note": null,
+    "candidateName": "Zoya Fernandes",
+    "companyName": "Collabera Inc",
+    "jobTitle": "SAP ABAP Developer — Contract"
+  },
+  {
+    "id": "fu_cbw088",
+    "firmId": "firm_cbw",
+    "applicationId": "app_cbw292",
+    "assignedToUserId": "user_rehana",
+    "kind": "CUSTOM",
+    "dueAt": "2026-10-08T18:17:53.015Z",
+    "state": "PENDING",
+    "completedAt": null,
+    "snoozedUntil": null,
+    "note": null,
+    "candidateName": "Zoya Fernandes",
     "companyName": "Insight Global",
     "jobTitle": "Business Analyst — Hybrid"
   }

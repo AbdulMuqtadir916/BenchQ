@@ -1,6 +1,7 @@
 [
   {
     "id": "doc_rec_cand_01_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Rajesh_Venkataraman_Resume.pdf",
@@ -14,6 +15,7 @@
   },
   {
     "id": "doc_cand_01_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H-1B approval notice (I-797)",
     "fileName": "I-797_H1B_Approval.pdf",
@@ -27,6 +29,7 @@
   },
   {
     "id": "doc_cand_01_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -40,6 +43,7 @@
   },
   {
     "id": "doc_cert_rec_cand_01_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "AWS Developer Associate",
     "fileName": "AWS_Developer_Associate.pdf",
@@ -53,6 +57,7 @@
   },
   {
     "id": "doc_cert_rec_cand_01_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Certified Kubernetes Administrator",
     "fileName": "Certified_Kubernetes_Administrator.pdf",
@@ -66,6 +71,7 @@
   },
   {
     "id": "doc_edu_rec_cand_01_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Bachelor of Technology certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -79,6 +85,7 @@
   },
   {
     "id": "doc_rec_cand_02_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Priya_Raman_Resume.pdf",
@@ -92,6 +99,7 @@
   },
   {
     "id": "doc_cand_02_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "Green Card",
     "fileName": "Green_Card.pdf",
@@ -105,6 +113,7 @@
   },
   {
     "id": "doc_cand_02_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -118,6 +127,7 @@
   },
   {
     "id": "doc_cert_rec_cand_02_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Salesforce Platform Developer I",
     "fileName": "Salesforce_Platform_Developer_I.pdf",
@@ -131,6 +141,7 @@
   },
   {
     "id": "doc_rec_cand_03_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Amit_Patel_Resume.pdf",
@@ -144,6 +155,7 @@
   },
   {
     "id": "doc_cand_03_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H-1B approval notice (I-797)",
     "fileName": "I-797_H1B_Approval.pdf",
@@ -157,6 +169,7 @@
   },
   {
     "id": "doc_cert_rec_cand_03_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Salesforce Platform Developer I",
     "fileName": "Salesforce_Platform_Developer_I.pdf",
@@ -170,6 +183,7 @@
   },
   {
     "id": "doc_cert_rec_cand_03_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Scrum Master",
     "fileName": "Scrum_Master.pdf",
@@ -183,6 +197,7 @@
   },
   {
     "id": "doc_rec_cand_04_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Lakshmi_Narayanan_Resume.pdf",
@@ -196,6 +211,7 @@
   },
   {
     "id": "doc_cand_04_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "OPT EAD card",
     "fileName": "OPT_EAD_Card.pdf",
@@ -209,6 +225,7 @@
   },
   {
     "id": "doc_cand_04_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -222,6 +239,7 @@
   },
   {
     "id": "doc_cert_rec_cand_04_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Azure Administrator Associate",
     "fileName": "Azure_Administrator_Associate.pdf",
@@ -235,6 +253,7 @@
   },
   {
     "id": "doc_cert_rec_cand_04_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "ServiceNow CSA",
     "fileName": "ServiceNow_CSA.pdf",
@@ -248,6 +267,7 @@
   },
   {
     "id": "doc_edu_rec_cand_04_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Master of Science certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -261,6 +281,7 @@
   },
   {
     "id": "doc_cand_04_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Recent pay stub",
     "fileName": "Recent_pay_stub.pdf",
@@ -274,6 +295,7 @@
   },
   {
     "id": "doc_rec_cand_05_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Deepak_Sharma_Resume.pdf",
@@ -287,6 +309,7 @@
   },
   {
     "id": "doc_cand_05_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H-1B approval notice (I-797)",
     "fileName": "I-797_H1B_Approval.pdf",
@@ -300,6 +323,7 @@
   },
   {
     "id": "doc_cand_05_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -313,6 +337,7 @@
   },
   {
     "id": "doc_cert_rec_cand_05_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Azure Administrator Associate",
     "fileName": "Azure_Administrator_Associate.pdf",
@@ -326,6 +351,7 @@
   },
   {
     "id": "doc_edu_rec_cand_05_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Master of Science certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -339,6 +365,7 @@
   },
   {
     "id": "doc_rec_cand_06_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Meera_Krishnan_Resume.pdf",
@@ -352,6 +379,7 @@
   },
   {
     "id": "doc_cand_06_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "US passport",
     "fileName": "US_Passport.pdf",
@@ -365,6 +393,7 @@
   },
   {
     "id": "doc_cand_06_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -378,6 +407,7 @@
   },
   {
     "id": "doc_edu_rec_cand_06_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Bachelor of Technology certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -391,6 +421,7 @@
   },
   {
     "id": "doc_cand_06_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Recent pay stub",
     "fileName": "Recent_pay_stub.pdf",
@@ -404,6 +435,7 @@
   },
   {
     "id": "doc_rec_cand_07_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Kavitha_Subramanian_Resume.pdf",
@@ -417,6 +449,7 @@
   },
   {
     "id": "doc_cand_07_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H-1B approval notice (I-797)",
     "fileName": "I-797_H1B_Approval.pdf",
@@ -430,6 +463,7 @@
   },
   {
     "id": "doc_cand_07_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -443,6 +477,7 @@
   },
   {
     "id": "doc_edu_rec_cand_07_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Bachelor of Technology certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -456,6 +491,7 @@
   },
   {
     "id": "doc_rec_cand_08_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Ravi_Menon_Resume.pdf",
@@ -469,6 +505,7 @@
   },
   {
     "id": "doc_cand_08_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "OPT EAD card",
     "fileName": "OPT_EAD_Card.pdf",
@@ -482,6 +519,7 @@
   },
   {
     "id": "doc_cand_08_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -495,6 +533,7 @@
   },
   {
     "id": "doc_cert_rec_cand_08_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "ServiceNow CSA",
     "fileName": "ServiceNow_CSA.pdf",
@@ -508,6 +547,7 @@
   },
   {
     "id": "doc_cert_rec_cand_08_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Scrum Master",
     "fileName": "Scrum_Master.pdf",
@@ -521,6 +561,7 @@
   },
   {
     "id": "doc_edu_rec_cand_08_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Master of Science certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -534,6 +575,7 @@
   },
   {
     "id": "doc_rec_cand_09_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Suresh_Gupta_Resume.pdf",
@@ -547,6 +589,7 @@
   },
   {
     "id": "doc_cand_09_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "Green Card",
     "fileName": "Green_Card.pdf",
@@ -560,6 +603,7 @@
   },
   {
     "id": "doc_cert_rec_cand_09_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Salesforce Platform Developer I",
     "fileName": "Salesforce_Platform_Developer_I.pdf",
@@ -573,6 +617,7 @@
   },
   {
     "id": "doc_cert_rec_cand_09_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "ServiceNow CSA",
     "fileName": "ServiceNow_CSA.pdf",
@@ -586,6 +631,7 @@
   },
   {
     "id": "doc_rec_cand_10_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Ananya_Reddy_Resume.pdf",
@@ -599,6 +645,7 @@
   },
   {
     "id": "doc_cand_10_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "CPT authorization (I-20)",
     "fileName": "I-20_CPT.pdf",
@@ -612,6 +659,7 @@
   },
   {
     "id": "doc_rec_cand_11_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Vinod_Kumar_Resume.pdf",
@@ -625,6 +673,7 @@
   },
   {
     "id": "doc_cand_11_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H-1B approval notice (I-797)",
     "fileName": "I-797_H1B_Approval.pdf",
@@ -638,6 +687,7 @@
   },
   {
     "id": "doc_cand_11_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -651,6 +701,7 @@
   },
   {
     "id": "doc_cert_rec_cand_11_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "PMP",
     "fileName": "PMP.pdf",
@@ -664,6 +715,7 @@
   },
   {
     "id": "doc_cert_rec_cand_11_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Azure Administrator Associate",
     "fileName": "Azure_Administrator_Associate.pdf",
@@ -677,6 +729,7 @@
   },
   {
     "id": "doc_edu_rec_cand_11_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Master of Technology certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -690,6 +743,7 @@
   },
   {
     "id": "doc_cand_11_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Experience letter",
     "fileName": "Experience_letter.pdf",
@@ -703,6 +757,7 @@
   },
   {
     "id": "doc_rec_cand_12_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Shalini_Nair_Resume.pdf",
@@ -716,6 +771,7 @@
   },
   {
     "id": "doc_cand_12_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H4 EAD card",
     "fileName": "H4_EAD_Card.pdf",
@@ -729,6 +785,7 @@
   },
   {
     "id": "doc_cert_rec_cand_12_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Azure Administrator Associate",
     "fileName": "Azure_Administrator_Associate.pdf",
@@ -742,6 +799,7 @@
   },
   {
     "id": "doc_cert_rec_cand_12_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Certified Kubernetes Administrator",
     "fileName": "Certified_Kubernetes_Administrator.pdf",
@@ -755,6 +813,7 @@
   },
   {
     "id": "doc_rec_cand_13_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Karthik_Iyer_Resume.pdf",
@@ -768,6 +827,7 @@
   },
   {
     "id": "doc_cand_13_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "OPT EAD card",
     "fileName": "OPT_EAD_Card.pdf",
@@ -781,6 +841,7 @@
   },
   {
     "id": "doc_cert_rec_cand_13_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "AWS Developer Associate",
     "fileName": "AWS_Developer_Associate.pdf",
@@ -794,6 +855,7 @@
   },
   {
     "id": "doc_cert_rec_cand_13_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Certified Kubernetes Administrator",
     "fileName": "Certified_Kubernetes_Administrator.pdf",
@@ -807,6 +869,7 @@
   },
   {
     "id": "doc_edu_rec_cand_13_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Bachelor of Technology certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -820,6 +883,7 @@
   },
   {
     "id": "doc_rec_cand_14_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Pooja_Deshmukh_Resume.pdf",
@@ -833,6 +897,7 @@
   },
   {
     "id": "doc_cand_14_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "Green Card",
     "fileName": "Green_Card.pdf",
@@ -846,6 +911,7 @@
   },
   {
     "id": "doc_cand_14_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -859,6 +925,7 @@
   },
   {
     "id": "doc_rec_cand_15_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Rahul_Joshi_Resume.pdf",
@@ -872,6 +939,7 @@
   },
   {
     "id": "doc_cand_15_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H-1B approval notice (I-797)",
     "fileName": "I-797_H1B_Approval.pdf",
@@ -885,6 +953,7 @@
   },
   {
     "id": "doc_cand_15_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -898,6 +967,7 @@
   },
   {
     "id": "doc_edu_rec_cand_15_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Master of Science certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -911,6 +981,7 @@
   },
   {
     "id": "doc_rec_cand_16_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Nisha_Agarwal_Resume.pdf",
@@ -924,6 +995,7 @@
   },
   {
     "id": "doc_cand_16_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "CPT authorization (I-20)",
     "fileName": "I-20_CPT.pdf",
@@ -937,6 +1009,7 @@
   },
   {
     "id": "doc_cand_16_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -950,6 +1023,7 @@
   },
   {
     "id": "doc_cand_16_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Experience letter",
     "fileName": "Experience_letter.pdf",
@@ -963,6 +1037,7 @@
   },
   {
     "id": "doc_rec_cand_17_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Arjun_Mehta_Resume.pdf",
@@ -976,6 +1051,7 @@
   },
   {
     "id": "doc_cand_17_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "US passport",
     "fileName": "US_Passport.pdf",
@@ -989,6 +1065,7 @@
   },
   {
     "id": "doc_cand_17_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -1002,6 +1079,7 @@
   },
   {
     "id": "doc_cert_rec_cand_17_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Salesforce Platform Developer I",
     "fileName": "Salesforce_Platform_Developer_I.pdf",
@@ -1015,6 +1093,7 @@
   },
   {
     "id": "doc_cand_17_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Experience letter",
     "fileName": "Experience_letter.pdf",
@@ -1028,6 +1107,7 @@
   },
   {
     "id": "doc_rec_cand_18_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Divya_Venkatesh_Resume.pdf",
@@ -1041,6 +1121,7 @@
   },
   {
     "id": "doc_cand_18_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H-1B approval notice (I-797)",
     "fileName": "I-797_H1B_Approval.pdf",
@@ -1054,6 +1135,7 @@
   },
   {
     "id": "doc_cand_18_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -1067,6 +1149,7 @@
   },
   {
     "id": "doc_cert_rec_cand_18_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Certified Kubernetes Administrator",
     "fileName": "Certified_Kubernetes_Administrator.pdf",
@@ -1080,6 +1163,7 @@
   },
   {
     "id": "doc_cand_18_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Relieving letter",
     "fileName": "Relieving_letter.pdf",
@@ -1093,6 +1177,7 @@
   },
   {
     "id": "doc_rec_cand_19_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Sanjay_Pillai_Resume.pdf",
@@ -1106,6 +1191,7 @@
   },
   {
     "id": "doc_cand_19_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "Green Card",
     "fileName": "Green_Card.pdf",
@@ -1119,6 +1205,7 @@
   },
   {
     "id": "doc_cand_19_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -1132,6 +1219,7 @@
   },
   {
     "id": "doc_cert_rec_cand_19_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "ServiceNow CSA",
     "fileName": "ServiceNow_CSA.pdf",
@@ -1145,6 +1233,7 @@
   },
   {
     "id": "doc_cert_rec_cand_19_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "AWS Solutions Architect Associate",
     "fileName": "AWS_Solutions_Architect_Associate.pdf",
@@ -1158,6 +1247,7 @@
   },
   {
     "id": "doc_edu_rec_cand_19_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Master of Science certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -1171,6 +1261,7 @@
   },
   {
     "id": "doc_cand_19_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Recent pay stub",
     "fileName": "Recent_pay_stub.pdf",
@@ -1184,6 +1275,7 @@
   },
   {
     "id": "doc_rec_cand_20_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Neha_Bhatt_Resume.pdf",
@@ -1197,6 +1289,7 @@
   },
   {
     "id": "doc_cand_20_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "OPT EAD card",
     "fileName": "OPT_EAD_Card.pdf",
@@ -1210,6 +1303,7 @@
   },
   {
     "id": "doc_cand_20_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -1223,6 +1317,7 @@
   },
   {
     "id": "doc_cert_rec_cand_20_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "ServiceNow CSA",
     "fileName": "ServiceNow_CSA.pdf",
@@ -1236,6 +1331,7 @@
   },
   {
     "id": "doc_edu_rec_cand_20_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Bachelor of Technology certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -1249,6 +1345,7 @@
   },
   {
     "id": "doc_rec_cand_21_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Harish_Rao_Resume.pdf",
@@ -1262,6 +1359,7 @@
   },
   {
     "id": "doc_cand_21_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "OPT EAD card",
     "fileName": "OPT_EAD_Card.pdf",
@@ -1275,6 +1373,7 @@
   },
   {
     "id": "doc_cert_rec_cand_21_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "PMP",
     "fileName": "PMP.pdf",
@@ -1288,6 +1387,7 @@
   },
   {
     "id": "doc_cert_rec_cand_21_1",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "Azure Administrator Associate",
     "fileName": "Azure_Administrator_Associate.pdf",
@@ -1301,6 +1401,7 @@
   },
   {
     "id": "doc_cand_21_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Experience letter",
     "fileName": "Experience_letter.pdf",
@@ -1314,6 +1415,7 @@
   },
   {
     "id": "doc_rec_cand_22_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Swathi_Mohan_Resume.pdf",
@@ -1327,6 +1429,7 @@
   },
   {
     "id": "doc_cand_22_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "US passport",
     "fileName": "US_Passport.pdf",
@@ -1340,6 +1443,7 @@
   },
   {
     "id": "doc_cand_22_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -1353,6 +1457,7 @@
   },
   {
     "id": "doc_cert_rec_cand_22_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "AWS Developer Associate",
     "fileName": "AWS_Developer_Associate.pdf",
@@ -1366,6 +1471,7 @@
   },
   {
     "id": "doc_edu_rec_cand_22_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Master of Science certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -1379,6 +1485,7 @@
   },
   {
     "id": "doc_rec_cand_23_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Manoj_Srinivasan_Resume.pdf",
@@ -1392,6 +1499,7 @@
   },
   {
     "id": "doc_cand_23_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "CPT authorization (I-20)",
     "fileName": "I-20_CPT.pdf",
@@ -1405,6 +1513,7 @@
   },
   {
     "id": "doc_cand_23_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -1418,6 +1527,7 @@
   },
   {
     "id": "doc_cert_rec_cand_23_0",
+    "firmId": "firm_hts",
     "kind": "CERTIFICATION",
     "title": "AWS Developer Associate",
     "fileName": "AWS_Developer_Associate.pdf",
@@ -1431,6 +1541,7 @@
   },
   {
     "id": "doc_edu_rec_cand_23_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Master of Science certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -1444,6 +1555,7 @@
   },
   {
     "id": "doc_rec_cand_24_resume",
+    "firmId": "firm_hts",
     "kind": "RESUME",
     "title": "Original resume",
     "fileName": "Vikram_Reddy_Resume.pdf",
@@ -1457,6 +1569,7 @@
   },
   {
     "id": "doc_cand_24_visa",
+    "firmId": "firm_hts",
     "kind": "WORK_AUTH",
     "title": "H-1B approval notice (I-797)",
     "fileName": "I-797_H1B_Approval.pdf",
@@ -1470,6 +1583,7 @@
   },
   {
     "id": "doc_cand_24_id",
+    "firmId": "firm_hts",
     "kind": "IDENTITY",
     "title": "Driver's license",
     "fileName": "Drivers_License.jpg",
@@ -1483,6 +1597,7 @@
   },
   {
     "id": "doc_edu_rec_cand_24_0",
+    "firmId": "firm_hts",
     "kind": "EDUCATION",
     "title": "Bachelor of Science certificate",
     "fileName": "Degree_Certificate.pdf",
@@ -1496,6 +1611,7 @@
   },
   {
     "id": "doc_cand_24_employment",
+    "firmId": "firm_hts",
     "kind": "EMPLOYMENT",
     "title": "Experience letter",
     "fileName": "Experience_letter.pdf",
@@ -1506,5 +1622,383 @@
     "candidateId": "cand_24",
     "uploadedByUserId": "user_vikram",
     "shareUrl": "https://files.benchq.app/s/doc_cand_24_employment"
+  },
+  {
+    "id": "doc_rec_cand_stl02_resume",
+    "firmId": "firm_stl",
+    "kind": "RESUME",
+    "title": "Original resume",
+    "fileName": "Priya_Raman_Resume.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 364,
+    "uploadedAt": "2026-08-21T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl02",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_rec_cand_stl02_resume"
+  },
+  {
+    "id": "doc_cand_stl02_visa",
+    "firmId": "firm_stl",
+    "kind": "WORK_AUTH",
+    "title": "Green Card",
+    "fileName": "Green_Card.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 498,
+    "uploadedAt": "2026-08-07T06:17:53.020Z",
+    "expiresAt": "2029-10-09T06:17:53.020Z",
+    "candidateId": "cand_stl02",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl02_visa"
+  },
+  {
+    "id": "doc_cand_stl02_id",
+    "firmId": "firm_stl",
+    "kind": "IDENTITY",
+    "title": "Driver's license",
+    "fileName": "Drivers_License.jpg",
+    "mimeType": "image/jpeg",
+    "sizeKb": 2099,
+    "uploadedAt": "2026-08-07T06:17:53.020Z",
+    "expiresAt": "2027-05-11T06:17:53.020Z",
+    "candidateId": "cand_stl02",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl02_id"
+  },
+  {
+    "id": "doc_cert_rec_cand_stl02_0",
+    "firmId": "firm_stl",
+    "kind": "CERTIFICATION",
+    "title": "Salesforce Platform Developer I",
+    "fileName": "Salesforce_Platform_Developer_I.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 137,
+    "uploadedAt": "2026-08-09T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl02",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cert_rec_cand_stl02_0"
+  },
+  {
+    "id": "doc_rec_cand_stl03_resume",
+    "firmId": "firm_stl",
+    "kind": "RESUME",
+    "title": "Original resume",
+    "fileName": "Amit_Patel_Resume.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 381,
+    "uploadedAt": "2026-08-09T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl03",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_rec_cand_stl03_resume"
+  },
+  {
+    "id": "doc_cand_stl03_visa",
+    "firmId": "firm_stl",
+    "kind": "WORK_AUTH",
+    "title": "H-1B approval notice (I-797)",
+    "fileName": "I-797_H1B_Approval.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 480,
+    "uploadedAt": "2026-08-13T06:17:53.020Z",
+    "expiresAt": "2026-12-15T06:17:52.966Z",
+    "candidateId": "cand_stl03",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl03_visa"
+  },
+  {
+    "id": "doc_cert_rec_cand_stl03_0",
+    "firmId": "firm_stl",
+    "kind": "CERTIFICATION",
+    "title": "Salesforce Platform Developer I",
+    "fileName": "Salesforce_Platform_Developer_I.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 312,
+    "uploadedAt": "2026-08-23T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl03",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cert_rec_cand_stl03_0"
+  },
+  {
+    "id": "doc_cert_rec_cand_stl03_1",
+    "firmId": "firm_stl",
+    "kind": "CERTIFICATION",
+    "title": "Scrum Master",
+    "fileName": "Scrum_Master.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 129,
+    "uploadedAt": "2026-09-14T06:17:53.020Z",
+    "expiresAt": "2029-09-09T06:17:52.996Z",
+    "candidateId": "cand_stl03",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cert_rec_cand_stl03_1"
+  },
+  {
+    "id": "doc_rec_cand_stl05_resume",
+    "firmId": "firm_stl",
+    "kind": "RESUME",
+    "title": "Original resume",
+    "fileName": "Deepak_Sharma_Resume.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 326,
+    "uploadedAt": "2026-08-31T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl05",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_rec_cand_stl05_resume"
+  },
+  {
+    "id": "doc_cand_stl05_visa",
+    "firmId": "firm_stl",
+    "kind": "WORK_AUTH",
+    "title": "H-1B approval notice (I-797)",
+    "fileName": "I-797_H1B_Approval.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 566,
+    "uploadedAt": "2026-08-04T06:17:53.020Z",
+    "expiresAt": "2027-11-05T06:17:52.966Z",
+    "candidateId": "cand_stl05",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl05_visa"
+  },
+  {
+    "id": "doc_cand_stl05_id",
+    "firmId": "firm_stl",
+    "kind": "IDENTITY",
+    "title": "Driver's license",
+    "fileName": "Drivers_License.jpg",
+    "mimeType": "image/jpeg",
+    "sizeKb": 1272,
+    "uploadedAt": "2026-08-04T06:17:53.020Z",
+    "expiresAt": "2030-04-16T06:17:53.020Z",
+    "candidateId": "cand_stl05",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl05_id"
+  },
+  {
+    "id": "doc_cert_rec_cand_stl05_0",
+    "firmId": "firm_stl",
+    "kind": "CERTIFICATION",
+    "title": "Azure Administrator Associate",
+    "fileName": "Azure_Administrator_Associate.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 219,
+    "uploadedAt": "2026-07-23T06:17:53.020Z",
+    "expiresAt": "2029-08-17T06:17:52.996Z",
+    "candidateId": "cand_stl05",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cert_rec_cand_stl05_0"
+  },
+  {
+    "id": "doc_edu_rec_cand_stl05_0",
+    "firmId": "firm_stl",
+    "kind": "EDUCATION",
+    "title": "Master of Science certificate",
+    "fileName": "Degree_Certificate.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 400,
+    "uploadedAt": "2026-07-25T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl05",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_edu_rec_cand_stl05_0"
+  },
+  {
+    "id": "doc_rec_cand_stl15_resume",
+    "firmId": "firm_stl",
+    "kind": "RESUME",
+    "title": "Original resume",
+    "fileName": "Rahul_Joshi_Resume.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 265,
+    "uploadedAt": "2026-07-29T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl15",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_rec_cand_stl15_resume"
+  },
+  {
+    "id": "doc_cand_stl15_visa",
+    "firmId": "firm_stl",
+    "kind": "WORK_AUTH",
+    "title": "H-1B approval notice (I-797)",
+    "fileName": "I-797_H1B_Approval.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 499,
+    "uploadedAt": "2026-08-12T06:17:53.020Z",
+    "expiresAt": "2028-01-24T06:17:52.966Z",
+    "candidateId": "cand_stl15",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl15_visa"
+  },
+  {
+    "id": "doc_cand_stl15_id",
+    "firmId": "firm_stl",
+    "kind": "IDENTITY",
+    "title": "Driver's license",
+    "fileName": "Drivers_License.jpg",
+    "mimeType": "image/jpeg",
+    "sizeKb": 1998,
+    "uploadedAt": "2026-08-02T06:17:53.020Z",
+    "expiresAt": "2030-05-21T06:17:53.020Z",
+    "candidateId": "cand_stl15",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl15_id"
+  },
+  {
+    "id": "doc_edu_rec_cand_stl15_0",
+    "firmId": "firm_stl",
+    "kind": "EDUCATION",
+    "title": "Master of Science certificate",
+    "fileName": "Degree_Certificate.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 750,
+    "uploadedAt": "2026-08-15T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl15",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_edu_rec_cand_stl15_0"
+  },
+  {
+    "id": "doc_rec_cand_stl22_resume",
+    "firmId": "firm_stl",
+    "kind": "RESUME",
+    "title": "Original resume",
+    "fileName": "Swathi_Mohan_Resume.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 199,
+    "uploadedAt": "2026-08-14T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl22",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_rec_cand_stl22_resume"
+  },
+  {
+    "id": "doc_cand_stl22_visa",
+    "firmId": "firm_stl",
+    "kind": "WORK_AUTH",
+    "title": "US passport",
+    "fileName": "US_Passport.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 640,
+    "uploadedAt": "2026-08-16T06:17:53.020Z",
+    "expiresAt": "2030-04-16T06:17:53.020Z",
+    "candidateId": "cand_stl22",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl22_visa"
+  },
+  {
+    "id": "doc_cand_stl22_id",
+    "firmId": "firm_stl",
+    "kind": "IDENTITY",
+    "title": "Driver's license",
+    "fileName": "Drivers_License.jpg",
+    "mimeType": "image/jpeg",
+    "sizeKb": 1307,
+    "uploadedAt": "2026-07-20T06:17:53.020Z",
+    "expiresAt": "2029-03-28T06:17:53.020Z",
+    "candidateId": "cand_stl22",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_stl22_id"
+  },
+  {
+    "id": "doc_cert_rec_cand_stl22_0",
+    "firmId": "firm_stl",
+    "kind": "CERTIFICATION",
+    "title": "AWS Developer Associate",
+    "fileName": "AWS_Developer_Associate.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 313,
+    "uploadedAt": "2026-08-13T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl22",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_cert_rec_cand_stl22_0"
+  },
+  {
+    "id": "doc_edu_rec_cand_stl22_0",
+    "firmId": "firm_stl",
+    "kind": "EDUCATION",
+    "title": "Master of Science certificate",
+    "fileName": "Degree_Certificate.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 815,
+    "uploadedAt": "2026-07-25T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_stl22",
+    "uploadedByUserId": "user_kiran",
+    "shareUrl": "https://files.benchq.app/s/doc_edu_rec_cand_stl22_0"
+  },
+  {
+    "id": "doc_rec_cand_cbw06_resume",
+    "firmId": "firm_cbw",
+    "kind": "RESUME",
+    "title": "Original resume",
+    "fileName": "Meera_Krishnan_Resume.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 216,
+    "uploadedAt": "2026-07-31T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_cbw06",
+    "uploadedByUserId": "user_rehana",
+    "shareUrl": "https://files.benchq.app/s/doc_rec_cand_cbw06_resume"
+  },
+  {
+    "id": "doc_cand_cbw06_visa",
+    "firmId": "firm_cbw",
+    "kind": "WORK_AUTH",
+    "title": "US passport",
+    "fileName": "US_Passport.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 540,
+    "uploadedAt": "2026-09-07T06:17:53.020Z",
+    "expiresAt": "2031-05-03T06:17:53.020Z",
+    "candidateId": "cand_cbw06",
+    "uploadedByUserId": "user_rehana",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_cbw06_visa"
+  },
+  {
+    "id": "doc_cand_cbw06_id",
+    "firmId": "firm_cbw",
+    "kind": "IDENTITY",
+    "title": "Driver's license",
+    "fileName": "Drivers_License.jpg",
+    "mimeType": "image/jpeg",
+    "sizeKb": 2389,
+    "uploadedAt": "2026-08-02T06:17:53.020Z",
+    "expiresAt": "2029-03-10T06:17:53.020Z",
+    "candidateId": "cand_cbw06",
+    "uploadedByUserId": "user_rehana",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_cbw06_id"
+  },
+  {
+    "id": "doc_edu_rec_cand_cbw06_0",
+    "firmId": "firm_cbw",
+    "kind": "EDUCATION",
+    "title": "Bachelor of Technology certificate",
+    "fileName": "Degree_Certificate.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 719,
+    "uploadedAt": "2026-08-02T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_cbw06",
+    "uploadedByUserId": "user_rehana",
+    "shareUrl": "https://files.benchq.app/s/doc_edu_rec_cand_cbw06_0"
+  },
+  {
+    "id": "doc_cand_cbw06_employment",
+    "firmId": "firm_cbw",
+    "kind": "EMPLOYMENT",
+    "title": "Recent pay stub",
+    "fileName": "Recent_pay_stub.pdf",
+    "mimeType": "application/pdf",
+    "sizeKb": 93,
+    "uploadedAt": "2026-09-13T06:17:53.020Z",
+    "expiresAt": null,
+    "candidateId": "cand_cbw06",
+    "uploadedByUserId": "user_rehana",
+    "shareUrl": "https://files.benchq.app/s/doc_cand_cbw06_employment"
   }
 ]

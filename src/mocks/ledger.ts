@@ -1,9 +1,10 @@
 import { arrayOf } from "@/lib/api/client";
 import { LedgerEntrySchema, type LedgerEntry } from "@/lib/schemas/analytics";
 import ledgerSeed from "./data/ledger.json";
-import { mockResult } from "./_shared";
+import { inDevFirm, mockResult } from "./_shared";
 
-const ledger: LedgerEntry[] = arrayOf(LedgerEntrySchema).parse(ledgerSeed);
+export const allLedger: LedgerEntry[] = arrayOf(LedgerEntrySchema).parse(ledgerSeed);
+const ledger: LedgerEntry[] = inDevFirm(allLedger);
 
 export const ledgerMock = {
   list: (params?: { limit?: number; offset?: number }): Promise<LedgerEntry[]> => {

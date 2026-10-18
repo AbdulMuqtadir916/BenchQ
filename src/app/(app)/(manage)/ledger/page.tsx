@@ -21,6 +21,14 @@ const ACTION_TONE: Record<LedgerEntry["action"], TagTone> = {
   EXPORT: "teal",
   LOGIN: "neutral",
   ADMIN_ACCESS: "neutral",
+  ADMIN_ACCESS_END: "neutral",
+  FIRM_CREATED: "green",
+  FIRM_SUSPENDED: "red",
+  FIRM_REACTIVATED: "green",
+  PLAN_CHANGED: "blue",
+  INVITE_SENT: "blue",
+  INVITE_ACCEPTED: "green",
+  INVITE_REVOKED: "amber",
 };
 
 const ACTOR_TONE: Record<LedgerEntry["actorType"], TagTone> = {

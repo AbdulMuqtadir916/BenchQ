@@ -33,6 +33,7 @@ export type JobRequirement = z.infer<typeof JobRequirementSchema>;
 
 export const JobSchema = z.object({
   id: z.string(),
+  firmId: z.string(),
   companyId: z.string(),
   company: CompanySchema,
 

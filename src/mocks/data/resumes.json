@@ -1,6 +1,7 @@
 [
   {
     "id": "resume_cand_01_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_01",
     "name": "Master Resume",
     "isMaster": true,
@@ -424,7 +425,8 @@
           "generatedBy": "HUMAN",
           "modelId": null,
           "promptVersion": "v2.1",
-          "generatedAt": "2026-09-28T06:17:53.004Z"
+          "generatedAt": "2026-09-28T06:17:53.004Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -642,6 +644,7 @@
   },
   {
     "id": "resume_cand_02_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_02",
     "name": "Master Resume",
     "isMaster": true,
@@ -855,7 +858,8 @@
           "generatedBy": "HUMAN",
           "modelId": null,
           "promptVersion": null,
-          "generatedAt": "2026-09-18T06:17:53.004Z"
+          "generatedAt": "2026-09-18T06:17:53.004Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -1071,7 +1075,8 @@
           "generatedBy": "HUMAN",
           "modelId": null,
           "promptVersion": "v2.1",
-          "generatedAt": "2026-10-01T06:17:53.004Z"
+          "generatedAt": "2026-10-01T06:17:53.004Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -1289,6 +1294,7 @@
   },
   {
     "id": "resume_cand_02_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_02",
     "name": "Tailored — Consulting",
     "isMaster": false,
@@ -1510,6 +1516,7 @@
   },
   {
     "id": "resume_cand_03_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_03",
     "name": "Master Resume",
     "isMaster": true,
@@ -1896,7 +1903,8 @@
           "generatedBy": "AGENT",
           "modelId": "claude-sonnet-5",
           "promptVersion": "v2.1",
-          "generatedAt": "2026-09-28T06:17:53.004Z"
+          "generatedAt": "2026-09-28T06:17:53.004Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -1911,6 +1919,7 @@
   },
   {
     "id": "resume_cand_03_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_03",
     "name": "Tailored — Fintech",
     "isMaster": false,
@@ -2110,6 +2119,7 @@
   },
   {
     "id": "resume_cand_04_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_04",
     "name": "Master Resume",
     "isMaster": true,
@@ -2293,7 +2303,8 @@
           "generatedBy": "AGENT",
           "modelId": "claude-sonnet-5",
           "promptVersion": null,
-          "generatedAt": "2026-09-18T06:17:53.004Z"
+          "generatedAt": "2026-09-18T06:17:53.004Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -2480,7 +2491,8 @@
           "generatedBy": "HUMAN",
           "modelId": "claude-sonnet-5",
           "promptVersion": null,
-          "generatedAt": "2026-09-20T06:17:53.004Z"
+          "generatedAt": "2026-09-20T06:17:53.004Z",
+          "firmId": "firm_hts"
         },
         "tracer": {
           "token": "trc_rv_cand_04_2",
@@ -2502,6 +2514,7 @@
   },
   {
     "id": "resume_cand_04_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_04",
     "name": "Tailored — Enterprise",
     "isMaster": false,
@@ -2686,6 +2699,7 @@
   },
   {
     "id": "resume_cand_05_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_05",
     "name": "Master Resume",
     "isMaster": true,
@@ -2975,6 +2989,7 @@
   },
   {
     "id": "resume_cand_05_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_05",
     "name": "Tailored — Healthcare",
     "isMaster": false,
@@ -3264,6 +3279,7 @@
   },
   {
     "id": "resume_cand_06_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_06",
     "name": "Master Resume",
     "isMaster": true,
@@ -3507,7 +3523,8 @@
           "generatedBy": "AGENT",
           "modelId": "claude-sonnet-5",
           "promptVersion": null,
-          "generatedAt": "2026-09-27T06:17:53.004Z"
+          "generatedAt": "2026-09-27T06:17:53.004Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -3522,6 +3539,7 @@
   },
   {
     "id": "resume_cand_06_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_06",
     "name": "Tailored — Fintech",
     "isMaster": false,
@@ -3766,6 +3784,7 @@
   },
   {
     "id": "resume_cand_07_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_07",
     "name": "Master Resume",
     "isMaster": true,
@@ -4025,6 +4044,7 @@
   },
   {
     "id": "resume_cand_07_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_07",
     "name": "Tailored — Healthcare",
     "isMaster": false,
@@ -4284,6 +4304,7 @@
   },
   {
     "id": "resume_cand_08_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_08",
     "name": "Master Resume",
     "isMaster": true,
@@ -4437,7 +4458,8 @@
           "generatedBy": "HUMAN",
           "modelId": null,
           "promptVersion": "v2.1",
-          "generatedAt": "2026-09-24T06:17:53.005Z"
+          "generatedAt": "2026-09-24T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -4594,7 +4616,8 @@
           "generatedBy": "AGENT",
           "modelId": "claude-sonnet-5",
           "promptVersion": "v2.1",
-          "generatedAt": "2026-09-18T06:17:53.005Z"
+          "generatedAt": "2026-09-18T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -4752,6 +4775,7 @@
   },
   {
     "id": "resume_cand_08_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_08",
     "name": "Tailored — Healthcare",
     "isMaster": false,
@@ -4906,6 +4930,7 @@
   },
   {
     "id": "resume_cand_09_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_09",
     "name": "Master Resume",
     "isMaster": true,
@@ -5660,7 +5685,8 @@
           "generatedBy": "AGENT",
           "modelId": "claude-sonnet-5",
           "promptVersion": null,
-          "generatedAt": "2026-09-30T06:17:53.005Z"
+          "generatedAt": "2026-09-30T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -5675,6 +5701,7 @@
   },
   {
     "id": "resume_cand_10_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_10",
     "name": "Master Resume",
     "isMaster": true,
@@ -6121,7 +6148,8 @@
           "generatedBy": "HUMAN",
           "modelId": null,
           "promptVersion": null,
-          "generatedAt": "2026-09-26T06:17:53.005Z"
+          "generatedAt": "2026-09-26T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -6136,6 +6164,7 @@
   },
   {
     "id": "resume_cand_11_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_11",
     "name": "Master Resume",
     "isMaster": true,
@@ -6350,6 +6379,7 @@
   },
   {
     "id": "resume_cand_12_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_12",
     "name": "Master Resume",
     "isMaster": true,
@@ -6736,7 +6766,8 @@
           "generatedBy": "HUMAN",
           "modelId": "claude-sonnet-5",
           "promptVersion": null,
-          "generatedAt": "2026-09-26T06:17:53.005Z"
+          "generatedAt": "2026-09-26T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -6751,6 +6782,7 @@
   },
   {
     "id": "resume_cand_12_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_12",
     "name": "Tailored — Enterprise",
     "isMaster": false,
@@ -6949,7 +6981,8 @@
           "generatedBy": "HUMAN",
           "modelId": null,
           "promptVersion": "v2.1",
-          "generatedAt": "2026-09-26T06:17:53.005Z"
+          "generatedAt": "2026-09-26T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": {
           "token": "trc_rv_cand_12_t1",
@@ -6971,6 +7004,7 @@
   },
   {
     "id": "resume_cand_13_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_13",
     "name": "Master Resume",
     "isMaster": true,
@@ -7139,7 +7173,8 @@
           "generatedBy": "AGENT",
           "modelId": null,
           "promptVersion": null,
-          "generatedAt": "2026-09-28T06:17:53.005Z"
+          "generatedAt": "2026-09-28T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -7311,7 +7346,8 @@
           "generatedBy": "HUMAN",
           "modelId": "claude-sonnet-5",
           "promptVersion": null,
-          "generatedAt": "2026-09-20T06:17:53.005Z"
+          "generatedAt": "2026-09-20T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -7483,7 +7519,8 @@
           "generatedBy": "AGENT",
           "modelId": null,
           "promptVersion": null,
-          "generatedAt": "2026-09-19T06:17:53.005Z"
+          "generatedAt": "2026-09-19T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -7498,6 +7535,7 @@
   },
   {
     "id": "resume_cand_14_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_14",
     "name": "Master Resume",
     "isMaster": true,
@@ -7726,7 +7764,8 @@
           "generatedBy": "AGENT",
           "modelId": "claude-sonnet-5",
           "promptVersion": null,
-          "generatedAt": "2026-09-24T06:17:53.005Z"
+          "generatedAt": "2026-09-24T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": {
           "token": "trc_rv_cand_14_1",
@@ -8182,7 +8221,8 @@
           "generatedBy": "HUMAN",
           "modelId": null,
           "promptVersion": null,
-          "generatedAt": "2026-09-29T06:17:53.005Z"
+          "generatedAt": "2026-09-29T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": {
           "token": "trc_rv_cand_14_3",
@@ -8204,6 +8244,7 @@
   },
   {
     "id": "resume_cand_15_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_15",
     "name": "Master Resume",
     "isMaster": true,
@@ -8868,6 +8909,7 @@
   },
   {
     "id": "resume_cand_15_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_15",
     "name": "Tailored — Consulting",
     "isMaster": false,
@@ -9202,6 +9244,7 @@
   },
   {
     "id": "resume_cand_16_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_16",
     "name": "Master Resume",
     "isMaster": true,
@@ -9371,6 +9414,7 @@
   },
   {
     "id": "resume_cand_16_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_16",
     "name": "Tailored — Fintech",
     "isMaster": false,
@@ -9540,6 +9584,7 @@
   },
   {
     "id": "resume_cand_17_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_17",
     "name": "Master Resume",
     "isMaster": true,
@@ -9799,6 +9844,7 @@
   },
   {
     "id": "resume_cand_18_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_18",
     "name": "Master Resume",
     "isMaster": true,
@@ -10011,7 +10057,8 @@
           "generatedBy": "AGENT",
           "modelId": null,
           "promptVersion": "v2.1",
-          "generatedAt": "2026-09-26T06:17:53.005Z"
+          "generatedAt": "2026-09-26T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -10026,6 +10073,7 @@
   },
   {
     "id": "resume_cand_19_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_19",
     "name": "Master Resume",
     "isMaster": true,
@@ -10300,6 +10348,7 @@
   },
   {
     "id": "resume_cand_19_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_19",
     "name": "Tailored — Healthcare",
     "isMaster": false,
@@ -10574,6 +10623,7 @@
   },
   {
     "id": "resume_cand_20_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_20",
     "name": "Master Resume",
     "isMaster": true,
@@ -10728,6 +10778,7 @@
   },
   {
     "id": "resume_cand_21_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_21",
     "name": "Master Resume",
     "isMaster": true,
@@ -11017,6 +11068,7 @@
   },
   {
     "id": "resume_cand_21_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_21",
     "name": "Tailored — Fintech",
     "isMaster": false,
@@ -11305,7 +11357,8 @@
           "generatedBy": "HUMAN",
           "modelId": null,
           "promptVersion": null,
-          "generatedAt": "2026-09-18T06:17:53.005Z"
+          "generatedAt": "2026-09-18T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": {
           "token": "trc_rv_cand_21_t1",
@@ -11327,6 +11380,7 @@
   },
   {
     "id": "resume_cand_22_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_22",
     "name": "Master Resume",
     "isMaster": true,
@@ -11540,7 +11594,8 @@
           "generatedBy": "AGENT",
           "modelId": null,
           "promptVersion": "v2.1",
-          "generatedAt": "2026-09-20T06:17:53.005Z"
+          "generatedAt": "2026-09-20T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -11758,6 +11813,7 @@
   },
   {
     "id": "resume_cand_23_master",
+    "firmId": "firm_hts",
     "candidateId": "cand_23",
     "name": "Master Resume",
     "isMaster": true,
@@ -11926,7 +11982,8 @@
           "generatedBy": "AGENT",
           "modelId": "claude-sonnet-5",
           "promptVersion": "v2.1",
-          "generatedAt": "2026-09-28T06:17:53.005Z"
+          "generatedAt": "2026-09-28T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -11941,6 +11998,7 @@
   },
   {
     "id": "resume_cand_23_tailored",
+    "firmId": "firm_hts",
     "candidateId": "cand_23",
     "name": "Tailored — Enterprise",
     "isMaster": false,
@@ -12109,7 +12167,8 @@
           "generatedBy": "AGENT",
           "modelId": "claude-sonnet-5",
           "promptVersion": null,
-          "generatedAt": "2026-09-28T06:17:53.005Z"
+          "generatedAt": "2026-09-28T06:17:53.005Z",
+          "firmId": "firm_hts"
         },
         "tracer": null,
         "pdfUrl": null,
@@ -12121,5 +12180,3998 @@
       }
     ],
     "latestVersionId": "rv_cand_23_t1"
+  },
+  {
+    "id": "resume_cand_stl02_master",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl02",
+    "name": "Master Resume",
+    "isMaster": true,
+    "targetJobId": null,
+    "templateId": "template_modern",
+    "versions": [
+      {
+        "id": "rv_cand_stl02_1",
+        "resumeId": "resume_cand_stl02_master",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_modern",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl02_1_1",
+          "claim_rv_cand_stl02_1_2",
+          "claim_rv_cand_stl02_1_3",
+          "claim_rv_cand_stl02_1_4",
+          "claim_rv_cand_stl02_1_5",
+          "claim_rv_cand_stl02_1_6"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 75,
+        "atsGrade": "C",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": false
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 37,
+        "keywordsMatched": [
+          "Java",
+          "SQL",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "Spring Boot",
+          "AWS",
+          "Kubernetes",
+          "Python",
+          "React"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl02_1_0",
+            "resumeVersionId": "rv_cand_stl02_1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced data engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_1_1",
+            "resumeVersionId": "rv_cand_stl02_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_1_2",
+            "resumeVersionId": "rv_cand_stl02_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 1,
+            "text": "Implemented CI/CD pipeline improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_1_3",
+            "resumeVersionId": "rv_cand_stl02_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 2,
+            "text": "Reduced bug count by 26% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_1_4",
+            "resumeVersionId": "rv_cand_stl02_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 3,
+            "text": "Implemented test automation improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "Metric unverified — source document doesn't mention percentage",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_1_5",
+            "resumeVersionId": "rv_cand_stl02_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_1",
+            "bulletIndex": 0,
+            "text": "Implemented test automation improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_1_6",
+            "resumeVersionId": "rv_cand_stl02_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_1",
+            "bulletIndex": 1,
+            "text": "Implemented monitoring stack improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": {
+          "targetJobId": "job_stl078",
+          "targetJobTitle": "Senior Java Developer",
+          "targetCompanyName": "Capital One",
+          "keywordsTargeted": [
+            "Java",
+            "SQL",
+            "Agile"
+          ],
+          "bulletsRewritten": 4,
+          "generatedBy": "HUMAN",
+          "modelId": null,
+          "promptVersion": null,
+          "generatedAt": "2026-09-18T06:17:53.004Z",
+          "firmId": "firm_stl"
+        },
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-29T06:17:53.004Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-29T06:17:53.004Z"
+      },
+      {
+        "id": "rv_cand_stl02_2",
+        "resumeId": "resume_cand_stl02_master",
+        "versionNumber": 2,
+        "parentVersionId": "rv_cand_stl02_1",
+        "templateId": "template_classic",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl02_2_1",
+          "claim_rv_cand_stl02_2_2",
+          "claim_rv_cand_stl02_2_3",
+          "claim_rv_cand_stl02_2_4",
+          "claim_rv_cand_stl02_2_5",
+          "claim_rv_cand_stl02_2_6"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 93,
+        "atsGrade": "A",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": false
+          }
+        ],
+        "keywordScore": 100,
+        "keywordsMatched": [
+          "Java",
+          "Spring Boot",
+          "AWS",
+          "Kubernetes",
+          "Python",
+          "React",
+          "SQL",
+          "Agile"
+        ],
+        "keywordsMissing": [],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl02_2_0",
+            "resumeVersionId": "rv_cand_stl02_2",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced data engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_2_1",
+            "resumeVersionId": "rv_cand_stl02_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_2_2",
+            "resumeVersionId": "rv_cand_stl02_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 1,
+            "text": "Implemented CI/CD pipeline improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_2_3",
+            "resumeVersionId": "rv_cand_stl02_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 2,
+            "text": "Reduced bug count by 26% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_2_4",
+            "resumeVersionId": "rv_cand_stl02_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 3,
+            "text": "Implemented test automation improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_2_5",
+            "resumeVersionId": "rv_cand_stl02_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_1",
+            "bulletIndex": 0,
+            "text": "Implemented test automation improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_2_6",
+            "resumeVersionId": "rv_cand_stl02_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_1",
+            "bulletIndex": 1,
+            "text": "Implemented monitoring stack improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": {
+          "targetJobId": "job_stl192",
+          "targetJobTitle": "Senior Java Developer",
+          "targetCompanyName": "JPMorgan Chase",
+          "keywordsTargeted": [
+            "Java",
+            "Spring Boot",
+            "AWS"
+          ],
+          "bulletsRewritten": 6,
+          "generatedBy": "HUMAN",
+          "modelId": null,
+          "promptVersion": "v2.1",
+          "generatedAt": "2026-10-01T06:17:53.004Z",
+          "firmId": "firm_stl"
+        },
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-25T06:17:53.004Z",
+        "changeSummary": "Added recent project",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-25T06:17:53.004Z"
+      },
+      {
+        "id": "rv_cand_stl02_3",
+        "resumeId": "resume_cand_stl02_master",
+        "versionNumber": 3,
+        "parentVersionId": "rv_cand_stl02_2",
+        "templateId": "template_minimal",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl02_3_1",
+          "claim_rv_cand_stl02_3_2",
+          "claim_rv_cand_stl02_3_3",
+          "claim_rv_cand_stl02_3_4",
+          "claim_rv_cand_stl02_3_5",
+          "claim_rv_cand_stl02_3_6"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 95,
+        "atsGrade": "A",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": false
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": false
+          }
+        ],
+        "keywordScore": 87,
+        "keywordsMatched": [
+          "Java",
+          "Spring Boot",
+          "AWS",
+          "Kubernetes",
+          "Python",
+          "React",
+          "SQL"
+        ],
+        "keywordsMissing": [
+          "Agile"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl02_3_0",
+            "resumeVersionId": "rv_cand_stl02_3",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced data engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_3_1",
+            "resumeVersionId": "rv_cand_stl02_3",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_3_2",
+            "resumeVersionId": "rv_cand_stl02_3",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 1,
+            "text": "Implemented CI/CD pipeline improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_3_3",
+            "resumeVersionId": "rv_cand_stl02_3",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 2,
+            "text": "Reduced bug count by 26% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_3_4",
+            "resumeVersionId": "rv_cand_stl02_3",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 3,
+            "text": "Implemented test automation improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "No evidence on record for team size — needs candidate confirmation",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_3_5",
+            "resumeVersionId": "rv_cand_stl02_3",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_1",
+            "bulletIndex": 0,
+            "text": "Implemented test automation improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_3_6",
+            "resumeVersionId": "rv_cand_stl02_3",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_1",
+            "bulletIndex": 1,
+            "text": "Implemented monitoring stack improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-27T06:17:53.004Z",
+        "changeSummary": "Added recent project",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-24T06:17:53.004Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl02_3"
+  },
+  {
+    "id": "resume_cand_stl02_tailored",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl02",
+    "name": "Tailored — Consulting",
+    "isMaster": false,
+    "targetJobId": "job_stl075",
+    "templateId": "template_modern",
+    "versions": [
+      {
+        "id": "rv_cand_stl02_t1",
+        "resumeId": "resume_cand_stl02_tailored",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_modern",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl02_t1_1",
+          "claim_rv_cand_stl02_t1_2",
+          "claim_rv_cand_stl02_t1_3",
+          "claim_rv_cand_stl02_t1_4",
+          "claim_rv_cand_stl02_t1_5",
+          "claim_rv_cand_stl02_t1_6"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 63,
+        "atsGrade": "D",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": false
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": false
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 50,
+        "keywordsMatched": [
+          "Java",
+          "Python",
+          "React",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "Spring Boot",
+          "AWS",
+          "Kubernetes",
+          "SQL"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl02_t1_0",
+            "resumeVersionId": "rv_cand_stl02_t1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced data engineer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_t1_1",
+            "resumeVersionId": "rv_cand_stl02_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_t1_2",
+            "resumeVersionId": "rv_cand_stl02_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 1,
+            "text": "Implemented CI/CD pipeline improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_t1_3",
+            "resumeVersionId": "rv_cand_stl02_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 2,
+            "text": "Reduced bug count by 26% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_t1_4",
+            "resumeVersionId": "rv_cand_stl02_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_0",
+            "bulletIndex": 3,
+            "text": "Implemented test automation improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "No evidence on record for team size — needs candidate confirmation",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_t1_5",
+            "resumeVersionId": "rv_cand_stl02_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_1",
+            "bulletIndex": 0,
+            "text": "Implemented test automation improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl02_t1_6",
+            "resumeVersionId": "rv_cand_stl02_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl02_1",
+            "bulletIndex": 1,
+            "text": "Implemented monitoring stack improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl02_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": {
+          "token": "trc_rv_cand_stl02_t1",
+          "url": "https://track.benchq.app/t/rv_cand_stl02_t1",
+          "openCount": 2,
+          "clickCount": 2,
+          "firstOpenedAt": "2026-09-29T06:17:53.004Z",
+          "lastOpenedAt": "2026-09-30T06:17:53.004Z"
+        },
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-10-01T06:17:53.004Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-21T06:17:53.004Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl02_t1"
+  },
+  {
+    "id": "resume_cand_stl03_master",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl03",
+    "name": "Master Resume",
+    "isMaster": true,
+    "targetJobId": null,
+    "templateId": "template_minimal",
+    "versions": [
+      {
+        "id": "rv_cand_stl03_1",
+        "resumeId": "resume_cand_stl03_master",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_minimal",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl03_1_1",
+          "claim_rv_cand_stl03_1_2",
+          "claim_rv_cand_stl03_1_3",
+          "claim_rv_cand_stl03_1_4",
+          "claim_rv_cand_stl03_1_5"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 90,
+        "atsGrade": "A",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 37,
+        "keywordsMatched": [
+          "AWS",
+          "Kubernetes",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "Java",
+          "Spring Boot",
+          "Python",
+          "React",
+          "SQL"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl03_1_0",
+            "resumeVersionId": "rv_cand_stl03_1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced .net developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_1_1",
+            "resumeVersionId": "rv_cand_stl03_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 0,
+            "text": "Implemented monitoring stack improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_1_2",
+            "resumeVersionId": "rv_cand_stl03_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 1,
+            "text": "Implemented security scanning improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_1_3",
+            "resumeVersionId": "rv_cand_stl03_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 2,
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_1_4",
+            "resumeVersionId": "rv_cand_stl03_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_1",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "Metric unverified — source document doesn't mention percentage",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_1_5",
+            "resumeVersionId": "rv_cand_stl03_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_1",
+            "bulletIndex": 1,
+            "text": "Reduced costs by 75% through automation",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-27T06:17:53.004Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-29T06:17:53.004Z"
+      },
+      {
+        "id": "rv_cand_stl03_2",
+        "resumeId": "resume_cand_stl03_master",
+        "versionNumber": 2,
+        "parentVersionId": "rv_cand_stl03_1",
+        "templateId": "template_classic",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl03_2_1",
+          "claim_rv_cand_stl03_2_2",
+          "claim_rv_cand_stl03_2_3",
+          "claim_rv_cand_stl03_2_4",
+          "claim_rv_cand_stl03_2_5"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 89,
+        "atsGrade": "B",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": false
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": false
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": false
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": false
+          }
+        ],
+        "keywordScore": 50,
+        "keywordsMatched": [
+          "Java",
+          "Spring Boot",
+          "Python",
+          "React"
+        ],
+        "keywordsMissing": [
+          "AWS",
+          "Kubernetes",
+          "SQL",
+          "Agile"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl03_2_0",
+            "resumeVersionId": "rv_cand_stl03_2",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced .net developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_2_1",
+            "resumeVersionId": "rv_cand_stl03_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 0,
+            "text": "Implemented monitoring stack improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_2_2",
+            "resumeVersionId": "rv_cand_stl03_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 1,
+            "text": "Implemented security scanning improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_2_3",
+            "resumeVersionId": "rv_cand_stl03_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 2,
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_2_4",
+            "resumeVersionId": "rv_cand_stl03_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_1",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "No evidence on record for team size — needs candidate confirmation",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_2_5",
+            "resumeVersionId": "rv_cand_stl03_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_1",
+            "bulletIndex": 1,
+            "text": "Reduced costs by 75% through automation",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": {
+          "targetJobId": "job_stl241",
+          "targetJobTitle": "Data Engineer",
+          "targetCompanyName": "Capital One",
+          "keywordsTargeted": [
+            "Java",
+            "Spring Boot",
+            "Python"
+          ],
+          "bulletsRewritten": 6,
+          "generatedBy": "AGENT",
+          "modelId": "claude-sonnet-5",
+          "promptVersion": "v2.1",
+          "generatedAt": "2026-09-28T06:17:53.004Z",
+          "firmId": "firm_stl"
+        },
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-27T06:17:53.004Z",
+        "changeSummary": null,
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-25T06:17:53.004Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl03_2"
+  },
+  {
+    "id": "resume_cand_stl03_tailored",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl03",
+    "name": "Tailored — Fintech",
+    "isMaster": false,
+    "targetJobId": "job_stl270",
+    "templateId": "template_modern",
+    "versions": [
+      {
+        "id": "rv_cand_stl03_t1",
+        "resumeId": "resume_cand_stl03_tailored",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_modern",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl03_t1_1",
+          "claim_rv_cand_stl03_t1_2",
+          "claim_rv_cand_stl03_t1_3",
+          "claim_rv_cand_stl03_t1_4",
+          "claim_rv_cand_stl03_t1_5"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 77,
+        "atsGrade": "C",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 87,
+        "keywordsMatched": [
+          "Spring Boot",
+          "AWS",
+          "Kubernetes",
+          "Python",
+          "React",
+          "SQL",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "Java"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl03_t1_0",
+            "resumeVersionId": "rv_cand_stl03_t1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced .net developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_t1_1",
+            "resumeVersionId": "rv_cand_stl03_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 0,
+            "text": "Implemented monitoring stack improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_t1_2",
+            "resumeVersionId": "rv_cand_stl03_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 1,
+            "text": "Implemented security scanning improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_t1_3",
+            "resumeVersionId": "rv_cand_stl03_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_0",
+            "bulletIndex": 2,
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_t1_4",
+            "resumeVersionId": "rv_cand_stl03_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_1",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "Metric unverified — source document doesn't mention percentage",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl03_t1_5",
+            "resumeVersionId": "rv_cand_stl03_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl03_1",
+            "bulletIndex": 1,
+            "text": "Reduced costs by 75% through automation",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl03_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-29T06:17:53.004Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-10-01T06:17:53.004Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl03_t1"
+  },
+  {
+    "id": "resume_cand_stl05_master",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl05",
+    "name": "Master Resume",
+    "isMaster": true,
+    "targetJobId": null,
+    "templateId": "template_minimal",
+    "versions": [
+      {
+        "id": "rv_cand_stl05_1",
+        "resumeId": "resume_cand_stl05_master",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_minimal",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl05_1_1",
+          "claim_rv_cand_stl05_1_2",
+          "claim_rv_cand_stl05_1_3",
+          "claim_rv_cand_stl05_1_4",
+          "claim_rv_cand_stl05_1_5",
+          "claim_rv_cand_stl05_1_6",
+          "claim_rv_cand_stl05_1_7",
+          "claim_rv_cand_stl05_1_8",
+          "claim_rv_cand_stl05_1_9",
+          "claim_rv_cand_stl05_1_10",
+          "claim_rv_cand_stl05_1_11"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 86,
+        "atsGrade": "B",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": false
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": false
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": false
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 62,
+        "keywordsMatched": [
+          "Java",
+          "AWS",
+          "Kubernetes",
+          "SQL",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "Spring Boot",
+          "Python",
+          "React"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl05_1_0",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced cloud architect specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_1",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_0",
+            "bulletIndex": 0,
+            "text": "Led team of 2 engineers on platform migration",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_2",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_0",
+            "bulletIndex": 1,
+            "text": "Developed and maintained REST APIs serving 21M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_3",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_0",
+            "bulletIndex": 2,
+            "text": "Developed and maintained microservices serving 20M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_4",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_1",
+            "bulletIndex": 0,
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "No evidence on record for team size — needs candidate confirmation",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_5",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_1",
+            "bulletIndex": 1,
+            "text": "Developed and maintained REST APIs serving 0M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_6",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_2",
+            "bulletIndex": 0,
+            "text": "Led team of 4 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_7",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_2",
+            "bulletIndex": 1,
+            "text": "Led team of 9 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_8",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_2",
+            "bulletIndex": 2,
+            "text": "Implemented monitoring stack improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_6",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_9",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_2",
+            "bulletIndex": 3,
+            "text": "Implemented test automation improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_7",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_10",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_3",
+            "bulletIndex": 0,
+            "text": "Developed and maintained REST APIs serving 18M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_8",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_1_11",
+            "resumeVersionId": "rv_cand_stl05_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_3",
+            "bulletIndex": 1,
+            "text": "Developed and maintained data pipelines serving 25M+ users",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "No evidence on record for team size — needs candidate confirmation",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-26T06:17:53.004Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-09T06:17:53.004Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl05_1"
+  },
+  {
+    "id": "resume_cand_stl05_tailored",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl05",
+    "name": "Tailored — Healthcare",
+    "isMaster": false,
+    "targetJobId": "job_stl356",
+    "templateId": "template_modern",
+    "versions": [
+      {
+        "id": "rv_cand_stl05_t1",
+        "resumeId": "resume_cand_stl05_tailored",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_modern",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl05_t1_1",
+          "claim_rv_cand_stl05_t1_2",
+          "claim_rv_cand_stl05_t1_3",
+          "claim_rv_cand_stl05_t1_4",
+          "claim_rv_cand_stl05_t1_5",
+          "claim_rv_cand_stl05_t1_6",
+          "claim_rv_cand_stl05_t1_7",
+          "claim_rv_cand_stl05_t1_8",
+          "claim_rv_cand_stl05_t1_9",
+          "claim_rv_cand_stl05_t1_10",
+          "claim_rv_cand_stl05_t1_11"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 80,
+        "atsGrade": "B",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": false
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": false
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 37,
+        "keywordsMatched": [
+          "Kubernetes",
+          "Python",
+          "React"
+        ],
+        "keywordsMissing": [
+          "Java",
+          "Spring Boot",
+          "AWS",
+          "SQL",
+          "Agile"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl05_t1_0",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced cloud architect specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_1",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_0",
+            "bulletIndex": 0,
+            "text": "Led team of 2 engineers on platform migration",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_2",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_0",
+            "bulletIndex": 1,
+            "text": "Developed and maintained REST APIs serving 21M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_3",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_0",
+            "bulletIndex": 2,
+            "text": "Developed and maintained microservices serving 20M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_4",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_1",
+            "bulletIndex": 0,
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_5",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_1",
+            "bulletIndex": 1,
+            "text": "Developed and maintained REST APIs serving 0M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_6",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_2",
+            "bulletIndex": 0,
+            "text": "Led team of 4 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_7",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_2",
+            "bulletIndex": 1,
+            "text": "Led team of 9 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_8",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_2",
+            "bulletIndex": 2,
+            "text": "Implemented monitoring stack improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_6",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_9",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_2",
+            "bulletIndex": 3,
+            "text": "Implemented test automation improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_7",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_10",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_3",
+            "bulletIndex": 0,
+            "text": "Developed and maintained REST APIs serving 18M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl05_8",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl05_t1_11",
+            "resumeVersionId": "rv_cand_stl05_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl05_3",
+            "bulletIndex": 1,
+            "text": "Developed and maintained data pipelines serving 25M+ users",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "No evidence on record for team size — needs candidate confirmation",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-25T06:17:53.004Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-20T06:17:53.004Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl05_t1"
+  },
+  {
+    "id": "resume_cand_stl15_master",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl15",
+    "name": "Master Resume",
+    "isMaster": true,
+    "targetJobId": null,
+    "templateId": "template_classic",
+    "versions": [
+      {
+        "id": "rv_cand_stl15_1",
+        "resumeId": "resume_cand_stl15_master",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_classic",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl15_1_1",
+          "claim_rv_cand_stl15_1_2",
+          "claim_rv_cand_stl15_1_3",
+          "claim_rv_cand_stl15_1_4",
+          "claim_rv_cand_stl15_1_5",
+          "claim_rv_cand_stl15_1_6",
+          "claim_rv_cand_stl15_1_7",
+          "claim_rv_cand_stl15_1_8",
+          "claim_rv_cand_stl15_1_9",
+          "claim_rv_cand_stl15_1_10",
+          "claim_rv_cand_stl15_1_11",
+          "claim_rv_cand_stl15_1_12",
+          "claim_rv_cand_stl15_1_13",
+          "claim_rv_cand_stl15_1_14"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 83,
+        "atsGrade": "B",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": false
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": false
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 87,
+        "keywordsMatched": [
+          "Java",
+          "Spring Boot",
+          "AWS",
+          "Kubernetes",
+          "Python",
+          "React",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "SQL"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl15_1_0",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced java full stack developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_1",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 0,
+            "text": "Led team of 5 engineers on greenfield project",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_2",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 1,
+            "text": "Developed and maintained microservices serving 13M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_3",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 2,
+            "text": "Led team of 9 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_4",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 3,
+            "text": "Developed and maintained microservices serving 43M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_5",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 0,
+            "text": "Developed and maintained data pipelines serving 21M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_6",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 1,
+            "text": "Developed and maintained frontend components serving 2M+ users",
+            "state": "CONTRADICTED",
+            "evidenceId": null,
+            "reason": "Contradicted by prior resume version",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_7",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 2,
+            "text": "Reduced bug count by 75% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_8",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 3,
+            "text": "Reduced deployment time by 52% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_9",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_2",
+            "bulletIndex": 0,
+            "text": "Led team of 11 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_6",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_10",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_2",
+            "bulletIndex": 1,
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_7",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_11",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving coverage",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_12",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 1,
+            "text": "Developed and maintained data pipelines serving 16M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_8",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_13",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 2,
+            "text": "Led team of 2 engineers on performance optimization",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_1_14",
+            "resumeVersionId": "rv_cand_stl15_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 3,
+            "text": "Led team of 7 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_9",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-26T06:17:53.005Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-24T06:17:53.005Z"
+      },
+      {
+        "id": "rv_cand_stl15_2",
+        "resumeId": "resume_cand_stl15_master",
+        "versionNumber": 2,
+        "parentVersionId": "rv_cand_stl15_1",
+        "templateId": "template_minimal",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl15_2_1",
+          "claim_rv_cand_stl15_2_2",
+          "claim_rv_cand_stl15_2_3",
+          "claim_rv_cand_stl15_2_4",
+          "claim_rv_cand_stl15_2_5",
+          "claim_rv_cand_stl15_2_6",
+          "claim_rv_cand_stl15_2_7",
+          "claim_rv_cand_stl15_2_8",
+          "claim_rv_cand_stl15_2_9",
+          "claim_rv_cand_stl15_2_10",
+          "claim_rv_cand_stl15_2_11",
+          "claim_rv_cand_stl15_2_12",
+          "claim_rv_cand_stl15_2_13",
+          "claim_rv_cand_stl15_2_14"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 93,
+        "atsGrade": "A",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": false
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": false
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 75,
+        "keywordsMatched": [
+          "Java",
+          "Spring Boot",
+          "AWS",
+          "Python",
+          "React",
+          "SQL"
+        ],
+        "keywordsMissing": [
+          "Kubernetes",
+          "Agile"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl15_2_0",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced java full stack developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_1",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 0,
+            "text": "Led team of 5 engineers on greenfield project",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "Metric unverified — source document doesn't mention percentage",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_2",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 1,
+            "text": "Developed and maintained microservices serving 13M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_3",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 2,
+            "text": "Led team of 9 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_4",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 3,
+            "text": "Developed and maintained microservices serving 43M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_5",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 0,
+            "text": "Developed and maintained data pipelines serving 21M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_6",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 1,
+            "text": "Developed and maintained frontend components serving 2M+ users",
+            "state": "CONTRADICTED",
+            "evidenceId": null,
+            "reason": "Timeline inconsistent with employment record",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_7",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 2,
+            "text": "Reduced bug count by 75% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_8",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 3,
+            "text": "Reduced deployment time by 52% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_9",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_2",
+            "bulletIndex": 0,
+            "text": "Led team of 11 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_6",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_10",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_2",
+            "bulletIndex": 1,
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_7",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_11",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving coverage",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "Metric unverified — source document doesn't mention percentage",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_12",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 1,
+            "text": "Developed and maintained data pipelines serving 16M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_8",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_13",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 2,
+            "text": "Led team of 2 engineers on performance optimization",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_2_14",
+            "resumeVersionId": "rv_cand_stl15_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 3,
+            "text": "Led team of 7 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_9",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": {
+          "token": "trc_rv_cand_stl15_2",
+          "url": "https://track.benchq.app/t/rv_cand_stl15_2",
+          "openCount": 3,
+          "clickCount": 1,
+          "firstOpenedAt": "2026-09-30T06:17:53.005Z",
+          "lastOpenedAt": "2026-09-30T06:17:53.005Z"
+        },
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-29T06:17:53.005Z",
+        "changeSummary": null,
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-20T06:17:53.005Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl15_2"
+  },
+  {
+    "id": "resume_cand_stl15_tailored",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl15",
+    "name": "Tailored — Consulting",
+    "isMaster": false,
+    "targetJobId": "job_stl193",
+    "templateId": "template_classic",
+    "versions": [
+      {
+        "id": "rv_cand_stl15_t1",
+        "resumeId": "resume_cand_stl15_tailored",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_classic",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl15_t1_1",
+          "claim_rv_cand_stl15_t1_2",
+          "claim_rv_cand_stl15_t1_3",
+          "claim_rv_cand_stl15_t1_4",
+          "claim_rv_cand_stl15_t1_5",
+          "claim_rv_cand_stl15_t1_6",
+          "claim_rv_cand_stl15_t1_7",
+          "claim_rv_cand_stl15_t1_8",
+          "claim_rv_cand_stl15_t1_9",
+          "claim_rv_cand_stl15_t1_10",
+          "claim_rv_cand_stl15_t1_11",
+          "claim_rv_cand_stl15_t1_12",
+          "claim_rv_cand_stl15_t1_13",
+          "claim_rv_cand_stl15_t1_14"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 80,
+        "atsGrade": "B",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": false
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": false
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": false
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 75,
+        "keywordsMatched": [
+          "Spring Boot",
+          "AWS",
+          "Python",
+          "React",
+          "SQL",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "Java",
+          "Kubernetes"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl15_t1_0",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced java full stack developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_1",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 0,
+            "text": "Led team of 5 engineers on greenfield project",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_2",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 1,
+            "text": "Developed and maintained microservices serving 13M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_3",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 2,
+            "text": "Led team of 9 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_4",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_0",
+            "bulletIndex": 3,
+            "text": "Developed and maintained microservices serving 43M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_5",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 0,
+            "text": "Developed and maintained data pipelines serving 21M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_6",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 1,
+            "text": "Developed and maintained frontend components serving 2M+ users",
+            "state": "CONTRADICTED",
+            "evidenceId": null,
+            "reason": "No certificate on file; candidate confirmed not held",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_7",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 2,
+            "text": "Reduced bug count by 75% through caching",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_8",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_1",
+            "bulletIndex": 3,
+            "text": "Reduced deployment time by 52% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_9",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_2",
+            "bulletIndex": 0,
+            "text": "Led team of 11 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_6",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_10",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_2",
+            "bulletIndex": 1,
+            "text": "Implemented monitoring stack improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_7",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_11",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving coverage",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_12",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 1,
+            "text": "Developed and maintained data pipelines serving 16M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_8",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_13",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 2,
+            "text": "Led team of 2 engineers on performance optimization",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "Metric unverified — source document doesn't mention percentage",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl15_t1_14",
+            "resumeVersionId": "rv_cand_stl15_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl15_3",
+            "bulletIndex": 3,
+            "text": "Led team of 7 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl15_9",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-28T06:17:53.005Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-04T06:17:53.005Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl15_t1"
+  },
+  {
+    "id": "resume_cand_stl22_master",
+    "firmId": "firm_stl",
+    "candidateId": "cand_stl22",
+    "name": "Master Resume",
+    "isMaster": true,
+    "targetJobId": null,
+    "templateId": "template_minimal",
+    "versions": [
+      {
+        "id": "rv_cand_stl22_1",
+        "resumeId": "resume_cand_stl22_master",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_minimal",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl22_1_1",
+          "claim_rv_cand_stl22_1_2",
+          "claim_rv_cand_stl22_1_3",
+          "claim_rv_cand_stl22_1_4",
+          "claim_rv_cand_stl22_1_5",
+          "claim_rv_cand_stl22_1_6"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 68,
+        "atsGrade": "D",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": false
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 75,
+        "keywordsMatched": [
+          "Java",
+          "Spring Boot",
+          "Python",
+          "React",
+          "SQL",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "AWS",
+          "Kubernetes"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl22_1_0",
+            "resumeVersionId": "rv_cand_stl22_1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced python/django developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_1_1",
+            "resumeVersionId": "rv_cand_stl22_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_0",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_1_2",
+            "resumeVersionId": "rv_cand_stl22_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_0",
+            "bulletIndex": 1,
+            "text": "Reduced bug count by 79% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_1_3",
+            "resumeVersionId": "rv_cand_stl22_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_0",
+            "bulletIndex": 2,
+            "text": "Developed and maintained frontend components serving 41M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_1_4",
+            "resumeVersionId": "rv_cand_stl22_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_1",
+            "bulletIndex": 0,
+            "text": "Reduced deployment time by 37% through refactoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_1_5",
+            "resumeVersionId": "rv_cand_stl22_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_1",
+            "bulletIndex": 1,
+            "text": "Led team of 9 engineers on performance optimization",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_1_6",
+            "resumeVersionId": "rv_cand_stl22_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_1",
+            "bulletIndex": 2,
+            "text": "Reduced deployment time by 71% through automation",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": {
+          "targetJobId": "job_stl064",
+          "targetJobTitle": "Data Engineer",
+          "targetCompanyName": "Deloitte",
+          "keywordsTargeted": [
+            "Java",
+            "Spring Boot",
+            "Python"
+          ],
+          "bulletsRewritten": 4,
+          "generatedBy": "AGENT",
+          "modelId": null,
+          "promptVersion": "v2.1",
+          "generatedAt": "2026-09-20T06:17:53.005Z",
+          "firmId": "firm_stl"
+        },
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-30T06:17:53.005Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-17T06:17:53.005Z"
+      },
+      {
+        "id": "rv_cand_stl22_2",
+        "resumeId": "resume_cand_stl22_master",
+        "versionNumber": 2,
+        "parentVersionId": "rv_cand_stl22_1",
+        "templateId": "template_modern",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_stl22_2_1",
+          "claim_rv_cand_stl22_2_2",
+          "claim_rv_cand_stl22_2_3",
+          "claim_rv_cand_stl22_2_4",
+          "claim_rv_cand_stl22_2_5",
+          "claim_rv_cand_stl22_2_6"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 79,
+        "atsGrade": "C",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": false
+          }
+        ],
+        "keywordScore": 62,
+        "keywordsMatched": [
+          "Java",
+          "AWS",
+          "Kubernetes",
+          "Python",
+          "SQL"
+        ],
+        "keywordsMissing": [
+          "Spring Boot",
+          "React",
+          "Agile"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_stl22_2_0",
+            "resumeVersionId": "rv_cand_stl22_2",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced python/django developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_2_1",
+            "resumeVersionId": "rv_cand_stl22_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_0",
+            "bulletIndex": 0,
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_2_2",
+            "resumeVersionId": "rv_cand_stl22_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_0",
+            "bulletIndex": 1,
+            "text": "Reduced bug count by 79% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_2_3",
+            "resumeVersionId": "rv_cand_stl22_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_0",
+            "bulletIndex": 2,
+            "text": "Developed and maintained frontend components serving 41M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_2_4",
+            "resumeVersionId": "rv_cand_stl22_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_1",
+            "bulletIndex": 0,
+            "text": "Reduced deployment time by 37% through refactoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_2_5",
+            "resumeVersionId": "rv_cand_stl22_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_1",
+            "bulletIndex": 1,
+            "text": "Led team of 9 engineers on performance optimization",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_stl22_2_6",
+            "resumeVersionId": "rv_cand_stl22_2",
+            "section": "experience",
+            "entityId": "exp_rec_cand_stl22_1",
+            "bulletIndex": 2,
+            "text": "Reduced deployment time by 71% through automation",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_stl22_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-28T06:17:53.005Z",
+        "changeSummary": "Added recent project",
+        "createdByUserId": "user_kiran",
+        "createdAt": "2026-09-08T06:17:53.005Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_stl22_2"
+  },
+  {
+    "id": "resume_cand_cbw06_master",
+    "firmId": "firm_cbw",
+    "candidateId": "cand_cbw06",
+    "name": "Master Resume",
+    "isMaster": true,
+    "targetJobId": null,
+    "templateId": "template_minimal",
+    "versions": [
+      {
+        "id": "rv_cand_cbw06_1",
+        "resumeId": "resume_cand_cbw06_master",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_minimal",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_cbw06_1_1",
+          "claim_rv_cand_cbw06_1_2",
+          "claim_rv_cand_cbw06_1_3",
+          "claim_rv_cand_cbw06_1_4",
+          "claim_rv_cand_cbw06_1_5",
+          "claim_rv_cand_cbw06_1_6",
+          "claim_rv_cand_cbw06_1_7",
+          "claim_rv_cand_cbw06_1_8"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 93,
+        "atsGrade": "A",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": true
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": true
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": true
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 62,
+        "keywordsMatched": [
+          "Java",
+          "Spring Boot",
+          "AWS",
+          "Kubernetes",
+          "Python"
+        ],
+        "keywordsMissing": [
+          "React",
+          "SQL",
+          "Agile"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_cbw06_1_0",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced salesforce developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_1_1",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_0",
+            "bulletIndex": 0,
+            "text": "Led team of 10 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_1_2",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_0",
+            "bulletIndex": 1,
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_1_3",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_0",
+            "bulletIndex": 2,
+            "text": "Implemented CI/CD pipeline improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_1_4",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_0",
+            "bulletIndex": 3,
+            "text": "Implemented test automation improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_1_5",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_1",
+            "bulletIndex": 0,
+            "text": "Reduced deployment time by 72% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_1_6",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_1",
+            "bulletIndex": 1,
+            "text": "Developed and maintained data pipelines serving 10M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_1_7",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_1",
+            "bulletIndex": 2,
+            "text": "Implemented test automation improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_6",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_1_8",
+            "resumeVersionId": "rv_cand_cbw06_1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_1",
+            "bulletIndex": 3,
+            "text": "Reduced bug count by 70% through refactoring",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "AI-generated bullet — human review required",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": {
+          "targetJobId": "job_cbw247",
+          "targetJobTitle": "React Developer",
+          "targetCompanyName": "Deloitte",
+          "keywordsTargeted": [
+            "Java",
+            "Spring Boot",
+            "AWS"
+          ],
+          "bulletsRewritten": 5,
+          "generatedBy": "AGENT",
+          "modelId": "claude-sonnet-5",
+          "promptVersion": null,
+          "generatedAt": "2026-09-27T06:17:53.004Z",
+          "firmId": "firm_cbw"
+        },
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-28T06:17:53.004Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_rehana",
+        "createdAt": "2026-09-28T06:17:53.004Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_cbw06_1"
+  },
+  {
+    "id": "resume_cand_cbw06_tailored",
+    "firmId": "firm_cbw",
+    "candidateId": "cand_cbw06",
+    "name": "Tailored — Fintech",
+    "isMaster": false,
+    "targetJobId": "job_cbw116",
+    "templateId": "template_modern",
+    "versions": [
+      {
+        "id": "rv_cand_cbw06_t1",
+        "resumeId": "resume_cand_cbw06_tailored",
+        "versionNumber": 1,
+        "parentVersionId": null,
+        "templateId": "template_modern",
+        "includedSectionIds": [
+          "summary",
+          "experience",
+          "education",
+          "skills"
+        ],
+        "includedBulletIds": [
+          "claim_rv_cand_cbw06_t1_1",
+          "claim_rv_cand_cbw06_t1_2",
+          "claim_rv_cand_cbw06_t1_3",
+          "claim_rv_cand_cbw06_t1_4",
+          "claim_rv_cand_cbw06_t1_5",
+          "claim_rv_cand_cbw06_t1_6",
+          "claim_rv_cand_cbw06_t1_7",
+          "claim_rv_cand_cbw06_t1_8"
+        ],
+        "bulletOverrides": {},
+        "atsScore": 72,
+        "atsGrade": "D",
+        "atsIssues": [
+          {
+            "check": "SEMANTIC_HEADINGS",
+            "label": "Semantic headings",
+            "severity": "BLOCKER",
+            "message": "No semantic heading structure detected",
+            "fix": "Use standard section headers: Experience, Education, Skills",
+            "passed": false
+          },
+          {
+            "check": "TABLE_DETECTED",
+            "label": "Tables detected",
+            "severity": "IMPORTANT",
+            "message": "Tables may not parse correctly in ATS",
+            "fix": "Replace tables with plain text formatting",
+            "passed": false
+          },
+          {
+            "check": "FONT_COUNT",
+            "label": "Font count",
+            "severity": "MINOR",
+            "message": "More than 2 fonts detected",
+            "fix": "Limit to 1-2 professional fonts",
+            "passed": true
+          },
+          {
+            "check": "IMAGE_TEXT",
+            "label": "Text in images",
+            "severity": "BLOCKER",
+            "message": "Text embedded in images cannot be parsed",
+            "fix": "Replace image text with selectable text",
+            "passed": false
+          },
+          {
+            "check": "CONTACT_BLOCK",
+            "label": "Contact information",
+            "severity": "IMPORTANT",
+            "message": "Missing or incomplete contact block",
+            "fix": "Include name, email, phone, and location at the top",
+            "passed": true
+          },
+          {
+            "check": "DATE_FORMAT",
+            "label": "Date format",
+            "severity": "MINOR",
+            "message": "Inconsistent date formatting",
+            "fix": "Use consistent format like 'MMM YYYY'",
+            "passed": true
+          },
+          {
+            "check": "SECTION_ORDER",
+            "label": "Section ordering",
+            "severity": "MINOR",
+            "message": "Non-standard section ordering",
+            "fix": "Use: Summary, Experience, Education, Skills, Certifications",
+            "passed": true
+          }
+        ],
+        "keywordScore": 87,
+        "keywordsMatched": [
+          "Java",
+          "AWS",
+          "Kubernetes",
+          "Python",
+          "React",
+          "SQL",
+          "Agile"
+        ],
+        "keywordsMissing": [
+          "Spring Boot"
+        ],
+        "claims": [
+          {
+            "id": "claim_rv_cand_cbw06_t1_0",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "summary",
+            "entityId": null,
+            "bulletIndex": null,
+            "text": "Experienced salesforce developer specializing in enterprise applications. Strong track record of delivering scalable solutions in fast-paced environments.",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_summary",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_t1_1",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_0",
+            "bulletIndex": 0,
+            "text": "Led team of 10 engineers on greenfield project",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_0",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_t1_2",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_0",
+            "bulletIndex": 1,
+            "text": "Implemented security scanning improving velocity",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_1",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_t1_3",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_0",
+            "bulletIndex": 2,
+            "text": "Implemented CI/CD pipeline improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_2",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_t1_4",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_0",
+            "bulletIndex": 3,
+            "text": "Implemented test automation improving coverage",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_3",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_t1_5",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_1",
+            "bulletIndex": 0,
+            "text": "Reduced deployment time by 72% through monitoring",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_4",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_t1_6",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_1",
+            "bulletIndex": 1,
+            "text": "Developed and maintained data pipelines serving 10M+ users",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_5",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_t1_7",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_1",
+            "bulletIndex": 2,
+            "text": "Implemented test automation improving reliability",
+            "state": "VERIFIED",
+            "evidenceId": "ev_rec_cand_cbw06_6",
+            "reason": null,
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          },
+          {
+            "id": "claim_rv_cand_cbw06_t1_8",
+            "resumeVersionId": "rv_cand_cbw06_t1",
+            "section": "experience",
+            "entityId": "exp_rec_cand_cbw06_1",
+            "bulletIndex": 3,
+            "text": "Reduced bug count by 70% through refactoring",
+            "state": "UNVERIFIED",
+            "evidenceId": null,
+            "reason": "Metric unverified — source document doesn't mention percentage",
+            "overriddenByUserId": null,
+            "overrideReason": null,
+            "overriddenAt": null
+          }
+        ],
+        "tailoring": null,
+        "tracer": null,
+        "pdfUrl": null,
+        "docxUrl": null,
+        "renderedAt": "2026-09-30T06:17:53.005Z",
+        "changeSummary": "Initial version",
+        "createdByUserId": "user_rehana",
+        "createdAt": "2026-09-14T06:17:53.005Z"
+      }
+    ],
+    "latestVersionId": "rv_cand_cbw06_t1"
   }
 ]

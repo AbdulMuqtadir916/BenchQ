@@ -26,7 +26,7 @@ type StartFrom = "record" | "blank";
 
 function composeDocument(id: string, start: StartFrom, candidate: Candidate, record: Record_ | undefined, templateId: string, upload: string | null): ResumeDocument {
   const name = upload ? upload.replace(/\.[a-z]+$/i, "").replace(/[_-]+/g, " ") : "Untitled resume";
-  const shell = { id, candidateId: candidate.id, name, isMaster: false, targetJobId: null, templateId, versions: [], latestVersionId: "" };
+  const shell = { id, firmId: candidate.firmId, candidateId: candidate.id, name, isMaster: false, targetJobId: null, templateId, versions: [], latestVersionId: "" };
   const doc = buildResumeDocument(shell, candidate, start === "record" ? record : undefined);
   if (start === "blank") {
     return { ...doc, summary: newClaim(), experience: [{ id: newId("exp"), company: "", title: "", location: "", dates: "", description: "", bullets: [newClaim()] }] };

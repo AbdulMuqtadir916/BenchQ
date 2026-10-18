@@ -21,6 +21,7 @@ export type MailSignal = z.infer<typeof MailSignal>;
 
 export const InboxMessageSchema = z.object({
   id: z.string(),
+  firmId: z.string(),
   candidateId: z.string(),
   /** Null when the email couldn't be matched to an application. */
   applicationId: z.string().nullable(),
@@ -40,6 +41,7 @@ export const InboxMessageSchema = z.object({
 export type InboxMessage = z.infer<typeof InboxMessageSchema>;
 
 export const MailboxConnectionSchema = z.object({
+  firmId: z.string(),
   candidateId: z.string(),
   provider: z.literal("GOOGLE"),
   address: z.string(),
@@ -49,6 +51,7 @@ export const MailboxConnectionSchema = z.object({
 export type MailboxConnection = z.infer<typeof MailboxConnectionSchema>;
 
 export const CandidateInboxSchema = z.object({
+  firmId: z.string(),
   connection: MailboxConnectionSchema.nullable(),
   messages: z.array(InboxMessageSchema),
 });
