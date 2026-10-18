@@ -43,12 +43,14 @@ describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every
     expect(await outcomesFor(principal)).toEqual(expected);
   });
 
-  it("platform admin without a support view: every slug, known or not, is the support interstitial (§2.5 row 4), and no firm is looked up", async () => {
+  it("platform admin without a support view: every existing firm is the support interstitial (§2.5 row 4); an unknown slug is not-found (row 2 comes first)", async () => {
     const { principal } = await sessionApi.devSignInAs("padm_sana");
     expect(principal.kind).toBe("platform");
-    expect(Object.values(await outcomesFor(principal))).toEqual(slugs.map(() => "support-required"));
-    // The lookup itself refuses a non-member (the gate doesn't even ask): a support view is P4.
-    await expect(sessionApi.firmBySlug(firms[0]!.slug)).rejects.toMatchObject({ status: 404 });
+    const expected = Object.fromEntries(slugs.map((slug) => [slug, slug === UNKNOWN_SLUG ? "not-found" : "support-required"]));
+    expect(await outcomesFor(principal)).toEqual(expected);
+    // The lookup answers an admin for any existing firm (they manage them all), but its data stays closed: support view is P4.
+    expect((await sessionApi.firmBySlug(firms[0]!.slug)).id).toBe(firms[0]!.id);
+    await expect(sessionApi.firmBySlug(UNKNOWN_SLUG)).rejects.toMatchObject({ status: 404 });
   });
 
   it("covers a user of every firm that has users, including the suspended one", () => {
@@ -84,6 +86,14 @@ describe("firmOutcome edges", () => {
   it("checks membership itself too: a firm the backend returned that isn't the principal's is not-found", () => {
     expect(firmOutcome(principal, { status: "success", firm: firm({ id: "firm_b" }) }).kind).toBe("not-found");
     expect(firmOutcome(principal, { status: "success", firm: firm({ id: "firm_b", status: "SUSPENDED" }) }).kind).toBe("not-found");
+  });
+
+  it("gives a platform admin not-found for an unknown slug and the interstitial only for a firm that exists", () => {
+    const admin = { kind: "platform" as const, userId: "padm", role: "PLATFORM_ADMIN" as const, support: null };
+    expect(firmOutcome(admin, { status: "pending" }).kind).toBe("resolving");
+    expect(firmOutcome(admin, { status: "error", error: new ApiError("nope", "NOT_FOUND", 404) }).kind).toBe("not-found");
+    expect(firmOutcome(admin, { status: "success", firm: firm({}) }).kind).toBe("support-required");
+    expect(firmOutcome(admin, { status: "success", firm: firm({ status: "SUSPENDED" }) }).kind).toBe("support-required");
   });
 
   it("checks signed-out first and suspended after membership (§2.5 order)", () => {

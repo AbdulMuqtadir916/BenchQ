@@ -137,6 +137,12 @@ they read (`sessionApi.devSignInAs`).
 `["*"]`), then load the screen with an empty cache (e.g. after a principal switch); set it to `[]`
 and press Retry to recover. Inert in production builds.
 
+**Dev session survives a full page load** (dev builds only, `src/components/dev/dev-session-restore.tsx`):
+the dev switcher's principal is remembered in this tab's `sessionStorage` (`benchq.dev.principal`), so
+a typed URL, a reload or an unknown route keeps who you were signed in as; sign-out forgets it. Mock
+data still resets on reload, so a principal the fresh data doesn't have (a dev-accepted invite's
+user) is dropped and the default user (Adnan) stays. Absent from production builds.
+
 ---
 
 ## 4. What the fixtures must contain

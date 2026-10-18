@@ -6,7 +6,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { useCurrentSession } from "@/lib/hooks/use-session";
 import { landingHref } from "@/lib/routes/landing";
 import { hrefFor } from "@/lib/routes/registry";
-import { useSession } from "@/lib/stores/session-store";
+import { useIsSessionSettling, useSession } from "@/lib/stores/session-store";
 import { GateScreen, GateSkeleton } from "./gate-screen";
 
 /**
@@ -16,7 +16,7 @@ import { GateScreen, GateSkeleton } from "./gate-screen";
 export function Landing() {
   const router = useRouter();
   const isSignedIn = useSession((s) => s.principal !== null);
-  const isSessionPending = useSession((s) => s.pending !== null);
+  const isSessionPending = useIsSessionSettling();
   const session = useCurrentSession();
   const target = isSessionPending ? null : !isSignedIn || session.data === null ? hrefFor("sign-in") : session.data ? landingHref(session.data) : null;
 

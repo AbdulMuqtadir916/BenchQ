@@ -7,8 +7,9 @@ export const sessionApi = {
   current: async (): Promise<Session | null> => (await mock()).current(),
 
   /**
-   * The firm a URL slug names, for the firm layout (docs/07 §2.5). 404 for an unknown slug and for a
-   * firm the signed-in user doesn't belong to alike; 401 when signed out.
+   * The firm a URL slug names, for the firm layout (docs/07 §2.5). For a firm user: 404 for an unknown
+   * slug and for a firm they don't belong to alike. For a platform admin: any existing firm, 404 for an
+   * unknown slug. 401 when signed out.
    */
   firmBySlug: async (slug: string): Promise<Firm> => (await mock()).firmBySlug(slug),
 

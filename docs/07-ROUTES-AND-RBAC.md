@@ -39,6 +39,8 @@ All decisions live here. Change a decision here first, then the sections below.
 | Q20 | Support view and audit (A12–A14) | Support view is a **fixed 60 minutes, no extension**: to continue, start a new view (new reason, new ledger entry). The firm sees the admin's **name** and the **reason as written**, never the email. **Any event about a firm carries its `firmId`** and shows in that firm's `/[firm]/ledger`: `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `PLAN_CHANGED`, firm invites, `ADMIN_ACCESS`, `ADMIN_ACCESS_END`. `firmId` is null only for platform-only events (admin sign-ins, platform-team invites, plan catalogue edits); `/admin/audit` shows everything. **No `PlanChange` entity**: plan history is derived from `PLAN_CHANGED` entries whose summary states before and after (e.g. "Starter → Growth, seats 5 → 10") | 2026-10-14 |
 | Q21 | Smaller points (A15, A17) | `Plan.features` is display labels only; no feature flags until something gates on them. Agent and tailoring runs are firm-scoped (`firmId`), because `/admin/system` needs AI spend by firm and joins are fragile | 2026-10-14 |
 | Q22 | Slug-less URLs from before firm URLs (e.g. `/candidates`) | **Not-found, no redirect** (decided 2026-10-18): no such links exist outside the prototype demo. If old links ever appear, a redirect can prepend the signed-in user's slug and match the result against the same registry (`matchRoute`), so no second route list is needed |
+| Q23 | Where the firm-side invite flow lives | **Phase M, after Phase S** (approved 2026-10-18): OWNER invites / resends / revokes on settings/team (Q15) and firm pages read pending invites. Depends on C (`member.*` through `can()`) and S (shared invite adapter, `/invite/[token]`, the suspended-firm invite answers that change seat counts) |
+| Q24 | How a resend is logged | **Another `INVITE_SENT`** in the firm's ledger, summary **"Invite resent to <email>"** (approved 2026-10-18). No new ledger action, no contract change |
 
 ---
 
@@ -145,7 +147,7 @@ help, status, settings, new`.
 | Signed out                                    | redirect `/sign-in?returnTo=<path>`                                                                                      |
 | Slug unknown                                  | not-found                                                                                                                |
 | Firm user, different firm                     | not-found                                                                                                                |
-| Platform admin, no support view for this firm | **Support interstitial**: "Open a read-only support view of {firm}?" + required reason → starts the view. Not a redirect |
+| Platform admin, no support view for this firm | **Support interstitial**: "Open a read-only support view of {firm}?" + required reason → starts the view. Not a redirect. Only for a firm that exists: an unknown slug is not-found for a platform admin too (the "Slug unknown" row comes first) |
 | Firm status `SUSPENDED`, firm user            | "Workspace suspended — contact your BenchQ account manager" screen on every route                                        |
 | Firm status `SUSPENDED`, support view         | renders normally (read-only)                                                                                             |
 | Otherwise                                     | page, subject to the route's access level                                                                                |
@@ -308,7 +310,7 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | Planned                            |
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
 | **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit, system                                                                                                   | P, B             | Planned                            |
-| **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Proposed (2026-10-18)              |
+| **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Planned (Q23)                      |
 | **D**  | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks                                                                                                           | backend D1/D2    | Later                              |
 
 **Why C moves before B (change from v1):** the audit checks that controls a principal can't use
@@ -421,7 +423,7 @@ the other firm's data (checked on every list screen); query keys all include `fi
 | #   | Task                                                                                                                                                                           |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | P1  | Registry v2 (§5): `area`, `access` union, `admin` shell and nav section, helpers on `Principal` — **done in PR 12** (`feat/platform-shell`): `RouteAccess` union, `area: "platform"`, `admin` shell / nav section; every helper (`accessFor`, `accessForPath`, `canOpen`, `navFor`, `paletteRoutesFor`, `shortcutsFor`, `landingFor`) takes a `Principal`; the Support column is derived (`supportAccess`: read where OWNER has access, `none` on `welcome`, `candidates/new`, `jobs/capture`, `focus`, `settings/preferences`) and table-tested against §2.2. Platform sessions are real: the mock backend, the session store (`principal`, `user` or `platformUser`) and the dev switcher sign in as a Super Admin; the membership check refuses a platform admin on every firm call (404) until P4 |
-| P2  | `src/app/admin/layout.tsx`: admin shell (same frosted shell, admin nav), platform guard → not-found for others — **done in PR 12**: `src/app/admin/layout.tsx` → `PlatformGate` (signed out → sign-in with returnTo; any non-admin → not-found, no shell) → `AppShell variant="admin"` (admin nav, no firm notifications). `/admin` is a placeholder page until P3. The tab title names a platform route only to a platform admin (principle 4). A platform admin on a firm URL gets `support-required` (§2.5 row 4) — a plain screen with "Back to admin" until P4 builds the interstitial; ⌘K for an admin already lists only platform routes (P5 adds firms search and "View workspace") |
+| P2  | `src/app/admin/layout.tsx`: admin shell (same frosted shell, admin nav), platform guard → not-found for others — **done in PR 12**: `src/app/admin/layout.tsx` → `PlatformGate` (signed out → sign-in with returnTo; any non-admin → not-found, no shell) → `AppShell variant="admin"` (admin nav, no firm notifications). `/admin` is a placeholder page until P3. The tab title names a platform route only to a platform admin (principle 4). A platform admin on a firm URL gets `support-required` (§2.5 row 4) — a plain screen with "Back to admin" until P4 builds the interstitial; ⌘K for an admin already lists only platform routes (P5 adds firms search and "View workspace"). Follow-up PR: a platform admin on an **unknown** firm slug gets not-found (an existing one the interstitial); an unknown `/admin/…` URL renders not-found **inside the admin shell** (`admin/[...unknown]` catch-all + `admin/not-found.tsx`; catch-alls aren't registry routes) |
 | P3  | Every route in §2.3 with real layout and skeleton / empty / error (and not-found for `[firmId]`), on mock adapters `platformApi` (`firms`, `plans`, `audit`, `system`, `team`) |
 | P4  | Support view (§4): start / exit / expiry, interstitial, banner, ledger entries, support access column                                                                          |
 | P5  | ⌘K for admins: firms search, "View workspace", admin nav; firm-scoped commands hidden outside a firm                                                                           |
@@ -486,7 +488,7 @@ invites, plans, suspend/reactivate, audit, system. Out of scope until then.
 
 ---
 
-## Phase M — Firm members and invites (firm side) — proposed 2026-10-18
+## Phase M — Firm members and invites (firm side) — approved 2026-10-18 (Q23)
 
 The firm half of the invite flow. Today only the Super Admin side is planned (S: the OWNER's invite
 when a firm is created, resend / revoke on `/admin/firms/[firmId]/users`), and the dev switcher
@@ -497,7 +499,7 @@ stands in for accepting.
 | M1  | Firm-scoped invites adapter: list a firm's invites (with `effectiveInviteStatus`), create, resend (same row, new token, +7 days, Q19), revoke; mock behind the membership check |
 | M2  | `settings/team`: OWNER invites a member (email + role, never OWNER, A10), resends, revokes, sees pending / expired invites; blocked when `canAddSeat` is false (Q17). MANAGER sees the list read-only (Q15); BDE / VIEWER can't open the page |
 | M3  | Firm pages read pending invites: the OWNER card becomes **"Seats used x / seatLimit"** from `deriveFirmUsage` (A1), the same function and data `/admin` uses, so the two can't disagree; a test renders both from one fixture state |
-| M4  | Ledger, with the approved actions only (docs/02): `INVITE_SENT` on invite, `INVITE_REVOKED` on revoke, `INVITE_ACCEPTED` on acceptance, in the firm's own ledger (Q20). **Open:** a resend has no action of its own; logging it as another `INVITE_SENT` is the default, and a separate `INVITE_RESENT` would be a contract change (product decision) |
+| M4  | Ledger, with the approved actions only (docs/02): `INVITE_SENT` on invite, `INVITE_REVOKED` on revoke, `INVITE_ACCEPTED` on acceptance, in the firm's own ledger (Q20). A resend logs another `INVITE_SENT` with the summary "Invite resent to <email>" (Q24) |
 | M5  | Tests: the Q15 matrix through `can()` (OWNER only for `member.*`), the seat block at the limit, resend keeps the row and resets `expiresAt`, a firm can't see or touch another firm's invites |
 
 **Why after S, depending on C and S:**
@@ -524,7 +526,7 @@ stands in for accepting.
    by `firmId` and checks the principal.
 2. Server-readable session cookie; the frontend reads the principal server-side.
 3. `src/proxy.ts` for optimistic redirects only (signed out → `/sign-in`).
-4. `forbidden()` + `forbidden.tsx`; firm and admin layouts check the principal on the server.
+4. `forbidden()` + `forbidden.tsx`; firm and admin layouts check the principal on the server. Until then the gates run in the browser, so a not-found under `/[firm]/…` or `/admin/…` (unknown slug, another firm, a non-admin at `/admin`, an unknown admin URL) answers **HTTP 200** with the not-found screen; the 404 status arrives with this step.
 5. Client `scope*` helpers deleted; the dev principal switcher deleted.
 
 ---

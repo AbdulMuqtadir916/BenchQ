@@ -3,14 +3,14 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { hrefFor } from "@/lib/routes/registry";
-import { useSession } from "@/lib/stores/session-store";
+import { useIsSessionSettling, useSession } from "@/lib/stores/session-store";
 import { GateSkeleton } from "./gate-screen";
 
 /** For signed-in pages outside a firm (/dev): signed out → sign-in with returnTo, like the firm gate. UX, not security. */
 export function SignedInGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const isSignedIn = useSession((s) => s.principal !== null);
-  const isSessionPending = useSession((s) => s.pending !== null);
+  const isSessionPending = useIsSessionSettling();
 
   useEffect(() => {
     if (isSignedIn || isSessionPending) return;
