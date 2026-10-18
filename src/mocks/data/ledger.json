@@ -1,6 +1,7 @@
 [
   {
     "id": "ledger_001",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -17,6 +18,7 @@
   },
   {
     "id": "ledger_002",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "Vikram Desai",
@@ -33,6 +35,7 @@
   },
   {
     "id": "ledger_003",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "Adnan Khan",
@@ -49,6 +52,7 @@
   },
   {
     "id": "ledger_004",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "Vikram Desai",
@@ -65,6 +69,7 @@
   },
   {
     "id": "ledger_005",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "AGENT",
     "actorName": "Vikram Desai",
@@ -81,6 +86,7 @@
   },
   {
     "id": "ledger_006",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "System",
@@ -97,6 +103,7 @@
   },
   {
     "id": "ledger_007",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "AGENT",
     "actorName": "Sneha Rao",
@@ -113,6 +120,7 @@
   },
   {
     "id": "ledger_008",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "SYSTEM",
     "actorName": "Vikram Desai",
@@ -129,6 +137,7 @@
   },
   {
     "id": "ledger_009",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "SYSTEM",
     "actorName": "Sneha Rao",
@@ -145,6 +154,7 @@
   },
   {
     "id": "ledger_010",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -161,6 +171,7 @@
   },
   {
     "id": "ledger_011",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Adnan Khan",
@@ -177,6 +188,7 @@
   },
   {
     "id": "ledger_012",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "Adnan Khan",
@@ -193,6 +205,7 @@
   },
   {
     "id": "ledger_013",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "USER",
     "actorName": "System",
@@ -209,6 +222,7 @@
   },
   {
     "id": "ledger_014",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "AI Agent",
@@ -225,6 +239,7 @@
   },
   {
     "id": "ledger_015",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "AGENT",
     "actorName": "Sneha Rao",
@@ -241,6 +256,7 @@
   },
   {
     "id": "ledger_016",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -257,6 +273,7 @@
   },
   {
     "id": "ledger_017",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "Vikram Desai",
@@ -273,6 +290,7 @@
   },
   {
     "id": "ledger_018",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "AGENT",
     "actorName": "Adnan Khan",
@@ -289,6 +307,7 @@
   },
   {
     "id": "ledger_019",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Adnan Khan",
@@ -305,6 +324,7 @@
   },
   {
     "id": "ledger_020",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "Sneha Rao",
@@ -321,6 +341,7 @@
   },
   {
     "id": "ledger_021",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -337,6 +358,7 @@
   },
   {
     "id": "ledger_022",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "AI Agent",
@@ -353,6 +375,7 @@
   },
   {
     "id": "ledger_023",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -369,6 +392,7 @@
   },
   {
     "id": "ledger_024",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "AGENT",
     "actorName": "Vikram Desai",
@@ -385,6 +409,7 @@
   },
   {
     "id": "ledger_025",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -401,6 +426,7 @@
   },
   {
     "id": "ledger_026",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "Vikram Desai",
@@ -417,6 +443,7 @@
   },
   {
     "id": "ledger_027",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "Vikram Desai",
@@ -433,6 +460,7 @@
   },
   {
     "id": "ledger_028",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -449,6 +477,7 @@
   },
   {
     "id": "ledger_029",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -465,6 +494,7 @@
   },
   {
     "id": "ledger_030",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "AGENT",
     "actorName": "AI Agent",
@@ -481,6 +511,7 @@
   },
   {
     "id": "ledger_031",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -497,6 +528,7 @@
   },
   {
     "id": "ledger_032",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "AGENT",
     "actorName": "System",
@@ -513,6 +545,7 @@
   },
   {
     "id": "ledger_033",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -529,6 +562,7 @@
   },
   {
     "id": "ledger_034",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "System",
@@ -545,6 +579,7 @@
   },
   {
     "id": "ledger_035",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "AI Agent",
@@ -561,6 +596,7 @@
   },
   {
     "id": "ledger_036",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "SYSTEM",
     "actorName": "Vikram Desai",
@@ -577,6 +613,7 @@
   },
   {
     "id": "ledger_037",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "System",
@@ -593,6 +630,7 @@
   },
   {
     "id": "ledger_038",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "Vikram Desai",
@@ -609,6 +647,7 @@
   },
   {
     "id": "ledger_039",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "AI Agent",
@@ -625,6 +664,7 @@
   },
   {
     "id": "ledger_040",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -641,6 +681,7 @@
   },
   {
     "id": "ledger_041",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "AGENT",
     "actorName": "Sneha Rao",
@@ -657,6 +698,7 @@
   },
   {
     "id": "ledger_042",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "System",
@@ -673,6 +715,7 @@
   },
   {
     "id": "ledger_043",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "SYSTEM",
     "actorName": "Sneha Rao",
@@ -689,6 +732,7 @@
   },
   {
     "id": "ledger_044",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -705,6 +749,7 @@
   },
   {
     "id": "ledger_045",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -721,6 +766,7 @@
   },
   {
     "id": "ledger_046",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "AGENT",
     "actorName": "System",
@@ -737,6 +783,7 @@
   },
   {
     "id": "ledger_047",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "Sneha Rao",
@@ -753,6 +800,7 @@
   },
   {
     "id": "ledger_048",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -769,6 +817,7 @@
   },
   {
     "id": "ledger_049",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -785,6 +834,7 @@
   },
   {
     "id": "ledger_050",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "SYSTEM",
     "actorName": "System",
@@ -801,6 +851,7 @@
   },
   {
     "id": "ledger_051",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "AGENT",
     "actorName": "System",
@@ -817,6 +868,7 @@
   },
   {
     "id": "ledger_052",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "AGENT",
     "actorName": "System",
@@ -833,6 +885,7 @@
   },
   {
     "id": "ledger_053",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -849,6 +902,7 @@
   },
   {
     "id": "ledger_054",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -865,6 +919,7 @@
   },
   {
     "id": "ledger_055",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -881,6 +936,7 @@
   },
   {
     "id": "ledger_056",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "AI Agent",
@@ -897,6 +953,7 @@
   },
   {
     "id": "ledger_057",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "Adnan Khan",
@@ -913,6 +970,7 @@
   },
   {
     "id": "ledger_058",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "Vikram Desai",
@@ -929,6 +987,7 @@
   },
   {
     "id": "ledger_059",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "SYSTEM",
     "actorName": "AI Agent",
@@ -945,6 +1004,7 @@
   },
   {
     "id": "ledger_060",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -961,6 +1021,7 @@
   },
   {
     "id": "ledger_061",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "SYSTEM",
     "actorName": "System",
@@ -977,6 +1038,7 @@
   },
   {
     "id": "ledger_062",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "AGENT",
     "actorName": "Sneha Rao",
@@ -993,6 +1055,7 @@
   },
   {
     "id": "ledger_063",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "AGENT",
     "actorName": "AI Agent",
@@ -1009,6 +1072,7 @@
   },
   {
     "id": "ledger_064",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "SYSTEM",
     "actorName": "System",
@@ -1025,6 +1089,7 @@
   },
   {
     "id": "ledger_065",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -1041,6 +1106,7 @@
   },
   {
     "id": "ledger_066",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "AGENT",
     "actorName": "System",
@@ -1057,6 +1123,7 @@
   },
   {
     "id": "ledger_067",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "AI Agent",
@@ -1073,6 +1140,7 @@
   },
   {
     "id": "ledger_068",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "AGENT",
     "actorName": "Adnan Khan",
@@ -1089,6 +1157,7 @@
   },
   {
     "id": "ledger_069",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "USER",
     "actorName": "AI Agent",
@@ -1105,6 +1174,7 @@
   },
   {
     "id": "ledger_070",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -1121,6 +1191,7 @@
   },
   {
     "id": "ledger_071",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "AI Agent",
@@ -1137,6 +1208,7 @@
   },
   {
     "id": "ledger_072",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -1153,6 +1225,7 @@
   },
   {
     "id": "ledger_073",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -1169,6 +1242,7 @@
   },
   {
     "id": "ledger_074",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "AGENT",
     "actorName": "System",
@@ -1185,6 +1259,7 @@
   },
   {
     "id": "ledger_075",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "System",
@@ -1201,6 +1276,7 @@
   },
   {
     "id": "ledger_076",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "SYSTEM",
     "actorName": "System",
@@ -1217,6 +1293,7 @@
   },
   {
     "id": "ledger_077",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "USER",
     "actorName": "System",
@@ -1233,6 +1310,7 @@
   },
   {
     "id": "ledger_078",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "USER",
     "actorName": "Adnan Khan",
@@ -1249,6 +1327,7 @@
   },
   {
     "id": "ledger_079",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -1265,6 +1344,7 @@
   },
   {
     "id": "ledger_080",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "Adnan Khan",
@@ -1281,6 +1361,7 @@
   },
   {
     "id": "ledger_081",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "Sneha Rao",
@@ -1297,6 +1378,7 @@
   },
   {
     "id": "ledger_082",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "SYSTEM",
     "actorName": "System",
@@ -1313,6 +1395,7 @@
   },
   {
     "id": "ledger_083",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "SYSTEM",
     "actorName": "AI Agent",
@@ -1329,6 +1412,7 @@
   },
   {
     "id": "ledger_084",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -1345,6 +1429,7 @@
   },
   {
     "id": "ledger_085",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "System",
@@ -1361,6 +1446,7 @@
   },
   {
     "id": "ledger_086",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "Sneha Rao",
@@ -1377,6 +1463,7 @@
   },
   {
     "id": "ledger_087",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -1393,6 +1480,7 @@
   },
   {
     "id": "ledger_088",
+    "firmId": "firm_hts",
     "actorUserId": null,
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -1409,6 +1497,7 @@
   },
   {
     "id": "ledger_089",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "AGENT",
     "actorName": "Vikram Desai",
@@ -1425,6 +1514,7 @@
   },
   {
     "id": "ledger_090",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "AI Agent",
@@ -1441,6 +1531,7 @@
   },
   {
     "id": "ledger_091",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "AI Agent",
@@ -1457,6 +1548,7 @@
   },
   {
     "id": "ledger_092",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "USER",
     "actorName": "System",
@@ -1473,6 +1565,7 @@
   },
   {
     "id": "ledger_093",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "SYSTEM",
     "actorName": "AI Agent",
@@ -1489,6 +1582,7 @@
   },
   {
     "id": "ledger_094",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "Sneha Rao",
@@ -1505,6 +1599,7 @@
   },
   {
     "id": "ledger_095",
+    "firmId": "firm_hts",
     "actorUserId": "user_vikram",
     "actorType": "USER",
     "actorName": "System",
@@ -1521,6 +1616,7 @@
   },
   {
     "id": "ledger_096",
+    "firmId": "firm_hts",
     "actorUserId": "user_sneha",
     "actorType": "AGENT",
     "actorName": "Sneha Rao",
@@ -1537,6 +1633,7 @@
   },
   {
     "id": "ledger_097",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "System",
@@ -1553,6 +1650,7 @@
   },
   {
     "id": "ledger_098",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "USER",
     "actorName": "Vikram Desai",
@@ -1569,6 +1667,7 @@
   },
   {
     "id": "ledger_099",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "SYSTEM",
     "actorName": "System",
@@ -1585,6 +1684,7 @@
   },
   {
     "id": "ledger_100",
+    "firmId": "firm_hts",
     "actorUserId": "user_adnan",
     "actorType": "AGENT",
     "actorName": "Vikram Desai",
@@ -1598,5 +1698,192 @@
     "evidenceIds": [],
     "claimState": null,
     "createdAt": "2026-09-05T06:17:53.727Z"
+  },
+  {
+    "id": "ledger_p_001",
+    "firmId": "firm_stl",
+    "actorUserId": "padm_sana",
+    "actorType": "PLATFORM_ADMIN",
+    "actorName": "Sana Mirza",
+    "entityType": "firm",
+    "entityId": "firm_stl",
+    "entityLabel": "Secunderabad Talent Labs",
+    "action": "FIRM_CREATED",
+    "summary": "Created firm on Starter (4 seats, 25 candidates)",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-08-12T06:30:00.000Z"
+  },
+  {
+    "id": "ledger_p_002",
+    "firmId": "firm_stl",
+    "actorUserId": "user_lakshmi",
+    "actorType": "USER",
+    "actorName": "Lakshmi Iyer",
+    "entityType": "invite",
+    "entityId": "inv_stl_01",
+    "entityLabel": "ravi@stlabs.com",
+    "action": "INVITE_SENT",
+    "summary": "Invited ravi@stlabs.com as BDE",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-10-16T06:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_003",
+    "firmId": "firm_cbw",
+    "actorUserId": "padm_sana",
+    "actorType": "PLATFORM_ADMIN",
+    "actorName": "Sana Mirza",
+    "entityType": "firm",
+    "entityId": "firm_cbw",
+    "entityLabel": "Cyberabad Bench Works",
+    "action": "FIRM_CREATED",
+    "summary": "Created firm on Growth (10 seats, 100 candidates)",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-07-20T07:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_004",
+    "firmId": "firm_cbw",
+    "actorUserId": "padm_sana",
+    "actorType": "PLATFORM_ADMIN",
+    "actorName": "Sana Mirza",
+    "entityType": "firm",
+    "entityId": "firm_cbw",
+    "entityLabel": "Cyberabad Bench Works",
+    "action": "PLAN_CHANGED",
+    "summary": "Growth → Starter, seats 10 → 4, candidates 100 → 25",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-09-25T07:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_005",
+    "firmId": "firm_cbw",
+    "actorUserId": "padm_sana",
+    "actorType": "PLATFORM_ADMIN",
+    "actorName": "Sana Mirza",
+    "entityType": "firm",
+    "entityId": "firm_cbw",
+    "entityLabel": "Cyberabad Bench Works",
+    "action": "FIRM_SUSPENDED",
+    "summary": "Suspended: account on hold pending contract renewal",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-10-10T07:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_006",
+    "firmId": "firm_gsc",
+    "actorUserId": "padm_sana",
+    "actorType": "PLATFORM_ADMIN",
+    "actorName": "Sana Mirza",
+    "entityType": "firm",
+    "entityId": "firm_gsc",
+    "entityLabel": "Gachibowli Staffing Co",
+    "action": "FIRM_CREATED",
+    "summary": "Created firm on Starter (4 seats, 25 candidates)",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-10-15T10:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_007",
+    "firmId": "firm_gsc",
+    "actorUserId": "padm_sana",
+    "actorType": "PLATFORM_ADMIN",
+    "actorName": "Sana Mirza",
+    "entityType": "invite",
+    "entityId": "inv_gsc_owner",
+    "entityLabel": "owner@gachibowlistaffing.com",
+    "action": "INVITE_SENT",
+    "summary": "Invited owner@gachibowlistaffing.com as OWNER",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-10-15T10:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_008",
+    "firmId": null,
+    "actorUserId": "padm_sana",
+    "actorType": "PLATFORM_ADMIN",
+    "actorName": "Sana Mirza",
+    "entityType": "platform_user",
+    "entityId": "padm_sana",
+    "entityLabel": "Sana Mirza",
+    "action": "LOGIN",
+    "summary": "Super Admin signed in",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-10-17T12:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_009",
+    "firmId": null,
+    "actorUserId": "padm_sana",
+    "actorType": "PLATFORM_ADMIN",
+    "actorName": "Sana Mirza",
+    "entityType": "invite",
+    "entityId": "inv_platform_01",
+    "entityLabel": "omar@benchq.io",
+    "action": "INVITE_SENT",
+    "summary": "Invited omar@benchq.io to the platform team",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-10-16T08:00:00.000Z"
+  },
+  {
+    "id": "ledger_p_010",
+    "firmId": "firm_stl",
+    "actorUserId": "user_lakshmi",
+    "actorType": "USER",
+    "actorName": "Lakshmi Iyer",
+    "entityType": "invite",
+    "entityId": "inv_stl_owner",
+    "entityLabel": "lakshmi@stlabs.com",
+    "action": "INVITE_ACCEPTED",
+    "summary": "Lakshmi Iyer accepted the OWNER invite; firm is now active",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-08-12T09:15:00.000Z"
+  },
+  {
+    "id": "ledger_p_011",
+    "firmId": "firm_cbw",
+    "actorUserId": "user_naveen",
+    "actorType": "USER",
+    "actorName": "Naveen Reddy",
+    "entityType": "invite",
+    "entityId": "inv_cbw_owner",
+    "entityLabel": "naveen@cbworks.in",
+    "action": "INVITE_ACCEPTED",
+    "summary": "Naveen Reddy accepted the OWNER invite; firm is now active",
+    "modelId": null,
+    "promptVersion": null,
+    "evidenceIds": [],
+    "claimState": null,
+    "createdAt": "2026-07-20T11:40:00.000Z"
   }
 ]

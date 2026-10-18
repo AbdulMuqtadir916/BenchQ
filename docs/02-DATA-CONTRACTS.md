@@ -157,13 +157,15 @@ export const SessionSchema = z.object({
 export type Session = z.infer<typeof SessionSchema>;
 ```
 
-### 3.1 Tenancy contracts — APPROVED 2026-10-14 (not yet implemented)
+### 3.1 Tenancy contracts — APPROVED 2026-10-14 (schemas and fixtures implemented)
 
 > **Status: signed off by the product owner on 2026-10-14** (changes requested, then approved with
 > the answers in the decision table at the end of this section; recorded in `docs/07` §0 as Q16–Q21).
-> **Nothing here exists in code yet.** Phase T (07) turns these into Zod schemas, fixtures, the
-> `Principal` session and `firmId`-scoped query keys. Until then, no schema, fixture, session type
-> or query key may be changed to match this section. Five rules the owner did not state
+> **Implemented in Phase T PR 1 (T1–T3):** the Zod schemas (`src/lib/schemas/tenancy.ts`, `firmId` on
+> the records below, `Firm` additions), the derived usage (`src/lib/derive/tenancy.ts`) and the fixtures
+> (four firms, plans, invites, a platform admin). **Not yet:** the `Principal` session, the dev principal
+> switcher and `firmId`-scoped query keys and adapters (PR 2, T4–T5). Until PR 2 the mocks serve only
+> firm A (`DEV_FIRM_ID` in `src/mocks/_shared.ts`), so the UI is unchanged. Five rules the owner did not state
 > but approved on 2026-10-16 are marked **(approved 2026-10-16)** and listed under *Implications*.
 > **Numbering.** **A1–A17** are the owner's 17 answers (decision table at the end of this section).
 > **`07 Qn`** is always a decision in `docs/07` §0. Both are recorded there as Q16–Q21.
@@ -235,13 +237,14 @@ slug: z.string()
 |---|---|
 | `seatsUsed` | number of **active users** (OWNER, MANAGER, BDE and VIEWER all count) **+ pending invites** (A1). Per A9, an invite that is `PENDING` but past `expiresAt` is treated as `EXPIRED` and does not reserve a seat **(approved 2026-10-16)** |
 | `activeCandidates` | candidates whose status is `ON_BENCH`, `INTERVIEWING` or `OFFER`. `PLACED`, `PAUSED` and `INACTIVE` do not count (A2) |
-| `isOverSeatLimit` / `isOverCandidateLimit` | `seatsUsed > seatLimit` / `activeCandidates > candidateLimit` |
+| `canAddSeat` / `canAddCandidate` | `seatsUsed < seatLimit` / `activeCandidates < candidateLimit`. **These drive the block** on new additions: at the limit you can't add one more |
+| `isOverSeatLimit` / `isOverCandidateLimit` | `seatsUsed > seatLimit` / `activeCandidates > candidateLimit`. Over, not at: a firm exactly at its limit is not flagged |
 | `isOverLimit` | either of the two above. Shown as a flag on the admin firms list (A4) |
 
 `SessionSchema.seatsUsed`, `seatLimit`, `activeCandidates` and `candidateLimit` stop being stored in
 the session: usage is derived, and the two limits live on `Firm` (07 T2).
 
-**Over-limit rule (A4).** Once at or over a limit, **block new additions**: sending an invite,
+**Over-limit rule (A4).** When `canAddSeat` / `canAddCandidate` is false (at or over a limit), **block new additions**: sending an invite,
 creating a candidate, reactivating a user, reactivating a candidate. ("Reactivating" here means a
 *user* or a *candidate*, never the firm: reactivating a suspended firm is not blocked by a limit.) The message names the limit
 ("Your plan allows 10 seats; 10 are in use."). **Never auto-remove or deactivate anything.** After
@@ -267,7 +270,9 @@ only assigning (or re-assigning) a plan copies its limits onto the firm. `Firm.s
 #### Invite — how every user joins (07 Q11)
 
 ```ts
-export const InviteSchema = z.object({
+// The fields, without the cross-field rule, so .extend / .pick / .omit keep working
+// (a refined Zod schema can't be extended). Validate a whole invite with InviteSchema.
+export const InviteBaseSchema = z.object({
   id: z.string(),
   firmId: z.string().nullable(),           // null = invite to the BenchQ platform team
   email: z.string().email(),               // who is invited; the token is sent here
@@ -276,10 +281,12 @@ export const InviteSchema = z.object({
   status: z.enum(['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED']),
   expiresAt: z.string().datetime(),        // createdAt + 7 days (A9)
   createdAt: z.string().datetime(),
-}).superRefine((invite, ctx) => {
-  // A11: firmId is null  ⇔  role is PLATFORM_ADMIN
+});
+
+// A11: firmId is null  ⇔  role is PLATFORM_ADMIN
+export const InviteSchema = InviteBaseSchema.superRefine((invite, ctx) => {
   if ((invite.firmId === null) !== (invite.role === 'PLATFORM_ADMIN')) {
-    ctx.addIssue({ code: 'custom', message: 'firmId is null if and only if role is PLATFORM_ADMIN' });
+    ctx.addIssue({ code: 'custom', path: ['firmId'], message: 'firmId must be null exactly when role is PLATFORM_ADMIN' });
   }
 });                                        // the `[token]` in /invite/[token] is an opaque secret the
                                            // backend owns: it is not a field here and never in a fixture

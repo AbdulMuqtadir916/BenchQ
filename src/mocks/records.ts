@@ -1,9 +1,10 @@
 import { arrayOf } from "@/lib/api/client";
 import { RecordSchema, type Record_ } from "@/lib/schemas/record";
 import recordsSeed from "./data/records.json";
-import { mockResult, notFound } from "./_shared";
+import { inDevFirm, mockResult, notFound } from "./_shared";
 
-const records: Record_[] = arrayOf(RecordSchema).parse(recordsSeed);
+export const allRecords: Record_[] = arrayOf(RecordSchema).parse(recordsSeed);
+const records: Record_[] = inDevFirm(allRecords);
 
 export const recordsMock = {
   byCandidate: (candidateId: string): Promise<Record_> =>

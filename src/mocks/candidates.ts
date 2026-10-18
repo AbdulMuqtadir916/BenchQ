@@ -1,9 +1,11 @@
 import { arrayOf } from "@/lib/api/client";
 import { CandidateSchema, UpdateCandidateSchema, type Candidate, type UpdateCandidate } from "@/lib/schemas/candidate";
 import candidatesSeed from "./data/candidates.json";
-import { mockResult, notFound } from "./_shared";
+import { inDevFirm, mockResult, notFound } from "./_shared";
 
-export const candidates: Candidate[] = arrayOf(CandidateSchema).parse(candidatesSeed);
+/** Every firm's candidates, validated. */
+export const allCandidates: Candidate[] = arrayOf(CandidateSchema).parse(candidatesSeed);
+export const candidates: Candidate[] = inDevFirm(allCandidates);
 
 export const candidatesMock = {
   list: (): Promise<Candidate[]> => mockResult(candidates),

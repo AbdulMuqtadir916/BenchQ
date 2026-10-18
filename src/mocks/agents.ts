@@ -1,4 +1,5 @@
-import { mockResult, wait } from "./_shared";
+import { DEV_FIRM_ID, mockResult, wait } from "./_shared";
+import { firmIdForResumeVersion } from "./resumes";
 import { AgentDraftSchema, TailorResumeInputSchema, type AgentDraft, type TailorResumeInput } from "@/lib/schemas/agent";
 import { RewriteInputSchema, type RewriteInput, type RewriteResult, RewriteResultSchema } from "@/lib/schemas/resume-document";
 import { ResumeClaimSchema, type ResumeClaim } from "@/lib/schemas/resume";
@@ -117,6 +118,7 @@ export const agentsMock = {
     await wait(2_000, signal);
     return mockResult(AgentDraftSchema.parse({
       runId: `run_${input.resumeVersionId}_${input.jobId}`,
+      firmId: firmIdForResumeVersion(input.resumeVersionId) ?? DEV_FIRM_ID,
       resumeVersionId: input.resumeVersionId,
       jobId: input.jobId,
       stages,

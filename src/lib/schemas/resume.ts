@@ -14,6 +14,8 @@ export type Tracer = z.infer<typeof TracerSchema>;
 
 /** JobNavigator-aligned: tailoring history per job. */
 export const TailoringSchema = z.object({
+  /** A17: tailoring runs are firm-scoped (AI spend by firm in /admin/system). */
+  firmId: z.string(),
   targetJobId: z.string(),
   targetJobTitle: z.string(),
   targetCompanyName: z.string(),
@@ -87,6 +89,7 @@ export type ResumeVersion = z.infer<typeof ResumeVersionSchema>;
 
 export const ResumeSchema = z.object({
   id: z.string(),
+  firmId: z.string(),
   candidateId: z.string(),
   name: z.string(),
   isMaster: z.boolean(),

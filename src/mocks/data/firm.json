@@ -1,14 +1,70 @@
 {
-  "firm": {
-    "id": "firm_hts",
-    "name": "Hyderabad Tech Staffing LLC",
-    "slug": "hyderabad-tech-staffing",
-    "logoUrl": null,
-    "primaryTimezone": "Asia/Kolkata",
-    "clientTimezone": "America/New_York",
-    "truthGuardMode": "BALANCED",
-    "applicationExpiryDays": 30
-  },
+  "firms": [
+    {
+      "id": "firm_hts",
+      "name": "Hyderabad Tech Staffing LLC",
+      "slug": "hyderabad-tech-staffing",
+      "logoUrl": null,
+      "primaryTimezone": "Asia/Kolkata",
+      "clientTimezone": "America/New_York",
+      "truthGuardMode": "BALANCED",
+      "applicationExpiryDays": 30,
+      "status": "ACTIVE",
+      "planId": "plan_growth",
+      "seatLimit": 10,
+      "candidateLimit": 100,
+      "contactPhone": "+91 40 6600 1200",
+      "createdAt": "2026-06-02T09:00:00.000Z"
+    },
+    {
+      "id": "firm_stl",
+      "name": "Secunderabad Talent Labs",
+      "slug": "secunderabad-talent",
+      "logoUrl": null,
+      "primaryTimezone": "Asia/Kolkata",
+      "clientTimezone": "America/Chicago",
+      "truthGuardMode": "STRICT",
+      "applicationExpiryDays": 30,
+      "status": "ACTIVE",
+      "planId": "plan_starter",
+      "seatLimit": 4,
+      "candidateLimit": 25,
+      "contactPhone": "+91 40 4012 7788",
+      "createdAt": "2026-08-12T06:30:00.000Z"
+    },
+    {
+      "id": "firm_cbw",
+      "name": "Cyberabad Bench Works",
+      "slug": "cyberabad-bench",
+      "logoUrl": null,
+      "primaryTimezone": "Asia/Kolkata",
+      "clientTimezone": "America/New_York",
+      "truthGuardMode": "BALANCED",
+      "applicationExpiryDays": 30,
+      "status": "SUSPENDED",
+      "planId": "plan_starter",
+      "seatLimit": 4,
+      "candidateLimit": 25,
+      "contactPhone": null,
+      "createdAt": "2026-07-20T07:00:00.000Z"
+    },
+    {
+      "id": "firm_gsc",
+      "name": "Gachibowli Staffing Co",
+      "slug": "gachibowli-staffing",
+      "logoUrl": null,
+      "primaryTimezone": "Asia/Kolkata",
+      "clientTimezone": "America/New_York",
+      "truthGuardMode": "BALANCED",
+      "applicationExpiryDays": 30,
+      "status": "ONBOARDING",
+      "planId": "plan_starter",
+      "seatLimit": 4,
+      "candidateLimit": 25,
+      "contactPhone": null,
+      "createdAt": "2026-10-15T10:00:00.000Z"
+    }
+  ],
   "users": [
     {
       "id": "user_imran",
@@ -59,6 +115,76 @@
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-10-01T00:17:52.943Z"
+    },
+    {
+      "id": "user_lakshmi",
+      "firmId": "firm_stl",
+      "name": "Lakshmi Iyer",
+      "email": "lakshmi@stlabs.com",
+      "role": "OWNER",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-10-01T05:00:00.000Z"
+    },
+    {
+      "id": "user_kiran",
+      "firmId": "firm_stl",
+      "name": "Kiran Varma",
+      "email": "kiran@stlabs.com",
+      "role": "BDE",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-10-01T05:30:00.000Z"
+    },
+    {
+      "id": "user_meena",
+      "firmId": "firm_stl",
+      "name": "Meena Joshi",
+      "email": "meena@stlabs.com",
+      "role": "VIEWER",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-28T11:00:00.000Z"
+    },
+    {
+      "id": "user_naveen",
+      "firmId": "firm_cbw",
+      "name": "Naveen Reddy",
+      "email": "naveen@cbworks.in",
+      "role": "OWNER",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-30T08:00:00.000Z"
+    },
+    {
+      "id": "user_rehana",
+      "firmId": "firm_cbw",
+      "name": "Rehana Begum",
+      "email": "rehana@cbworks.in",
+      "role": "BDE",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-30T09:00:00.000Z"
+    },
+    {
+      "id": "user_imtiaz",
+      "firmId": "firm_cbw",
+      "name": "Imtiaz Ali",
+      "email": "imtiaz@cbworks.in",
+      "role": "BDE",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-29T10:00:00.000Z"
+    },
+    {
+      "id": "user_swapna",
+      "firmId": "firm_cbw",
+      "name": "Swapna Das",
+      "email": "swapna@cbworks.in",
+      "role": "VIEWER",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-27T10:00:00.000Z"
     }
   ]
 }

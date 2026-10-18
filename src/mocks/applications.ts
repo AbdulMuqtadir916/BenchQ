@@ -4,10 +4,12 @@ import { UpdateApplicationStatusSchema, type UpdateApplicationStatus } from "@/l
 import applicationsSeed from "./data/applications.json";
 import followupsSeed from "./data/followups.json";
 import { currentUser } from "./team";
-import { mockResult, notFound } from "./_shared";
+import { inDevFirm, mockResult, notFound } from "./_shared";
 
-const applications: Application[] = arrayOf(ApplicationSchema).parse(applicationsSeed);
-const followups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
+export const allApplications: Application[] = arrayOf(ApplicationSchema).parse(applicationsSeed);
+export const allFollowups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
+const applications: Application[] = inDevFirm(allApplications);
+const followups: FollowUpTask[] = inDevFirm(allFollowups);
 
 const CLOSED_STATUSES = ["PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
 

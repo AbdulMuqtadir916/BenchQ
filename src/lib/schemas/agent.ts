@@ -9,6 +9,8 @@ export type TailorResumeInput = z.infer<typeof TailorResumeInputSchema>;
 
 export const AgentDraftSchema = z.object({
   runId: z.string(),
+  /** A17: agent runs are firm-scoped. */
+  firmId: z.string(),
   resumeVersionId: z.string(),
   jobId: z.string(),
   stages: z.array(z.string()),

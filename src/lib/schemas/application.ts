@@ -15,6 +15,7 @@ export type ApplicationEvent = z.infer<typeof ApplicationEventSchema>;
 
 export const ApplicationSchema = z.object({
   id: z.string(),
+  firmId: z.string(),
   candidateId: z.string(),
   jobId: z.string(),
   resumeVersionId: z.string().nullable(),
@@ -70,6 +71,7 @@ export type OutreachTouch = z.infer<typeof OutreachTouchSchema>;
 
 export const FollowUpTaskSchema = z.object({
   id: z.string(),
+  firmId: z.string(),
   applicationId: z.string(),
   assignedToUserId: z.string(),
   kind: FollowUpKind,

@@ -80,6 +80,7 @@ export type RecordCertificate = z.infer<typeof RecordCertificateSchema>;
 
 export const RecordSchema = z.object({
   id: z.string(),
+  firmId: z.string(),
   candidateId: z.string(),
   headline: z.string().nullable(),
   summary: z.string().nullable(),

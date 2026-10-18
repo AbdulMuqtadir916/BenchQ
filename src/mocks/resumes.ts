@@ -1,9 +1,15 @@
 import { arrayOf } from "@/lib/api/client";
 import { ResumeSchema, type Resume } from "@/lib/schemas/resume";
 import resumesSeed from "./data/resumes.json";
-import { mockResult, notFound } from "./_shared";
+import { inDevFirm, mockResult, notFound } from "./_shared";
 
-const resumes: Resume[] = arrayOf(ResumeSchema).parse(resumesSeed);
+export const allResumes: Resume[] = arrayOf(ResumeSchema).parse(resumesSeed);
+const resumes: Resume[] = inDevFirm(allResumes);
+
+/** The firm that owns a resume version (agent runs are firm-scoped, A17). */
+export function firmIdForResumeVersion(resumeVersionId: string): string | null {
+  return allResumes.find((resume) => resume.versions.some((version) => version.id === resumeVersionId))?.firmId ?? null;
+}
 
 export const resumesMock = {
   list: (): Promise<Resume[]> => mockResult(resumes),

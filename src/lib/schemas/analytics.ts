@@ -62,6 +62,8 @@ export type BdeDashboard = z.infer<typeof BdeDashboardSchema>;
 
 export const LedgerEntrySchema = z.object({
   id: z.string(),
+  /** Set for any event about a firm (shows in that firm's ledger); null only for platform-only events (A13). */
+  firmId: z.string().nullable(),
   actorUserId: z.string().nullable(),
   actorType: z.enum(["USER", "SYSTEM", "AGENT", "PLATFORM_ADMIN"]),
   actorName: z.string(),
@@ -79,6 +81,16 @@ export const LedgerEntrySchema = z.object({
     "EXPORT",
     "LOGIN",
     "ADMIN_ACCESS",
+    // tenancy (docs/02 §3.1)
+    "ADMIN_ACCESS_END",
+    "FIRM_CREATED",
+    "FIRM_SUSPENDED",
+    "FIRM_REACTIVATED",
+    /** summary states before → after, e.g. "Starter → Growth, seats 5 → 10" (A14). */
+    "PLAN_CHANGED",
+    "INVITE_SENT",
+    "INVITE_ACCEPTED",
+    "INVITE_REVOKED",
   ]),
   summary: z.string(),
   modelId: z.string().nullable(),

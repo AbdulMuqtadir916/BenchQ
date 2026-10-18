@@ -10,6 +10,7 @@ export type DocumentKind = z.infer<typeof DocumentKind>;
 
 export const CandidateDocumentSchema = z.object({
   id: z.string(),
+  firmId: z.string(),
   candidateId: z.string(),
   kind: DocumentKind,
   title: z.string(),

@@ -1,9 +1,10 @@
 import { arrayOf } from "@/lib/api/client";
 import { JobSchema, type Job } from "@/lib/schemas/job";
 import jobsSeed from "./data/jobs.json";
-import { mockResult, notFound } from "./_shared";
+import { inDevFirm, mockResult, notFound } from "./_shared";
 
-const jobs: Job[] = arrayOf(JobSchema).parse(jobsSeed);
+export const allJobs: Job[] = arrayOf(JobSchema).parse(jobsSeed);
+const jobs: Job[] = inDevFirm(allJobs);
 
 export const jobsMock = {
   list: (params?: { limit?: number; offset?: number }): Promise<Job[]> => {

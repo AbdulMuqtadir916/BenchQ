@@ -13,5 +13,10 @@ export class ApiError extends Error {
   }
 }
 
+/** The record doesn't exist (or the user may not know it exists): show not-found, not an error card. */
+export function isNotFoundError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404;
+}
+
 /** Helper used by the local JSON store and adapter schemas. */
 export const arrayOf = <T,>(schema: ZodType<T>) => z.array(schema);
