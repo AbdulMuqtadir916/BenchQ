@@ -6,12 +6,15 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/empty-state";
 import { landingFor } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
-import type { FirmRole } from "@/lib/schemas/enums";
+import type { Principal } from "@/lib/schemas/tenancy";
 
-const ROLE_LABEL: Record<FirmRole, string> = { OWNER: "Owner", MANAGER: "Manager", BDE: "BDE", VIEWER: "Viewer" };
+const ROLE_LABEL = { OWNER: "Owner", MANAGER: "Manager", BDE: "BDE", VIEWER: "Viewer" } as const;
+
+/** Who the page is closed to, in the words the screen uses. */
+const audience = (principal: Principal) => (principal.kind === "firm" ? `the ${ROLE_LABEL[principal.role]} role` : principal.support ? "a support view" : "a Super Admin");
 
 /** Shown in place of a page the current role can't open (docs/04 §12: no redirect). */
-export function ForbiddenState({ role, pageTitle }: { role: FirmRole; pageTitle: string }) {
+export function ForbiddenState({ principal, pageTitle }: { principal: Principal; pageTitle: string }) {
   const toHref = useHref();
   return (
     <div className="bq-page">
@@ -19,10 +22,10 @@ export function ForbiddenState({ role, pageTitle }: { role: FirmRole; pageTitle:
         icon={ShieldX}
         variant="filtered"
         title="You don't have access to this page"
-        description={`${pageTitle} isn't available to the ${ROLE_LABEL[role]} role. If you need it, ask your firm's owner.`}
+        description={`${pageTitle} isn't available to ${audience(principal)}. If you need it, ask your firm's owner.`}
         action={
           <Button asChild variant="secondary">
-            <Link href={toHref(landingFor(role))}>Go to dashboard</Link>
+            <Link href={toHref(landingFor(principal))}>Go to dashboard</Link>
           </Button>
         }
       />

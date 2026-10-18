@@ -11,7 +11,7 @@ import { GateScreen, GateSkeleton } from "./gate-screen";
 
 /**
  * `/` (docs/07 §2.1, T7): signed out → sign-in; a firm user → their own firm's landing (an OWNER's first
- * run → welcome). The platform admin → /admin arrives with Phase P.
+ * run → welcome); a platform admin → /admin.
  */
 export function Landing() {
   const router = useRouter();

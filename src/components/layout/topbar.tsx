@@ -7,7 +7,8 @@ import { PrincipalSwitcher } from "@/components/dev/principal-switcher";
 import { useCommandPalette } from "@/components/command/command-palette";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
 
-export function Topbar() {
+/** The firm's notifications are firm work: the admin variant (docs/07 P2) leaves them out. */
+export function Topbar({ variant = "firm" }: { variant?: "firm" | "admin" }) {
   const { open } = useCommandPalette();
   return (
     <header className="bq-topbar">
@@ -19,7 +20,7 @@ export function Topbar() {
           <span className="hidden sm:inline">Search</span>
           <kbd className="hidden sm:inline text-mono-sm text-[var(--color-text-3)] ml-3">⌘ K</kbd>
         </button>
-        <NotificationsMenu />
+        {variant === "firm" ? <NotificationsMenu /> : null}
         <ThemeToggle />
       </div>
     </header>

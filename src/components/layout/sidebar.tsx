@@ -5,27 +5,35 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { isRouteActive, navFor, type RouteDef, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { EASE_OUT } from "@/lib/motion";
 
 /**
  * Frosted navigation: 208px expanded, 60px collapsed, 48px mobile rail.
- * Items come from the route registry: a route the role can't open isn't rendered.
+ * Items come from the route registry: a route the principal can't open isn't rendered. The admin
+ * variant (docs/07 P2) shows the platform nav instead of the firm's workspace and preferences.
  */
+
+type NavGroup = { label: string; section: NonNullable<RouteDef["nav"]>["section"] };
+const GROUPS: Record<"firm" | "admin", NavGroup[]> = {
+  firm: [{ label: "Workspace", section: "workspace" }, { label: "Preferences", section: "preferences" }],
+  admin: [{ label: "Platform", section: "admin" }],
+};
 
 export function Sidebar({
   collapsed,
   onToggle,
+  variant = "firm",
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  variant?: "firm" | "admin";
 }) {
-  const role = useSignedInUser().role;
+  const principal = useSignedInPrincipal();
   const reduceMotion = useReducedMotion() ?? false;
-  const primary = navFor(role, "workspace");
-  const secondary = navFor(role, "preferences");
+  const groups = GROUPS[variant].map((group) => ({ ...group, routes: navFor(principal, group.section) }));
   const fade = { duration: reduceMotion ? 0 : 0.14, ease: EASE_OUT };
 
   // Width, padding and label opacity transition in CSS (.bq-sidebar in globals.css), so the
@@ -80,20 +88,16 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden">
-        <p className="sidebar-label mb-2 px-2.5 text-caption text-[var(--color-text-3)]" aria-hidden={collapsed}>Workspace</p>
-        <ul className="space-y-0.5">
-          {primary.map((route) => (
-            <SidebarItem key={route.id} route={route} />
-          ))}
-        </ul>
-
-        <div className="my-5" />
-        <p className="sidebar-label mb-2 px-2.5 text-caption text-[var(--color-text-3)]" aria-hidden={collapsed}>Preferences</p>
-        <ul className="space-y-0.5">
-          {secondary.map((route) => (
-            <SidebarItem key={route.id} route={route} />
-          ))}
-        </ul>
+        {groups.map((group, index) => (
+          <div key={group.section} className={index > 0 ? "mt-5" : undefined}>
+            <p className="sidebar-label mb-2 px-2.5 text-caption text-[var(--color-text-3)]" aria-hidden={collapsed}>{group.label}</p>
+            <ul className="space-y-0.5">
+              {group.routes.map((route) => (
+                <SidebarItem key={route.id} route={route} />
+              ))}
+            </ul>
+          </div>
+        ))}
       </nav>
     </aside>
   );

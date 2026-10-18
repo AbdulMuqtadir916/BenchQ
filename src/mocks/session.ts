@@ -1,15 +1,23 @@
 import { ApiError } from "@/lib/api/client";
-import { DevPrincipalOptionSchema, FirmSchema, FirmSessionSchema, type DevPrincipalOption, type Firm, type FirmSession } from "@/lib/schemas/session";
-import { currentPrincipal, currentUser, firmById, isSignedIn, signInAs, signOut } from "./auth";
+import { DevPrincipalOptionSchema, FirmSchema, FirmSessionSchema, PlatformSessionSchema, type DevPrincipalOption, type Firm, type FirmSession, type Session } from "@/lib/schemas/session";
+import { currentPlatformUser, currentPrincipal, currentUser, firmById, isSignedIn, signInAs, signOut } from "./auth";
 import { allUsers, firms } from "./team";
 import { invites, platformUsers } from "./tenancy";
 import { acceptInvite, markActive } from "./invites";
 import { effectiveInviteStatus } from "@/lib/derive/tenancy";
 import { mockResult, wait } from "./_shared";
 
-function sessionNow(): FirmSession {
+function firmSessionNow(): FirmSession {
+  const user = currentUser();
+  const principal = { kind: "firm" as const, userId: user.id, firmId: user.firmId, role: user.role };
+  return FirmSessionSchema.parse({ principal, user, firm: firmById(user.firmId) });
+}
+
+/** The signed-in principal's session: a firm user's, or a platform admin's (no support-view firm until P4). */
+function sessionNow(): Session {
   const principal = currentPrincipal();
-  return FirmSessionSchema.parse({ principal, user: currentUser(), firm: firmById(principal.firmId) });
+  if (principal.kind === "platform") return PlatformSessionSchema.parse({ principal, platformUser: currentPlatformUser(), firm: null });
+  return firmSessionNow();
 }
 
 const ROLE_ORDER = ["OWNER", "MANAGER", "BDE", "VIEWER"] as const;
@@ -61,8 +69,8 @@ function devPrincipals(): DevPrincipalOption[] {
     firmId: null,
     firmName: null,
     firmStatus: null,
-    available: false,
-    note: "Platform sessions arrive with the admin area (Phase P)",
+    available: admin.isActive,
+    note: admin.isActive ? null : "Inactive user",
   }));
   return [...firmUsers, ...admins].map((option) => DevPrincipalOptionSchema.parse(option));
 }
@@ -75,13 +83,14 @@ function devPrincipals(): DevPrincipalOption[] {
 function firmBySlug(slug: string): Firm {
   const principal = currentPrincipal();
   const firm = firms.find((item) => item.slug === slug);
-  if (!firm || firm.id !== principal.firmId) throw new ApiError("Not found.", "NOT_FOUND", 404);
+  // A platform admin opens a firm only through a support view (P4), never as a member.
+  if (!firm || principal.kind !== "firm" || firm.id !== principal.firmId) throw new ApiError("Not found.", "NOT_FOUND", 404);
   return FirmSchema.parse(firm);
 }
 
 export const sessionMock = {
   /** Who is signed in, or null when signed out. */
-  current: (): Promise<FirmSession | null> => mockResult(isSignedIn() ? sessionNow() : null),
+  current: (): Promise<Session | null> => mockResult(isSignedIn() ? sessionNow() : null),
 
   firmBySlug: async (slug: string): Promise<Firm> => {
     await wait();
@@ -91,7 +100,7 @@ export const sessionMock = {
   /** The signed-in user finished (or skipped) /welcome: they are active from now on (docs/07 T7). */
   finishFirstRun: (): Promise<FirmSession> => {
     markActive(currentUser().id);
-    return mockResult(sessionNow());
+    return mockResult(firmSessionNow());
   },
 
   signOut: async (): Promise<null> => {
@@ -102,10 +111,7 @@ export const sessionMock = {
   devPrincipals: (): Promise<DevPrincipalOption[]> => mockResult(devPrincipals()),
 
   /** DEV ONLY: the dev principal switcher's "sign in as". */
-  devSignInAs: (userId: string): Promise<FirmSession> => {
-    if (platformUsers.some((admin) => admin.id === userId)) {
-      throw new ApiError("Platform sessions arrive with the admin area (Phase P).", "NOT_AVAILABLE", 400);
-    }
+  devSignInAs: (userId: string): Promise<Session> => {
     // An invite id from the list: accept it as the dev acceptance's person, then sign in as them.
     const pending = pendingAcceptance(userId);
     signInAs(pending ? acceptInvite(pending.invite.id, pending.person).id : userId);

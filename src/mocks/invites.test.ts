@@ -19,6 +19,7 @@ describe("GSC owner: accept the invite, first run, finish /welcome", () => {
   it("accepting creates the never-active OWNER, activates the firm, logs INVITE_ACCEPTED, and lands on /welcome", async () => {
     const session = await sessionApi.devSignInAs("inv_gsc_owner");
     expect(session.principal).toEqual({ kind: "firm", userId: "user_gsc_owner", firmId: "firm_gsc", role: "OWNER" });
+    if (!("user" in session)) throw new Error("expected a firm session");
     expect(session.user.lastActiveAt).toBeNull();
     expect(firms.find((firm) => firm.id === "firm_gsc")?.status).toBe("ACTIVE");
     expect(invites.find((invite) => invite.id === "inv_gsc_owner")?.status).toBe("ACCEPTED");

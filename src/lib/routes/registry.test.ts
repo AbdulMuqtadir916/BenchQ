@@ -2,12 +2,16 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ROLES, ROUTES, accessFor, accessForPath, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, routeById, type Access, type RouteId } from "./registry";
+import { ROLES, ROUTES, accessFor, accessForPath, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, routeById, supportAccess, type Access, type RouteId } from "./registry";
 import { RESERVED_SLUGS } from "@/lib/schemas/tenancy";
 import type { FirmRole } from "@/lib/schemas/enums";
+import type { Principal } from "@/lib/schemas/tenancy";
 import { isInScope } from "./scope";
 
 const APP_DIR = fileURLToPath(new URL("../../app", import.meta.url));
+
+/** A firm user of the given role: the registry's helpers take a principal (docs/07 §5). */
+const asRole = (role: FirmRole): Principal => ({ kind: "firm", userId: "u", firmId: "f", role });
 
 /** A firm slug for building URLs in tests. */
 const S = "acme";
@@ -54,7 +58,7 @@ describe("route registry", () => {
 
   it("reserves every top-level static segment, so no firm slug can shadow a route (docs/07 §2.4)", () => {
     const topLevel = new Set(pagePaths().map((path) => path.split("/")[1]!).filter((segment) => segment && !segment.startsWith("[")));
-    expect([...topLevel].sort()).toEqual(["dev", "sign-in"]);
+    expect([...topLevel].sort()).toEqual(["admin", "dev", "sign-in"]);
     for (const segment of topLevel) expect(RESERVED_SLUGS as readonly string[], segment).toContain(segment);
   });
 
@@ -73,14 +77,14 @@ describe("route registry", () => {
   it("gives every role a landing route it can open, in its firm; an OWNER's first run opens welcome (T7)", () => {
     for (const role of ROLES) {
       for (const isFirstRun of [false, true]) {
-        const landing = routeById(landingFor(role, { isFirstRun }));
+        const landing = routeById(landingFor(asRole(role), { isFirstRun }));
         expect(landing.area).toBe("firm");
-        expect(canOpen(landing, role), `${role} ${isFirstRun}`).toBe(true);
+        expect(canOpen(landing, asRole(role)), `${role} ${isFirstRun}`).toBe(true);
       }
     }
-    expect(landingFor("OWNER", { isFirstRun: true })).toBe("welcome");
-    expect(landingFor("OWNER")).toBe("dashboard");
-    expect(ROLES.filter((role) => role !== "OWNER").map((role) => landingFor(role, { isFirstRun: true }))).toEqual(["dashboard", "dashboard", "dashboard"]);
+    expect(landingFor(asRole("OWNER"), { isFirstRun: true })).toBe("welcome");
+    expect(landingFor(asRole("OWNER"))).toBe("dashboard");
+    expect(ROLES.filter((role) => role !== "OWNER").map((role) => landingFor(asRole(role), { isFirstRun: true }))).toEqual(["dashboard", "dashboard", "dashboard"]);
   });
 
   it("prefers static segments over dynamic ones", () => {
@@ -96,10 +100,10 @@ describe("route registry", () => {
   });
 
   it("only shows nav items a role can open", () => {
-    expect(navFor("BDE", "workspace").map((r) => r.id)).not.toContain("analytics");
-    expect(navFor("VIEWER", "workspace").map((r) => r.id)).not.toContain("followups");
-    expect(navFor("MANAGER", "settings").map((r) => r.id)).toEqual(["settings.team", "settings.templates", "settings.preferences"]);
-    expect(navFor("BDE", "settings").map((r) => r.id)).toEqual(["settings.preferences"]);
+    expect(navFor(asRole("BDE"), "workspace").map((r) => r.id)).not.toContain("analytics");
+    expect(navFor(asRole("VIEWER"), "workspace").map((r) => r.id)).not.toContain("followups");
+    expect(navFor(asRole("MANAGER"), "settings").map((r) => r.id)).toEqual(["settings.team", "settings.templates", "settings.preferences"]);
+    expect(navFor(asRole("BDE"), "settings").map((r) => r.id)).toEqual(["settings.preferences"]);
   });
 });
 
@@ -185,10 +189,12 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
 /** Routes outside the firm table: public pages, and the dev-only design system (docs/07 §2.1, §2.4). */
 const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in"];
 const DEV_ROUTES: readonly RouteId[] = ["design-system"];
+/** docs/07 §2.3: PLATFORM_ADMIN only; the rest of the list arrives with P3. */
+const PLATFORM_ROUTES: readonly RouteId[] = ["admin"];
 
 describe("access table (docs/07 §2.2)", () => {
   it("has a row for every firm route, and only for routes that exist", () => {
-    const covered = new Set<string>([...FIRM_TABLE.map(([id]) => id), ...PUBLIC_ROUTES, ...DEV_ROUTES]);
+    const covered = new Set<string>([...FIRM_TABLE.map(([id]) => id), ...PUBLIC_ROUTES, ...DEV_ROUTES, ...PLATFORM_ROUTES]);
     expect(ROUTES.filter((route) => !covered.has(route.id)).map((route) => route.id)).toEqual([]);
     expect(FIRM_TABLE.filter(([id]) => !ROUTES.some((route) => route.id === id)).map(([id]) => id)).toEqual([]);
     expect(new Set(FIRM_TABLE.map(([id]) => id)).size).toBe(FIRM_TABLE.length);
@@ -196,10 +202,10 @@ describe("access table (docs/07 §2.2)", () => {
 
   it.each(FIRM_TABLE)("%s: OWNER %s · MANAGER %s · BDE %s · VIEWER %s", (id, ...expected) => {
     const route = routeById(id);
-    const actual = ROLES.map((role: FirmRole) => accessFor(route, role));
+    const actual = ROLES.map((role: FirmRole) => accessFor(route, asRole(role)));
     expect(actual).toEqual(expected);
     // Every role is covered, and canOpen agrees with "none".
-    ROLES.forEach((role, index) => expect(canOpen(route, role)).toBe(expected[index] !== "none"));
+    ROLES.forEach((role, index) => expect(canOpen(route, asRole(role))).toBe(expected[index] !== "none"));
   });
 
   it("sends a denied role to the landing route only for /welcome; everywhere else the Forbidden screen shows in place (Q2, Q4)", () => {
@@ -210,8 +216,8 @@ describe("access table (docs/07 §2.2)", () => {
 
   it("leaves public routes open to every role", () => {
     for (const id of PUBLIC_ROUTES) {
-      expect(routeById(id).access).toBe("public");
-      for (const role of ROLES) expect(accessFor(routeById(id), role)).toBe("full");
+      expect(routeById(id).access).toEqual({ kind: "public" });
+      for (const role of ROLES) expect(accessFor(routeById(id), asRole(role))).toBe("full");
     }
   });
 
@@ -221,7 +227,7 @@ describe("access table (docs/07 §2.2)", () => {
       expect(route.devOnly).toBe(true);
       expect(route.path.startsWith("/dev/")).toBe(true);
       // vitest runs with NODE_ENV=test and no NEXT_PUBLIC_SHOW_DEV_ROUTES
-      for (const role of ROLES) expect(canOpen(route, role)).toBe(false);
+      for (const role of ROLES) expect(canOpen(route, asRole(role))).toBe(false);
     }
   });
 });
@@ -229,16 +235,16 @@ describe("access table (docs/07 §2.2)", () => {
 describe("accessForPath (fails closed)", () => {
   it("is none for a path that matches no route, for every role", () => {
     for (const role of ROLES) {
-      for (const path of ["/nope", "/candidates", f("/candidates/cand_01/extra"), "/admin", f("/settings/unknown"), f("/dashboard/x"), f("")]) {
-        expect(accessForPath(path, role), `${role} ${path}`).toEqual({ route: null, access: "none" });
+      for (const path of ["/nope", "/candidates", f("/candidates/cand_01/extra"), "/admin/nope", f("/settings/unknown"), f("/dashboard/x"), f("")]) {
+        expect(accessForPath(path, asRole(role)), `${role} ${path}`).toEqual({ route: null, access: "none" });
       }
     }
   });
 
   it("returns the route's own access for registered paths, ignoring query and hash", () => {
-    expect(accessForPath(f("/analytics?range=7d"), "BDE")).toEqual({ route: routeById("analytics"), access: "none" });
-    expect(accessForPath(f("/candidates/cand_01#notes"), "BDE").access).toBe("assigned");
-    expect(accessForPath(f("/resumes/new"), "VIEWER").access).toBe("read");
+    expect(accessForPath(f("/analytics?range=7d"), asRole("BDE"))).toEqual({ route: routeById("analytics"), access: "none" });
+    expect(accessForPath(f("/candidates/cand_01#notes"), asRole("BDE")).access).toBe("assigned");
+    expect(accessForPath(f("/resumes/new"), asRole("VIEWER")).access).toBe("read");
   });
 });
 
@@ -246,7 +252,7 @@ describe("no public sign-up (docs/07 Q11)", () => {
   it("has no /sign-up route: unregistered, closed to every role, and no page for it", () => {
     expect(matchRoute("/sign-up")).toBeNull();
     expect(ROUTES.some((route) => route.id === "sign-up" || route.path === "/sign-up")).toBe(false);
-    for (const role of ROLES) expect(accessForPath("/sign-up", role)).toEqual({ route: null, access: "none" });
+    for (const role of ROLES) expect(accessForPath("/sign-up", asRole(role))).toEqual({ route: null, access: "none" });
     expect(pagePaths()).not.toContain("/sign-up");
   });
 });
@@ -296,5 +302,52 @@ describe("isRouteActive (matches on route ids, not paths)", () => {
       if (!id.includes(".")) continue;
       expect(ids.has(id.slice(0, id.lastIndexOf("."))), `${id} has no parent route`).toBe(true);
     }
+  });
+});
+
+/**
+ * docs/07 §2.2 "Support" column: a platform admin inside a read-only support view. Derived (read where
+ * OWNER has access) except acting and personal routes; `welcome` sends them to the landing.
+ */
+const SUPPORT_TABLE: ReadonlyArray<readonly [RouteId, Access]> = [
+  ["welcome", "none"], ["dashboard", "read"], ["candidates", "read"], ["candidates.new", "none"], ["candidates.detail", "read"],
+  ["jobs", "read"], ["jobs.detail", "read"], ["jobs.capture", "none"], ["applications", "read"], ["applications.detail", "read"],
+  ["resumes", "read"], ["resumes.studio", "read"], ["outreach", "read"], ["followups", "read"], ["focus", "none"],
+  ["analytics", "read"], ["ledger", "read"], ["settings", "read"], ["settings.firm", "read"], ["settings.team", "read"],
+  ["settings.templates", "read"], ["settings.preferences", "none"],
+];
+
+const admin: Principal = { kind: "platform", userId: "padm", role: "PLATFORM_ADMIN", support: null };
+const inSupport: Principal = { ...admin, support: { id: "sv", firmId: "f", reason: "Investigating a report", startedAt: "2026-10-18T12:00:00.000Z", expiresAt: "2026-10-18T13:00:00.000Z" } };
+
+describe("platform tier (docs/07 §2.3, §2.2 Support, P1)", () => {
+  it("opens platform routes to a platform admin only; every firm role gets none (the admin layout shows not-found)", () => {
+    for (const id of PLATFORM_ROUTES) {
+      const route = routeById(id);
+      expect(route.area).toBe("platform");
+      expect(route.path === "/admin" || route.path.startsWith("/admin/")).toBe(true);
+      expect(accessFor(route, admin)).toBe("full");
+      expect(accessFor(route, inSupport)).toBe("full");
+      for (const role of ROLES) expect(accessFor(route, asRole(role)), role).toBe("none");
+    }
+  });
+
+  it("covers every firm route in the Support table", () => {
+    expect(SUPPORT_TABLE.map(([id]) => id).sort()).toEqual(FIRM_TABLE.map(([id]) => id).sort());
+  });
+
+  it.each(SUPPORT_TABLE)("%s: support view %s; a platform admin without one gets none", (id, expected) => {
+    const route = routeById(id);
+    expect(supportAccess(route)).toBe(expected);
+    expect(accessFor(route, inSupport)).toBe(expected);
+    expect(accessFor(route, admin)).toBe("none");
+  });
+
+  it("lands a platform admin on /admin and gives them only the admin nav", () => {
+    expect(landingFor(admin)).toBe("admin");
+    expect(hrefFor(landingFor(admin))).toBe("/admin");
+    expect(navFor(admin, "admin").map((route) => route.id)).toEqual(["admin"]);
+    expect(navFor(admin, "workspace")).toEqual([]);
+    for (const role of ROLES) expect(navFor(asRole(role), "admin"), role).toEqual([]);
   });
 });

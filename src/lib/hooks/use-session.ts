@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { landingHref } from "@/lib/routes/landing";
 import { sessionApi } from "@/lib/api/session";
 import { queryKeys } from "@/lib/query/keys";
-import type { FirmSession } from "@/lib/schemas/session";
+import type { Session } from "@/lib/schemas/session";
 import { useSession } from "@/lib/stores/session-store";
 
 /**
@@ -20,8 +20,9 @@ export function useCurrentSession() {
 
 /** The firm a URL slug names, for the firm layout (docs/07 §2.5). 404 for an unknown slug and another firm's alike. */
 export function useFirmBySlug(slug: string) {
-  const isSignedIn = useSession((s) => s.principal !== null);
-  return useQuery({ queryKey: queryKeys.session.firmBySlug(slug), queryFn: () => sessionApi.firmBySlug(slug), enabled: isSignedIn, staleTime: Infinity });
+  // Only a firm user looks a firm up by slug; a platform admin goes through a support view (P4).
+  const isFirmUser = useSession((s) => s.principal?.kind === "firm");
+  return useQuery({ queryKey: queryKeys.session.firmBySlug(slug), queryFn: () => sessionApi.firmBySlug(slug), enabled: isFirmUser, staleTime: Infinity });
 }
 
 /** DEV ONLY: every fixture principal, for the dev principal switcher. */
@@ -38,7 +39,7 @@ export function useDevPrincipals(enabled: boolean) {
  * session changes only once that page's URL is in place (SessionCommitter), so the page being left
  * never re-renders under the new principal.
  */
-export function useDevSignInAs(options: { navigateTo?: (session: FirmSession) => string | null } = {}) {
+export function useDevSignInAs(options: { navigateTo?: (session: Session) => string | null } = {}) {
   const router = useRouter();
   const setSession = useSession((s) => s.setSession);
   const setPending = useSession((s) => s.setPending);

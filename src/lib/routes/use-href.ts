@@ -15,7 +15,7 @@ import { hrefFor, routeById } from "./registry";
 export function useHref(): typeof hrefFor {
   const urlFirm = useOptionalFirm();
   const session = useCurrentSession();
-  const slug = urlFirm?.slug ?? session.data?.firm.slug ?? null;
+  const slug = urlFirm?.slug ?? session.data?.firm?.slug ?? null;
 
   return useCallback<typeof hrefFor>(
     (target, params = {}, query) => {

@@ -10,12 +10,13 @@ import { KeyboardHintSheet } from "@/components/command/keyboard-hint-sheet";
 import { RouteGuard } from "@/components/routes/route-guard";
 
 /**
- * AppShell — Sidebar + Topbar + main. Docs/04 §1.1.
+ * AppShell — Sidebar + Topbar + main. Docs/04 §1.1. `variant="admin"` is the platform tier's shell
+ * (docs/07 P2): the same frosted frame with the admin nav.
  * Sidebar collapse persists in localStorage via useUiStore.
  * Global keyboard system + command palette wired here so they're active
  * on every (app) route.
  */
-export function AppShell({ children, modal }: { children: React.ReactNode, modal?: React.ReactNode }) {
+export function AppShell({ children, modal, variant = "firm" }: { children: React.ReactNode; modal?: React.ReactNode; variant?: "firm" | "admin" }) {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const hydrate = useUiStore((s) => s.hydrate);
@@ -30,9 +31,9 @@ export function AppShell({ children, modal }: { children: React.ReactNode, modal
     <div className="bq-shell">
       <a href="#main-content" className="sr-only focus:not-sr-only">Skip to content</a>
       <div className="bq-frame">
-      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} variant={variant} />
       <div className="bq-workspace">
-        <Topbar />
+        <Topbar variant={variant} />
         <main id="main-content" className="min-w-0"><RouteGuard>{children}</RouteGuard></main>
       </div>
       </div>

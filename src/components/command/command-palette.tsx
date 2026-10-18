@@ -13,8 +13,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useUiStore } from "@/lib/stores/ui-store";
-import { useSignedInUser } from "@/lib/stores/session-store";
-import type { FirmRole } from "@/lib/schemas/enums";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import type { Principal } from "@/lib/schemas/tenancy";
 import { canOpen, paletteRoutesFor, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { usePaletteRecords } from "@/lib/hooks/use-palette-records";
@@ -32,7 +32,7 @@ interface Command {
   group: "Actions" | "Navigation" | "Candidates" | "Jobs";
   icon: LucideIcon;
   keywords?: string;
-  /** Registry id of the page this command opens; hidden from roles that can't open it. */
+  /** Registry id of the page this command opens; hidden from principals that can't open it. */
   routeId?: RouteId;
   run: (router: ReturnType<typeof useRouter>, toHref: ReturnType<typeof useHref>) => void;
 }
@@ -67,10 +67,10 @@ const STATIC_COMMANDS: Command[] = [
   },
 ];
 
-/** Actions the role can open plus one Navigation entry per palette route in the registry. */
-function staticCommandsFor(role: FirmRole): Command[] {
-  const actions = STATIC_COMMANDS.filter((command) => !command.routeId || canOpen(routeById(command.routeId), role));
-  const navigation = paletteRoutesFor(role).map<Command>((route) => ({
+/** Actions the principal can open plus one Navigation entry per palette route in the registry. */
+function staticCommandsFor(principal: Principal): Command[] {
+  const actions = STATIC_COMMANDS.filter((command) => !command.routeId || canOpen(routeById(command.routeId), principal));
+  const navigation = paletteRoutesFor(principal).map<Command>((route) => ({
     id: `nav-${route.id}`,
     group: "Navigation",
     label: route.id.startsWith("settings.") ? `Settings · ${route.title}` : route.title,
@@ -107,7 +107,7 @@ export function CommandPalette() {
 
   const records = usePaletteRecords();
   const reduceMotion = useReducedMotion() ?? false;
-  const role = useSignedInUser().role;
+  const principal = useSignedInPrincipal();
 
   const results = useMemo(() => {
     const dynamicCommands: Command[] = [];
@@ -134,14 +134,14 @@ export function CommandPalette() {
       });
     });
 
-    const allCommands = [...staticCommandsFor(role), ...dynamicCommands];
+    const allCommands = [...staticCommandsFor(principal), ...dynamicCommands];
     
     const q = query.trim().toLowerCase();
     if (!q) return allCommands.slice(0, 50); // limit empty state
     return allCommands.filter((c) =>
       `${c.label} ${c.keywords ?? ""}`.toLowerCase().includes(q),
     ).slice(0, 50);
-  }, [query, role, records.candidates, records.jobs]);
+  }, [query, principal, records.candidates, records.jobs]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, Command[]> = {};
