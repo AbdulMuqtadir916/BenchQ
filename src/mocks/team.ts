@@ -1,15 +1,9 @@
-import { z } from "zod";
-import { arrayOf } from "@/lib/api/client";
-import { FirmSchema, UserSchema, type Firm, type User } from "@/lib/schemas/session";
-import firmSeed from "./data/firm.json";
+import type { User } from "@/lib/schemas/session";
 import { inFirm, mockResult } from "./_shared";
 import { firmScoped } from "./membership";
+import { allUsers } from "./team-data";
 
-const seed = z.object({ firms: arrayOf(FirmSchema), users: arrayOf(UserSchema) }).parse(firmSeed);
-
-/** Every firm and every firm user, validated. */
-export const firms: Firm[] = seed.firms;
-export const allUsers: User[] = seed.users;
+export { allUsers, firms } from "./team-data";
 
 export const teamMock = firmScoped("team", {
   list: (firmId: string): Promise<User[]> => mockResult(inFirm(allUsers, firmId)),

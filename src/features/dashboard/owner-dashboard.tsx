@@ -1,13 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import { useApplications } from "@/lib/hooks/use-applications";
+import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useTeam } from "@/lib/hooks/use-team";
-import { daysBetween } from "@/lib/derive";
+import { daysBetween, isActiveCandidate } from "@/lib/derive";
 import { StatCard } from "@/components/app/stat-card";
 import { PageHeader } from "@/components/app/page-header";
 import { SkeletonCard } from "@/components/app/skeleton-card";
+import { ErrorState } from "@/components/app/error-state";
+import { GroupRowError } from "@/components/app/card-group";
+import { hasPageFailed, queryGroup } from "@/lib/query/query-group";
+import { useFirm } from "@/lib/tenancy/firm-context";
 import { FloorContent } from "./manager-dashboard";
 
 const EMPTY: never[] = [];
@@ -16,11 +20,15 @@ export function OwnerDashboard() {
   const applicationsQuery = useApplications();
   const candidatesQuery = useCandidates();
   const teamQuery = useTeam();
+  // FloorContent reads the follow-ups too (same cache entry): needed to know if the whole page failed.
+  const followupsQuery = useFollowups();
+  const firm = useFirm();
+  const rollups = queryGroup(applicationsQuery, candidatesQuery, teamQuery);
+  const page = queryGroup(applicationsQuery, candidatesQuery, teamQuery, followupsQuery);
 
   const applications = applicationsQuery.data ?? EMPTY;
   const candidates = candidatesQuery.data ?? EMPTY;
   const team = teamQuery.data ?? EMPTY;
-  const isLoading = applicationsQuery.isLoading || candidatesQuery.isLoading;
 
   const placements = useMemo(
     () => applications.filter((a) => a.status === "PLACED"),
@@ -40,15 +48,28 @@ export function OwnerDashboard() {
     return Math.round(spans.reduce((s, d) => s + d, 0) / spans.length);
   }, [placements]);
 
-  const seatUsage = `${team.filter((u) => u.isActive).length} / 10`;
-  const candidateUsage = `${candidates.filter((c) => c.status !== "INACTIVE").length} / 50`;
+  // Limits come from the firm (copied from its plan, A3); active = ON_BENCH / INTERVIEWING / OFFER (A2).
+  // Seats count active users only: pending invites (A1) aren't served to firm pages until Phase S.
+  const seatUsage = `${team.filter((u) => u.isActive).length} / ${firm.seatLimit}`;
+  const candidateUsage = `${candidates.filter(isActiveCandidate).length} / ${firm.candidateLimit}`;
+
+  if (hasPageFailed(applicationsQuery, candidatesQuery, teamQuery, followupsQuery)) {
+    return (
+      <div className="bq-page">
+        <PageHeader title="The business" subtitle="Placements, throughput, and plan usage at a glance." />
+        <ErrorState variant="page" error={page.error ?? new Error("The request failed.")} onRetry={page.retry} />
+      </div>
+    );
+  }
 
   return (
     <div className="bq-page">
       <PageHeader title="The business" subtitle="Placements, throughput, and plan usage at a glance." />
 
       <section aria-label="Business rollups" className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
+        {rollups.status === "error" ? (
+          <GroupRowError group={rollups} />
+        ) : rollups.status === "pending" ? (
           <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
         ) : (
           <>

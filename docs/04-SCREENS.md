@@ -560,3 +560,36 @@ cramped builder nobody can use.
 - Resume export blocked → gate message with a jump-to-claim link
 - Duplicate job on capture → comparison card, merge or keep
 - Session role switched mid-flight → refetch, don't leave stale data on screen
+
+---
+
+## 13. Multi-card pages — loading and error (decided 2026-10-18)
+
+Pages made of several cards fed by several queries (the four dashboards today; the `/admin`
+overview in Phase P) follow one pattern. Code: `src/lib/query/query-group.ts` (`queryGroup`,
+`hasPageFailed`) and `src/components/app/card-group.tsx` (`GroupBody`, `GroupRowError`). Test:
+`src/features/dashboard/dashboard-errors.test.ts`.
+
+1. **A card group is the unit.** A group is the smallest set of cards that read the same queries: a
+   row of stat cards fed by the same data is one group; a table, a chart and a list each are their
+   own. Each group declares its queries: `const throughput = queryGroup(candidatesQuery, …)`.
+2. **Loading:** the group shows its skeleton while any of its queries is loading.
+3. **Error, per group:** if any query the group reads has failed, the group shows an inline error
+   with **Retry** in place of its content (a stat row shows one error card spanning the row). Retry
+   refetches only the failed queries. An error wins over loading, so a failed query is never drawn
+   as data while a sibling query is still in flight.
+4. **Never a number from failed data.** A group renders only when every query it reads succeeded:
+   no zeros, no "Nothing due", no empty list standing in for "didn't load". Titles that carry a
+   count (`My candidates (8)`) drop the count unless the group loaded. Content is passed to
+   `GroupBody` as a function so it isn't even built from missing data.
+5. **Everything failed → one page-level error.** When every query the page reads has failed, the
+   page shows its header and a single page-level error with Retry (refetching everything), not one
+   identical error per card.
+6. **Partial failure stays partial.** Groups whose queries loaded keep rendering their real data
+   next to the failed ones; a Retry that fixes a shared query recovers every group that reads it.
+
+Groups on today's dashboards: OWNER — rollups (applications, candidates, team) + the floor groups;
+MANAGER / VIEWER — throughput (candidates, applications, team), per-BDE performance (+ follow-ups),
+pipeline funnel (applications), at-risk (candidates, applications); BDE — tonight's numbers
+(candidates, applications, follow-ups), my candidates (candidates, applications), queue
+(candidates, applications, jobs).
