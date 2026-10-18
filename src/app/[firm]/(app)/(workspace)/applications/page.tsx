@@ -16,6 +16,7 @@ import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
 import { STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
+import { ErrorState } from "@/components/app/error-state";
 
 const VIEWS: Array<{ id: View; label: string; Icon: LucideIcon }> = [
   { id: "kanban", label: "Board", Icon: Columns3 },
@@ -29,6 +30,12 @@ export default function ApplicationsPage() {
   const user = useSignedInUser();
   const applicationsQuery = useApplications();
   const candidatesQuery = useCandidates();
+  // An error must never read as an empty board (CLAUDE.md: three states, always).
+  const loadError = (applicationsQuery.error ?? candidatesQuery.error) as Error | null;
+  const retry = () => {
+    void applicationsQuery.refetch();
+    void candidatesQuery.refetch();
+  };
   const [view, setView] = useState<View>("kanban");
   const [overrides, setOverrides] = useState<Record<string, ApplicationStatus>>({});
 
@@ -59,7 +66,7 @@ export default function ApplicationsPage() {
         ))}
       </div>
 
-      {applicationsQuery.isLoading ? <SkeletonCard /> : view === "kanban" ? (
+      {loadError ? <ErrorState error={loadError} onRetry={retry} /> : applicationsQuery.isLoading ? <SkeletonCard /> : view === "kanban" ? (
         <ApplicationBoard apps={apps} candidateName={candidateName} onMove={moveTo} canAct={user.role !== "VIEWER"} />
       ) : view === "table" ? (
         <TableView apps={apps} candidateName={candidateName} />

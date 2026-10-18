@@ -4,6 +4,7 @@ import { CandidateInboxSchema, InboxMessageSchema, type CandidateInbox, type Inb
 import inboxSeed from "./data/inbox.json";
 import { allCandidates } from "./candidates";
 import { findInFirm, inFirm, mockResult, wait } from "./_shared";
+import { firmScoped } from "./membership";
 
 const seed = z
   .object({ messages: arrayOf(InboxMessageSchema), initiallyConnected: z.array(z.string()) })
@@ -33,7 +34,7 @@ function inboxFor(firmId: string, candidateId: string): CandidateInbox {
   });
 }
 
-export const inboxMock = {
+export const inboxMock = firmScoped("inbox", {
   byCandidate: (firmId: string, candidateId: string): Promise<CandidateInbox> => mockResult(inboxFor(firmId, candidateId)),
 
   connect: async (firmId: string, candidateId: string): Promise<CandidateInbox> => {
@@ -54,4 +55,4 @@ export const inboxMock = {
     message.isRead = true;
     return mockResult(InboxMessageSchema.parse(message));
   },
-};
+});

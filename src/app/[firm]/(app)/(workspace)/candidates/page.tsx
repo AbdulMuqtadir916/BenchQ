@@ -203,6 +203,7 @@ export default function CandidatesPage() {
           getRowId={(r) => r.candidate.id}
           isLoading={candidatesQuery.isLoading}
           error={candidatesQuery.error as Error | null}
+          onRetry={() => void candidatesQuery.refetch()}
           onRowClick={(r) => router.push(toHref("candidates.detail", { id: r.candidate.id }))}
           searchPlaceholder="Search candidates…"
           storageKey="candidates-list"

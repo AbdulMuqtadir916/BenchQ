@@ -106,6 +106,7 @@ export default function LedgerPage() {
           getRowId={(e) => e.id}
           isLoading={ledgerQuery.isLoading}
           error={ledgerQuery.error as Error | null}
+          onRetry={() => void ledgerQuery.refetch()}
           isRowSelectable={false}
           searchPlaceholder="Search the ledger…"
           storageKey="ledger-list"

@@ -3,6 +3,7 @@ import { arrayOf } from "@/lib/api/client";
 import { FirmSchema, UserSchema, type Firm, type User } from "@/lib/schemas/session";
 import firmSeed from "./data/firm.json";
 import { inFirm, mockResult } from "./_shared";
+import { firmScoped } from "./membership";
 
 const seed = z.object({ firms: arrayOf(FirmSchema), users: arrayOf(UserSchema) }).parse(firmSeed);
 
@@ -10,6 +11,6 @@ const seed = z.object({ firms: arrayOf(FirmSchema), users: arrayOf(UserSchema) }
 export const firms: Firm[] = seed.firms;
 export const allUsers: User[] = seed.users;
 
-export const teamMock = {
+export const teamMock = firmScoped("team", {
   list: (firmId: string): Promise<User[]> => mockResult(inFirm(allUsers, firmId)),
-};
+});

@@ -5,13 +5,14 @@ import applicationsSeed from "./data/applications.json";
 import followupsSeed from "./data/followups.json";
 import { currentUser } from "./auth";
 import { findInFirm, inFirm, mockResult } from "./_shared";
+import { firmScoped } from "./membership";
 
 export const allApplications: Application[] = arrayOf(ApplicationSchema).parse(applicationsSeed);
 export const allFollowups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
 
 const CLOSED_STATUSES = ["PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
 
-export const applicationsMock = {
+export const applicationsMock = firmScoped("applications", {
   list: (firmId: string, params?: { candidateId?: string }): Promise<Application[]> => {
     const applications = inFirm(allApplications, firmId);
     return mockResult(params?.candidateId ? applications.filter((application) => application.candidateId === params.candidateId) : applications);
@@ -42,11 +43,11 @@ export const applicationsMock = {
     if (CLOSED_STATUSES.includes(update.status)) application.closedAt = now;
     return mockResult(ApplicationSchema.parse(application));
   },
-};
+});
 
-export const followupsMock = {
+export const followupsMock = firmScoped("followups", {
   list: (firmId: string, params?: { userId?: string }): Promise<FollowUpTask[]> => {
     const followups = inFirm(allFollowups, firmId);
     return mockResult(params?.userId ? followups.filter((followup) => followup.assignedToUserId === params.userId) : followups);
   },
-};
+});

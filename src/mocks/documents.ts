@@ -9,10 +9,11 @@ import documentsSeed from "./data/documents.json";
 import { allCandidates } from "./candidates";
 import { currentUser } from "./auth";
 import { findInFirm, inFirm, mockResult } from "./_shared";
+import { firmScoped } from "./membership";
 
 export const allDocuments: CandidateDocument[] = arrayOf(CandidateDocumentSchema).parse(documentsSeed);
 
-export const documentsMock = {
+export const documentsMock = firmScoped("documents", {
   byCandidate: (firmId: string, candidateId: string): Promise<CandidateDocument[]> =>
     mockResult(inFirm(allDocuments, firmId).filter((document) => document.candidateId === candidateId)),
 
@@ -37,4 +38,4 @@ export const documentsMock = {
     allDocuments.splice(allDocuments.indexOf(document), 1);
     return mockResult(document);
   },
-};
+});

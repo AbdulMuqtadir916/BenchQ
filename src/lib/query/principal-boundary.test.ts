@@ -45,6 +45,7 @@ describe("principal change clears the query cache (dev switcher, sign-in, sign-o
     useSession.getState().reset();
     expect(client.getQueryCache().getAll()).toEqual([]);
 
+    await sessionApi.devSignInAs(DEFAULT_SESSION.user.id); // the mock backend checks membership (T8)
     await client.fetchQuery(query);
     useSession.getState().setSession(await sessionApi.devSignInAs("user_kiran"));
     expect(client.getQueryCache().getAll()).toEqual([]);

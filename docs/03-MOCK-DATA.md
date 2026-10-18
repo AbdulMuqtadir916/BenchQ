@@ -127,6 +127,16 @@ Firm B and the suspended firm were cloned from a slice of firm A with every id, 
 re-pointed; `src/mocks/fixtures.test.ts` checks that nothing references another firm. Usage counts
 (seats, active candidates) are derived, never stored.
 
+**The mock backend checks membership** (`src/mocks/membership.ts`, T8): every firm-scoped mock call
+runs only for a member of the firm it names: another firm's id is a 404 (the same as a firm that
+doesn't exist), signed out is a 401, as a real server answers. Tests sign in as a member of the firm
+they read (`sessionApi.devSignInAs`).
+
+**Dev fault switch:** to see an error state and its Retry without a backend, in the browser console
+`window.__BENCHQ_MOCK_FAIL__ = ["candidates.list"]` (any `resource.method` of a firm-scoped mock, or
+`["*"]`), then load the screen with an empty cache (e.g. after a principal switch); set it to `[]`
+and press Retry to recover. Inert in production builds.
+
 ---
 
 ## 4. What the fixtures must contain

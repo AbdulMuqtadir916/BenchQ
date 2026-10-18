@@ -14,6 +14,7 @@ import { FunnelBars } from "@/components/app/charts/funnel-bars";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { BarChart2 } from "lucide-react";
+import { ErrorState } from "@/components/app/error-state";
 
 const PERIODS = [
   { key: "7d", label: "7 days", days: 7 },
@@ -61,6 +62,8 @@ export default function AnalyticsPage() {
   }, [jobsQuery.data, applications]);
 
   const isLoading = applicationsQuery.isLoading || teamQuery.isLoading;
+  // Failed data must never render as real zeros (CLAUDE.md: every number is derived, three states).
+  const loadError = (applicationsQuery.error ?? candidatesQuery.error ?? jobsQuery.error ?? teamQuery.error) as Error | null;
   const maxApps = Math.max(1, ...perBde.map((b) => b.applicationsSubmitted));
   const maxSource = Math.max(1, ...sourceRoi.map((s) => s.apps));
 
@@ -68,6 +71,15 @@ export default function AnalyticsPage() {
     return (
       <div className="bq-page">
         <EmptyState icon={BarChart2} title="Analytics is a manager view" description="Ask your manager for the floor and business rollups." variant="filtered" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="bq-page">
+        <PageHeader title="Analytics" subtitle="Funnel, throughput, and source effectiveness." />
+        <ErrorState error={loadError} onRetry={() => { void applicationsQuery.refetch(); void candidatesQuery.refetch(); void jobsQuery.refetch(); void teamQuery.refetch(); }} />
       </div>
     );
   }
