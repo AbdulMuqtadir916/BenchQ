@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpdateCandidate } from "@/lib/schemas/candidate";
 import { candidatesApi } from "@/lib/api/candidates";
 import { queryKeys } from "@/lib/query/keys";
-import { useFirmId } from "@/lib/stores/session-store";
+import { useFirmId } from "@/lib/tenancy/firm-context";
 
 export function useCandidates() {
   const firmId = useFirmId();

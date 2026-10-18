@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { agentsApi } from "@/lib/api/agents";
 import type { TailorResumeInput } from "@/lib/schemas/agent";
 import type { RewriteInput } from "@/lib/schemas/resume-document";
-import { useFirmId } from "@/lib/stores/session-store";
+import { useFirmId } from "@/lib/tenancy/firm-context";
 
 export function useRewrite() {
   return useMutation({

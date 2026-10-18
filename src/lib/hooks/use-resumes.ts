@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { resumesApi } from "@/lib/api/resumes";
 import { queryKeys } from "@/lib/query/keys";
-import { useFirmId } from "@/lib/stores/session-store";
+import { useFirmId } from "@/lib/tenancy/firm-context";
 
 export function useAllResumes() {
   const firmId = useFirmId();

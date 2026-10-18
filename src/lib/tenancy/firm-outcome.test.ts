@@ -1,0 +1,86 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { ApiError } from "@/lib/api/client";
+import { sessionApi } from "@/lib/api/session";
+import type { Firm } from "@/lib/schemas/session";
+import type { FirmPrincipal } from "@/lib/schemas/tenancy";
+import { DEFAULT_SESSION } from "@/lib/stores/session-store";
+import { allUsers, firms } from "@/mocks/team";
+import { firmOutcome, type FirmLookup } from "./firm-outcome";
+
+/**
+ * docs/07 §2.5 for every fixture principal: sign the mock backend in, resolve each firm's slug (and
+ * an unknown one) the way the firm layout does, and check what renders.
+ */
+
+const UNKNOWN_SLUG = "no-such-firm";
+const slugs = [...firms.map((firm) => firm.slug), UNKNOWN_SLUG];
+
+async function lookup(slug: string): Promise<FirmLookup> {
+  try {
+    return { status: "success", firm: await sessionApi.firmBySlug(slug) };
+  } catch (error) {
+    return { status: "error", error: error as Error };
+  }
+}
+
+async function outcomesFor(principal: FirmPrincipal | null): Promise<Record<string, string>> {
+  const row: Record<string, string> = {};
+  for (const slug of slugs) row[slug] = firmOutcome(principal, await lookup(slug)).kind;
+  return row;
+}
+
+afterEach(async () => {
+  await sessionApi.devSignInAs(DEFAULT_SESSION.user.id);
+});
+
+describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every firm slug", () => {
+  const signedInUsers = allUsers.filter((user) => user.isActive);
+
+  it.each(signedInUsers.map((user) => [user.id, user.role, user.firmId] as const))("%s (%s of %s): own firm opens (or is suspended); every other slug is not-found", async (userId, _role, firmId) => {
+    const { principal } = await sessionApi.devSignInAs(userId);
+    const own = firms.find((firm) => firm.id === firmId)!;
+    const expected = Object.fromEntries(slugs.map((slug) => [slug, slug === own.slug ? (own.status === "SUSPENDED" ? "suspended" : "open") : "not-found"]));
+    expect(await outcomesFor(principal)).toEqual(expected);
+  });
+
+  it("covers a user of every firm that has users, including the suspended one", () => {
+    expect(new Set(signedInUsers.map((user) => user.firmId))).toEqual(new Set(["firm_hts", "firm_stl", "firm_cbw"]));
+  });
+
+  it("signed out: every slug, known or not, goes to sign-in (and the backend answers 401, not 404)", async () => {
+    await sessionApi.signOut();
+    expect(Object.values(await outcomesFor(null))).toEqual(slugs.map(() => "signed-out"));
+    await expect(sessionApi.firmBySlug(firms[0]!.slug)).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("answers an unknown slug and another firm's slug with the same 404, so a URL never confirms a firm exists", async () => {
+    await sessionApi.devSignInAs("user_adnan");
+    const otherFirm = firms.find((firm) => firm.id === "firm_stl")!.slug;
+    expect(firms.some((firm) => firm.slug === UNKNOWN_SLUG)).toBe(false);
+    const errors = await Promise.all([UNKNOWN_SLUG, otherFirm].map((slug) => sessionApi.firmBySlug(slug).catch((error: ApiError) => [error.status, error.code, error.message])));
+    expect(errors[0]).toEqual(errors[1]);
+    expect(errors[0]).toEqual([404, "NOT_FOUND", "Not found."]);
+  });
+});
+
+describe("firmOutcome edges", () => {
+  const principal: FirmPrincipal = { kind: "firm", userId: "u", firmId: "firm_a", role: "BDE" };
+  const firm = (overrides: Partial<Firm>) => ({ ...DEFAULT_SESSION.firm, id: "firm_a", ...overrides }) as Firm;
+
+  it("waits while the slug resolves, and shows the error state for anything but a 404", () => {
+    expect(firmOutcome(principal, { status: "pending" }).kind).toBe("resolving");
+    expect(firmOutcome(principal, { status: "error", error: new ApiError("down", "NETWORK", 503) }).kind).toBe("error");
+    expect(firmOutcome(principal, { status: "error", error: new ApiError("nope", "NOT_FOUND", 404) }).kind).toBe("not-found");
+  });
+
+  it("checks membership itself too: a firm the backend returned that isn't the principal's is not-found", () => {
+    expect(firmOutcome(principal, { status: "success", firm: firm({ id: "firm_b" }) }).kind).toBe("not-found");
+    expect(firmOutcome(principal, { status: "success", firm: firm({ id: "firm_b", status: "SUSPENDED" }) }).kind).toBe("not-found");
+  });
+
+  it("checks signed-out first and suspended after membership (§2.5 order)", () => {
+    expect(firmOutcome(null, { status: "error", error: new ApiError("x", "NOT_FOUND", 404) }).kind).toBe("signed-out");
+    expect(firmOutcome(principal, { status: "success", firm: firm({ status: "SUSPENDED" }) }).kind).toBe("suspended");
+    expect(firmOutcome(principal, { status: "success", firm: firm({ status: "ACTIVE" }) }).kind).toBe("open");
+  });
+});

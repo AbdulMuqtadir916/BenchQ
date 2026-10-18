@@ -7,7 +7,7 @@ import type { Record_ } from "@/lib/schemas/record";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useRecord } from "@/lib/hooks/use-records";
-import { useSession } from "@/lib/stores/session-store";
+import { useSignedInUser } from "@/lib/stores/session-store";
 import { buildResumeDocument, newClaim, newId } from "@/lib/resume-doc/build";
 import { allClaims, setClaimState } from "@/lib/resume-doc/ops";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ function composeDocument(id: string, start: StartFrom, candidate: Candidate, rec
 }
 
 export function NewResume({ initialMode, upload }: { initialMode: StudioMode; upload: string | null }) {
-  const { user } = useSession();
+  const user = useSignedInUser();
   const close = useCloseStudio();
   const candidatesQuery = useCandidates();
   const [draftId] = useState(() => newId("resume_new"));

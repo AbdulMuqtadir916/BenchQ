@@ -1,10 +1,12 @@
 "use client";
 
 import { Fragment, useEffect, useId, useRef, useState } from "react";
-import { BriefcaseBusiness, ChevronDown, Crown, Eye, ShieldCheck, ShieldUser, UsersRound, type LucideIcon } from "lucide-react";
+import { useParams } from "next/navigation";
+import { BriefcaseBusiness, ChevronDown, Crown, Eye, LogOut, ShieldCheck, ShieldUser, UsersRound, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useSession } from "@/lib/stores/session-store";
-import { useDevPrincipals, useDevSignInAs } from "@/lib/hooks/use-session";
+import { useSignedInUser } from "@/lib/stores/session-store";
+import { useCurrentSession, useDevPrincipals, useDevSignInAs, useSignOut } from "@/lib/hooks/use-session";
+import { landingHref } from "@/lib/routes/landing";
 import type { DevPrincipalOption } from "@/lib/schemas/session";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/cn";
@@ -13,6 +15,8 @@ import { CONTENT_EXIT, POPOVER_TRANSITION } from "@/lib/motion";
 /**
  * Dev principal switcher (docs/07 §3, T4): sign in as any fixture principal — every role in firm A,
  * the users of the other firms, and the platform admin (listed, not selectable until Phase P).
+ * A switch to a user of the firm in the URL stays on the page; a switch to another firm's user goes to
+ * that user's landing (staying would be a not-found, docs/07 §2.5). Sign out is at the end.
  * Rendered only when NEXT_PUBLIC_SHOW_DEV_TOOLS="true". Role simulation, not security.
  */
 
@@ -36,11 +40,16 @@ const groupOf = (option: DevPrincipalOption) => option.firmName ?? "BenchQ platf
 
 export function PrincipalSwitcher({ align = "end" }: { align?: "start" | "end" }) {
   const show = process.env.NEXT_PUBLIC_SHOW_DEV_TOOLS === "true";
-  const user = useSession((s) => s.user);
-  const firm = useSession((s) => s.firm);
+  const urlSlug = useParams<{ firm?: string }>()?.firm ?? null;
+  const user = useSignedInUser();
+  // The signed-in user's own firm, which is not necessarily the URL's (e.g. on /dev).
+  const firmName = useCurrentSession().data?.firm.name ?? "";
   const [open, setOpen] = useState(false);
   const principals = useDevPrincipals(show && open);
-  const signInAs = useDevSignInAs();
+  const signInAs = useDevSignInAs({
+    navigateTo: (session) => (urlSlug && session.firm.slug !== urlSlug ? landingHref(session) : null),
+  });
+  const signOut = useSignOut();
   const reduceMotion = useReducedMotion() ?? false;
   const ref = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -82,7 +91,7 @@ export function PrincipalSwitcher({ align = "end" }: { align?: "start" | "end" }
       >
         <ShieldUser size={14} aria-hidden="true" className="shrink-0" />
         <span className="truncate font-[550]">{user.name}</span>
-        <span className="hidden truncate text-[var(--color-text-3)] sm:inline">· {ROLE_LABEL[user.role]} · {firm.name}</span>
+        <span className="hidden truncate text-[var(--color-text-3)] sm:inline">· {ROLE_LABEL[user.role]}{firmName ? ` · ${firmName}` : ""}</span>
         <ChevronDown size={14} aria-hidden="true" className={cn("shrink-0 transition-transform", open && "rotate-180")} />
       </button>
       <AnimatePresence initial={false}>
@@ -91,7 +100,7 @@ export function PrincipalSwitcher({ align = "end" }: { align?: "start" | "end" }
             id={menuId}
             role="menu"
             aria-label="Sign in as"
-            aria-busy={principals.isLoading || signInAs.isPending}
+            aria-busy={principals.isLoading || signInAs.isPending || signOut.isPending}
             initial={{ opacity: 0, y: reduceMotion ? 0 : -4, scale: reduceMotion ? 1 : 0.985, filter: reduceMotion ? "none" : "blur(3px)" }}
             animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: reduceMotion ? 0 : -2, scale: reduceMotion ? 1 : 0.99, filter: reduceMotion ? "none" : "blur(2px)", transition: CONTENT_EXIT }}
@@ -154,6 +163,21 @@ export function PrincipalSwitcher({ align = "end" }: { align?: "start" | "end" }
                 </Fragment>
               );
             })}
+            <li role="presentation" className="my-1 border-t border-[var(--color-border)]" />
+            <li>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={signOut.isPending || signInAs.isPending}
+                onClick={() => signOut.mutate()}
+                className="w-full flex items-center gap-2 text-left px-2.5 py-2 rounded-[var(--radius-md)] text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"
+              >
+                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] text-[var(--color-text-3)]">
+                  <LogOut size={14} aria-hidden="true" />
+                </span>
+                Sign out
+              </button>
+            </li>
           </motion.ul>
         ) : null}
       </AnimatePresence>

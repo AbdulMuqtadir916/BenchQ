@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { inboxApi } from "@/lib/api/inbox";
 import type { CandidateInbox } from "@/lib/schemas/inbox";
 import { queryKeys } from "@/lib/query/keys";
-import { useFirmId } from "@/lib/stores/session-store";
+import { useFirmId } from "@/lib/tenancy/firm-context";
 
 export function useCandidateInbox(candidateId: string) {
   const firmId = useFirmId();

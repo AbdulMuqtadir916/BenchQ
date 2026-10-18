@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useResume } from "@/lib/hooks/use-resumes";
 import { useCandidate } from "@/lib/hooks/use-candidates";
 import { useRecord } from "@/lib/hooks/use-records";
-import { useSession } from "@/lib/stores/session-store";
+import { useSignedInUser } from "@/lib/stores/session-store";
 import { buildResumeDocument } from "@/lib/resume-doc/build";
 import { deriveDocumentGate } from "@/lib/derive";
 import { ErrorState } from "@/components/app/error-state";
@@ -30,7 +30,7 @@ export function useCloseStudio() {
 
 export function OpenResume({ id, initialMode, review = false }: { id: string; initialMode: StudioMode; review?: boolean }) {
   const toHref = useHref();
-  const { user } = useSession();
+  const user = useSignedInUser();
   const close = useCloseStudio();
   const resumeQuery = useResume(id);
   const candidateId = resumeQuery.data?.candidateId ?? "";

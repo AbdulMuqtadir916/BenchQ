@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { teamApi } from "@/lib/api/team";
 import { queryKeys } from "@/lib/query/keys";
-import { useFirmId } from "@/lib/stores/session-store";
+import { useFirmId } from "@/lib/tenancy/firm-context";
 
 export function useTeam() {
   const firmId = useFirmId();

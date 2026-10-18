@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { Play, Sparkles, Send, Mail, ArrowRight, BellRing, MailCheck, CircleHelp } from "lucide-react";
-import { useSession } from "@/lib/stores/session-store";
+import { useSignedInUser } from "@/lib/stores/session-store";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
 import { useJobs } from "@/lib/hooks/use-jobs";
@@ -27,7 +27,7 @@ const NIGHTLY_TARGET = 40;
 
 export function BdeDashboard() {
   const toHref = useHref();
-  const { user } = useSession();
+  const user = useSignedInUser();
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
   const followupsQuery = useFollowups(user.id);

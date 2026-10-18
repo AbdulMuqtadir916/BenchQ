@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { ForbiddenState } from "@/components/app/forbidden-state";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { landingFor } from "@/lib/routes/registry";
+import { useHref } from "@/lib/routes/use-href";
 import { useRouteAccess } from "@/lib/routes/use-route-access";
-import { useSession } from "@/lib/stores/session-store";
+import { useSignedInUser } from "@/lib/stores/session-store";
 
 /**
  * Renders the page only if the current role may open it (docs/07 Phase A4).
@@ -15,25 +15,18 @@ import { useSession } from "@/lib/stores/session-store";
  */
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const role = useSession((s) => s.user.role);
+  const toHref = useHref();
+  const role = useSignedInUser().role;
   const { route, access } = useRouteAccess();
   const isDenied = access === "none";
   const shouldLeave = isDenied && route?.onDenied === "landing";
 
   useEffect(() => {
-    if (shouldLeave) router.replace(landingFor(role));
-  }, [shouldLeave, role, router]);
+    if (shouldLeave) router.replace(toHref(landingFor(role)));
+  }, [shouldLeave, role, router, toHref]);
 
-  // docs/04 §12: switching who is signed in refetches instead of leaving the previous principal's data
-  // on screen. Firm data is keyed by firm already; this covers user-specific lists (scopes, follow-ups).
-  const userId = useSession((s) => s.principal.userId);
-  const previousUser = useRef(userId);
-  useEffect(() => {
-    if (previousUser.current === userId) return;
-    previousUser.current = userId;
-    void queryClient.invalidateQueries();
-  }, [userId, queryClient]);
+  // docs/04 §12: a principal switch never leaves the previous principal's data on screen. That is
+  // handled once, for the whole app, by the query provider (src/lib/query/principal-boundary.ts).
 
   if (shouldLeave) return null;
   // Not a route we know: render nothing of the page, and don't pretend it exists (docs/07 principle 4).

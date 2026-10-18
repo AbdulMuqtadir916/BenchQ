@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUiStore } from "@/lib/stores/ui-store";
-import { useSession } from "@/lib/stores/session-store";
+import { useSignedInUser } from "@/lib/stores/session-store";
 import { shortcutsFor } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 
@@ -36,7 +36,7 @@ export function useGlobalShortcuts() {
   const closeCommandPalette = useUiStore((s) => s.closeCommandPalette);
   const openHintSheet = useUiStore((s) => s.openHintSheet);
   const closeHintSheet = useUiStore((s) => s.closeHintSheet);
-  const role = useSession((s) => s.user.role);
+  const role = useSignedInUser().role;
 
   const gPressedAt = useRef<number>(0);
 

@@ -5,7 +5,7 @@ import { applicationsApi, followupsApi } from "@/lib/api/applications";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { queryKeys } from "@/lib/query/keys";
-import { useFirmId } from "@/lib/stores/session-store";
+import { useFirmId } from "@/lib/tenancy/firm-context";
 
 export function useApplications(candidateId?: string) {
   const firmId = useFirmId();
