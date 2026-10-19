@@ -270,7 +270,7 @@ A stopped task with a clear question beats a confident wrong implementation.
 | Dashboards error states — per-group errors, one page-level error when everything fails (docs/04 §13) | Done (#10) |
 | 07 Phase L — sign-in with seeded accounts on `/sign-in`, dev principal switcher removed, session shared across tabs (Q25–Q27) | Done (#16) |
 | Demo data persists in the browser; Super Admin "Reset demo data" (docs/03 §3.3) | **Built, in review** (`feat/persistent-demo-data`); before P3 |
-| 07 Phase P — `/admin/*` routes, admin shell, read-only support view | **In progress**: P1 (registry v2, principal-typed helpers, platform sessions) + P2 (admin layout, platform guard, admin shell) done (#12, #13). P3 waits for Phase L and the docs/04 Admin section |
+| 07 Phase P — `/admin/*` routes, admin shell, read-only support view | **In progress**: P1 (registry v2, principal-typed helpers, platform sessions) + P2 (admin layout, platform guard, admin shell) done (#12, #13). P3 (admin screens from docs/04 §14, every write persisted with its ledger entry) in review; P4 (support view, `/invite/[token]`) next |
 | 07 Phase C — permission policy, scope helpers, remove inline role checks | Planned |
 | 07 Phase B — UI completion audit (route × principal) | Planned |
 | 07 Phase S — Super Admin flow polish (UI-first) | Planned |

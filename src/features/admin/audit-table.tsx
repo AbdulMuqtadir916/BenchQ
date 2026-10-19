@@ -91,7 +91,7 @@ export function AuditTable({
         enableSorting: false,
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
-            <span className="text-[var(--color-text)]">{row.original.actorName}</span>
+            <span className="whitespace-nowrap text-[var(--color-text)]">{row.original.actorName}</span>
             <ActorTag type={row.original.actorType} />
           </span>
         ),
