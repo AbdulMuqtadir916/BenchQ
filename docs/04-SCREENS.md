@@ -764,7 +764,7 @@ Suspend shows only for ACTIVE firms; Reactivate only for SUSPENDED.
 ### Users tab — `/admin/firms/[firmId]/users`
 
 - **Members table:** name · email · role · status (Active / Deactivated) · last active.
-  Row action: **Deactivate** (confirm). Reactivate (confirm; **blocked when the firm can't add a seat**, A4,
+  Row action: **Deactivate** (confirm; logs `STATE_CHANGE`, 07 Q30). Reactivate (confirm; **blocked when the firm can't add a seat**, A4,
   rendered as §0's over-limit exception: visible, disabled, the reason inline, e.g. "Your plan allows 4
   seats; 4 are in use.").
   The OWNER cannot be deactivated (ownership transfer is out of scope, A10); on the OWNER's
@@ -786,6 +786,8 @@ Empty: members "No users yet — the owner hasn't accepted their invite."; invit
 - **Custom limits:** "Adjust limits" sets limits different from the plan's (e.g. Starter with 6 seats; the
   Firm holds the effective limits, A3). Same over-limit preview as a plan change. Logged as `PLAN_CHANGED`
   with before → after; the firm is marked "custom limits" on this tab, the firm header and the firms list.
+  The mark is derived (07 Q30): the firm's latest `PLAN_CHANGED` is a limits adjustment (`entityType:
+  "firm_limits"`); a plan change (`entityType: "firm"`) clears it.
 - **History:** derived from this firm's `PLAN_CHANGED` entries: date, by whom, before → after.
 
 ### Activity tab — `/admin/firms/[firmId]/activity`
@@ -804,7 +806,7 @@ this plan (derived count).
 The edit dialog states plainly: "Changes apply to firms assigned this plan from now on. Existing firms keep
 their current limits." (A3)
 
-Writes `CREATE` / `UPDATE` with `entityType: 'Plan'`, `firmId` null.
+Writes `CREATE` / `UPDATE` with `entityType: "plan"` (lowercase, like every ledger entity type), `firmId` null.
 
 No prices, no billing fields.
 
