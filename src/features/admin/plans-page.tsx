@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/lib/auth/permissions";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Eye, EyeOff, Layers, Pencil, Plus } from "lucide-react";
@@ -25,6 +26,7 @@ export function PlansPage() {
   const group = queryGroup(plans, firms);
   const setActive = useSetPlanActive();
   const [editing, setEditing] = useState<Plan | "new" | null>(null);
+  const canEdit = useCan("plan.edit");
 
   const columns = useMemo<ColumnDef<Plan, unknown>[]>(
     () => [
@@ -52,7 +54,7 @@ export function PlansPage() {
         id: "actions",
         header: "",
         enableSorting: false,
-        cell: ({ row }) => (
+        cell: ({ row }) => !canEdit ? null : (
           <span className="inline-flex gap-1">
             <Button variant="ghost" size="sm" onClick={() => setEditing(row.original)}><Pencil size={13} aria-hidden /> Edit</Button>
             <Button variant="ghost" size="sm" disabled={setActive.isPending} onClick={() => setActive.mutate({ planId: row.original.id, isActive: !row.original.isActive })}>
@@ -62,7 +64,7 @@ export function PlansPage() {
         ),
       },
     ],
-    [firms.data, setActive],
+    [firms.data, setActive, canEdit],
   );
 
   return (
@@ -70,7 +72,7 @@ export function PlansPage() {
       <PageHeader
         title="Plans"
         subtitle="Templates for a firm's limits. Assigning a plan copies its limits onto the firm."
-        actions={<Button onClick={() => setEditing("new")}><Plus size={14} aria-hidden /> New plan</Button>}
+        actions={canEdit ? <Button onClick={() => setEditing("new")}><Plus size={14} aria-hidden /> New plan</Button> : undefined}
       />
       {setActive.isError ? <p role="alert" className="mb-3 text-sm text-[var(--color-danger-fg)]">{errorMessage(setActive.error)}</p> : null}
       <DataTable
@@ -83,7 +85,7 @@ export function PlansPage() {
         isRowSelectable={false}
         hasToolbar={false}
         label="Plans"
-        emptyState={<EmptyState icon={Layers} title="No plans yet" description="Create a plan to offer it to new firms." action={<Button onClick={() => setEditing("new")}><Plus size={14} aria-hidden /> New plan</Button>} />}
+        emptyState={<EmptyState icon={Layers} title="No plans yet" description="Create a plan to offer it to new firms." action={canEdit ? <Button onClick={() => setEditing("new")}><Plus size={14} aria-hidden /> New plan</Button> : undefined} />}
       />
       {editing ? <PlanDialog plan={editing === "new" ? null : editing} onClose={() => setEditing(null)} /> : null}
     </div>

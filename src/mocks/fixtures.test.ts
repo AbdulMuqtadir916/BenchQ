@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isOwner } from "@/lib/auth/roles";
 import { allCandidates } from "./candidates";
 import { allJobs } from "./jobs";
 import { allApplications, allFollowups } from "./applications";
@@ -41,8 +42,8 @@ describe("firms, plans, users and invites", () => {
   it("puts every user in a known firm and gives each firm at most one OWNER, counting pending OWNER invites (A10)", () => {
     for (const user of allUsers) expect(firmIds.has(user.firmId), user.id).toBe(true);
     for (const firm of firms) {
-      const owners = allUsers.filter((user) => user.firmId === firm.id && user.role === "OWNER").length;
-      const pendingOwnerInvites = invites.filter((invite) => invite.firmId === firm.id && invite.role === "OWNER" && invite.status === "PENDING").length;
+      const owners = allUsers.filter((user) => user.firmId === firm.id && isOwner(user)).length;
+      const pendingOwnerInvites = invites.filter((invite) => invite.firmId === firm.id && isOwner(invite) && invite.status === "PENDING").length;
       expect(owners + pendingOwnerInvites, firm.id).toBe(1);
     }
   });
@@ -58,10 +59,10 @@ describe("firms, plans, users and invites", () => {
   it("records how each active firm's OWNER joined: an accepted OWNER invite from a Super Admin, plus INVITE_ACCEPTED in the firm's ledger", () => {
     const platformIds = new Set(platformUsers.map((user) => user.id));
     for (const firmId of ["firm_stl", "firm_cbw"]) {
-      const accepted = invites.find((invite) => invite.firmId === firmId && invite.role === "OWNER" && invite.status === "ACCEPTED");
+      const accepted = invites.find((invite) => invite.firmId === firmId && isOwner(invite) && invite.status === "ACCEPTED");
       expect(accepted, firmId).toBeDefined();
       expect(platformIds.has(accepted!.invitedByUserId)).toBe(true);
-      const owner = allUsers.find((user) => user.firmId === firmId && user.role === "OWNER");
+      const owner = allUsers.find((user) => user.firmId === firmId && isOwner(user));
       expect(accepted!.email).toBe(owner!.email);
       expect(allLedger.some((entry) => entry.firmId === firmId && entry.action === "INVITE_ACCEPTED" && entry.entityId === accepted!.id)).toBe(true);
     }

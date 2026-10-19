@@ -66,7 +66,7 @@ export const InviteBaseSchema = z.object({
 
 /** A11: firmId is null if and only if the role is PLATFORM_ADMIN. */
 export const InviteSchema = InviteBaseSchema.superRefine((invite, ctx) => {
-  if ((invite.firmId === null) !== (invite.role === "PLATFORM_ADMIN")) {
+  if ((invite.firmId === null) !== PlatformRole.safeParse(invite.role).success) {
     ctx.addIssue({
       code: "custom",
       path: ["firmId"],

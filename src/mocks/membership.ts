@@ -1,5 +1,5 @@
 import { ApiError } from "@/lib/api/client";
-import { can, type FirmAction } from "@/lib/auth/policy";
+import { can, type Action, type FirmAction } from "@/lib/auth/policy";
 import { currentPrincipal } from "./auth";
 
 /**
@@ -30,7 +30,7 @@ export const isReadMethod = (name: string): boolean => READ_METHODS.has(name);
  * a VIEWER, a support view or a platform admin is refused with 403 — the UI never offers them the
  * control, and this is the layer a request can't skip.
  */
-export function requireAction(action: FirmAction): void {
+export function requireAction(action: Action): void {
   if (!can(currentPrincipal(), action)) throw new ApiError("Your role can't do that here.", "FORBIDDEN", 403);
 }
 

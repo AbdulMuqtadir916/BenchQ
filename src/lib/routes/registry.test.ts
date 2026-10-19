@@ -87,7 +87,7 @@ describe("route registry", () => {
     }
     expect(landingFor(asRole("OWNER"), { isFirstRun: true })).toBe("welcome");
     expect(landingFor(asRole("OWNER"))).toBe("dashboard");
-    expect(ROLES.filter((role) => role !== "OWNER").map((role) => landingFor(asRole(role), { isFirstRun: true }))).toEqual(["dashboard", "dashboard", "dashboard"]);
+    expect((["MANAGER", "BDE", "VIEWER"] as const).map((role) => landingFor(asRole(role), { isFirstRun: true }))).toEqual(["dashboard", "dashboard", "dashboard"]);
   });
 
   it("prefers static segments over dynamic ones", () => {

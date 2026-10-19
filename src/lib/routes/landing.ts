@@ -1,5 +1,6 @@
 import type { Session } from "@/lib/schemas/session";
-import { accessFor, hrefFor, landingFor, matchRoute } from "./registry";
+import { can } from "@/lib/auth/policy";
+import { hrefFor, landingFor, matchRoute } from "./registry";
 
 /** Where a signed-in principal lands (docs/07 §2.1, T7): a firm user in their own firm, a platform admin at /admin. */
 export function landingHref(session: Session): string {
@@ -36,7 +37,7 @@ export function signInTarget(session: Session, returnTo: string | null): string 
   const landing = landingHref(session);
   if (!returnTo) return landing;
   const route = matchRoute(returnTo);
-  if (!route || accessFor(route, session.principal) === "none") return landing;
+  if (!route || !can(session.principal, "route.view", route)) return landing;
   if (route.area === "firm") {
     const slug = returnTo.split(/[?#]/)[0]!.split("/")[1];
     if (!session.firm || session.firm.slug !== slug) return landing;

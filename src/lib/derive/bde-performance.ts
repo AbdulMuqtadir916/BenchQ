@@ -1,4 +1,5 @@
 import type { Candidate } from "@/lib/schemas/candidate";
+import { isBde } from "@/lib/auth/roles";
 import type { Application } from "@/lib/schemas/application";
 import type { User } from "@/lib/schemas/session";
 import type { BdePerformance } from "@/lib/schemas/analytics";
@@ -14,7 +15,7 @@ export function deriveBdePerformance(
   applications: Application[],
 ): BdePerformance[] {
   return users
-    .filter((u) => u.role === "BDE")
+    .filter(isBde)
     .map((user) => {
       const assigned = candidates.filter((c) => c.assignedUserIds.includes(user.id));
       const assignedIds = new Set(assigned.map((c) => c.id));

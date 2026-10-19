@@ -1,4 +1,5 @@
 import type { Candidate } from "@/lib/schemas/candidate";
+import { isOwner } from "@/lib/auth/roles";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import type { Firm, User } from "@/lib/schemas/session";
 import { RESERVED_SLUGS, SUPPORT_VIEW_MINUTES, type FirmStatus, type Invite } from "@/lib/schemas/tenancy";
@@ -41,10 +42,10 @@ export type OwnerStatus =
 
 /** The firm's one OWNER (A10): the user, else the latest owner invite that is pending or expired. */
 export function ownerStatus(firmId: string, data: Pick<PlatformData, "users" | "invites">, now: Date): OwnerStatus {
-  const owner = data.users.find((user) => user.firmId === firmId && user.role === "OWNER");
+  const owner = data.users.find((user) => user.firmId === firmId && isOwner(user));
   if (owner) return { kind: "active", name: owner.name, email: owner.email, userId: owner.id, isActive: owner.isActive };
   const invite = data.invites
-    .filter((item) => item.firmId === firmId && item.role === "OWNER")
+    .filter((item) => item.firmId === firmId && isOwner(item))
     .filter((item) => ["PENDING", "EXPIRED"].includes(effectiveInviteStatus(item, now)))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (!invite) return { kind: "none" };

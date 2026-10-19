@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ForbiddenState } from "@/components/app/forbidden-state";
 import { NotFoundState } from "@/components/app/not-found-state";
+import { can } from "@/lib/auth/policy";
 import { landingFor } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { useRouteAccess } from "@/lib/routes/use-route-access";
@@ -17,8 +18,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const toHref = useHref();
   const principal = useSignedInPrincipal();
-  const { route, access } = useRouteAccess();
-  const isDenied = access === "none";
+  const { route } = useRouteAccess();
+  // Route access through the policy (docs/07 Phase C): can(principal, "route.view", route).
+  const isDenied = !route || !can(principal, "route.view", route);
   const shouldLeave = isDenied && route?.onDenied === "landing";
 
   useEffect(() => {

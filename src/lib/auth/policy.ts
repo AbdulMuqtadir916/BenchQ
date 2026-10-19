@@ -1,20 +1,22 @@
 import type { FirmRole } from "@/lib/schemas/enums";
 import type { Principal } from "@/lib/schemas/tenancy";
+import { canOpen, type RouteDef } from "@/lib/routes/registry";
 
 /**
- * The permission policy (docs/07 Phase C, brought into P4 by Q32): what a principal may *do* in a firm.
- * Pure, so the mock backend enforces the same table the UI reads (src/mocks/membership.ts). Route access (may it open the page?) stays in the registry. Pages ask `can()` / `useCan()`
- * instead of checking roles inline, and filter records through the scope helpers below.
+ * The permission policy (docs/07 Phase C): what a principal may do, and may open. Pure, so the UI
+ * (`useCan`, `<Can>`), the route guard and the mock backend (src/mocks/membership.ts, platform.ts) all
+ * read this one table. Nothing else checks roles.
  *
- * - Firm users: the matrix below.
- * - A platform admin in a read-only support view (07 §4): **every action false**; they see the whole
- *   firm. Without a support view a platform admin has no firm actions at all.
+ * - **Firm users:** the role table below — firm work, team management (Q15) and team visibility.
+ * - **A platform admin:** every platform action; no firm action. In a read-only support view (07 §4)
+ *   still none — they only see the whole firm (`team.view`).
+ * - **Routes:** `can(principal, "route.view", route)` — the registry's access table (07 §2).
  *
  * In the UI this is UX, not security; the mock backend refuses the same writes with this same table, and
  * in Phase D the real backend does.
- * Phase C proper adds the platform actions and the full principal × action table test.
  */
 
+/** Firm work. */
 export type FirmAction =
   | "candidate.create"
   | "candidate.edit"
@@ -25,16 +27,36 @@ export type FirmAction =
   | "outreach.act"
   | "followup.act";
 
-/** Every firm action, for tests that walk them all. */
-export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act"];
+/** Managing the firm's team (07 Q15). The invite controls arrive with Phase M; the rules are here now. */
+export type TeamAction = "member.invite" | "member.remove" | "member.changeRole" | "member.deactivate" | "candidate.assign";
 
-/** Not an action: whether the person sees the team (owner and assignments) on firm pages (Q15). */
+/** Not an action: whether the person sees the team (members, owner, assignments) on firm pages (Q15). */
 export type FirmVisibility = "team.view";
 
-const ALL_ACTING: readonly FirmRole[] = ["OWNER", "MANAGER", "BDE"];
+/** The platform tier (07 §2.3): PLATFORM_ADMIN only. */
+export type PlatformAction =
+  | "firm.create"
+  | "firm.edit"
+  | "firm.suspend"
+  | "firm.viewWorkspace"
+  | "plan.edit"
+  | "invite.resend"
+  | "invite.revoke"
+  | "platformTeam.manage";
 
-/** Who may take each action. VIEWER reads everything it can open and acts on nothing. */
-const MATRIX: Record<FirmAction | FirmVisibility, readonly FirmRole[]> = {
+export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
+
+export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act"];
+export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "candidate.assign"];
+export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage"];
+export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
+
+const ALL_ACTING: readonly FirmRole[] = ["OWNER", "MANAGER", "BDE"];
+const OWNER_ONLY: readonly FirmRole[] = ["OWNER"];
+const OWNER_AND_MANAGER: readonly FirmRole[] = ["OWNER", "MANAGER"];
+
+/** Who in a firm may take each action. VIEWER reads everything it can open and acts on nothing. */
+const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly FirmRole[]> = {
   "candidate.create": ALL_ACTING,
   "candidate.edit": ALL_ACTING,
   "job.capture": ALL_ACTING,
@@ -43,14 +65,24 @@ const MATRIX: Record<FirmAction | FirmVisibility, readonly FirmRole[]> = {
   "resume.edit": ALL_ACTING,
   "outreach.act": ALL_ACTING,
   "followup.act": ALL_ACTING,
-  "team.view": ["OWNER", "MANAGER"],
+  "member.invite": OWNER_ONLY,
+  "member.remove": OWNER_ONLY,
+  "member.changeRole": OWNER_ONLY,
+  "member.deactivate": OWNER_ONLY,
+  "candidate.assign": OWNER_AND_MANAGER,
+  "team.view": OWNER_AND_MANAGER,
 };
 
-export function can(principal: Principal, action: FirmAction | FirmVisibility): boolean {
-  if (principal.kind === "platform") return principal.support !== null && action === "team.view";
-  return MATRIX[action].includes(principal.role);
-}
+const isPlatformAction = (action: Action): action is PlatformAction => (PLATFORM_ACTIONS as readonly string[]).includes(action);
 
+export function can(principal: Principal, action: Action): boolean;
+export function can(principal: Principal, action: "route.view", route: RouteDef): boolean;
+export function can(principal: Principal, action: Action | "route.view", route?: RouteDef): boolean {
+  if (action === "route.view") return route ? canOpen(route, principal) : false;
+  if (isPlatformAction(action)) return principal.kind === "platform";
+  if (principal.kind === "platform") return principal.support !== null && action === "team.view";
+  return FIRM_TABLE[action].includes(principal.role);
+}
 
 /** True inside a read-only support view (07 §4). */
 export const isSupportView = (principal: Principal): boolean => principal.kind === "platform" && principal.support !== null;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/lib/auth/permissions";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { MailX, UserPlus, UserX } from "lucide-react";
@@ -31,6 +32,7 @@ export function TeamPage() {
   const team = usePlatformTeam();
   const invites = usePlatformInvites(null);
   const [isInviting, setIsInviting] = useState(false);
+  const canManage = useCan("platformTeam.manage");
   const [deactivating, setDeactivating] = useState<PlatformUser | null>(null);
   const activeCount = (team.data ?? []).filter((user) => user.isActive).length;
 
@@ -45,12 +47,12 @@ export function TeamPage() {
         header: "",
         enableSorting: false,
         cell: ({ row }) =>
-          row.original.isActive && row.original.id !== principal.userId && activeCount > 1 ? (
+          canManage && row.original.isActive && row.original.id !== principal.userId && activeCount > 1 ? (
             <Button variant="ghost" size="sm" onClick={() => setDeactivating(row.original)}>Deactivate</Button>
           ) : null,
       },
     ],
-    [principal.userId, activeCount],
+    [principal.userId, activeCount, canManage],
   );
 
   type InviteRow = { invite: Invite; status: InviteStatus };
@@ -88,7 +90,7 @@ export function TeamPage() {
 
   return (
     <div className="bq-page">
-      <PageHeader title="Team" subtitle="BenchQ staff with Super Admin access." actions={<Button onClick={() => setIsInviting(true)}><UserPlus size={14} aria-hidden /> Invite staff</Button>} />
+      <PageHeader title="Team" subtitle="BenchQ staff with Super Admin access." actions={canManage ? <Button onClick={() => setIsInviting(true)}><UserPlus size={14} aria-hidden /> Invite staff</Button> : undefined} />
       <section aria-labelledby="staff-heading" className="mb-8">
         <h2 id="staff-heading" className="mb-3 text-h3 text-[var(--color-text)]">Staff</h2>
         <DataTable
