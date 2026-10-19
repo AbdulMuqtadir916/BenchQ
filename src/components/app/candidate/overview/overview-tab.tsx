@@ -31,7 +31,7 @@ export function OverviewTab({ ws, actions, canAct, onNotify }: { ws: CandidateWo
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="min-w-0 space-y-5">
-        <AttentionCard ws={ws} actions={actions} />
+        <AttentionCard ws={ws} actions={actions} canAct={canAct} />
         <div className="grid gap-5 xl:grid-cols-2">
           <PipelineCard applications={ws.applications} onOpen={() => actions.openTab("applications")} />
           <InboxPreview inbox={ws.inbox} isLoading={ws.inboxQuery.isLoading} firstName={candidate.fullName.split(" ")[0]!} onOpenMessage={actions.openMessage} onOpenInbox={() => actions.openTab("inbox")} />

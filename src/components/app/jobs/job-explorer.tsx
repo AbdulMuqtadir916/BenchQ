@@ -34,6 +34,7 @@ import { VerificationBadge } from "@/components/app/verification-badge";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { EmptyState } from "@/components/app/empty-state";
 import { PORTALS, PortalLogo, portalForJob, type PortalKey } from "@/components/app/jobs/portal-logo";
+import { useCan } from "@/lib/auth/permissions";
 import { useHref } from "@/lib/routes/use-href";
 
 const REMOTE_OPTIONS: SelectOption[] = [
@@ -324,6 +325,8 @@ function JobDetailHeader({
   onHide: () => void;
 }) {
   const toHref = useHref();
+  // A read-only viewer (VIEWER, a support view) gets the job's details, never "Tailor & apply".
+  const canApply = useCan("job.apply");
   const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl ?? toHref("jobs.detail", { id: job.id });
   return (
     <div className="relative border-b border-[var(--color-border)]">
@@ -342,7 +345,7 @@ function JobDetailHeader({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer">Open source<ExternalLink size={13} /></a></Button>
-          {context ? <Button size="sm"><Sparkles size={13} />Tailor & apply</Button> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
+          {context && canApply ? <Button size="sm"><Sparkles size={13} />Tailor & apply</Button> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
           <Button variant="secondary" size="icon" aria-label="More job actions" aria-expanded={menuOpen} onClick={onMenuToggle}><MoreHorizontal size={15} /></Button>
         </div>
       </div>

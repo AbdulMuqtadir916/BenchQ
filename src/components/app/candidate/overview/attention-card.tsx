@@ -39,8 +39,12 @@ const TONE_CLASS: Record<TagTone, string> = {
   teal: "bg-[var(--color-teal-bg)] text-[var(--color-teal-fg)]",
 };
 
-/** The first thing on the page: what needs the BDE tonight, each with the action that resolves it. */
-export function AttentionCard({ ws, actions }: { ws: CandidateWorkspace; actions: CandidateActions }) {
+/**
+ * The first thing on the page: what needs the BDE tonight, each with the action that resolves it.
+ * Read-only (`canAct` false: a VIEWER, a support view): only the items' views are offered — no status
+ * move, no inbox connection.
+ */
+export function AttentionCard({ ws, actions, canAct }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean }) {
   const reduce = useReducedMotion() ?? false;
   const [showAll, setShowAll] = useState(false);
   const appById = new Map(ws.applications.map((a) => [a.id, a]));
@@ -71,8 +75,9 @@ export function AttentionCard({ ws, actions }: { ws: CandidateWorkspace; actions
         title: `${app?.companyNameAtApply ?? s.message.fromName}: ${meta.label.toLowerCase()}`,
         detail: `${app?.jobTitleAtApply ?? ""} · still marked ${STATUS_LABEL[app?.status ?? "APPLIED"].toLowerCase()}`,
         when: formatRelative(s.message.receivedAt),
-        primary: { label: `Move to ${STATUS_LABEL[s.to]}`, onClick: () => actions.applySuggestion(s) },
-        secondary: { label: "Email", onClick: () => actions.openMessage(s.message.id) },
+        ...(canAct
+          ? { primary: { label: `Move to ${STATUS_LABEL[s.to]}`, onClick: () => actions.applySuggestion(s) }, secondary: { label: "Email", onClick: () => actions.openMessage(s.message.id) } }
+          : { primary: { label: "Email", onClick: () => actions.openMessage(s.message.id) } }),
       };
     }),
     ...ws.followups
@@ -90,7 +95,7 @@ export function AttentionCard({ ws, actions }: { ws: CandidateWorkspace; actions
           primary: { label: "Open", onClick: () => actions.openApplication(f.applicationId) },
         };
       }),
-    ...(ws.inbox && !ws.inbox.connection
+    ...(canAct && ws.inbox && !ws.inbox.connection
       ? [{ key: "connect", Icon: Mail, tone: "blue" as const, title: `Connect ${first}'s inbox`, detail: "Recruiter replies, shortlists and interviews get tracked automatically", primary: { label: "Connect", onClick: () => actions.openTab("inbox") } }]
       : []),
     ...ws.expiringDocuments.slice(0, 2).map((d): Item => ({

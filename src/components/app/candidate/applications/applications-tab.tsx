@@ -55,7 +55,7 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
         </div>
       </div>
 
-      {ws.suggestions.length > 0 ? (
+      {canAct && ws.suggestions.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-violet-bg)] px-3 py-2 text-sm text-[var(--color-violet-fg)]">
           <span className="font-[550]">From the inbox:</span>
           {ws.suggestions.slice(0, 3).map((s) => {
