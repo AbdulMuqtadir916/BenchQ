@@ -353,6 +353,19 @@ platform-only events.
 **No `PlanChange` entity (A14).** A firm's plan history is *derived* from its `PLAN_CHANGED` ledger
 entries.
 
+**Ledger entity types for tenancy events (lowercase, like every `entityType` in the ledger fixtures;
+07 Q30).** `entityType` stays `z.string()`; these are the values the platform tier writes:
+
+| `entityType` | Written by | `firmId` |
+|---|---|---|
+| `firm` | `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `UPDATE` (edit, slug change), `PLAN_CHANGED` for a **plan change** | the firm |
+| `firm_limits` | `PLAN_CHANGED` for **custom limits** ("Adjust limits"); the firm's "custom limits" mark is derived from it (07 Q30) | the firm |
+| `invite` | `INVITE_SENT` (sent or resent), `INVITE_ACCEPTED`, `INVITE_REVOKED` | the firm, or null for a platform-team invite |
+| `user` | `STATE_CHANGE` when a firm user is deactivated or reactivated (07 Q30) | the firm |
+| `platform_user` | `STATE_CHANGE` when staff are deactivated; `LOGIN` | null |
+| `plan` | `CREATE` / `UPDATE` on the plan catalogue (implication 3) | null |
+| `support_view` | `ADMIN_ACCESS`, `ADMIN_ACCESS_END` (07 P4); `entityId` is the support view's id | the firm |
+
 #### Decisions — answers to the 17 open questions (2026-10-14)
 
 | A# | Topic | Decision | Lands in |
@@ -386,13 +399,155 @@ obvious reading and marked **(approved 2026-10-16)** where it appears. Tell me i
    OWNER, and A5 says the firm turns ACTIVE when the owner accepts). So `Invite.role = 'OWNER'` with a
    `PlatformUser` as `invitedByUserId` is valid, and the "not OWNER" rule applies to firm-user inviters.
 3. **Plan catalogue edits** (create or edit a `Plan`, `firmId` null) use the existing `CREATE` /
-   `UPDATE` actions with `entityType: 'Plan'`; no new action was requested.
+   `UPDATE` actions with `entityType: 'plan'` (lowercase, see *Ledger entity types*); no new action was requested.
 4. **An unexpired PENDING invite blocks the one-OWNER rule too:** a firm cannot hold both an active
    OWNER and a pending OWNER invite.
 5. **Reactivating a firm** (SUSPENDED → ACTIVE) is not blocked by over-limit. In A4, "reactivating"
    means a **user or candidate**, never the firm; the block applies to new additions only.
 
 ---
+
+### 3.2 System contracts — DRAFT for sign-off (2026-10-19)
+
+> **Status: draft, not approved. Nothing is built from it** — no schema, fixture, adapter or screen.
+> `/admin/system` stays a placeholder and AI spend stays hidden on the overview until these are
+> signed off (07 Q29, docs/04 §14.9). Open points are **S1–S12** at the end of this section; the
+> shapes below are the draft's defaults and change with the answers.
+>
+> **Grounded in the backend** (JobNavigator, `backend/`), so the mapper has something to map:
+> `GET /health` (status + version, no DB), `scrape_log` (one row per search/company scrape:
+> `jobs_found`, `new_jobs`, `error`, `is_warning`, `source_breakdown`, `duration_seconds`, `ran_at`),
+> `job_runs` (scheduled jobs: `job_type`, `trigger`, `status`, times, `error`) and `llm_call_log`
+> (`purpose`, `provider`, `model`, input/output/cache tokens, `cost_usd` float, `duration_ms`,
+> `success`, `job_id`). **None of them carries a firm** — the backend is single-tenant (D1/D2).
+
+All three are **platform data**: read by `PLATFORM_ADMIN` on `/admin/system` only, never shown to a
+firm. Every total on that page is **derived** from these rows (CLAUDE.md), never stored.
+
+#### HealthCheck — is each part of the system working?
+
+```ts
+export const HealthComponent = z.enum([
+  'API',            // the FastAPI process (GET /health today)
+  'DATABASE',       // Postgres reachable, pool not drained
+  'SCHEDULER',      // scheduled jobs running on time (job_runs)
+  'SCRAPER',        // derived from recent ScraperRuns (rule below)
+  'EMAIL_MONITOR',  // inbox polling (backend/email_monitor)
+  'LLM_PROVIDER',   // the AI provider answering
+]);                 // S1: which components exist, and which ones the backend can report
+
+export const HealthStatus = z.enum(['OK', 'DEGRADED', 'DOWN', 'UNKNOWN']);
+// UNKNOWN = no check result yet, or the check itself failed to run
+
+export const HealthCheckSchema = z.object({
+  component: HealthComponent,
+  status: HealthStatus,
+  checkedAt: z.string().datetime(),
+  latencyMs: z.number().int().nonnegative().nullable(),
+  /** Short, human, no secrets or stack traces: "3 consecutive empty scrapes on LinkedIn". */
+  detail: z.string().nullable(),
+  /** Backend version for API; null elsewhere. */
+  version: z.string().nullable(),
+});
+```
+
+- **One row per component, current state only** by default (a live probe, no history). S2 decides
+  whether history is kept (uptime over 7 / 30 days needs it).
+- **`SCRAPER` is derived, not probed:** `DOWN` when any source's last 3 runs all failed or found nothing
+  (the backend's own alert rule, `check_scrape_health`); `DEGRADED` when the latest run of any source is
+  a warning; otherwise `OK`.
+
+#### ScraperRun — one scrape of one search or company
+
+```ts
+export const ScraperRunSchema = z.object({
+  id: z.string(),
+  /** S5: firm-scoped (a firm's saved search) or platform-wide (shared job boards)? */
+  firmId: z.string().nullable(),
+  target: z.object({
+    kind: z.enum(['SEARCH', 'COMPANY']),
+    id: z.string().nullable(),       // null once the search/company is deleted (the backend keeps the row)
+    label: z.string(),               // "Java developers · Dallas" / "Acme Corp careers"
+  }),
+  trigger: z.enum(['SCHEDULED', 'MANUAL']),
+  status: z.enum(['SUCCEEDED', 'WARNING', 'FAILED']),   // WARNING = backend is_warning (one board empty)
+  jobsFound: z.number().int().nonnegative(),
+  newJobs: z.number().int().nonnegative(),
+  /** Per board, for multi-board runs; empty for a single-source scrape. */
+  sources: z.array(z.object({
+    board: z.string(),                // "indeed", "linkedin", "zip_recruiter"
+    seen: z.number().int().nonnegative().nullable(),
+    new: z.number().int().nonnegative().nullable(),
+    error: z.string().nullable(),
+  })),
+  error: z.string().nullable(),        // human summary, no stack trace
+  startedAt: z.string().datetime(),
+  durationSeconds: z.number().nonnegative().nullable(),
+});
+```
+
+#### AiUsage — one call to an AI model
+
+```ts
+export const AiPurpose = z.enum([
+  'RESUME_TAILOR',      // the tailoring agent (AgentDraft.runId)
+  'JOB_SCORE_FULL',     // backend purpose "score_full"
+  'JOB_SCORE_LIGHT',    // "score_light"
+  'EMAIL_CLASSIFY',     // "email"
+  'OTHER',
+]);                     // S8: the full list, and whether OTHER is allowed
+
+export const AiUsageSchema = z.object({
+  id: z.string(),
+  /** A17: agent and tailoring runs are firm-scoped. S6: null for platform/system calls (e.g. scoring a shared job)? */
+  firmId: z.string().nullable(),
+  purpose: AiPurpose,
+  provider: z.string(),                 // "anthropic"
+  modelId: z.string(),                  // "claude-sonnet-5-5"
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  cacheReadTokens: z.number().int().nonnegative(),
+  cacheWriteTokens: z.number().int().nonnegative(),
+  /**
+   * Cost in **micro-US-dollars** (1 USD = 1,000,000), an integer, so sums never drift (the backend
+   * stores a float `cost_usd`; the mapper converts). S3 / S4: currency, unit, and who prices it.
+   */
+  costMicroUsd: z.number().int().nonnegative(),
+  /** The run this call belongs to (AgentDraft.runId), if any. */
+  runId: z.string().nullable(),
+  jobId: z.string().nullable(),
+  durationMs: z.number().int().nonnegative(),
+  success: z.boolean(),
+  createdAt: z.string().datetime(),
+});
+```
+
+**Derived, never stored** (all on `/admin/system` and, once approved, the overview's AI spend group):
+
+| Value | Definition |
+|---|---|
+| Spend in a period | sum of `costMicroUsd` over the period's rows (failed calls included: they are billed) |
+| Spend by firm | the same, grouped by `firmId` (null shown as "Platform") |
+| Spend by model | grouped by `modelId` |
+| Tokens by purpose | sums of the four token counts, grouped by `purpose` |
+| Scraper health | the `SCRAPER` rule above, per source and overall |
+
+#### Open questions for sign-off
+
+| # | Question | Draft default |
+|---|---|---|
+| S1 | Which health components exist, and which can the backend report today? (Only `API` has an endpoint.) | the six above; `UNKNOWN` until the backend reports one |
+| S2 | Keep health history (for uptime over time), or current state only? | current state only |
+| S3 | Currency and unit for AI cost: USD only, or also INR for the firms? Exchange rate source and date if INR. | USD, integer micro-dollars |
+| S4 | Who prices a call: the backend at call time (provider price list), or the frontend from a price table? | the backend, at call time; the frontend never prices |
+| S5 | Are scrapes firm-scoped (each firm's saved searches) or platform-wide (shared boards, jobs copied per firm)? | firm-scoped once searches carry `firmId` |
+| S6 | Can an AI call have no firm (platform/system work)? If not, `firmId` becomes required. | nullable, shown as "Platform" |
+| S7 | Retention: how long are ScraperRun and AiUsage rows kept (e.g. 90 days raw, then monthly totals)? | 90 days raw; monthly totals kept |
+| S8 | The full list of AI purposes; is `OTHER` acceptable? | the five above |
+| S9 | Is AI spend ever shown to a firm (its own usage), or Super Admin only? | Super Admin only |
+| S10 | Budgets or alerts (e.g. a firm over X dollars a month) — in scope now? | not now |
+| S11 | Time zone for period boundaries ("this month"): IST, UTC? | IST, like the rest of the admin area |
+| S12 | Do failed AI calls count in spend? | yes, when the provider billed them |
 
 ## 4. Candidate
 
