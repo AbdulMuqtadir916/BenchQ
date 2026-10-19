@@ -58,7 +58,7 @@ export default function ApplicationsPage() {
 
   return (
     <div className="bq-page bq-page-wide">
-      <PageHeader title="Applications" subtitle="Drag a card into the next stage." />
+      <PageHeader title="Applications" subtitle={can(principal, "application.move") ? "Drag a card into the next stage." : "Every application, by stage."} />
       <div className="mb-4 flex flex-wrap items-center gap-1" role="tablist" aria-label="View">
         {VIEWS.map(({ id, label, Icon }) => (
           <button key={id} type="button" role="tab" aria-selected={view === id} className="bq-view-tab" onClick={() => setView(id)}>

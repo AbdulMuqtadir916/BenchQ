@@ -857,7 +857,7 @@ Start → creates the view (60 minutes), writes `ADMIN_ACCESS`, goes to `/{slug}
 **Start from a firm URL (interstitial, 07 §2.5 row 4):** same content as a full page in place of the firm
 screen, with "Back to {firm} in admin". Replaces P2's "Support view required" screen.
 
-**Banner (every firm page while active, not dismissible):** "Support view of {firm} · read-only · started
+**Banner (every firm page while active, not dismissible; fixed to the bottom of the screen so it never covers the page header):** "Support view of {firm} · read-only · started
 {time} by {admin} · {mm} min left · Exit". At 5 minutes left the remaining time switches to the warning
 colour.
 
