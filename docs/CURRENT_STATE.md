@@ -1,339 +1,145 @@
 # Current state
 
-Factual snapshot of the frontend. Read-only inventory; no code was changed to produce it.
-Anything not confirmed is marked **(unverified)**.
+Factual snapshot of the frontend, regenerated at the end of Phase P. Read-only inventory: it
+describes the code as it is; decisions and plans live in `docs/07` and the other docs. Anything not
+confirmed is marked **(unverified)**.
 
 | | |
 |---|---|
-| Date | 2026-10-13 |
-| Branch / HEAD | `feat/routes` @ `a2dffee` ("Add routes and RBAC plan with recorded decisions") |
-| Working tree | **Phase A is uncommitted**: 39 `git status` entries (17 modified tracked files, 22 untracked; includes `CLAUDE.md`, this file and `docs/ruflo-setup.md`). HEAD contains only the plan. |
-| Read for this snapshot | `CLAUDE.md` (current on-disk version), `docs/07-ROUTES-AND-RBAC.md`, then the code |
-| Not read | `.env.local` (access denied by the session; live-module setting is therefore unverified) |
-
-> **Changed since this snapshot (Phase A2, branch `feat/routes-a2`):** `hrefFor(id | route, params, query)` and
-> `useHref()` now exist and no path literals remain outside `src/lib/routes/` (section 2 item 6 and
-> section 9 firm-routing blocker 4 are resolved); `FirmRole` has one declaration, the Zod enum
-> (section 3, section 4); `useRouteAccess` fails closed for unregistered paths (section 2 item 8);
-> the RoleSwitcher renders only when `NEXT_PUBLIC_SHOW_DEV_TOOLS=true` (section 4); `/design-system`
-> is now `/dev/design-system` (section 2); the `iconsax-react` comment is fixed (section 8). The
-> test suite is now 54 tests across 4 files. Everything else below is unchanged.
->
-> **Update 2026-10-14:** the tenancy contracts (Principal, SupportView, Firm additions, Plan, Invite,
-> PlatformUser, `firmId` on records, new ledger actions) are **approved** in `docs/02` §3.1 and
-> `docs/07` §0 Q16–Q21, but still **not in code**: section 6 and the blockers in section 9 describe the
-> code as it is today. Phase T0 (`feat/routes-t0`) also removed `/sign-up`, added the `(workspace)` and
-> `(manage)` route groups, moved the dashboards to `src/features/dashboard/`, and added
-> `isRouteActive()`.
+| Date | 2026-10-19 |
+| Base | `codex/json-data-migration` @ `b055330` (merge of #21, Phase P done) |
+| Phases done | 07 A, A2, T0, T, L, P (P1–P6); docs/04 §13 dashboard errors; demo-data persistence (docs/03 §3.3) |
+| Next | the rest of 07 Phase C ("still to do"), then B, S, M (07 phase table) |
+| Not read | `.env.local` (denied to the session), so `NEXT_PUBLIC_LIVE_MODULES` is unverified — but no adapter reads it (§7) |
 
 ---
 
 ## 1. Stack
 
-Versions are the ranges in `package.json`; resolved versions are in `pnpm-lock.yaml` (not inspected).
+Versions are the ranges in `package.json`.
 
 | Area | Package | Version |
 |---|---|---|
-| Framework | `next` | 16.3.5 (webpack: `next dev --webpack`, `next build --webpack`) |
+| Framework | `next` | 16.3.5 (webpack: `next dev --webpack`, `next build --webpack`; middleware is `src/proxy.ts`) |
 | UI runtime | `react`, `react-dom` | 19.2.8 |
 | Server state | `@tanstack/react-query` (+ `-devtools`) | ^5.103.1 |
 | Client state | `zustand` | ^5.0.15 |
 | Validation | `zod` | ^4.6.5 |
 | Styling | `tailwindcss`, `@tailwindcss/postcss` | ^4 |
-| Language | `typescript` | ^5 (`strict`, `allowJs`) |
+| Language | `typescript` | ^5 (`strict`) |
 | Tables / virtual | `@tanstack/react-table` ^8.21.3, `@tanstack/react-virtual` ^3.14.13 | |
 | Motion / theme / icons | `motion` ^13.4.0, `next-themes` ^0.4.6, `lucide-react` ^1.47.0 | |
 | Misc | `@dnd-kit/core`, `@radix-ui/react-slot`, `class-variance-authority`, `clsx`, `tailwind-merge`, `date-fns`, `date-fns-tz`, two `@fontsource-variable` fonts | |
-| Lint | `eslint` ^9, `eslint-config-next` 16.3.5, `@tanstack/eslint-plugin-query` ^5.103.1 | |
-| **Test tools** | **`vitest` ^3.2.7 only** | no Testing Library, jsdom, MSW, Playwright or axe in `package.json` |
+| Lint | `eslint` ^9, `eslint-config-next` 16.3.5, `@tanstack/eslint-plugin-query` | |
+| Test tools | `vitest` ^3.2.7 only | no Testing Library, jsdom, MSW, Playwright or axe |
 
 | Runtime | Value |
 |---|---|
-| Node | `engines.node` ">=22"; `.nvmrc` = 22; this machine ran v24.21.0 (`arm64`) |
-| pnpm | `packageManager` = `pnpm@12.5.1`; `pnpm` was not on PATH here, `corepack pnpm` (12.5.1) worked |
-| Scripts | `dev`, `build`, `start`, `lint` (`eslint`), `typecheck` (`tsc --noEmit`), `test` (`vitest run`) |
-| Source size | 246 `.ts`/`.tsx` files under `src/` |
+| Node | `engines.node` ">=22", `.nvmrc` 22; this machine runs v24.21.0 (`arm64`) |
+| pnpm | `pnpm@12.5.1`; not on PATH here, `corepack pnpm` works |
+| Env vars read by `src/` | `NEXT_PUBLIC_LIVE_MODULES`, `NEXT_PUBLIC_MOCK_DELAY_MS`, `NEXT_PUBLIC_SHOW_DEV_ROUTES` |
+| Source size | 367 `.ts`/`.tsx` files under `src/` |
 
 ---
 
 ## 2. Route tree
 
-Source of truth for what exists: `src/app/**`. Route groups: `(app)`, `(studio)`. Parallel slot: `(app)/@modal`. Intercepting: `(app)/@modal/(.)candidates/new`, `(app)/@modal/(.)jobs/capture`.
+37 registered routes (`src/lib/routes/registry.ts`): 3 public, 24 firm, 11 platform, 1 dev.
 
-| Route | Files | Shell |
-|---|---|---|
-| `/` | `src/app/page.tsx` (redirects to `/dashboard`) | none |
-| `/sign-in`, `/sign-up` | `sign-in/page.tsx`, `sign-up/page.tsx` | auth |
-| `/welcome` | `welcome/page.tsx`, `welcome/layout.tsx` (wraps `RouteGuard`) | auth |
-| `/dashboard` | `(app)/dashboard/page.tsx` | app |
-| `/candidates`, `/candidates/new`, `/candidates/[id]` | `(app)/candidates/{page,new/page,[id]/page}.tsx` | app |
-| `/jobs`, `/jobs/capture`, `/jobs/[id]` | `(app)/jobs/{page,capture/page,[id]/page}.tsx` | app |
-| `/applications`, `/applications/[id]` | `(app)/applications/{page,[id]/page}.tsx` | app |
-| `/resumes` | `(app)/resumes/page.tsx` | app |
-| `/resumes/[id]` (incl. `new`) | `(studio)/resumes/[id]/page.tsx`; `id === "new"` handled at line 17 | studio |
-| `/outreach`, `/followups`, `/analytics`, `/ledger` | `(app)/<name>/page.tsx` | app |
-| `/focus` | `focus/page.tsx`, `focus/layout.tsx` (wraps `RouteGuard`) | focus |
-| `/settings` (redirect index), `/settings/{firm,team,templates,preferences}` | `(app)/settings/{page,layout}.tsx`, `(app)/settings/<section>/page.tsx` | app |
-| `/design-system` | `(app)/design-system/page.tsx` (`devRoutesEnabled()` else `notFound()` at line 53) | app |
-| Modal intercepts | `(app)/@modal/(.)candidates/new/page.tsx`, `(app)/@modal/(.)jobs/capture/page.tsx`, `(app)/@modal/default.tsx` | modal over app |
-
-Special files:
-
-| File | Present |
+| Area | URLs |
 |---|---|
-| `layout.tsx` | `app/`, `(app)/`, `(studio)/`, `focus/`, `welcome/`, `(app)/settings/` |
-| `template.tsx` | `(app)/template.tsx` (wraps `PageTransition`) |
-| `loading.tsx` | `(app)/loading.tsx` only |
-| `error.tsx` | `(app)/error.tsx`, `(studio)/error.tsx` |
-| `not-found.tsx` | `app/not-found.tsx`, `(app)/not-found.tsx` |
-| `global-error.tsx` | `app/global-error.tsx` |
-| `forbidden.tsx` | absent (Phase D in 07) |
-| `route.ts` (API handlers) | none (matches the "no API routes" rule) |
-| `proxy.ts` / `middleware.ts` | none (see section 4) |
+| Public | `/` (landing per principal), `/sign-in`, `/invite/[token]` |
+| Firm (`/[firm]/…`, slug in the URL) | `welcome`, `dashboard`, `candidates`, `candidates/new`, `candidates/[id]`, `jobs`, `jobs/capture`, `jobs/[id]`, `applications`, `applications/[id]`, `resumes`, `resumes/[id]` (studio shell), `outreach`, `followups`, `analytics`, `ledger`, `focus` (focus shell), `settings` (index redirect), `settings/firm`, `settings/team`, `settings/templates`, `settings/preferences` |
+| Platform (`/admin/…`) | `/admin` (overview), `firms`, `firms/new`, `firms/[firmId]` (+ `users`, `plan`, `activity` tabs), `plans`, `audit`, `system` (placeholder), `team` |
+| Dev | `/dev/design-system` (dev builds or `NEXT_PUBLIC_SHOW_DEV_ROUTES`) |
 
-Guard wiring: `RouteGuard` (`src/components/routes/route-guard.tsx`) wraps children in `components/layout/app-shell.tsx:36`, `(studio)/layout.tsx`, `focus/layout.tsx`, `welcome/layout.tsx`. Client-side only.
-
-### Differences from `docs/07` §2 and "What Phase A delivered"
-
-| # | Finding |
-|---|---|
-| 1 | `/invite/[token]` is in 07 §2 and A6 but **does not exist** (no page, no registry entry). `CLAUDE.md` also records this as the open Phase A item. |
-| 2 | `/admin` is in 07 §2 as "deferred (Q5)": absent, as designed. `CLAUDE.md` now says Q5 is to be reopened. |
-| 3 | Every file in the "What Phase A delivered" table exists on disk (checked by path). Behaviour (role × route outcomes, themes, widths, axe) is **(unverified)**; I did not run the app. |
-| 4 | All Phase A exit-criteria checkboxes in 07 (lines 208–213) are still unticked, although the status line says "Phase A done except `/invite/[token]`". |
-| 5 | Files present but not named in 07: `(app)/template.tsx`, `(app)/@modal/default.tsx`. |
-| 6 | 07 A2 and `CLAUDE.md:110` say to use `hrefFor()`. **`hrefFor` is not exported by `registry.ts` and exists nowhere in `src/`.** See section 9. |
-| 7 | The 07 Phase B gap "Ledger: BDE sees only own actions" is still open (no role filter in `ledger/page.tsx`); the dangling `·` when `promptVersion` is null is still at `ledger/page.tsx:75`. |
-| 8 | `useRouteAccess` (`src/lib/routes/use-route-access.ts`) treats unregistered paths as `"full"`; the real unknown-URL handling is Next's `not-found.tsx`. |
+Route groups: `(app)`, `(workspace)`, `(manage)`, `(studio)` under `[firm]`; `@modal` with intercepting
+`(.)candidates/new` and `(.)jobs/capture`. Catch-all `admin/[...unknown]` renders not-found inside the
+admin shell (not a registry route). Slug-less firm URLs (`/candidates`) are not-found (Q22).
 
 ---
 
-## 3. Registry
+## 3. Registry and navigation
 
-`src/lib/routes/registry.ts`
-
-```ts
-export type Access = "full" | "assigned" | "own" | "read" | "none";
-export type RoleAccess = Record<FirmRole, Access>;
-
-export interface RouteDef {
-  id: string;
-  path: string;                                  // app-folder syntax, route groups removed
-  title: string;
-  shell: "auth" | "app" | "studio" | "focus";
-  access: RoleAccess | "public";
-  onDenied?: "forbidden" | "landing";            // default: Forbidden screen in place
-  nav?: { section: "workspace" | "preferences" | "settings"; order: number; icon?: LucideIcon };
-  shortcut?: string;                             // second key of a `g` shortcut
-  palette?: boolean;
-  devOnly?: boolean;
-}
-```
-
-`FirmRole` is declared at `src/lib/stores/session-store.ts:11`: `"OWNER" | "MANAGER" | "BDE" | "VIEWER"`. A **second** declaration exists as a Zod enum at `src/lib/schemas/enums.ts:8` (same four values).
-
-**Route ids (26):** `root`, `sign-in`, `sign-up`, `welcome`, `dashboard`, `candidates`, `candidates.new`, `candidates.detail`, `jobs`, `jobs.capture`, `jobs.detail`, `applications`, `applications.detail`, `resumes`, `resumes.studio`, `outreach`, `followups`, `analytics`, `ledger`, `focus`, `design-system`, `settings`, `settings.firm`, `settings.team`, `settings.templates`, `settings.preferences`.
-
-**Exports:** `ROLES`, `ROUTES`, `routeById`, `devRoutesEnabled`, `matchRoute`, `accessFor`, `canOpen`, `navFor`, `paletteRoutesFor`, `shortcutsFor`, `landingFor`. Companion: `scope.ts` (`isInScope`, `ScopedRecord`), `use-route-access.ts` (`useRouteAccess`). Every helper is typed on `FirmRole`.
-
-**Tests** (`src/lib/routes/registry.test.ts`, 7 tests):
-
-| Test | What it asserts |
-|---|---|
-| has an entry for every page, and a page for every entry | `ROUTES` paths equal the `page.tsx` paths found on disk; skips `@slot` and `(.)` intercepting dirs |
-| has unique ids and paths | no duplicates |
-| gives every role a landing route it can open | `landingFor(role)` matches a route that `canOpen` |
-| prefers static segments over dynamic ones | `matchRoute` cases such as `/candidates/new`, `/resumes/new`, `/nope` |
-| matches the access table in docs/07 | 7 spot checks (e.g. BDE cannot open analytics; welcome `onDenied` is `landing`), **not** the full table |
-| only shows nav items a role can open | `navFor` for BDE, VIEWER, MANAGER |
-| record scope: applies assigned and own scopes | `isInScope` for `assigned`, `own`, `read`, `none` |
-
-Note: "access defined for every role" (`CLAUDE.md:111`) is enforced by the TypeScript type `Record<FirmRole, Access>`, not by the test.
+- One `ROUTE_DEFS` list: `id`, `path`, `title`, `area`, `shell`, `access`, optional `nav`, `shortcut`, `palette`, `devOnly`.
+- `RouteAccess` = public | firm (per-role `full` / `assigned` / `own` / `read` / `none`, optional `support`) | platform.
+- Helpers on `Principal`: `accessFor`, `accessForPath` (fails closed), `canOpen`, `navFor`, `paletteRoutesFor(principal, area)`, `shortcutsFor(principal, area)`, `landingFor`, `supportAccess`, `activeNavId`, `isRouteActive`, `matchRoute`, `hrefFor` / `useHref()`.
+- `g` shortcuts and ⌘K navigation are per area: the firm map in the firm shell, the admin map (`g o/f/p/a/s/t`) in the admin shell.
+- Table tests: `registry.test.ts` (firm table per role, Support column, platform rows, ⌘K by area), `no-path-literals.test.ts`.
 
 ---
 
-## 4. Session and roles
+## 4. Session, sign-in and the support view
 
-`src/lib/stores/session-store.ts` (Zustand, `"use client"`):
-
-| Item | As written |
+| Piece | State |
 |---|---|
-| `SessionUser` | `{ id, name, email, role: FirmRole, avatarUrl: string \| null }`, **no `firmId`**, no `isActive` |
-| `SessionFirm` | `{ id, name, primaryTimezone, clientTimezone }` (separate from `FirmSchema`) |
-| State | `{ user, firm, setRole(role) }` |
-| Initial values | hard-coded `DEFAULT_USER` (`user_adnan`, role `BDE`) and `DEFAULT_FIRM` (`firm_hts`) inside the store file |
-| `setRole` | replaces `user.role` on the same user; the user id does not change |
+| Sign-in | `/sign-in`, email + password against the seeded accounts in the mock layer (docs/03 §3.2; one demo password); one generic error. No principal switcher (Q25) |
+| Session | mock auth keeps the account id in `localStorage` `benchq.session`, shared by tabs (Q27); `useSessionSync` / `applySession`; the app starts signed out and bootstrapping |
+| Principal change | clears the whole query cache and remounts the app (`principal-boundary.ts`); sign-in / support start / exit navigate first, then commit (`setPending`) |
+| Landing | firm user → `/{slug}/dashboard` (OWNER first run → `/welcome`); Super Admin → `/admin`; `returnTo` only if the account can open it (`signInTarget`) |
+| Invites | `/invite/[token]`: tokens in `src/mocks/invite-tokens.ts` (never on the Invite; resend replaces them); accepting creates the account, stores its chosen password (`credentials`, mock only) and signs it in |
+| Support view | platform principal's `support`; started from "View workspace", the firm-URL interstitial or ⌘K; 60 minutes, one at a time, ended by exit / expiry / sign-out; banner on every firm page; `ADMIN_ACCESS` / `ADMIN_ACCESS_END` on `support_view` in the firm's ledger |
+| Gates | `FirmGate` → `firmOutcome` (07 §2.5 order); `PlatformGate` → `platformOutcome`; both pure and table-tested |
 
-Where `firmId` lives: only on the **Zod** `UserSchema` (`src/lib/schemas/session.ts:18`) and fixtures. The runtime store's `SessionUser` has no `firmId`; it carries a separate `firm.id`.
-
-Other session facts:
-
-| Topic | Finding |
-|---|---|
-| Parallel types | `SessionUser` (store) vs `User` (`schemas/session.ts:16`, adds `firmId`, `isActive`, `lastActiveAt`): two shapes for one concept. `CLAUDE.md` says to infer types from Zod. |
-| Session API | `src/lib/api/session.ts` exists; **no consumer** of `sessionApi` was found in `src/`. The store's header comment says a fixture session "is loaded on mount"; no such loader was found **(unverified)**. |
-| `SessionSchema` | `{ user, firm, seatsUsed, seatLimit, activeCandidates, candidateLimit }` (`schemas/session.ts:28`); the mock fills `seatLimit` 10 and `candidateLimit` 100 as literals (`src/mocks/session.ts`) |
-| RoleSwitcher | `src/components/dev/role-switcher.tsx`, rendered in `components/layout/topbar.tsx:14`. Dropdown of the four roles; calls `setRole`. Visible **unless `NEXT_PUBLIC_SHOW_ROLE_SWITCHER === "false"`**, so it is on by default, also in production builds. Not listed in `.env.example`; mentioned in `docs/01-FRONTEND-ARCHITECTURE.md:238,267`. |
-| Role change | `RouteGuard` calls `queryClient.invalidateQueries()` when the role changes (`route-guard.tsx:29-33`) |
-| `proxy.ts` / middleware | **none** (`src/proxy.ts`, `src/middleware.ts`, `middleware.ts`, `proxy.ts` all absent). `CLAUDE.md` says Next 16's middleware is `src/proxy.ts`; Phase D in 07. |
-| Server-readable session | none; no cookie handling in the frontend |
-| Fixtures | `src/mocks/data/firm.json`: one firm (`firm_hts`) and 5 users: 1 OWNER (`user_imran`), 1 MANAGER (`user_fatima`), 3 BDE (`user_adnan`, `user_sneha`, `user_vikram`). **No VIEWER user**; VIEWER is reachable only through the switcher. |
+Mock auth, not security: real enforcement is Phase D.
 
 ---
 
-## 5. Remaining inline role checks and BDE filters
+## 5. Permissions
 
-Greps: `role ===`, `role !==`, `assignedUserIds.includes`, `submittedByUserId ===`. Line numbers are as of this snapshot.
-
-**`user.role !== "VIEWER"`: 11 occurrences in 11 files** (07 says 11; matches)
-
-| File:line | Use |
-|---|---|
-| `src/app/(app)/candidates/[id]/page.tsx:41` | `canAct` |
-| `src/app/(app)/candidates/page.tsx:157` | `canCreate` |
-| `src/app/(app)/resumes/page.tsx:21` | `canEdit` |
-| `src/app/(app)/applications/page.tsx:63` | `canAct` prop |
-| `src/app/(app)/applications/[id]/page.tsx:88` | gates the "next stage" control |
-| `src/app/(app)/followups/page.tsx:49` | `canAct` |
-| `src/app/(app)/jobs/page.tsx:52` | gates an action |
-| `src/app/(app)/jobs/[id]/page.tsx:56` | `canAct` |
-| `src/app/(app)/outreach/page.tsx:34` | `canAct` |
-| `src/components/app/resume-studio/open-resume.tsx:96` | `canEdit` |
-| `src/components/app/resume-studio/new-resume.tsx:65` | `canEdit` |
-
-**BDE data filters: 8** (07 lists 8; matches)
-
-| File:line | Filter |
-|---|---|
-| `src/app/(app)/candidates/page.tsx:85,92` | `isBde` → `assignedUserIds.includes(user.id)` |
-| `src/app/(app)/jobs/page.tsx:32` | `assignedUserIds.includes` |
-| `src/app/(app)/jobs/[id]/page.tsx:49` | `assignedUserIds.includes` |
-| `src/app/focus/page.tsx:24` | `assignedUserIds.includes` |
-| `src/components/app/resume-studio/new-resume.tsx:52` | `assignedUserIds.includes` |
-| `src/app/(app)/applications/page.tsx:42` | `submittedByUserId === user.id` |
-| `src/app/(app)/outreach/page.tsx:43` | `submittedByUserId === user.id` |
-| `src/app/(app)/followups/page.tsx:47` | `useFollowups(user.role === "BDE" ? user.id : undefined)` |
-
-**Other role comparisons**
-
-| File:line | Use |
-|---|---|
-| `src/app/(app)/candidates/[id]/page.tsx:117` | `showOwner={role === MANAGER \|\| OWNER}` |
-| `src/app/(app)/dashboard/page.tsx:15-17` | picks BDE / Owner / Manager dashboard |
-| `src/app/(app)/analytics/page.tsx:67` | BDE empty-state branch (07 says delete it; now unreachable) |
-| `src/components/app/dashboard/manager-dashboard.tsx:23` | title by role |
-| `src/app/(app)/settings/team/page.tsx:39` | tag tone by role (presentational) |
-| `src/lib/derive/bde-performance.ts:17` | `u.role === "BDE"` over the user list (data derivation) |
-
-**`assignedUserIds.includes` that are not role-gated filters** (derivations and the scope helper): `components/app/dashboard/bde-dashboard.tsx:40`, `lib/derive/bde-performance.ts:19`, `lib/derive/dashboard.ts:27`, `lib/routes/scope.ts:15`.
-
-**Record-scope helper in use** (`isInScope` → not-found): `candidates/[id]/page.tsx:106`, `applications/[id]/page.tsx:68`, `components/app/resume-studio/open-resume.tsx:39`.
-
-No permission-policy module exists yet (`src/lib/auth/permissions.ts`, `useCan`, `<Can>` absent): Phase C not started.
+- **Policy** `src/lib/auth/policy.ts` (pure; `permissions.ts` re-exports it with `useCan`): `can(principal, action)` over a role × action table — `candidate.create`, `candidate.edit`, `job.capture`, `job.apply`, `application.move`, `resume.edit`, `outreach.act`, `followup.act`, visibility `team.view`. A support view: every action false. Scope helpers `scopeCandidates`, `scopeApplications`, `scopeFollowupsUserId`, `scopeLedger`, `hasOwnScope`, `dashboardFor`.
+- **Firm pages** read the principal and use `can()` / the scope helpers; no `role !== "VIEWER"` checks or BDE filters remain there.
+- **Mock backend** enforces the same table: every firm-scoped write declares its action (`firmScoped(…, writes)`) and is refused (403) for a VIEWER or a support view; `src/mocks/write-authorization.test.ts` walks every write.
+- **Remaining `role ===` hits** (record roles, not the viewer's access): `settings/team` role tag tones, the admin users tab's OWNER-can't-be-deactivated rule and invite role label, the manager dashboard's title, `derive/bde-performance.ts`, `derive/platform.ts` (owner lookup). `applications.updateStatus` in the mock still also checks `accessFor` + `isInScope` itself.
+- What Phase C still has to do: 07 "Phase C — Permission policy", *Still to do*.
 
 ---
 
-## 6. Firm / tenant model
+## 6. Tenancy
 
-| Entity | Schema / contract | Status |
-|---|---|---|
-| Firm | `FirmSchema` (`schemas/session.ts:4`): `id, name, slug, logoUrl, primaryTimezone, clientTimezone, truthGuardMode, applicationExpiryDays` | exists; **no** status/suspended, plan, or created date |
-| User | `UserSchema` (`schemas/session.ts:16`): `id, firmId, name, email, role, avatarUrl, isActive, lastActiveAt` | exists |
-| TeamMember | none; the team list is `User[]` (`src/mocks/team.ts`, `use-team.ts`) | no separate entity |
-| Invite | none | **absent** |
-| Plan | none | **absent** |
-| Seat | only counters inside `SessionSchema`: `seatsUsed`, `seatLimit`, `activeCandidates`, `candidateLimit` | no Seat entity |
-| Platform user / SUPER_ADMIN | none. Related: `LedgerEntrySchema.actorType` includes `"PLATFORM_ADMIN"` (`schemas/analytics.ts:66`) and the action `ADMIN_ACCESS` (`:81`) | no platform role on the session |
-
-**`firmId` on records** (grep over all of `src/lib/schemas`):
-
-| Record | `firmId`? |
-|---|---|
-| Candidate | **yes**: `schemas/candidate.ts:41`; all 24 fixtures carry `firm_hts` |
-| User | yes (`schemas/session.ts:18`) |
-| Job | no (400 fixtures) |
-| Application | no (320) |
-| Resume | no (36) |
-| LedgerEntry | no (100) |
-| Record (candidate record), Document, Company, Inbox, Agent | no |
-
-(A naive `grep firmId` also matches `confirmId` in `components/app/candidate/documents/document-list.tsx`; those are unrelated.)
-
-`src/mocks/data/firm.json` shape: `{ firm: { id, name, slug, logoUrl, primaryTimezone, clientTimezone, truthGuardMode, applicationExpiryDays }, users: [ {…} ×5 ] }`. One firm only.
-
-Naming: `docs/07` and `docs/02` and the schemas say `PLATFORM_ADMIN`; `CLAUDE.md` says `SUPER_ADMIN`.
+- Contracts approved (docs/02 §3.1, 07 Q16–Q21, Q31): `Firm` (status, plan, copied limits, `contactPhone`), `Plan`, `Invite` (+ `inviteeName`), `PlatformUser`, `SupportView`, `Principal`; `firmId` on every firm-owned record; ledger `firmId` nullable for platform-only events.
+- The firm comes from the URL (`useFirm()` / `useFirmId()`); query keys start with `firmId`; platform keys start with `"platform"`.
+- Every number is derived (`src/lib/derive/tenancy.ts`, `platform.ts`): seats, active candidates, over-limit, owner status, last activity, plan history, custom-limits mark, needs attention.
+- Fixture firms: Hyderabad Tech Staffing (ACTIVE, Growth), Secunderabad Talent Labs (ACTIVE, Starter, at its seat limit), Cyberabad Bench Works (SUSPENDED, over its seat limit), Gachibowli Staffing (ONBOARDING, owner invite pending).
 
 ---
 
 ## 7. Data layer
 
-| Layer | Finding |
+| Piece | State |
 |---|---|
-| Only `fetch` | `src/lib/api/http.ts:62` (the other `fetch(` greps are `refetch(`). Compliant with the rule. |
-| Adapters | 12 files in `src/lib/api/`: `agents, analytics (ledger), applications, candidates, companies, documents, inbox, jobs, records, resumes, session, team`. **All 12 dynamically import `@/mocks/…`.** |
-| Live switch | `src/lib/api/config.ts`: `isLive(module)` reads `NEXT_PUBLIC_LIVE_MODULES`; `ApiModule` has 13 names (`session, team, candidates, companies, jobs, records, resumes, applications, followups, documents, inbox, ledger, agents`). **No adapter calls `isLive` yet.** |
-| Live modules | **None, by code.** The env value in `.env.local` was not read **(unverified)**, but it has no effect while no adapter checks it. Matches `docs/integration/README.md:215-216`: Module 00 "In progress, Part A done", Module 01 "Not started". |
-| Backend proxy | `next.config.ts` rewrites `/api/:path*` and `/health` to `BACKEND_URL` when set |
-| DTO mappers | `src/lib/api/dto/shared.ts` (+ `shared.test.ts`) only |
-| Mocks | `src/mocks/*.ts` plus JSON in `src/mocks/data/`: applications, candidates, companies, documents, firm, followups, inbox, jobs, ledger, records, resumes |
-| Hooks | `src/lib/hooks/`: `use-agents, use-applications, use-candidates, use-companies, use-documents, use-inbox, use-jobs, use-ledger, use-records, use-resumes, use-team` (+ `use-keyboard-shortcuts`). There is no session hook. |
-| Env | `.env.example`: `BACKEND_URL`, `NEXT_PUBLIC_LIVE_MODULES`, `NEXT_PUBLIC_MOCK_DELAY_MS`, `NEXT_PUBLIC_SHOW_DEV_ROUTES`, `NEXT_PUBLIC_DEFAULT_CANDIDATE_ID` |
-
-**Query keys** (literal arrays inside each hook; no key factory, **none include `firmId`**):
-
-| Hook file | Keys |
-|---|---|
-| `use-candidates.ts` | `["candidates"]`, `["candidate", id]` |
-| `use-jobs.ts` | `["jobs", params]`, `["job", id]` |
-| `use-applications.ts` | `["applications", { candidateId }]`, `["application", id]`, `["followups", { userId }]`, invalidations `["applications"]` |
-| `use-resumes.ts` | `["resumes"]`, `["resumes", candidateId]`, `["resume", id]` |
-| `use-records.ts` | `["record", candidateId]` |
-| `use-companies.ts` | `["companies"]`, `["company", id]` |
-| `use-team.ts` | `["team"]` |
-| `use-ledger.ts` | `["ledger", params]` |
+| Adapters | `src/lib/api/*.ts`, one per module, plus `platform.ts`, `invites.ts`, `session.ts`, `demo-data.ts`. **Every adapter is served by its mock**: `isLive()` in `config.ts` exists but no adapter calls it, so `NEXT_PUBLIC_LIVE_MODULES` has no effect today |
+| HTTP | `src/lib/api/http.ts` exists; nothing imports it yet |
+| DTO | `src/lib/api/dto/shared.ts` (+ test); no module mapper yet |
+| Mocks | 26 modules in `src/mocks/`; firm-scoped calls go through `firmScoped` (membership, support-view reads, declared writes) |
+| Persistence | demo data in `localStorage` `benchq.demo-data` (`{version, seededAt, tables}`), changed tables only; `FIXTURE_VERSION` fingerprints the fixtures; Super Admin "Reset demo data" on `/admin/system`. Persisted tables: firms, users, invites, inviteTokens, credentials, supportViews, plans, platformUsers, candidates, applications, documents, inboxMessages, inboxConnections, ledger |
+| Backend | JobNavigator (FastAPI) in `backend/`; integration paused after Module 01 (CLAUDE.md, `docs/integration/`) |
+| System contracts | `HealthCheck`, `ScraperRun`, `AiUsage` in docs/02 §3.2: approved (07 Q33, Q34), **not built** |
 
 ---
 
 ## 8. Quality
 
-Run on the current working tree on 2026-10-13.
-
-| Check | Result |
+| Check | State (2026-10-19) |
 |---|---|
-| `pnpm typecheck` (`tsc --noEmit`) | **exit 0**, no diagnostics |
-| `pnpm lint` (`eslint`) | **exit 0**, no diagnostics |
-| `pnpm test` (`vitest run`) | **exit 0**: 3 files, 19 tests passed (`api/dto/shared.test.ts` 7, `routes/registry.test.ts` 7, `derive/derive.test.ts` 5), about 0.4 s |
-| `pnpm build` | exit 0 earlier today on the same Phase A tree (not re-run for this snapshot). One CSS warning: `::highlight(bq-ai-pending)` is not recognised by the CSS optimiser (app code, unrelated to routes). |
-
-Not covered by any automated check: component rendering, role × route outcomes, themes, responsive widths, axe. There is no component, e2e or accessibility test tooling in `package.json`. No CI configuration exists (`.github/workflows` absent).
-
-Stale comment: `next.config.ts` mentions `iconsax-react`; the project uses `lucide-react`.
+| `pnpm typecheck` | clean |
+| `pnpm lint` | clean |
+| `pnpm test` | 421 tests in 31 files, passing |
+| `pnpm build` | clean |
+| Both themes | checked by eye in Chrome for the screens built in Phases L and P |
+| Widths 1440 / 1024 / 390 | **(unverified)** for the admin screens and the invite page: not walked at 1024 or 390 |
+| `axe` | **not run** — no axe tooling in the repo |
+| Known UI gaps | 07 "Phase B — UI completion audit" (ledger filters and diff expander, `·` with a null `promptVersion`, full settings UIs, "Not found" tab title, outreach thread-list states, the candidates search box at 390 px) |
 
 ---
 
-## 9. Blockers
+## 9. Open work
 
-### Adding a platform tier (`/admin`)
-
-| # | Blocker |
+| Item | Where it is tracked |
 |---|---|
-| 1 | **No platform role.** `CLAUDE.md` says `SUPER_ADMIN` must not be a `FirmRole`, but every helper (`accessFor`, `canOpen`, `navFor`, `paletteRoutesFor`, `shortcutsFor`, `landingFor`, `useRouteAccess`, `RouteGuard`) and `RouteDef.access` (`RoleAccess = Record<FirmRole, Access>`) are typed on `FirmRole`. Adding a second role axis changes the registry types and all of those callers. |
-| 2 | **Session has no platform identity.** `SessionUser` has one `role: FirmRole`; the store has one fixed firm. Needs a separate platform-role field and a way to represent "no firm". |
-| 3 | **Naming conflict:** `PLATFORM_ADMIN` (07, 02, schemas) vs `SUPER_ADMIN` (`CLAUDE.md`). Needs a decision before any schema or registry change. |
-| 4 | **No contracts or schemas** for Plan, Seat/entitlements, Invite, platform user, or firm status (suspended). `CLAUDE.md` requires a contract in `docs/02-DATA-CONTRACTS.md` and product sign-off first. |
-| 5 | **Registry/shell gaps:** `shell` has no admin value; nav `section` is only `workspace \| preferences \| settings`; `landingFor` knows only `/dashboard` and `/settings/preferences`. |
-| 6 | **Open product decisions** (listed in `CLAUDE.md`): support access by impersonation vs read-only view; firm in URL vs session; multi-firm membership. No banner or audit path exists, though the ledger schema already has `PLATFORM_ADMIN` and `ADMIN_ACCESS`. |
-| 7 | **Guards are client-only.** No server session, no `proxy.ts`, no `forbidden.tsx`. An `/admin` area protected only by a client store is UX, not security (07 Phase D, backend D1/D2). |
-| 8 | Registry test parity (page ↔ entry) will fail until entries exist, which is the intended safety net; the spot-check table test must also be extended. |
-
-### Firm-scoped routing and data
-
-| # | Blocker |
-|---|---|
-| 1 | **`firmId` exists only on Candidate and User.** Job, Application, Resume, LedgerEntry, Record, Document, Company, Inbox and Agent have none, so no firm filtering is possible in mocks or types. The mocks hold a single firm. |
-| 2 | **Query keys carry no `firmId`** (section 7), against `CLAUDE.md`'s tenancy rule; cached data could cross firms on a firm switch. |
-| 3 | **Session shape:** the runtime `SessionUser` lacks `firmId`; `SessionFirm` duplicates `FirmSchema`; the store is hard-coded to one firm. `sessionApi` has no consumer. |
-| 4 | **If the firm goes in the URL** (`/[firm]/…`): no firm segment exists anywhere in `src/app`, and `hrefFor()` (the planned single place to build links) does not exist. There are **39** `href="/…"` literals, **5** `router.push/replace("/…")` and **1** `redirect("/…")` outside the registry, all of which would need to change. `FirmSchema.slug` already exists as a candidate URL segment. |
-| 5 | **Scope helpers don't know firms:** `isInScope(access, userId, record)` and the 8 inline filters compare only user ids; there is no `scopeCandidates` / `scopeApplications` / `scopeLedger` yet (Phase C). |
-| 6 | **Backend has no tenancy.** Per `CLAUDE.md`, `backend/` is single-user with one shared key; Modules 02–05 wait on decisions D1/D2 (`docs/integration/06-open-decisions.md`). |
-| 7 | **Unsettled order of work:** Phase B (route × role audit) and Phase C (permission policy) are not started; `CLAUDE.md` puts the Super Admin flow after Phase C. |
+| Rest of the permission policy (platform actions, team actions, `<Can>`, route access via `can`, full table test, exit grep, `updateStatus` fold-in) | 07 Phase C, *Still to do* |
+| Per-route × per-principal UI audit, both themes, widths, axe | 07 Phase B |
+| Super Admin flow polish | 07 Phase S |
+| Firm-side invite flow (OWNER invites members) | 07 Phase M |
+| Build the system contracts (`/admin/system`, AI spend on the overview) — approved, not built | docs/02 §3.2, 07 Q29, Q33, Q34 |
+| Backend tenancy and real auth, then Modules 02–05 | 07 Phase D, `docs/integration/` |

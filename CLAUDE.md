@@ -256,24 +256,26 @@ A stopped task with a clear question beats a confident wrong implementation.
 
 > **Update this section as you progress.** It's the first thing the next session reads.
 
-**Phase: Production routes, tenancy + RBAC** (`docs/07-ROUTES-AND-RBAC.md` v2).
+**Phase: Production routes, tenancy + RBAC** (`docs/07-ROUTES-AND-RBAC.md` v2). Phases T, L and P are
+done. **Next: the rest of Phase C** — work from 07's Phase C *Still to do* list (a slice was done in P4,
+Q32, and the BDE ledger scope in P); then B, S, M. Repo snapshot: `docs/CURRENT_STATE.md` (2026-10-19).
 
 | Step | Status |
 |---|---|
 | UI build phases 0–8 (`docs/06`) — all screens on mocks | Done |
 | Integration Module 00 Part A — backend in repo, proxy verified | Done |
-| Repo snapshot `docs/CURRENT_STATE.md` (2026-10-13) | Done |
-| 07 Phase A — registry, guards, access/error screens, settings split | Done |
-| 07 Phase A2 — `hrefFor` everywhere, full access table test, one `FirmRole`, dev switcher off in prod | Done |
-| 07 Phase T0 — no-contract groundwork: remove `/sign-up` (Q11), route groups (Q14), role views out of pages, active links by route id, team-access TODO (Q15), draft §7 contracts in `docs/02` | Done |
-| 07 Phase T — tenancy in the frontend: schemas from the approved contracts (07 §7, `docs/02` §3.1), `Principal` session, `/[firm]` URLs, firm-scoped mocks + query keys | Done (PRs 1–4, exit check recorded in 07) |
-| Dashboards error states — per-group errors, one page-level error when everything fails (docs/04 §13) | Done (#10) |
-| 07 Phase L — sign-in with seeded accounts on `/sign-in`, dev principal switcher removed, session shared across tabs (Q25–Q27) | Done (#16) |
-| Demo data persists in the browser; Super Admin "Reset demo data" (docs/03 §3.3) | Done (#17) |
-| 07 Phase P — `/admin/*` routes, admin shell, read-only support view | **Done, in review** (`feat/platform-finish`): P1–P4 merged (#12, #13, #18, #20); P5 (⌘K for admins) and P6 (platform tests) plus the BDE ledger scope; exit check recorded in 07 |
-| 07 Phase C — permission policy, scope helpers, remove inline role checks | Planned |
-| 07 Phase B — UI completion audit (route × principal) | Planned |
-| 07 Phase S — Super Admin flow polish (UI-first) | Planned |
+| 07 Phases A, A2, T0 — registry, guards, access/error screens, `hrefFor`, route groups, no `/sign-up` | Done |
+| 07 Phase T — tenancy in the frontend: approved contracts, `Principal` session, `/[firm]` URLs, firm-scoped mocks and query keys | Done (exit check in 07) |
+| Dashboard error states (docs/04 §13) | Done (#10) |
+| 07 Phase L — sign-in with seeded accounts, no principal switcher, session shared across tabs | Done (#16) |
+| Demo data persists in the browser; "Reset demo data" on `/admin/system` (docs/03 §3.3) | Done (#17) |
+| 07 Phase P — `/admin/*` screens, invites and `/invite/[token]`, read-only support view, ⌘K for admins, platform tests | Done (#12, #13, #18, #20, #21; exit check in 07) |
+| `docs/CURRENT_STATE.md` regenerated | Done (2026-10-19) |
+| **07 Phase C — the rest of the permission policy** (platform and team actions, `<Can>`, route access via `can`, full principal × action table test, exit grep, fold `updateStatus` into the policy) | **Next** |
+| 07 Phase B — UI completion audit (route × principal, both themes, 1440 / 1024 / 390, axe) | Planned, after C |
+| 07 Phase S — Super Admin flow polish (UI-first) | Planned, after B |
+| 07 Phase M — firm-side invite flow (OWNER invites members) | Planned, after S (Q23) |
+| System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Approved (Q33, Q34), not built |
 | Integration Module 00 B/C + Module 01 (ledger) | Can run in parallel |
 | Backend tenancy + real auth (D1/D2), 07 Phase D, then Modules 02–05 with `firmId` | Later |
 
@@ -287,4 +289,15 @@ limits are *copied* onto the firm; over a limit, block new additions and never a
 and `contactPhone` only on `Firm`; invites last 7 days, exactly one OWNER per firm, `firmId` null ⇔
 `PLATFORM_ADMIN`; support view is 60 minutes with no extension; firm events carry `firmId`; no
 `PlanChange` entity; agent and tailoring runs are firm-scoped.
-**Still open:** nothing. The five implied rules at the end of `docs/02` §3.1 were approved on 2026-10-16.
+**Since then:** slug-less URLs are not-found (Q22); Phase M comes after S (Q23); a resend logs another
+`INVITE_SENT` "Invite resent to …" (Q24); everyone signs in on `/sign-in` with seeded accounts, no
+principal switcher (Q25); `/invite/[token]` belongs to P4 (Q26); the session is shared across tabs (Q27);
+an invite to a SUSPENDED firm is blocked and stays PENDING (Q28); the Super Admin decisions of docs/04
+§14.11 — `/admin/system` placeholder, custom limits, view an empty ONBOARDING firm, suspend ACTIVE only,
+stalled onboarding at 7 days, over-limit block visible-disabled-with-reason (§0's second exception) (Q29);
+"custom limits" derived from the ledger, (de)activation logs `STATE_CHANGE`, lowercase entity types (Q30);
+`Invite.inviteeName` (Q31); a Phase C slice came into P4 (Q32); system contracts' first answers — USD
+micro-dollars, reportable health checks only, firm attachment, retention (Q33); the rest — health history
+with 7/30-day uptime, backend pricing, the AI purpose list, spend Super Admin only, no budgets yet, IST
+periods, billed failed calls count (Q34).
+**Still open:** nothing. docs/02 §3.2 is approved, not built.
