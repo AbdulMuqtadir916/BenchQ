@@ -14,7 +14,8 @@ export function Topbar({ variant = "firm" }: { variant?: "firm" | "admin" }) {
     <header className="bq-topbar">
       <div className="min-w-0"><UserMenu align="start" /></div>
       <div className="flex shrink-0 items-center gap-2">
-        <div className="hidden xl:block"><ShiftClock /></div>
+        {/* The BDE's shift isn't the admin's (docs/04 §14). */}
+        {variant === "firm" ? <div className="hidden xl:block"><ShiftClock /></div> : null}
         <button type="button" onClick={open} aria-label="Open command palette" className="bq-secondary inline-flex h-8 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm">
           <Search size={14} aria-hidden />
           <span className="hidden sm:inline">Search</span>

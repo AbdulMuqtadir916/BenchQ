@@ -19,7 +19,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface PlatformData {
   firms: readonly Firm[];
-  users: readonly Pick<User, "id" | "firmId" | "name" | "email" | "role" | "isActive">[];
+  users: readonly User[];
   invites: readonly Invite[];
   candidates: readonly Pick<Candidate, "firmId" | "status">[];
   ledger: readonly LedgerEntry[];

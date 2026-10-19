@@ -2,7 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ROLES, ROUTES, accessFor, accessForPath, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, routeById, supportAccess, type Access, type RouteId } from "./registry";
+import { ROLES, ROUTES, accessFor, accessForPath, activeNavId, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, routeById, shortcutsFor, supportAccess, type Access, type RouteId } from "./registry";
 import { RESERVED_SLUGS } from "@/lib/schemas/tenancy";
 import type { FirmRole } from "@/lib/schemas/enums";
 import type { Principal } from "@/lib/schemas/tenancy";
@@ -192,8 +192,11 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
 /** Routes outside the firm table: public pages, and the dev-only design system (docs/07 §2.1, §2.4). */
 const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in"];
 const DEV_ROUTES: readonly RouteId[] = ["design-system"];
-/** docs/07 §2.3: PLATFORM_ADMIN only; the rest of the list arrives with P3. */
-const PLATFORM_ROUTES: readonly RouteId[] = ["admin"];
+/** docs/07 §2.3: PLATFORM_ADMIN only, every route of the list (P3). */
+const PLATFORM_ROUTES: readonly RouteId[] = [
+  "admin", "admin.firms", "admin.firms.new", "admin.firms.detail", "admin.firms.detail.users", "admin.firms.detail.plan", "admin.firms.detail.activity",
+  "admin.plans", "admin.audit", "admin.system", "admin.team",
+];
 
 describe("access table (docs/07 §2.2)", () => {
   it("has a row for every firm route, and only for routes that exist", () => {
@@ -349,8 +352,43 @@ describe("platform tier (docs/07 §2.3, §2.2 Support, P1)", () => {
   it("lands a platform admin on /admin and gives them only the admin nav", () => {
     expect(landingFor(admin)).toBe("admin");
     expect(hrefFor(landingFor(admin))).toBe("/admin");
-    expect(navFor(admin, "admin").map((route) => route.id)).toEqual(["admin"]);
+    expect(navFor(admin, "admin").map((route) => route.id)).toEqual(["admin", "admin.firms", "admin.plans", "admin.audit", "admin.system", "admin.team"]);
     expect(navFor(admin, "workspace")).toEqual([]);
     for (const role of ROLES) expect(navFor(asRole(role), "admin"), role).toEqual([]);
   });
 });
+
+describe("admin nav and keys (docs/04 §14.1)", () => {
+  it("lists every §2.3 route under /admin, with admin URLs keyed by firmId (not slug)", () => {
+    expect(ROUTES.filter((route) => route.area === "platform").map((route) => route.id).sort()).toEqual([...PLATFORM_ROUTES].sort());
+    expect(hrefFor("admin.firms.detail.users", { firmId: "firm_hts" })).toBe("/admin/firms/firm_hts/users");
+    expect(matchRoute("/admin/firms/new")?.id).toBe("admin.firms.new");
+    expect(matchRoute("/admin/firms/firm_hts")?.id).toBe("admin.firms.detail");
+  });
+
+  it("has the admin g-map g o · g f · g p · g a · g s · g t, only in the admin shell; the firm map stays the firm's", () => {
+    const keys = (principal: Principal, area: "firm" | "platform") => Object.fromEntries(shortcutsFor(principal, area).map(({ key, route }) => [key, route.id]));
+    expect(keys(admin, "platform")).toEqual({ o: "admin", f: "admin.firms", p: "admin.plans", a: "admin.audit", s: "admin.system", t: "admin.team" });
+    expect(keys(admin, "firm")).toEqual({});
+    expect(keys(inSupport, "firm")).toEqual({ d: "dashboard", c: "candidates", j: "jobs", a: "applications", f: "followups" });
+    expect(keys(asRole("OWNER"), "firm")).toMatchObject({ a: "applications", f: "followups" });
+    expect(keys(asRole("OWNER"), "platform")).toEqual({});
+  });
+
+  it("keeps g keys unique within an area", () => {
+    for (const area of ["firm", "platform"] as const) {
+      const keys = ROUTES.filter((route) => route.area === area && route.shortcut).map((route) => route.shortcut);
+      expect(new Set(keys).size, area).toBe(keys.length);
+    }
+  });
+
+  it("lights exactly one admin nav item on every admin page: the most specific (Overview only on /admin)", () => {
+    const nav = navFor(admin, "admin");
+    expect(activeNavId(nav, "/admin")).toBe("admin");
+    expect(activeNavId(nav, "/admin/firms")).toBe("admin.firms");
+    expect(activeNavId(nav, "/admin/firms/firm_hts/plan")).toBe("admin.firms");
+    expect(activeNavId(nav, "/admin/audit?firm=firm_hts")).toBe("admin.audit");
+    expect(activeNavId(nav, "/admin/nope")).toBeNull();
+  });
+});
+

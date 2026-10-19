@@ -29,7 +29,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return false;
 }
 
-export function useGlobalShortcuts() {
+/** `area`: the shell's — the firm map in the firm shell, the admin map in the admin shell (docs/04 §14.1). */
+export function useGlobalShortcuts(area: "firm" | "platform") {
   const router = useRouter();
   const toHref = useHref();
   const openCommandPalette = useUiStore((s) => s.openCommandPalette);
@@ -72,7 +73,7 @@ export function useGlobalShortcuts() {
       }
 
       if (now - gPressedAt.current < G_PREFIX_MS) {
-        const target = shortcutsFor(principal).find((shortcut) => shortcut.key === e.key.toLowerCase());
+        const target = shortcutsFor(principal, area).find((shortcut) => shortcut.key === e.key.toLowerCase());
         if (target) {
           e.preventDefault();
           gPressedAt.current = 0;
@@ -87,6 +88,7 @@ export function useGlobalShortcuts() {
     router,
     toHref,
     principal,
+    area,
     openCommandPalette,
     closeCommandPalette,
     openHintSheet,

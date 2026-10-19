@@ -7,36 +7,8 @@ import { useLedger } from "@/lib/hooks/use-ledger";
 import { PageHeader } from "@/components/app/page-header";
 import { DataTable } from "@/components/app/data-table";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
-import { Tag, type TagTone } from "@/components/ui/tag";
+import { ActionTag, ActorTag } from "@/components/app/ledger-tags";
 import { ClaimChip } from "@/components/app/claim-chip";
-
-const ACTION_TONE: Record<LedgerEntry["action"], TagTone> = {
-  CREATE: "green",
-  UPDATE: "blue",
-  DELETE: "red",
-  STATE_CHANGE: "violet",
-  AI_GENERATE: "amber",
-  AI_BLOCK: "red",
-  AI_OVERRIDE: "amber",
-  EXPORT: "teal",
-  LOGIN: "neutral",
-  ADMIN_ACCESS: "neutral",
-  ADMIN_ACCESS_END: "neutral",
-  FIRM_CREATED: "green",
-  FIRM_SUSPENDED: "red",
-  FIRM_REACTIVATED: "green",
-  PLAN_CHANGED: "blue",
-  INVITE_SENT: "blue",
-  INVITE_ACCEPTED: "green",
-  INVITE_REVOKED: "amber",
-};
-
-const ACTOR_TONE: Record<LedgerEntry["actorType"], TagTone> = {
-  USER: "blue",
-  SYSTEM: "neutral",
-  AGENT: "amber",
-  PLATFORM_ADMIN: "violet",
-};
 
 export default function LedgerPage() {
   const ledgerQuery = useLedger({ limit: 100 });
@@ -61,7 +33,7 @@ export default function LedgerPage() {
         header: "Actor",
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <Tag tone={ACTOR_TONE[row.original.actorType]}>{row.original.actorType.toLowerCase()}</Tag>
+            <ActorTag type={row.original.actorType} />
             <span className="text-[var(--color-text-2)]">{row.original.actorName}</span>
           </div>
         ),
@@ -70,7 +42,7 @@ export default function LedgerPage() {
         id: "action",
         accessorFn: (e) => e.action,
         header: "Action",
-        cell: ({ row }) => <Tag tone={ACTION_TONE[row.original.action]}>{row.original.action.replaceAll("_", " ").toLowerCase()}</Tag>,
+        cell: ({ row }) => <ActionTag action={row.original.action} />,
       },
       {
         id: "summary",

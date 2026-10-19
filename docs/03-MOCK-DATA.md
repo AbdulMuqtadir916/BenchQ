@@ -221,11 +221,11 @@ account changes, for every account signed in on this browser. Code: `src/mocks/d
   fixtures change, `db.test.ts` fails until the fingerprint is updated; a browser holding another
   version reseeds automatically on its next load (and so does unreadable stored data; a stored table
   that no longer fits its schema falls back to its fixture).
-- **Reset:** Sana (Super Admin) → `/admin` → **Demo data** → **Reset demo data…**, confirmed in a
+- **Reset:** Sana (Super Admin) → `/admin/system` → **Demo data** → **Reset demo data…**, confirmed in a
   dialog that says it wipes every change made in this browser, by every account, and can't be undone.
   It reseeds from the fixtures in place (no reload); other tabs follow. Signed-in sessions stay unless
   the account itself was created by a change (e.g. an accepted invite's user), which then ends.
-  Other browsers keep their own data. (It moves to `/admin/system` when P3 builds that page.)
+  Other browsers keep their own data.
 - **Tabs:** a change saved in one tab refreshes the tables of every other open tab (storage event) and
   they refetch, so two tabs can't overwrite each other's changes.
 - **Storage full:** if a save fails (the browser's `localStorage` quota is full, or storage is

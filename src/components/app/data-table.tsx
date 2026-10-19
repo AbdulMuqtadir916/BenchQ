@@ -47,6 +47,17 @@ interface DataTableProps<TData, TValue> {
   toolbarPlacement?: "inside" | "outside";
   pagination?: boolean;
   pageSize?: number;
+  /**
+   * Controlled search and page, for lists that keep them in the URL (CLAUDE.md). With `search`, the
+   * caller filters `data` itself (the table does no filtering of its own); with `page`, the 0-based
+   * page index is the caller's.
+   */
+  search?: { value: string; onChange: (value: string) => void };
+  page?: { index: number; onChange: (index: number) => void };
+  /** false: no search / columns toolbar (a short list whose filters would otherwise not be in the URL). */
+  hasToolbar?: boolean;
+  /** Accessible name of the table region. */
+  label?: string;
 }
 
 const ROW_HEIGHT: Record<Density, number> = {
@@ -81,12 +92,24 @@ export function DataTable<TData, TValue>({
   toolbarPlacement = "inside",
   pagination = false,
   pageSize = 10,
+  search,
+  page,
+  hasToolbar = true,
+  label = "Data table",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [ownFilter, setOwnFilter] = React.useState("");
+  const globalFilter = search ? search.value : ownFilter;
+  const setGlobalFilter = React.useCallback((value: string) => (search ? search.onChange(value) : setOwnFilter(value)), [search]);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [paginationState, setPaginationState] = React.useState({ pageIndex: 0, pageSize });
+  const [ownPagination, setOwnPagination] = React.useState({ pageIndex: 0, pageSize });
+  const paginationState = page ? { pageIndex: page.index, pageSize } : ownPagination;
+  const setPaginationState = (updater: React.SetStateAction<{ pageIndex: number; pageSize: number }>) => {
+    const next = typeof updater === "function" ? updater(paginationState) : updater;
+    if (page) page.onChange(next.pageIndex);
+    else setOwnPagination(next);
+  };
   const [focusedIndex, setFocusedIndex] = React.useState(0);
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const filterRef = React.useRef<HTMLInputElement>(null);
@@ -129,7 +152,8 @@ export function DataTable<TData, TValue>({
     columns,
     state: { sorting, globalFilter, rowSelection, columnVisibility, ...(pagination ? { pagination: paginationState } : {}) },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
+    onGlobalFilterChange: (value: string) => setGlobalFilter(value),
+    manualFiltering: Boolean(search),
     onRowSelectionChange: setRowSelection,
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPaginationState,
@@ -273,15 +297,15 @@ export function DataTable<TData, TValue>({
 
   return (
     <>
-    {isOutside ? toolbar : null}
+    {isOutside && hasToolbar ? toolbar : null}
     <section
       className={cn(
         "overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]",
         className,
       )}
-      aria-label="Data table"
+      aria-label={label}
     >
-      {isOutside ? null : toolbar}
+      {isOutside || !hasToolbar ? null : toolbar}
 
       {rows.length === 0 ? (
         emptyState ?? (

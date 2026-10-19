@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
 
 type Shortcut = { keys: string[]; label: string };
 
-export function KeyboardHintSheet() {
+export function KeyboardHintSheet({ area }: { area: "firm" | "platform" }) {
   const isOpen = useUiStore((s) => s.hintSheetOpen);
   const close = useUiStore((s) => s.closeHintSheet);
   const principal = useSignedInPrincipal();
@@ -23,7 +23,7 @@ export function KeyboardHintSheet() {
 
   const shortcuts: Shortcut[] = [
     { keys: ["⌘", "K"], label: "Open command palette" },
-    ...shortcutsFor(principal).map(({ key, route }) => ({ keys: ["g", key], label: `Go to ${route.title}` })),
+    ...shortcutsFor(principal, area).map(({ key, route }) => ({ keys: ["g", key], label: `Go to ${route.title}` })),
     { keys: ["?"], label: "Open this shortcut sheet" },
     { keys: ["Esc"], label: "Close panel / clear selection" },
   ];
