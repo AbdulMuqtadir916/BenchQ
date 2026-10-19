@@ -34,7 +34,7 @@ export const queryKeys = {
   records: { byCandidate: (firmId: string, candidateId: string) => [firmId, "records", "byCandidate", candidateId] as const },
   documents: { byCandidate: (firmId: string, candidateId: string) => [firmId, "documents", "byCandidate", candidateId] as const },
   inbox: { byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const },
-  ledger: { list: (firmId: string, params?: Params) => [firmId, "ledger", "list", params ?? {}] as const },
+  ledger: { all: (firmId: string) => [firmId, "ledger"] as const, list: (firmId: string, params?: Params) => [firmId, "ledger", "list", params ?? {}] as const },
   team: { list: (firmId: string) => [firmId, "team", "list"] as const },
 
   // not firm-scoped

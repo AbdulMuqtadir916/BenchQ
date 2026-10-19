@@ -13,7 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Tag } from "@/components/ui/tag";
 import { WORK_AUTH_LABEL, WorkAuthChip } from "@/components/app/work-auth-chip";
 
-const EMPLOYMENT_LABEL: Record<EmploymentType, string> = { C2C: "C2C", W2: "W2", TEEN99: "1099", FTE: "Full-time" };
+export const EMPLOYMENT_LABEL: Record<EmploymentType, string> = { C2C: "C2C", W2: "W2", TEEN99: "1099", FTE: "Full-time" };
 const toDate = (iso: string | null) => (iso ? format(new Date(iso), "yyyy-MM-dd") : "");
 const fromDate = (value: string) => (value ? new Date(`${value}T12:00:00Z`).toISOString() : null);
 const toNumber = (value: string) => (value.trim() === "" ? null : Number(value));

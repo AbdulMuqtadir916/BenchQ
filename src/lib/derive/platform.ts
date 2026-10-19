@@ -34,6 +34,11 @@ export function seatBlockReason(usage: Pick<FirmUsage, "seatsUsed" | "seatLimit"
   return `Your plan allows ${usage.seatLimit} seat${usage.seatLimit === 1 ? "" : "s"}; ${usage.seatsUsed} ${usage.seatsUsed === 1 ? "is" : "are"} in use.`;
 }
 
+/** The over-limit block on a new candidate (A4), word for word on the button and from the mock. */
+export function candidateBlockReason(usage: Pick<FirmUsage, "activeCandidates" | "candidateLimit">): string {
+  return `Your plan allows ${usage.candidateLimit} active candidate${usage.candidateLimit === 1 ? "" : "s"}; ${usage.activeCandidates} ${usage.activeCandidates === 1 ? "is" : "are"} active.`;
+}
+
 export type OwnerStatus =
   | { kind: "active"; name: string; email: string; userId: string; isActive: boolean }
   | { kind: "pending"; email: string; name: string | null; invite: Invite }

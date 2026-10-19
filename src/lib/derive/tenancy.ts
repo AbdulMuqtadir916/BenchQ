@@ -50,7 +50,7 @@ export function deriveFirmUsage(
   const activeUsers = data.users.filter((user) => user.firmId === firm.id && user.isActive).length;
   const reserved = data.invites.filter((invite) => invite.firmId === firm.id && isSeatReservingInvite(invite, now)).length;
   const seatsUsed = activeUsers + reserved;
-  const activeCandidates = data.candidates.filter((candidate) => candidate.firmId === firm.id && isActiveCandidate(candidate)).length;
+  const { activeCandidates } = candidateCapacity(firm, data.candidates);
   const isOverSeatLimit = seatsUsed > firm.seatLimit;
   const isOverCandidateLimit = activeCandidates > firm.candidateLimit;
   return {
@@ -64,4 +64,16 @@ export function deriveFirmUsage(
     isOverCandidateLimit,
     isOverLimit: isOverSeatLimit || isOverCandidateLimit,
   };
+}
+
+/**
+ * Room for one more active candidate (A2, A4), from the firm's candidates alone — what firm pages can
+ * read. The same numbers as `deriveFirmUsage`'s candidate half.
+ */
+export function candidateCapacity(
+  firm: { id: string; candidateLimit: number },
+  candidates: readonly Pick<Candidate, "firmId" | "status">[],
+): Pick<FirmUsage, "activeCandidates" | "candidateLimit" | "canAddCandidate"> {
+  const activeCandidates = candidates.filter((candidate) => candidate.firmId === firm.id && isActiveCandidate(candidate)).length;
+  return { activeCandidates, candidateLimit: firm.candidateLimit, canAddCandidate: activeCandidates < firm.candidateLimit };
 }

@@ -1,10 +1,10 @@
 import { arrayOf } from "@/lib/api/client";
 import { LedgerEntrySchema, type LedgerEntry } from "@/lib/schemas/analytics";
 import ledgerSeed from "./data/ledger.json";
-import { inFirm, mockResult } from "./_shared";
-import { seededAt, table } from "./db";
+import { inFirm, mockResult, newId } from "./_shared";
+import { changed, seededAt, table } from "./db";
 import { firmScoped } from "./membership";
-import { currentPrincipal } from "./auth";
+import { currentPrincipal, currentUser } from "./auth";
 import { scopeLedger } from "@/lib/auth/policy";
 import { shiftFixtureDate } from "./tenancy";
 
@@ -33,3 +33,24 @@ export const ledgerMock = firmScoped("ledger", {
     return mockResult(scopeLedger(currentPrincipal(), inFirm(allLedger, firmId)).slice(offset, offset + limit));
   },
 });
+
+/**
+ * A firm user's action, in their firm's ledger (actor = the signed-in user). Writers call it after the
+ * write itself; it marks the ledger changed.
+ */
+export function logFirmAction(entry: Pick<LedgerEntry, "firmId" | "entityType" | "entityId" | "entityLabel" | "action" | "summary">, now = new Date()): void {
+  const user = currentUser();
+  allLedger.unshift({
+    id: newId("ledger", now),
+    actorUserId: user.id,
+    actorType: "USER",
+    actorName: user.name,
+    modelId: null,
+    promptVersion: null,
+    evidenceIds: [],
+    claimState: null,
+    createdAt: now.toISOString(),
+    ...entry,
+  });
+  changed("ledger");
+}

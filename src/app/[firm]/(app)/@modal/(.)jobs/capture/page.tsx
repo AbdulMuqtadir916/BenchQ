@@ -3,7 +3,7 @@ import { ModalRoute } from "@/components/layout/modal-route";
 
 export default function CaptureJobModal() {
   return (
-    <ModalRoute className="bq-dialog-wide" labelledBy="capture-job-title">
+    <ModalRoute routeId="jobs.capture" className="bq-dialog-wide" labelledBy="capture-job-title">
       <JobCaptureForm modal />
     </ModalRoute>
   );

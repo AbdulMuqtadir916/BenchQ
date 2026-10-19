@@ -102,3 +102,21 @@ export const UpdateCandidateSchema = CandidateSchema.pick({
   employmentTypes: true,
 }).partial();
 export type UpdateCandidate = z.infer<typeof UpdateCandidateSchema>;
+
+/**
+ * New candidate (docs/04 §4.2, `POST /api/candidates`): what the intake form sends. `assignedUserId` is
+ * the BDE to assign — only a principal with `candidate.assign` may name one; a BDE's new candidate is
+ * always assigned to themself, so it lands in their own scope.
+ */
+export const CreateCandidateSchema = CandidateSchema.pick({
+  email: true,
+  phone: true,
+  workAuth: true,
+  needsSponsorship: true,
+  needsTransfer: true,
+}).extend({
+  fullName: z.string().trim().min(1, "Enter the candidate's name."),
+  primaryRole: z.string().trim().min(1, "Enter the target role."),
+  assignedUserId: z.string().nullable(),
+});
+export type CreateCandidate = z.infer<typeof CreateCandidateSchema>;
