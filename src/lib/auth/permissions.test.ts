@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Principal } from "@/lib/schemas/tenancy";
-import { can, dashboardFor, hasOwnScope, isSupportView, scopeApplications, scopeCandidates, scopeFollowupsUserId, type FirmAction } from "./permissions";
+import { can, dashboardFor, hasOwnScope, isSupportView, scopeApplications, scopeCandidates, scopeFollowupsUserId, scopeLedger, type FirmAction } from "./permissions";
 
 const firmUser = (role: "OWNER" | "MANAGER" | "BDE" | "VIEWER"): Principal => ({ kind: "firm", userId: `u_${role}`, firmId: "f", role });
 const admin: Principal = { kind: "platform", userId: "padm", role: "PLATFORM_ADMIN", support: null };
@@ -36,6 +36,9 @@ describe("scope helpers", () => {
     expect(scopeCandidates(firmUser("BDE"), candidates).map((c) => c.id)).toEqual(["c1"]);
     expect(scopeApplications(firmUser("BDE"), applications).map((a) => a.id)).toEqual(["a1"]);
     expect(scopeFollowupsUserId(firmUser("BDE"))).toBe("u_BDE");
+    const ledger = [{ id: "l1", actorUserId: "u_BDE" }, { id: "l2", actorUserId: "other" }, { id: "l3", actorUserId: null }];
+    expect(scopeLedger(firmUser("BDE"), ledger).map((e) => e.id)).toEqual(["l1"]);
+    for (const principal of [firmUser("OWNER"), firmUser("MANAGER"), firmUser("VIEWER"), support]) expect(scopeLedger(principal, ledger)).toHaveLength(3);
     expect(hasOwnScope(firmUser("BDE"))).toBe(true);
     for (const principal of [firmUser("OWNER"), firmUser("MANAGER"), firmUser("VIEWER"), support]) {
       expect(scopeCandidates(principal, candidates)).toHaveLength(2);

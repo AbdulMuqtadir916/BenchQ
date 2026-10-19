@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { useLedger } from "@/lib/hooks/use-ledger";
+import { hasOwnScope, scopeLedger } from "@/lib/auth/permissions";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { PageHeader } from "@/components/app/page-header";
 import { DataTable } from "@/components/app/data-table";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
@@ -11,13 +13,15 @@ import { ActionTag, ActorTag } from "@/components/app/ledger-tags";
 import { ClaimChip } from "@/components/app/claim-chip";
 
 export default function LedgerPage() {
+  const principal = useSignedInPrincipal();
   const ledgerQuery = useLedger({ limit: 100 });
   const [actorFilter, setActorFilter] = useState<"ALL" | LedgerEntry["actorType"]>("ALL");
 
   const rows = useMemo(() => {
-    const entries = ledgerQuery.data ?? [];
+    // The backend already scopes a BDE's ledger to their own entries (07 §2.2); the page applies the same rule.
+    const entries = scopeLedger(principal, ledgerQuery.data ?? []);
     return entries.filter((e) => actorFilter === "ALL" || e.actorType === actorFilter);
-  }, [ledgerQuery.data, actorFilter]);
+  }, [ledgerQuery.data, actorFilter, principal]);
 
   const columns = useMemo<ColumnDef<LedgerEntry, unknown>[]>(
     () => [
@@ -69,7 +73,7 @@ export default function LedgerPage() {
 
   return (
     <div className="bq-page">
-      <PageHeader title="Ledger" subtitle="Append-only audit trail. Every AI action, every state change, immutable." />
+      <PageHeader title="Ledger" subtitle={hasOwnScope(principal) ? "Your actions in the audit trail. Append-only, immutable." : "Append-only audit trail. Every AI action, every state change, immutable."} />
 
       <div className="mt-4">
         <DataTable

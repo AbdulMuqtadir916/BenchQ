@@ -70,6 +70,11 @@ export function scopeApplications<T extends { submittedByUserId: string }>(princ
   return isOwnScope(principal) ? applications.filter((application) => application.submittedByUserId === principal.userId) : [...applications];
 }
 
+/** The ledger a principal sees (07 §2.2 `ledger`: BDE `own`): a BDE, only the entries they made; everyone else the firm's. */
+export function scopeLedger<T extends { actorUserId: string | null }>(principal: Principal, entries: readonly T[]): T[] {
+  return isOwnScope(principal) ? entries.filter((entry) => entry.actorUserId === principal.userId) : [...entries];
+}
+
 /** The follow-ups to load: one person's for a BDE, the whole firm's (undefined) otherwise. */
 export function scopeFollowupsUserId(principal: Principal): string | undefined {
   return isOwnScope(principal) ? principal.userId : undefined;

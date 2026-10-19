@@ -4,6 +4,8 @@ import ledgerSeed from "./data/ledger.json";
 import { inFirm, mockResult } from "./_shared";
 import { seededAt, table } from "./db";
 import { firmScoped } from "./membership";
+import { currentPrincipal } from "./auth";
+import { scopeLedger } from "@/lib/auth/policy";
 import { shiftFixtureDate } from "./tenancy";
 
 /**
@@ -21,10 +23,13 @@ export function ledgerAt(now: Date): LedgerEntry[] {
 export const allLedger: LedgerEntry[] = table("ledger", LedgerEntrySchema, () => ledgerAt(seededAt()));
 
 export const ledgerMock = firmScoped("ledger", {
-  /** A firm's ledger: its own events only. Platform-only events (firmId null) belong to /admin/audit (Phase P). */
+  /**
+   * A firm's ledger: its own events only (platform-only events, firmId null, are /admin/audit's), in the
+   * principal's scope (07 §2.2): a BDE gets only the entries they made, before paging.
+   */
   list: (firmId: string, params?: { limit?: number; offset?: number }): Promise<LedgerEntry[]> => {
     const limit = params?.limit ?? 50;
     const offset = params?.offset ?? 0;
-    return mockResult(inFirm(allLedger, firmId).slice(offset, offset + limit));
+    return mockResult(scopeLedger(currentPrincipal(), inFirm(allLedger, firmId)).slice(offset, offset + limit));
   },
 });
