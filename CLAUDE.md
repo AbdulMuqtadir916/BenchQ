@@ -275,7 +275,7 @@ Q32, and the BDE ledger scope in P); then B, S, M. Repo snapshot: `docs/CURRENT_
 | 07 Phase B — UI completion audit (route × principal, both themes, 1440 / 1024 / 390, axe) | Planned, after C |
 | 07 Phase S — Super Admin flow polish (UI-first) | Planned, after B |
 | 07 Phase M — firm-side invite flow (OWNER invites members) | Planned, after S (Q23) |
-| System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Partly approved (Q33), not built; S2, S4, S8–S12 open |
+| System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Approved (Q33, Q34), not built |
 | Integration Module 00 B/C + Module 01 (ledger) | Can run in parallel |
 | Backend tenancy + real auth (D1/D2), 07 Phase D, then Modules 02–05 with `firmId` | Later |
 
@@ -297,5 +297,7 @@ an invite to a SUSPENDED firm is blocked and stays PENDING (Q28); the Super Admi
 stalled onboarding at 7 days, over-limit block visible-disabled-with-reason (§0's second exception) (Q29);
 "custom limits" derived from the ledger, (de)activation logs `STATE_CHANGE`, lowercase entity types (Q30);
 `Invite.inviteeName` (Q31); a Phase C slice came into P4 (Q32); system contracts' first answers — USD
-micro-dollars, reportable health checks only, firm attachment, retention (Q33).
-**Still open:** system contracts S2, S4, S8–S12 (docs/02 §3.2).
+micro-dollars, reportable health checks only, firm attachment, retention (Q33); the rest — health history
+with 7/30-day uptime, backend pricing, the AI purpose list, spend Super Admin only, no budgets yet, IST
+periods, billed failed calls count (Q34).
+**Still open:** nothing. docs/02 §3.2 is approved, not built.

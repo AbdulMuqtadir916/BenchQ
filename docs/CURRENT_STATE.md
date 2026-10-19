@@ -114,7 +114,7 @@ Mock auth, not security: real enforcement is Phase D.
 | Mocks | 26 modules in `src/mocks/`; firm-scoped calls go through `firmScoped` (membership, support-view reads, declared writes) |
 | Persistence | demo data in `localStorage` `benchq.demo-data` (`{version, seededAt, tables}`), changed tables only; `FIXTURE_VERSION` fingerprints the fixtures; Super Admin "Reset demo data" on `/admin/system`. Persisted tables: firms, users, invites, inviteTokens, credentials, supportViews, plans, platformUsers, candidates, applications, documents, inboxMessages, inboxConnections, ledger |
 | Backend | JobNavigator (FastAPI) in `backend/`; integration paused after Module 01 (CLAUDE.md, `docs/integration/`) |
-| System contracts | `HealthCheck`, `ScraperRun`, `AiUsage` in docs/02 §3.2: partly approved (07 Q33), **not built** |
+| System contracts | `HealthCheck`, `ScraperRun`, `AiUsage` in docs/02 §3.2: approved (07 Q33, Q34), **not built** |
 
 ---
 
@@ -141,5 +141,5 @@ Mock auth, not security: real enforcement is Phase D.
 | Per-route × per-principal UI audit, both themes, widths, axe | 07 Phase B |
 | Super Admin flow polish | 07 Phase S |
 | Firm-side invite flow (OWNER invites members) | 07 Phase M |
-| System contracts S2, S4, S8–S12 | docs/02 §3.2 |
+| Build the system contracts (`/admin/system`, AI spend on the overview) — approved, not built | docs/02 §3.2, 07 Q29, Q33, Q34 |
 | Backend tenancy and real auth, then Modules 02–05 | 07 Phase D, `docs/integration/` |

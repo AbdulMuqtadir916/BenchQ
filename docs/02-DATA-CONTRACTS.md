@@ -409,12 +409,12 @@ obvious reading and marked **(approved 2026-10-16)** where it appears. Tell me i
 
 ---
 
-### 3.2 System contracts — PARTLY APPROVED, NOT BUILT (2026-10-19)
+### 3.2 System contracts — APPROVED, NOT BUILT (2026-10-19)
 
-> **Status: partly approved, not built.** S1, S3, S5, S6 and S7 were answered on 2026-10-19 (07 Q33) and
-> are applied below; S2, S4 and S8–S12 are still open. **Nothing is built from it** — no schema, fixture,
-> adapter or screen. `/admin/system` stays a placeholder and AI spend stays hidden on the overview until
-> the section is fully signed off (07 Q29, docs/04 §14.9).
+> **Status: approved, not built.** Every open question (S1–S12) was answered on 2026-10-19 (07 Q33, Q34)
+> and the answers are applied below. **Nothing is built from it yet** — no schema, fixture, adapter or
+> screen; `/admin/system` stays a placeholder and AI spend stays hidden on the overview until it is built
+> (07 Q29, docs/04 §14.9).
 >
 > **Grounded in the backend** (JobNavigator, `backend/`), so the mapper has something to map:
 > `GET /health` (status + version, no DB), `scrape_log` (one row per search/company scrape:
@@ -451,8 +451,8 @@ export const HealthCheckSchema = z.object({
 });
 ```
 
-- **Retention (S7, answered):** health checks are kept **30 days**. That means checks are stored, not just
-  probed live — S2 (still open) decides what the page does with that history.
+- **History (S2) and retention (S7):** checks are stored and kept **30 days**; `/admin/system` shows each
+  component's current status and its uptime over 7 and 30 days, derived from the stored checks.
 - **`SCRAPER` reports the last run** (S1: what the backend can report): `OK` when the latest ScraperRun
   succeeded, `DEGRADED` when it was a warning, `DOWN` when it failed, `UNKNOWN` before any run; `detail`
   names the run and its time.
@@ -496,8 +496,11 @@ export const AiPurpose = z.enum([
   'JOB_SCORE_FULL',     // backend purpose "score_full"
   'JOB_SCORE_LIGHT',    // "score_light"
   'EMAIL_CLASSIFY',     // "email"
+  'RESUME_REWRITE',     // resume text rewrite: the studio's "Ask AI"
+  'RESUME_PARSE',       // resume parsing on upload
+  'JOB_PARSE',          // job description parsing on capture
   'OTHER',
-]);                     // S8: the full list, and whether OTHER is allowed
+]);                     // S8 (answered, 07 Q34): this list, OTHER allowed
 
 export const AiUsageSchema = z.object({
   id: z.string(),
@@ -512,7 +515,8 @@ export const AiUsageSchema = z.object({
   cacheWriteTokens: z.number().int().nonnegative(),
   /**
    * Cost in **micro-US-dollars** (1 USD = 1,000,000), an integer, so sums never drift (S3, answered: USD,
-   * whole micro-dollars; the backend stores a float `cost_usd`, the mapper converts). S4 (open): who prices it.
+   * whole micro-dollars; the backend stores a float `cost_usd`, the mapper converts). S4 (answered): the
+   * backend prices each call at call time from the provider's price list; the frontend never prices.
    */
   costMicroUsd: z.number().int().nonnegative(),
   /** The run this call belongs to (AgentDraft.runId), if any. */
@@ -530,28 +534,28 @@ export const AiUsageSchema = z.object({
 
 | Value | Definition |
 |---|---|
-| Spend in a period | sum of `costMicroUsd` over the period's rows (whether failed calls count is S12, open) |
+| Spend in a period | sum of `costMicroUsd` over the period's rows; failed calls count when the provider billed them (S12). Periods ("this month") are IST calendar periods (S11) |
 | Spend by firm | the same, grouped by `firmId` (always set, S6) |
 | Spend by model | grouped by `modelId` |
 | Tokens by purpose | sums of the four token counts, grouped by `purpose` |
 | Scraper health | the `SCRAPER` rule above (the last run) |
 
-#### Questions for sign-off — S1, S3, S5, S6, S7 answered (07 Q33); the rest open
+#### Questions for sign-off — all answered (07 Q33, Q34)
 
 | # | Question | Draft default |
 |---|---|---|
 | S1 | Which health components exist? | **Answered (07 Q33):** only what the backend can report — `API`, `DATABASE`, `SCRAPER` (last run), `LLM_PROVIDER` (reachability). Nothing invented |
-| S2 | Keep health history (for uptime over time), or current state only? | **Open.** Draft default now: keep the 30 days S7 retains and show uptime over 7 / 30 days per component (S7's 30-day retention implies checks are stored) |
+| S2 | Keep health history (for uptime over time), or current state only? | **Answered (07 Q34):** keep the 30 days S7 retains; show uptime over 7 and 30 days per component |
 | S3 | Currency and unit for AI cost | **Answered (07 Q33):** USD, stored as whole micro-dollars |
-| S4 | Who prices a call: the backend at call time (provider price list), or the frontend from a price table? | the backend, at call time; the frontend never prices |
+| S4 | Who prices an AI call? | **Answered (07 Q34):** the backend, at call time, from the provider's price list; the frontend never prices |
 | S5 | Are scrapes firm-scoped or platform-wide? | **Answered (07 Q33):** `firmId` when the run was for a firm; null for a shared run |
 | S6 | Can an AI call have no firm? | **Answered (07 Q33):** no — every AI usage row carries `firmId` (required) |
 | S7 | Retention | **Answered (07 Q33):** AI usage 13 months; scraper runs 90 days; health checks 30 days |
-| S8 | The full list of AI purposes; is `OTHER` acceptable? | the five above |
-| S9 | Is AI spend ever shown to a firm (its own usage), or Super Admin only? | Super Admin only |
-| S10 | Budgets or alerts (e.g. a firm over X dollars a month) — in scope now? | not now |
-| S11 | Time zone for period boundaries ("this month"): IST, UTC? | IST, like the rest of the admin area |
-| S12 | Do failed AI calls count in spend? | yes, when the provider billed them |
+| S8 | The full list of AI purposes; is `OTHER` acceptable? | **Answered (07 Q34):** resume tailoring, full job scoring, light job scoring, email classification, resume text rewrite (studio "Ask AI"), resume parsing (upload), job description parsing (capture), and `OTHER` |
+| S9 | Is AI spend ever shown to a firm? | **Answered (07 Q34):** no — Super Admin only |
+| S10 | Budgets or alerts now? | **Answered (07 Q34):** not now |
+| S11 | Time zone for period boundaries | **Answered (07 Q34):** IST, like the rest of the admin area |
+| S12 | Do failed AI calls count in spend? | **Answered (07 Q34):** yes, when the provider billed them |
 
 ## 4. Candidate
 
