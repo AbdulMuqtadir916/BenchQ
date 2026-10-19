@@ -35,8 +35,8 @@ export function seatBlockReason(usage: Pick<FirmUsage, "seatsUsed" | "seatLimit"
 
 export type OwnerStatus =
   | { kind: "active"; name: string; email: string; userId: string; isActive: boolean }
-  | { kind: "pending"; email: string; invite: Invite }
-  | { kind: "expired"; email: string; invite: Invite }
+  | { kind: "pending"; email: string; name: string | null; invite: Invite }
+  | { kind: "expired"; email: string; name: string | null; invite: Invite }
   | { kind: "none" };
 
 /** The firm's one OWNER (A10): the user, else the latest owner invite that is pending or expired. */
@@ -48,7 +48,7 @@ export function ownerStatus(firmId: string, data: Pick<PlatformData, "users" | "
     .filter((item) => ["PENDING", "EXPIRED"].includes(effectiveInviteStatus(item, now)))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (!invite) return { kind: "none" };
-  return effectiveInviteStatus(invite, now) === "PENDING" ? { kind: "pending", email: invite.email, invite } : { kind: "expired", email: invite.email, invite };
+  return effectiveInviteStatus(invite, now) === "PENDING" ? { kind: "pending", email: invite.email, name: invite.inviteeName, invite } : { kind: "expired", email: invite.email, name: invite.inviteeName, invite };
 }
 
 const newestFirst = (a: LedgerEntry, b: LedgerEntry) => b.createdAt.localeCompare(a.createdAt);

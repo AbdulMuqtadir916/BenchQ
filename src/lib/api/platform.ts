@@ -5,7 +5,7 @@ import type { Invite, Plan, PlatformUser } from "@/lib/schemas/tenancy";
 
 const mock = () => import("@/mocks/platform").then((m) => m.platformMock);
 
-/** docs/04 §14.4 Create firm. The owner's name goes in the ledger: an invite carries no name (docs/02 §3.1). */
+/** docs/04 §14.4 Create firm. The owner's name becomes the invite's `inviteeName` (07 Q31). */
 export interface CreateFirmInput {
   name: string;
   slug: string;

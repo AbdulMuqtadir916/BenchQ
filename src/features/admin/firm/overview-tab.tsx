@@ -94,6 +94,7 @@ function Overview({ detail }: { detail: FirmDetail }) {
         ) : (
           <div className="space-y-3">
             <dl className="divide-y divide-[var(--color-border)]">
+              <Row label="Name">{owner.name ?? <span className="text-[var(--color-text-3)]">Not given</span>}</Row>
               <Row label="Email">{owner.email}</Row>
               <Row label="Status">
                 {owner.kind === "pending" ? (

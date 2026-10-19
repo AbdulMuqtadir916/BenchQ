@@ -156,6 +156,7 @@ function InvitesTable({ rows, usage, nameOf }: { rows: InviteRow[]; usage: FirmU
   const blocked = usage.canAddSeat ? null : seatBlockReason(usage);
   const columns = useMemo<ColumnDef<InviteRow, unknown>[]>(
     () => [
+      { id: "name", header: "Name", enableSorting: false, cell: ({ row }) => row.original.invite.inviteeName ?? <span className="text-[var(--color-text-3)]">—</span> },
       { id: "email", header: "Email", enableSorting: false, cell: ({ row }) => <span className="text-[var(--color-text)]">{row.original.invite.email}</span> },
       { id: "role", header: "Role", enableSorting: false, cell: ({ row }) => (row.original.invite.role === "PLATFORM_ADMIN" ? "Super Admin" : ROLE_LABEL[row.original.invite.role]) },
       { id: "sentBy", header: "Sent by", enableSorting: false, cell: ({ row }) => nameOf(row.original.invite.invitedByUserId) },

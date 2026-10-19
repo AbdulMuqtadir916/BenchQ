@@ -99,11 +99,12 @@ function done<T>(value: T, ...tables: TableName[]): Promise<T> {
 }
 
 
-function sendInvite(input: { firmId: string | null; email: string; role: Invite["role"]; label: string }, now: Date): Invite {
+function sendInvite(input: { firmId: string | null; email: string; inviteeName: string | null; role: Invite["role"]; label: string }, now: Date): Invite {
   const invite: Invite = {
     id: newId("inv", now),
     firmId: input.firmId,
     email: input.email,
+    inviteeName: input.inviteeName,
     role: input.role,
     invitedByUserId: currentPlatformUser().id,
     status: "PENDING",
@@ -149,8 +150,8 @@ export const platformMock = {
       };
       firms.push(firm);
       log({ firmId: firm.id, entityType: ENTITY.firm, entityId: firm.id, entityLabel: firm.name, action: "FIRM_CREATED", summary: `Created firm on ${plan.name} (${limitsText(plan)})` }, now);
-      // The invite carries no name (docs/02 §3.1): the owner sets theirs on accepting. The ledger keeps it.
-      sendInvite({ firmId: firm.id, email, role: "OWNER", label: `Invited ${ownerName} (${email}) as OWNER` }, now);
+      // 07 Q31: the name is prefilled on /invite/[token]; the owner may change it when accepting.
+      sendInvite({ firmId: firm.id, email, inviteeName: ownerName, role: "OWNER", label: `Invited ${ownerName} (${email}) as OWNER` }, now);
       return done(firm, "firms", "invites");
     },
 
@@ -347,7 +348,7 @@ export const platformMock = {
     invite: (email: string, now = new Date()): Promise<Invite> => {
       const address = checkEmail(email);
       checkEmailFree(address, now);
-      const invite = sendInvite({ firmId: null, email: address, role: "PLATFORM_ADMIN", label: `Invited ${address} to the platform team` }, now);
+      const invite = sendInvite({ firmId: null, email: address, inviteeName: null, role: "PLATFORM_ADMIN", label: `Invited ${address} to the platform team` }, now);
       return done(invite, "invites");
     },
 

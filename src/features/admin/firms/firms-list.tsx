@@ -53,8 +53,8 @@ const SORTS: Record<z.infer<typeof FirmsQuery>["sort"], { label: string; compare
 
 function OwnerCell({ owner }: { owner: OwnerStatus }) {
   if (owner.kind === "active") return <span className="text-[var(--color-text)]">{owner.name}</span>;
-  if (owner.kind === "pending") return <span className="text-[var(--color-text-3)]">Invite pending</span>;
-  if (owner.kind === "expired") return <span className="text-[var(--color-warning-fg)]">Invite expired</span>;
+  if (owner.kind === "pending") return <span className="text-[var(--color-text-3)]">{owner.name ? `${owner.name} · ` : ""}Invite pending</span>;
+  if (owner.kind === "expired") return <span className="text-[var(--color-warning-fg)]">{owner.name ? `${owner.name} · ` : ""}Invite expired</span>;
   return <span className="text-[var(--color-text-3)]">—</span>;
 }
 
