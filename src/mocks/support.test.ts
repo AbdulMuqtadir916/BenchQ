@@ -50,7 +50,7 @@ describe("start", () => {
     expect(session.principal).toMatchObject({ kind: "platform", support: { firmId: "firm_hts", reason: REASON } });
     expect(session.firm?.id).toBe("firm_hts");
     expect((await m.candidates.list("firm_hts")).length).toBeGreaterThan(0);
-    await expect(m.applications.updateStatus("firm_hts", "app_001", "INTERVIEW")).rejects.toMatchObject({ status: 403, message: "A support view is read-only." });
+    await expect(m.applications.updateStatus("firm_hts", "app_001", { status: "INTERVIEW", note: null })).rejects.toMatchObject({ status: 403, message: "A support view is read-only." });
     await expect(m.candidates.list("firm_stl")).rejects.toMatchObject({ status: 404 }); // another firm stays closed
     expect(m.ledger[0]).toMatchObject({ action: "ADMIN_ACCESS", firmId: "firm_hts", actorType: "PLATFORM_ADMIN", actorName: "Sana Mirza", entityType: "support_view", summary: `Support view started: ${REASON}` });
     expect(JSON.stringify(m.ledger[0])).not.toContain("sana@"); // the firm never sees the admin's email (A12)

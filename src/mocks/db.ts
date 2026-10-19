@@ -212,6 +212,19 @@ function ensureWatching(): void {
   });
 }
 
+/**
+ * Take the stored data if it is newer than this tab's (another tab saved, and its storage event hasn't
+ * arrived yet). Returns true when the tables changed. Unsaved changes in this tab are saved first.
+ */
+export function syncFromStorage(): boolean {
+  flush();
+  const stored = readSnapshot();
+  if (!stored || JSON.stringify(stored.tables) === JSON.stringify(current().tables)) return false;
+  reload(stored);
+  notify();
+  return true;
+}
+
 /** Call `onChange` after the data changed underneath this tab (another tab's change, or a reset). */
 export function watchDemoData(onChange: () => void): () => void {
   ensureWatching();

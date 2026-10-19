@@ -4,7 +4,7 @@ import type { Principal, PlatformUser } from "@/lib/schemas/tenancy";
 import type { Firm, User } from "@/lib/schemas/session";
 import { allUsers, firms } from "./team-data";
 import { platformUsers } from "./tenancy";
-import { changed, table } from "./db";
+import { changed, flush, syncFromStorage, table } from "./db";
 import { activeSupportView, asContract } from "./support-data";
 
 /**
@@ -106,6 +106,9 @@ function signedInAccount(): { kind: "firm"; user: User } | { kind: "platform"; a
   if (admin?.isActive) return { kind: "platform", admin };
   const user = allUsers.find((item) => item.id === id);
   if (user?.isActive) return { kind: "firm", user };
+  // Unknown here, but maybe just created in another tab whose data change hasn't reached this tab yet
+  // (the session is shared, Q27): re-read the stored data before deciding the account is gone.
+  if (syncFromStorage()) return signedInAccount();
   writeSession(null);
   return null;
 }
@@ -159,8 +162,12 @@ export function signInWithPassword(email: string, password: string): Principal {
   return currentPrincipal();
 }
 
-/** Sign an account in without a password: right after it accepted an invite (07 P4). */
+/**
+ * Sign an account in without a password: right after it accepted an invite (07 P4). The new account is
+ * saved first, so another tab that sees the session change already has the account to find.
+ */
 export function startSession(accountId: string): Principal {
+  flush();
   writeSession(accountId);
   return currentPrincipal();
 }

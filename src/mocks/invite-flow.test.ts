@@ -18,7 +18,7 @@ const T0 = "2026-10-19T09:00:00.000Z";
 const NOW = new Date(T0);
 const DAY = 86_400_000;
 const SANA = "sana@admin.benchq.test";
-type Globals = { __BENCHQ_DEMO_STORAGE__?: Storage | null; __BENCHQ_DEMO_NOW__?: string };
+type Globals = { __BENCHQ_DEMO_STORAGE__?: Storage | null; __BENCHQ_DEMO_NOW__?: string; window?: unknown };
 const g = globalThis as Globals;
 
 async function load(email: string | null = null) {
@@ -40,6 +40,7 @@ beforeEach(() => {
 afterEach(() => {
   delete g.__BENCHQ_DEMO_STORAGE__;
   delete g.__BENCHQ_DEMO_NOW__;
+  delete g.window;
 });
 
 const newFirm = {
@@ -142,3 +143,21 @@ describe("a staff invite", () => {
     expect(m.ledger[0]).toMatchObject({ action: "INVITE_ACCEPTED", firmId: null, actorType: "PLATFORM_ADMIN" });
   });
 });
+
+describe("another tab open while someone accepts (the session is shared, Q27)", () => {
+  it("the other tab finds the new account instead of ending the shared session", async () => {
+    // One browser: the demo data and the session cookie stand-in share one localStorage; each tab has its own modules.
+    const storage = new StubStorage();
+    g.__BENCHQ_DEMO_STORAGE__ = storage as unknown as Storage;
+    g.window = Object.assign(new EventTarget(), { localStorage: storage });
+    const tabA = await load(null);
+    const tabB = await load(null); // loaded before the accept: its tables don't have the new user yet
+    const { tokenForInvite } = await import("./invite-tokens");
+    await tabA.flow.accept(tokenForInvite("inv_gsc_owner")!, { name: "Sunita Rao", password: "sunita-2026" }, NOW);
+    // Tab B hears about the session first (it was written last, but B reads it before its data event arrives).
+    expect(tabB.auth.isSignedIn()).toBe(true);
+    expect(storage.getItem("benchq.session")).not.toBeNull();
+    expect(tabB.users.some((user) => user.email === "owner@gachibowli-staffing.benchq.test")).toBe(true);
+  });
+});
+
