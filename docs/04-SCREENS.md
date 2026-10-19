@@ -846,7 +846,8 @@ runs carry `firmId` (A17), but no approved field records cost or tokens.
 P3 builds `/admin/system` as a placeholder page ("Being specified") holding the **Reset demo data** card
 (docs/03 §3.3, moved from the `/admin` placeholder); AI spend stays hidden on the overview. Three contracts
 are drafted for sign-off separately — `HealthCheck`, `ScraperRun`, `AiUsage` (firmId, model, tokens in/out,
-cost, run reference, timestamp) — and the page is built after approval.
+cost, run reference, timestamp) — and the page is built after approval. The drafts and their open questions
+(S1–S12) are in `docs/02` §3.2.
 
 ## 14.10 Support view
 
