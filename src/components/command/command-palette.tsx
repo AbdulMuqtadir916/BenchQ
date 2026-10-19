@@ -10,6 +10,7 @@ import {
   Search,
   UserCircle,
   Building2,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 import { useUiStore } from "@/lib/stores/ui-store";
@@ -18,18 +19,21 @@ import type { Principal } from "@/lib/schemas/tenancy";
 import { canOpen, paletteRoutesFor, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { usePaletteRecords } from "@/lib/hooks/use-palette-records";
+import { usePlatformFirms } from "@/lib/hooks/use-platform";
 import { cn } from "@/lib/cn";
 import { CONTENT_EXIT, EASE_OUT, SPRING_PANEL } from "@/lib/motion";
 
 /**
- * CommandPalette — docs/04 §1.2.
- * Wired to search real candidates and jobs.
+ * CommandPalette — docs/04 §1.2, §14.1. In the firm area: the firm's candidates, jobs, actions and
+ * pages the principal can open (a support view: only reads — no "New candidate", no "Capture job").
+ * In the admin shell: admin pages, every firm by name or slug, and "View workspace of {firm}", which
+ * asks for the support-view reason. Never firm commands outside a firm, never admin pages inside one.
  */
 
 interface Command {
   id: string;
   label: string;
-  group: "Actions" | "Navigation" | "Candidates" | "Jobs";
+  group: "Actions" | "Navigation" | "Candidates" | "Jobs" | "Firms";
   icon: LucideIcon;
   keywords?: string;
   /** Registry id of the page this command opens; hidden from principals that can't open it. */
@@ -68,9 +72,9 @@ const STATIC_COMMANDS: Command[] = [
 ];
 
 /** Actions the principal can open plus one Navigation entry per palette route in the registry. */
-function staticCommandsFor(principal: Principal): Command[] {
-  const actions = STATIC_COMMANDS.filter((command) => !command.routeId || canOpen(routeById(command.routeId), principal));
-  const navigation = paletteRoutesFor(principal).map<Command>((route) => ({
+function staticCommandsFor(principal: Principal, area: "firm" | "platform"): Command[] {
+  const actions = area === "firm" ? STATIC_COMMANDS.filter((command) => !command.routeId || canOpen(routeById(command.routeId), principal)) : [];
+  const navigation = paletteRoutesFor(principal, area).map<Command>((route) => ({
     id: `nav-${route.id}`,
     group: "Navigation",
     label: route.id.startsWith("settings.") ? `Settings · ${route.title}` : route.title,
@@ -86,7 +90,7 @@ export function useCommandPalette() {
   return { open, close };
 }
 
-export function CommandPalette() {
+export function CommandPalette({ area }: { area: "firm" | "platform" }) {
   const router = useRouter();
   const toHref = useHref();
   const isOpen = useUiStore((s) => s.commandPaletteOpen);
@@ -108,9 +112,31 @@ export function CommandPalette() {
   const records = usePaletteRecords();
   const reduceMotion = useReducedMotion() ?? false;
   const principal = useSignedInPrincipal();
+  const openSupportDialog = useUiStore((s) => s.openSupportDialog);
+  const firms = usePlatformFirms({ enabled: area === "platform" && principal.kind === "platform" });
 
   const results = useMemo(() => {
     const dynamicCommands: Command[] = [];
+
+    // Admin shell: every firm, by name or slug (docs/04 §14.1).
+    for (const firm of area === "platform" ? (firms.data ?? []) : []) {
+      dynamicCommands.push({
+        id: `firm-${firm.id}`,
+        group: "Firms",
+        label: firm.name,
+        icon: Building2,
+        keywords: firm.slug,
+        run: (r, toHref) => r.push(toHref("admin.firms.detail", { firmId: firm.id })),
+      });
+      dynamicCommands.push({
+        id: `firm-view-${firm.id}`,
+        group: "Actions",
+        label: `View workspace of ${firm.name}`,
+        icon: Eye,
+        keywords: `${firm.slug} support view`,
+        run: () => openSupportDialog({ id: firm.id, slug: firm.slug, name: firm.name }),
+      });
+    }
     
     records.candidates.forEach(c => {
       dynamicCommands.push({
@@ -134,14 +160,14 @@ export function CommandPalette() {
       });
     });
 
-    const allCommands = [...staticCommandsFor(principal), ...dynamicCommands];
+    const allCommands = [...staticCommandsFor(principal, area), ...dynamicCommands];
     
     const q = query.trim().toLowerCase();
     if (!q) return allCommands.slice(0, 50); // limit empty state
     return allCommands.filter((c) =>
       `${c.label} ${c.keywords ?? ""}`.toLowerCase().includes(q),
     ).slice(0, 50);
-  }, [query, principal, records.candidates, records.jobs]);
+  }, [query, principal, area, records.candidates, records.jobs, firms.data, openSupportDialog]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, Command[]> = {};

@@ -25,6 +25,9 @@ export type FirmAction =
   | "outreach.act"
   | "followup.act";
 
+/** Every firm action, for tests that walk them all. */
+export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act"];
+
 /** Not an action: whether the person sees the team (owner and assignments) on firm pages (Q15). */
 export type FirmVisibility = "team.view";
 

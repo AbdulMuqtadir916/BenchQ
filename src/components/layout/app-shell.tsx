@@ -44,7 +44,7 @@ export function AppShell({ children, modal, variant = "firm" }: { children: Reac
         </main>
       </div>
       </div>
-      <CommandPalette />
+      <CommandPalette area={area} />
       <KeyboardHintSheet area={area} />
       <ToastViewport />
       {modal}

@@ -12,7 +12,7 @@ import { queryKeys } from "@/lib/query/keys";
 
 const k = queryKeys.platform;
 
-export const usePlatformFirms = () => useQuery({ queryKey: k.firms(), queryFn: () => platformApi.firms.list() });
+export const usePlatformFirms = (options: { enabled?: boolean } = {}) => useQuery({ queryKey: k.firms(), queryFn: () => platformApi.firms.list(), enabled: options.enabled ?? true });
 export const usePlatformFirm = (firmId: string) => useQuery({ queryKey: k.firm(firmId), queryFn: () => platformApi.firms.get(firmId), retry: (count, error) => !isNotFound(error) && count < 2 });
 export const usePlatformUsers = (firmId?: string) => useQuery({ queryKey: k.users(firmId), queryFn: () => platformApi.users.list(firmId) });
 export const usePlatformInvites = (firmId?: string | null) => useQuery({ queryKey: k.invites(firmId), queryFn: () => platformApi.invites.list(firmId) });

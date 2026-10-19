@@ -2,7 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ROLES, ROUTES, accessFor, accessForPath, activeNavId, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, routeById, shortcutsFor, supportAccess, type Access, type RouteId } from "./registry";
+import { ROLES, ROUTES, accessFor, accessForPath, activeNavId, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, paletteRoutesFor, routeById, shortcutsFor, supportAccess, type Access, type RouteId } from "./registry";
 import { RESERVED_SLUGS } from "@/lib/schemas/tenancy";
 import type { FirmRole } from "@/lib/schemas/enums";
 import type { Principal } from "@/lib/schemas/tenancy";
@@ -389,6 +389,28 @@ describe("admin nav and keys (docs/04 §14.1)", () => {
     expect(activeNavId(nav, "/admin/firms/firm_hts/plan")).toBe("admin.firms");
     expect(activeNavId(nav, "/admin/audit?firm=firm_hts")).toBe("admin.audit");
     expect(activeNavId(nav, "/admin/nope")).toBeNull();
+  });
+});
+
+describe("⌘K navigation by area (P5, docs/04 §14.1)", () => {
+  const ids = (principal: Principal, area: "firm" | "platform") => paletteRoutesFor(principal, area).map((route) => route.id).sort();
+
+  it("a platform admin in the admin shell: the admin pages, nothing of a firm", () => {
+    expect(ids(admin, "platform")).toEqual(["admin", "admin.audit", "admin.firms", "admin.plans", "admin.system", "admin.team"]);
+    expect(ids(admin, "firm")).toEqual([]);
+  });
+
+  it("inside a support view: only firm pages it can open (read), no admin pages, no personal ones", () => {
+    const pages = ids(inSupport, "firm");
+    expect(pages).toContain("dashboard");
+    expect(pages).toContain("ledger");
+    expect(pages).not.toContain("settings.preferences"); // personal: none in a support view
+    expect(pages.every((id) => !id.startsWith("admin"))).toBe(true);
+    for (const id of pages) expect(accessFor(routeById(id), inSupport), id).toBe("read");
+  });
+
+  it("a firm user never gets admin pages", () => {
+    for (const role of ROLES) expect(ids(asRole(role), "platform"), role).toEqual([]);
   });
 });
 

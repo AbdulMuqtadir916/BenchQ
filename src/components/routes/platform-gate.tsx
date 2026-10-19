@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { hrefFor } from "@/lib/routes/registry";
 import { useIsSessionSettling, useSession } from "@/lib/stores/session-store";
+import { platformOutcome } from "@/lib/tenancy/platform-outcome";
 import { GateScreen, GateSkeleton } from "./gate-screen";
 
 /**
@@ -21,14 +22,14 @@ export function PlatformGate({ children }: { children: ReactNode }) {
   const isHydrated = useSyncExternalStore(subscribeNever, () => true, () => false);
   const principal = useSession((s) => s.principal);
   const isSessionPending = useIsSessionSettling();
-  const isSignedOut = isHydrated && principal === null && !isSessionPending;
+  const outcome = platformOutcome(principal, { isHydrated, isSettling: isSessionPending });
 
   useEffect(() => {
-    if (isSignedOut) router.replace(hrefFor("sign-in", {}, { returnTo: `${window.location.pathname}${window.location.search}` }));
-  }, [isSignedOut, router]);
+    if (outcome === "sign-in") router.replace(hrefFor("sign-in", {}, { returnTo: `${window.location.pathname}${window.location.search}` }));
+  }, [outcome, router]);
 
-  if (!isHydrated || isSessionPending || principal === null) return <GateSkeleton label={isSignedOut ? "Opening sign-in" : "Opening admin"} />;
-  if (principal.kind !== "platform") {
+  if (outcome === "waiting" || outcome === "sign-in") return <GateSkeleton label={outcome === "sign-in" ? "Opening sign-in" : "Opening admin"} />;
+  if (outcome === "not-found") {
     return (
       <GateScreen>
         <NotFoundState />
