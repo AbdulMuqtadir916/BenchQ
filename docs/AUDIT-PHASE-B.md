@@ -16,7 +16,7 @@ at the end refer to those IDs.
 | Severity | Meaning | Count |
 |---|---|---|
 | **Blocks use** | the screen claims to do something it doesn't; work is lost | 2 |
-| **Wrong behaviour** | differs from the spec or a CLAUDE.md rule; the user can work around it | 25 |
+| **Wrong behaviour** | differs from the spec or a CLAUDE.md rule; the user can work around it | 26 |
 | **Cosmetic** | looks or reads wrong; behaviour is correct | 6 |
 
 ## Method
@@ -58,7 +58,7 @@ less on them, so their cells in §2 record access, scope and the controls offere
 | W4 | Wrong behaviour | `focus` | OWNER, MANAGER, BDE | No loading or error state: while the query loads the page says "Assign a candidate…" (the empty state) | Add skeleton and error branches before the empty one |
 | W5 | Wrong behaviour | `outreach` | all with access | Thread list has no skeleton and no empty state (known, 07 Phase B) | Add the list skeleton and an empty state ("No threads yet") |
 | W6 | Wrong behaviour | `analytics` | OWNER, MANAGER, VIEWER, support view | No empty state: a period with no events shows empty charts | Add an empty state per chart group (docs/04 §13 pattern) |
-| W7 | Wrong behaviour | `settings/firm` | OWNER, support view | "Shift window" and "Default follow-up cadence" are hardcoded strings, not from the firm | Read them from the firm, or show "Not set" until the contract has them; the full settings UI is a known gap |
+| W7 | Wrong behaviour | `settings/firm` | OWNER, support view | "Shift window" and "Default follow-up cadence" are hardcoded strings, not from the firm | Show "Not set" now (never an invented value); read the fields once the docs/02 §3.3 draft is approved |
 | W8 | Wrong behaviour | `settings/templates` | OWNER, MANAGER, support view | Static placeholder; no templates are listed or editable (known: full settings UIs) | Build after its docs/04 spec; until then label it "Coming soon" instead of fake rows |
 | W9 | Wrong behaviour | `welcome` | OWNER (first run) | One card, not the 4-step wizard in docs/04 §2.2 | Build steps 1, 3 and 4 now; step 2 (invite the team) waits for Phase M |
 | W10 | Wrong behaviour | `sign-in` | signed out | "Forgot password?" is `href="#"`; the forgot-password confirmation state in §2.1 is missing | Add the confirmation state (mock: always "If the email exists, we've sent a link") |
@@ -82,6 +82,7 @@ less on them, so their cells in §2 record access, scope and the controls offere
 | C3 | Cosmetic | firm routes | Super Admin (no support view) | The "start a support view" interstitial keeps the page's tab title | Title it "Support view required · BenchQ" |
 | C4 | Cosmetic | `ledger` | all with access | A dangling `·` when `promptVersion` is null (known) | Join the parts that exist with the separator |
 | C5 | Cosmetic | `candidates` | all, 390 px | Search box squeezed to a few characters (known) | Search on its own row below `md` |
+| W26 | Wrong behaviour | `sign-in` | every signed-in principal | The form renders for someone already signed in (decided 07 Q35: redirect) | Redirect to `signInTarget` (the landing, or `returnTo` when the account can open it) |
 | C6 | Cosmetic | many lists (meta lines) | all | The `·` separators measure 1.28 light / 1.6 dark | Separators are decorative: mark them `aria-hidden` and give them `text-3` with the W21 fix |
 
 ### Not confirmed
@@ -89,8 +90,6 @@ less on them, so their cells in §2 record access, scope and the controls offere
 - **Busy indicators after 1.8 s** on `applications`, `applications/[id]` and `candidates/[id]` in the iframe
   sweep. They may be the mock delay plus cold iframes rather than stuck queries; it wasn't reproduced
   in the top window. Re-check with axe/Playwright timing (§6) before treating it as a finding.
-- **`/sign-in` while signed in** renders the form with no note. Not in the spec either way. Proposed:
-  redirect to the landing, as `/` does. Needs a product call (it could be a way to switch accounts).
 
 ---
 
@@ -109,7 +108,7 @@ interstitial to start a support view (spec) · **NF** not-found (spec) · an **I
 | Route | OWNER | MANAGER | BDE | VIEWER | Support view | Super Admin | Signed out |
 |---|---|---|---|---|---|---|---|
 | `/` | L | L | L | L | L | L (`/admin`) | S |
-| `/sign-in` | ✓ (form; see "Not confirmed") | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ · W10 |
+| `/sign-in` | W26 | W26 | W26 | W26 | W26 | W26 | ✓ · W10 |
 | `/invite/[token]` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (all link states: P4 tests) |
 
 ### Firm tier (`/hyderabad-tech-staffing/…`)
@@ -268,7 +267,7 @@ the main issue found), and `@axe-core/react` (dev-time console only, not a gate)
    hide content. The same harness can then settle the "busy indicator" question in §1.
 
 That's 7 principals × ~30 routes × 3 widths × 2 themes, about 1,000 scans. Run it locally and before
-merging UI PRs; it doesn't go in `pnpm test` (Vitest stays fast). Adding it is its own PR (PR 7 below).
+merging UI PRs; it doesn't go in `pnpm test` (Vitest stays fast). Adding it is its own PR (PR 7 below), just before the contrast fix (PR 8), so the fix is measured by axe, not estimated.
 
 ---
 
@@ -284,17 +283,17 @@ Small PRs, one concern each, in the order I'd do them. Each closes the IDs liste
 | 4 | **Tab titles**: not-found, design-system in prod, support interstitial | C1, C2, C3 | One helper; cheap |
 | 5 | **URL state**: filters, tabs, search to `useUrlState` + Zod | W11 | CLAUDE.md rule; touches many screens, so it goes before keyboard work on the same lists |
 | 6 | **Keyboard**: one shortcut table, `?` sheet from it, Esc back, J/K hook on every list, N, T/A/O | W12–W16 | Builds on 5 (lists settle) |
-| 7 | **axe tooling** (§6), then **contrast tokens** (`text-3`, inactive tabs, dark badge, timer, separators) with axe confirming | W21–W24, C6 | Token change in `design.md` first (needs your OK as a design-token change), axe as the gate |
-| 8 | **Responsive**: sidebar collapse at 1024, drawer at 768–1023, 390 grid/nav fixes, kanban → list, candidates search row | W17–W20, C5 | Shell-level change; after 6 so the drawer gets keyboard paths from the shared table |
-| 9 | **Ledger**: filters (URL), diff expander, `·` join | W25, C4 | Self-contained; known gap |
-| 10 | **Sign-in**: forgot-password confirmation state | W10 | Small, but mock-only copy; spec exists (§2.1) |
-| 11 | **Settings and welcome**: settings/firm fields, templates, welcome wizard steps 1/3/4 | W7, W8, W9 | Spec-heavy; may need docs/04 detail first. Step 2 and the team invite controls wait for Phase M |
+| 7 | **axe tooling** (§6): `@playwright/test` + `@axe-core/playwright`, a separate `pnpm e2e` suite; lands reporting the current violations as its baseline | — (measures W21–W24, C6) | Decided: before the contrast fix, so that fix is measured, not estimated |
+| 8 | **Contrast tokens**: propose the `text-3` change in `design.md` (and `text-2` for inactive tabs where needed), dark badge, timer, separators; axe from PR 7 confirms | W21–W24, C6 | Decided: propose the token change in this PR |
+| 9 | **Responsive**: sidebar collapse at 1024, drawer at 768–1023, 390 grid/nav fixes, kanban → list, candidates search row | W17–W20, C5 | Shell-level change; after 6 so the drawer gets keyboard paths from the shared table |
+| 10 | **Ledger**: filters (URL), diff expander, `·` join | W25, C4 | Self-contained; known gap |
+| 11 | **Sign-in**: redirect when signed in (Q35), forgot-password confirmation state | W26, W10 | Small; spec exists (§2.1) |
+| 12 | **Settings and welcome**: settings/firm shows "Not set" for shift window and cadence (fields once docs/02 §3.3 is approved), templates, welcome wizard steps 1/3/4 | W7, W8, W9 | Spec-heavy; may need docs/04 detail first. Step 2 and the team invite controls wait for Phase M |
 
-Questions before the fix PRs (none block PRs 1–6):
+Answers (2026-10-19, product owner):
 
-- **PR 7:** changing `text-3` (or using `text-2` for table headers and inactive tabs) is a `design.md` token
-  change. OK to propose it in that PR?
-- **"Not confirmed": `/sign-in` while signed in** — redirect to the landing, or keep it as a way to switch
-  accounts?
-- **W7:** shift window and follow-up cadence aren't on the `Firm` contract. Show "Not set" for now, or add
-  them to docs/02 (needs sign-off)?
+- **Contrast:** propose the `text-3` token change in `design.md` (PR 8), with the axe tooling in the PR just before it (PR 7).
+- **`/sign-in` while signed in:** redirect to the landing page, `returnTo` still honoured if the account can open it. Switching
+  accounts = Sign out from the user menu first. Recorded as 07 Q35; finding W26, PR 11.
+- **Shift window and follow-up cadence:** drafted as `Firm` fields in docs/02 §3.3 for sign-off (defaults 18:30–00:30 in the
+  firm's primary timezone; day-3 LinkedIn / day-7 email). Until approved, `settings/firm` shows "Not set", never invented values.
