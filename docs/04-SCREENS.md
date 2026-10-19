@@ -1,7 +1,7 @@
 # 04 — Screens
 
 **Project:** BenchQ · frontend only
-**Version:** 1.0 · September 2026
+**Version:** 1.1 · 19 October 2026 (aligned with docs/07 v2, Phase L and §14 Admin)
 
 Every route, its layout, its states, its permissions and its keyboard map. If a screen isn't in
 here, it doesn't get built — propose it first.
@@ -11,7 +11,9 @@ here, it doesn't get built — propose it first.
 ## 0. Rules that apply to every screen
 
 **Three states, always.** Skeleton while loading, empty when there's nothing, error when the
-adapter throws. Set `NEXT_PUBLIC_MOCK_ERROR_RATE=0.1` and walk the app — every error state you hit
+adapter throws. In a dev build, make mock calls fail from the browser console —
+`window.__BENCHQ_MOCK_FAIL__ = ["candidates.list"]` (or `["*"]` for every call; clear it to recover;
+`src/mocks/membership.ts`, inert in production builds) — and walk the app: every error state you hit
 must already exist.
 
 **Light first.** Light is the default render; dark is a preference the user opts into. Both are
@@ -62,6 +64,11 @@ supplies a count.
 │  Settings  │                                                                 │
 └────────────┴─────────────────────────────────────────────────────────────────┘
 ```
+
+There is **no firm switcher** (a user belongs to one firm, docs/07 Q9; the firm comes from the URL) and
+**no role switcher** (removed with the dev principal switcher, Q25). The **account menu** (user menu)
+shows who is signed in — name, role, firm — and holds **Sign out**. In the admin shell (§14) it
+shows the Super Admin, and the topbar has no notifications and no shift clock.
 
 Sidebar: 208px expanded, 60px collapsed, 48px mobile icon rail, state in `localStorage`. Items carry live badge counts
 (follow-ups due today, unreviewed unverified claims). Badges are derived, and a badge of zero is
@@ -132,9 +139,18 @@ keep it accurate — it's the cheapest documentation in the product.
 
 ### 2.1 `/sign-in`, `/invite/[token]`
 
-`AuthShell`: centred card, product mark, no sidebar. There is no real auth in this repo — the form
-validates with Zod, shows the error state on a deliberately wrong password (`wrong@benchq.io`), and
-on success writes a session into the Zustand store and routes to `/dashboard`.
+`AuthShell`: centred card, product mark, no sidebar. Invite-only, no public sign-up (docs/07 Q11).
+Until real auth (Phase D), the form signs in against the **seeded accounts** in the mock layer (docs/03
+§3.2: one per fixture user plus the Super Admin, one shared demo password; docs/07 Q25). The session is
+shared by every tab (Q27). An unknown email, a wrong password and a deactivated account all get the same
+error, "Email or password is incorrect.", so the page never reveals which accounts exist; a service
+failure says "Couldn't sign in right now. Try again."
+
+On success: a firm user lands on **`/{slug}/dashboard`** (an OWNER on first run on `/{slug}/welcome`,
+§2.2); the Super Admin lands on **`/admin`**. **`returnTo`:** a guard that sends a signed-out visitor
+here adds `?returnTo=<path>`. After sign-in it is honoured only if it is a same-origin path **and the
+account that just signed in can open it** (`signInTarget`); otherwise — another firm's URL, `/admin` for
+a firm user, an external URL — the account's own landing.
 
 Build the states properly anyway: field-level validation, a submit-pending state, a form-level
 error banner, and a "check your email" confirmation on the forgot-password request. These are cheap now and expensive
@@ -147,8 +163,10 @@ button. An expired token renders its own state with a "request a new invite" act
 
 Four steps, progress rail on the left, back/next, resumable (step index in `localStorage`).
 
-1. **Firm** — name, timezone, shift window (defaults to 18:30–00:30 IST)
-2. **Invite team** — email rows with role selects; skippable
+1. **Firm** — confirms the firm the Super Admin created (§14.4): name, timezones, shift window
+   (defaults to 18:30–00:30 IST), each editable here
+2. **Invite team** — email rows with role selects; skippable. **Waits for Phase M** (the firm-side
+   invite flow, docs/07): until then the wizard skips this step
 3. **First candidate** — name, title, work authorisation, resume upload (drop zone simulates a
    parse with a 3s progress state, then shows extracted fields as `UNVERIFIED` claims for review)
 4. **Done** — three suggested next actions, routes to dashboard
@@ -535,13 +553,14 @@ the knowledge that it exists.
 
 | Route | Role | Content |
 |---|---|---|
-| `/settings` | OWNER | Firm name, logo, timezone, shift window, default follow-up cadence |
-| `/settings/team` | OWNER, MANAGER | Member table, invite flow, role changes, candidate assignment matrix |
+| `/settings` | all | No content: redirects to the first section the role may open (docs/07 Q1) |
+| `/settings/firm` | OWNER | Firm name, logo, timezone, shift window, default follow-up cadence |
+| `/settings/team` | OWNER, MANAGER | Member table and candidate assignment matrix. **OWNER** invites, removes and deactivates members and changes roles; **MANAGER** sees the team read-only and assigns candidates to BDEs (docs/07 Q15). BDE and VIEWER don't see it |
 | `/settings/templates` | OWNER, MANAGER | Resume templates and outreach templates, with preview and merge-field reference |
 | `/settings/preferences` | all | Theme, density, keyboard shortcut sheet, notification preferences, timezone display |
 
-`/admin` is `PLATFORM_ADMIN` only: firm list, seat usage, feature flags. Mock data only, and it
-never appears in the sidebar for any other role.
+`/admin/…` is the platform tier, `PLATFORM_ADMIN` only (not-found for everyone else): see **§14**.
+It never appears in the sidebar for any other role.
 
 ---
 
@@ -570,7 +589,8 @@ cramped builder nobody can use.
 - Optimistic update rejected → revert with a toast naming the reason
 - Resume export blocked → gate message with a jump-to-claim link
 - Duplicate job on capture → comparison card, merge or keep
-- Session role switched mid-flight → refetch, don't leave stale data on screen
+- Principal changes mid-flight (sign-out, another account signed in, another tab) → the query cache is
+  cleared and the app remounts, so no data from the previous account stays on screen
 
 ---
 
