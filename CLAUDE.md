@@ -257,8 +257,7 @@ A stopped task with a clear question beats a confident wrong implementation.
 > **Update this section as you progress.** It's the first thing the next session reads.
 
 **Phase: Production routes, tenancy + RBAC** (`docs/07-ROUTES-AND-RBAC.md` v2). Phases T, L and P are
-done. **Next: the rest of Phase C** — work from 07's Phase C *Still to do* list (a slice was done in P4,
-Q32, and the BDE ledger scope in P); then B, S, M. Repo snapshot: `docs/CURRENT_STATE.md` (2026-10-19).
+done; Phase C is done and in review. **Next: Phase B** (UI completion audit), then S, M. Repo snapshot: `docs/CURRENT_STATE.md` (2026-10-19).
 
 | Step | Status |
 |---|---|
@@ -271,11 +270,11 @@ Q32, and the BDE ledger scope in P); then B, S, M. Repo snapshot: `docs/CURRENT_
 | Demo data persists in the browser; "Reset demo data" on `/admin/system` (docs/03 §3.3) | Done (#17) |
 | 07 Phase P — `/admin/*` screens, invites and `/invite/[token]`, read-only support view, ⌘K for admins, platform tests | Done (#12, #13, #18, #20, #21; exit check in 07) |
 | `docs/CURRENT_STATE.md` regenerated | Done (2026-10-19) |
-| **07 Phase C — the rest of the permission policy** (platform and team actions, `<Can>`, route access via `can`, full principal × action table test, exit grep, fold `updateStatus` into the policy) | **Next** |
-| 07 Phase B — UI completion audit (route × principal, both themes, 1440 / 1024 / 390, axe) | Planned, after C |
-| 07 Phase S — Super Admin flow polish (UI-first) | Planned, after B |
+| 07 Phase C — the permission policy (firm, team and platform actions, `<Can>`, route access via `can`, full principal × action table test, exit grep) | **Done, in review** (`feat/phase-c`) |
+| **07 Phase B — UI completion audit** (route × principal, both themes, 1440 / 1024 / 390, axe) | **Next** |
+| 07 Phase S — Super Admin flow polish (UI-first), including building `/admin/system` and AI spend from docs/02 §3.2 | Planned, after B |
 | 07 Phase M — firm-side invite flow (OWNER invites members) | Planned, after S (Q23) |
-| System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Approved (Q33, Q34), not built |
+| System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Approved (Q33, Q34), not built — built in Phase S |
 | Integration Module 00 B/C + Module 01 (ledger) | Can run in parallel |
 | Backend tenancy + real auth (D1/D2), 07 Phase D, then Modules 02–05 with `firmId` | Later |
 

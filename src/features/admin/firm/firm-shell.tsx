@@ -1,5 +1,7 @@
 "use client";
 
+import { Can } from "@/lib/auth/can";
+import { useCan } from "@/lib/auth/permissions";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -36,6 +38,7 @@ export function FirmShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "";
   const { firmId, group, isNotFound, detail } = useFirmDetail();
   const [dialog, setDialog] = useState<Dialog>(null);
+  const canSuspend = useCan("firm.suspend");
   const hasSupportExpired = useSearchParams().get("supportEnded") === "expired";
 
   if (isNotFound) return <NotFoundState title="Firm not found" description="There is no firm with this id." backHref={toHref("admin.firms")} backLabel="Back to firms" />;
@@ -74,13 +77,17 @@ export function FirmShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => setDialog("support")}><Eye size={14} aria-hidden /> View workspace</Button>
-            <Button variant="secondary" size="sm" onClick={() => setDialog("edit")}><Pencil size={14} aria-hidden /> Edit</Button>
-            <Button variant="secondary" size="sm" onClick={() => setDialog("slug")}><Link2 size={14} aria-hidden /> Change slug</Button>
-            {detail.firm.status === "ACTIVE" ? (
+            <Can action="firm.viewWorkspace">
+              <Button size="sm" onClick={() => setDialog("support")}><Eye size={14} aria-hidden /> View workspace</Button>
+            </Can>
+            <Can action="firm.edit">
+              <Button variant="secondary" size="sm" onClick={() => setDialog("edit")}><Pencil size={14} aria-hidden /> Edit</Button>
+              <Button variant="secondary" size="sm" onClick={() => setDialog("slug")}><Link2 size={14} aria-hidden /> Change slug</Button>
+            </Can>
+            {detail.firm.status === "ACTIVE" && canSuspend ? (
               <Button variant="secondary" size="sm" onClick={() => setDialog("suspend")}><PauseCircle size={14} aria-hidden /> Suspend</Button>
             ) : null}
-            {detail.firm.status === "SUSPENDED" ? (
+            {detail.firm.status === "SUSPENDED" && canSuspend ? (
               <Button variant="secondary" size="sm" onClick={() => setDialog("reactivate")}><PlayCircle size={14} aria-hidden /> Reactivate</Button>
             ) : null}
           </div>

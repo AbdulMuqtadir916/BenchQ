@@ -127,3 +127,29 @@ describe("ledger scope (07 §2.2: BDE `own`)", () => {
     }
   });
 });
+
+describe("platform writes (07 Phase C): every one names its platform action; a firm user is refused", () => {
+  it("the inventory: every platform method is a read or a declared write", async () => {
+    const { platformMock, PLATFORM_WRITE_ACTIONS } = await import("./platform");
+    for (const [resource, methods] of Object.entries(platformMock)) {
+      for (const name of Object.keys(methods)) {
+        const isRead = ["list", "get", "usage"].includes(name);
+        expect(isRead || Boolean(PLATFORM_WRITE_ACTIONS[resource]?.[name]), `${resource}.${name}`).toBe(true);
+      }
+    }
+  });
+
+  it("an OWNER is refused (403) on every platform write; a Super Admin is not refused by the policy", async () => {
+    const { platformMock, PLATFORM_WRITE_ACTIONS } = await import("./platform");
+    const writesList = Object.entries(PLATFORM_WRITE_ACTIONS).flatMap(([resource, methods]) => Object.keys(methods).map((name) => [resource, name] as const));
+    expect(writesList.length).toBe(17);
+    const callPlatform = (resource: string, name: string) => (platformMock as unknown as Record<string, Record<string, (...args: unknown[]) => Promise<unknown>>>)[resource]![name]!("nope", "nope");
+    await signInAs("user_imran");
+    for (const [resource, name] of writesList) await expect(callPlatform(resource, name), `${resource}.${name}`).rejects.toMatchObject({ status: 403 });
+    await signInAs("padm_sana");
+    for (const [resource, name] of writesList) {
+      const outcome = await callPlatform(resource, name).then(() => "ok", (error: { status?: number }) => error.status);
+      expect(outcome, `${resource}.${name}`).not.toBe(403);
+    }
+  });
+});

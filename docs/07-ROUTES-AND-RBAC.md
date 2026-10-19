@@ -318,9 +318,9 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | **T0** | Groundwork that needs no §7 contract — remove `/sign-up`, `(workspace)`/`(manage)` groups, role views into `src/features/`, active links by route id, team-access TODO, draft §7 contracts | A2               | Done                               |
 | **T**  | Tenancy in the frontend — contracts, principal, `/[firm]` URLs, firm-scoped mocks and query keys                                                                                           | A2 + §7 sign-off | Done (PRs 1–4; exit check recorded below) |
 | **P**  | Platform tier routes — `/admin/*` shell and pages (all states, mock data), support view                                                                                                    | T, L (from P3)   | **Done** (P1–P6; exit check below, 2026-10-19), in review |
-| **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | Planned                            |
+| **C**  | Permission policy — `can()`, `useCan`, `<Can>`, scope helpers; delete inline checks                                                                                                        | T, P             | **Done**, in review (`feat/phase-c`) |
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
-| **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit, system                                                                                                   | P, B             | Planned                            |
+| **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit; **build `/admin/system` and AI spend on the overview** from the approved docs/02 §3.2 contracts (Q33, Q34)                                                                                                   | P, B             | Planned                            |
 | **L**  | Sign-in with seeded accounts (Q25–Q27) — `/sign-in` against the mock layer's seeded accounts; dev principal switcher removed; user-menu sign-out; mock session shared across tabs | T, P1–P2         | Built, in review — before P3       |
 | **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Planned (Q23)                      |
 | **D**  | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks                                                                                                           | backend D1/D2    | Later                              |
@@ -468,37 +468,26 @@ their invite on `/invite/[token]` and lands on `/welcome`.
 
 ## Phase C — Permission policy
 
-**Status (2026-10-19): a slice is done in P4 (Q32, PR #20); the rest is open.** Read this before
-starting Phase C, so nothing is redone and nothing is left behind.
+**Status (2026-10-19): done** — a slice in P4 (Q32, #20), the BDE ledger scope in P (#21), the rest on
+`feat/phase-c`. The plan below ("As v1 Phase C") is kept for reference; this table is what exists.
 
-| Done in P4 (Q32) | Where |
+| Done | Where |
 |---|---|
-| The pure policy `can(principal, action)` with the role × action table at the top; a support view → every firm action `false` (`team.view` true: it reads the whole firm); a platform admin outside one → no firm actions | `src/lib/auth/policy.ts` |
-| `useCan` for components | `src/lib/auth/permissions.ts` (re-exports the policy) |
-| Firm actions in the table: `candidate.create`, `candidate.edit`, `job.capture`, `job.apply`, `application.move`, `resume.edit`, `outreach.act`, `followup.act`; visibility `team.view` (Q15) | policy table |
-| Scope helpers `scopeCandidates`, `scopeApplications`, `scopeFollowupsUserId`, `hasOwnScope`, `dashboardFor`; **`scopeLedger`** (a BDE sees only the ledger entries they made, §2.2 `own`) applied in the mock backend's `ledger.list` and on `/[firm]/ledger` (Phase P, tested and mutation-checked) | `src/lib/auth/policy.ts`, `src/mocks/ledger.ts` |
-| Every `role !== "VIEWER"` check and BDE filter on firm pages replaced (candidates, candidate detail, jobs, job detail, applications, application detail, resumes and the studio, outreach, follow-ups, focus, dashboard, BDE dashboard); pages read the principal, not a firm user; the unreachable analytics BDE branch deleted | those pages |
-| Controls that ignored `canAct` gated (attention "Move to…" / "Connect inbox", inbox suggestions, auto mark-read, "Tailor & apply") | candidate overview, applications tab, inbox, job explorer |
-| **The mock backend enforces the same table**: every firm-scoped write names its action (`firmScoped(…, writes)`; an undeclared write fails at load) and is refused (403) when `can()` says no — a VIEWER, a support view; `agents.rewrite` too. `src/mocks/write-authorization.test.ts` walks every write as a VIEWER, a support view and (control) an OWNER | `src/mocks/membership.ts` |
-| Table tests: per role, support view, platform admin; scope helpers | `src/lib/auth/permissions.test.ts` |
+| The pure policy: `can(principal, action)` over one table for every action — firm work (`candidate.create`, `candidate.edit`, `job.capture`, `job.apply`, `application.move`, `resume.edit`, `outreach.act`, `followup.act`), team (Q15: `member.invite`, `member.remove`, `member.changeRole`, `member.deactivate` OWNER only; `candidate.assign`, `team.view` OWNER and MANAGER) and platform (`firm.create`, `firm.edit`, `firm.suspend`, `firm.viewWorkspace`, `plan.edit`, `invite.resend`, `invite.revoke`, `platformTeam.manage`: PLATFORM_ADMIN, in or out of a support view). A support view: no firm or team action, `team.view` only | `src/lib/auth/policy.ts` |
+| Route access: `can(principal, "route.view", route)` — the registry's access table; used by the route guard, ⌘K actions and the sign-in target | `policy.ts`, `route-guard.tsx`, `command-palette.tsx`, `landing.ts` |
+| `useCan`, `useCanView`, `<Can action>` / `<Can route>` | `src/lib/auth/permissions.ts`, `can.tsx` |
+| Scope helpers `scopeCandidates`, `scopeApplications`, `scopeFollowupsUserId`, `scopeLedger`, `hasOwnScope`, `dashboardFor` | `policy.ts` |
+| Firm pages read the principal and ask `can()` (no `role !== "VIEWER"` checks, no BDE filters); controls that ignored `canAct` gated | firm pages (P4) |
+| Admin screens ask `can()` for every platform action: New firm and `n` (`firm.create`); Edit, Change slug, Change plan, Adjust limits, user (de)activation (`firm.edit`); Suspend / Reactivate (`firm.suspend`); View workspace, ⌘K "View workspace of" (`firm.viewWorkspace`); plan New / Edit / Hide (`plan.edit`); Resend, Copy link (`invite.resend`); Revoke (`invite.revoke`); staff invite / deactivate (`platformTeam.manage`) | `src/features/admin/**` |
+| `/settings/team` reads the team rules (OWNER: manages members; MANAGER: read-only). The member controls themselves arrive with Phase M and render under `member.*` | `settings/team/page.tsx` |
+| **The mock backend enforces the same table**: every firm-scoped write and every platform write names its action and is refused (403) when `can()` says no; starting a support view needs `firm.viewWorkspace`. `applications.updateStatus` now relies on `application.move` plus the scope helper (the older `accessFor` check is gone) | `src/mocks/membership.ts`, `platform.ts`, `session.ts`, `applications.ts` |
+| Record roles (a user's or an invite's role, not the viewer's) through `isOwner`, `isBde`, `isPlatformRole`, `ROLE_LABEL`, `ROLE_TONE` | `src/lib/auth/roles.ts` |
+| Tests: the full principal × action table and `route.view` against the registry (`policy-table.test.ts`); per-role helpers (`permissions.test.ts`); every firm and platform write walked (`src/mocks/write-authorization.test.ts`); mutation-checked | `src/lib/auth/`, `src/mocks/` |
+| Exit grep: `grep -rE "role (===|!==)" src` finds nothing outside `src/lib/auth/` and the registry | — |
 
-**Still to do in Phase C:**
-
-- Platform actions in the table (`firm.create`, `firm.edit`, `firm.suspend`, `firm.viewWorkspace`, `plan.edit`,
-  `invite.resend`, `invite.revoke`, `platformTeam.manage`) and the admin screens asking `can()` instead of relying
-  on the platform guard alone.
-- Firm team actions (Q15): `member.invite`, `member.remove`, `member.changeRole`, `member.deactivate` (OWNER only),
-  `candidate.assign` (OWNER, MANAGER) — with the settings/team controls they gate (Phase M builds the invite flow).
-- `<Can>`.
-- Route access as `can(principal, "route.view", route)`.
-- The full principal × action table test (every principal, every action, platform included).
-- The exit grep: `grep -rE "role (===|!==)"` returns nothing outside `src/lib/auth/` and the registry. Today the
-  remaining hits are record-role checks, not access checks (settings/team role tag colours, the admin users tab's
-  OWNER rule, manager-dashboard title, derive helpers) — decide which become policy and which are data rules.
-- `applications.updateStatus` still also checks `accessFor` + `isInScope` itself (it predates the policy); fold it
-  into the declared action plus a scope check.
-- Outreach and follow-ups have no write endpoints yet; when they get them, they declare `outreach.act` /
-  `followup.act` and the write-authorization test covers them automatically.
+**Left for later phases:** the member controls on `/settings/team` and candidate assignment UI (Phase M);
+outreach and follow-up write endpoints, which will declare `outreach.act` / `followup.act` and be covered
+by the write-authorization test automatically.
 
 As v1 Phase C, typed on `Principal`:
 
@@ -530,7 +519,14 @@ dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: sig
 ## Phase S — Super Admin flow (UI-first)
 
 Planned separately once P and B are done: screen specs in `docs/04`, then polish of create firm,
-invites, plans, suspend/reactivate, audit, system. Out of scope until then.
+invites, plans, suspend/reactivate, audit. Out of scope until then.
+
+**Also in Phase S: build `/admin/system` and AI spend** (proposed 2026-10-19). The contracts are approved
+(docs/02 §3.2, Q33, Q34) but nothing is built: schemas `HealthCheck`, `ScraperRun`, `AiUsage`; fixtures;
+platform adapters and mock (`platformApi.system`); the System page (health per component with 7 / 30-day
+uptime, scraper runs, AI spend by firm / model / purpose, IST periods) and the overview's AI spend group
+(hidden until then, Q29). Why S: it is Super Admin UI on mock data like the rest of S, needs no backend
+change to start, and B's audit should not wait on it. Its docs/04 screen spec comes first, as for §14.
 
 **Open questions for Phase S** (product owner; decide before building the invite and suspend flows):
 

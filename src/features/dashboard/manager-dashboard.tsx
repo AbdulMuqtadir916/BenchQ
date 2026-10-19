@@ -20,9 +20,11 @@ import { useHref } from "@/lib/routes/use-href";
 
 const EMPTY: never[] = [];
 
+const TITLE: Record<"MANAGER" | "OWNER" | "VIEWER", string> = { OWNER: "The business", MANAGER: "The floor", VIEWER: "The floor" };
+
 export function ManagerDashboard({ role = "MANAGER" }: { role?: "MANAGER" | "OWNER" | "VIEWER" }) {
   const queries = useFloorQueries();
-  const header = <PageHeader title={role === "OWNER" ? "The business" : "The floor"} subtitle="Who is working on what, at which stage, right now." />;
+  const header = <PageHeader title={TITLE[role]} subtitle="Who is working on what, at which stage, right now." />;
   // docs/04 §13: everything failed → one page-level error, not one per card.
   if (hasPageFailed(...queries)) {
     const page = queryGroup(...queries);

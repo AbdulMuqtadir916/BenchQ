@@ -3,6 +3,7 @@ import { FirmSchema, FirmSessionSchema, PlatformSessionSchema, type Firm, type F
 import { currentPlatformUser, currentPrincipal, currentUser, firmById, isSignedIn, signInWithPassword, signOut, watchSession } from "./auth";
 import { firms } from "./team";
 import { markActive } from "./invites";
+import { requireAction } from "./membership";
 import { endSupportViewOnSignOut, exitSupportView, settleExpiredSupportViews, startSupportView } from "./support";
 import { mockResult, wait } from "./_shared";
 
@@ -47,6 +48,7 @@ export const sessionMock = {
   /** Start a read-only support view of a firm (07 §4): PLATFORM_ADMIN only; ends any open one first. */
   startSupportView: async (firmId: string, reason: string): Promise<Session> => {
     await wait();
+    requireAction("firm.viewWorkspace");
     startSupportView(firmId, reason);
     return structuredClone(sessionNow());
   },

@@ -1,6 +1,8 @@
 import { ApiError } from "@/lib/api/client";
+import { isOwner, isPlatformRole } from "@/lib/auth/roles";
 import { effectiveInviteStatus } from "@/lib/derive/tenancy";
 import type { User } from "@/lib/schemas/session";
+import { FirmRole } from "@/lib/schemas/enums";
 import type { Invite, PlatformUser } from "@/lib/schemas/tenancy";
 import { allLedger } from "./ledger";
 import { allUsers, firms } from "./team";
@@ -70,14 +72,14 @@ function logAccepted(invite: Invite, actor: { id: string; name: string }, summar
 /** A firm invite: the user is created in the invite's firm with the invite's role. */
 export function acceptInvite(inviteId: string, person: { userId: string; name: string }, now = new Date()): User {
   const { index, invite } = acceptable(inviteId, now);
-  if (invite.firmId === null || invite.role === "PLATFORM_ADMIN") throw new ApiError("This is a platform-team invite.", "WRONG_INVITE", 400);
+  if (invite.firmId === null || isPlatformRole(invite)) throw new ApiError("This is a platform-team invite.", "WRONG_INVITE", 400);
   const firmIndex = firms.findIndex((firm) => firm.id === invite.firmId);
   const firm = firms[firmIndex]!;
 
-  const user: User = { id: person.userId, firmId: firm.id, name: person.name, email: invite.email, role: invite.role, avatarUrl: null, isActive: true, lastActiveAt: null };
+  const user: User = { id: person.userId, firmId: firm.id, name: person.name, email: invite.email, role: FirmRole.parse(invite.role), avatarUrl: null, isActive: true, lastActiveAt: null };
   allUsers.push(user);
   invites[index] = { ...invite, status: "ACCEPTED" };
-  const activates = invite.role === "OWNER" && firm.status === "ONBOARDING";
+  const activates = isOwner(invite) && firm.status === "ONBOARDING";
   if (activates) firms[firmIndex] = { ...firm, status: "ACTIVE" };
   logAccepted(invite, user, `${user.name} accepted the ${invite.role} invite${activates ? "; firm is now active" : ""}`, now);
   changed("users", "invites", "firms", "ledger");
@@ -87,7 +89,7 @@ export function acceptInvite(inviteId: string, person: { userId: string; name: s
 /** A platform-team invite (A11): the person joins BenchQ staff as a Super Admin. */
 export function acceptPlatformInvite(inviteId: string, person: { userId: string; name: string }, now = new Date()): PlatformUser {
   const { index, invite } = acceptable(inviteId, now);
-  if (invite.firmId !== null || invite.role !== "PLATFORM_ADMIN") throw new ApiError("This is a firm invite.", "WRONG_INVITE", 400);
+  if (invite.firmId !== null || !isPlatformRole(invite)) throw new ApiError("This is a firm invite.", "WRONG_INVITE", 400);
   const admin: PlatformUser = { id: person.userId, name: person.name, email: invite.email, role: "PLATFORM_ADMIN", isActive: true, lastActiveAt: now.toISOString() };
   platformUsers.push(admin);
   invites[index] = { ...invite, status: "ACCEPTED" };

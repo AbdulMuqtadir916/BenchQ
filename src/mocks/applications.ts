@@ -3,9 +3,7 @@ import { ApplicationSchema, FollowUpTaskSchema, type Application, type FollowUpT
 import { UpdateApplicationStatusSchema, type UpdateApplicationStatus } from "@/lib/schemas/inbox";
 import applicationsSeed from "./data/applications.json";
 import followupsSeed from "./data/followups.json";
-import { ApiError } from "@/lib/api/client";
-import { accessFor, routeById } from "@/lib/routes/registry";
-import { isInScope } from "@/lib/routes/scope";
+import { scopeApplications } from "@/lib/auth/policy";
 import { currentPrincipal, currentUser } from "./auth";
 import { findInFirm, inFirm, mockResult, notFound } from "./_shared";
 import { firmScoped } from "./membership";
@@ -27,13 +25,10 @@ export const applicationsMock = firmScoped("applications", {
   // Stand-in for the backend's status-transition rules; delete with this module.
   updateStatus: (firmId: string, id: string, body: UpdateApplicationStatus): Promise<Application> => {
     const application = findInFirm(allApplications, firmId, id, "Application");
-    // Who may move it, by the same access table the UI reads (docs/07 §2.2, applications.detail):
-    // read-only (VIEWER, a support view) → 403; outside "own" scope (a BDE, someone else's) → 404,
-    // exactly like a missing one, so the call never confirms it exists (principle 4).
-    const principal = currentPrincipal();
-    const access = accessFor(routeById("applications.detail"), principal);
-    if (access === "read" || access === "none") throw new ApiError("You can't change applications.", "FORBIDDEN", 403);
-    if (!isInScope(access, principal.userId, { ownerUserId: application.submittedByUserId })) notFound("Application", id);
+    // Who may move it is the policy (docs/07 Phase C): `application.move` is checked by firmScoped (a
+    // VIEWER or a support view → 403); the record must be in the principal's scope (a BDE, someone
+    // else's → 404, exactly like a missing one, so the call never confirms it exists, principle 4).
+    if (scopeApplications(currentPrincipal(), [application]).length === 0) notFound("Application", id);
     const update = UpdateApplicationStatusSchema.parse(body);
     const now = new Date().toISOString();
 

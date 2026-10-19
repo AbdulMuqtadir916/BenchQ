@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/api/client";
+import { isOwner } from "@/lib/auth/roles";
 import type { CreateFirmInput, FirmProfileInput, LimitsInput, PlanInput } from "@/lib/api/platform";
 import { ENTITY, seatBlockReason, slugProblem, usageOf } from "@/lib/derive/platform";
 import { effectiveInviteStatus } from "@/lib/derive/tenancy";
@@ -9,7 +10,8 @@ import { currentPlatformUser } from "./auth";
 import { allCandidates } from "./candidates";
 import { changed, type TableName } from "./db";
 import { allLedger } from "./ledger";
-import { injectedFailure } from "./membership";
+import { injectedFailure, requireAction } from "./membership";
+import type { PlatformAction } from "@/lib/auth/policy";
 import { allUsers, firms } from "./team-data";
 import { invites, plans, platformUsers } from "./tenancy";
 import { issueInviteToken, tokenForInvite } from "./invite-tokens";
@@ -81,11 +83,28 @@ function checkEmailFree(address: string, now: Date): void {
 }
 
 /** PLATFORM_ADMIN only, with the dev fault switch (docs/04 §0), like the firm-scoped mocks. */
-function platformOnly<M extends Record<string, (...args: never[]) => unknown>>(resource: string, methods: M): M {
+/** The platform reads (anything a PLATFORM_ADMIN may look at); every other method is a write. */
+const PLATFORM_READS = new Set(["list", "get", "usage"]);
+
+/** Every platform write and the action it needs (the platform write test walks it). */
+export const PLATFORM_WRITE_ACTIONS: Record<string, Record<string, PlatformAction>> = {};
+
+/**
+ * PLATFORM_ADMIN only, with the dev fault switch (docs/04 §0). Reads need a platform admin; every write
+ * names its platform action and is refused (403) unless `can()` allows it — the same policy the admin
+ * screens render from. A write without an action fails at load.
+ */
+function platformOnly<M extends Record<string, (...args: never[]) => unknown>>(resource: string, methods: M, writes: Partial<Record<keyof M & string, PlatformAction>> = {}): M {
   const guarded: Record<string, (...args: never[]) => Promise<unknown>> = {};
   for (const [name, method] of Object.entries(methods)) {
+    const action = (writes as Record<string, PlatformAction | undefined>)[name];
+    if (!PLATFORM_READS.has(name)) {
+      if (!action) throw new Error(`platformOnly("${resource}"): the write "${name}" must name the action it needs`);
+      (PLATFORM_WRITE_ACTIONS[resource] ??= {})[name] = action;
+    }
     guarded[name] = async (...args) => {
       currentPlatformUser();
+      if (action) requireAction(action);
       injectedFailure(`platform.${resource}.${name}`);
       return method(...args);
     };
@@ -235,7 +254,7 @@ export const platformMock = {
       log({ firmId, entityType: ENTITY.firmLimits, entityId: firmId, entityLabel: firm.name, action: "PLAN_CHANGED", summary }, now);
       return done(after, "firms");
     },
-  }),
+  }, { create: "firm.create", update: "firm.edit", changeSlug: "firm.edit", changePlan: "firm.edit", adjustLimits: "firm.edit", suspend: "firm.suspend", reactivate: "firm.suspend" }),
 
   users: platformOnly("users", {
     /** Every firm user, or one firm's. */
@@ -245,7 +264,7 @@ export const platformMock = {
     deactivate: (userId: string, now = new Date()): Promise<User> => {
       const index = allUsers.findIndex((user) => user.id === userId);
       const user = allUsers[index] ?? notFound("User", userId);
-      if (user.role === "OWNER") throw conflict("The firm's owner can't be deactivated.");
+      if (isOwner(user)) throw conflict("The firm's owner can't be deactivated.");
       if (!user.isActive) return mockResult(user);
       allUsers[index] = { ...user, isActive: false };
       log({ firmId: user.firmId, entityType: ENTITY.user, entityId: user.id, entityLabel: user.name, action: "STATE_CHANGE", summary: `Deactivated ${user.name} (${user.role})` }, now);
@@ -264,7 +283,7 @@ export const platformMock = {
       log({ firmId: user.firmId, entityType: ENTITY.user, entityId: user.id, entityLabel: user.name, action: "STATE_CHANGE", summary: `Reactivated ${user.name} (${user.role})` }, now);
       return done(allUsers[index]!, "users");
     },
-  }),
+  }, { deactivate: "firm.edit", reactivate: "firm.edit" }),
 
   invites: platformOnly("invites", {
     /** Every invite, one firm's, or (null) the platform team's. */
@@ -305,7 +324,7 @@ export const platformMock = {
       log({ firmId: invite.firmId, entityType: ENTITY.invite, entityId: invite.id, entityLabel: invite.email, action: "INVITE_REVOKED", summary: `Revoked the invite to ${invite.email}` }, now);
       return done(invites[index]!, "invites");
     },
-  }),
+  }, { resend: "invite.resend", link: "invite.resend", revoke: "invite.revoke" }),
 
   plans: platformOnly("plans", {
     list: (): Promise<Plan[]> => mockResult(plans),
@@ -345,7 +364,7 @@ export const platformMock = {
       log({ firmId: null, entityType: ENTITY.plan, entityId: planId, entityLabel: plan.name, action: "UPDATE", summary: `${isActive ? "Showed" : "Hid"} plan ${plan.name}` }, now);
       return done(plans[index]!, "plans");
     },
-  }),
+  }, { create: "plan.edit", update: "plan.edit", setActive: "plan.edit" }),
 
   audit: platformOnly("audit", {
     /** Every ledger entry, platform and firm (A13), newest first. */
@@ -375,7 +394,7 @@ export const platformMock = {
       log({ firmId: null, entityType: ENTITY.platformUser, entityId: user.id, entityLabel: user.name, action: "STATE_CHANGE", summary: `Deactivated ${user.name}` }, now);
       return done(platformUsers[index]!, "platformUsers");
     },
-  }),
+  }, { invite: "platformTeam.manage", deactivate: "platformTeam.manage" }),
 
   /** Minimal candidate rows for usage counts (A2): firm and status only. */
   candidates: platformOnly("candidates", {

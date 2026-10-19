@@ -1,5 +1,7 @@
 "use client";
 
+import { ROLE_LABEL, isOwner } from "@/lib/auth/roles";
+import { useCan } from "@/lib/auth/permissions";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { MailX, UserX, Users } from "lucide-react";
@@ -18,7 +20,6 @@ import { AdminDate, AdminTime } from "../admin-time";
 import { CopyInviteLinkButton, ResendInviteButton, RevokeInviteButton } from "./invite-actions";
 import { useFirmDetail, type FirmDetail } from "./use-firm-detail";
 
-const ROLE_LABEL: Record<User["role"], string> = { OWNER: "Owner", MANAGER: "Manager", BDE: "BDE", VIEWER: "Viewer" };
 
 /**
  * /admin/firms/[firmId]/users (docs/04 §14.5 Users tab): members, with Deactivate / Reactivate
@@ -65,6 +66,7 @@ type MemberAction = { user: User; kind: "deactivate" | "reactivate" } | null;
 function MembersTable({ members, usage }: { members: User[]; usage: FirmUsage }) {
   const [action, setAction] = useState<MemberAction>(null);
   const blocked = usage.canAddSeat ? null : seatBlockReason(usage);
+  const canEditFirm = useCan("firm.edit");
   const columns = useMemo<ColumnDef<User, unknown>[]>(
     () => [
       { id: "name", header: "Name", enableSorting: false, cell: ({ row }) => <span className="text-[var(--color-text)]">{row.original.name}</span> },
@@ -88,7 +90,8 @@ function MembersTable({ members, usage }: { members: User[]; usage: FirmUsage })
         enableSorting: false,
         cell: ({ row }) => {
           const user = row.original;
-          if (user.role === "OWNER") return null; // A10: the owner can't be deactivated
+          if (!canEditFirm) return null;
+          if (isOwner(user)) return null; // A10: the owner can't be deactivated
           if (user.isActive) {
             return <Button variant="ghost" size="sm" onClick={() => setAction({ user, kind: "deactivate" })}>Deactivate</Button>;
           }
@@ -104,7 +107,7 @@ function MembersTable({ members, usage }: { members: User[]; usage: FirmUsage })
         },
       },
     ],
-    [blocked],
+    [blocked, canEditFirm],
   );
 
   return (
@@ -158,7 +161,7 @@ function InvitesTable({ rows, usage, nameOf }: { rows: InviteRow[]; usage: FirmU
     () => [
       { id: "name", header: "Name", enableSorting: false, cell: ({ row }) => row.original.invite.inviteeName ?? <span className="text-[var(--color-text-3)]">—</span> },
       { id: "email", header: "Email", enableSorting: false, cell: ({ row }) => <span className="text-[var(--color-text)]">{row.original.invite.email}</span> },
-      { id: "role", header: "Role", enableSorting: false, cell: ({ row }) => (row.original.invite.role === "PLATFORM_ADMIN" ? "Super Admin" : ROLE_LABEL[row.original.invite.role]) },
+      { id: "role", header: "Role", enableSorting: false, cell: ({ row }) => ROLE_LABEL[row.original.invite.role] },
       { id: "sentBy", header: "Sent by", enableSorting: false, cell: ({ row }) => nameOf(row.original.invite.invitedByUserId) },
       { id: "sent", header: "Sent", enableSorting: false, cell: ({ row }) => <AdminDate iso={row.original.invite.createdAt} /> },
       { id: "expires", header: "Expires", enableSorting: false, cell: ({ row }) => <AdminDate iso={row.original.invite.expiresAt} /> },

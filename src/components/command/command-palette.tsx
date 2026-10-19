@@ -16,7 +16,8 @@ import {
 import { useUiStore } from "@/lib/stores/ui-store";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import type { Principal } from "@/lib/schemas/tenancy";
-import { canOpen, paletteRoutesFor, routeById, type RouteId } from "@/lib/routes/registry";
+import { can } from "@/lib/auth/policy";
+import { paletteRoutesFor, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { usePaletteRecords } from "@/lib/hooks/use-palette-records";
 import { usePlatformFirms } from "@/lib/hooks/use-platform";
@@ -73,7 +74,7 @@ const STATIC_COMMANDS: Command[] = [
 
 /** Actions the principal can open plus one Navigation entry per palette route in the registry. */
 function staticCommandsFor(principal: Principal, area: "firm" | "platform"): Command[] {
-  const actions = area === "firm" ? STATIC_COMMANDS.filter((command) => !command.routeId || canOpen(routeById(command.routeId), principal)) : [];
+  const actions = area === "firm" ? STATIC_COMMANDS.filter((command) => !command.routeId || can(principal, "route.view", routeById(command.routeId))) : [];
   const navigation = paletteRoutesFor(principal, area).map<Command>((route) => ({
     id: `nav-${route.id}`,
     group: "Navigation",
@@ -128,7 +129,7 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
         keywords: firm.slug,
         run: (r, toHref) => r.push(toHref("admin.firms.detail", { firmId: firm.id })),
       });
-      dynamicCommands.push({
+      if (can(principal, "firm.viewWorkspace")) dynamicCommands.push({
         id: `firm-view-${firm.id}`,
         group: "Actions",
         label: `View workspace of ${firm.name}`,

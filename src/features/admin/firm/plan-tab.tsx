@@ -1,5 +1,6 @@
 "use client";
 
+import { Can } from "@/lib/auth/can";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { History, Layers, SlidersHorizontal } from "lucide-react";
@@ -69,8 +70,10 @@ function FirmPlan({ detail }: { detail: FirmDetail }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setDialog("plan")}><Layers size={14} aria-hidden /> Change plan</Button>
-            <Button variant="secondary" size="sm" onClick={() => setDialog("limits")}><SlidersHorizontal size={14} aria-hidden /> Adjust limits</Button>
+            <Can action="firm.edit">
+              <Button variant="secondary" size="sm" onClick={() => setDialog("plan")}><Layers size={14} aria-hidden /> Change plan</Button>
+              <Button variant="secondary" size="sm" onClick={() => setDialog("limits")}><SlidersHorizontal size={14} aria-hidden /> Adjust limits</Button>
+            </Can>
           </div>
         </div>
       </Card>

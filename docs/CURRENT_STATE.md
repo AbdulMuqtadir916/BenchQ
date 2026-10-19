@@ -87,11 +87,18 @@ Mock auth, not security: real enforcement is Phase D.
 
 ## 5. Permissions
 
-- **Policy** `src/lib/auth/policy.ts` (pure; `permissions.ts` re-exports it with `useCan`): `can(principal, action)` over a role × action table — `candidate.create`, `candidate.edit`, `job.capture`, `job.apply`, `application.move`, `resume.edit`, `outreach.act`, `followup.act`, visibility `team.view`. A support view: every action false. Scope helpers `scopeCandidates`, `scopeApplications`, `scopeFollowupsUserId`, `scopeLedger`, `hasOwnScope`, `dashboardFor`.
-- **Firm pages** read the principal and use `can()` / the scope helpers; no `role !== "VIEWER"` checks or BDE filters remain there.
-- **Mock backend** enforces the same table: every firm-scoped write declares its action (`firmScoped(…, writes)`) and is refused (403) for a VIEWER or a support view; `src/mocks/write-authorization.test.ts` walks every write.
-- **Remaining `role ===` hits** (record roles, not the viewer's access): `settings/team` role tag tones, the admin users tab's OWNER-can't-be-deactivated rule and invite role label, the manager dashboard's title, `derive/bde-performance.ts`, `derive/platform.ts` (owner lookup). `applications.updateStatus` in the mock still also checks `accessFor` + `isInScope` itself.
-- What Phase C still has to do: 07 "Phase C — Permission policy", *Still to do*.
+*(Updated with Phase C, `feat/phase-c`.)*
+
+- **Policy** `src/lib/auth/policy.ts` (pure): `can(principal, action)` over one table — firm work, team
+  (Q15) and platform actions — and `can(principal, "route.view", route)` (the registry's access table).
+  `useCan`, `useCanView` (`permissions.ts`), `<Can>` (`can.tsx`). Scope helpers `scopeCandidates`,
+  `scopeApplications`, `scopeFollowupsUserId`, `scopeLedger`, `hasOwnScope`, `dashboardFor`.
+- **UI:** firm pages, admin screens, the route guard, ⌘K and the sign-in target all ask the policy.
+- **Mock backend:** every firm-scoped and platform write declares its action and is refused (403) when
+  `can()` says no; `src/mocks/write-authorization.test.ts` walks them all.
+- **Record roles** (a user's or invite's role) go through `src/lib/auth/roles.ts`; `grep -rE "role (===|!==)" src`
+  finds nothing outside `src/lib/auth/` and the registry.
+- **Table test:** `src/lib/auth/policy-table.test.ts` (every principal × every action, and route.view).
 
 ---
 

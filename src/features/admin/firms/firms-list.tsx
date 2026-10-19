@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/lib/auth/permissions";
 import Link from "next/link";
 import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -68,8 +69,9 @@ export function FirmsList() {
   const plans = usePlans();
   const group = queryGroup(platform.queries.firms, platform.queries.users, platform.queries.invites, platform.queries.candidates, platform.queries.ledger, plans);
 
+  const canCreate = useCan("firm.create");
   const newFirm = useCallback(() => router.push(toHref("admin.firms.new")), [router, toHref]);
-  usePageKey("n", newFirm);
+  usePageKey("n", newFirm, canCreate);
 
   const allRows = useMemo<FirmRow[]>(() => {
     const data = platform.data;
@@ -151,7 +153,7 @@ export function FirmsList() {
         icon={Building2}
         title="No firms yet"
         description="Create a firm to onboard its owner."
-        action={<Button onClick={newFirm}><Plus size={14} aria-hidden /> Create the first firm</Button>}
+        action={canCreate ? <Button onClick={newFirm}><Plus size={14} aria-hidden /> Create the first firm</Button> : undefined}
       />
     ) : (
       <EmptyState
@@ -169,11 +171,13 @@ export function FirmsList() {
         title="Firms"
         subtitle="Every client firm: status, plan, seats and owner."
         actions={
-          <Button asChild>
-            <Link href={toHref("admin.firms.new")}>
-              <Plus size={14} aria-hidden /> New firm <kbd className="ml-1 text-mono-sm opacity-70">N</kbd>
-            </Link>
-          </Button>
+          canCreate ? (
+            <Button asChild>
+              <Link href={toHref("admin.firms.new")}>
+                <Plus size={14} aria-hidden /> New firm <kbd className="ml-1 text-mono-sm opacity-70">N</kbd>
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
       <DataTable

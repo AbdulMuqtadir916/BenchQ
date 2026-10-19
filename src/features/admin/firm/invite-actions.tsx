@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/lib/auth/permissions";
 import { useState } from "react";
 import { Link2, Send, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,10 @@ import { AdminDialog, errorMessage } from "../admin-dialog";
  * a seat again, so at the seat limit it is the §0 over-limit exception: visible, disabled, reason inline.
  */
 export function ResendInviteButton({ invite, blockedReason }: { invite: Invite; blockedReason?: string | null }) {
+  const isAllowed = useCan("invite.resend");
   const resend = useResendInvite();
   const [isDone, setIsDone] = useState(false);
+  if (!isAllowed) return null;
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <Button
@@ -39,6 +42,7 @@ export function ResendInviteButton({ invite, blockedReason }: { invite: Invite; 
  * clipboard is blocked, the link shows in a read-only field to copy by hand.
  */
 export function CopyInviteLinkButton({ invite }: { invite: Invite }) {
+  const isAllowed = useCan("invite.resend");
   const link = useInviteLink();
   const [copied, setCopied] = useState<string | null>(null);
   const [manual, setManual] = useState<string | null>(null);
@@ -53,6 +57,7 @@ export function CopyInviteLinkButton({ invite }: { invite: Invite }) {
       setManual(url);
     }
   }
+  if (!isAllowed) return null;
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <Button variant="ghost" size="sm" disabled={link.isPending} onClick={() => void copy().catch(() => undefined)}>
@@ -67,12 +72,14 @@ export function CopyInviteLinkButton({ invite }: { invite: Invite }) {
 
 /** Revoke a pending invite (confirm; INVITE_REVOKED). */
 export function RevokeInviteButton({ invite }: { invite: Invite }) {
+  const isAllowed = useCan("invite.revoke");
   const revoke = useRevokeInvite();
   const [isOpen, setIsOpen] = useState(false);
   const close = () => {
     revoke.reset();
     setIsOpen(false);
   };
+  if (!isAllowed) return null;
   return (
     <>
       <Button variant="ghost" size="sm" onClick={() => setIsOpen(true)}>
