@@ -11,7 +11,7 @@ import { deriveFirmUsage, effectiveInviteStatus, type FirmUsage } from "./tenanc
  */
 
 /** Ledger entity types (lowercase, as the fixtures write them). */
-export const ENTITY = { firm: "firm", firmLimits: "firm_limits", invite: "invite", plan: "plan", user: "user", platformUser: "platform_user" } as const;
+export const ENTITY = { firm: "firm", firmLimits: "firm_limits", invite: "invite", plan: "plan", user: "user", platformUser: "platform_user", supportView: "support_view" } as const;
 
 /** docs/04 §14.2: an onboarding firm whose owner invite is still pending after this long needs attention. */
 export const STALLED_ONBOARDING_DAYS = 7;

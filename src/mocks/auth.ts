@@ -5,6 +5,7 @@ import type { Firm, User } from "@/lib/schemas/session";
 import { allUsers, firms } from "./team-data";
 import { platformUsers } from "./tenancy";
 import { changed, table } from "./db";
+import { activeSupportView, asContract } from "./support-data";
 
 /**
  * The mock backend's sign-in state (docs/07 Phase L, Q25–Q27): who the "server" thinks is signed in.
@@ -121,7 +122,10 @@ function requireAccount() {
 
 export function currentPrincipal(): Principal {
   const account = requireAccount();
-  if (account.kind === "platform") return { kind: "platform", userId: account.admin.id, role: "PLATFORM_ADMIN", support: null };
+  if (account.kind === "platform") {
+    const view = activeSupportView(account.admin.id, new Date());
+    return { kind: "platform", userId: account.admin.id, role: "PLATFORM_ADMIN", support: view ? asContract(view) : null };
+  }
   const { user } = account;
   return { kind: "firm", userId: user.id, firmId: user.firmId, role: user.role };
 }

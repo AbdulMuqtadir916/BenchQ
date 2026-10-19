@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
-import { ArrowLeft, Pencil, Link2, PauseCircle, PlayCircle } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { ArrowLeft, Clock, Eye, Pencil, Link2, PauseCircle, PlayCircle } from "lucide-react";
 import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +12,8 @@ import { activeNavId, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { CustomLimitsBadge, FirmStatusBadge, OverLimitBadge } from "../firm-badges";
 import { ChangeSlugDialog, EditFirmDialog, ReactivateFirmDialog, SuspendFirmDialog } from "./firm-actions";
+import { DialogFrame } from "../admin-dialog";
+import { SupportStartForm } from "@/components/app/support/support-start-form";
 import { useFirmDetail } from "./use-firm-detail";
 
 const TABS: { id: RouteId; label: string }[] = [
@@ -21,19 +23,21 @@ const TABS: { id: RouteId; label: string }[] = [
   { id: "admin.firms.detail.activity", label: "Activity" },
 ];
 
-type Dialog = "edit" | "slug" | "suspend" | "reactivate" | null;
+type Dialog = "edit" | "slug" | "suspend" | "reactivate" | "support" | null;
 
 /**
  * /admin/firms/[firmId] and its tabs (docs/04 §14.5): the header (name, slug, status, over-limit and
  * custom-limits marks, actions that apply to the firm's state) and the tab nav, around the tab.
- * An unknown firm id is a not-found inside the admin shell. "View workspace" arrives with the support
- * view (P4).
+ * An unknown firm id is a not-found inside the admin shell. "View workspace" starts a read-only support
+ * view (07 §4, docs/04 §14.10) — for an ONBOARDING firm with no users too (07 Q29); `?supportEnded=expired`
+ * says a view of this firm just ran out.
  */
 export function FirmShell({ children }: { children: ReactNode }) {
   const toHref = useHref();
   const pathname = usePathname() ?? "";
   const { firmId, group, isNotFound, detail } = useFirmDetail();
   const [dialog, setDialog] = useState<Dialog>(null);
+  const hasSupportExpired = useSearchParams().get("supportEnded") === "expired";
 
   if (isNotFound) return <NotFoundState title="Firm not found" description="There is no firm with this id." backHref={toHref("admin.firms")} backLabel="Back to firms" />;
 
@@ -45,6 +49,12 @@ export function FirmShell({ children }: { children: ReactNode }) {
       <Link href={toHref("admin.firms")} className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
         <ArrowLeft size={14} aria-hidden /> Firms
       </Link>
+
+      {hasSupportExpired && detail ? (
+        <p role="status" className="mb-4 flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-warning-bg)] px-3 py-2 text-sm text-[var(--color-warning-fg)]">
+          <Clock size={15} aria-hidden /> Your support view of {detail.firm.name} ended after 60 minutes. To continue, start a new one.
+        </p>
+      ) : null}
 
       {group.status === "error" ? (
         <ErrorState variant="page" error={group.error} onRetry={group.retry} />
@@ -65,6 +75,7 @@ export function FirmShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => setDialog("support")}><Eye size={14} aria-hidden /> View workspace</Button>
             <Button variant="secondary" size="sm" onClick={() => setDialog("edit")}><Pencil size={14} aria-hidden /> Edit</Button>
             <Button variant="secondary" size="sm" onClick={() => setDialog("slug")}><Link2 size={14} aria-hidden /> Change slug</Button>
             {detail.firm.status === "ACTIVE" ? (
@@ -74,6 +85,9 @@ export function FirmShell({ children }: { children: ReactNode }) {
               <Button variant="secondary" size="sm" onClick={() => setDialog("reactivate")}><PlayCircle size={14} aria-hidden /> Reactivate</Button>
             ) : null}
           </div>
+          {dialog === "support" ? (
+            <SupportDialog firm={detail.firm} onClose={() => setDialog(null)} />
+          ) : null}
           {dialog === "edit" ? <EditFirmDialog firm={detail.firm} open onClose={() => setDialog(null)} /> : null}
           {dialog === "slug" ? <ChangeSlugDialog firm={detail.firm} open onClose={() => setDialog(null)} /> : null}
           {dialog === "suspend" ? <SuspendFirmDialog firm={detail.firm} open onClose={() => setDialog(null)} /> : null}
@@ -94,5 +108,14 @@ export function FirmShell({ children }: { children: ReactNode }) {
         </>
       )}
     </div>
+  );
+}
+
+/** "View workspace" (docs/04 §14.10): the support-view form in a dialog; Esc or Cancel closes it. */
+function SupportDialog({ firm, onClose }: { firm: Parameters<typeof SupportStartForm>[0]["firm"]; onClose: () => void }) {
+  return (
+    <DialogFrame title={`View ${firm.name}'s workspace`} onClose={onClose}>
+      <SupportStartForm firm={firm} autoFocus secondary={<Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>} />
+    </DialogFrame>
   );
 }
