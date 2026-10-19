@@ -3,11 +3,11 @@ import { renderToString } from "react-dom/server";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 // renderToString reads a zustand store through its server snapshot, the store's *initial* state
-// (signed out: in the app the gates wait for the client). The BDE dashboard needs the signed-in user,
+// (signed out: in the app the gates wait for the client). The BDE dashboard needs the signed-in principal,
 // so in this server render it reads the live store instead. Everything else is real.
 vi.mock("@/lib/stores/session-store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/stores/session-store")>();
-  return { ...actual, useSignedInUser: () => actual.useSession.getState().user! };
+  return { ...actual, useSignedInUser: () => actual.useSession.getState().user!, useSignedInPrincipal: () => actual.useSession.getState().principal! };
 });
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";

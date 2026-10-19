@@ -5,7 +5,8 @@ import { use, useMemo, useState } from "react";
 import { ArrowLeft, Sparkles, Send, Mail, Bookmark, Building2, Check, X, Minus } from "lucide-react";
 import { useJob } from "@/lib/hooks/use-jobs";
 import { useCandidates } from "@/lib/hooks/use-candidates";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import { can, scopeCandidates } from "@/lib/auth/permissions";
 import { deriveMatchScore } from "@/lib/derive";
 import type { Job, JobRequirement } from "@/lib/schemas/job";
 import type { Candidate } from "@/lib/schemas/candidate";
@@ -44,20 +45,20 @@ function matchRequirement(req: JobRequirement, candidate: Candidate | null): Req
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const toHref = useHref();
   const { id } = use(params);
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const jobQuery = useJob(id);
   const candidatesQuery = useCandidates();
 
   const myCandidates = useMemo(() => {
     const cs = candidatesQuery.data ?? [];
-    return user.role === "BDE" ? cs.filter((c) => c.assignedUserIds.includes(user.id)) : cs;
-  }, [candidatesQuery.data, user]);
+    return scopeCandidates(principal, cs);
+  }, [candidatesQuery.data, principal]);
 
   const [candidateId, setCandidateId] = useState("");
   const context = myCandidates.find((c) => c.id === candidateId) ?? null;
 
   const run = useAgentRun(ANALYSIS_STAGES.length);
-  const canAct = user.role !== "VIEWER";
+  const canAct = can(principal, "job.apply");
 
   if (jobQuery.isLoading) return <div className="bq-page"><SkeletonCard /></div>;
   if (isNotFoundError(jobQuery.error)) {

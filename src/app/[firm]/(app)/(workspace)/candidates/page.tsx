@@ -12,7 +12,8 @@ import type { CandidateStatus } from "@/lib/schemas/enums";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { can, hasOwnScope, scopeCandidates } from "@/lib/auth/permissions";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { deriveCandidateStats } from "@/lib/derive";
 import { DataTable } from "@/components/app/data-table";
 import { PageHeader } from "@/components/app/page-header";
@@ -77,22 +78,20 @@ type Row = {
 export default function CandidatesPage() {
   const toHref = useHref();
   const router = useRouter();
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
+  const isOwnScope = hasOwnScope(principal);
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
   const teamQuery = useTeam();
   const [statusFilter, setStatusFilter] = useState<CandidateStatusFilter>("ALL");
   const view = useSyncExternalStore(subscribeView, readView, () => "table" as View);
 
-  const isBde = user.role === "BDE";
 
   const rows = useMemo<Row[]>(() => {
     const candidates = candidatesQuery.data ?? [];
     const applications = applicationsQuery.data ?? [];
     const team = teamQuery.data ?? [];
-    const visible = isBde
-      ? candidates.filter((c) => c.assignedUserIds.includes(user.id))
-      : candidates;
+    const visible = scopeCandidates(principal, candidates);
     return visible
       .filter((c) => statusFilter === "ALL" || c.status === statusFilter)
       .map((c) => {
@@ -107,7 +106,7 @@ export default function CandidatesPage() {
           lastActivity: stats.lastActivityAt,
         };
       });
-  }, [candidatesQuery.data, applicationsQuery.data, teamQuery.data, isBde, user.id, statusFilter]);
+  }, [candidatesQuery.data, applicationsQuery.data, teamQuery.data, principal, statusFilter]);
 
   const columns = useMemo<ColumnDef<Row, unknown>[]>(() => {
     const cols: ColumnDef<Row, unknown>[] = [
@@ -145,7 +144,7 @@ export default function CandidatesPage() {
         cell: ({ row }) => <span className="whitespace-nowrap text-[var(--color-text-3)]">{row.original.lastActivity ? formatRelative(row.original.lastActivity) : "—"}</span>,
       },
     ];
-    if (!isBde) {
+    if (!isOwnScope) {
       cols.splice(3, 0, {
         id: "bde",
         accessorFn: (r) => r.bde,
@@ -154,9 +153,9 @@ export default function CandidatesPage() {
       });
     }
     return cols;
-  }, [isBde]);
+  }, [isOwnScope]);
 
-  const canCreate = user.role !== "VIEWER";
+  const canCreate = can(principal, "candidate.create");
 
   const toolbar = (
     <div className="flex items-center gap-2">
@@ -175,7 +174,7 @@ export default function CandidatesPage() {
     <div className="bq-page">
       <PageHeader
         title="Candidates"
-        subtitle={isBde ? "Your assigned bench." : "Every candidate on the firm's bench."}
+        subtitle={isOwnScope ? "Your assigned bench." : "Every candidate on the firm's bench."}
         actions={
           canCreate ? (
             <Button asChild>
@@ -192,7 +191,7 @@ export default function CandidatesPage() {
             isLoading={candidatesQuery.isLoading || applicationsQuery.isLoading}
             error={candidatesQuery.error}
             onRetry={() => void candidatesQuery.refetch()}
-            showBde={!isBde}
+            showBde={!isOwnScope}
             status={{ tone: (c) => STATUS_TONE[c.status], label: (c) => STATUS_LABEL[c.status] }}
             toolbar={toolbar}
           />

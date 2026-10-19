@@ -5,7 +5,8 @@ import { Send, Mail, Check, TriangleAlert, Link2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import { can, scopeApplications } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/app/page-header";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,11 +30,11 @@ const TEMPLATES = [
 ];
 
 export default function OutreachPage() {
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const applicationsQuery = useApplications();
   const candidatesQuery = useCandidates();
   const loadError = (applicationsQuery.error ?? candidatesQuery.error) as Error | null;
-  const canAct = user.role !== "VIEWER";
+  const canAct = can(principal, "outreach.act");
 
   const candidateName = useMemo(() => {
     const m = new Map((candidatesQuery.data ?? []).map((c) => [c.id, c.fullName]));
@@ -42,9 +43,9 @@ export default function OutreachPage() {
 
   const threads = useMemo(() => {
     let apps = applicationsQuery.data ?? [];
-    if (user.role === "BDE") apps = apps.filter((a) => a.submittedByUserId === user.id);
+    apps = scopeApplications(principal, apps);
     return apps.filter((a) => ["APPLIED", "RESPONSE", "SCREENING"].includes(a.status)).slice(0, 20);
-  }, [applicationsQuery.data, user]);
+  }, [applicationsQuery.data, principal]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState(TEMPLATES[0]!.id);

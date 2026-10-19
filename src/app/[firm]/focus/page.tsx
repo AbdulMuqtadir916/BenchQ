@@ -7,7 +7,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { useApplications } from "@/lib/hooks/use-applications";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import { scopeCandidates } from "@/lib/auth/permissions";
 import { rankJobsForCandidate } from "@/lib/derive";
 import { MatchScore } from "@/components/app/match-score";
 import { Tag } from "@/components/ui/tag";
@@ -16,16 +17,16 @@ import { useHref } from "@/lib/routes/use-href";
 
 export default function FocusModePage() {
   const toHref = useHref();
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const candidatesQuery = useCandidates();
   const jobsQuery = useJobs({ limit: 400 });
   const applicationsQuery = useApplications();
 
   const myCandidates = useMemo(() => {
     const cs = candidatesQuery.data ?? [];
-    const mine = user.role === "BDE" ? cs.filter((c) => c.assignedUserIds.includes(user.id)) : cs;
+    const mine = scopeCandidates(principal, cs);
     return mine.filter((c) => c.status === "ON_BENCH" || c.status === "INTERVIEWING");
-  }, [candidatesQuery.data, user]);
+  }, [candidatesQuery.data, principal]);
 
   const [candidateId, setCandidateId] = useState<string>("");
   const candidate = myCandidates.find((c) => c.id === candidateId) ?? myCandidates[0] ?? null;

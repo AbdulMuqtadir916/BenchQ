@@ -9,7 +9,8 @@ import { useJob } from "@/lib/hooks/use-jobs";
 import { useResumes } from "@/lib/hooks/use-resumes";
 import { useTeam } from "@/lib/hooks/use-team";
 import { useCandidateInbox } from "@/lib/hooks/use-inbox";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { can } from "@/lib/auth/permissions";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { deriveMatchScore } from "@/lib/derive";
 import { formatRelative } from "@/lib/format/timezone";
 import { PageHeader } from "@/components/app/page-header";
@@ -43,7 +44,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 export default function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const toHref = useHref();
   const { id } = use(params);
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const appQuery = useApplication(id);
   const app = appQuery.data;
   const { access } = useRouteAccess();
@@ -71,7 +72,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
       </div>
     );
   }
-  if (!isInScope(access, user.id, { ownerUserId: app.submittedByUserId })) return notFoundState;
+  if (!isInScope(access, principal.userId, { ownerUserId: app.submittedByUserId })) return notFoundState;
 
   const candidate = candidateQuery.data;
   const job = jobQuery.data;
@@ -89,7 +90,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
         actions={
           <>
             <Tag tone={STATUS_TONE[app.status]}>{STATUS_LABEL[app.status]}</Tag>
-            {user.role !== "VIEWER" && next ? (
+            {can(principal, "application.move") && next ? (
               <Button size="sm" variant="secondary" disabled={updateStatus.isPending} onClick={() => updateStatus.mutate({ id: app.id, status: next, note: null })}>
                 Move to {STATUS_LABEL[next]} <ArrowRight size={13} aria-hidden />
               </Button>

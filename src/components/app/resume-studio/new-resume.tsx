@@ -7,7 +7,8 @@ import type { Record_ } from "@/lib/schemas/record";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useRecord } from "@/lib/hooks/use-records";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import { can, scopeCandidates } from "@/lib/auth/permissions";
 import { buildResumeDocument, newClaim, newId } from "@/lib/resume-doc/build";
 import { allClaims, setClaimState } from "@/lib/resume-doc/ops";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ function composeDocument(id: string, start: StartFrom, candidate: Candidate, rec
 }
 
 export function NewResume({ initialMode, upload }: { initialMode: StudioMode; upload: string | null }) {
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const close = useCloseStudio();
   const candidatesQuery = useCandidates();
   const [draftId] = useState(() => newId("resume_new"));
@@ -49,8 +50,8 @@ export function NewResume({ initialMode, upload }: { initialMode: StudioMode; up
 
   const candidates = useMemo(() => {
     const all = candidatesQuery.data ?? [];
-    return user.role === "BDE" ? all.filter((c) => c.assignedUserIds.includes(user.id)) : all;
-  }, [candidatesQuery.data, user]);
+    return scopeCandidates(principal, all);
+  }, [candidatesQuery.data, principal]);
   // The first candidate is preselected, so fall back to it until the user picks another.
   const candidate = candidates.find((c) => c.id === candidateId) ?? candidates[0];
   const recordQuery = useRecord(start === "record" && candidate ? candidate.id : "");
@@ -62,7 +63,7 @@ export function NewResume({ initialMode, upload }: { initialMode: StudioMode; up
   }, [start, candidate, recordQuery.data, loadedId, draftId, templateId, upload, initialMode, load]);
 
   if (loadedId === draftId) {
-    return <ResumeStudio subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")} canEdit={user.role !== "VIEWER"} onClose={close} />;
+    return <ResumeStudio subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")} canEdit={can(principal, "resume.edit")} onClose={close} />;
   }
 
   const isBusy = start !== null;

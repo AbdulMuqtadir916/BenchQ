@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from "motion/react";
 import type { FollowUpTask } from "@/lib/schemas/application";
 import type { FollowUpKind } from "@/lib/schemas/enums";
 import { useFollowups } from "@/lib/hooks/use-applications";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { can, scopeFollowupsUserId } from "@/lib/auth/permissions";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { PageHeader } from "@/components/app/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,10 +45,10 @@ const BUCKETS: { key: Bucket; label: string; tone: "red" | "amber" | "blue" | "n
 ];
 
 export default function FollowupsPage() {
-  const user = useSignedInUser();
-  const followupsQuery = useFollowups(user.role === "BDE" ? user.id : undefined);
+  const principal = useSignedInPrincipal();
+  const followupsQuery = useFollowups(scopeFollowupsUserId(principal));
   const [done, setDone] = useState<Set<string>>(new Set());
-  const canAct = user.role !== "VIEWER";
+  const canAct = can(principal, "followup.act");
 
   const pending = useMemo(
     () => (followupsQuery.data ?? []).filter((f) => f.state === "PENDING" && !done.has(f.id)),
