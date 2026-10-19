@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/command/command-palette";
 import { KeyboardHintSheet } from "@/components/command/keyboard-hint-sheet";
 import { RouteGuard } from "@/components/routes/route-guard";
 import { DemoStorageNotice } from "@/components/app/demo-storage-notice";
+import { ToastViewport } from "@/components/app/toast-viewport";
 
 /**
  * AppShell — Sidebar + Topbar + main. Docs/04 §1.1. `variant="admin"` is the platform tier's shell
@@ -26,7 +27,8 @@ export function AppShell({ children, modal, variant = "firm" }: { children: Reac
     hydrate();
   }, [hydrate]);
 
-  useGlobalShortcuts();
+  const area = variant === "admin" ? "platform" : "firm";
+  useGlobalShortcuts(area);
 
   return (
     <div className="bq-shell">
@@ -43,7 +45,8 @@ export function AppShell({ children, modal, variant = "firm" }: { children: Reac
       </div>
       </div>
       <CommandPalette />
-      <KeyboardHintSheet />
+      <KeyboardHintSheet area={area} />
+      <ToastViewport />
       {modal}
     </div>
   );

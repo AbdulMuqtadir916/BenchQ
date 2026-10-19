@@ -1,7 +1,7 @@
 # 04 — Screens
 
 **Project:** BenchQ · frontend only
-**Version:** 1.0 · September 2026
+**Version:** 1.1 · 19 October 2026 (aligned with docs/07 v2, Phase L and §14 Admin)
 
 Every route, its layout, its states, its permissions and its keyboard map. If a screen isn't in
 here, it doesn't get built — propose it first.
@@ -11,7 +11,9 @@ here, it doesn't get built — propose it first.
 ## 0. Rules that apply to every screen
 
 **Three states, always.** Skeleton while loading, empty when there's nothing, error when the
-adapter throws. Set `NEXT_PUBLIC_MOCK_ERROR_RATE=0.1` and walk the app — every error state you hit
+adapter throws. In a dev build, make mock calls fail from the browser console —
+`window.__BENCHQ_MOCK_FAIL__ = ["candidates.list"]` (or `["*"]` for every call; clear it to recover;
+`src/mocks/membership.ts`, inert in production builds) — and walk the app: every error state you hit
 must already exist.
 
 **Light first.** Light is the default render; dark is a preference the user opts into. Both are
@@ -26,8 +28,15 @@ is 36px, compact 32px, comfortable 44px. The setting persists per user in `local
 client-local time primary, IST secondary. Never show a bare UTC string.
 
 **Permission rendering.** A control the current role cannot use is **not rendered at all**. Do not
-render a disabled button as a hint that a feature exists. The one exception is the export gate,
-where the disabled state *is* the message.
+render a disabled button as a hint that a feature exists. There are two exceptions, where the
+disabled state *is* the message:
+
+1. **The export gate:** a resume with unverified claims can't be exported; the button stays visible,
+   disabled, naming the count with a jump-to-claim link.
+2. **The over-limit block** (docs/07 Q17, Q29): an action the role *may* take but the firm's plan limit
+   blocks (add a member at the seat limit, add a candidate at the candidate limit) stays visible,
+   disabled, with the reason inline (e.g. "Your plan allows 4 seats; 4 are in use.", §14.11). A role
+   that may not take the action at all still sees nothing.
 
 **Counts are derived.** Every number on every screen comes from `src/lib/derive/`. A fixture never
 supplies a count.
@@ -55,6 +64,11 @@ supplies a count.
 │  Settings  │                                                                 │
 └────────────┴─────────────────────────────────────────────────────────────────┘
 ```
+
+There is **no firm switcher** (a user belongs to one firm, docs/07 Q9; the firm comes from the URL) and
+**no role switcher** (removed with the dev principal switcher, Q25). The **account menu** (user menu)
+shows who is signed in — name, role, firm — and holds **Sign out**. In the admin shell (§14) it
+shows the Super Admin, and the topbar has no notifications and no shift clock.
 
 Sidebar: 208px expanded, 60px collapsed, 48px mobile icon rail, state in `localStorage`. Items carry live badge counts
 (follow-ups due today, unreviewed unverified claims). Badges are derived, and a badge of zero is
@@ -125,9 +139,18 @@ keep it accurate — it's the cheapest documentation in the product.
 
 ### 2.1 `/sign-in`, `/invite/[token]`
 
-`AuthShell`: centred card, product mark, no sidebar. There is no real auth in this repo — the form
-validates with Zod, shows the error state on a deliberately wrong password (`wrong@benchq.io`), and
-on success writes a session into the Zustand store and routes to `/dashboard`.
+`AuthShell`: centred card, product mark, no sidebar. Invite-only, no public sign-up (docs/07 Q11).
+Until real auth (Phase D), the form signs in against the **seeded accounts** in the mock layer (docs/03
+§3.2: one per fixture user plus the Super Admin, one shared demo password; docs/07 Q25). The session is
+shared by every tab (Q27). An unknown email, a wrong password and a deactivated account all get the same
+error, "Email or password is incorrect.", so the page never reveals which accounts exist; a service
+failure says "Couldn't sign in right now. Try again."
+
+On success: a firm user lands on **`/{slug}/dashboard`** (an OWNER on first run on `/{slug}/welcome`,
+§2.2); the Super Admin lands on **`/admin`**. **`returnTo`:** a guard that sends a signed-out visitor
+here adds `?returnTo=<path>`. After sign-in it is honoured only if it is a same-origin path **and the
+account that just signed in can open it** (`signInTarget`); otherwise — another firm's URL, `/admin` for
+a firm user, an external URL — the account's own landing.
 
 Build the states properly anyway: field-level validation, a submit-pending state, a form-level
 error banner, and a "check your email" confirmation on the forgot-password request. These are cheap now and expensive
@@ -140,8 +163,10 @@ button. An expired token renders its own state with a "request a new invite" act
 
 Four steps, progress rail on the left, back/next, resumable (step index in `localStorage`).
 
-1. **Firm** — name, timezone, shift window (defaults to 18:30–00:30 IST)
-2. **Invite team** — email rows with role selects; skippable
+1. **Firm** — confirms the firm the Super Admin created (§14.4): name, timezones, shift window
+   (defaults to 18:30–00:30 IST), each editable here
+2. **Invite team** — email rows with role selects; skippable. **Waits for Phase M** (the firm-side
+   invite flow, docs/07): until then the wizard skips this step
 3. **First candidate** — name, title, work authorisation, resume upload (drop zone simulates a
    parse with a 3s progress state, then shows extracted fields as `UNVERIFIED` claims for review)
 4. **Done** — three suggested next actions, routes to dashboard
@@ -528,13 +553,14 @@ the knowledge that it exists.
 
 | Route | Role | Content |
 |---|---|---|
-| `/settings` | OWNER | Firm name, logo, timezone, shift window, default follow-up cadence |
-| `/settings/team` | OWNER, MANAGER | Member table, invite flow, role changes, candidate assignment matrix |
+| `/settings` | all | No content: redirects to the first section the role may open (docs/07 Q1) |
+| `/settings/firm` | OWNER | Firm name, logo, timezone, shift window, default follow-up cadence |
+| `/settings/team` | OWNER, MANAGER | Member table and candidate assignment matrix. **OWNER** invites, removes and deactivates members and changes roles; **MANAGER** sees the team read-only and assigns candidates to BDEs (docs/07 Q15). BDE and VIEWER don't see it |
 | `/settings/templates` | OWNER, MANAGER | Resume templates and outreach templates, with preview and merge-field reference |
 | `/settings/preferences` | all | Theme, density, keyboard shortcut sheet, notification preferences, timezone display |
 
-`/admin` is `PLATFORM_ADMIN` only: firm list, seat usage, feature flags. Mock data only, and it
-never appears in the sidebar for any other role.
+`/admin/…` is the platform tier, `PLATFORM_ADMIN` only (not-found for everyone else): see **§14**.
+It never appears in the sidebar for any other role.
 
 ---
 
@@ -563,7 +589,8 @@ cramped builder nobody can use.
 - Optimistic update rejected → revert with a toast naming the reason
 - Resume export blocked → gate message with a jump-to-claim link
 - Duplicate job on capture → comparison card, merge or keep
-- Session role switched mid-flight → refetch, don't leave stale data on screen
+- Principal changes mid-flight (sign-out, another account signed in, another tab) → the query cache is
+  cleared and the app remounts, so no data from the previous account stays on screen
 
 ---
 
@@ -597,3 +624,253 @@ MANAGER / VIEWER — throughput (candidates, applications, team), per-BDE perfor
 pipeline funnel (applications), at-risk (candidates, applications); BDE — tonight's numbers
 (candidates, applications, follow-ups), my candidates (candidates, applications), queue
 (candidates, applications, jobs).
+
+---
+
+## 14. Admin (platform tier) (decided 2026-10-19)
+
+Built from `docs/07` §2.3, §2.5, §4 and decisions Q17–Q24 (seat/limit rules A1–A4, slug rules A7,
+invites A9–A11, support view A12, ledger A13–A14); the open points were decided in 07 Q29. Phases:
+the screens and their writes are P3; the support view (14.10) is P4; ⌘K for admins is P5.
+
+Applies to every screen below, in addition to §0:
+
+- **Who:** `PLATFORM_ADMIN` only. Everyone else gets the plain not-found (07 §2.3). No Forbidden screens here.
+- **Shell:** the admin shell from P2 (frosted shell, admin nav, no firm notifications, no shift clock —
+  the BDE's shift isn't the admin's).
+- **Numbers:** every count, total and flag is derived (`deriveFirmUsage` and friends). Never a literal.
+- **States:** every data surface has skeleton, empty and error; `[firmId]` routes also have not-found.
+  Multi-card pages use the §13 per-group pattern.
+- **Permission rendering (§0):** an action that doesn't apply to a row or a state is not rendered
+  (Reactivate on an active firm, Deactivate on the OWNER). The exception is the over-limit block, §0's
+  second exception: visible, disabled, with the reason inline (14.11).
+- **Timestamps:** admin actions aren't US-facing, so `DualTimestamp` isn't required: IST, with relative
+  time ("3 h ago") and the full date on hover. Times shown *about a firm's work* (last activity) follow
+  the same rule.
+- **Writes:** in the mock layer (UI-first). Every write appends the matching ledger entry (A13). Every
+  destructive or hard-to-reverse action goes through a confirm dialog.
+- **Lists:** filters, sort, search and page live in the URL, parsed with Zod. `J`/`K` move, `Enter` opens,
+  `/` focuses the filter (§1.3). Row density per §0.
+- **Widths:** per §11. The admin area is desk work: full layout at ≥ 1440, two-pane at 1024; below 768,
+  read-mostly — lists and firm detail are readable, create/edit forms still work, but nothing is designed
+  for heavy use on a phone.
+
+## 14.1 Admin nav and keyboard
+
+Nav order: Overview · Firms · Plans · Audit · System · Team.
+
+| Key | Action |
+|---|---|
+| `g o` | Overview|
+| `g f` | Firms|
+| `g p` | Plans|
+| `g a` | Audit|
+| `g s` | System|
+| `g t` | Team|
+| `n` | New firm (on Firms)|
+| `⌘K` | Firm search by name or slug; "View workspace of {firm}"; admin nav. No firm-scoped commands outside a support view (P5) |
+
+`g f` and `g a` mean Follow-ups and Applications in the firm area (§1.3). Inside a support view the admin
+is in the firm's UI, so the firm map applies there; the admin map applies only under `/admin`. The `?`
+sheet always shows the map for where you are.
+
+## 14.2 `/admin` — Overview
+
+**Purpose:** what needs the Super Admin's attention right now, then the health of the business.
+
+**Layout (top to bottom):**
+
+1. **Needs attention** (one card, list). Each row links to the firm:
+   - firms **over a limit** (`isOverLimit`), with which limit and by how much;
+   - **onboarding firms whose owner invite has expired** (the firm can't go ACTIVE until it's resent);
+   - **onboarding firms older than 7 days** with the owner invite still pending;
+   - support views **currently open** by any admin.
+   Empty: "Nothing needs attention."
+2. **Firms by status** (stat group): Active · Onboarding · Suspended, each a link to the firms list filtered.
+3. **Seats** (stat group): seats used vs. seat limits summed over ACTIVE firms; active users (all firms).
+4. **AI spend:** not shown until its `AiUsage` contract is approved (14.9).
+5. **Recent platform activity:** last 10 entries from `/admin/audit`, "View all" link.
+
+**States:** §13 per group. A firm count of zero is a real zero only once the firms query has loaded.
+
+## 14.3 `/admin/firms` — Firms list
+
+**Columns:** name · slug (monospace) · status badge · plan · seats used / limit · over-limit flag ·
+owner (name, or "Invite pending" / "Invite expired") · created · last activity.
+
+**Controls (in the URL):** search (`q`, name or slug) · status (`all | ACTIVE | ONBOARDING | SUSPENDED`) ·
+over limit only (`overLimit=1`) · sort (`name | created | lastActivity`, default `lastActivity` desc) · page.
+
+**Actions:** "New firm" (primary, `n`). Row → `/admin/firms/[firmId]`.
+
+**Empty:** with no firms at all, "No firms yet" plus "Create the first firm". With filters, "No firms match"
+plus "Clear filters".
+
+**Last activity** = latest ledger entry with that `firmId`. Derived.
+
+## 14.4 `/admin/firms/new` — Create firm
+
+**Fields:**
+
+| Field | Rules |
+|---|---|
+| Firm name | required |
+| Slug | required. Suggested from the name as you type (until edited). Live check as you type: pattern and length (A7), reserved word (07 §2.4), taken. Each failure has its own message. Shows the resulting URL: `benchq…/{slug}/dashboard` |
+| Plan | required, active plans only. Shows the limits that will be copied onto the firm (A3) |
+| Primary timezone | default `Asia/Kolkata` |
+| Client timezone | default `America/New_York` |
+| Contact phone | optional |
+| Owner name | required |
+| Owner email | required, valid email |
+
+Not on this form: Truth Guard mode and application expiry days. They take their defaults; the firm's OWNER
+changes them in `settings/firm`.
+
+**Submit:** creates the firm (`ONBOARDING`), copies the plan's limits, creates the OWNER invite (7 days,
+sent by this admin), writes `FIRM_CREATED` and `INVITE_SENT`, then goes to `/admin/firms/[firmId]` with a
+toast "Firm created. Invite sent to {email}."
+
+**Cancel / `Esc`:** back to the firms list. If fields were edited, confirm discard.
+
+## 14.5 `/admin/firms/[firmId]` and its tabs
+
+**Header (all tabs):** firm name, slug, status badge, over-limit badge when set. Tabs as sub-routes:
+Overview · Users · Plan · Activity.
+
+**Header actions:**
+
+| Action | Behaviour |
+|---|---|
+| View workspace | Opens the support-view dialog (14.10, P4). Shown for an ONBOARDING firm with no users too: the workspace just shows its empty states |
+| Edit | Dialog: name, contact phone, timezones. Writes `UPDATE` |
+| Change slug | Separate dialog. Same live checks as create. Warns: "Every link to this firm's workspace will stop working. There is no redirect." Requires typing the new slug to confirm. Writes `UPDATE` with old → new in the summary |
+| Suspend | Confirm dialog with a required reason (min. 10 chars). Explains: firm users can sign in but see "Workspace suspended"; nothing is deleted. Writes `FIRM_SUSPENDED` (reason in summary) |
+| Reactivate | Confirm dialog. Not blocked by being over a limit. Writes `FIRM_REACTIVATED` |
+
+Suspend shows only for ACTIVE firms; Reactivate only for SUSPENDED.
+
+**Not-found:** unknown `firmId` → not-found inside the admin shell.
+
+### Overview tab
+
+- **Profile:** name, slug, timezones, contact phone, created.
+- **Plan and usage** (group): plan name; **Seats used** `N / limit` with breakdown "X active users + Y
+  pending invites"; **Active candidates** `N / limit` ("ON_BENCH, INTERVIEWING, OFFER"). Over a limit: the
+  number in the danger colour with label, plus "New additions are blocked. Existing users keep working."
+- **Owner:** name and email, status (Active / Invite pending, expires {date} / Invite expired). If the
+  invite is pending or expired: "Resend invite".
+- **Recent activity:** last 5 of this firm's ledger entries, "View all" → Activity tab.
+
+### Users tab — `/admin/firms/[firmId]/users`
+
+- **Members table:** name · email · role · status (Active / Deactivated) · last active.
+  Row action: **Deactivate** (confirm; logs `STATE_CHANGE`, 07 Q30). Reactivate (confirm; **blocked when the firm can't add a seat**, A4,
+  rendered as §0's over-limit exception: visible, disabled, the reason inline, e.g. "Your plan allows 4
+  seats; 4 are in use.").
+  The OWNER cannot be deactivated (ownership transfer is out of scope, A10); on the OWNER's
+  row the action is not rendered (§0) and the role cell reads "Owner".
+- **Pending invites table:** email · role · sent by · sent · expires · status.
+  Actions: **Resend** (new token, +7 days, logs `INVITE_SENT` "Invite resent to …", Q24) and **Revoke**
+  (confirm; logs `INVITE_REVOKED`). Expired invites show "Expired" and offer Resend only.
+- No "invite member" here: firms invite their own members (Phase M). The admin only sends the OWNER invite
+  at creation.
+
+Empty: members "No users yet — the owner hasn't accepted their invite."; invites "No pending invites."
+
+### Plan tab — `/admin/firms/[firmId]/plan`
+
+- **Current:** plan name and the firm's effective limits.
+- **Change plan:** select a plan → preview shows the new limits and, if current usage exceeds them, a warning:
+  "This firm will be over its seat limit (7 / 4). Existing users keep working; new additions will be blocked."
+  Allowed (A4: never auto-remove). Confirm writes `PLAN_CHANGED` with before → after in the summary (A14).
+- **Custom limits:** "Adjust limits" sets limits different from the plan's (e.g. Starter with 6 seats; the
+  Firm holds the effective limits, A3). Same over-limit preview as a plan change. Logged as `PLAN_CHANGED`
+  with before → after; the firm is marked "custom limits" on this tab, the firm header and the firms list.
+  The mark is derived (07 Q30): the firm's latest `PLAN_CHANGED` is a limits adjustment (`entityType:
+  "firm_limits"`); a plan change (`entityType: "firm"`) clears it.
+- **History:** derived from this firm's `PLAN_CHANGED` entries: date, by whom, before → after.
+
+### Activity tab — `/admin/firms/[firmId]/activity`
+
+This firm's ledger, newest first, every action including support views (`ADMIN_ACCESS` /
+`ADMIN_ACCESS_END`, with admin name and reason). Filters in the URL: action type, actor type, date range.
+Read-only.
+
+## 14.6 `/admin/plans` — Plan catalogue
+
+**Table:** name · seat limit · candidate limit · features (labels) · status (Active / Hidden) · firms on
+this plan (derived count).
+
+**Actions:** New plan · Edit · Hide (isActive false) / Show.
+
+The edit dialog states plainly: "Changes apply to firms assigned this plan from now on. Existing firms keep
+their current limits." (A3)
+
+Writes `CREATE` / `UPDATE` with `entityType: "plan"` (lowercase, like every ledger entity type), `firmId` null.
+
+No prices, no billing fields.
+
+## 14.7 `/admin/audit` — Platform audit log
+
+Every ledger entry, platform and firm (A13). Columns: when · actor (name, type) · action · firm (link, or
+"Platform") · entity · summary.
+
+Filters in the URL: firm, action, actor type, platform-only (`firmId` null), date range. Default: last 7
+days.
+
+Empty: "No activity in this period."
+
+## 14.8 `/admin/team` — BenchQ staff
+
+- **Staff table:** name · email · status · last active. Action: Deactivate (confirm).
+  You can't deactivate yourself, and the last active admin can't be deactivated.
+- **Invite staff:** email only (role is always `PLATFORM_ADMIN`, A11). Pending staff invites with Resend /
+  Revoke, as on the firm users tab.
+
+Never empty (you are on it).
+
+## 14.9 `/admin/system` — placeholder until its contracts are approved
+
+07 §2.3 lists backend health, scraper runs and AI spend by firm and model. **None of these have a data
+contract**, and CLAUDE.md requires one (with sign-off) before any schema or fixture. Agent and tailoring
+runs carry `firmId` (A17), but no approved field records cost or tokens.
+
+P3 builds `/admin/system` as a placeholder page ("Being specified") holding the **Reset demo data** card
+(docs/03 §3.3, moved from the `/admin` placeholder); AI spend stays hidden on the overview. Three contracts
+are drafted for sign-off separately — `HealthCheck`, `ScraperRun`, `AiUsage` (firmId, model, tokens in/out,
+cost, run reference, timestamp) — and the page is built after approval.
+
+## 14.10 Support view
+
+**Start from the firm page:** "View workspace" opens a dialog: firm name, a required reason (min. 10
+chars, live counter), and the notice "The firm will see your name and this reason in its activity log."
+Start → creates the view (60 minutes), writes `ADMIN_ACCESS`, goes to `/{slug}/dashboard`.
+
+**Start from a firm URL (interstitial, 07 §2.5 row 4):** same content as a full page in place of the firm
+screen, with "Back to {firm} in admin". Replaces P2's "Support view required" screen.
+
+**Banner (every firm page while active, not dismissible):** "Support view of {firm} · read-only · started
+{time} by {admin} · {mm} min left · Exit". At 5 minutes left the remaining time switches to the warning
+colour.
+
+**Exit / expiry / sign-out:** ends the view, writes `ADMIN_ACCESS_END`, returns to `/admin/firms/[firmId]`.
+On expiry, a notice there: "Your support view of {firm} ended after 60 minutes." To continue, start a new
+view (A12).
+
+**One at a time:** starting a view of firm B while viewing firm A ends A first (both entries logged).
+
+## 14.11 Decisions (07 Q29, 2026-10-19)
+
+1. **System and AI spend:** `/admin/system` is a placeholder; `HealthCheck`, `ScraperRun` and `AiUsage`
+   contracts are drafted for sign-off separately; the demo-data reset moves onto the placeholder; AI spend is
+   hidden on the overview until its contract is approved (14.9).
+2. **Custom limits** per firm: allowed, logged as `PLAN_CHANGED`, the firm marked "custom limits" (14.5).
+3. **View workspace** of an ONBOARDING firm with no users: allowed; it shows empty states.
+4. **Suspend:** ACTIVE firms only.
+5. **Stalled onboarding** shows in Needs attention after 7 days.
+7. **Over-limit block:** the second §0 exception. The action (Reactivate user here; Invite and New candidate
+   on firm pages in Phase M) stays visible but disabled, with the reason inline: "Your plan allows 4 seats; 4
+   are in use." Like the export gate, the block is the message.
+8. **Defaults accepted:** the OWNER can't be deactivated; you can't deactivate yourself or the last active
+   admin; a slug change needs the new slug typed to confirm; the `g`-shortcuts in 14.1; the 5-minute warning
+   on the support banner.

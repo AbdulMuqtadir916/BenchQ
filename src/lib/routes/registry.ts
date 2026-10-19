@@ -1,9 +1,11 @@
 import {
+  Activity,
   BarChart3,
   Bell,
   Briefcase,
   Building2,
   FileText,
+  Layers,
   LayoutDashboard,
   ShieldCheck,
   Mail,
@@ -103,7 +105,19 @@ const ROUTE_DEFS = [
   { id: "settings.preferences", path: "/[firm]/settings/preferences", title: "Preferences", area: "firm", shell: "app", access: firm(everyone("full"), "none"), nav: { section: "settings", order: 4, icon: SlidersHorizontal }, palette: true },
 
   // Platform tier (docs/07 §2.3): PLATFORM_ADMIN only; everyone else gets not-found from the admin layout.
-  { id: "admin", path: "/admin", title: "Overview", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 1, icon: ShieldCheck }, palette: true },
+  // `g` keys here are the admin map (docs/04 §14.1): they apply only in the admin shell, so `g f` / `g a`
+  // can mean Follow-ups / Applications in the firm area (shortcutsFor takes the area).
+  { id: "admin", path: "/admin", title: "Overview", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 1, icon: ShieldCheck }, shortcut: "o", palette: true },
+  { id: "admin.firms", path: "/admin/firms", title: "Firms", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 2, icon: Building2 }, shortcut: "f", palette: true },
+  { id: "admin.firms.new", path: "/admin/firms/new", title: "New firm", area: "platform", shell: "admin", access: PLATFORM },
+  { id: "admin.firms.detail", path: "/admin/firms/[firmId]", title: "Firm", area: "platform", shell: "admin", access: PLATFORM },
+  { id: "admin.firms.detail.users", path: "/admin/firms/[firmId]/users", title: "Firm users", area: "platform", shell: "admin", access: PLATFORM },
+  { id: "admin.firms.detail.plan", path: "/admin/firms/[firmId]/plan", title: "Firm plan", area: "platform", shell: "admin", access: PLATFORM },
+  { id: "admin.firms.detail.activity", path: "/admin/firms/[firmId]/activity", title: "Firm activity", area: "platform", shell: "admin", access: PLATFORM },
+  { id: "admin.plans", path: "/admin/plans", title: "Plans", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 3, icon: Layers }, shortcut: "p", palette: true },
+  { id: "admin.audit", path: "/admin/audit", title: "Audit", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 4, icon: ScrollText }, shortcut: "a", palette: true },
+  { id: "admin.system", path: "/admin/system", title: "System", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 5, icon: Activity }, shortcut: "s", palette: true },
+  { id: "admin.team", path: "/admin/team", title: "Team", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 6, icon: Users }, shortcut: "t", palette: true },
 ] as const satisfies readonly RouteDef[];
 
 /** Every registered route id. A mistyped id fails the typecheck instead of failing at render time. */
@@ -213,6 +227,18 @@ export function isRouteActive(routeId: RouteId, pathname: string): boolean {
   return current.id === routeId || current.id.startsWith(`${routeId}.`);
 }
 
+/**
+ * Which of `routes` (a nav list) is the current page's: the most specific one that `isRouteActive`.
+ * The admin Overview is `admin`, the parent of every admin route, so it must not light up on /admin/firms.
+ */
+export function activeNavId(routes: readonly RouteDef[], pathname: string): string | null {
+  let best: string | null = null;
+  for (const route of routes) {
+    if (isRouteActive(route.id as RouteId, pathname) && (best === null || route.id.length > best.length)) best = route.id;
+  }
+  return best;
+}
+
 export function canOpen(route: RouteDef, principal: Principal): boolean {
   if (route.devOnly && !devRoutesEnabled()) return false;
   return accessFor(route, principal) !== "none";
@@ -228,8 +254,12 @@ export function paletteRoutesFor(principal: Principal): RouteDef[] {
   return ROUTES.filter((route) => route.palette && canOpen(route, principal));
 }
 
-export function shortcutsFor(principal: Principal): { key: string; route: RouteDef }[] {
-  return ROUTES.filter((route) => route.shortcut && canOpen(route, principal)).map((route) => ({ key: route.shortcut!, route }));
+/**
+ * The `g` shortcuts where the principal is: the firm map in the firm area (a support view included),
+ * the admin map in the admin shell (docs/04 §14.1). Keys are unique within an area.
+ */
+export function shortcutsFor(principal: Principal, area: "firm" | "platform"): { key: string; route: RouteDef }[] {
+  return ROUTES.filter((route) => route.shortcut && route.area === area && canOpen(route, principal)).map((route) => ({ key: route.shortcut!, route }));
 }
 
 /**

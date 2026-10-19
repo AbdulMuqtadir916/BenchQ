@@ -44,7 +44,7 @@ export interface FirmUsage {
 export function deriveFirmUsage(
   /** A Firm (its effective limits, copied from the plan). */
   firm: { id: string; seatLimit: number; candidateLimit: number },
-  data: { users: readonly User[]; invites: readonly Invite[]; candidates: readonly Candidate[] },
+  data: { users: readonly Pick<User, "firmId" | "isActive">[]; invites: readonly Invite[]; candidates: readonly Pick<Candidate, "firmId" | "status">[] },
   now: Date,
 ): FirmUsage {
   const activeUsers = data.users.filter((user) => user.firmId === firm.id && user.isActive).length;

@@ -328,7 +328,7 @@ button:disabled { cursor: not-allowed; }
 .bq-page { padding: 24px; max-width: 1480px; margin-inline: auto; }
 .bq-page-wide { max-width: none; }
 .bq-view-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--color-text-3); background: transparent; }
-.bq-view-tab[aria-selected="true"] { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text); box-shadow: var(--shadow-sm); font-weight: 550; }
+.bq-view-tab[aria-selected="true"], .bq-view-tab[aria-current="page"] { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text); box-shadow: var(--shadow-sm); font-weight: 550; }
 .bq-view-tab:hover { color: var(--color-text); }
 .bq-board { display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; padding-bottom: 4px; }
 .bq-board-col { display: flex; flex-direction: column; width: 300px; flex: 0 0 auto; max-height: calc(100dvh - var(--topbar-height) - 11rem); min-height: 12rem; border: 1px solid transparent; border-radius: var(--radius-xl); background: var(--color-bg-subtle); padding: 10px; }

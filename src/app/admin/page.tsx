@@ -1,26 +1,6 @@
-import { LayoutDashboard } from "lucide-react";
-import { PageHeader } from "@/components/app/page-header";
-import { EmptyState } from "@/components/app/empty-state";
-import { DemoDataCard } from "@/features/admin/demo-data-card";
+import { AdminOverview } from "@/features/admin/overview";
 
-/**
- * /admin — placeholder until P3, which builds the overview (firm count by status, seats used vs sold,
- * active users, AI spend; all derived) from the docs/04 Admin section and the multi-card pattern in
- * docs/04 §13. P2 only needs a page so the shell and the platform guard can be checked.
- */
+/** /admin (docs/04 §14.2). */
 export default function AdminOverviewPage() {
-  return (
-    <div className="bq-page">
-      <PageHeader title="Overview" subtitle="The platform at a glance." />
-      <EmptyState
-        icon={LayoutDashboard}
-        variant="first-run"
-        title="The overview is being specified"
-        description="Firm counts, seat usage, active users and AI spend arrive once the admin screens are specified."
-      />
-      <div className="mt-6 max-w-2xl">
-        <DemoDataCard />
-      </div>
-    </div>
-  );
+  return <AdminOverview />;
 }

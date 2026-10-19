@@ -7,10 +7,10 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { useResetDemoData } from "@/lib/hooks/use-demo-data";
 
 /**
- * /admin: the demo data's reset (docs/03 §3.3). The demo data persists in this browser for every
+ * /admin/system: the demo data's reset (docs/03 §3.3). The demo data persists in this browser for every
  * account; resetting wipes every change made here and restores the original fixtures. A native modal
  * <dialog> confirms it (focus is held inside, Esc cancels, Cancel has the initial focus).
- * Temporary: it moves to /admin/system when P3 builds that page, and goes with the mocks (Phase D).
+ * It goes with the mocks (Phase D).
  */
 export function DemoDataCard() {
   const reset = useResetDemoData();

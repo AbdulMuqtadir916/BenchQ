@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { isRouteActive, navFor, type RouteDef, type RouteId } from "@/lib/routes/registry";
+import { activeNavId, navFor, type RouteDef } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { EASE_OUT } from "@/lib/motion";
 
@@ -33,7 +33,9 @@ export function Sidebar({
 }) {
   const principal = useSignedInPrincipal();
   const reduceMotion = useReducedMotion() ?? false;
+  const pathname = usePathname() ?? "";
   const groups = GROUPS[variant].map((group) => ({ ...group, routes: navFor(principal, group.section) }));
+  const activeId = activeNavId(groups.flatMap((group) => group.routes), pathname);
   const fade = { duration: reduceMotion ? 0 : 0.14, ease: EASE_OUT };
 
   // Width, padding and label opacity transition in CSS (.bq-sidebar in globals.css), so the
@@ -93,7 +95,7 @@ export function Sidebar({
             <p className="sidebar-label mb-2 px-2.5 text-caption text-[var(--color-text-3)]" aria-hidden={collapsed}>{group.label}</p>
             <ul className="space-y-0.5">
               {group.routes.map((route) => (
-                <SidebarItem key={route.id} route={route} />
+                <SidebarItem key={route.id} route={route} isActive={route.id === activeId} />
               ))}
             </ul>
           </div>
@@ -103,11 +105,9 @@ export function Sidebar({
   );
 }
 
-function SidebarItem({ route }: { route: RouteDef }) {
-  const pathname = usePathname();
+function SidebarItem({ route, isActive }: { route: RouteDef; isActive: boolean }) {
   const toHref = useHref();
   const Icon = route.nav?.icon;
-  const isActive = isRouteActive(route.id as RouteId, pathname ?? "");
 
   return (
     <li>
