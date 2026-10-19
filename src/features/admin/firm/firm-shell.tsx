@@ -12,8 +12,7 @@ import { activeNavId, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { CustomLimitsBadge, FirmStatusBadge, OverLimitBadge } from "../firm-badges";
 import { ChangeSlugDialog, EditFirmDialog, ReactivateFirmDialog, SuspendFirmDialog } from "./firm-actions";
-import { DialogFrame } from "../admin-dialog";
-import { SupportStartForm } from "@/components/app/support/support-start-form";
+import { SupportDialog } from "../support-dialog";
 import { useFirmDetail } from "./use-firm-detail";
 
 const TABS: { id: RouteId; label: string }[] = [
@@ -111,11 +110,3 @@ export function FirmShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** "View workspace" (docs/04 §14.10): the support-view form in a dialog; Esc or Cancel closes it. */
-function SupportDialog({ firm, onClose }: { firm: Parameters<typeof SupportStartForm>[0]["firm"]; onClose: () => void }) {
-  return (
-    <DialogFrame title={`View ${firm.name}'s workspace`} onClose={onClose}>
-      <SupportStartForm firm={firm} autoFocus secondary={<Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>} />
-    </DialogFrame>
-  );
-}

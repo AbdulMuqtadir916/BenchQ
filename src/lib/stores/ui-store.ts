@@ -19,6 +19,10 @@ interface UiState {
   setDensity: (d: Density) => void;
 
   commandPaletteOpen: boolean;
+  /** The firm ⌘K's "View workspace of {firm}" asks a support-view reason for (admin shell, docs/04 §14.1). */
+  supportDialogFirm: { id: string; slug: string; name: string } | null;
+  openSupportDialog: (firm: { id: string; slug: string; name: string }) => void;
+  closeSupportDialog: () => void;
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
 
@@ -67,6 +71,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
 
   commandPaletteOpen: false,
+  supportDialogFirm: null,
+  openSupportDialog: (firm) => set({ supportDialogFirm: firm, commandPaletteOpen: false }),
+  closeSupportDialog: () => set({ supportDialogFirm: null }),
   openCommandPalette: () => set({ commandPaletteOpen: true }),
   closeCommandPalette: () => set({ commandPaletteOpen: false }),
 

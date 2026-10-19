@@ -251,8 +251,12 @@ export function navFor(principal: Principal, section: NonNullable<RouteDef["nav"
   );
 }
 
-export function paletteRoutesFor(principal: Principal): RouteDef[] {
-  return ROUTES.filter((route) => route.palette && canOpen(route, principal));
+/**
+ * The ⌘K navigation where the principal is (docs/04 §14.1): firm routes in the firm area (a support view
+ * included: only routes it can open, read-only), admin routes in the admin shell — never both.
+ */
+export function paletteRoutesFor(principal: Principal, area: "firm" | "platform"): RouteDef[] {
+  return ROUTES.filter((route) => route.palette && route.area === area && canOpen(route, principal));
 }
 
 /**

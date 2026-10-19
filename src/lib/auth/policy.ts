@@ -25,6 +25,9 @@ export type FirmAction =
   | "outreach.act"
   | "followup.act";
 
+/** Every firm action, for tests that walk them all. */
+export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act"];
+
 /** Not an action: whether the person sees the team (owner and assignments) on firm pages (Q15). */
 export type FirmVisibility = "team.view";
 
@@ -68,6 +71,11 @@ export function scopeCandidates<T extends { assignedUserIds: readonly string[] }
 
 export function scopeApplications<T extends { submittedByUserId: string }>(principal: Principal, applications: readonly T[]): T[] {
   return isOwnScope(principal) ? applications.filter((application) => application.submittedByUserId === principal.userId) : [...applications];
+}
+
+/** The ledger a principal sees (07 §2.2 `ledger`: BDE `own`): a BDE, only the entries they made; everyone else the firm's. */
+export function scopeLedger<T extends { actorUserId: string | null }>(principal: Principal, entries: readonly T[]): T[] {
+  return isOwnScope(principal) ? entries.filter((entry) => entry.actorUserId === principal.userId) : [...entries];
 }
 
 /** The follow-ups to load: one person's for a BDE, the whole firm's (undefined) otherwise. */

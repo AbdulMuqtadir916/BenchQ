@@ -112,3 +112,18 @@ describe("control: an OWNER is not refused by the policy", () => {
     expect(outcome).not.toBe(403);
   });
 });
+
+describe("ledger scope (07 §2.2: BDE `own`)", () => {
+  it("a BDE gets only the entries they made; OWNER, MANAGER and VIEWER the whole firm's", async () => {
+    await signInAs("user_adnan"); // BDE, firm_hts
+    const mine = await ledgerMock.list(FIRM, { limit: 1000 });
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.every((entry) => entry.actorUserId === "user_adnan")).toBe(true);
+    for (const userId of ["user_imran", "user_fatima", "user_rohan"]) {
+      await signInAs(userId);
+      const all = await ledgerMock.list(FIRM, { limit: 1000 });
+      expect(all.some((entry) => entry.actorUserId !== "user_adnan"), userId).toBe(true);
+      expect(all.length, userId).toBeGreaterThan(mine.length);
+    }
+  });
+});
