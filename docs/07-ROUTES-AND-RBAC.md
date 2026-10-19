@@ -521,7 +521,7 @@ As v1 Phase C, typed on `Principal`:
 ## Phase B — UI completion audit
 
 As v1 Phase B (per-route checklist), with the audit board extended to the platform tier and the
-Support column. Known gaps carried over: ledger BDE "own" filter + filters + diff expander; the
+Support column. Known gaps carried over: ledger filters + diff expander (the BDE "own" scope is done, Phase P); the
 dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: sign-out in the user menu moved to Phase L (L3: without the switcher it is the only way to change accounts); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates"). From PR 4: outreach has no skeleton or empty state for its thread list; the candidates search box is squeezed at 390 px. (The dashboards' missing error states were fixed before Phase P: docs/04 §13.) ~~Two scripted navigations didn't happen~~ **Closed 2026-10-19:** on a production build (`pnpm build && pnpm start`) sign-in → landing took 142 ms, job page → studio 71 ms and a `router.push` row click 118 ms; the misses seen in dev were the dev server compiling each route on first visit (10–25 s), not a navigation bug. The OWNER rollup is labelled "Active users" until firm pages read pending invites (Phase M).
 
 ---
