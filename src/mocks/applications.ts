@@ -55,7 +55,7 @@ export const applicationsMock = firmScoped("applications", {
     changed("applications");
     return mockResult(ApplicationSchema.parse(application));
   },
-});
+}, { updateStatus: "application.move" });
 
 export const followupsMock = firmScoped("followups", {
   list: (firmId: string, params?: { userId?: string }): Promise<FollowUpTask[]> => {

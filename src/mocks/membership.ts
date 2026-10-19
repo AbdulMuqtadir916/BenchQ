@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/api/client";
+import { can, type FirmAction } from "@/lib/auth/policy";
 import { currentPrincipal } from "./auth";
 
 /**
@@ -22,6 +23,19 @@ export function requireMember(firmId: string, access: "read" | "write" = "read")
 
 /** The firm-scoped methods that only read; every other method of a firm-scoped mock writes. */
 const READ_METHODS = new Set(["list", "byId", "byCandidate"]);
+export const isReadMethod = (name: string): boolean => READ_METHODS.has(name);
+
+/**
+ * May the signed-in principal take this action? The same table the UI reads (src/lib/auth/policy.ts):
+ * a VIEWER, a support view or a platform admin is refused with 403 — the UI never offers them the
+ * control, and this is the layer a request can't skip.
+ */
+export function requireAction(action: FirmAction): void {
+  if (!can(currentPrincipal(), action)) throw new ApiError("Your role can't do that here.", "FORBIDDEN", 403);
+}
+
+/** Every firm-scoped write and the action it needs, by resource (the write-authorization test walks it). */
+export const WRITE_ACTIONS: Record<string, Record<string, FirmAction>> = {};
 
 /**
  * DEV ONLY: make chosen mock calls fail, to see the error state and its retry without a backend.
@@ -38,12 +52,23 @@ export function injectedFailure(call: string): void {
 
 type FirmMethod = (firmId: string, ...args: never[]) => Promise<unknown>;
 
-/** A firm-scoped mock: every method takes the firm id first and runs only for that firm's members. */
-export function firmScoped<M extends Record<string, FirmMethod>>(resource: string, methods: M): M {
+/**
+ * A firm-scoped mock: every method takes the firm id first and runs only for that firm's members.
+ * Reads (`list`, `byId`, `byCandidate`) need membership — or a support view of the firm. Every other
+ * method is a write and must name its action in `writes`: it then needs membership *and* `can(action)`,
+ * so a VIEWER and a support view are refused (403). A write without an action fails at load time.
+ */
+export function firmScoped<M extends Record<string, FirmMethod>>(resource: string, methods: M, writes: Partial<Record<keyof M & string, FirmAction>> = {}): M {
   const scoped: Record<string, FirmMethod> = {};
   for (const [name, method] of Object.entries(methods)) {
+    const action = (writes as Record<string, FirmAction | undefined>)[name];
+    if (!READ_METHODS.has(name)) {
+      if (!action) throw new Error(`firmScoped("${resource}"): the write "${name}" must name the action it needs`);
+      (WRITE_ACTIONS[resource] ??= {})[name] = action;
+    }
     scoped[name] = async (firmId, ...args) => {
-      requireMember(firmId, READ_METHODS.has(name) ? "read" : "write");
+      requireMember(firmId, action ? "write" : "read");
+      if (action) requireAction(action);
       injectedFailure(`${resource}.${name}`);
       return method(firmId, ...args);
     };

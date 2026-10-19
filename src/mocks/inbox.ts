@@ -66,4 +66,4 @@ export const inboxMock = firmScoped("inbox", {
     changed("inboxMessages");
     return mockResult(InboxMessageSchema.parse(message));
   },
-});
+}, { connect: "candidate.edit", disconnect: "candidate.edit", markRead: "candidate.edit" });

@@ -1,5 +1,5 @@
 import { mockResult, wait } from "./_shared";
-import { firmScoped } from "./membership";
+import { firmScoped, requireAction } from "./membership";
 import { AgentDraftSchema, TailorResumeInputSchema, type AgentDraft, type TailorResumeInput } from "@/lib/schemas/agent";
 import { RewriteInputSchema, type RewriteInput, type RewriteResult, RewriteResultSchema } from "@/lib/schemas/resume-document";
 import { ResumeClaimSchema, type ResumeClaim } from "@/lib/schemas/resume";
@@ -108,6 +108,8 @@ function draftClaims(resumeVersionId: string): ResumeClaim[] {
 
 export const agentsMock = {
   rewrite: async (rawInput: RewriteInput, signal?: AbortSignal): Promise<RewriteResult> => {
+    // Not about one firm's records, but it is still editing a resume: read-only principals are refused.
+    requireAction("resume.edit");
     const input = RewriteInputSchema.parse(rawInput);
     await wait(900, signal);
     return mockResult(rewriteText(input), signal);
@@ -128,5 +130,5 @@ export const agentsMock = {
         generatedAt: new Date().toISOString(),
       }), signal);
     },
-  }),
+  }, { tailorResume: "resume.edit" }),
 };

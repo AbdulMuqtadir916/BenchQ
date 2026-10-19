@@ -457,6 +457,39 @@ their invite on `/invite/[token]` and lands on `/welcome`.
 
 ## Phase C — Permission policy
 
+**Status (2026-10-19): a slice is done in P4 (Q32, PR #20); the rest is open.** Read this before
+starting Phase C, so nothing is redone and nothing is left behind.
+
+| Done in P4 (Q32) | Where |
+|---|---|
+| The pure policy `can(principal, action)` with the role × action table at the top; a support view → every firm action `false` (`team.view` true: it reads the whole firm); a platform admin outside one → no firm actions | `src/lib/auth/policy.ts` |
+| `useCan` for components | `src/lib/auth/permissions.ts` (re-exports the policy) |
+| Firm actions in the table: `candidate.create`, `candidate.edit`, `job.capture`, `job.apply`, `application.move`, `resume.edit`, `outreach.act`, `followup.act`; visibility `team.view` (Q15) | policy table |
+| Scope helpers `scopeCandidates`, `scopeApplications`, `scopeFollowupsUserId`, `hasOwnScope`, `dashboardFor` | `src/lib/auth/policy.ts` |
+| Every `role !== "VIEWER"` check and BDE filter on firm pages replaced (candidates, candidate detail, jobs, job detail, applications, application detail, resumes and the studio, outreach, follow-ups, focus, dashboard, BDE dashboard); pages read the principal, not a firm user; the unreachable analytics BDE branch deleted | those pages |
+| Controls that ignored `canAct` gated (attention "Move to…" / "Connect inbox", inbox suggestions, auto mark-read, "Tailor & apply") | candidate overview, applications tab, inbox, job explorer |
+| **The mock backend enforces the same table**: every firm-scoped write names its action (`firmScoped(…, writes)`; an undeclared write fails at load) and is refused (403) when `can()` says no — a VIEWER, a support view; `agents.rewrite` too. `src/mocks/write-authorization.test.ts` walks every write as a VIEWER, a support view and (control) an OWNER | `src/mocks/membership.ts` |
+| Table tests: per role, support view, platform admin; scope helpers | `src/lib/auth/permissions.test.ts` |
+
+**Still to do in Phase C:**
+
+- Platform actions in the table (`firm.create`, `firm.edit`, `firm.suspend`, `firm.viewWorkspace`, `plan.edit`,
+  `invite.resend`, `invite.revoke`, `platformTeam.manage`) and the admin screens asking `can()` instead of relying
+  on the platform guard alone.
+- Firm team actions (Q15): `member.invite`, `member.remove`, `member.changeRole`, `member.deactivate` (OWNER only),
+  `candidate.assign` (OWNER, MANAGER) — with the settings/team controls they gate (Phase M builds the invite flow).
+- `<Can>`, and `scopeLedger`: a BDE's `own` ledger scope (§2.2) is **not applied anywhere yet** — `/[firm]/ledger`
+  shows a BDE the whole firm's ledger. Phase C adds it (mock and page).
+- Route access as `can(principal, "route.view", route)`.
+- The full principal × action table test (every principal, every action, platform included).
+- The exit grep: `grep -rE "role (===|!==)"` returns nothing outside `src/lib/auth/` and the registry. Today the
+  remaining hits are record-role checks, not access checks (settings/team role tag colours, the admin users tab's
+  OWNER rule, manager-dashboard title, derive helpers) — decide which become policy and which are data rules.
+- `applications.updateStatus` still also checks `accessFor` + `isInScope` itself (it predates the policy); fold it
+  into the declared action plus a scope check.
+- Outreach and follow-ups have no write endpoints yet; when they get them, they declare `outreach.act` /
+  `followup.act` and the write-authorization test covers them automatically.
+
 As v1 Phase C, typed on `Principal`:
 
 - `src/lib/auth/permissions.ts`: `can(principal, action, resource?)` with the role × action

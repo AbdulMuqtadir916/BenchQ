@@ -19,4 +19,4 @@ export const candidatesMock = firmScoped("candidates", {
     changed("candidates");
     return mockResult(CandidateSchema.parse(candidate));
   },
-});
+}, { update: "candidate.edit" });
