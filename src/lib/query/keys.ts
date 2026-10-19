@@ -38,6 +38,18 @@ export const queryKeys = {
   team: { list: (firmId: string) => [firmId, "team", "list"] as const },
 
   // not firm-scoped
+  /** The platform tier (docs/07 §2.3): every firm's rows, PLATFORM_ADMIN only. One prefix, so an admin write refreshes it all. */
+  platform: {
+    all: () => ["platform"] as const,
+    firms: () => ["platform", "firms"] as const,
+    firm: (firmId: string) => ["platform", "firms", firmId] as const,
+    users: (firmId?: string) => ["platform", "users", firmId ?? "all"] as const,
+    invites: (firmId?: string | null) => ["platform", "invites", firmId === undefined ? "all" : (firmId ?? "platform")] as const,
+    plans: () => ["platform", "plans"] as const,
+    audit: () => ["platform", "audit"] as const,
+    team: () => ["platform", "team"] as const,
+    candidateUsage: () => ["platform", "candidateUsage"] as const,
+  },
   companies: {
     all: () => ["companies"] as const,
     detail: (id: string) => ["companies", "detail", id] as const,

@@ -6,11 +6,11 @@ import platformUsersSeed from "./data/platform-users.json";
 import { seededAt, table } from "./db";
 
 /**
- * Platform-tier fixtures (docs/02 §3.1). No adapter serves them yet: the admin area arrives in
- * Phase P, and firm-scoped invites in T5. Parsed here so every fixture is validated.
+ * Platform-tier tables (docs/02 §3.1), persisted (src/mocks/db.ts): the plan catalogue and BenchQ staff,
+ * both changed from /admin (docs/04 §14.6, §14.8).
  */
-export const plans: Plan[] = arrayOf(PlanSchema).parse(plansSeed);
-export const platformUsers: PlatformUser[] = arrayOf(PlatformUserSchema).parse(platformUsersSeed);
+export const plans: Plan[] = table("plans", PlanSchema, () => arrayOf(PlanSchema).parse(plansSeed));
+export const platformUsers: PlatformUser[] = table("platformUsers", PlatformUserSchema, () => arrayOf(PlatformUserSchema).parse(platformUsersSeed));
 
 /**
  * The instant the invite dates in invites.json were written against. At load they are shifted so
@@ -21,9 +21,13 @@ export const FIXTURE_NOW = new Date("2026-10-18T12:00:00.000Z");
 
 const inviteSeed: Invite[] = arrayOf(InviteSchema).parse(invitesSeed);
 
+/** Move a fixture date so that FIXTURE_NOW becomes `now` (invites, and the ledger entries about them). */
+export function shiftFixtureDate(iso: string, now: Date): string {
+  return new Date(new Date(iso).getTime() + now.getTime() - FIXTURE_NOW.getTime()).toISOString();
+}
+
 export function invitesAt(now: Date): Invite[] {
-  const shift = now.getTime() - FIXTURE_NOW.getTime();
-  const move = (iso: string) => new Date(new Date(iso).getTime() + shift).toISOString();
+  const move = (iso: string) => shiftFixtureDate(iso, now);
   return inviteSeed.map((invite) => InviteSchema.parse({ ...invite, createdAt: move(invite.createdAt), expiresAt: move(invite.expiresAt) }));
 }
 

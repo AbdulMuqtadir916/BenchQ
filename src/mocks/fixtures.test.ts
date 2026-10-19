@@ -6,7 +6,7 @@ import { allResumes } from "./resumes";
 import { allRecords } from "./records";
 import { allDocuments } from "./documents";
 import { allMessages } from "./inbox";
-import { allLedger } from "./ledger";
+import { allLedger, ledgerAt } from "./ledger";
 import { allUsers, firms } from "./team";
 import { FIXTURE_NOW, invitesAt, plans, platformUsers } from "./tenancy";
 
@@ -76,6 +76,27 @@ describe("firms, plans, users and invites", () => {
       expect(invite.role, invite.id).not.toBe("OWNER");
     }
   });
+});
+
+describe("invite ledger entries match their invites' dates (docs/07 P3)", () => {
+  // Any "now": both move together, so the tie holds however long after FIXTURE_NOW the data is seeded.
+  for (const now of [FIXTURE_NOW, new Date("2026-12-25T18:30:00.000Z")]) {
+    it(`at ${now.toISOString()}: INVITE_SENT on the invite's createdAt, INVITE_ACCEPTED / REVOKED within its life`, () => {
+      const inviteById = byId(invitesAt(now));
+      const entries = ledgerAt(now).filter((entry) => entry.action.startsWith("INVITE_"));
+      expect(entries.length).toBeGreaterThan(0);
+      for (const entry of entries) {
+        const invite = inviteById.get(entry.entityId);
+        expect(invite, entry.id).toBeDefined();
+        expect(entry.entityType, entry.id).toBe("invite");
+        if (entry.action === "INVITE_SENT") expect(entry.createdAt, entry.id).toBe(invite!.createdAt);
+        else {
+          expect(entry.createdAt >= invite!.createdAt, entry.id).toBe(true);
+          expect(entry.createdAt <= invite!.expiresAt, entry.id).toBe(true);
+        }
+      }
+    });
+  }
 });
 
 describe("firmId on every firm-scoped record", () => {
