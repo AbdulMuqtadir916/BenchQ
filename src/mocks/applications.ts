@@ -3,11 +3,15 @@ import { ApplicationSchema, FollowUpTaskSchema, type Application, type FollowUpT
 import { UpdateApplicationStatusSchema, type UpdateApplicationStatus } from "@/lib/schemas/inbox";
 import applicationsSeed from "./data/applications.json";
 import followupsSeed from "./data/followups.json";
-import { currentUser } from "./auth";
-import { findInFirm, inFirm, mockResult } from "./_shared";
+import { ApiError } from "@/lib/api/client";
+import { accessFor, routeById } from "@/lib/routes/registry";
+import { isInScope } from "@/lib/routes/scope";
+import { currentPrincipal, currentUser } from "./auth";
+import { findInFirm, inFirm, mockResult, notFound } from "./_shared";
 import { firmScoped } from "./membership";
+import { changed, table } from "./db";
 
-export const allApplications: Application[] = arrayOf(ApplicationSchema).parse(applicationsSeed);
+export const allApplications: Application[] = table("applications", ApplicationSchema, () => arrayOf(ApplicationSchema).parse(applicationsSeed));
 export const allFollowups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
 
 const CLOSED_STATUSES = ["PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
@@ -23,6 +27,13 @@ export const applicationsMock = firmScoped("applications", {
   // Stand-in for the backend's status-transition rules; delete with this module.
   updateStatus: (firmId: string, id: string, body: UpdateApplicationStatus): Promise<Application> => {
     const application = findInFirm(allApplications, firmId, id, "Application");
+    // Who may move it, by the same access table the UI reads (docs/07 §2.2, applications.detail):
+    // read-only (VIEWER, a support view) → 403; outside "own" scope (a BDE, someone else's) → 404,
+    // exactly like a missing one, so the call never confirms it exists (principle 4).
+    const principal = currentPrincipal();
+    const access = accessFor(routeById("applications.detail"), principal);
+    if (access === "read" || access === "none") throw new ApiError("You can't change applications.", "FORBIDDEN", 403);
+    if (!isInScope(access, principal.userId, { ownerUserId: application.submittedByUserId })) notFound("Application", id);
     const update = UpdateApplicationStatusSchema.parse(body);
     const now = new Date().toISOString();
 
@@ -41,6 +52,7 @@ export const applicationsMock = firmScoped("applications", {
     if (update.status === "INTERVIEW" && !application.interviewAt) application.interviewAt = now;
     if (update.status === "OFFER") application.offerAt = now;
     if (CLOSED_STATUSES.includes(update.status)) application.closedAt = now;
+    changed("applications");
     return mockResult(ApplicationSchema.parse(application));
   },
 });

@@ -1,6 +1,7 @@
 import { LayoutDashboard } from "lucide-react";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState } from "@/components/app/empty-state";
+import { DemoDataCard } from "@/features/admin/demo-data-card";
 
 /**
  * /admin — placeholder until P3, which builds the overview (firm count by status, seats used vs sold,
@@ -17,6 +18,9 @@ export default function AdminOverviewPage() {
         title="The overview is being specified"
         description="Firm counts, seat usage, active users and AI spend arrive once the admin screens are specified."
       />
+      <div className="mt-6 max-w-2xl">
+        <DemoDataCard />
+      </div>
     </div>
   );
 }

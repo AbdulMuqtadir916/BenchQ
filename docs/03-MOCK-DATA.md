@@ -139,8 +139,8 @@ and press Retry to recover. Inert in production builds.
 
 **The session survives a full page load** and is shared by tabs (docs/07 Q27): the mock backend keeps
 the signed-in account's id in `localStorage` (`benchq.session`), standing in for the session cookie. Mock
-data still resets on reload, so a stored account the fresh data doesn't have (e.g. a user created by
-accepting an invite in a previous page life) is dropped and the visitor is signed out.
+data persists too (§3.3), so an account created by a change (an accepted invite) survives reloads; a
+stored account the data no longer has (after a reset) is dropped and the visitor is signed out.
 
 ### 3.2 Seed accounts (Q25–Q27, Phase L) — in effect
 
@@ -161,7 +161,7 @@ the `User` contract) until the backend has real users (Phase D).
 - **One account per browser profile** (Q27): the session lives in `localStorage` and is shared by
   every tab, like the production cookie will be. Signing out, or in as someone else, in any tab
   applies to all open tabs. **To use two accounts at once** (e.g. a BDE and their OWNER side by side),
-  use a private window or a second browser profile. Mock data still resets on every full page load.
+  use a private window or a second browser profile. The demo data persists across reloads and accounts in this browser (§3.3).
 
 | Name | Sign-in email | Firm | Role | Lands on | Current fixture email |
 | ---- | ------------- | ---- | ---- | -------- | --------------------- |
@@ -201,6 +201,53 @@ Invite emails, same pattern (the invites are not accounts; nothing signs in with
 | `inv_cbw_01` | BDE | PENDING | `new.bde@cbworks.in` | `new.bde@cyberabad-bench.benchq.test` |
 | `inv_gsc_owner` | OWNER | PENDING | `owner@gachibowlistaffing.com` | `owner@gachibowli-staffing.benchq.test` |
 | `inv_platform_01` | PLATFORM_ADMIN | PENDING | `omar@benchq.io` | `omar@admin.benchq.test` |
+
+
+### 3.3 Demo data persists in the browser (decided 2026-10-19)
+
+The mock layer behaves like a real app's backend: **changes persist**. The fixtures seed the data the
+first time this browser opens BenchQ; after that every change survives reloads, sign-outs and
+account changes, for every account signed in on this browser. Code: `src/mocks/db.ts`.
+
+- **Where:** one versioned `localStorage` key, `benchq.demo-data`, holding `{ version, seededAt,
+  tables }`. Only the tables that changed are stored (the fixtures are ~3.5 MB, too much for
+  `localStorage` to rewrite on every change); a table that was never changed is read from the
+  fixtures. Writable tables today: `firms`, `users`, `invites`, `candidates`, `applications`,
+  `documents`, `inboxMessages`, `inboxConnections`, `ledger`. A new writable table registers with
+  `table()` and calls `changed()` after writing (the save is batched).
+- **What is stored:** records only. Every number on screen (seats used, active candidates, dashboard
+  counts, funnels) is still derived from the records at read time; nothing derived is persisted.
+- **Version and reseeding:** `FIXTURE_VERSION` is a fingerprint of `src/mocks/data/*.json`. When the
+  fixtures change, `db.test.ts` fails until the fingerprint is updated; a browser holding another
+  version reseeds automatically on its next load (and so does unreadable stored data; a stored table
+  that no longer fits its schema falls back to its fixture).
+- **Reset:** Sana (Super Admin) → `/admin` → **Demo data** → **Reset demo data…**, confirmed in a
+  dialog that says it wipes every change made in this browser, by every account, and can't be undone.
+  It reseeds from the fixtures in place (no reload); other tabs follow. Signed-in sessions stay unless
+  the account itself was created by a change (e.g. an accepted invite's user), which then ends.
+  Other browsers keep their own data. (It moves to `/admin/system` when P3 builds that page.)
+- **Tabs:** a change saved in one tab refreshes the tables of every other open tab (storage event) and
+  they refetch, so two tabs can't overwrite each other's changes.
+- **Storage full:** if a save fails (the browser's `localStorage` quota is full, or storage is
+  blocked), the change is kept in memory, so the tab still shows it, and every shell shows **"Demo
+  storage is full. Ask a Super Admin to reset demo data."** plus "Your latest changes are kept in this
+  tab until you reload it." The next save retries with every changed table (so the earlier change is
+  saved too once there is room); the message goes when a save succeeds, e.g. after a reset. Tested
+  with a stand-in storage that throws (`db.test.ts`).
+- **Tests never use persisted data:** under the test runner storage is off, so every test runs on the
+  fixtures. `db.test.ts` installs a stub storage and a pinned clock to test persistence itself.
+
+**Relative fixture dates once the data persists.** Some fixture dates are written relative to "now":
+invites (`invitesAt`, pending = now + 5 days, expired = now − 2 days) and the "connected 12 days ago"
+inboxes. Before persistence they were re-shifted to the current time on every page load, so the demo
+never aged. Now they are anchored **once**, to `seededAt` (the moment this browser seeded the data,
+stored with the data); from then on they are ordinary dates and **age like real data**: three days later the pending invites are still pending (2 days left); after five days they
+expire, the seat each held frees up (seat counts are derived, `deriveFirmUsage`), and STL goes from
+4/4 to 3/4 — exactly what a real app would show. A **reset** re-anchors them to the new "now", so the
+demo's starting state comes back. Re-shifting on every load instead would keep the demo frozen, but it
+would also mean "expires in 5 days" was never true and would fight user-created dates; it was
+rejected. Tested in `db.test.ts` ("relative fixture dates"): seeded on day 0, reloaded on day 3
+(unchanged, pending, 4/4) and day 6 (expired, 3/4), reset on day 6 (pending again, 4/4).
 
 ---
 

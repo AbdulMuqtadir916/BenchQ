@@ -8,6 +8,7 @@ import { useGlobalShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { CommandPalette } from "@/components/command/command-palette";
 import { KeyboardHintSheet } from "@/components/command/keyboard-hint-sheet";
 import { RouteGuard } from "@/components/routes/route-guard";
+import { DemoStorageNotice } from "@/components/app/demo-storage-notice";
 
 /**
  * AppShell — Sidebar + Topbar + main. Docs/04 §1.1. `variant="admin"` is the platform tier's shell
@@ -34,7 +35,11 @@ export function AppShell({ children, modal, variant = "firm" }: { children: Reac
       <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} variant={variant} />
       <div className="bq-workspace">
         <Topbar variant={variant} />
-        <main id="main-content" className="min-w-0"><RouteGuard>{children}</RouteGuard></main>
+        <main id="main-content" className="min-w-0">
+          {/* Never lose a change silently: shown while the demo data can't be saved (docs/03 §3.3). */}
+          <div className="bq-page pb-0 empty:hidden"><DemoStorageNotice /></div>
+          <RouteGuard>{children}</RouteGuard>
+        </main>
       </div>
       </div>
       <CommandPalette />

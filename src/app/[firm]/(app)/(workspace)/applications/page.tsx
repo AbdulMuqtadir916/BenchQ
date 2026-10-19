@@ -5,7 +5,7 @@ import { Columns3, Calendar, Table2, type LucideIcon } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { useApplications } from "@/lib/hooks/use-applications";
+import { useApplications, useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { useSignedInUser } from "@/lib/stores/session-store";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { PageHeader } from "@/components/app/page-header";
@@ -37,7 +37,8 @@ export default function ApplicationsPage() {
     void candidatesQuery.refetch();
   };
   const [view, setView] = useState<View>("kanban");
-  const [overrides, setOverrides] = useState<Record<string, ApplicationStatus>>({});
+  // A move on the board is a real status change (it persists, docs/03 §3.3), shown at once (optimistic).
+  const updateStatus = useUpdateApplicationStatus();
 
   const candidateName = useMemo(() => {
     const map = new Map((candidatesQuery.data ?? []).map((c) => [c.id, c.fullName]));
@@ -47,11 +48,11 @@ export default function ApplicationsPage() {
   const apps = useMemo(() => {
     let list = applicationsQuery.data ?? [];
     if (user.role === "BDE") list = list.filter((a) => a.submittedByUserId === user.id);
-    return list.map((a) => ({ ...a, status: overrides[a.id] ?? a.status }));
-  }, [applicationsQuery.data, user, overrides]);
+    return list;
+  }, [applicationsQuery.data, user]);
 
   function moveTo(id: string, to: ApplicationStatus) {
-    setOverrides((prev) => ({ ...prev, [id]: to }));
+    updateStatus.mutate({ id, status: to, note: null });
   }
 
   return (

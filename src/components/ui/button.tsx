@@ -32,7 +32,8 @@ const buttonVariants = cva(
         subtle:
           "bg-[var(--color-primary-subtle)] text-[var(--color-primary-subtle-fg)] hover:bg-[var(--color-primary-subtle)]/80",
         danger:
-          "bg-[var(--color-danger-fg)] text-white hover:opacity-90",
+          // Text on the red: --color-surface, not white (AA in dark too: 6.7:1; white on the dark theme's red was 2.8:1).
+        "bg-[var(--color-danger-fg)] text-[var(--color-surface)] hover:opacity-90",
         link:
           "text-[var(--color-primary-subtle-fg)] underline-offset-4 hover:underline p-0 h-auto",
       },
