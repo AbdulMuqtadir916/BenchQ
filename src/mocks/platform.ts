@@ -12,6 +12,7 @@ import { allLedger } from "./ledger";
 import { injectedFailure } from "./membership";
 import { allUsers, firms } from "./team-data";
 import { invites, plans, platformUsers } from "./tenancy";
+import { issueInviteToken, tokenForInvite } from "./invite-tokens";
 import { mockResult, notFound } from "./_shared";
 
 /**
@@ -99,11 +100,12 @@ function done<T>(value: T, ...tables: TableName[]): Promise<T> {
 }
 
 
-function sendInvite(input: { firmId: string | null; email: string; role: Invite["role"]; label: string }, now: Date): Invite {
+function sendInvite(input: { firmId: string | null; email: string; inviteeName: string | null; role: Invite["role"]; label: string }, now: Date): Invite {
   const invite: Invite = {
     id: newId("inv", now),
     firmId: input.firmId,
     email: input.email,
+    inviteeName: input.inviteeName,
     role: input.role,
     invitedByUserId: currentPlatformUser().id,
     status: "PENDING",
@@ -111,6 +113,7 @@ function sendInvite(input: { firmId: string | null; email: string; role: Invite[
     createdAt: now.toISOString(),
   };
   invites.unshift(invite);
+  issueInviteToken(invite.id);
   log({ firmId: input.firmId, entityType: ENTITY.invite, entityId: invite.id, entityLabel: invite.email, action: "INVITE_SENT", summary: input.label }, now);
   return invite;
 }
@@ -149,8 +152,8 @@ export const platformMock = {
       };
       firms.push(firm);
       log({ firmId: firm.id, entityType: ENTITY.firm, entityId: firm.id, entityLabel: firm.name, action: "FIRM_CREATED", summary: `Created firm on ${plan.name} (${limitsText(plan)})` }, now);
-      // The invite carries no name (docs/02 §3.1): the owner sets theirs on accepting. The ledger keeps it.
-      sendInvite({ firmId: firm.id, email, role: "OWNER", label: `Invited ${ownerName} (${email}) as OWNER` }, now);
+      // 07 Q31: the name is prefilled on /invite/[token]; the owner may change it when accepting.
+      sendInvite({ firmId: firm.id, email, inviteeName: ownerName, role: "OWNER", label: `Invited ${ownerName} (${email}) as OWNER` }, now);
       return done(firm, "firms", "invites");
     },
 
@@ -281,8 +284,17 @@ export const platformMock = {
         if (!usage.canAddSeat) throw conflict(seatBlockReason(usage), "SEAT_LIMIT");
       }
       invites[index] = { ...invite, status: "PENDING", expiresAt: new Date(now.getTime() + INVITE_DAYS * DAY_MS).toISOString() };
+      issueInviteToken(invite.id); // A9: a new token; the old link stops working
       log({ firmId: invite.firmId, entityType: ENTITY.invite, entityId: invite.id, entityLabel: invite.email, action: "INVITE_SENT", summary: `Invite resent to ${invite.email}` }, now);
       return done(invites[index]!, "invites");
+    },
+
+    /** The live token of a pending invite, for "Copy invite link" (the link is /invite/[token]). */
+    link: (inviteId: string, now = new Date()): Promise<{ token: string }> => {
+      const invite = invites.find((item) => item.id === inviteId) ?? notFound("Invite", inviteId);
+      if (effectiveInviteStatus(invite, now) !== "PENDING") throw conflict("Only a pending invite has a link. Resend an expired one first.");
+      const token = tokenForInvite(invite.id) ?? issueInviteToken(invite.id);
+      return mockResult({ token });
     },
 
     revoke: (inviteId: string, now = new Date()): Promise<Invite> => {
@@ -347,7 +359,7 @@ export const platformMock = {
     invite: (email: string, now = new Date()): Promise<Invite> => {
       const address = checkEmail(email);
       checkEmailFree(address, now);
-      const invite = sendInvite({ firmId: null, email: address, role: "PLATFORM_ADMIN", label: `Invited ${address} to the platform team` }, now);
+      const invite = sendInvite({ firmId: null, email: address, inviteeName: null, role: "PLATFORM_ADMIN", label: `Invited ${address} to the platform team` }, now);
       return done(invite, "invites");
     },
 

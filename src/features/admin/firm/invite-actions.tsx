@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Send, XCircle } from "lucide-react";
+import { Link2, Send, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useResendInvite, useRevokeInvite } from "@/lib/hooks/use-platform";
+import { useInviteLink, useResendInvite, useRevokeInvite } from "@/lib/hooks/use-platform";
+import { hrefFor } from "@/lib/routes/registry";
 import type { Invite } from "@/lib/schemas/tenancy";
 import { AdminDialog, errorMessage } from "../admin-dialog";
 
@@ -28,6 +29,38 @@ export function ResendInviteButton({ invite, blockedReason }: { invite: Invite; 
       {blockedReason ? <span id={`resend-${invite.id}-reason`} className="text-caption text-[var(--color-warning-fg)]">{blockedReason}</span> : null}
       {resend.isError ? <span role="alert" className="text-caption text-[var(--color-danger-fg)]">{errorMessage(resend.error)}</span> : null}
       {isDone && !resend.isError ? <span role="status" className="text-caption text-[var(--color-success-fg)]">Sent. Expires in 7 days.</span> : null}
+    </span>
+  );
+}
+
+/**
+ * Copy the invite's link (07 P4): /invite/[token] with its live token, which the mock auth layer keeps
+ * (never on the Invite). A resend replaces the token, so a copied link stops working then. If the
+ * clipboard is blocked, the link shows in a read-only field to copy by hand.
+ */
+export function CopyInviteLinkButton({ invite }: { invite: Invite }) {
+  const link = useInviteLink();
+  const [copied, setCopied] = useState<string | null>(null);
+  const [manual, setManual] = useState<string | null>(null);
+  async function copy() {
+    const { token } = await link.mutateAsync(invite.id);
+    const url = `${window.location.origin}${hrefFor("invite", { token })}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(url);
+      setManual(null);
+    } catch {
+      setManual(url);
+    }
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <Button variant="ghost" size="sm" disabled={link.isPending} onClick={() => void copy().catch(() => undefined)}>
+        <Link2 size={13} aria-hidden /> Copy link
+      </Button>
+      {copied ? <span role="status" className="text-caption text-[var(--color-success-fg)]">Link copied</span> : null}
+      {manual ? <input readOnly value={manual} aria-label={`Invite link for ${invite.email}`} onFocus={(event) => event.currentTarget.select()} className="bq-input h-7 w-64 text-mono-sm" /> : null}
+      {link.isError ? <span role="alert" className="text-caption text-[var(--color-danger-fg)]">{errorMessage(link.error)}</span> : null}
     </span>
   );
 }

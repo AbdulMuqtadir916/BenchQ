@@ -11,7 +11,7 @@ import { deriveFirmUsage, effectiveInviteStatus, type FirmUsage } from "./tenanc
  */
 
 /** Ledger entity types (lowercase, as the fixtures write them). */
-export const ENTITY = { firm: "firm", firmLimits: "firm_limits", invite: "invite", plan: "plan", user: "user", platformUser: "platform_user" } as const;
+export const ENTITY = { firm: "firm", firmLimits: "firm_limits", invite: "invite", plan: "plan", user: "user", platformUser: "platform_user", supportView: "support_view" } as const;
 
 /** docs/04 §14.2: an onboarding firm whose owner invite is still pending after this long needs attention. */
 export const STALLED_ONBOARDING_DAYS = 7;
@@ -35,8 +35,8 @@ export function seatBlockReason(usage: Pick<FirmUsage, "seatsUsed" | "seatLimit"
 
 export type OwnerStatus =
   | { kind: "active"; name: string; email: string; userId: string; isActive: boolean }
-  | { kind: "pending"; email: string; invite: Invite }
-  | { kind: "expired"; email: string; invite: Invite }
+  | { kind: "pending"; email: string; name: string | null; invite: Invite }
+  | { kind: "expired"; email: string; name: string | null; invite: Invite }
   | { kind: "none" };
 
 /** The firm's one OWNER (A10): the user, else the latest owner invite that is pending or expired. */
@@ -48,7 +48,7 @@ export function ownerStatus(firmId: string, data: Pick<PlatformData, "users" | "
     .filter((item) => ["PENDING", "EXPIRED"].includes(effectiveInviteStatus(item, now)))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (!invite) return { kind: "none" };
-  return effectiveInviteStatus(invite, now) === "PENDING" ? { kind: "pending", email: invite.email, invite } : { kind: "expired", email: invite.email, invite };
+  return effectiveInviteStatus(invite, now) === "PENDING" ? { kind: "pending", email: invite.email, name: invite.inviteeName, invite } : { kind: "expired", email: invite.email, name: invite.inviteeName, invite };
 }
 
 const newestFirst = (a: LedgerEntry, b: LedgerEntry) => b.createdAt.localeCompare(a.createdAt);

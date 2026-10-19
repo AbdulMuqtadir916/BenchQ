@@ -6,7 +6,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { useApplications, useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { can, scopeApplications } from "@/lib/auth/permissions";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { PageHeader } from "@/components/app/page-header";
 import { DataTable } from "@/components/app/data-table";
@@ -27,7 +28,7 @@ const VIEWS: Array<{ id: View; label: string; Icon: LucideIcon }> = [
 type View = "kanban" | "table" | "calendar";
 
 export default function ApplicationsPage() {
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const applicationsQuery = useApplications();
   const candidatesQuery = useCandidates();
   // An error must never read as an empty board (CLAUDE.md: three states, always).
@@ -47,9 +48,9 @@ export default function ApplicationsPage() {
 
   const apps = useMemo(() => {
     let list = applicationsQuery.data ?? [];
-    if (user.role === "BDE") list = list.filter((a) => a.submittedByUserId === user.id);
+    list = scopeApplications(principal, list);
     return list;
-  }, [applicationsQuery.data, user]);
+  }, [applicationsQuery.data, principal]);
 
   function moveTo(id: string, to: ApplicationStatus) {
     updateStatus.mutate({ id, status: to, note: null });
@@ -57,7 +58,7 @@ export default function ApplicationsPage() {
 
   return (
     <div className="bq-page bq-page-wide">
-      <PageHeader title="Applications" subtitle="Drag a card into the next stage." />
+      <PageHeader title="Applications" subtitle={can(principal, "application.move") ? "Drag a card into the next stage." : "Every application, by stage."} />
       <div className="mb-4 flex flex-wrap items-center gap-1" role="tablist" aria-label="View">
         {VIEWS.map(({ id, label, Icon }) => (
           <button key={id} type="button" role="tab" aria-selected={view === id} className="bq-view-tab" onClick={() => setView(id)}>
@@ -68,7 +69,7 @@ export default function ApplicationsPage() {
       </div>
 
       {loadError ? <ErrorState error={loadError} onRetry={retry} /> : applicationsQuery.isLoading ? <SkeletonCard /> : view === "kanban" ? (
-        <ApplicationBoard apps={apps} candidateName={candidateName} onMove={moveTo} canAct={user.role !== "VIEWER"} />
+        <ApplicationBoard apps={apps} candidateName={candidateName} onMove={moveTo} canAct={can(principal, "application.move")} />
       ) : view === "table" ? (
         <TableView apps={apps} candidateName={candidateName} />
       ) : (

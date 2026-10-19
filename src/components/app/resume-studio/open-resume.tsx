@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useResume } from "@/lib/hooks/use-resumes";
 import { useCandidate } from "@/lib/hooks/use-candidates";
 import { useRecord } from "@/lib/hooks/use-records";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import { can } from "@/lib/auth/permissions";
 import { buildResumeDocument } from "@/lib/resume-doc/build";
 import { deriveDocumentGate } from "@/lib/derive";
 import { ErrorState } from "@/components/app/error-state";
@@ -30,7 +31,7 @@ export function useCloseStudio() {
 
 export function OpenResume({ id, initialMode, review = false }: { id: string; initialMode: StudioMode; review?: boolean }) {
   const toHref = useHref();
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const close = useCloseStudio();
   const resumeQuery = useResume(id);
   const candidateId = resumeQuery.data?.candidateId ?? "";
@@ -40,7 +41,7 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
   const load = useStudio((s) => s.load);
   const setMode = useStudio((s) => s.setMode);
   const { access } = useRouteAccess();
-  const inScope = !candidateQuery.data || isInScope(access, user.id, { assignedUserIds: candidateQuery.data.assignedUserIds });
+  const inScope = !candidateQuery.data || isInScope(access, principal.userId, { assignedUserIds: candidateQuery.data.assignedUserIds });
 
   useEffect(() => {
     if (!inScope || !resumeQuery.data || !candidateQuery.data || !recordQuery.data || loadedId === id) return;
@@ -98,7 +99,7 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
   return (
     <ResumeStudio
       subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")}
-      canEdit={user.role !== "VIEWER"}
+      canEdit={can(principal, "resume.edit")}
       onClose={close}
     />
   );

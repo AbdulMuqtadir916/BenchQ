@@ -8,7 +8,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications } from "@/lib/hooks/use-applications";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import { can, scopeCandidates } from "@/lib/auth/permissions";
 import { EASE_OUT } from "@/lib/motion";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState } from "@/components/app/error-state";
@@ -19,7 +20,7 @@ import { useHref } from "@/lib/routes/use-href";
 
 function JobsContent() {
   const toHref = useHref();
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const focusId = useSearchParams().get("candidate");
   const reduce = useReducedMotion() ?? false;
   const jobsQuery = useJobs({ limit: 400 });
@@ -31,9 +32,9 @@ function JobsContent() {
   const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);
   const focus = focusId ? (candidates.find((c) => c.id === focusId) ?? null) : null;
   const myCandidates = useMemo(() => {
-    const mine = user.role === "BDE" ? candidates.filter((c) => c.assignedUserIds.includes(user.id)) : candidates;
+    const mine = scopeCandidates(principal, candidates);
     return focus && !mine.some((c) => c.id === focus.id) ? [focus, ...mine] : mine;
-  }, [candidates, user, focus]);
+  }, [candidates, principal, focus]);
 
   const isLoading = jobsQuery.isLoading || candidatesQuery.isLoading || applicationsQuery.isLoading;
   const error = jobsQuery.error ?? candidatesQuery.error ?? applicationsQuery.error;
@@ -51,7 +52,7 @@ function JobsContent() {
         title="Jobs"
         subtitle={focus ? `Open roles ranked for ${focus.fullName} — best match first.` : "Search, score, and inspect every role without leaving the queue."}
         actions={
-          user.role !== "VIEWER" ? (
+          can(principal, "job.capture") ? (
             <JobCaptureDialogTrigger />
           ) : undefined
         }

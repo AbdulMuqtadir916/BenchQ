@@ -19,6 +19,12 @@ export const sessionApi = {
 
   signOut: async (): Promise<null> => (await mock()).signOut(),
 
+  /** Start a read-only support view of a firm (07 §4, PLATFORM_ADMIN only). Ends any open one first. */
+  startSupportView: async (firmId: string, reason: string): Promise<Session> => (await mock()).startSupportView(firmId, reason),
+
+  /** End the open support view; `firmId` is the firm it was of, for the way back. */
+  exitSupportView: async (): Promise<{ session: Session; firmId: string | null }> => (await mock()).exitSupportView(),
+
   /**
    * Call `onChange` when the session changes in another tab (signed in, out, or as someone else); then
    * ask `current()`. Returns the unsubscribe.

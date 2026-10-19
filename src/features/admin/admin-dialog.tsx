@@ -92,6 +92,33 @@ export function AdminDialog({
   );
 }
 
+/**
+ * A modal <dialog> around a form that brings its own buttons (the support-view form): opens on mount,
+ * Esc and the form's Cancel call `onClose`.
+ */
+export function DialogFrame({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="bq-dialog"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <h2 id={titleId} className="mb-4 text-h3 text-[var(--color-text)]">{title}</h2>
+      {children}
+    </dialog>
+  );
+}
+
 /** A labelled field with its hint or error, wired for screen readers. */
 export function Field({ id, label, hint, error, children }: { id: string; label: string; hint?: ReactNode; error?: string | null; children: ReactNode }) {
   return (

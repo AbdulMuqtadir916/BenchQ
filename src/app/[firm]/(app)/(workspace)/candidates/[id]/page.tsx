@@ -4,7 +4,8 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { can } from "@/lib/auth/permissions";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { EASE_OUT } from "@/lib/motion";
 import { ErrorState } from "@/components/app/error-state";
@@ -32,7 +33,7 @@ import { useHref } from "@/lib/routes/use-href";
 export default function CandidateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const toHref = useHref();
   const { id } = use(params);
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
   const router = useRouter();
   const pathname = usePathname();
   const tabParam = useSearchParams().get("tab");
@@ -41,7 +42,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const ws = useCandidateWorkspace(id);
   const { access } = useRouteAccess();
   const updateStatus = useUpdateApplicationStatus();
-  const canAct = user.role !== "VIEWER";
+  const canAct = can(principal, "candidate.edit");
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
@@ -109,7 +110,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     return <div className="bq-page"><ErrorState variant="page" error={ws.candidateQuery.error ?? new Error("Candidate not found.")} onRetry={() => void ws.candidateQuery.refetch()} /></div>;
   }
   const candidate = ws.candidate;
-  if (!isInScope(access, user.id, { assignedUserIds: candidate.assignedUserIds })) {
+  if (!isInScope(access, principal.userId, { assignedUserIds: candidate.assignedUserIds })) {
     return notFoundState;
   }
   const resumes = ws.resumesQuery.data ?? [];
@@ -120,7 +121,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         candidate={candidate}
         stats={ws.stats}
         ownerName={ws.ownerName}
-        showOwner={user.role === "MANAGER" || user.role === "OWNER"}
+        showOwner={can(principal, "team.view")}
         canAct={canAct}
         resumeHref={toHref("resumes.studio", { id: resumes[0]?.id ?? "new" })}
         onFindJobs={actions.findJobs}

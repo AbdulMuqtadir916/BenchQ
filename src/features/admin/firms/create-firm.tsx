@@ -55,7 +55,8 @@ export function CreateFirm() {
   const activePlans = useMemo(() => (plans.data ?? []).filter((plan) => plan.isActive), [plans.data]);
   const planId = form.planId || activePlans[0]?.id || "";
   const plan = activePlans.find((item) => item.id === planId);
-  const taken = useMemo(() => (firms.data ?? []).map((firm) => firm.slug), [firms.data]);
+  // Once created, the firms list refetches with this firm in it: stop checking until the page has moved on.
+  const taken = useMemo(() => (create.isSuccess ? [] : (firms.data ?? []).map((firm) => firm.slug)), [firms.data, create.isSuccess]);
   const isEdited = JSON.stringify(form) !== JSON.stringify(EMPTY);
 
   const errors = {
@@ -177,7 +178,7 @@ export function CreateFirm() {
           {create.isError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{errorMessage(create.error)}</p> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={cancel} disabled={create.isPending}>Cancel</Button>
-            <Button type="submit" disabled={create.isPending || activePlans.length === 0}>{create.isPending ? "Creating…" : "Create firm and send invite"}</Button>
+            <Button type="submit" disabled={create.isPending || create.isSuccess || activePlans.length === 0}>{create.isPending || create.isSuccess ? "Creating…" : "Create firm and send invite"}</Button>
           </div>
         </form>
       )}

@@ -5,15 +5,12 @@ import { useApplications } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { useTeam } from "@/lib/hooks/use-team";
-import { useSignedInUser } from "@/lib/stores/session-store";
 import { deriveFunnel, deriveBdePerformance, daysBetween } from "@/lib/derive";
 import type { JobSourceType } from "@/lib/schemas/enums";
 import { PageHeader } from "@/components/app/page-header";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { FunnelBars } from "@/components/app/charts/funnel-bars";
 import { SkeletonCard } from "@/components/app/skeleton-card";
-import { EmptyState } from "@/components/app/empty-state";
-import { BarChart2 } from "lucide-react";
 import { ErrorState } from "@/components/app/error-state";
 
 const PERIODS = [
@@ -23,7 +20,6 @@ const PERIODS = [
 ] as const;
 
 export default function AnalyticsPage() {
-  const user = useSignedInUser();
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["key"]>("30d");
 
   const applicationsQuery = useApplications();
@@ -66,14 +62,6 @@ export default function AnalyticsPage() {
   const loadError = (applicationsQuery.error ?? candidatesQuery.error ?? jobsQuery.error ?? teamQuery.error) as Error | null;
   const maxApps = Math.max(1, ...perBde.map((b) => b.applicationsSubmitted));
   const maxSource = Math.max(1, ...sourceRoi.map((s) => s.apps));
-
-  if (user.role === "BDE") {
-    return (
-      <div className="bq-page">
-        <EmptyState icon={BarChart2} title="Analytics is a manager view" description="Ask your manager for the floor and business rollups." variant="filtered" />
-      </div>
-    );
-  }
 
   if (loadError) {
     return (

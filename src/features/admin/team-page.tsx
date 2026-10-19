@@ -17,7 +17,7 @@ import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import type { Invite, InviteStatus, PlatformUser } from "@/lib/schemas/tenancy";
 import { AdminDialog, Field, errorMessage, fieldAria } from "./admin-dialog";
 import { AdminDate, AdminTime } from "./admin-time";
-import { ResendInviteButton, RevokeInviteButton } from "./firm/invite-actions";
+import { CopyInviteLinkButton, ResendInviteButton, RevokeInviteButton } from "./firm/invite-actions";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -76,6 +76,7 @@ export function TeamPage() {
         cell: ({ row }) => (
           <span className="inline-flex flex-wrap items-center gap-1">
             <ResendInviteButton invite={row.original.invite} />
+            {row.original.status === "PENDING" ? <CopyInviteLinkButton invite={row.original.invite} /> : null}
             {row.original.status === "PENDING" ? <RevokeInviteButton invite={row.original.invite} /> : null}
           </span>
         ),

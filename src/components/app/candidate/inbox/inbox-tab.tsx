@@ -41,13 +41,14 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
   const count = (f: Filter) => ws.messages.filter((m) => inFilter(f, m)).length;
   const selected = ws.messages.find((m) => m.id === selectedId) ?? list[0] ?? null;
 
-  // An email counts as read once it's open in the reader.
+  // An email counts as read once it's open in the reader — for someone who works the inbox. A read-only
+  // reader (a VIEWER, a support view) leaves the firm's unread state as it is.
   const openId = selected?.id;
   const isUnread = !!selected && !selected.isRead;
   const { mutate: markAsRead } = markRead;
   useEffect(() => {
-    if (openId && isUnread) markAsRead(openId);
-  }, [openId, isUnread, markAsRead]);
+    if (canAct && openId && isUnread) markAsRead(openId);
+  }, [canAct, openId, isUnread, markAsRead]);
 
   if (ws.inboxQuery.error) return <ErrorState error={ws.inboxQuery.error} onRetry={() => void ws.inboxQuery.refetch()} />;
   if (ws.inboxQuery.isLoading) return <SkeletonList rows={6} />;

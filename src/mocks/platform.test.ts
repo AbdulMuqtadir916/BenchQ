@@ -78,7 +78,7 @@ describe("firm writes persist and log (docs/04 §14.4–14.5)", () => {
     const after = await reload(m);
     expect(after.firms.find((item) => item.id === firm.id)?.slug).toBe("madhapur-bench");
     const invite = after.invites.find((item) => item.firmId === firm.id)!;
-    expect(invite).toMatchObject({ role: "OWNER", email: "priya@madhapur-bench.benchq.test", status: "PENDING", invitedByUserId: "padm_sana", expiresAt: new Date(NOW.getTime() + 7 * DAY).toISOString() });
+    expect(invite).toMatchObject({ role: "OWNER", email: "priya@madhapur-bench.benchq.test", inviteeName: "Priya Nair", status: "PENDING", invitedByUserId: "padm_sana", expiresAt: new Date(NOW.getTime() + 7 * DAY).toISOString() });
     const entries = after.ledger.filter((entry) => entry.firmId === firm.id);
     expect(entries.map((entry) => entry.action).sort()).toEqual(["FIRM_CREATED", "INVITE_SENT"]);
     expect(entries.every((entry) => entry.actorType === "PLATFORM_ADMIN" && entry.actorName === "Sana Mirza")).toBe(true);

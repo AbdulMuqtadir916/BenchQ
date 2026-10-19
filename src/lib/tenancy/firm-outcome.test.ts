@@ -96,6 +96,16 @@ describe("firmOutcome edges", () => {
     expect(firmOutcome(admin, { status: "success", firm: firm({ status: "SUSPENDED" }) }).kind).toBe("support-required");
   });
 
+  it("opens the firm, read-only, inside a support view of it — a SUSPENDED firm too; a view of another firm is the interstitial (P4, §2.5)", () => {
+    const view = { id: "sv", reason: "Checking a report", startedAt: "2026-10-19T09:00:00.000Z", expiresAt: "2026-10-19T10:00:00.000Z" };
+    const supportOf = (firmId: string) => ({ kind: "platform" as const, userId: "padm", role: "PLATFORM_ADMIN" as const, support: { ...view, firmId } });
+    const target = firm({});
+    expect(firmOutcome(supportOf(target.id), { status: "success", firm: target })).toEqual({ kind: "open", firm: target });
+    const suspended = firm({ status: "SUSPENDED" });
+    expect(firmOutcome(supportOf(suspended.id), { status: "success", firm: suspended }).kind).toBe("open");
+    expect(firmOutcome(supportOf("firm_other"), { status: "success", firm: target }).kind).toBe("support-required");
+  });
+
   it("checks signed-out first and suspended after membership (§2.5 order)", () => {
     expect(firmOutcome(null, { status: "error", error: new ApiError("x", "NOT_FOUND", 404) }).kind).toBe("signed-out");
     expect(firmOutcome(principal, { status: "success", firm: firm({ status: "SUSPENDED" }) }).kind).toBe("suspended");

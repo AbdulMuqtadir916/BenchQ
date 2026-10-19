@@ -32,6 +32,7 @@ describe("InviteSchema (A11: firmId null ⇔ role PLATFORM_ADMIN)", () => {
   const base = {
     id: "inv_x",
     email: "new@firm.com",
+    inviteeName: null,
     invitedByUserId: "user_owner",
     status: "PENDING" as const,
     expiresAt: "2026-10-25T00:00:00.000Z",

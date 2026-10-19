@@ -12,6 +12,7 @@ import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firmOutcome, type FirmLookup, type FirmOutcome } from "@/lib/tenancy/firm-outcome";
 import { GateScreen, GateSkeleton } from "./gate-screen";
 import { SupportRequiredState } from "./support-required-state";
+import { SupportBanner } from "@/components/app/support/support-banner";
 
 /**
  * The firm layout's gate (docs/07 §2.5): resolves the URL's slug and renders the page only for a
@@ -22,6 +23,7 @@ import { SupportRequiredState } from "./support-required-state";
 export function FirmGate({ slug, children }: { slug: string; children: ReactNode }) {
   const router = useRouter();
   const principal = useSession((s) => s.principal);
+  const adminName = useSession((s) => s.platformUser?.name ?? null);
   // A sign-in or cross-firm switch is landing on this URL: its session commits right after this render.
   const isSessionPending = useIsSessionSettling();
   const query = useFirmBySlug(slug);
@@ -42,7 +44,7 @@ export function FirmGate({ slug, children }: { slug: string; children: ReactNode
     case "support-required":
       return (
         <GateScreen>
-          <SupportRequiredState />
+          <SupportRequiredState firm={outcome.firm} />
         </GateScreen>
       );
     case "not-found":
@@ -64,6 +66,11 @@ export function FirmGate({ slug, children }: { slug: string; children: ReactNode
         </GateScreen>
       );
     case "open":
-      return <FirmProvider firm={outcome.firm}>{children}</FirmProvider>;
+      return (
+        <FirmProvider firm={outcome.firm}>
+          {children}
+          {principal?.kind === "platform" && principal.support ? <SupportBanner view={principal.support} firmName={outcome.firm.name} adminName={adminName ?? "Super Admin"} /> : null}
+        </FirmProvider>
+      );
   }
 }

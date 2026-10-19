@@ -15,7 +15,7 @@ import type { User } from "@/lib/schemas/session";
 import type { Invite, InviteStatus } from "@/lib/schemas/tenancy";
 import { AdminDialog, errorMessage } from "../admin-dialog";
 import { AdminDate, AdminTime } from "../admin-time";
-import { ResendInviteButton, RevokeInviteButton } from "./invite-actions";
+import { CopyInviteLinkButton, ResendInviteButton, RevokeInviteButton } from "./invite-actions";
 import { useFirmDetail, type FirmDetail } from "./use-firm-detail";
 
 const ROLE_LABEL: Record<User["role"], string> = { OWNER: "Owner", MANAGER: "Manager", BDE: "BDE", VIEWER: "Viewer" };
@@ -156,6 +156,7 @@ function InvitesTable({ rows, usage, nameOf }: { rows: InviteRow[]; usage: FirmU
   const blocked = usage.canAddSeat ? null : seatBlockReason(usage);
   const columns = useMemo<ColumnDef<InviteRow, unknown>[]>(
     () => [
+      { id: "name", header: "Name", enableSorting: false, cell: ({ row }) => row.original.invite.inviteeName ?? <span className="text-[var(--color-text-3)]">—</span> },
       { id: "email", header: "Email", enableSorting: false, cell: ({ row }) => <span className="text-[var(--color-text)]">{row.original.invite.email}</span> },
       { id: "role", header: "Role", enableSorting: false, cell: ({ row }) => (row.original.invite.role === "PLATFORM_ADMIN" ? "Super Admin" : ROLE_LABEL[row.original.invite.role]) },
       { id: "sentBy", header: "Sent by", enableSorting: false, cell: ({ row }) => nameOf(row.original.invite.invitedByUserId) },
@@ -174,6 +175,7 @@ function InvitesTable({ rows, usage, nameOf }: { rows: InviteRow[]; usage: FirmU
         cell: ({ row }) => (
           <span className="inline-flex flex-wrap items-center gap-1">
             <ResendInviteButton invite={row.original.invite} blockedReason={row.original.status === "EXPIRED" ? blocked : null} />
+            {row.original.status === "PENDING" ? <CopyInviteLinkButton invite={row.original.invite} /> : null}
             {row.original.status === "PENDING" ? <RevokeInviteButton invite={row.original.invite} /> : null}
           </span>
         ),

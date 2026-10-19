@@ -41,4 +41,4 @@ export const documentsMock = firmScoped("documents", {
     changed("documents");
     return mockResult(document);
   },
-});
+}, { upload: "candidate.edit", remove: "candidate.edit" });

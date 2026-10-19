@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { Play, Sparkles, Send, Mail, ArrowRight, BellRing, MailCheck, CircleHelp } from "lucide-react";
-import { useSignedInUser } from "@/lib/stores/session-store";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import { scopeCandidates } from "@/lib/auth/permissions";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
 import { useJobs } from "@/lib/hooks/use-jobs";
@@ -30,10 +31,11 @@ const NIGHTLY_TARGET = 40;
 
 export function BdeDashboard() {
   const toHref = useHref();
-  const user = useSignedInUser();
+  const principal = useSignedInPrincipal();
+  const userId = principal.userId;
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
-  const followupsQuery = useFollowups(user.id);
+  const followupsQuery = useFollowups(userId);
   const jobsQuery = useJobs({ limit: 300 });
   // docs/04 §13: one group per set of cards that read the same queries.
   const numbers = queryGroup(candidatesQuery, applicationsQuery, followupsQuery);
@@ -47,13 +49,13 @@ export function BdeDashboard() {
   const jobs = jobsQuery.data ?? EMPTY;
 
   const myCandidates = useMemo(
-    () => candidates.filter((c) => c.assignedUserIds.includes(user.id)),
-    [candidates, user.id],
+    () => scopeCandidates(principal, candidates),
+    [principal, candidates],
   );
 
   const dash = useMemo(
-    () => deriveBdeDashboard(user.id, candidates, applications, followups),
-    [user.id, candidates, applications, followups],
+    () => deriveBdeDashboard(userId, candidates, applications, followups),
+    [userId, candidates, applications, followups],
   );
 
   const unverifiedToReview = useMemo(

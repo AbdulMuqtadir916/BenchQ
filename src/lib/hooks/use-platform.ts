@@ -43,6 +43,8 @@ export const useAdjustLimits = (firmId: string) => usePlatformMutation((limits: 
 export const useDeactivateUser = () => usePlatformMutation((userId: string) => platformApi.users.deactivate(userId));
 export const useReactivateUser = () => usePlatformMutation((userId: string) => platformApi.users.reactivate(userId));
 export const useResendInvite = () => usePlatformMutation((inviteId: string) => platformApi.invites.resend(inviteId));
+/** Not a write: reads the invite's live token for "Copy invite link". */
+export const useInviteLink = () => useMutation({ mutationFn: (inviteId: string) => platformApi.invites.link(inviteId) });
 export const useRevokeInvite = () => usePlatformMutation((inviteId: string) => platformApi.invites.revoke(inviteId));
 export const useCreatePlan = () => usePlatformMutation((input: PlanInput) => platformApi.plans.create(input));
 export const useUpdatePlan = (planId: string) => usePlatformMutation((input: PlanInput) => platformApi.plans.update(planId, input));

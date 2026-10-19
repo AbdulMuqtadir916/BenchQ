@@ -5,7 +5,7 @@ import type { Invite, Plan, PlatformUser } from "@/lib/schemas/tenancy";
 
 const mock = () => import("@/mocks/platform").then((m) => m.platformMock);
 
-/** docs/04 §14.4 Create firm. The owner's name goes in the ledger: an invite carries no name (docs/02 §3.1). */
+/** docs/04 §14.4 Create firm. The owner's name becomes the invite's `inviteeName` (07 Q31). */
 export interface CreateFirmInput {
   name: string;
   slug: string;
@@ -47,6 +47,8 @@ export const platformApi = {
     list: async (firmId?: string | null): Promise<Invite[]> => (await mock()).invites.list(firmId),
     resend: async (inviteId: string): Promise<Invite> => (await mock()).invites.resend(inviteId),
     revoke: async (inviteId: string): Promise<Invite> => (await mock()).invites.revoke(inviteId),
+    /** The live token of a pending invite: the link is /invite/[token] (07 P4). */
+    link: async (inviteId: string): Promise<{ token: string }> => (await mock()).invites.link(inviteId),
   },
   plans: {
     list: async (): Promise<Plan[]> => (await mock()).plans.list(),

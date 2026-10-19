@@ -277,6 +277,8 @@ export const InviteBaseSchema = z.object({
   id: z.string(),
   firmId: z.string().nullable(),           // null = invite to the BenchQ platform team
   email: z.string().email(),               // who is invited; the token is sent here
+  inviteeName: z.string().nullable(),      // the name the inviter gave, prefilled on /invite/[token];
+                                           // the person may change it when accepting (07 Q31). null = not given
   role: z.union([FirmRole, z.literal('PLATFORM_ADMIN')]),
   invitedByUserId: z.string(),             // a firm user or a PlatformUser id
   status: z.enum(['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED']),

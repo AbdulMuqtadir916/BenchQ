@@ -3,6 +3,7 @@ import { FirmSchema, FirmSessionSchema, PlatformSessionSchema, type Firm, type F
 import { currentPlatformUser, currentPrincipal, currentUser, firmById, isSignedIn, signInWithPassword, signOut, watchSession } from "./auth";
 import { firms } from "./team";
 import { markActive } from "./invites";
+import { endSupportViewOnSignOut, exitSupportView, settleExpiredSupportViews, startSupportView } from "./support";
 import { mockResult, wait } from "./_shared";
 
 function firmSessionNow(): FirmSession {
@@ -11,10 +12,13 @@ function firmSessionNow(): FirmSession {
   return FirmSessionSchema.parse({ principal, user, firm: firmById(user.firmId) });
 }
 
-/** The signed-in principal's session: a firm user's, or a platform admin's (no support-view firm until P4). */
-function sessionNow(): Session {
+/** The signed-in principal's session: a firm user's, or a platform admin's (with the support-view firm, if one is open). */
+export function sessionNow(): Session {
   const principal = currentPrincipal();
-  if (principal.kind === "platform") return PlatformSessionSchema.parse({ principal, platformUser: currentPlatformUser(), firm: null });
+  if (principal.kind === "platform") {
+    const firm = principal.support ? firmById(principal.support.firmId) : null;
+    return PlatformSessionSchema.parse({ principal, platformUser: currentPlatformUser(), firm });
+  }
   return firmSessionNow();
 }
 
@@ -35,7 +39,24 @@ function firmBySlug(slug: string): Firm {
 
 export const sessionMock = {
   /** Who is signed in, or null when signed out. */
-  current: (): Promise<Session | null> => mockResult(isSignedIn() ? sessionNow() : null),
+  current: async (): Promise<Session | null> => {
+    settleExpiredSupportViews();
+    return mockResult(isSignedIn() ? sessionNow() : null);
+  },
+
+  /** Start a read-only support view of a firm (07 §4): PLATFORM_ADMIN only; ends any open one first. */
+  startSupportView: async (firmId: string, reason: string): Promise<Session> => {
+    await wait();
+    startSupportView(firmId, reason);
+    return structuredClone(sessionNow());
+  },
+
+  /** End the open support view: the session, and the firm to go back to (/admin/firms/[firmId]). */
+  exitSupportView: async (): Promise<{ session: Session; firmId: string | null }> => {
+    await wait();
+    const firmId = exitSupportView();
+    return structuredClone({ session: sessionNow(), firmId });
+  },
 
   firmBySlug: async (slug: string): Promise<Firm> => {
     await wait();
@@ -59,6 +80,8 @@ export const sessionMock = {
   },
 
   signOut: async (): Promise<null> => {
+    const principal = isSignedIn() ? currentPrincipal() : null;
+    if (principal?.kind === "platform") endSupportViewOnSignOut(principal.userId);
     signOut();
     return mockResult(null);
   },
