@@ -12,7 +12,7 @@ function firmSessionNow(): FirmSession {
 }
 
 /** The signed-in principal's session: a firm user's, or a platform admin's (no support-view firm until P4). */
-function sessionNow(): Session {
+export function sessionNow(): Session {
   const principal = currentPrincipal();
   if (principal.kind === "platform") return PlatformSessionSchema.parse({ principal, platformUser: currentPlatformUser(), firm: null });
   return firmSessionNow();

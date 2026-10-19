@@ -156,8 +156,16 @@ Build the states properly anyway: field-level validation, a submit-pending state
 error banner, and a "check your email" confirmation on the forgot-password request. These are cheap now and expensive
 to retrofit.
 
-`/invite/[token]` shows the inviting firm's name and the role being offered before the accept
-button. An expired token renders its own state with a "request a new invite" action.
+`/invite/[token]` (07 P4) shows the inviting firm's name and the role being offered, the invite's email
+(read-only) and the name the inviter gave (`inviteeName`, prefilled and editable, 07 Q31). The person
+sets their name and a password (8+ characters) and accepts: the account is created and signed in (any
+other account in this browser is signed out, Q27); an OWNER lands on `/welcome` and makes an
+ONBOARDING firm ACTIVE; a staff invite lands on `/admin`. Every other state has its own screen with a
+way to sign in: **invalid** (unknown or replaced token — says nothing about any invite), **expired**
+("ask the person who invited you to resend it"; resending is the inviter's action), **revoked**,
+**already accepted**, and **workspace suspended** (blocked, the invite stays pending, Q28). The link
+comes from "Copy link" on a pending invite (admin users tab, owner card, staff invites); a resend issues a
+new token and the old link stops working.
 
 ### 2.2 `/welcome` — onboarding wizard
 

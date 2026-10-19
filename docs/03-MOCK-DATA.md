@@ -212,8 +212,12 @@ account changes, for every account signed in on this browser. Code: `src/mocks/d
 - **Where:** one versioned `localStorage` key, `benchq.demo-data`, holding `{ version, seededAt,
   tables }`. Only the tables that changed are stored (the fixtures are ~3.5 MB, too much for
   `localStorage` to rewrite on every change); a table that was never changed is read from the
-  fixtures. Writable tables today: `firms`, `users`, `invites`, `candidates`, `applications`,
-  `documents`, `inboxMessages`, `inboxConnections`, `ledger`. A new writable table registers with
+  fixtures. Writable tables today: `firms`, `users`, `invites`, `inviteTokens`, `credentials`,
+  `supportViews`, `plans`, `platformUsers`, `candidates`, `applications`, `documents`,
+  `inboxMessages`, `inboxConnections`, `ledger`. `inviteTokens` (the `[token]` of each invite link,
+  never on the Invite; fixture invites get a fixed token so their links survive reloads) and
+  `credentials` (the password an account chose when accepting an invite; seeded accounts keep the
+  demo password) are mock-auth only and go with the mocks in Phase D. A new writable table registers with
   `table()` and calls `changed()` after writing (the save is batched).
 - **What is stored:** records only. Every number on screen (seats used, active candidates, dashboard
   counts, funnels) is still derived from the records at read time; nothing derived is persisted.

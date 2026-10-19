@@ -8,7 +8,7 @@ import { firmLedger, seatBlockReason } from "@/lib/derive/platform";
 import { useHref } from "@/lib/routes/use-href";
 import { AdminDate } from "../admin-time";
 import { ActivityList } from "../activity-list";
-import { ResendInviteButton } from "./invite-actions";
+import { CopyInviteLinkButton, ResendInviteButton } from "./invite-actions";
 import { useFirmDetail, type FirmDetail } from "./use-firm-detail";
 
 /** /admin/firms/[firmId] Overview tab (docs/04 §14.5). The shell shows the error and not-found. */
@@ -104,7 +104,10 @@ function Overview({ detail }: { detail: FirmDetail }) {
                 )}
               </Row>
             </dl>
-            <ResendInviteButton invite={owner.invite} blockedReason={owner.kind === "expired" && !usage.canAddSeat ? seatBlockReason(usage) : null} />
+            <div className="flex flex-wrap items-center gap-2">
+              <ResendInviteButton invite={owner.invite} blockedReason={owner.kind === "expired" && !usage.canAddSeat ? seatBlockReason(usage) : null} />
+              {owner.kind === "pending" ? <CopyInviteLinkButton invite={owner.invite} /> : null}
+            </div>
           </div>
         )}
       </Card>

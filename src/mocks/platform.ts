@@ -12,6 +12,7 @@ import { allLedger } from "./ledger";
 import { injectedFailure } from "./membership";
 import { allUsers, firms } from "./team-data";
 import { invites, plans, platformUsers } from "./tenancy";
+import { issueInviteToken, tokenForInvite } from "./invite-tokens";
 import { mockResult, notFound } from "./_shared";
 
 /**
@@ -112,6 +113,7 @@ function sendInvite(input: { firmId: string | null; email: string; inviteeName: 
     createdAt: now.toISOString(),
   };
   invites.unshift(invite);
+  issueInviteToken(invite.id);
   log({ firmId: input.firmId, entityType: ENTITY.invite, entityId: invite.id, entityLabel: invite.email, action: "INVITE_SENT", summary: input.label }, now);
   return invite;
 }
@@ -282,8 +284,17 @@ export const platformMock = {
         if (!usage.canAddSeat) throw conflict(seatBlockReason(usage), "SEAT_LIMIT");
       }
       invites[index] = { ...invite, status: "PENDING", expiresAt: new Date(now.getTime() + INVITE_DAYS * DAY_MS).toISOString() };
+      issueInviteToken(invite.id); // A9: a new token; the old link stops working
       log({ firmId: invite.firmId, entityType: ENTITY.invite, entityId: invite.id, entityLabel: invite.email, action: "INVITE_SENT", summary: `Invite resent to ${invite.email}` }, now);
       return done(invites[index]!, "invites");
+    },
+
+    /** The live token of a pending invite, for "Copy invite link" (the link is /invite/[token]). */
+    link: (inviteId: string, now = new Date()): Promise<{ token: string }> => {
+      const invite = invites.find((item) => item.id === inviteId) ?? notFound("Invite", inviteId);
+      if (effectiveInviteStatus(invite, now) !== "PENDING") throw conflict("Only a pending invite has a link. Resend an expired one first.");
+      const token = tokenForInvite(invite.id) ?? issueInviteToken(invite.id);
+      return mockResult({ token });
     },
 
     revoke: (inviteId: string, now = new Date()): Promise<Invite> => {

@@ -47,6 +47,8 @@ export const platformApi = {
     list: async (firmId?: string | null): Promise<Invite[]> => (await mock()).invites.list(firmId),
     resend: async (inviteId: string): Promise<Invite> => (await mock()).invites.resend(inviteId),
     revoke: async (inviteId: string): Promise<Invite> => (await mock()).invites.revoke(inviteId),
+    /** The live token of a pending invite: the link is /invite/[token] (07 P4). */
+    link: async (inviteId: string): Promise<{ token: string }> => (await mock()).invites.link(inviteId),
   },
   plans: {
     list: async (): Promise<Plan[]> => (await mock()).plans.list(),

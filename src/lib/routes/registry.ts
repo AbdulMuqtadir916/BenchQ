@@ -72,6 +72,7 @@ const ROUTE_DEFS = [
   // Auth and onboarding
   { id: "root", path: "/", title: "BenchQ", area: "public", shell: "auth", access: PUBLIC },
   { id: "sign-in", path: "/sign-in", title: "Sign in", area: "public", shell: "auth", access: PUBLIC },
+  { id: "invite", path: "/invite/[token]", title: "Accept invite", area: "public", shell: "auth", access: PUBLIC },
   { id: "welcome", path: "/[firm]/welcome", title: "Welcome", area: "firm", shell: "auth", access: firm(roles("full", "none", "none", "none"), "none"), onDenied: "landing" },
 
   // Workspace

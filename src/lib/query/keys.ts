@@ -50,6 +50,8 @@ export const queryKeys = {
     team: () => ["platform", "team"] as const,
     candidateUsage: () => ["platform", "candidateUsage"] as const,
   },
+  /** /invite/[token]: public, before anyone signs in. */
+  invite: (token: string) => ["invite", token] as const,
   companies: {
     all: () => ["companies"] as const,
     detail: (id: string) => ["companies", "detail", id] as const,

@@ -1,8 +1,10 @@
+import { z } from "zod";
 import { ApiError } from "@/lib/api/client";
 import type { Principal, PlatformUser } from "@/lib/schemas/tenancy";
 import type { Firm, User } from "@/lib/schemas/session";
 import { allUsers, firms } from "./team-data";
 import { platformUsers } from "./tenancy";
+import { changed, table } from "./db";
 
 /**
  * The mock backend's sign-in state (docs/07 Phase L, Q25–Q27): who the "server" thinks is signed in.
@@ -13,6 +15,29 @@ import { platformUsers } from "./tenancy";
 
 /** docs/03 §3.2: the one demo password every seeded account signs in with. Mock layer only. */
 export const DEMO_PASSWORD = "benchq-demo-2026";
+
+/**
+ * Passwords set by people who joined through an invite (07 P4): the seeded accounts keep the demo
+ * password; an account created by accepting signs in with the password it chose. Mock only — kept in the
+ * demo data so the account works after a reload; never a real credential store (Phase D).
+ */
+const CredentialSchema = z.object({ accountId: z.string(), password: z.string() });
+const credentials = table("credentials", CredentialSchema, () => []);
+
+/** docs/04 §2.1: the minimum length of a password chosen on /invite/[token]. */
+export const MIN_PASSWORD_LENGTH = 8;
+
+export function setPassword(accountId: string, password: string): void {
+  const index = credentials.findIndex((item) => item.accountId === accountId);
+  if (index >= 0) credentials[index] = { accountId, password };
+  else credentials.push({ accountId, password });
+  changed("credentials");
+}
+
+function passwordMatches(accountId: string, password: string): boolean {
+  const own = credentials.find((item) => item.accountId === accountId);
+  return own ? own.password === password : password === DEMO_PASSWORD;
+}
 
 /** The stand-in for the session cookie (Q27). Only this module reads or writes it. */
 const SESSION_KEY = "benchq.session";
@@ -125,8 +150,14 @@ export function signInWithPassword(email: string, password: string): Principal {
   const admin = platformUsers.find((item) => item.email.toLowerCase() === address);
   const user = admin ? null : allUsers.find((item) => item.email.toLowerCase() === address);
   const account = admin ?? user;
-  if (!account || !account.isActive || password !== DEMO_PASSWORD) throw INVALID_CREDENTIALS();
+  if (!account || !account.isActive || !passwordMatches(account.id, password)) throw INVALID_CREDENTIALS();
   writeSession(account.id);
+  return currentPrincipal();
+}
+
+/** Sign an account in without a password: right after it accepted an invite (07 P4). */
+export function startSession(accountId: string): Principal {
+  writeSession(accountId);
   return currentPrincipal();
 }
 

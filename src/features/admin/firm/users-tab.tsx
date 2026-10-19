@@ -15,7 +15,7 @@ import type { User } from "@/lib/schemas/session";
 import type { Invite, InviteStatus } from "@/lib/schemas/tenancy";
 import { AdminDialog, errorMessage } from "../admin-dialog";
 import { AdminDate, AdminTime } from "../admin-time";
-import { ResendInviteButton, RevokeInviteButton } from "./invite-actions";
+import { CopyInviteLinkButton, ResendInviteButton, RevokeInviteButton } from "./invite-actions";
 import { useFirmDetail, type FirmDetail } from "./use-firm-detail";
 
 const ROLE_LABEL: Record<User["role"], string> = { OWNER: "Owner", MANAGER: "Manager", BDE: "BDE", VIEWER: "Viewer" };
@@ -175,6 +175,7 @@ function InvitesTable({ rows, usage, nameOf }: { rows: InviteRow[]; usage: FirmU
         cell: ({ row }) => (
           <span className="inline-flex flex-wrap items-center gap-1">
             <ResendInviteButton invite={row.original.invite} blockedReason={row.original.status === "EXPIRED" ? blocked : null} />
+            {row.original.status === "PENDING" ? <CopyInviteLinkButton invite={row.original.invite} /> : null}
             {row.original.status === "PENDING" ? <RevokeInviteButton invite={row.original.invite} /> : null}
           </span>
         ),
