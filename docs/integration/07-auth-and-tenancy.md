@@ -30,6 +30,21 @@ rules (§5). §6 lists what in the backend makes this harder than it looks.
 
 ## 2. Decisions needed from you
 
+> **Decided 2026-10-21 (07-ROUTES-AND-RBAC Q37).** Approved: D2 in FastAPI; opaque cookie sessions
+> (HttpOnly, Secure, SameSite=Lax, status re-checked per request, 7 days sliding / 30-day cap, same-origin
+> unsafe requests); Argon2id; D1 `candidates` table; D3 the 10 statuses; D4 `evidence` + `claims` tables
+> with the database refusing `VERIFIED` without evidence.
+> **Scraped jobs:** shared pool + a firm link table. A firm sees only jobs matching its own searches, plus
+> jobs it captured by hand. Searches become firm-owned (this replaces §6.4's "platform-owned").
+> **The shared API key** is removed at F6, no overlap; the extension gets per-user tokens later.
+> **Folded into the foundation:** the ledger's own table in F2 (auth, invites and support views write to
+> it; the Module 01 track then only connects the screen). Background jobs (scheduler, email monitor) pass
+> `firm_id` explicitly. Until the scheduler moves out of process, deploy **exactly one backend worker**.
+> Backend tests run on Postgres from F1. In F2, classify every setting as platform-wide or firm-owned.
+> "Mark applied" moves to the 03 Applications track.
+>
+> The text below is the original proposal, kept for the reasoning.
+
 Each has my recommendation. Your stated leaning is noted; where I agree I say so, and I say why where
 I'd add a condition.
 
@@ -135,17 +150,25 @@ backend only; the frontend keeps running on mocks until F6.**
 
 ### F1 — Alembic baseline
 
-- Add Alembic. Generate the **baseline revision from the current models against an empty Postgres**, then
-  review it by hand: the `jobs_short_id_seq` sequence, the JSONB defaults, and the columns that
-  `create_tables()` and `seed.run_migrations()` add or drop.
-- An existing database is **stamped** at the baseline. A fresh one is built by `alembic upgrade head`.
+- Add Alembic. The **baseline revision is the fully migrated end state**: `create_tables()`, then all of
+  `seed.run_migrations()`, then `migrate_h1b_to_visa_cache`, built on an empty Postgres and reviewed by
+  hand (the `jobs_short_id_seq` sequence, the JSONB defaults, the columns those functions add or drop).
+- The old DDL moves, unchanged, into a frozen `backend/migrations/legacy_bootstrap.py`. Two things use
+  it: the one-time path for an existing database, and the equivalence test. Delete it once every dev
+  database is stamped.
+- Migrations run **before uvicorn**, not in `lifespan`: `backend/scripts/db_upgrade.py`, under a Postgres
+  advisory lock, called by the Dockerfile `CMD`. No `alembic_version` table but `jobs` exists → run the
+  legacy bootstrap, then **stamp** the baseline. Otherwise `alembic upgrade head`. `lifespan` only checks
+  the database is at head and fails fast if not.
 - Startup stops running `create_all`, the ALTERs in `create_tables()` and `seed.run_migrations()`. Data
-  seeding (`run_seeds`) stays, minus its migrations.
-- Tests keep `create_all` on SQLite for speed, **and** gain a CI job against Postgres that runs
-  `alembic upgrade head` on an empty database and checks the models match the migrations
-  (`alembic check`), so the two can't drift.
+  seeding and data backfills (`run_seeds`) stay.
+- **Tests run on Postgres** (a `db-test` compose service on port 5433, data in tmpfs): the schema is built
+  once per session by `alembic upgrade head`, tables are truncated between tests, and the SQLite scaffolding
+  is deleted. A test builds two scratch databases, one the old way and one by Alembic, and compares tables,
+  columns (type, nullability, default), constraints, indexes and sequences, so the two can't drift. The repo
+  has no CI workflow; the command is in `docs/integration/README.md`.
 - **Done when:** a clean `docker compose up` builds the schema from migrations only; an existing dev
-  database upgrades with no change; all backend tests pass.
+  database is stamped with no change; all backend tests pass on Postgres.
 
 ### F2 — Auth and tenancy tables; `firm_id` on existing tables
 
@@ -293,8 +316,8 @@ tests can be written before its dependencies are live; only "switch the adapter 
    absorb both in the right order, or an old dev database and a fresh one will differ. This is the
    riskiest step and why it goes first, alone.
 3. **The tests run on SQLite**, and the new schema leans on Postgres (UUID, JSONB, sequences, partial
-   indexes, possibly row-level security later). F1 keeps SQLite for the existing unit tests and adds a
-   Postgres job; the isolation test (F7) must run on Postgres.
+   indexes, possibly row-level security later). F1 moves the backend tests to Postgres (Q37), so
+   the isolation test (F7) runs there too.
 4. **Global configuration mixed with firm data.** `settings` is one global key-value store (LLM keys,
    Gmail, Telegram, cron schedules); `companies` holds both reference data and one user's choices
    (`selected_resume_ids`, scrape URLs, tiers); `searches` are one user's scrape configs. Proposed: settings
