@@ -7,6 +7,10 @@ in `src/mocks/` are **not** deleted) or use the stated interim.
 
 Each decision: what the frontend needs → what the backend has → options → a recommendation.
 
+> **2026-10-21:** the auth + tenancy plan ([`07-auth-and-tenancy.md`](./07-auth-and-tenancy.md) §2)
+> updates the recommendations for D1–D4 (D2 is now: users, firms and roles in FastAPI) and adds a new
+> one: scraped jobs as a shared pool. Record the answers in the log below.
+
 ---
 
 ## D1 — Candidates

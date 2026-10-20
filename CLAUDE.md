@@ -256,8 +256,11 @@ A stopped task with a clear question beats a confident wrong implementation.
 
 > **Update this section as you progress.** It's the first thing the next session reads.
 
-**Phase: Production routes, tenancy + RBAC** (`docs/07-ROUTES-AND-RBAC.md` v2). Phases T, L and P are
-done; Phase C is done and in review. **Next: Phase B** (UI completion audit), then S, M. Repo snapshot: `docs/CURRENT_STATE.md` (2026-10-19).
+**Phase: Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md`, plan in review). Frontend
+phases T, L, P and C are done; the Phase B audit is done and its fixes are **paused after fix PR 2 (#27)**
+(2026-10-21) so teammates can integrate modules in parallel. **Next:** your decisions in 07-auth §2, then
+foundation F1–F7, then the module tracks. Repo snapshot: `docs/CURRENT_STATE.md` (2026-10-19, predates
+Phase B).
 
 | Step | Status |
 |---|---|
@@ -270,13 +273,13 @@ done; Phase C is done and in review. **Next: Phase B** (UI completion audit), th
 | Demo data persists in the browser; "Reset demo data" on `/admin/system` (docs/03 §3.3) | Done (#17) |
 | 07 Phase P — `/admin/*` screens, invites and `/invite/[token]`, read-only support view, ⌘K for admins, platform tests | Done (#12, #13, #18, #20, #21; exit check in 07) |
 | `docs/CURRENT_STATE.md` regenerated | Done (2026-10-19) |
-| 07 Phase C — the permission policy (firm, team and platform actions, `<Can>`, route access via `can`, full principal × action table test, exit grep) | **Done, in review** (`feat/phase-c`) |
-| **07 Phase B — UI completion audit** (route × principal, both themes, 1440 / 1024 / 390, axe) | **Next** |
-| 07 Phase S — Super Admin flow polish (UI-first), including building `/admin/system` and AI spend from docs/02 §3.2 | Planned, after B |
+| 07 Phase C — the permission policy (firm, team and platform actions, `<Can>`, route access via `can`, full principal × action table test, exit grep) | Done (#23) |
+| 07 Phase B — UI completion audit (`docs/AUDIT-PHASE-B.md`) | Audit done (#24, #25). Fix PRs 1–2 done (#26 real create, #27 read-only leaks + `JobMark`); **PRs 3–14 paused** (2026-10-21), list unchanged |
+| **Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md`): decisions D1–D4, D2, sessions, jobs pool; foundation F1–F7 | **Next** — plan in review |
+| 07 Phase S — Super Admin flow polish (UI-first), including building `/admin/system` and AI spend from docs/02 §3.2 | Planned, after B resumes |
 | 07 Phase M — firm-side invite flow (OWNER invites members) | Planned, after S (Q23) |
 | System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Approved (Q33, Q34), not built — built in Phase S |
-| Integration Module 00 B/C + Module 01 (ledger) | Can run in parallel |
-| Backend tenancy + real auth (D1/D2), 07 Phase D, then Modules 02–05 with `firmId` | Later |
+| Module tracks (01 Ledger, 02 Jobs, Candidates, Admin API, then 03 Applications, 04 Resumes + claims, 05 Analytics) and 07 Phase D | After foundation F7 (`docs/integration/README.md` board) |
 
 **Decided (07 §0):** firm in the URL (Q8); one firm per user (Q9); read-only support view, no
 impersonation (Q10); role name `PLATFORM_ADMIN`, label "Super Admin" (Q7); invite-only, no public

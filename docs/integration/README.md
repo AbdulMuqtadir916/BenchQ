@@ -4,8 +4,12 @@ This folder is the plan for connecting the BenchQ frontend to the Python backend
 time. Each module has its own file with everything needed to do it: the endpoints, the response
 shape, a field-by-field mapping, the known gaps, a task checklist, and how to know it's done.
 
-**If you are a Claude session:** read this file, then the module file you were assigned, then
-`CLAUDE.md`. Do only the module you were assigned. If the module file and the code disagree, or a
+**Read [`07-auth-and-tenancy.md`](./07-auth-and-tenancy.md) first.** The backend is becoming
+multi-tenant (users, firms, roles, sessions) before any data module goes live; every track below starts
+after that foundation and is firm-scoped from its first endpoint.
+
+**If you are a Claude session:** read this file, then `07-auth-and-tenancy.md`, then the module file
+you were assigned, then `CLAUDE.md`. Do only the module you were assigned. If the module file and the code disagree, or a
 mapping needs a product decision, stop and ask.
 
 ---
@@ -17,9 +21,9 @@ mapping needs a product decision, stop and ask.
 "Known setup pitfalls" in `00-foundation.md`).
 
 ```bash
-# 1. Get the code. Until it's merged, all integration work starts from this branch.
+# 1. Get the code. All integration work starts from the main branch.
 git clone https://github.com/samad-012/BenchQ.git && cd BenchQ
-git checkout integration/backend-foundation
+git checkout codex/json-data-migration
 
 # 2. Frontend dependencies
 nvm use                      # reads .nvmrc (Node 22)
@@ -41,22 +45,23 @@ pnpm dev                                 # http://localhost:3000
 
 - `http://localhost:3000/health` shows the backend's health JSON. That means the frontend → backend
   proxy works.
-- `http://localhost:3000/dashboard` renders. Every screen still runs on mock data until a module is
-  switched on.
+- `http://localhost:3000/sign-in` renders, and a seeded account (docs/03 §3.2) signs in. Every screen
+  still runs on mock data until a module is switched on (and, until foundation step F6, so does sign-in).
 - `pnpm typecheck && pnpm lint && pnpm test` all pass.
 
 **Then pick up a module:**
 
-1. Choose the next free module on the [module board](#module-board) — respect **Depends on** — and
+1. Choose the next free track on the [module board](#module-board) — respect **Depends on** — and
    put your name in **Owner**.
 2. Read that module's file end to end.
-3. Create your branch from `integration/backend-foundation`: `git checkout -b integrate/<module>`.
+3. Create your branch from `codex/json-data-migration`: `git checkout -b integrate/<module>`.
 4. Follow [the workflow for one module](#the-workflow-for-one-module). If you use Claude, start it
    with the prompt in [Briefing a Claude session](#briefing-a-claude-session).
-5. Open your PR **into `integration/backend-foundation`** (or the main branch, once that's merged).
+5. Open your PR **into `codex/json-data-migration`**.
 
-The database starts empty apart from a few seeded companies. To get real data, add companies or
-jobs through the backend's API docs at `http://localhost:8000/docs` (e.g. `POST /api/jobs/manual`).
+Until foundation step F5 lands, the database starts empty apart from a few seeded companies; add data
+through the backend's API docs at `http://localhost:8000/docs`. After F5, `backend/scripts/seed_demo.py`
+loads the same firms, accounts and data as the mocks.
 To look inside the database, see [`database-viewer.md`](./database-viewer.md).
 
 ---
@@ -64,14 +69,15 @@ To look inside the database, see [`database-viewer.md`](./database-viewer.md).
 ## The backend
 
 The backend is **JobNavigator** (FastAPI + SQLAlchemy + PostgreSQL, MIT licence, upstream
-`github.com/vesaias/JobNavigator`). It lives in `backend/` once Module 00 is done. Its endpoint
+`github.com/vesaias/JobNavigator`). It lives in `backend/` (Module 00 Part A). Its endpoint
 reference is `docs/archive/BACKEND_API_FEATURES.md`; when the server runs, the live contract is at
 `http://localhost:8000/docs`.
 
 **It was built for one job-seeker, not a staffing firm.** It covers jobs, companies, applications,
 resumes and AI tailoring well. It has no concept of candidates, BDEs, firms, roles, claim states,
-evidence, follow-up tasks, documents or per-candidate inboxes. Those screens stay on mock data until
-a decision is made — see [`06-open-decisions.md`](./06-open-decisions.md).
+evidence, follow-up tasks, documents or per-candidate inboxes. The plan to add firms, users, roles and
+sessions is [`07-auth-and-tenancy.md`](./07-auth-and-tenancy.md); the product decisions behind the
+rest are in [`06-open-decisions.md`](./06-open-decisions.md) (recommendations for D1–D4 in 07 §2).
 
 ---
 
@@ -129,14 +135,15 @@ import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { arrayOf } from "./client";
 import { isLive } from "./config";
 import { http } from "./http";
-import { BackendActivitySchema, toLedgerEntry } from "./dto/ledger";
+import { BackendLedgerEntrySchema, toLedgerEntry } from "./dto/ledger";
 
 const mock = () => import("@/mocks/ledger").then((m) => m.ledgerMock);
 
 export const ledgerApi = {
-  list: async (params?: { limit?: number; offset?: number }): Promise<LedgerEntry[]> => {
-    if (!isLive("ledger")) return (await mock()).list(params);
-    const rows = await http.get("/api/activity-log", arrayOf(BackendActivitySchema), { query: params });
+  // Firm-scoped: every call names the firm (07-auth-and-tenancy §5, rule 1).
+  list: async (firmId: string, params?: { limit?: number; offset?: number }): Promise<LedgerEntry[]> => {
+    if (!isLive("ledger")) return (await mock()).list(firmId, params);
+    const rows = await http.get(`/api/firms/${firmId}/ledger`, arrayOf(BackendLedgerEntrySchema), { query: params });
     return rows.map(toLedgerEntry);
   },
 };
@@ -152,17 +159,20 @@ import { z } from "zod";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { toIso } from "./shared";
 
-export const BackendActivitySchema = z.object({
+export const BackendLedgerEntrySchema = z.object({
   id: z.string(),
-  type: z.string(),
-  message: z.string(),
-  company: z.string().nullable(),
-  details: z.record(z.string(), z.unknown()).nullable(),
+  firm_id: z.string().nullable(),
+  actor_user_id: z.string().nullable(),
+  action: z.string(),
+  entity_type: z.string(),
+  entity_id: z.string(),
+  summary: z.string(),
   created_at: z.string(),            // timestamps are ALWAYS z.string() here — see below
+  // …the rest of LedgerEntry's fields, snake_case
 });
-export type BackendActivity = z.infer<typeof BackendActivitySchema>;
+export type BackendLedgerEntry = z.infer<typeof BackendLedgerEntrySchema>;
 
-export function toLedgerEntry(row: BackendActivity): LedgerEntry { /* … */ }
+export function toLedgerEntry(row: BackendLedgerEntry): LedgerEntry { /* … */ }
 ```
 
 **Timestamps:** FastAPI sends `2026-10-03T10:00:00+00:00` or a zone-less value, and the frontend
@@ -173,8 +183,7 @@ schemas reject both. Declare every backend timestamp as `z.string()` and convert
 
 ## The workflow for one module
 
-1. **Branch** `integrate/<module>` from `integration/backend-foundation` (from the main branch
-   once that branch has been merged).
+1. **Branch** `integrate/<module>` from `codex/json-data-migration`.
 2. **Run both apps** (see "Running locally" below) and confirm `GET /health` through the proxy.
 3. **Capture real responses** from the backend for each endpoint you need, by browser or
    `curl -b cookies.txt`, and save them to `src/lib/api/dto/__samples__/<module>.json`. Trim to a few
@@ -206,26 +215,39 @@ schemas reject both. Declare every backend timestamp as `z.string()` and convert
 
 ## Module board
 
-Order matters: later modules reference IDs from earlier ones. Work in parallel where the
-**Can start** column allows — writing the DTO, mapper and tests never needs the dependency to be
-live; only step 5 does.
+**First the foundation, in order** (one PR each; [`07-auth-and-tenancy.md`](./07-auth-and-tenancy.md)
+§3). Then the tracks run in parallel. A track's DTO, mapper and tests can be written before its
+dependencies are live; only switching the adapter to live waits.
 
-| # | Module | Difficulty | Depends on | Can start | Owner | Status |
-|---|---|---|---|---|---|---|
-| 00 | [Foundation: monorepo, connection, auth](./00-foundation.md) | Easy | — | Now | | In progress — Part A done (backend in repo, runs, proxy verified); B/C open |
-| 01 | [Ledger (activity log)](./01-ledger.md) | Easy | 00 | After 00 | | Not started |
-| 02 | [Jobs (+ companies)](./02-jobs.md) | Medium | 00 | After 00 | | Not started |
-| 03 | [Applications](./03-applications.md) | Medium–hard | 02 live | After 00 (live after 02) | | Not started |
-| 04 | [Resumes + AI tailoring](./04-resumes-and-tailoring.md) | Hard | 02 live | After 00 (live after 02) | | Not started |
-| 05 | [Analytics](./05-analytics.md) | Easy | 03 live | After 03 | | Not started |
-| 06 | [Open decisions](./06-open-decisions.md) | — | Product decision | — | Product owner | Waiting |
+| # | Foundation step | Depends on | Owner | Status |
+|---|---|---|---|---|
+| 00 | [Monorepo + proxy](./00-foundation.md) (Part A); Parts B/C are replaced by F3/F6 | — | | Part A done |
+| F1 | Alembic baseline | 00 | | Not started |
+| F2 | Auth + tenancy tables; `firm_id` on existing tables, backfilled to a default firm | F1 | | Not started |
+| F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | | Not started |
+| F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | | Not started |
+| F5 | Seed script: the mocks' firms, accounts and data | F2 | | Not started |
+| F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | | Not started |
+| F7 | Reusable cross-firm isolation test over every route | F4 | | Not started |
+
+| Track | Module | Depends on | Owner | Status |
+|---|---|---|---|---|
+| 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6) | F1–F7 | | Not started |
+| 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md) | F1–F7; shared-pool decision (07 §2) | | Not started |
+| — | Candidates (D1) | F1–F7; D1 | | Not started |
+| — | Admin API (firms, plans, users, invites, platform team, audit) | F1–F7 | | Not started |
+| 03 | [Applications](./03-applications.md) (10 statuses, D3) | 02, Candidates, D3 | | Not started |
+| 04 | [Resumes + claims + AI tailoring](./04-resumes-and-tailoring.md) (D4) | 02, Candidates, D4 | | Not started |
+| 05 | [Analytics](./05-analytics.md) | 03 | | Not started |
+| 06 | [Open decisions](./06-open-decisions.md) | Product decision | Product owner | D1–D4 recommended in 07 §2 |
 
 Status values: `Not started` → `In progress` → `Live behind flag` → `Done (mock deleted)`.
 
-**Why this order:** Module 01 is a read-only list on one screen, so it proves the whole pipeline
-(proxy, auth cookie, `http.ts`, DTO, mapper, error states) with the least risk. Jobs come next
-because applications and resumes reference job IDs. Mixing a live module with a mocked module it
-references breaks joins, because mock IDs (`job_0001`) don't match backend UUIDs.
+**Why this order:** nothing can be firm-scoped until there are firms and principals, so the foundation
+comes first and alone. After it, 01 Ledger proves the whole pipeline (session cookie, scoping,
+`http.ts`, DTO, mapper, error states) on one read-only screen. Jobs and Candidates come before
+Applications and Resumes, which reference both. Mixing a live module with a mocked module it references
+breaks joins, unless both use the seeded ids (F5 derives backend UUIDs from the fixture ids).
 
 ---
 

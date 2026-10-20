@@ -15,7 +15,7 @@ it through the Next.js proxy, and a sign-in that gets the backend's session cook
 - `src/lib/api/dto/shared.ts` — `toIso` / `toIsoOrNull` timestamp normalisation, with tests.
 - `next.config.ts` — proxies `/api/*` and `/health` to `BACKEND_URL` when it's set.
 - ESLint ignores `backend/**`; `.gitignore` covers Python artifacts.
-- **Part A (below) is done** on branch `integration/backend-foundation`: `backend/` copied from
+- **Part A (below) is done** and merged into `codex/json-data-migration` (#1): `backend/` copied from
   JobNavigator `cdc7273`, compose trimmed to `db` + `backend`, `.dockerignore` added, stack built
   and verified (health, proxy, backend tests). Parts B and C remain.
 
@@ -104,6 +104,8 @@ real data into it use JobNavigator's own flows — add companies and run a scrap
 
 ## Part B — Connect the frontend
 
+> Still valid for the proxy check; sign-in goes live in 07-auth-and-tenancy F6.
+
 1. `cp .env.example .env.local`. The template already has `BACKEND_URL=http://localhost:8000`.
 2. `pnpm dev`, open `http://localhost:3000/health` → backend JSON. That proves the proxy.
 3. Nothing else needs to change yet: with `NEXT_PUBLIC_LIVE_MODULES` empty, every screen still runs
@@ -112,6 +114,10 @@ real data into it use JobNavigator's own flows — add companies and run a scrap
 ---
 
 ## Part C — Auth
+
+> **Superseded (2026-10-21)** by [`07-auth-and-tenancy.md`](./07-auth-and-tenancy.md): the shared API
+> key is removed, not wired into the frontend. Sign-in becomes per-user sessions (07 §3, F3 and F6). Kept
+> below as a record of how the backend authenticates today.
 
 ### How the backend authenticates
 
