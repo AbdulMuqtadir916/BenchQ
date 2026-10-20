@@ -1,4 +1,4 @@
-import type { Candidate, UpdateCandidate } from "@/lib/schemas/candidate";
+import type { Candidate, CreateCandidate, UpdateCandidate } from "@/lib/schemas/candidate";
 
 const mock = () => import("@/mocks/candidates").then((m) => m.candidatesMock);
 
@@ -7,6 +7,8 @@ export const candidatesApi = {
   list: async (firmId: string): Promise<Candidate[]> => (await mock()).list(firmId),
 
   byId: async (firmId: string, id: string): Promise<Candidate> => (await mock()).byId(firmId, id),
+
+  create: async (firmId: string, body: CreateCandidate): Promise<Candidate> => (await mock()).create(firmId, body),
 
   update: async (firmId: string, id: string, body: UpdateCandidate): Promise<Candidate> => (await mock()).update(firmId, id, body),
 };

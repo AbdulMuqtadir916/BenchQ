@@ -1,12 +1,23 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { matchRoute, type RouteId } from "@/lib/routes/registry";
 
-export function ModalRoute({ children, className, labelledBy }: { children: React.ReactNode; className?: string; labelledBy?: string }) {
+/**
+ * An intercepted route shown as a dialog. `routeId` is the route it intercepts: a parallel slot keeps its
+ * last page on a soft navigation, so once the URL is somewhere else (say the record just created) the
+ * dialog renders nothing instead of staying open over it.
+ */
+export function ModalRoute({ routeId, children, className, labelledBy }: { routeId: RouteId; children: React.ReactNode; className?: string; labelledBy?: string }) {
+  const isOpen = matchRoute(usePathname())?.id === routeId;
+  return isOpen ? <OpenModalRoute className={className} labelledBy={labelledBy}>{children}</OpenModalRoute> : null;
+}
+
+function OpenModalRoute({ children, className, labelledBy }: { children: React.ReactNode; className?: string; labelledBy?: string }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
 

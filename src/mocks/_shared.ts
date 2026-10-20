@@ -44,3 +44,9 @@ export function findInFirm<T extends { id: string; firmId: string | null }>(rows
 export function notFound(resource: string, id: string): never {
   throw new ApiError(`${resource} ${id} not found.`, "NOT_FOUND", 404);
 }
+
+let sequence = 0;
+/** A new record id, e.g. `cand_mf3k2a0`: unique within this browser's demo data. */
+export function newId(prefix: string, now = new Date()): string {
+  return `${prefix}_${now.getTime().toString(36)}${(sequence++).toString(36)}`;
+}

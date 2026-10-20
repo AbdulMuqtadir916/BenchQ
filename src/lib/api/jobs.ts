@@ -1,4 +1,5 @@
-import type { Job } from "@/lib/schemas/job";
+import { ApiError } from "@/lib/api/client";
+import type { CaptureJob, Job } from "@/lib/schemas/job";
 
 const mock = () => import("@/mocks/jobs").then((m) => m.jobsMock);
 
@@ -7,4 +8,11 @@ export const jobsApi = {
   list: async (firmId: string, params?: { limit?: number; offset?: number }): Promise<Job[]> => (await mock()).list(firmId, params),
 
   byId: async (firmId: string, id: string): Promise<Job> => (await mock()).byId(firmId, id),
+
+  capture: async (firmId: string, body: CaptureJob): Promise<Job> => (await mock()).capture(firmId, body),
 };
+
+/** The capture was refused because the firm already has this listing; `jobId` is the existing job. */
+export function isDuplicateJob(error: unknown): error is ApiError & { jobId: string } {
+  return error instanceof ApiError && error.code === "DUPLICATE_JOB" && typeof (error as { jobId?: unknown }).jobId === "string";
+}

@@ -20,7 +20,7 @@ const invites = invitesAt(FIXTURE_NOW);
 const firmIds = new Set(firms.map((firm) => firm.id));
 const byId = <T extends { id: string }>(rows: readonly T[]) => new Map(rows.map((row) => [row.id, row]));
 const candidateById = byId(allCandidates);
-const jobById = byId(allJobs);
+const jobById = byId(allJobs());
 const applicationById = byId(allApplications);
 
 describe("firms, plans, users and invites", () => {
@@ -103,7 +103,7 @@ describe("invite ledger entries match their invites' dates (docs/07 P3)", () => 
 describe("firmId on every firm-scoped record", () => {
   const tables = {
     candidates: allCandidates,
-    jobs: allJobs,
+    jobs: allJobs(),
     applications: allApplications,
     followups: allFollowups,
     resumes: allResumes,

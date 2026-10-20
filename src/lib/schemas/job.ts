@@ -66,3 +66,26 @@ export const JobSchema = z.object({
   isActive: z.boolean(),
 });
 export type Job = z.infer<typeof JobSchema>;
+
+/**
+ * Capture a job by hand (docs/04 §5.2, `POST /api/jobs`): what the capture form sends. The mock (the
+ * backend in Phase D) builds the `Job` from it — provenance `USER_SUBMITTED` / `USER_SESSION`, the
+ * company matched by name or added, dedup on the canonical URL.
+ */
+export const CaptureJobSchema = z.object({
+  sourceUrl: z.string().trim().url("Enter the job's URL."),
+  title: z.string().trim().min(1, "Enter the job title."),
+  companyName: z.string().trim().min(1, "Enter the company."),
+  location: z.string().trim(),
+  remoteMode: RemoteMode,
+  employmentType: EmploymentType.nullable(),
+  payPeriod: z.enum(["HOUR", "YEAR"]),
+  payMin: z.number().nonnegative().nullable(),
+  payMax: z.number().nonnegative().nullable(),
+  sponsorsVisa: z.boolean(),
+  excludesC2C: z.boolean(),
+  experience: z.string().trim(),
+  skills: z.array(z.string().trim().min(1)),
+  description: z.string().trim().min(1, "Paste the job description."),
+});
+export type CaptureJob = z.infer<typeof CaptureJobSchema>;

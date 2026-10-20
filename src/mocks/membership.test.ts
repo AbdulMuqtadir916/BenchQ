@@ -40,7 +40,7 @@ const idsOf = (firmId: string) => {
   const resume = of(allResumes, firmId);
   return {
     candidate: candidate.id,
-    job: of(allJobs, firmId).id,
+    job: of(allJobs(), firmId).id,
     application: of(allApplications, firmId).id,
     resume: resume.id,
     resumeVersion: resume.versions[0]!.id,
@@ -54,9 +54,11 @@ type Ids = ReturnType<typeof idsOf>;
 const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) => Promise<unknown>, boolean]> = [
   ["candidates", "list", (f) => candidatesApi.list(f), false],
   ["candidates", "byId", (f, i) => candidatesApi.byId(f, i.candidate), false],
+  ["candidates", "create", (f) => candidatesApi.create(f, { fullName: "X", primaryRole: "Y", email: null, phone: null, workAuth: "H1B", needsSponsorship: false, needsTransfer: false, assignedUserId: null }), true],
   ["candidates", "update", (f, i) => candidatesApi.update(f, i.candidate, { noticePeriodDays: 99 } as never), true],
   ["jobs", "list", (f) => jobsApi.list(f), false],
   ["jobs", "byId", (f, i) => jobsApi.byId(f, i.job), false],
+  ["jobs", "capture", (f) => jobsApi.capture(f, { sourceUrl: "https://example.com/jobs/1", title: "X", companyName: "Y", location: "", remoteMode: "REMOTE", employmentType: null, payPeriod: "HOUR", payMin: null, payMax: null, sponsorsVisa: false, excludesC2C: false, experience: "", skills: [], description: "Z" }), true],
   ["applications", "list", (f) => applicationsApi.list(f), false],
   ["applications", "byId", (f, i) => applicationsApi.byId(f, i.application), false],
   ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "WITHDRAWN", note: null }), true],
@@ -106,10 +108,10 @@ describe("membership: a firm-A principal can't reach firm B through any adapter 
   });
 
   it("leaves firm B's records untouched after every refused write", async () => {
-    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages].map((rows) => rows.filter((row) => row.firmId === B)));
+    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs()].map((rows) => rows.filter((row) => row.firmId === B)));
     await signInAs("user_imran");
     for (const [, , call, isWrite] of CALLS) if (isWrite) await status(call(B, idsOf(B)));
-    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
+    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs()].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
   });
 
   it("answers another firm exactly like a firm that doesn't exist", async () => {

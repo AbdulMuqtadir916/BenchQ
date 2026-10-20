@@ -1224,6 +1224,22 @@ an `ApplicationEvent` — the same write the kanban makes.
 `rateTarget`, `rateMin`, `availableFrom`, `noticePeriodDays`, `willingToRelocate`,
 `employmentTypes`, sent to `PATCH /api/candidates/:id`.
 
+`CreateCandidate` (`src/lib/schemas/candidate.ts`, Phase B fix PR 1) — the New candidate form (docs/04 §4.2),
+sent to `POST /api/candidates`: `fullName`, `primaryRole`, `email`, `phone`, `workAuth`, `needsSponsorship`,
+`needsTransfer`, and `assignedUserId` (an active BDE of the firm, or null). Only `candidate.assign` (OWNER,
+MANAGER) may name one; a BDE's new candidate is assigned to themself. The candidate starts `ON_BENCH`, so at
+the firm's candidate limit the call is refused (A4). An input shape over existing `Candidate` fields: no new
+field. Logged as `CREATE` on `candidate`.
+
+`CaptureJob` (`src/lib/schemas/job.ts`, Phase B fix PR 1) — the Capture job form (docs/04 §5.2), sent to
+`POST /api/jobs`. The server builds the `Job`: provenance `USER_SUBMITTED` / `USER_SESSION` with the user as
+`capturedByUserId`; the company reused by normalised name, else added with nothing known (`clientType`
+`UNKNOWN`, no H-1B data, no verification); an hourly range fills `rateMin/Max`, a yearly one
+`salaryMin/Max`; "visa sponsorship available" allows every work authorization except `OTHER`, otherwise
+`USC` and `GC`; skills and required experience become `MANDATORY` requirements (not blockers). The same
+canonical URL (no query or fragment, lowercase host, no trailing slash) twice in a firm is refused with
+409 `DUPLICATE_JOB` naming the existing job. Logged as `CREATE` on `job`.
+
 ## 10. Analytics & ledger
 
 ```ts

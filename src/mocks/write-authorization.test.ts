@@ -32,6 +32,8 @@ const FIRM = "firm_hts";
 const ARGS: Record<string, unknown[]> = {
   "applications.updateStatus": ["app_001", { status: "WITHDRAWN", note: null }],
   "candidates.update": ["cand_01", { headline: "Senior Java Developer" }],
+  "candidates.create": [{ fullName: "Policy Check", primaryRole: "QA", email: null, phone: null, workAuth: "USC", needsSponsorship: false, needsTransfer: false, assignedUserId: null }],
+  "jobs.capture": [{ sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", remoteMode: "REMOTE", employmentType: null, payPeriod: "HOUR", payMin: null, payMax: null, sponsorsVisa: false, excludesC2C: false, experience: "", skills: [], description: "Policy check" }],
   "documents.upload": ["cand_01", { kind: "OTHER", title: "Note", fileName: "note.pdf", sizeBytes: 1000, expiresAt: null }],
   "documents.remove": ["doc_none"],
   "inbox.connect": ["cand_01"],
@@ -59,8 +61,13 @@ describe("the write inventory", () => {
       }
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
-      "agents.tailorResume", "applications.updateStatus", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead",
+      "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobs.capture",
     ]);
+  });
+
+  it("the new-record writes name their own actions (Phase B fix PR 1)", () => {
+    expect(WRITE_ACTIONS.candidates?.create).toBe("candidate.create");
+    expect(WRITE_ACTIONS.jobs?.capture).toBe("job.capture");
   });
 });
 

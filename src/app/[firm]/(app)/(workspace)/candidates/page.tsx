@@ -9,7 +9,7 @@ import { CandidateCardGrid } from "@/components/app/candidate/candidate-card-gri
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { CandidateStatus } from "@/lib/schemas/enums";
-import { useCandidates } from "@/lib/hooks/use-candidates";
+import { useCandidateBlock, useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
 import { can, hasOwnScope, scopeCandidates } from "@/lib/auth/permissions";
@@ -176,11 +176,7 @@ export default function CandidatesPage() {
         title="Candidates"
         subtitle={isOwnScope ? "Your assigned bench." : "Every candidate on the firm's bench."}
         actions={
-          canCreate ? (
-            <Button asChild>
-              <Link href={toHref("candidates.new")}><Plus size={14} aria-hidden />New candidate</Link>
-            </Button>
-          ) : undefined
+          canCreate ? <NewCandidateAction href={toHref("candidates.new")} /> : undefined
         }
       />
 
@@ -214,5 +210,23 @@ export default function CandidatesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/** New candidate — or, at the firm's candidate limit, the same control disabled with the reason (A4, docs/04 §0). */
+function NewCandidateAction({ href }: { href: string }) {
+  const block = useCandidateBlock();
+  if (block.reason === null) {
+    return (
+      <Button asChild>
+        <Link href={href}><Plus size={14} aria-hidden />New candidate</Link>
+      </Button>
+    );
+  }
+  return (
+    <>
+      <span id="new-candidate-blocked" className="text-sm text-[var(--color-text-2)]">{block.reason}</span>
+      <Button disabled aria-describedby="new-candidate-blocked"><Plus size={14} aria-hidden />New candidate</Button>
+    </>
   );
 }
