@@ -275,6 +275,10 @@ merging UI PRs; it doesn't go in `pnpm test` (Vitest stays fast). Adding it is i
 
 ## 7. Fix PRs, in order
 
+> **Paused after fix PR 2 (2026-10-21).** PR 1 (#26) and PR 2 (#27) are done. The work moves to backend
+> auth + tenancy (`docs/integration/07-auth-and-tenancy.md`) so teammates can integrate modules in
+> parallel. PRs 3–14 below stay as they are, in this order, for when Phase B resumes.
+
 Small PRs, one concern each, in the order I'd do them. Each closes the IDs listed.
 
 | # | PR | Closes | Why this order |
