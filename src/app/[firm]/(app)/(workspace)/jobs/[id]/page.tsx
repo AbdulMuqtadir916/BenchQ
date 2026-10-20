@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useMemo, useState } from "react";
 import { ArrowLeft, Sparkles, Send, Mail, Bookmark, Building2, Check, X, Minus } from "lucide-react";
 import { useJob } from "@/lib/hooks/use-jobs";
+import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { can, scopeCandidates } from "@/lib/auth/permissions";
@@ -47,6 +48,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const { id } = use(params);
   const principal = useSignedInPrincipal();
   const jobQuery = useJob(id);
+  const { savedIds } = useJobMarks();
+  const toggleMark = useToggleJobMark();
   const candidatesQuery = useCandidates();
 
   const myCandidates = useMemo(() => {
@@ -169,7 +172,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <Button asChild><Link href={toHref("resumes.studio", { id: "new" })}><Sparkles size={14} aria-hidden />Tailor</Link></Button>
               <Button variant="secondary"><Send size={14} aria-hidden />Mark applied</Button>
               <Button asChild variant="secondary"><Link href={toHref("outreach")}><Mail size={14} aria-hidden />Outreach</Link></Button>
-              <Button variant="ghost"><Bookmark size={14} aria-hidden />Save</Button>
+              <Button variant="ghost" aria-pressed={savedIds.has(job.id)} onClick={() => toggleMark.mutate({ jobId: job.id, kind: "SAVED", on: !savedIds.has(job.id) })}>
+                <Bookmark size={14} aria-hidden fill={savedIds.has(job.id) ? "currentColor" : "none"} />{savedIds.has(job.id) ? "Saved" : "Save"}
+              </Button>
             </div>
           ) : null}
         </div>

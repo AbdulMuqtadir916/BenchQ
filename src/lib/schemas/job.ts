@@ -89,3 +89,17 @@ export const CaptureJobSchema = z.object({
   description: z.string().trim().min(1, "Paste the job description."),
 });
 export type CaptureJob = z.infer<typeof CaptureJobSchema>;
+
+/** A person's saved / hidden job (docs/02 §6.x, approved 2026-10-20): personal, firm-scoped. */
+export const JobMarkKind = z.enum(["SAVED", "HIDDEN"]);
+export type JobMarkKind = z.infer<typeof JobMarkKind>;
+
+export const JobMarkSchema = z.object({
+  id: z.string(),
+  firmId: z.string(),
+  userId: z.string(),
+  jobId: z.string(),
+  kind: JobMarkKind,
+  createdAt: z.string().datetime(),
+});
+export type JobMark = z.infer<typeof JobMarkSchema>;

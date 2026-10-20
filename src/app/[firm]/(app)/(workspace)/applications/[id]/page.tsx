@@ -109,8 +109,11 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
             <h2 className="border-b border-[var(--color-border)] px-4 py-3 text-h3 text-[var(--color-text)]">Recruiter emails ({emails.length})</h2>
             {!inboxQuery.data?.connection ? (
               <p className="px-4 py-4 text-sm text-[var(--color-text-3)]">
-                The candidate&apos;s inbox isn&apos;t connected.{" "}
-                {candidate ? <Link href={toHref("candidates.detail", { id: candidate.id }, { tab: "inbox" })} className="text-[var(--color-primary-subtle-fg)] hover:underline">Connect it</Link> : null} to see recruiter replies here.
+                The candidate&apos;s inbox isn&apos;t connected.
+                {/* Connecting is a write (candidate.edit): a VIEWER or a support view gets the fact, not the link. */}
+                {candidate && can(principal, "candidate.edit") ? (
+                  <>{" "}<Link href={toHref("candidates.detail", { id: candidate.id }, { tab: "inbox" })} className="text-[var(--color-primary-subtle-fg)] hover:underline">Connect it</Link> to see recruiter replies here.</>
+                ) : null}
               </p>
             ) : emails.length === 0 ? (
               <p className="px-4 py-4 text-sm text-[var(--color-text-3)]">No recruiter emails matched to this application yet.</p>

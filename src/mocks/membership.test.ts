@@ -13,6 +13,8 @@ import { agentsApi } from "@/lib/api/agents";
 import { sessionApi } from "@/lib/api/session";
 import { allCandidates, candidatesMock } from "./candidates";
 import { allJobs, jobsMock } from "./jobs";
+import { allJobMarks, jobMarksMock } from "./job-marks";
+import { jobMarksApi } from "@/lib/api/job-marks";
 import { allApplications, applicationsMock, followupsMock } from "./applications";
 import { allResumes, resumesMock } from "./resumes";
 import { recordsMock } from "./records";
@@ -76,12 +78,15 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["inbox", "markRead", (f, i) => inboxApi.markRead(f, i.message), true],
   ["ledger", "list", (f) => ledgerApi.list(f), false],
   ["team", "list", (f) => teamApi.list(f), false],
+  ["jobMarks", "list", (f) => jobMarksApi.list(f), false],
+  ["jobMarks", "mark", (f, i) => jobMarksApi.mark(f, i.job, "SAVED"), true],
+  ["jobMarks", "unmark", (f, i) => jobMarksApi.unmark(f, i.job, "SAVED"), true],
   ["agents", "tailorResume", (f, i) => agentsApi.tailorResume(f, { resumeVersionId: i.resumeVersion, jobId: i.job }), true],
 ];
 
 const MOCKS: Record<(typeof FIRM_SCOPED_RESOURCES)[number], object> = {
   candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock,
-  records: recordsMock, documents: documentsMock, inbox: inboxMock, ledger: ledgerMock, team: teamMock, agents: agentsMock,
+  records: recordsMock, documents: documentsMock, inbox: inboxMock, ledger: ledgerMock, team: teamMock, agents: agentsMock, jobMarks: jobMarksMock,
 };
 /** Mock methods that take no firm (they work on text alone). */
 const UNSCOPED = new Set(["agents.rewrite"]);
@@ -108,10 +113,10 @@ describe("membership: a firm-A principal can't reach firm B through any adapter 
   });
 
   it("leaves firm B's records untouched after every refused write", async () => {
-    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs()].map((rows) => rows.filter((row) => row.firmId === B)));
+    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)));
     await signInAs("user_imran");
     for (const [, , call, isWrite] of CALLS) if (isWrite) await status(call(B, idsOf(B)));
-    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs()].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
+    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
   });
 
   it("answers another firm exactly like a firm that doesn't exist", async () => {

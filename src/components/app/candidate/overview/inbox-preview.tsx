@@ -10,8 +10,12 @@ import { Tag } from "@/components/ui/tag";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
 
-/** The latest recruiter emails, or the prompt to connect the mailbox. */
-export function InboxPreview({ inbox, isLoading, firstName, onOpenMessage, onOpenInbox }: { inbox: CandidateInbox | null; isLoading: boolean; firstName: string; onOpenMessage: (id: string) => void; onOpenInbox: () => void }) {
+/**
+ * The latest recruiter emails, or the prompt to connect the mailbox. Connecting is a write
+ * (`candidate.edit`): a read-only reader (a VIEWER, a support view) sees that the inbox isn't connected,
+ * with no Connect.
+ */
+export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessage, onOpenInbox }: { inbox: CandidateInbox | null; isLoading: boolean; firstName: string; canAct: boolean; onOpenMessage: (id: string) => void; onOpenInbox: () => void }) {
   const latest = (inbox?.messages ?? []).filter((m) => m.signal !== "CONFIRMATION").slice(0, 4);
 
   return (
@@ -29,8 +33,14 @@ export function InboxPreview({ inbox, isLoading, firstName, onOpenMessage, onOpe
       ) : !inbox?.connection ? (
         <div className="flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center">
           <span aria-hidden className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--color-info-bg)] text-[var(--color-info-fg)]"><Mail size={18} /></span>
-          <p className="flex-1 text-sm text-[var(--color-text-2)]">Connect {firstName}&apos;s Google account to see shortlists, recruiter calls and interview invites here as they arrive.</p>
-          <Button size="sm" onClick={onOpenInbox}>Connect</Button>
+          {canAct ? (
+            <>
+              <p className="flex-1 text-sm text-[var(--color-text-2)]">Connect {firstName}&apos;s Google account to see shortlists, recruiter calls and interview invites here as they arrive.</p>
+              <Button size="sm" onClick={onOpenInbox}>Connect</Button>
+            </>
+          ) : (
+            <p className="flex-1 text-sm text-[var(--color-text-2)]">{firstName}&apos;s inbox isn&apos;t connected. A recruiter on this candidate can connect it.</p>
+          )}
         </div>
       ) : latest.length === 0 ? (
         <p className="px-4 py-6 text-sm text-[var(--color-text-3)]">No recruiter emails yet. New ones appear here after each sync.</p>

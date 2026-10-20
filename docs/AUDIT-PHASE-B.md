@@ -16,7 +16,7 @@ at the end refer to those IDs.
 | Severity | Meaning | Count |
 |---|---|---|
 | **Blocks use** | the screen claims to do something it doesn't; work is lost | 2 |
-| **Wrong behaviour** | differs from the spec or a CLAUDE.md rule; the user can work around it | 26 |
+| **Wrong behaviour** | differs from the spec or a CLAUDE.md rule; the user can work around it | 28 |
 | **Cosmetic** | looks or reads wrong; behaviour is correct | 6 |
 
 ## Method
@@ -83,6 +83,8 @@ less on them, so their cells in §2 record access, scope and the controls offere
 | C4 | Cosmetic | `ledger` | all with access | A dangling `·` when `promptVersion` is null (known) | Join the parts that exist with the separator |
 | C5 | Cosmetic | `candidates` | all, 390 px | Search box squeezed to a few characters (known) | Search on its own row below `md` |
 | W26 | Wrong behaviour | `sign-in` | every signed-in principal | The form renders for someone already signed in (decided 07 Q35: redirect) | Redirect to `signInTarget` (the landing, or `returnTo` when the account can open it) |
+| W27 | Wrong behaviour | `candidates/new` (page and dialog) | OWNER, MANAGER, BDE | No resume upload or parse at intake, and only name, role, contact, work auth and assignment are asked; docs/04 §4.2 has identity / professional / sourcing sections and a resume drop zone whose parse drafts fields as `UNVERIFIED` with a review strip (added 2026-10-20, after fix PR 1) | Resume drop zone with a simulated parse (docs/03 §5 staging); parsed fields land `UNVERIFIED` with "N fields drafted from the resume — review before saving", typed fields `VERIFIED`; the rest of §4.2's fields |
+| W28 | Wrong behaviour | `jobs/capture` (page and dialogs) | OWNER, MANAGER, BDE | One manual form; docs/04 §5.2's Paste (URL or raw description → 2–4 s simulated parse → review with every field `UNVERIFIED` beside the source), Bulk paste (per-row queued → parsing → parsed / duplicate / failed) and Extension (install / connected states from a store flag) tabs are missing, and a duplicate is refused rather than offering "merge or keep separate" (added 2026-10-20) | The three tabs on the simulated parse; the duplicate comparison card with merge / keep separate |
 | C6 | Cosmetic | many lists (meta lines) | all | The `·` separators measure 1.28 light / 1.6 dark | Separators are decorative: mark them `aria-hidden` and give them `text-3` with the W21 fix |
 
 ### Not confirmed
@@ -289,6 +291,8 @@ Small PRs, one concern each, in the order I'd do them. Each closes the IDs liste
 | 10 | **Ledger**: filters (URL), diff expander, `·` join | W25, C4 | Self-contained; known gap |
 | 11 | **Sign-in**: redirect when signed in (Q35), forgot-password confirmation state | W26, W10 | Small; spec exists (§2.1) |
 | 12 | **Settings and welcome**: settings/firm shows "Not set" for shift window and cadence (fields once docs/02 §3.3 is approved), templates, welcome wizard steps 1/3/4 | W7, W8, W9 | Spec-heavy; may need docs/04 detail first. Step 2 and the team invite controls wait for Phase M |
+| 13 | **Intake from a resume**: drop zone, simulated parse, `UNVERIFIED` drafted fields with the review strip, the rest of §4.2's fields | W27 | Builds on PR 1's create; spec exists (docs/04 §4.2); the claim-state rules apply to drafted fields, so it gets its own review |
+| 14 | **Capture tabs**: Paste with parse and side-by-side review, Bulk paste with per-row status, Extension states; duplicate comparison with merge / keep separate | W28 | Builds on PR 1's capture and dedup; merge needs a rule for which fields win (ask before building) |
 
 Answers (2026-10-19, product owner):
 
