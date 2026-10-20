@@ -167,6 +167,11 @@ backend only; the frontend keeps running on mocks until F6.**
   is deleted. A test builds two scratch databases, one the old way and one by Alembic, and compares tables,
   columns (type, nullability, default), constraints, indexes and sequences, so the two can't drift. The repo
   has no CI workflow; the command is in `docs/integration/README.md`.
+- **Remove the legacy path by F6 at the latest.** Once every dev database is stamped, delete
+  `models.db.create_tables`, `seed.run_migrations` (with `run_migration_statements` and the helpers only it
+  calls), `seed.migrate_h1b_to_visa_cache`, `backend/migrations/legacy_bootstrap.py`, the stamp branch in
+  `db_schema.py`, and the tests that exist only for them. The equivalence test
+  (`test_schema_matches_legacy.py`) goes with them; `alembic check` stays.
 - **Done when:** a clean `docker compose up` builds the schema from migrations only; an existing dev
   database is stamped with no change; all backend tests pass on Postgres.
 
@@ -253,8 +258,12 @@ are ported as backend tests, case for case.
   `current()`.
 - **The other modules stay on mocks**, but now under a real signed-in principal. Until its track lands, a
   mocked module reads the principal from the session the way it does today.
+- **Delete the legacy schema path** (F1's list): `create_tables`, `run_migrations`,
+  `migrate_h1b_to_visa_cache`, `backend/migrations/legacy_bootstrap.py` and the stamp branch in
+  `db_schema.py`. By now every dev database has been stamped by starting the backend once.
 - **Done when:** every seeded account signs in on a production build and lands where docs/03 §3.2 says;
-  the support view starts and ends with its ledger entries; signing out in one tab signs out the others.
+  the support view starts and ends with its ledger entries; signing out in one tab signs out the others;
+  the legacy schema path is gone.
 
 ### F7 — The cross-firm isolation test, reusable
 
