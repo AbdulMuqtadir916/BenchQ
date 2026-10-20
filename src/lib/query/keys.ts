@@ -36,6 +36,8 @@ export const queryKeys = {
   inbox: { byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const },
   ledger: { all: (firmId: string) => [firmId, "ledger"] as const, list: (firmId: string, params?: Params) => [firmId, "ledger", "list", params ?? {}] as const },
   team: { list: (firmId: string) => [firmId, "team", "list"] as const },
+  /** The signed-in person's own marks (docs/02 §6.x); a principal change clears the cache. */
+  jobMarks: { mine: (firmId: string) => [firmId, "jobMarks", "mine"] as const },
 
   // not firm-scoped
   /** The platform tier (docs/07 §2.3): every firm's rows, PLATFORM_ADMIN only. One prefix, so an admin write refreshes it all. */

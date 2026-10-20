@@ -914,6 +914,35 @@ export const JobSchema = z.object({
 
 ---
 
+### 6.x JobMark — a person's saved and hidden jobs (approved 2026-10-20, Phase B fix PR 2)
+
+> **Approved 2026-10-20** by the product owner ("per person"). The job explorer's Save and Hide, and Save on
+> the job page, used to live in component state and vanish on reload (audit W3).
+
+```ts
+// src/lib/schemas/job.ts
+export const JobMarkKind = z.enum(['SAVED', 'HIDDEN']);
+
+export const JobMarkSchema = z.object({
+  id: z.string(),
+  firmId: z.string(),                      // firm-scoped like every firm record
+  userId: z.string(),                      // → User.id: marks are personal
+  jobId: z.string(),                       // → Job.id, a job of the same firm
+  kind: JobMarkKind,
+  createdAt: z.string().datetime(),
+});
+```
+
+- **Personal.** Each user sees and changes only their own marks; a BDE's hides never hide a job from anyone
+  else. One mark per `(userId, jobId, kind)`; a job may be both saved and hidden.
+- **Who:** the acting roles, by the existing `job.apply` action (OWNER, MANAGER, BDE). A VIEWER and a support
+  view see no Save / Hide and the backend refuses the writes (403). A support view reads no marks (they belong
+  to people, not to the firm's work).
+- **Not in the ledger:** personal triage, like reading an email.
+- Separate from `Match.isShortlisted` / `isDismissed` (§7), which are about one candidate and job.
+- Endpoints: `GET /api/job-marks` (the signed-in user's), `PUT /api/job-marks/:jobId/:kind`,
+  `DELETE /api/job-marks/:jobId/:kind`.
+
 ## 7. Matching & scoring
 
 ```ts

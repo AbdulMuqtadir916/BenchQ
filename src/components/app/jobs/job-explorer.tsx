@@ -10,6 +10,7 @@ import {
   Clock3,
   Copy,
   ExternalLink,
+  Eye,
   EyeOff,
   Heart,
   MapPin,
@@ -21,7 +22,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
-import { deriveMatchScore } from "@/lib/derive";
+import { deriveMatchScore, newestDate } from "@/lib/derive";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { EASE_OUT, POPOVER_TRANSITION } from "@/lib/motion";
@@ -36,6 +37,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { PORTALS, PortalLogo, portalForJob, type PortalKey } from "@/components/app/jobs/portal-logo";
 import { useCan } from "@/lib/auth/permissions";
 import { useHref } from "@/lib/routes/use-href";
+import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
 
 const REMOTE_OPTIONS: SelectOption[] = [
   { value: "ALL", label: "Any work mode" },
@@ -102,8 +104,11 @@ export function JobExplorer({
   const [scoreFloor, setScoreFloor] = useState(startingCandidateId ? "70" : "0");
   const [sort, setSort] = useState(startingCandidateId ? "MATCH" : "NEWEST");
   const [selectedId, setSelectedId] = useState("");
-  const [savedIds, setSavedIds] = useState(() => new Set<string>());
-  const [hiddenIds, setHiddenIds] = useState(() => new Set<string>());
+  // Save / Hide are the person's own (docs/02 §6.x), kept by the server; only the acting roles get them.
+  const canMark = useCan("job.apply");
+  const { savedIds, hiddenIds } = useJobMarks();
+  const toggleMark = useToggleJobMark();
+  const [showHidden, setShowHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -117,7 +122,7 @@ export function JobExplorer({
     const normalizedQuery = deferredQuery.trim().toLowerCase();
     const minimum = Number(scoreFloor);
     const list = jobs
-      .filter((job) => job.isActive && job.dedupe.duplicateOfJobId === null && !hiddenIds.has(job.id))
+      .filter((job) => job.isActive && job.dedupe.duplicateOfJobId === null && (showHidden || !hiddenIds.has(job.id)))
       .filter((job) => !context || (job.allowedWorkAuth.includes(context.workAuth) && !appliedIds.has(job.id)))
       .map((job) => ({ job, score: context ? deriveMatchScore(context, job) : null, portal: portalForJob(job) }))
       .filter(({ job, score, portal: rowPortal }) => {
@@ -131,25 +136,22 @@ export function JobExplorer({
     list.sort((a, b) => {
       if (sort === "MATCH" && a.score !== null && b.score !== null && a.score !== b.score) return b.score - a.score;
       if (sort === "COMPANY") return a.job.company.name.localeCompare(b.job.company.name);
-      return (b.job.postedAt ?? "").localeCompare(a.job.postedAt ?? "");
+      return newestDate(b.job).localeCompare(newestDate(a.job));
     });
     return list.slice(0, lockedCandidate ? 40 : 80);
-  }, [jobs, hiddenIds, context, appliedIds, deferredQuery, portal, remote, scoreFloor, sort, lockedCandidate]);
+  }, [jobs, hiddenIds, showHidden, context, appliedIds, deferredQuery, portal, remote, scoreFloor, sort, lockedCandidate]);
 
   const selected = rows.find(({ job }) => job.id === selectedId) ?? rows[0] ?? null;
   const arrivedToday = rows.filter(({ job }) => job.postedAt && renderedAt - new Date(job.postedAt).getTime() < 86_400_000).length;
   const activeFilterCount = [portal !== "ALL", remote !== "ALL", Number(scoreFloor) > 0, Boolean(query)].filter(Boolean).length;
 
   function toggleSaved(id: string) {
-    setSavedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    toggleMark.mutate({ jobId: id, kind: "SAVED", on: !savedIds.has(id) });
   }
 
-  function hideSelected(id: string) {
-    setHiddenIds((current) => new Set(current).add(id));
+  /** Hide a job from your own feed, or bring it back while hidden jobs are shown. */
+  function toggleHidden(id: string) {
+    toggleMark.mutate({ jobId: id, kind: "HIDDEN", on: !hiddenIds.has(id) });
     setMenuOpen(false);
   }
 
@@ -210,7 +212,14 @@ export function JobExplorer({
       <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xs)] lg:grid lg:h-[calc(100dvh-260px)] lg:min-h-[510px] lg:grid-cols-[minmax(350px,42%)_minmax(0,1fr)]">
         <div className="min-h-[360px] border-b border-[var(--color-border)] lg:min-h-0 lg:border-b-0 lg:border-r">
           <div className="flex h-9 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 text-caption text-[var(--color-text-3)]">
-            <span className="tabular">{rows.length} shown</span>
+            <span className="flex items-center gap-2">
+              <span className="tabular">{rows.length} shown</span>
+              {canMark && hiddenIds.size > 0 ? (
+                <button type="button" aria-pressed={showHidden} onClick={() => setShowHidden((value) => !value)} className="rounded-[var(--radius-sm)] text-[var(--color-primary-subtle-fg)] hover:underline">
+                  {showHidden ? `Hide ${hiddenIds.size} hidden` : `Show ${hiddenIds.size} hidden`}
+                </button>
+              ) : null}
+            </span>
             <span className="inline-flex items-center gap-1 font-mono text-[10px]"><span aria-hidden>↑↓</span> move · Enter open <CircleHelp size={13} aria-hidden /></span>
           </div>
           <div className="h-[520px] overflow-y-auto lg:h-[calc(100%-36px)]">
@@ -230,7 +239,7 @@ export function JobExplorer({
                       initial={isStaggered ? { opacity: 0, y: 10 } : false}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.28, delay: isStaggered ? index * 0.045 : 0, ease: EASE_OUT }}
-                      className={cn("group grid grid-cols-[minmax(0,1fr)_32px] transition-colors", isSelected ? "bg-[var(--color-primary-subtle)]" : "hover:bg-[var(--color-surface-2)]")}
+                      className={cn("group grid transition-colors", canMark ? "grid-cols-[minmax(0,1fr)_32px]" : "grid-cols-1", hiddenIds.has(job.id) && "opacity-60", isSelected ? "bg-[var(--color-primary-subtle)]" : "hover:bg-[var(--color-surface-2)]")}
                       style={{ contentVisibility: "auto", containIntrinsicSize: "74px" }}
                     >
                       <button
@@ -256,14 +265,16 @@ export function JobExplorer({
                             </div>
                           </div>
                       </button>
-                      <div className="flex flex-col border-l border-[var(--color-border)]">
-                          <button type="button" aria-label={savedIds.has(job.id) ? "Unsave job" : "Save job"} onClick={() => toggleSaved(job.id)} className="flex flex-1 items-center justify-center text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-danger-fg)]">
+                      {canMark ? (
+                        <div className="flex flex-col border-l border-[var(--color-border)]">
+                          <button type="button" aria-label={savedIds.has(job.id) ? "Unsave job" : "Save job"} aria-pressed={savedIds.has(job.id)} onClick={() => toggleSaved(job.id)} className="flex flex-1 items-center justify-center text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-danger-fg)]">
                             <Heart size={14} fill={savedIds.has(job.id) ? "currentColor" : "none"} />
                           </button>
-                          <button type="button" aria-label="Hide job" onClick={() => hideSelected(job.id)} className="flex flex-1 items-center justify-center border-t border-[var(--color-border)] text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]">
-                            <EyeOff size={14} />
+                          <button type="button" aria-label={hiddenIds.has(job.id) ? "Unhide job" : "Hide job"} onClick={() => toggleHidden(job.id)} className="flex flex-1 items-center justify-center border-t border-[var(--color-border)] text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]">
+                            {hiddenIds.has(job.id) ? <Eye size={14} /> : <EyeOff size={14} />}
                           </button>
-                      </div>
+                        </div>
+                      ) : null}
                     </motion.li>
                   );
                 })}
@@ -284,7 +295,8 @@ export function JobExplorer({
                 copied={copied}
                 onMenuToggle={() => setMenuOpen((open) => !open)}
                 onCopy={() => copyJobLink(selected.job)}
-                onHide={() => hideSelected(selected.job.id)}
+                isHidden={hiddenIds.has(selected.job.id)}
+                onHide={canMark ? () => toggleHidden(selected.job.id) : null}
               />
               <SourcePreview job={selected.job} portal={selected.portal} />
             </motion.div>
@@ -312,6 +324,7 @@ function JobDetailHeader({
   copied,
   onMenuToggle,
   onCopy,
+  isHidden,
   onHide,
 }: {
   job: Job;
@@ -322,7 +335,9 @@ function JobDetailHeader({
   copied: boolean;
   onMenuToggle: () => void;
   onCopy: () => void;
-  onHide: () => void;
+  isHidden: boolean;
+  /** Null for a read-only viewer: no Hide in the menu. */
+  onHide: (() => void) | null;
 }) {
   const toHref = useHref();
   // A read-only viewer (VIEWER, a support view) gets the job's details, never "Tailor & apply".
@@ -362,7 +377,9 @@ function JobDetailHeader({
           <motion.div initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.985 }} transition={POPOVER_TRANSITION} className="absolute right-5 top-16 z-30 w-56 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-md)]">
             <button type="button" onClick={onCopy} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]">{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? "Link copied" : "Copy job link"}</button>
             <a href={sourceUrl} target="_blank" rel="noreferrer" className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"><ExternalLink size={14} />Open in new tab</a>
-            <button type="button" onClick={onHide} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-danger-fg)] hover:bg-[var(--color-danger-bg)]"><EyeOff size={14} />Hide this job</button>
+            {onHide ? (
+              <button type="button" onClick={onHide} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-danger-fg)] hover:bg-[var(--color-danger-bg)]">{isHidden ? <><Eye size={14} />Unhide this job</> : <><EyeOff size={14} />Hide this job</>}</button>
+            ) : null}
           </motion.div>
         ) : null}
       </AnimatePresence>

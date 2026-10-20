@@ -77,4 +77,4 @@ export function firmScoped<M extends Record<string, FirmMethod>>(resource: strin
 }
 
 /** Every firm-scoped mock's name, for the isolation test to check it covers them all. */
-export const FIRM_SCOPED_RESOURCES = ["candidates", "jobs", "applications", "followups", "resumes", "records", "documents", "inbox", "ledger", "team", "agents"] as const;
+export const FIRM_SCOPED_RESOURCES = ["candidates", "jobs", "applications", "followups", "resumes", "records", "documents", "inbox", "ledger", "team", "agents", "jobMarks"] as const;

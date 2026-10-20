@@ -59,3 +59,8 @@ export function rankJobsForCandidate(
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 }
+
+/** "Newest" orders by the posted date, or the captured date when a job has none (one captured by hand); never an invented posted date. */
+export function newestDate(job: Pick<Job, "postedAt" | "provenance">): string {
+  return job.postedAt ?? job.provenance.ingestedAt;
+}
