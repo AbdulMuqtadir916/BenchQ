@@ -557,6 +557,47 @@ export const AiUsageSchema = z.object({
 | S11 | Time zone for period boundaries | **Answered (07 Q34):** IST, like the rest of the admin area |
 | S12 | Do failed AI calls count in spend? | **Answered (07 Q34):** yes, when the provider billed them |
 
+### 3.3 Firm working rhythm — DRAFT, awaiting sign-off (2026-10-19)
+
+> **Status: draft for the product owner's sign-off.** Nothing is built from it. Until it is approved,
+> `settings/firm` shows **"Not set"** for both values, never an invented one (Phase B audit W7).
+
+Two additions to `FirmSchema` (§3.1). Both are set when a firm is created (to the defaults below) and
+edited by the OWNER on `settings/firm`; a support view reads them.
+
+```ts
+// src/lib/schemas/tenancy.ts — FirmSchema additions (draft)
+const ClockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);   // "HH:MM", 24-hour
+
+shiftWindow: z.object({
+  start: ClockTime,                       // default "18:30"
+  end: ClockTime,                         // default "00:30"; end earlier than start = crosses midnight
+}),                                       // read in the firm's primaryTimezone (no timezone of its own)
+
+followUpCadence: z.array(z.object({
+  dayOffset: z.number().int().min(1).max(30),   // days after the application is submitted
+  channel: OutreachChannel,                      // §2 enum
+})).min(1).max(5),                               // ascending dayOffset, no duplicates
+// default: [{ dayOffset: 3, channel: 'LINKEDIN_MESSAGE' }, { dayOffset: 7, channel: 'EMAIL' }]
+```
+
+| Value | Default | Rules |
+|---|---|---|
+| `shiftWindow` | 18:30 – 00:30 in `primaryTimezone` | Times only; the window may cross midnight; start ≠ end. Shown with the timezone's abbreviation (IST for the beachhead) |
+| `followUpCadence` | day 3 LinkedIn message, day 7 email | 1–5 steps, ascending, offsets 1–30 days; one channel per step |
+
+**Questions with this draft** (proposed answers in brackets):
+
+1. **Existing follow-ups when the cadence changes.** *(Proposed: only follow-ups created after the change
+   use the new cadence; existing ones keep their dates.)*
+2. **`FollowUpKind` (`DAY_3_LINKEDIN`, `DAY_7_EMAIL`, `CUSTOM`).** *(Proposed: keep the enum; a step that
+   matches a default kind uses it, any other step creates `CUSTOM`. No enum change.)*
+3. **What the shift window drives.** *(Proposed: display only for now — the focus-mode timer and the
+   "shift" range on dashboards read it; nothing is blocked outside the window.)*
+4. **Ledger.** *(Proposed: editing either logs `UPDATE` with `entityType: "firm"`, as other firm edits do.)*
+
+---
+
 ## 4. Candidate
 
 ```ts
