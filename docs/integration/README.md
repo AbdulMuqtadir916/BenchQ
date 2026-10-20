@@ -265,12 +265,62 @@ the backend outside Docker.
 | Stop backend + database | `docker compose stop` (data is kept in the `pgdata` volume) |
 | Frontend | `pnpm dev`, then `http://localhost:3000/health` shows the backend's JSON |
 | Switch a module to the backend | add it to `NEXT_PUBLIC_LIVE_MODULES` in `.env.local`, restart `pnpm dev` |
-| Backend tests | see "Run it" in [`00-foundation.md`](./00-foundation.md) |
+| Backend tests (Postgres) | `docker compose up -d db-test backend`, then `docker compose exec -T backend python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider` (details in "Schema changes and the test database" below) |
+| Create a migration | `docker compose exec backend alembic -c backend/alembic.ini revision --autogenerate -m "what changed"`, then review the file (below) |
 | Look inside the database | [`database-viewer.md`](./database-viewer.md) (Adminer at `http://localhost:8081`) |
 
 The env variables are documented inside `.env.example` (frontend) and `backend/.env.example`
 (backend). Restart `pnpm dev` whenever `.env.local` changes, because `NEXT_PUBLIC_*` values are
 baked in at start.
+
+---
+
+## Schema changes and the test database
+
+The database schema changes **only through Alembic** (`backend/migrations/`). Nothing creates or alters
+tables at startup any more: `docker compose up` runs `python -m backend.scripts.db_upgrade` before the API
+starts (see the `CMD` in `Dockerfile.backend`), and the API refuses to start if the database is not at the
+newest revision. Run **exactly one backend worker** until the scheduler leaves the API process
+([07-auth-and-tenancy.md](./07-auth-and-tenancy.md), Q37).
+
+### Make a schema change
+
+1. Edit the model in `backend/models/db.py`.
+2. Generate a revision against your running dev database:
+   ```bash
+   docker compose exec backend alembic -c backend/alembic.ini revision --autogenerate -m "add firms table"
+   ```
+   The file appears in `backend/migrations/versions/` (the folder is mounted, so it is on your disk).
+3. **Read it.** Autogenerate misses sequences, check constraints, data fixes and renames (it sees a rename
+   as drop + add). Fix those by hand. Write a real `downgrade()`.
+4. Apply it: `docker compose exec backend python -m backend.scripts.db_upgrade`.
+5. Run `docker compose exec -T backend alembic -c backend/alembic.ini check`. It must say no new operations.
+   The test suite runs the same check (`test_models_and_migrations_agree`), so a model change without a
+   revision fails the tests.
+
+Never edit a revision that has been merged: add a new one. Never put schema changes in `seed.py`: it seeds
+and tidies **data** only. `seed.run_migrations`, `models.db.create_tables` and `migrate_h1b_to_visa_cache`
+are frozen: only `backend/migrations/legacy_bootstrap.py` calls them, for databases that predate Alembic.
+
+### An existing dev database
+
+The first time `db_upgrade` sees tables but no `alembic_version`, it runs the legacy bootstrap once (a no-op
+on a database that is already current), then **stamps** it at revision `0001`. Nothing is re-created and no
+data changes. Just rebuild and restart: `docker compose up -d --build backend`.
+
+### Tests run on Postgres
+
+```bash
+docker compose up -d db-test backend      # db-test is a throwaway Postgres on port 5433 (data in memory)
+docker compose exec -T backend python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider
+```
+
+The schema is built once per run by `alembic upgrade head`, and every table is emptied before each test.
+Tests refuse to run against a database whose name does not end in `_test`. To run pytest on your machine
+instead of in the container, set `TEST_DATABASE_URL=postgresql://jobnavigator:password@localhost:5433/jobnavigator_test`.
+A test that needs a row another table points to (a `Job` for `job_runs.target_job_id`, a `Search` for
+`scrape_log.search_id`) must create it first: the foreign keys are real now (`tests/r4_support.make_job`).
+The repo has no CI workflow yet; this command is the check to run before a PR.
 
 ---
 
