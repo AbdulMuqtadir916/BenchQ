@@ -15,10 +15,9 @@ class FakeJob:
 
 @pytest.fixture
 def scorer_db(monkeypatch):
-    """In-memory SQLite with Setting rows needed for scoring."""
+    """Setting rows needed for scoring, on the Postgres test database."""
     from backend.models.db import Setting, Base
-    engine = create_engine("sqlite:///:memory:")
-    Setting.__table__.create(engine)
+    from backend.models.db import engine   # the Postgres test database (tests/conftest.py)
     Session = sessionmaker(bind=engine)
 
     s = Session()

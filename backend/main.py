@@ -7,7 +7,8 @@ from fastapi import FastAPI, Query, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.models.db import create_tables, SessionLocal, Setting, JobRun
+from backend.db_schema import check_schema_at_head
+from backend.models.db import SessionLocal, Setting, JobRun
 from backend.seed import run_seeds
 from backend.config import INITIAL_API_KEY, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
@@ -36,9 +37,10 @@ for _noisy in ("httpx", "httpcore"):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: create tables, seed data, start scheduler."""
+    """Startup: check the schema, seed data, start scheduler. The schema itself is built by Alembic
+    before this process starts (backend/scripts/db_upgrade.py); deploy exactly one worker (docs/integration/07)."""
     logger.info("Starting JobNavigator backend...")
-    create_tables()
+    check_schema_at_head()
     run_seeds()
 
     # Set initial API key if dashboard_api_key is empty

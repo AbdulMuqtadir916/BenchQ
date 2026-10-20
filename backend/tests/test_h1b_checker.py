@@ -327,13 +327,11 @@ async def test_fetch_raises_when_both_blocked(monkeypatch):
 
 # ── migration: legacy companies.h1b_* → visa_cache ───────────────────────────
 
-def test_migrate_seeds_visa_cache_from_legacy_columns(test_db):
+def test_migrate_seeds_visa_cache_from_legacy_columns(test_db, add_legacy_h1b_columns):
     from sqlalchemy import text
     from backend.models.db import Company, VisaCache
     from backend.seed import migrate_h1b_to_visa_cache
-    for col, typ in [("h1b_lca_count", "INTEGER"), ("h1b_approval_rate", "FLOAT"),
-                     ("h1b_median_salary", "INTEGER"), ("h1b_last_checked", "DATETIME")]:
-        test_db.execute(text(f"ALTER TABLE companies ADD COLUMN {col} {typ}"))
+    add_legacy_h1b_columns()
     test_db.add(Company(name="LegacyCo"))
     test_db.commit()
     test_db.execute(text("update companies set h1b_lca_count=320, h1b_approval_rate=92.0, "

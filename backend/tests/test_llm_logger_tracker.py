@@ -7,8 +7,7 @@ from sqlalchemy.orm import sessionmaker
 @pytest.fixture
 def test_db(monkeypatch):
     from backend.models.db import Base, LlmCallLog
-    engine = create_engine("sqlite:///:memory:")
-    LlmCallLog.__table__.create(engine)
+    from backend.models.db import engine   # the Postgres test database (tests/conftest.py)
     Session = sessionmaker(bind=engine)
     import backend.analyzer.llm_logger as llm_logger
     monkeypatch.setattr(llm_logger, "SessionLocal", Session)
@@ -61,7 +60,9 @@ async def test_track_llm_call_job_id(test_db):
     from backend.analyzer.llm_logger import track_llm_call
     from backend.models.db import LlmCallLog
 
+    from backend.tests.r4_support import make_job
     jid = uuid.uuid4()
+    make_job(test_db, id=jid)   # llm_call_log.job_id is a real foreign key on Postgres
     async with track_llm_call("score_full", "claude_api", "claude-sonnet-4-6", job_id=jid) as tracker:
         tracker.usage = {"input_tokens": 100, "output_tokens": 10,
                          "cache_read_tokens": 0, "cache_write_tokens": 0}

@@ -110,8 +110,7 @@ class FakeJob:
 
 def _scorer_session(extra_rows):
     from backend.models.db import Setting
-    engine = create_engine("sqlite:///:memory:")
-    Setting.__table__.create(engine)
+    from backend.models.db import engine   # the Postgres test database (tests/conftest.py)
     Session = sessionmaker(bind=engine)
     s = Session()
     s.add(Setting(key="scoring_rubric", value="RUBRIC"))

@@ -470,16 +470,6 @@ def test_persona_singleton_is_created_once(test_db):
 # ══ migrate_h1b_to_visa_cache ═══════════════════════════════════════════════
 
 
-LEGACY_COLS = [("h1b_lca_count", "INTEGER"), ("h1b_approval_rate", "FLOAT"),
-               ("h1b_median_salary", "INTEGER"), ("h1b_last_checked", "DATETIME")]
-
-
-def _add_legacy_columns(db):
-    for col, typ in LEGACY_COLS:
-        db.execute(text(f"ALTER TABLE companies ADD COLUMN {col} {typ}"))
-    db.commit()
-
-
 def _fake_dialect(monkeypatch, db, name):
     """Make the migration's one `db.get_bind()` probe report `name`.
 
@@ -514,7 +504,7 @@ def test_a_column_probe_failure_returns_quietly(test_db, monkeypatch):
     original = test_db.execute
 
     def _fail_pragma(stmt, *a, **k):
-        if "PRAGMA" in str(stmt):
+        if "information_schema" in str(stmt):
             raise RuntimeError("probe exploded")
         return original(stmt, *a, **k)
     monkeypatch.setattr(test_db, "execute", _fail_pragma, raising=False)
@@ -544,9 +534,9 @@ def test_a_postgres_db_without_the_legacy_column_is_already_migrated(test_db, mo
     assert test_db.query(VisaCache).count() == 0
 
 
-def test_a_failing_legacy_select_seeds_nothing(test_db, monkeypatch):
+def test_a_failing_legacy_select_seeds_nothing(test_db, monkeypatch, add_legacy_h1b_columns):
     """A broken read of the legacy columns degrades to "no rows", not an exception."""
-    _add_legacy_columns(test_db)
+    add_legacy_h1b_columns()
     original = test_db.execute
 
     def _fail_select(stmt, *a, **k):
@@ -559,9 +549,9 @@ def test_a_failing_legacy_select_seeds_nothing(test_db, monkeypatch):
     assert test_db.query(VisaCache).count() == 0
 
 
-def test_only_companies_with_data_or_a_slug_are_copied(test_db):
+def test_only_companies_with_data_or_a_slug_are_copied(test_db, add_legacy_h1b_columns):
     """Blank names, names already in visa_cache and dataless rows are all skipped."""
-    _add_legacy_columns(test_db)
+    add_legacy_h1b_columns()
     test_db.add_all([
         Company(name="   "),                       # blank key → skipped
         Company(name="DupCo"),                     # already in visa_cache → skipped
@@ -589,9 +579,9 @@ def test_only_companies_with_data_or_a_slug_are_copied(test_db):
     assert slug_only.slug == "slug-only" and slug_only.has_data is False
 
 
-def test_postgres_drops_the_legacy_columns_and_survives_one_failing_drop(test_db, monkeypatch, caplog):
+def test_postgres_drops_the_legacy_columns_and_survives_one_failing_drop(test_db, monkeypatch, caplog, add_legacy_h1b_columns):
     """All four DROP COLUMN statements are attempted; one failing is only logged."""
-    _add_legacy_columns(test_db)
+    add_legacy_h1b_columns()
     test_db.add(Company(name="DataCo", h1b_slug="data-co"))
     test_db.commit()
     _fake_dialect(monkeypatch, test_db, "postgresql")
@@ -619,21 +609,6 @@ def test_postgres_drops_the_legacy_columns_and_survives_one_failing_drop(test_db
                        "h1b_median_salary", "h1b_last_checked"]
     assert any("drop legacy column h1b_median_salary failed" in r.getMessage()
                for r in caplog.records)
-    assert test_db.query(VisaCache).filter(VisaCache.name_key == "dataco").count() == 1
-
-
-def test_sqlite_keeps_the_legacy_columns(test_db):
-    """The DROP half is Postgres-only; on SQLite the columns are left in place."""
-    _add_legacy_columns(test_db)
-    test_db.add(Company(name="DataCo", h1b_slug="data-co"))
-    test_db.commit()
-
-    seed.migrate_h1b_to_visa_cache(test_db)
-
-    cols = {r[1] for r in test_db.execute(text("PRAGMA table_info(companies)"))}
-    assert "h1b_lca_count" in cols
-    # …and re-running is therefore not idempotent-by-column, but is by name_key.
-    seed.migrate_h1b_to_visa_cache(test_db)
     assert test_db.query(VisaCache).filter(VisaCache.name_key == "dataco").count() == 1
 
 
