@@ -1,6 +1,6 @@
 # 07 — Auth and tenancy in the backend
 
-**Status:** plan, for the product owner's review (2026-10-21). Nothing here is built.
+**Status:** approved (Q37), reordered by Q38 (2026-10-21). F1 is built (#29, then 0002 in #30); CI runs on every PR (#31).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
 
@@ -144,6 +144,15 @@ which isn't part of BenchQ yet.
 ---
 
 ## 3. The foundation, in order (one PR each)
+
+> **Reordered 2026-10-21 (07-ROUTES-AND-RBAC Q38).** The onboarding flow goes first, end to end: **1** F2a, the
+> new tables (firms, plans, users, platform users, invites, sessions, support views, ledger entries; a "Default"
+> plan and "Default firm") · **2** F3's sign-in, sign-out, me and invite endpoints, auth on **every** endpoint,
+> the shared API key and first-run mode removed · **3** F4's policy table · **4** Super Admin firms + invites
+> (from the Admin API track) · **5** OWNER member invites (the backend of Phase M) · **6** a
+> `create_platform_admin` command and F5's seed, outside production only · **7** F6 for the session, admin
+> and invites adapters. Then F2b (`firm_id` on existing tables, `firm_jobs`), F2c (settings), the support-view
+> endpoints and F7. The sections below keep their F-numbers for reference.
 
 Each PR is small enough to review in one sitting and leaves the backend's tests green. **F1–F5 are
 backend only; the frontend keeps running on mocks until F6.**

@@ -256,11 +256,12 @@ A stopped task with a clear question beats a confident wrong implementation.
 
 > **Update this section as you progress.** It's the first thing the next session reads.
 
-**Phase: Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md`, plan in review). Frontend
-phases T, L, P and C are done; the Phase B audit is done and its fixes are **paused after fix PR 2 (#27)**
-(2026-10-21) so teammates can integrate modules in parallel. **Next:** your decisions in 07-auth §2, then
-foundation F1–F7, then the module tracks. Repo snapshot: `docs/CURRENT_STATE.md` (2026-10-19, predates
-Phase B).
+**Phase: Backend auth + tenancy, onboarding first** (`docs/integration/07-auth-and-tenancy.md` §3, reordered by
+07 Q38 on 2026-10-21). F1 (Alembic, tests on Postgres) and 0002 are merged; CI runs on every PR into
+`codex/json-data-migration`. **Next:** the onboarding flow on the real backend, in seven PRs: tables · sign-in and
+auth on every endpoint · policy table · Super Admin firms + invites · OWNER member invites · first-admin command
+and demo seed · frontend cut-over. Phase B fixes stay **paused after fix PR 2 (#27)**. Repo snapshot:
+`docs/CURRENT_STATE.md` (2026-10-19, predates Phase B).
 
 | Step | Status |
 |---|---|
@@ -275,9 +276,9 @@ Phase B).
 | `docs/CURRENT_STATE.md` regenerated | Done (2026-10-19) |
 | 07 Phase C — the permission policy (firm, team and platform actions, `<Can>`, route access via `can`, full principal × action table test, exit grep) | Done (#23) |
 | 07 Phase B — UI completion audit (`docs/AUDIT-PHASE-B.md`) | Audit done (#24, #25). Fix PRs 1–2 done (#26 real create, #27 read-only leaks + `JobMark`); **PRs 3–14 paused** (2026-10-21), list unchanged |
-| **Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md`): decisions D1–D4, D2, sessions, jobs pool; foundation F1–F7 | **Next** — plan in review |
+| **Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md`): decisions D1–D4, D2, sessions, jobs pool (Q37); onboarding first (Q38) | F1 + 0002 done (#29, #30), CI (#31); **onboarding PRs 1–7 next** |
 | 07 Phase S — Super Admin flow polish (UI-first), including building `/admin/system` and AI spend from docs/02 §3.2 | Planned, after B resumes |
-| 07 Phase M — firm-side invite flow (OWNER invites members) | Planned, after S (Q23) |
+| 07 Phase M — firm-side invite flow (OWNER invites members) | Backend side in the onboarding PRs (Q38); UI with the frontend cut-over |
 | System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Approved (Q33, Q34), not built — built in Phase S |
 | Module tracks (01 Ledger, 02 Jobs, Candidates, Admin API, then 03 Applications, 04 Resumes + claims, 05 Analytics) and 07 Phase D | After foundation F7 (`docs/integration/README.md` board) |
 
@@ -302,4 +303,6 @@ stalled onboarding at 7 days, over-limit block visible-disabled-with-reason (§0
 micro-dollars, reportable health checks only, firm attachment, retention (Q33); the rest — health history
 with 7/30-day uptime, backend pricing, the AI purpose list, spend Super Admin only, no budgets yet, IST
 periods, billed failed calls count (Q34).
+**Since then (2026-10-21):** backend auth decisions (Q37); onboarding on the real backend first, auth on every
+endpoint, the shared key removed in PR 2, invite links shown once, seat rule for suspended firms, table conventions (Q38).
 **Still open:** nothing. docs/02 §3.2 is approved, not built.
