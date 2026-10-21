@@ -1,5 +1,5 @@
 import { ApiError } from "@/lib/api/client";
-import { can, type Action, type FirmAction } from "@/lib/auth/policy";
+import { can, type Action, type FirmAction, type TeamAction } from "@/lib/auth/policy";
 import { currentPrincipal } from "./auth";
 
 /**
@@ -35,7 +35,7 @@ export function requireAction(action: Action): void {
 }
 
 /** Every firm-scoped write and the action it needs, by resource (the write-authorization test walks it). */
-export const WRITE_ACTIONS: Record<string, Record<string, FirmAction>> = {};
+export const WRITE_ACTIONS: Record<string, Record<string, FirmAction | TeamAction>> = {};
 
 /**
  * DEV ONLY: make chosen mock calls fail, to see the error state and its retry without a backend.
@@ -58,10 +58,10 @@ type FirmMethod = (firmId: string, ...args: never[]) => Promise<unknown>;
  * method is a write and must name its action in `writes`: it then needs membership *and* `can(action)`,
  * so a VIEWER and a support view are refused (403). A write without an action fails at load time.
  */
-export function firmScoped<M extends Record<string, FirmMethod>>(resource: string, methods: M, writes: Partial<Record<keyof M & string, FirmAction>> = {}): M {
+export function firmScoped<M extends Record<string, FirmMethod>>(resource: string, methods: M, writes: Partial<Record<keyof M & string, FirmAction | TeamAction>> = {}): M {
   const scoped: Record<string, FirmMethod> = {};
   for (const [name, method] of Object.entries(methods)) {
-    const action = (writes as Record<string, FirmAction | undefined>)[name];
+    const action = (writes as Record<string, FirmAction | TeamAction | undefined>)[name];
     if (!READ_METHODS.has(name)) {
       if (!action) throw new Error(`firmScoped("${resource}"): the write "${name}" must name the action it needs`);
       (WRITE_ACTIONS[resource] ??= {})[name] = action;
@@ -77,4 +77,4 @@ export function firmScoped<M extends Record<string, FirmMethod>>(resource: strin
 }
 
 /** Every firm-scoped mock's name, for the isolation test to check it covers them all. */
-export const FIRM_SCOPED_RESOURCES = ["candidates", "jobs", "applications", "followups", "resumes", "records", "documents", "inbox", "ledger", "team", "agents", "jobMarks"] as const;
+export const FIRM_SCOPED_RESOURCES = ["candidates", "jobs", "applications", "followups", "resumes", "records", "documents", "inbox", "ledger", "team", "memberInvites", "agents", "jobMarks"] as const;
