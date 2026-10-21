@@ -227,9 +227,10 @@ are ported as backend tests, case for case.
 
 - `backend/auth/policy.py`: the same table as `src/lib/auth/policy.ts`: firm actions, team actions (Q15),
   `team.view`, platform actions; `can(principal, action)`. **One shared fixture file**
-  (`shared/policy-table.json`, generated from the TypeScript table by a script) and **a test on each side**
-  that compares its table with the file. A change on one side fails the other side's test until both
-  agree.
+  (`backend/auth/policy_table.json`, under `backend/` because the backend container has only that folder;
+  generated from the TypeScript table by `UPDATE_POLICY_TABLE=1 pnpm test src/lib/auth/policy-shared.test.ts`)
+  and **a test on each side** that compares its table with the file. A change on one side fails the other
+  side's test until both agree. Built in onboarding PR 3, with `require(action)`.
 - Dependencies, used by every router:
   - `current_principal` (401 when signed out);
   - `firm_scope(firm_id)`: the principal must belong to the firm, or be a Super Admin inside an active

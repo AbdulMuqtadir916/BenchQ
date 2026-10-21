@@ -1,0 +1,35 @@
+{
+  "_about": "Generated from src/lib/auth/policy.ts by src/lib/auth/policy-shared.test.ts; do not edit by hand. Y = allowed.",
+  "columns": [
+    "OWNER",
+    "MANAGER",
+    "BDE",
+    "VIEWER",
+    "PLATFORM_ADMIN",
+    "SUPPORT_VIEW"
+  ],
+  "actions": {
+    "application.move": "Y Y Y - - -",
+    "candidate.assign": "Y Y - - - -",
+    "candidate.create": "Y Y Y - - -",
+    "candidate.edit": "Y Y Y - - -",
+    "firm.create": "- - - - Y Y",
+    "firm.edit": "- - - - Y Y",
+    "firm.suspend": "- - - - Y Y",
+    "firm.viewWorkspace": "- - - - Y Y",
+    "followup.act": "Y Y Y - - -",
+    "invite.resend": "- - - - Y Y",
+    "invite.revoke": "- - - - Y Y",
+    "job.apply": "Y Y Y - - -",
+    "job.capture": "Y Y Y - - -",
+    "member.changeRole": "Y - - - - -",
+    "member.deactivate": "Y - - - - -",
+    "member.invite": "Y - - - - -",
+    "member.remove": "Y - - - - -",
+    "outreach.act": "Y Y Y - - -",
+    "plan.edit": "- - - - Y Y",
+    "platformTeam.manage": "- - - - Y Y",
+    "resume.edit": "Y Y Y - - -",
+    "team.view": "Y Y - - - Y"
+  }
+}
