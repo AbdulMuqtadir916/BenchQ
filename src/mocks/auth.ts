@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { ApiError } from "@/lib/api/client";
+import { isLive } from "@/lib/api/config";
+import { liveSession } from "@/lib/api/live-session";
 import type { Principal, PlatformUser } from "@/lib/schemas/tenancy";
 import type { Firm, User } from "@/lib/schemas/session";
 import { allUsers, firms } from "./team-data";
@@ -90,7 +92,9 @@ function platformUserById(userId: string): PlatformUser | null {
 }
 
 export function firmById(firmId: string): Firm {
-  const firm = firms.find((item) => item.id === firmId);
+  // A live session's firm may be one created on the backend, which the fixtures don't have.
+  const live = isLive("session") ? liveSession()?.firm : null;
+  const firm = firms.find((item) => item.id === firmId) ?? (live?.id === firmId ? live : undefined);
   if (!firm) throw new ApiError(`Firm ${firmId} not found.`, "NOT_FOUND", 404);
   return firm;
 }
@@ -100,6 +104,12 @@ export function firmById(firmId: string): Firm {
  * deactivated since, ends the session, as a server would refuse a stale cookie.
  */
 function signedInAccount(): { kind: "firm"; user: User } | { kind: "platform"; admin: PlatformUser } | null {
+  // On the live backend the session is the backend's (src/lib/api/live-session.ts); the mocks only read it.
+  if (isLive("session")) {
+    const session = liveSession();
+    if (!session) return null;
+    return "user" in session ? { kind: "firm", user: session.user } : { kind: "platform", admin: session.platformUser };
+  }
   const id = readSession();
   if (!id) return null;
   const admin = platformUserById(id);

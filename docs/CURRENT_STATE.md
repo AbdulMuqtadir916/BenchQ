@@ -115,7 +115,7 @@ Mock auth, not security: real enforcement is Phase D.
 
 | Piece | State |
 |---|---|
-| Adapters | `src/lib/api/*.ts`, one per module, plus `platform.ts`, `invites.ts`, `session.ts`, `demo-data.ts`. **Every adapter is served by its mock**: `isLive()` in `config.ts` exists but no adapter calls it, so `NEXT_PUBLIC_LIVE_MODULES` has no effect today |
+| Adapters | `src/lib/api/*.ts`, one per module, plus `platform.ts`, `invites.ts`, `session.ts`, `demo-data.ts`. Every adapter is served by its mock except, with `NEXT_PUBLIC_LIVE_MODULES=session`, the session, invites, team and platform adapters (07 Q38) |
 | HTTP | `src/lib/api/http.ts` exists; nothing imports it yet |
 | DTO | `src/lib/api/dto/shared.ts` (+ test); no module mapper yet |
 | Mocks | 26 modules in `src/mocks/`; firm-scoped calls go through `firmScoped` (membership, support-view reads, declared writes) |
