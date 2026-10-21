@@ -26,6 +26,9 @@ from backend.api.routes_linkedin import router as linkedin_router
 from backend.api.routes_autofill import router as autofill_router
 from backend.api.routes_llm import router as llm_router
 from backend.api.routes_auth import router as auth_router
+from backend.api.routes_admin import router as admin_router
+from backend.api.routes_firms import router as firms_router
+from backend.api.routes_invites import router as invites_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("jobnavigator")
@@ -129,6 +132,9 @@ app.middleware("http")(enforce_access)
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
+app.include_router(firms_router, prefix="/api")
+app.include_router(invites_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
 app.include_router(applications_router, prefix="/api")

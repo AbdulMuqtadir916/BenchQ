@@ -1,6 +1,6 @@
 """Who may call each endpoint (07 Q38): every route is classified here, and anything unclassified is refused.
 
-  PUBLIC     no session: sign-in, health, tracer links, the Telegram webhook (its own secret)
+  PUBLIC     no session: sign-in, invite links, health, tracer links, the Telegram webhook (its own secret)
   SIGNED_IN  any signed-in account
   FIRM       a signed-in firm user whose firm is not SUSPENDED. JobNavigator's firm data (jobs, résumés,
              applications…) has no firm_id filters yet, so a Super Admin is refused until each module's
@@ -45,10 +45,13 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/telegram/webhook": P,               # checks its own secret header
     "POST /api/auth/sign-in": P,
     "POST /api/auth/sign-out": P,                  # clears the cookie even when the session is already gone
+    "GET /api/invites/{token}": P,                 # /invite/[token]: the link's 256-bit token is the secret
+    "POST /api/invites/{token}/accept": P,
     "GET /docs": D, "GET /docs/oauth2-redirect": D, "GET /redoc": D, "GET /openapi.json": D,
 
     # ── Any signed-in account ─────────────────────────────────────────────────
     "GET /api/auth/me": S,
+    "GET /api/firms/by-slug/{slug}": S,            # a firm user's own firm only; 404 otherwise
     "GET /api/companies": S,                       # global reference data
     "GET /api/searches/countries": S,
     "GET /api/llm/models": S,
@@ -120,6 +123,14 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/stats/timeline": F,
 
     # ── Super Admin ───────────────────────────────────────────────────────────
+    # The platform tier (docs/04 §14). Each write also needs its platform action (backend/auth/policy.py).
+    "GET /api/admin/plans": A,
+    "GET /api/admin/firms": A,
+    "POST /api/admin/firms": A,
+    "GET /api/admin/firms/{firm_id}": A,
+    "GET /api/admin/invites": A,
+    "POST /api/admin/invites/{invite_id}/resend": A,
+    "POST /api/admin/invites/{invite_id}/revoke": A,
     "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)
     "POST /api/auto-reject/run": A,
     "POST /api/companies": A,                      # companies are global reference data
