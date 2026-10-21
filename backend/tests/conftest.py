@@ -13,6 +13,9 @@ TEST_DATABASE_URL = os.getenv(
 if not TEST_DATABASE_URL.split("?")[0].endswith("_test"):
     raise RuntimeError(f"TEST_DATABASE_URL must name a database ending in _test, got {TEST_DATABASE_URL!r}")
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+# Development settings (plain-http cookies, API docs on), as docker-compose runs the app locally. Tests that
+# need production behaviour patch backend.config / backend.auth.access themselves.
+os.environ["BENCHQ_ENV"] = "development"
 
 
 def pytest_configure(config):
@@ -26,18 +29,13 @@ def pytest_configure(config):
 
 @pytest.fixture(autouse=True)
 def _clean_auth_throttle():
-    """The per-IP auth failure counter (R4-T5-06) is process-global by design, so a test
-    that posts wrong keys would otherwise lock out the tests that follow it."""
-    import sys
+    """The sign-in failure counter is process-global by design, so a test that posts wrong passwords
+    would otherwise lock out the tests that follow it."""
+    from backend.auth import throttle
 
-    def _reset():
-        mod = sys.modules.get("backend.main")
-        if mod is not None:
-            mod._reset_auth_throttle()
-
-    _reset()
+    throttle.reset()
     yield
-    _reset()
+    throttle.reset()
 
 
 # ── Anthropic mock fixtures ───────────────────────────────────────────────
@@ -150,8 +148,16 @@ def test_db():
 
 
 @pytest.fixture
-def api_client(test_db, monkeypatch):
-    """FastAPI TestClient for endpoint tests; test_db already rebound SessionLocal, so this only stubs lifespan deps and the scheduler."""
+def accounts(test_db):
+    """An ACTIVE firm with an OWNER, and a Super Admin, each signed in (tests/auth_support.py)."""
+    from backend.tests.auth_support import seed_accounts
+    return seed_accounts(test_db)
+
+
+@pytest.fixture
+def api_client(test_db, accounts, monkeypatch):
+    """FastAPI TestClient for endpoint tests, signed in: each request carries the session its route's class
+    needs (tests/auth_support.py). Stubs the lifespan deps and the scheduler."""
     from fastapi.testclient import TestClient
 
     # Pre-import backend.main + heavy modules so lazy imports capture bindings before monkeypatches.
@@ -185,11 +191,22 @@ def api_client(test_db, monkeypatch):
     from backend.models.db import get_db
     app.dependency_overrides[get_db] = override_get_db
 
+    from backend.tests.auth_support import send_sessions
     try:
         with TestClient(app) as client:
+            send_sessions(client, app, accounts)
             yield client
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def anonymous_client(api_client):
+    """A TestClient with no session, for the auth tests (shares api_client's app setup)."""
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    with TestClient(app) as client:
+        yield client
 
 
 # ── httpx + Telegram mock fixtures ───────────────────────────────────────

@@ -34,10 +34,9 @@ def test_tracer_redirect_succeeds_normally(api_client, test_db):
     assert "example.com/apply" in resp.headers.get("location", "")
 
 
-def test_tracer_redirect_bypasses_api_key(api_client, test_db):
-    """With a dashboard API key configured, the public /cv/{token} redirect must still work WITHOUT the key header — recruiters click it from a PDF with no key."""
-    from backend.models.db import Setting, Resume, TracerLink
-    test_db.add(Setting(key="dashboard_api_key", value="secret-key-123"))
+def test_tracer_redirect_needs_no_session(anonymous_client, test_db):
+    """The public /cv/{token} redirect works with no session: recruiters click it from a PDF."""
+    from backend.models.db import Resume, TracerLink
     resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
     test_db.commit()
@@ -52,24 +51,22 @@ def test_tracer_redirect_bypasses_api_key(api_client, test_db):
     test_db.add(link)
     test_db.commit()
 
-    # Guard: the key really is enforced — a protected route 401s without the header.
-    protected = api_client.get("/api/settings", follow_redirects=False)
+    # Guard: auth really is enforced for this client — a protected route 401s.
+    protected = anonymous_client.get("/api/settings", follow_redirects=False)
     assert protected.status_code == 401, (
-        f"key not enforced (got {protected.status_code}); bypass test would be meaningless"
+        f"auth not enforced (got {protected.status_code}); this test would be meaningless"
     )
 
-    # The public tracer path must bypass auth and redirect.
-    resp = api_client.get("/cv/pub789", follow_redirects=False)
+    resp = anonymous_client.get("/cv/pub789", follow_redirects=False)
     assert resp.status_code in (302, 307), (
-        f"tracer link should bypass API key, got {resp.status_code}: {resp.text}"
+        f"tracer link should need no session, got {resp.status_code}: {resp.text}"
     )
     assert "example.com/apply3" in resp.headers.get("location", "")
 
 
-def test_tracer_redirect_param_style_bypasses_and_redirects(api_client, test_db):
-    """Param-style links (?cv=token on root) must also bypass auth and redirect, since resumes were exported in both /cv/{token} and ?cv={token} shapes."""
-    from backend.models.db import Setting, Resume, TracerLink
-    test_db.add(Setting(key="dashboard_api_key", value="secret-key-123"))
+def test_tracer_redirect_param_style_needs_no_session(anonymous_client, test_db):
+    """Param-style links (?cv=token on root) also need no session, since resumes were exported in both /cv/{token} and ?cv={token} shapes."""
+    from backend.models.db import Resume, TracerLink
     resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
     test_db.commit()
@@ -84,7 +81,7 @@ def test_tracer_redirect_param_style_bypasses_and_redirects(api_client, test_db)
     test_db.add(link)
     test_db.commit()
 
-    resp = api_client.get("/?cv=qp123", follow_redirects=False)
+    resp = anonymous_client.get("/?cv=qp123", follow_redirects=False)
     assert resp.status_code in (302, 307), (
         f"param-style link should redirect, got {resp.status_code}: {resp.text}"
     )

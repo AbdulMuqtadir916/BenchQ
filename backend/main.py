@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun
 from backend.seed import run_seeds
-from backend.config import INITIAL_API_KEY, TELEGRAM_BOT_TOKEN
+from backend.auth.access import enforce as enforce_access
+from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
 
 from backend.api.routes_settings import router as settings_router
@@ -24,6 +25,7 @@ from backend.api.routes_cover_letters import router as cover_letters_router
 from backend.api.routes_linkedin import router as linkedin_router
 from backend.api.routes_autofill import router as autofill_router
 from backend.api.routes_llm import router as llm_router
+from backend.api.routes_auth import router as auth_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("jobnavigator")
@@ -42,16 +44,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting JobNavigator backend...")
     check_schema_at_head()
     run_seeds()
-
-    # Set initial API key if dashboard_api_key is empty
-    db = SessionLocal()
-    try:
-        setting = db.query(Setting).filter(Setting.key == "dashboard_api_key").first()
-        if setting and not setting.value:
-            setting.value = INITIAL_API_KEY
-            db.commit()
-    finally:
-        db.close()
 
     # Clean up stale job runs from previous process
     cleanup_stale_runs()
@@ -98,23 +90,17 @@ app = FastAPI(
         "Personal job hunt automation system. Scrapes job boards and career pages, "
         "scores jobs against resumes using Claude API, monitors Gmail for responses, "
         "sends Telegram notifications.\n\n"
-        "**Auth:** Pass `X-API-Key` header with dashboard API key. "
-        "Health, docs, and OpenAPI endpoints skip auth."
+        "**Auth:** the `bq_session` cookie from `POST /api/auth/sign-in`. Who may call each endpoint is "
+        "set in `backend/auth/access.py`; an endpoint missing there is refused."
     ),
     openapi_tags=OPENAPI_TAGS,
     lifespan=lifespan,
 )
 
 # CORS — allow dashboard frontend (configurable via ALLOWED_ORIGINS env var)
-import os as _os_cors
-_allowed_origins = _os_cors.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost,http://localhost:3000,http://localhost:80"
-).split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in _allowed_origins if o.strip()],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -136,187 +122,13 @@ def _pool_busy_response() -> JSONResponse:
     )
 
 
-# ── API Key auth middleware ──────────────────────────────────────────────────
-import hmac as _hmac_mw
-
-# Paths that NEVER require auth (exact or prefix match)
-_PUBLIC_PREFIXES = ("/health", "/docs", "/openapi.json", "/redoc", "/cv", "/api/telegram/webhook", "/api/auth/set-session", "/api/auth/verify", "/api/auth/logout")
-
-@app.middleware("http")
-async def api_key_auth(request: Request, call_next):
-    path = request.url.path
-
-    # Let CORS preflight requests pass through so CORSMiddleware can respond
-    if request.method == "OPTIONS":
-        return await call_next(request)
-
-    # Public endpoints
-    if any(path == p or path.startswith(p + "/") or path == p.rstrip("/") for p in _PUBLIC_PREFIXES):
-        return await call_next(request)
-    # docs subpaths
-    if path.startswith("/docs"):
-        return await call_next(request)
-    # Param-style tracer links (?cv=token on root) are public, same as /cv/{token}.
-    if path == "/" and request.query_params.get("cv"):
-        return await call_next(request)
-
-    # Accept either X-API-Key header (API clients, extension) OR jn_session cookie (browser)
-    api_key = request.headers.get("X-API-Key", "") or request.cookies.get("jn_session", "")
-
-    # A middleware runs outside FastAPI's exception handlers, so a pool timeout
-    # here would surface as a bare connection error, not a status code. The
-    # connection is acquired lazily by the query, not by SessionLocal().
-    db = SessionLocal()
-    try:
-        try:
-            setting = db.query(Setting).filter(Setting.key == "dashboard_api_key").first()
-        except _PoolTimeout:
-            logger.warning("DB pool exhausted while authenticating %s", request.url.path)
-            return _pool_busy_response()
-        expected = setting.value if setting else INITIAL_API_KEY
-        # First-run: no key configured → allow everything
-        if not expected:
-            # WARNING-level so operators see this in logs when they shouldn't (e.g.,
-            # dashboard_api_key setting cleared by a botched DB restore).
-            logger.warning(
-                "api key BYPASS (first-run mode): path=%s — dashboard_api_key setting is empty",
-                request.url.path,
-            )
-            return await call_next(request)
-        # Key configured → require match (timing-safe compare)
-        if not api_key:
-            return JSONResponse(status_code=401, content={"detail": "API key required"})
-        if not _hmac_mw.compare_digest(api_key, expected):
-            return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
-    finally:
-        db.close()
-
-    return await call_next(request)
-
-
-# ── Auth endpoints (cookie session) ──────────────────────────────────────────
-import hmac as _hmac
-import time as _time
-from fastapi import Response as _Response
-
-# ── Brute-force throttle for the two unauthenticated auth endpoints ──────────
-# They answered 401 at ~276 req/s with no delay and no lockout (R4-T5-06). In-memory
-# per-IP failure counter: N failures inside the window → 429 + Retry-After; a
-# successful verify clears the bucket. Process-local by design (single-user app,
-# one backend process) — a restart forgives everything, which is fine.
-_AUTH_FAIL_LIMIT = 10
-_AUTH_FAIL_WINDOW = 60.0
-_auth_failures: dict[str, list[float]] = {}
-
-
-def _auth_client_ip(request: Request) -> str:
-    """Caller IP. Through Caddy every browser request has the proxy's IP as the peer,
-    so prefer the forwarded client address — otherwise one LAN attacker would lock
-    out the dashboard itself."""
-    fwd = request.headers.get("x-forwarded-for", "")
-    if fwd:
-        first = fwd.split(",")[0].strip()
-        if first:
-            return first
-    return request.client.host if request.client else "unknown"
-
-
-def _auth_throttle(request: Request) -> None:
-    """Raise 429 with Retry-After while this IP is over the failure budget."""
-    ip = _auth_client_ip(request)
-    now = _time.monotonic()
-    hits = [t for t in _auth_failures.get(ip, []) if now - t < _AUTH_FAIL_WINDOW]
-    if hits:
-        _auth_failures[ip] = hits
-    else:
-        _auth_failures.pop(ip, None)
-    if len(hits) >= _AUTH_FAIL_LIMIT:
-        retry_after = max(1, int(_AUTH_FAIL_WINDOW - (now - hits[0])) + 1)
-        logger.warning("auth throttle: %s locked out for %ss", ip, retry_after)
-        raise HTTPException(
-            status_code=429, detail="Too many failed attempts",
-            headers={"Retry-After": str(retry_after)},
-        )
-
-
-def _auth_record_failure(request: Request) -> None:
-    _auth_failures.setdefault(_auth_client_ip(request), []).append(_time.monotonic())
-
-
-def _auth_clear_failures(request: Request) -> None:
-    _auth_failures.pop(_auth_client_ip(request), None)
-
-
-def _reset_auth_throttle() -> None:
-    """Drop every bucket (tests, and a manual unlock)."""
-    _auth_failures.clear()
-
-
-@app.post("/api/auth/verify", tags=["auth"], summary="Verify an API key without setting a session")
-async def verify_api_key(body: dict, request: Request):
-    """Validate API key. Returns 200 {ok: true} on match, 401 otherwise, 429 after too many failures from one IP."""
-    _auth_throttle(request)
-    # hmac.compare_digest() raises TypeError on a non-string, and this endpoint is
-    # unauthenticated — anything that is not a string is simply not the key
-    # (R4-T1-24).
-    api_key = (body or {}).get("api_key", "")
-    if not isinstance(api_key, str):
-        api_key = ""
-    db = SessionLocal()
-    try:
-        setting = db.query(Setting).filter(Setting.key == "dashboard_api_key").first()
-        expected = setting.value if setting else INITIAL_API_KEY
-        if not expected:
-            return {"ok": True, "first_run": True}
-        if not api_key or not _hmac.compare_digest(api_key, expected):
-            _auth_record_failure(request)
-            raise HTTPException(status_code=401, detail="Invalid API key")
-        _auth_clear_failures(request)
-        return {"ok": True, "first_run": False}
-    finally:
-        db.close()
-
-
-@app.post("/api/auth/set-session", tags=["auth"], summary="Set session cookie from API key")
-async def set_session(body: dict, response: _Response, request: Request):
-    """Verify API key and set httpOnly jn_session cookie (also sent on iframe/download requests); 429 after too many failures from one IP."""
-    _auth_throttle(request)
-    # hmac.compare_digest() raises TypeError on a non-string, and this endpoint is
-    # unauthenticated — anything that is not a string is simply not the key
-    # (R4-T1-24).
-    api_key = (body or {}).get("api_key", "")
-    if not isinstance(api_key, str):
-        api_key = ""
-    db = SessionLocal()
-    try:
-        setting = db.query(Setting).filter(Setting.key == "dashboard_api_key").first()
-        expected = setting.value if setting else INITIAL_API_KEY
-        if expected and (not api_key or not _hmac.compare_digest(api_key, expected)):
-            _auth_record_failure(request)
-            raise HTTPException(status_code=401, detail="Invalid API key")
-        _auth_clear_failures(request)
-        # First-run (no key configured) is OK - set cookie to empty, middleware will allow
-        cookie_value = api_key or ""
-        response.set_cookie(
-            key="jn_session",
-            value=cookie_value,
-            httponly=True,
-            samesite="strict",
-            max_age=60 * 60 * 24 * 30,  # 30 days
-            secure=False,  # set True when deployed over HTTPS
-        )
-        return {"ok": True}
-    finally:
-        db.close()
-
-
-@app.post("/api/auth/logout", tags=["auth"], summary="Clear session cookie")
-async def logout(response: _Response):
-    response.delete_cookie(key="jn_session", samesite="strict", httponly=True)
-    return {"ok": True}
+# ── Sessions and access (07 Q37, Q38) ────────────────────────────────────────
+# Every route is classified in backend/auth/access.py; an unclassified one is refused.
+app.middleware("http")(enforce_access)
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
+app.include_router(auth_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
 app.include_router(applications_router, prefix="/api")

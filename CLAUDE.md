@@ -27,8 +27,9 @@ permission policy are production structure from day one. Routes, roles and permi
 by `docs/07-ROUTES-AND-RBAC.md`.
 
 **Backend integration is paused after Module 01 (ledger).** The backend is JobNavigator (FastAPI,
-Python) in `backend/`. It is single-user with one shared API key — no firms, users, roles,
-candidates, evidence or claims. Modules 02–05 wait until tenancy (decisions D1/D2 in
+Python) in `backend/`. It has per-user cookie sessions and auth on every endpoint
+(`backend/auth/access.py`, 07 Q37–Q38), but its data is not firm-scoped yet, and it has no candidates,
+evidence or claims. Modules 02–05 wait until tenancy (decisions D1/D2 in
 `docs/integration/06-open-decisions.md`) is designed, because every firm-owned record will need
 `firmId` scoping. Integration rules, when you do integration work, start at
 `docs/integration/README.md`.

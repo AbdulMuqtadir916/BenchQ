@@ -17,21 +17,29 @@ pytestmark = pytest.mark.live
 BASE = os.getenv("JN_LIVE_BASE", "http://caddy")
 
 
-def _key():
-    if os.getenv("JN_API_KEY"):
-        return os.getenv("JN_API_KEY")
-    try:
-        from backend.config import INITIAL_API_KEY
-        return INITIAL_API_KEY or ""
-    except Exception:
-        return ""
+# Session cookies (bq_session values) from a signed-in browser: a firm user's and a Super Admin's. Each
+# request carries the one its route's class needs (backend/auth/access.py).
+FIRM_SESSION = os.getenv("JN_LIVE_FIRM_SESSION", "")
+ADMIN_SESSION = os.getenv("JN_LIVE_ADMIN_SESSION", "")
+
+
+def _add_session(request):
+    from starlette.requests import Request
+    from backend.auth.access import ROUTE_ACCESS, Access, route_key
+    from backend.main import app
+    scope = {"type": "http", "method": request.method, "path": request.url.path, "root_path": "",
+             "query_string": b"", "headers": []}
+    platform = ROUTE_ACCESS.get(route_key(app, Request(scope))) is Access.PLATFORM
+    request.headers["cookie"] = f"bq_session={ADMIN_SESSION if platform else FIRM_SESSION}"
 
 
 @pytest.fixture(scope="module")
 def live():
     """An httpx client against the running stack, or a skip."""
     httpx = pytest.importorskip("httpx")
-    client = httpx.Client(base_url=BASE, headers={"X-API-Key": _key()}, timeout=30)
+    if not (FIRM_SESSION and ADMIN_SESSION):
+        pytest.skip("set JN_LIVE_FIRM_SESSION and JN_LIVE_ADMIN_SESSION to run the live checks")
+    client = httpx.Client(base_url=BASE, timeout=30, event_hooks={"request": [_add_session]})
     try:
         r = client.get("/health")
     except Exception as e:                      # noqa: BLE001 - any transport error
@@ -40,9 +48,9 @@ def live():
     if r.status_code != 200:
         client.close()
         pytest.skip(f"live stack unhealthy at {BASE}: {r.status_code}")
-    if client.get("/api/jobs?limit=1").status_code == 401:
+    if client.get("/api/jobs?limit=1").status_code == 401 or client.get("/api/settings").status_code == 401:
         client.close()
-        pytest.skip("no usable API key for the live stack")
+        pytest.skip("the live sessions have expired")
     yield client
     client.close()
 
@@ -179,12 +187,16 @@ def test_settings_never_return_a_secret_value(live):
     body = live.get("/api/settings").text
     _clean(live.get("/api/settings"), 200)
     for env_key in ("ANTHROPIC_API_KEY", "TELEGRAM_BOT_TOKEN", "GMAIL_CLIENT_SECRET",
-                    "GMAIL_REFRESH_TOKEN", "INITIAL_API_KEY"):
+                    "GMAIL_REFRESH_TOKEN"):
         value = os.getenv(env_key, "")
         if len(value) > 8:
             assert value not in body, f"{env_key} leaked through GET /api/settings"
 
 
-def test_protected_routes_require_a_key(live):
-    r = live.get("/api/jobs", headers={"X-API-Key": ""})
+def test_protected_routes_require_a_session():
+    httpx = pytest.importorskip("httpx")
+    try:
+        r = httpx.get(f"{BASE}/api/jobs", timeout=30)
+    except Exception as e:                      # noqa: BLE001 - any transport error
+        pytest.skip(f"live stack not reachable at {BASE}: {e}")
     assert r.status_code == 401

@@ -24,7 +24,6 @@ DEFAULT_SETTINGS = {
     "job_archive_after_days": ("90", "Delete skipped jobs older than N days (used by cleanup job)"),
     "auto_reject_after_days": ("0", "Reject applications older than N days, 0 = disabled (used by reject job)"),
     "proxy_url": ("", "Optional rotating proxy for scraping"),
-    "dashboard_api_key": ("", "Dashboard password — changeable from dashboard"),
     "default_resume_id": ("", "Default base Resume ID used for scoring when no company-level Resumes are configured"),
     "company_exclude_global": (json.dumps([]), "Global company ignore list — applies to all searches"),
     "title_exclude_global": (json.dumps([]), "Global title exclude keywords — applies to all searches and companies"),

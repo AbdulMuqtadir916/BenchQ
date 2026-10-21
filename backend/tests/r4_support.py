@@ -1,7 +1,7 @@
 """Shared helpers for the R4-T1 backend contract + robustness pass.
 
 `client` is the conftest `api_client` with two differences:
-  * a known `dashboard_api_key` is seeded and sent on every request;
+  * it is signed in the same way (tests/auth_support.py);
   * `raise_server_exceptions=False`, so an unhandled handler exception comes back
     as a 500 response we can assert on instead of blowing up the test.
 
@@ -27,22 +27,11 @@ LEAK_MARKERS = (
 )
 
 
-API_KEY = "r4-test-key"
-
-
 @pytest.fixture
-def client(test_db, monkeypatch):
-    """TestClient carrying a valid API key, with server exceptions surfaced as 500s.
-
-    The key is a real (non-empty) one on purpose: the lifespan overwrites an
-    empty `dashboard_api_key` with INITIAL_API_KEY, so "first-run mode" is not
-    reachable through TestClient startup.
-    """
+def client(test_db, accounts, monkeypatch):
+    """Signed-in TestClient with server exceptions surfaced as 500s."""
     from fastapi.testclient import TestClient
-    from backend.models.db import Setting
-
-    test_db.add(Setting(key="dashboard_api_key", value=API_KEY))
-    test_db.commit()
+    from backend.tests.auth_support import send_sessions
 
     import backend.main  # noqa: F401
     import backend.scraper.sources.linkedin_extension  # noqa: F401
@@ -74,7 +63,7 @@ def client(test_db, monkeypatch):
 
     try:
         with TestClient(app, raise_server_exceptions=False) as c:
-            c.headers.update({"X-API-Key": API_KEY})
+            send_sessions(c, app, accounts)
             yield c
     finally:
         app.dependency_overrides.pop(get_db, None)
