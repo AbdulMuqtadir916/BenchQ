@@ -61,6 +61,12 @@ ROUTE_ACCESS: dict[str, Access] = {
 
     # ── Firm users ────────────────────────────────────────────────────────────
     "POST /api/auth/first-run-done": F,
+    # The firm's team (Phase M): each also checks the path's firm is the caller's, and its action.
+    "GET /api/firms/{firm_id}/members": F,
+    "GET /api/firms/{firm_id}/invites": F,
+    "POST /api/firms/{firm_id}/invites": F,
+    "POST /api/firms/{firm_id}/invites/{invite_id}/resend": F,
+    "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": F,
     "POST /api/analyze/{job_id}": F,
     "GET /api/applications": F,
     "POST /api/applications": F,
