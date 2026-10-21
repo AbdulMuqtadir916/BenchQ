@@ -24,10 +24,7 @@ def test_get_settings_redacts_secret_shaped_keys(client, test_db):
     body = client.get("/api/settings").json()
     for key in SECRET_KEYS:
         assert body[key] == "•" * 6, key
-    # …and the API key itself, seeded by the fixture, is redacted too.
-    assert body["dashboard_api_key"] == "•" * 6
     assert "s3cret-value" not in client.get("/api/settings").text
-    assert "r4-test-key" not in client.get("/api/settings").text
 
 
 def test_get_settings_empty_secret_stays_empty_not_dots(client, test_db):

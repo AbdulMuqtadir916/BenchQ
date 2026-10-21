@@ -65,7 +65,7 @@ The folder must be named `backend/`: the code imports itself as `backend.*`
    - delete the `frontend` and `caddy` services and the `caddy_data` / `caddy_config` volumes;
    - on `backend`, change `env_file: .env` → `backend/.env` with `required: false`. This keeps
      backend secrets out of the root `.env*` files that Next.js auto-loads, and the stack still
-     starts without the file (open first-run mode);
+     starts without the file;
    - rename the backend `image:` to a local tag (`benchq-backend:local`), so Compose never pulls
      upstream's prebuilt image in place of this copy;
    - keep `db`, `backend`, `pgdata`, and the auth volumes the backend service mounts.
@@ -118,8 +118,8 @@ real data into it use JobNavigator's own flows — add companies and run a scrap
 ## Part C — Auth
 
 > **Superseded (2026-10-21)** by [`07-auth-and-tenancy.md`](./07-auth-and-tenancy.md): the shared API
-> key is removed, not wired into the frontend. Sign-in becomes per-user sessions (07 §3, F3 and F6). Kept
-> below as a record of how the backend authenticates today.
+> key is removed, not wired into the frontend: sign-in is per-user cookie sessions, and every endpoint needs one
+> (07 Q37, Q38; onboarding PR 2). Kept below as a record of how the backend authenticated before.
 
 ### How the backend authenticates
 

@@ -10,7 +10,7 @@ import pytest
 
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
-    make_job, make_company, set_setting, big_string, EMOJI, MISSING_UUID, API_KEY,
+    make_job, make_company, set_setting, big_string, EMOJI, MISSING_UUID,
 )
 
 
@@ -48,72 +48,33 @@ class _FakeRequest:
 
 # ══ Auth ═════════════════════════════════════════════════════════════════════
 
+NO_SESSION = {"cookie": "bq_session=not-a-session"}
+
+
 @pytest.mark.parametrize("path", ["/api/jobs", "/api/settings", "/api/monitor/active",
                                   "/api/stats", "/api/companies", "/api/persona"])
-def test_protected_routes_need_a_key(client, path):
-    r = client.get(path, headers={"X-API-Key": ""})
-    assert_clean(r, 401)
+def test_protected_routes_need_a_session(client, path):
+    assert_clean(client.get(path, headers=NO_SESSION), 401)
 
 
-@pytest.mark.parametrize("path", ["/api/jobs", "/api/settings"])
-def test_protected_routes_reject_a_wrong_key(client, path):
-    assert_clean(client.get(path, headers={"X-API-Key": "wrong"}), 401)
-
-
-def test_session_cookie_is_accepted_instead_of_the_header(client):
-    r = client.post("/api/auth/set-session", json={"api_key": API_KEY},
-                    headers={"X-API-Key": API_KEY})
-    assert_clean(r, 200)
-    c = client.get("/api/jobs", headers={"X-API-Key": ""},
-                   cookies={"jn_session": API_KEY})
-    assert_clean(c, 200)
-
-
-def test_verify_rejects_a_wrong_key(client):
-    assert_clean(client.post("/api/auth/verify", json={"api_key": "nope"},
-                             headers={"X-API-Key": API_KEY}), 401)
-
-
-@pytest.mark.parametrize("body", [{}, {"api_key": None}])
-def test_verify_bad_body_never_500(client, body):
-    assert_clean(client.post("/api/auth/verify", json=body,
-                             headers={"X-API-Key": API_KEY}), 401, 422)
-
-
-@pytest.mark.parametrize("body", [{"api_key": 5}, {"api_key": [1]}, {"api_key": {"a": 1}}])
-def test_verify_wrongly_typed_key_is_401_not_500(client, body):
-    """`hmac.compare_digest(5, expected)` raises TypeError."""
-    assert client.post("/api/auth/verify", json=body,
-                       headers={"X-API-Key": API_KEY}).status_code in (401, 422)
-
-
-@pytest.mark.parametrize("body", [{"api_key": 5}, {"api_key": [1]}])
-def test_verify_wrongly_typed_key_never_leaks_internals(client, body):
-    assert_no_leak(client.post("/api/auth/verify", json=body,
-                               headers={"X-API-Key": API_KEY}))
-
-
-@pytest.mark.parametrize("body", [{"api_key": 5}, {"api_key": [1]}])
-def test_set_session_wrongly_typed_key_is_401_not_500(client, body):
-    assert client.post("/api/auth/set-session", json=body,
-                       headers={"X-API-Key": API_KEY}).status_code in (401, 422)
+@pytest.mark.parametrize("body", [{}, {"email": None, "password": None}, {"email": 5, "password": [1]},
+                                  {"email": {"a": 1}, "password": True}])
+def test_sign_in_wrongly_typed_body_is_422_not_500(client, body):
+    r = client.post("/api/auth/sign-in", json=body, headers=NO_SESSION)
+    assert_clean(r, 422)
+    assert_no_leak(r)
 
 
 def test_health_is_public(client):
-    assert_clean(client.get("/health", headers={"X-API-Key": ""}), 200)
+    assert_clean(client.get("/health", headers=NO_SESSION), 200)
 
 
 def test_root_without_a_tracer_token_is_404(client):
     assert_clean(client.get("/"), 404)
 
 
-def test_root_without_a_key_and_without_a_token_is_401(client):
-    """The `?cv` bypass is narrow: a bare `/` still needs auth."""
-    assert_clean(client.get("/", headers={"X-API-Key": ""}), 401)
-
-
 def test_unknown_tracer_token_is_404(client):
-    assert_clean(client.get("/cv/zzzzzzzz", headers={"X-API-Key": ""}), 404)
+    assert_clean(client.get("/cv/zzzzzzzz", headers=NO_SESSION), 404)
 
 
 # ══ Triggers ═════════════════════════════════════════════════════════════════
@@ -353,8 +314,7 @@ def test_sankey_tolerates_malformed_transition_rows(client, test_db):
 # ══ Telegram ═════════════════════════════════════════════════════════════════
 
 def test_telegram_webhook_without_a_configured_secret_is_503(client):
-    assert_clean(client.post("/api/telegram/webhook", json={},
-                             headers={"X-API-Key": ""}), 503)
+    assert_clean(client.post("/api/telegram/webhook", json={}, headers=NO_SESSION), 503)
 
 
 def test_telegram_webhook_with_a_wrong_secret_is_401(client, test_db):
@@ -467,16 +427,3 @@ def test_health_entities_still_answers_for_a_sane_window(client, test_db):
 def test_analyze_trigger_malformed_job_id_is_404(client, bad):
     """R4-T1-23: uuid.UUID(job_id) ran inside the launch call, before any lookup."""
     assert_clean(client.post(f"/api/analyze/{bad}"), 404)
-
-
-@pytest.mark.parametrize("path", ["/api/auth/verify", "/api/auth/set-session"])
-@pytest.mark.parametrize("key", [5, 1.5, [1], {"a": 1}, True])
-def test_auth_wrongly_typed_key_is_401(client, path, key):
-    """R4-T1-24: hmac.compare_digest(5, expected) raised TypeError on a public route."""
-    assert_clean(client.post(path, json={"api_key": key},
-                             headers={"X-API-Key": API_KEY}), 401)
-
-
-def test_auth_still_accepts_the_real_key(client):
-    assert_clean(client.post("/api/auth/verify", json={"api_key": API_KEY},
-                             headers={"X-API-Key": API_KEY}), 200)

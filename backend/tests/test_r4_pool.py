@@ -458,7 +458,7 @@ def test_the_auth_middleware_answers_503_when_the_pool_is_drained(client, monkey
     """The middleware runs outside FastAPI's exception handlers, so it needs its
     own guard — without it a drained pool surfaced as a bare connection error."""
     from sqlalchemy.exc import TimeoutError as PoolTimeout
-    import backend.main as main_mod
+    import backend.auth.access as access_mod
 
     class _DrainedSession:
         def query(self, *a, **kw):
@@ -467,7 +467,7 @@ def test_the_auth_middleware_answers_503_when_the_pool_is_drained(client, monkey
         def close(self):
             return None
 
-    monkeypatch.setattr(main_mod, "SessionLocal", lambda *a, **kw: _DrainedSession())
+    monkeypatch.setattr(access_mod, "SessionLocal", lambda *a, **kw: _DrainedSession())
     resp = client.get("/api/jobs/feed-stats")
     assert resp.status_code == 503
     assert resp.headers.get("Retry-After") == "5"
