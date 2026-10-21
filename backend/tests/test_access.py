@@ -32,11 +32,12 @@ def test_the_table_names_no_route_that_does_not_exist():
 
 
 def test_the_public_allowlist_is_exactly_the_agreed_one():
-    """Q38: sign-in, health, tracer links, the Telegram webhook. Invite lookup/accept join in PR 4."""
+    """Q38: sign-in, invite lookup/accept, health, tracer links, the Telegram webhook."""
     public = sorted(k for k, v in ROUTE_ACCESS.items() if v is Access.PUBLIC)
     assert public == sorted([
         "GET /health", "GET /", "GET /cv/{token}", "POST /api/telegram/webhook",
         "POST /api/auth/sign-in", "POST /api/auth/sign-out",
+        "GET /api/invites/{token}", "POST /api/invites/{token}/accept",
     ])
 
 
