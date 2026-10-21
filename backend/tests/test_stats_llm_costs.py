@@ -8,8 +8,7 @@ from sqlalchemy.orm import sessionmaker
 @pytest.fixture
 def seeded_db(monkeypatch):
     from backend.models.db import Base, LlmCallLog
-    engine = create_engine("sqlite:///:memory:")
-    LlmCallLog.__table__.create(engine)
+    from backend.models.db import engine   # the Postgres test database (tests/conftest.py)
     Session = sessionmaker(bind=engine)
 
     import backend.main as main_mod

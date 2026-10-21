@@ -17,7 +17,7 @@ from sqlalchemy import event
 
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean,
-    make_company, make_search, MISSING_UUID,
+    make_company, make_search, make_job, MISSING_UUID,
 )
 
 
@@ -334,6 +334,7 @@ def test_stale_recovery_should_skip_runs_the_monitor_still_owns(test_db):
 async def test_monitor_active_and_in_flight_agree_with_running_state(client, test_db):
     import backend.job_monitor as jm
     jid = uuid.uuid4()
+    make_job(test_db, id=jid)   # job_runs.target_job_id is a real foreign key on Postgres
     gate = asyncio.Event()
 
     async def _slow():
@@ -358,6 +359,7 @@ async def test_monitor_active_and_in_flight_agree_with_running_state(client, tes
 async def test_finished_run_shows_up_in_monitor_finished(client, test_db):
     import backend.job_monitor as jm
     jid = uuid.uuid4()
+    make_job(test_db, id=jid)   # job_runs.target_job_id is a real foreign key on Postgres
 
     async def _ok():
         return "scored"
@@ -373,6 +375,7 @@ async def test_finished_run_shows_up_in_monitor_finished(client, test_db):
 async def test_failed_run_shows_up_in_monitor_finished_as_failed(client, test_db):
     import backend.job_monitor as jm
     jid = uuid.uuid4()
+    make_job(test_db, id=jid)   # job_runs.target_job_id is a real foreign key on Postgres
 
     async def _boom():
         raise RuntimeError("nope")

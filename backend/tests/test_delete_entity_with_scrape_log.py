@@ -29,6 +29,7 @@ def test_company_with_scrape_history_is_deletable(test_db):
 def test_search_with_runs_and_stored_jobs_is_deletable(test_db):
     test_db.add(Search(id=SE_ID, name="ZZ Search"))
     test_db.add(Search(id=OTHER_SE_ID, name="Keep me"))
+    test_db.flush()   # parents first: the scrape_log foreign key is enforced on Postgres
     test_db.add(ScrapeLog(search_id=SE_ID, source="jobspy", jobs_found=4))
     test_db.add(ScrapeLog(search_id=OTHER_SE_ID, source="jobspy", jobs_found=9))
     test_db.add(Job(external_id="ext-a08-1", title="TPM", company="Acme",
@@ -59,6 +60,7 @@ def test_missing_entities_still_404(test_db):
 
 def test_built_in_extension_search_is_still_protected(test_db):
     test_db.add(Search(id=SE_ID, name="Extension LI", search_mode="linkedin_extension"))
+    test_db.flush()
     test_db.add(ScrapeLog(search_id=SE_ID, source="linkedin_extension", jobs_found=2))
     test_db.commit()
 

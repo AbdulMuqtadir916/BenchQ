@@ -1,7 +1,8 @@
 """GET /api/monitor/finished — recently-finished per-job runs, with status; lets the dashboard resolve OK/NOK using the run's actual status, which can't be inferred from job fields for re-runs."""
 import uuid
 from datetime import datetime, timezone, timedelta
-from backend.models.db import Setting, JobRun
+from backend.models.db import Job, Setting, JobRun
+from backend.tests.r4_support import make_job
 
 
 def _seed(test_db):
@@ -10,6 +11,8 @@ def _seed(test_db):
 
 
 def _run(test_db, job_id, job_type, status, finished_at):
+    if test_db.get(Job, job_id) is None:   # job_runs.target_job_id is a real foreign key on Postgres
+        make_job(test_db, id=job_id)
     r = JobRun(job_type=job_type, trigger="manual", status=status,
                target_job_id=job_id, finished_at=finished_at)
     test_db.add(r)

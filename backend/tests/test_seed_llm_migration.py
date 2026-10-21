@@ -10,8 +10,7 @@ from backend.seed import migrate_llm_settings, DEFAULT_SETTINGS
 
 @pytest.fixture
 def db():
-    engine = create_engine("sqlite:///:memory:")
-    Setting.__table__.create(engine)
+    from backend.models.db import engine   # the Postgres test database (tests/conftest.py)
     Session = sessionmaker(bind=engine)
     s = Session()
     yield s

@@ -6,10 +6,9 @@ from sqlalchemy.orm import sessionmaker
 
 @pytest.fixture
 def test_db(monkeypatch):
-    """In-memory SQLite, patched into llm_logger.SessionLocal."""
+    """Postgres test database, patched into llm_logger.SessionLocal."""
     from backend.models.db import Base, LlmCallLog
-    engine = create_engine("sqlite:///:memory:")
-    LlmCallLog.__table__.create(engine)
+    from backend.models.db import engine   # the Postgres test database (tests/conftest.py)
     Session = sessionmaker(bind=engine)
 
     import backend.analyzer.llm_logger as llm_logger
@@ -94,7 +93,9 @@ def test_log_llm_call_with_job_id(test_db):
     from backend.analyzer.llm_logger import log_llm_call
     from backend.models.db import LlmCallLog
 
+    from backend.tests.r4_support import make_job
     job_id = uuid.uuid4()
+    make_job(test_db, id=job_id)   # llm_call_log.job_id is a real foreign key on Postgres
     log_llm_call(
         purpose="score_full",
         provider="claude_api",

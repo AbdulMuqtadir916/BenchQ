@@ -77,7 +77,8 @@ class Search(Base):
     # a question about a Canadian city with HTTP 200 and an empty result list, so
     # the country is an explicit field instead of a literal. Values are jobspy
     # Country aliases — see backend/countries.py.
-    country = Column(String, default=DEFAULT_COUNTRY)
+    # server_default mirrors what the database has had since seed.run_migrations set it (baseline 0001).
+    country = Column(String, default=DEFAULT_COUNTRY, server_default=DEFAULT_COUNTRY)
     is_remote = Column(Boolean, nullable=True)  # null=any
     job_type = Column(String, default="fulltime")
     hours_old = Column(Integer, default=24)
@@ -552,6 +553,9 @@ class TracerLink(Base):
     resume = relationship("Resume", backref="tracer_links")
     cover_letter = relationship("CoverLetter", backref="tracer_links")
     click_events = relationship("TracerClickEvent", backref="tracer_link", cascade="all, delete-orphan")
+
+    # Redundant with the unique index on token, but every existing database has it (baseline 0001).
+    __table_args__ = (Index("idx_tracer_links_token", "token"),)
 
 
 class TracerClickEvent(Base):

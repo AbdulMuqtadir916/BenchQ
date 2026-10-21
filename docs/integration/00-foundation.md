@@ -79,8 +79,9 @@ The folder must be named `backend/`: the code imports itself as `backend.*`
 docker compose up -d --build db backend      # first build takes a few minutes (Playwright)
 curl http://localhost:8000/health             # {"status":"ok","service":"JobNavigator",...}
 
-# backend tests (in-memory SQLite, no Postgres needed)
-docker compose exec -T -e DATABASE_URL=sqlite:///:memory: backend \
+# backend tests (Postgres; since F1 -- see "Schema changes and the test database" in README.md)
+docker compose up -d db-test
+docker compose exec -T backend \
   python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider
 ```
 
@@ -90,8 +91,9 @@ Python alternative, if you'd rather not rebuild the image while editing the back
 docker compose up -d db
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-DATABASE_URL=postgresql://jobnavigator:password@localhost:5432/jobnavigator \
-  uvicorn backend.main:app --reload --port 8000
+export DATABASE_URL=postgresql://jobnavigator:password@localhost:5432/jobnavigator
+python -m backend.scripts.db_upgrade          # builds / upgrades the schema (Alembic); the API will not start without it
+uvicorn backend.main:app --reload --port 8000
 ```
 
 (The `db` service already publishes Postgres on `127.0.0.1:5432`.)

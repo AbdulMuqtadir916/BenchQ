@@ -7,10 +7,9 @@ from sqlalchemy.orm import sessionmaker
 
 @pytest.fixture
 def test_db():
-    """In-memory SQLite with only LlmCallLog table created."""
+    """A session on the Postgres test database."""
     from backend.models.db import Base, LlmCallLog
-    engine = create_engine("sqlite:///:memory:")
-    LlmCallLog.__table__.create(engine)
+    from backend.models.db import engine   # the Postgres test database (tests/conftest.py)
     Session = sessionmaker(bind=engine)
     session = Session()
     yield session

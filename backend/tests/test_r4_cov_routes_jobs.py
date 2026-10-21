@@ -22,32 +22,6 @@ from backend.tests.r4_support import (  # noqa: F401
 )
 
 
-# ── shims ────────────────────────────────────────────────────────────────────
-
-@pytest.fixture
-def pg_cast_shim(test_db):
-    """Let the two raw-SQL feed endpoints run under SQLite.
-
-    `/feed-stats` and `/unscored-ids` compare `cv_scores::text` to `'{}'`.
-    SQLite has no `::` cast operator, so the statement is a syntax error there
-    and the endpoints' own Python has never been executed by a test. Dropping
-    the cast keeps the comparison meaning the same (SQLite stores the JSON
-    column as its serialised text) and leaves the handler untouched.
-    """
-    from sqlalchemy import event
-    import backend.models.db as db_mod
-    engine = db_mod.engine
-
-    def _strip(conn, cursor, statement, parameters, context, executemany):
-        return statement.replace("::text", ""), parameters
-
-    event.listen(engine, "before_cursor_execute", _strip, retval=True)
-    try:
-        yield
-    finally:
-        event.remove(engine, "before_cursor_execute", _strip)
-
-
 class _Resp:
     """Minimal stand-in for the httpx response `safe_get` returns."""
 
@@ -284,7 +258,7 @@ def test_filter_list_endpoints_reject_a_malformed_search_id(client):
 
 # ── /feed-stats and /unscored-ids ────────────────────────────────────────────
 
-def test_feed_stats_counts_todays_arrivals_and_unscored(client, test_db, pg_cast_shim):
+def test_feed_stats_counts_todays_arrivals_and_unscored(client, test_db):
     from datetime import datetime, timezone, timedelta
     yesterday = datetime.now(timezone.utc) - timedelta(days=2)
     make_job(test_db, url="https://x.com/a", status="new", cv_scores={})
@@ -297,7 +271,7 @@ def test_feed_stats_counts_todays_arrivals_and_unscored(client, test_db, pg_cast
     assert body["unscored"] == 2               # both `{}`-scored rows, any age
 
 
-def test_unscored_ids_returns_only_unscored_new_and_saved(client, test_db, pg_cast_shim):
+def test_unscored_ids_returns_only_unscored_new_and_saved(client, test_db):
     a = make_job(test_db, url="https://x.com/a", status="new", cv_scores={})
     make_job(test_db, url="https://x.com/b", status="new", cv_scores={"PM": 60})
     make_job(test_db, url="https://x.com/c", status="ignored", cv_scores={})
@@ -307,7 +281,7 @@ def test_unscored_ids_returns_only_unscored_new_and_saved(client, test_db, pg_ca
     assert [_uuid.UUID(i) for i in ids] == [a.id]
 
 
-def test_unscored_ids_honours_the_limit(client, test_db, pg_cast_shim):
+def test_unscored_ids_honours_the_limit(client, test_db):
     for i in range(3):
         make_job(test_db, url=f"https://x.com/{i}", status="new", cv_scores={})
     assert len(client.get("/api/jobs/unscored-ids?limit=2").json()["ids"]) == 2

@@ -3,7 +3,7 @@ import pytest
 
 
 def test_test_db_fixture_creates_tables(test_db):
-    """test_db yields a SQLAlchemy session with all tables created in SQLite."""
+    """test_db yields a SQLAlchemy session with all tables created by Alembic on Postgres."""
     from backend.models.db import Setting
     test_db.add(Setting(key="smoke", value="ok"))
     test_db.commit()
@@ -13,7 +13,7 @@ def test_test_db_fixture_creates_tables(test_db):
 
 
 def test_api_client_fixture_returns_client(api_client):
-    """api_client yields a FastAPI TestClient wired to the in-memory DB."""
+    """api_client yields a FastAPI TestClient wired to the test DB."""
     resp = api_client.get("/health")
     assert resp.status_code == 200
 

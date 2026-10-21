@@ -48,7 +48,7 @@ def client(test_db, monkeypatch):
     import backend.scraper.sources.linkedin_extension  # noqa: F401
 
     import backend.main as main_mod
-    monkeypatch.setattr(main_mod, "create_tables", lambda: None)
+    monkeypatch.setattr(main_mod, "check_schema_at_head", lambda: None)
     monkeypatch.setattr(main_mod, "run_seeds", lambda: None)
     monkeypatch.setattr(main_mod, "cleanup_stale_runs", lambda: None)
 

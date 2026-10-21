@@ -1317,7 +1317,8 @@ def migrate_dedup_tracking_params(db):
 def run_seeds():
     db = SessionLocal()
     try:
-        run_migrations(db)
+        # Schema changes are Alembic revisions now (backend/db_schema.py); this only seeds and
+        # tidies data. run_migrations / migrate_h1b_to_visa_cache run only via migrations/legacy_bootstrap.py.
         seed_settings(db)
         migrate_dedup_tracking_params(db)
         migrate_autofill_dicts(db)
@@ -1329,6 +1330,5 @@ def run_seeds():
         cleanup_removed_settings(db)
         migrate_llm_settings(db)
         migrate_cv_terminology(db)
-        migrate_h1b_to_visa_cache(db)
     finally:
         db.close()

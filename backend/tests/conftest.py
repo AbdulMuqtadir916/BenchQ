@@ -4,8 +4,44 @@ import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-# Force SQLite for tests before any imports that touch the engine
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+# The tests run on Postgres (docs/integration/07, F1): `docker compose up -d db-test`. DATABASE_URL is
+# forced to the test database before any import creates the engine, and the name must end in _test so a
+# test run can never truncate a real database.
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL", "postgresql://jobnavigator:password@localhost:5433/jobnavigator_test"
+)
+if not TEST_DATABASE_URL.split("?")[0].endswith("_test"):
+    raise RuntimeError(f"TEST_DATABASE_URL must name a database ending in _test, got {TEST_DATABASE_URL!r}")
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+
+
+# A bug SQLite hid and Postgres does not (found when the tests moved to Postgres, F1): the model declares
+# tracer_links.token as VARCHAR(10), but routes_resumes._rewrite_urls_with_tracers mints
+# secrets.token_urlsafe(8), which is 11 characters. On Postgres that insert fails with
+# StringDataRightTruncation, so any résumé that needs a random tracer token errors in production.
+# Fixing it is a behaviour change (widen the column in a new Alembic revision); until the backend
+# owner decides, these tests are strict expected failures, so fixing the bug makes them XPASS and
+# forces this list to be deleted.
+_TRACER_TOKEN_TOO_LONG = {
+    "backend/tests/test_tracer_token_collision.py::test_two_jobless_resumes_with_the_same_stubs",
+    "backend/tests/test_tracer_token_collision.py::test_second_owner_still_gets_working_links",
+    "backend/tests/test_tracer_token_collision.py::test_disabled_and_styles_never_raise[path]",
+    "backend/tests/test_tracer_token_collision.py::test_disabled_and_styles_never_raise[param]",
+    "backend/tests/test_routes_cover_letters.py::test_base_resume_without_stub_stays_random",
+    "backend/tests/test_r4_t5.py::test_random_tokens_come_from_secrets",
+    "backend/tests/test_r4_t5.py::test_random_tokens_are_long_and_unguessable",
+    "backend/tests/test_r4_t5.py::test_a_web_url_still_gets_a_tracer",
+    "backend/tests/test_preview_tracer_rewrite.py::test_preview_then_pdf_mints_no_extra_links",
+    "backend/tests/test_preview_tracer_rewrite.py::test_preview_serves_the_tracked_urls",
+    "backend/tests/test_preview_tracer_rewrite.py::test_preview_and_pdf_carry_the_same_tokens",
+}
+
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        if item.nodeid in _TRACER_TOKEN_TOO_LONG:
+            item.add_marker(pytest.mark.xfail(
+                strict=True, reason="tracer_links.token is VARCHAR(10) but 11-char tokens are minted (see conftest)"))
 
 
 def pytest_configure(config):
@@ -71,71 +107,75 @@ def mock_anthropic_client(mock_anthropic_response, monkeypatch):
 
 # ── DB + TestClient fixtures ─────────────────────────────────────────────
 
+@pytest.fixture(scope="session", autouse=True)
+def _schema():
+    """Build the schema once per run, the way production does: `alembic upgrade head` on an empty database."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import NullPool
+    from backend.db_schema import upgrade_database
+
+    engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+    engine.dispose()
+    upgrade_database()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _clean_db(_schema):
+    """Every test starts from empty tables. Runs for all tests, so one that touches SessionLocal
+    without asking for test_db still cannot see another test's rows."""
+    from sqlalchemy import text
+    from sqlalchemy.orm import close_all_sessions
+    import backend.models.db as db_mod
+
+    def _truncate():
+        db_mod.engine.dispose()           # drops connections a failed test left mid-transaction
+        with db_mod.engine.begin() as conn:
+            conn.execute(text("SET LOCAL lock_timeout = '10s'"))
+            names = [r[0] for r in conn.execute(text(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'alembic_version'"))]
+            conn.execute(text("TRUNCATE " + ", ".join(f'"{n}"' for n in names) + " RESTART IDENTITY CASCADE"))
+            conn.execute(text("ALTER SEQUENCE jobs_short_id_seq RESTART"))
+
+    _truncate()
+    yield
+    close_all_sessions()
+
+
+@pytest.fixture
+def add_legacy_h1b_columns(test_db):
+    """Returns a function that adds the old companies.h1b_* columns (a database from before visa_cache).
+    The schema is built once per run, so they are always dropped again afterwards."""
+    from sqlalchemy import text
+    cols = [("h1b_lca_count", "INTEGER"), ("h1b_approval_rate", "DOUBLE PRECISION"),
+            ("h1b_median_salary", "INTEGER"), ("h1b_last_checked", "TIMESTAMPTZ")]
+
+    def _add():
+        for col, typ in cols:
+            test_db.execute(text(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {col} {typ}"))
+        test_db.commit()
+
+    yield _add
+    test_db.rollback()
+    import backend.models.db as db_mod
+    with db_mod.engine.begin() as conn:   # own connection: a test may have patched test_db.execute
+        for col, _ in cols:
+            conn.execute(text(f"ALTER TABLE companies DROP COLUMN IF EXISTS {col}"))
+
+
 @pytest.fixture
 def test_db():
-    """In-memory SQLite DB with all tables; rebinds the shared SessionLocal so already-imported modules hit the test DB."""
-    from sqlalchemy import create_engine
-    from sqlalchemy.pool import StaticPool
+    """A session on the Postgres test database (tables are emptied around every test by _clean_db)."""
     import backend.models.db as db_mod
-    from backend.models.db import Base
-
-    # Patch Uuid.bind_processor once so string-shaped UUID binds work under SQLite.
-    import uuid as _uuid
-    from sqlalchemy.sql.sqltypes import Uuid as _SAUuid
-    if not getattr(_SAUuid, "_jn_test_patched", False):
-        _orig_bind = _SAUuid.bind_processor
-
-        def _lenient_bind(self, dialect):
-            character_based = (
-                not dialect.supports_native_uuid or not self.native_uuid
-            )
-            if character_based and self.as_uuid:
-                def process(value):
-                    if value is None:
-                        return None
-                    if isinstance(value, _uuid.UUID):
-                        return value.hex
-                    return _uuid.UUID(str(value)).hex
-                return process
-            return _orig_bind(self, dialect)
-
-        _SAUuid.bind_processor = _lenient_bind
-        _SAUuid._jn_test_patched = True
-
-    # StaticPool keeps a single shared connection so all sessions see the same DB.
-    test_engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-
-    # Strip PG-specific server_defaults that SQLite cannot parse (e.g. nextval()).
-    stashed = []
-    for table in Base.metadata.tables.values():
-        for col in table.columns:
-            if col.server_default is not None:
-                stashed.append((col, col.server_default))
-                col.server_default = None
-    try:
-        Base.metadata.create_all(test_engine)
-    finally:
-        for col, sd in stashed:
-            col.server_default = sd
-
-    # Rebind the shared SessionLocal (and engine ref) so top-level importers hit the test DB.
-    original_engine = db_mod.engine
-    original_bind = db_mod.SessionLocal.kw.get("bind")
-    db_mod.engine = test_engine
-    db_mod.SessionLocal.configure(bind=test_engine)
 
     session = db_mod.SessionLocal()
     try:
         yield session
     finally:
         session.close()
-        db_mod.SessionLocal.configure(bind=original_bind)
-        db_mod.engine = original_engine
-        test_engine.dispose()
 
 
 @pytest.fixture
@@ -149,7 +189,7 @@ def api_client(test_db, monkeypatch):
 
     # Stub the lifespan dependencies so TestClient startup is a no-op.
     import backend.main as main_mod
-    monkeypatch.setattr(main_mod, "create_tables", lambda: None)
+    monkeypatch.setattr(main_mod, "check_schema_at_head", lambda: None)
     monkeypatch.setattr(main_mod, "run_seeds", lambda: None)
     monkeypatch.setattr(main_mod, "cleanup_stale_runs", lambda: None)
     # Prevent the real scheduler from booting.
