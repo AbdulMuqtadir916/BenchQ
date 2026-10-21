@@ -4,7 +4,7 @@ import { ApiError } from "./client";
 /**
  * The only place the frontend talks to the network. Paths are relative
  * (`/api/...`); next.config.ts proxies them to BACKEND_URL so requests are
- * same-origin and the backend's HTTP-only `jn_session` cookie just works.
+ * same-origin and the backend's HTTP-only `bq_session` cookie just works.
  */
 
 type QueryValue = string | number | boolean | null | undefined;

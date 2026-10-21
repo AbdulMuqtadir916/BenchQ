@@ -18,5 +18,10 @@ export function isNotFoundError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404;
 }
 
+/** Something the mocks do that the backend doesn't have yet (07 Q38: the live backend is onboarding only so far). */
+export function notLiveYet(): never {
+  throw new ApiError("Not available on the live backend yet.", "NOT_AVAILABLE", 501);
+}
+
 /** Helper used by the local JSON store and adapter schemas. */
 export const arrayOf = <T,>(schema: ZodType<T>) => z.array(schema);

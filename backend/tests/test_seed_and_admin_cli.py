@@ -66,6 +66,19 @@ def test_ids_are_the_same_on_every_machine():
 
 
 @needs_mock_data
+def test_the_frontends_id_map_is_the_seeds():
+    """src/lib/api/dto/demo-ids.json lets the frontend keep fixture ids on a live session (src/lib/api/dto/demo-ids.ts).
+    Regenerate it with UPDATE_DEMO_IDS=1 pnpm exec vitest run src/lib/api/dto/demo-ids.test.ts."""
+    path = pathlib.Path(__file__).parents[2] / "src" / "lib" / "api" / "dto" / "demo-ids.json"
+    if not path.exists():
+        pytest.skip("the frontend isn't in this checkout (the backend container)")
+    ids = json.loads(path.read_text())
+    ids_now = seed_demo._fixture_ids()
+    assert len(ids) == sum(len(group) for group in ids_now.values())
+    assert all(str(seed_demo.demo_id(fixture)) == uuid for fixture, uuid in ids.items())
+
+
+@needs_mock_data
 def test_every_seed_account_signs_in_with_the_demo_password(anonymous_client, test_db):
     """docs/03 §3.2: done when signing in as each seeded account works against the backend."""
     seed_demo.seed(test_db)

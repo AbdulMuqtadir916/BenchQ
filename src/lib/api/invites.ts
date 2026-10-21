@@ -1,5 +1,10 @@
 import type { Session } from "@/lib/schemas/session";
-import type { Invite } from "@/lib/schemas/tenancy";
+import { InviteBaseSchema, type Invite } from "@/lib/schemas/tenancy";
+import { isLive } from "./config";
+import { InviteLookupDto, SessionDto, toSession } from "./dto/session";
+import { toIso } from "./dto/shared";
+import { http } from "./http";
+import { rememberLiveSession } from "./live-session";
 
 const mock = () => import("@/mocks/invite-flow").then((m) => m.inviteFlowMock);
 
@@ -17,8 +22,27 @@ export interface AcceptInviteInput {
   password: string;
 }
 
+const LookupFields = InviteBaseSchema.pick({ email: true, inviteeName: true, role: true, expiresAt: true });
+const tokenPath = (token: string) => `/api/invites/${encodeURIComponent(token)}`;
+
+/** The backend's invite links (backend/api/routes_invites.py), behind the session switch. */
+const live = {
+  lookup: async (token: string): Promise<InviteLookup> => {
+    const dto = await http.get(tokenPath(token), InviteLookupDto);
+    if (dto.status === "INVALID") return { status: "INVALID" };
+    const fields = LookupFields.parse({ email: dto.email, inviteeName: dto.invitee_name, role: dto.role, expiresAt: toIso(dto.expires_at) });
+    return { status: dto.status, firmName: dto.firm_name, ...fields };
+  },
+  accept: async (token: string, input: AcceptInviteInput): Promise<Session> => {
+    const session = toSession(await http.post(`${tokenPath(token)}/accept`, SessionDto, { body: input }));
+    rememberLiveSession(session);
+    return session;
+  },
+};
+
 /** The public side of an invite: no session needed. Accepting signs the new account in. */
 export const invitesApi = {
-  lookup: async (token: string): Promise<InviteLookup> => (await mock()).lookup(token),
-  accept: async (token: string, input: AcceptInviteInput): Promise<Session> => (await mock()).accept(token, input),
+  lookup: async (token: string): Promise<InviteLookup> => (isLive("session") ? live.lookup(token) : (await mock()).lookup(token)),
+  accept: async (token: string, input: AcceptInviteInput): Promise<Session> =>
+    isLive("session") ? live.accept(token, input) : (await mock()).accept(token, input),
 };

@@ -267,6 +267,7 @@ the backend outside Docker.
 | Stop backend + database | `docker compose stop` (data is kept in the `pgdata` volume) |
 | Frontend | `pnpm dev`, then `http://localhost:3000/health` shows the backend's JSON |
 | Switch a module to the backend | add it to `NEXT_PUBLIC_LIVE_MODULES` in `.env.local`, restart `pnpm dev` |
+| Onboarding on the real backend (07 Q38) | `NEXT_PUBLIC_LIVE_MODULES=session` and `BACKEND_URL=http://localhost:8000` in `.env.local`, seed the demo accounts (above), restart `pnpm dev`, open `http://localhost:3000` (not `127.0.0.1`: the backend checks the origin). Sign-in, `/invite/[token]`, the team list and `/admin` firms, plans, users, invites, team and audit are live; every other module stays on mock data, and a demo account keeps its mock dashboards. Admin actions without an endpoint yet say "Not available on the live backend yet" |
 | Backend tests (Postgres) | `docker compose up -d db-test backend`, then `docker compose exec -T backend python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider` (details in "Schema changes and the test database" below) |
 | Create a migration | `docker compose exec backend alembic -c backend/alembic.ini revision --autogenerate -m "what changed"`, then review the file (below) |
 | Look inside the database | [`database-viewer.md`](./database-viewer.md) (Adminer at `http://localhost:8081`) |
