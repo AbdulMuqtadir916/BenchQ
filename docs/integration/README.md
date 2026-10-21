@@ -323,7 +323,8 @@ Tests refuse to run against a database whose name does not end in `_test`. To ru
 instead of in the container, set `TEST_DATABASE_URL=postgresql://jobnavigator:password@localhost:5433/jobnavigator_test`.
 A test that needs a row another table points to (a `Job` for `job_runs.target_job_id`, a `Search` for
 `scrape_log.search_id`) must create it first: the foreign keys are real now (`tests/r4_support.make_job`).
-The repo has no CI workflow yet; this command is the check to run before a PR.
+CI (`.github/workflows/ci.yml`) runs the same command, plus the frontend's typecheck, lint, test and build,
+on every PR into `codex/json-data-migration`. Run them locally before you open one.
 
 ---
 

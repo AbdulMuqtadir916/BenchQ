@@ -1,0 +1,65 @@
+# Checks every PR into codex/json-data-migration (handoff step 3, after F1/0002). No push trigger and no
+# pip-audit, by decision. The commands are the same ones a contributor runs locally (CLAUDE.md "Commands",
+# docs/integration/README.md "Tests run on Postgres").
+name: CI
+
+on:
+  pull_request:
+    branches: [codex/json-data-migration]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # Reads the pnpm version from package.json's packageManager field.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      # Mirrors docker-compose's db-test service: same image, user and database, on port 5433.
+      db-test:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: jobnavigator
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: jobnavigator_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U jobnavigator -d jobnavigator_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://jobnavigator:password@localhost:5433/jobnavigator_test
+    steps:
+      - uses: actions/checkout@v4
+      # The backend image runs Python 3.12 (Dockerfile.backend).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      # "live" tests hit a running stack over HTTP; there is none here.
+      - run: python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider
