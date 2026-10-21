@@ -2,7 +2,8 @@
 
 Two scratch databases are built from nothing, one the old way (migrations/legacy_bootstrap.py: create_tables +
 run_migrations + migrate_h1b_to_visa_cache) and one by `db_upgrade` (alembic upgrade head), and their catalogs
-are compared: tables, columns (type, nullability, default), constraints, indexes, sequences. A third test
+are compared: tables, columns (type, nullability, default), constraints, indexes, sequences. The old path's
+create_all reads today's models, so it is compared with head, not with the baseline alone. A third test
 asks Alembic whether the models still agree with the migrations, so a model change without a revision fails.
 """
 import os
@@ -15,6 +16,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
 
+from backend.db_schema import head_revision
 from backend.tests.conftest import TEST_DATABASE_URL
 
 _CATALOG_QUERIES = {
@@ -101,7 +103,9 @@ def test_alembic_baseline_equals_the_old_startup_schema(scratch_dbs):
 
 
 def test_an_existing_unversioned_database_is_stamped_not_recreated(scratch_dbs):
-    """db_upgrade on a database the old path built: keep the rows, add alembic_version at the baseline."""
+    """db_upgrade on a database the old path built: keep the rows, stamp it at the baseline, then upgrade it
+    to head. (The old path builds from today's models, so later revisions find nothing to change here;
+    test_migration_0002.py covers a database that really is at the baseline.)"""
     name = scratch_dbs["legacy"]
     _run("backend.migrations.legacy_bootstrap", name)
     engine = create_engine(_url_for(name), poolclass=NullPool)
@@ -114,7 +118,7 @@ def test_an_existing_unversioned_database_is_stamped_not_recreated(scratch_dbs):
 
         with engine.connect() as conn:
             assert conn.execute(text("SELECT value FROM settings WHERE key = 'keep_me'")).scalar() == "yes"
-            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0001"
+            assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == head_revision()
         assert _catalog(name) == before, "stamping must not change the schema"
     finally:
         engine.dispose()

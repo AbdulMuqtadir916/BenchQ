@@ -307,7 +307,7 @@ are frozen: only `backend/migrations/legacy_bootstrap.py` calls them, for databa
 **Your existing database is stamped automatically on first start.** You do nothing: pull, then
 `docker compose up -d --build backend`. The first time `db_upgrade` sees tables but no `alembic_version`, it
 runs the legacy bootstrap once (a no-op on a database that is already current), then **stamps** it at
-revision `0001`. Nothing is re-created and no data changes. Do not drop your database or its volume.
+revision `0001` and upgrades it to head like any other database. Nothing is re-created and no data changes. Do not drop your database or its volume.
 The legacy path is deleted at F6 ([07-auth-and-tenancy.md](./07-auth-and-tenancy.md)), so start the backend
 once on this version before then.
 
