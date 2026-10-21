@@ -3,7 +3,8 @@
 Two scratch databases are built from nothing, one the old way (migrations/legacy_bootstrap.py: create_tables +
 run_migrations + migrate_h1b_to_visa_cache) and one by `db_upgrade` (alembic upgrade head), and their catalogs
 are compared: tables, columns (type, nullability, default), constraints, indexes, sequences. The old path's
-create_all reads today's models, so it is compared with head, not with the baseline alone. A third test
+create_all reads today's models, so it is compared with head, not with the baseline alone, on the tables it
+builds: tables added after the baseline (models/tenancy.py) exist only through Alembic. A third test
 asks Alembic whether the models still agree with the migrations, so a model change without a revision fails.
 """
 import os
@@ -92,6 +93,9 @@ def test_alembic_baseline_equals_the_old_startup_schema(scratch_dbs):
     _run("backend.scripts.db_upgrade", scratch_dbs["alembic"])
 
     old, new = _catalog(scratch_dbs["legacy"]), _catalog(scratch_dbs["alembic"])
+    # Tables added after the baseline (models/tenancy.py) exist only through Alembic; compare the rest.
+    new = _only_tables(new, {row[0] for row in old["columns"]})
+    assert old["columns"] and new["columns"], "the catalog query found nothing; the comparison would be vacuous"
 
     for kind in _CATALOG_QUERIES:
         only_old = sorted(set(old[kind]) - set(new[kind]))
@@ -99,7 +103,11 @@ def test_alembic_baseline_equals_the_old_startup_schema(scratch_dbs):
         assert not only_old and not only_new, (
             f"{kind} differ.\nOnly in the old startup path:\n  " + "\n  ".join(map(str, only_old))
             + "\nOnly in the Alembic baseline:\n  " + "\n  ".join(map(str, only_new)))
-    assert old["columns"], "the catalog query found nothing; the comparison would be vacuous"
+
+
+def _only_tables(catalog: dict, tables: set) -> dict:
+    """The catalog limited to `tables` (sequences have no table and are kept whole)."""
+    return {k: rows if k == "sequences" else [r for r in rows if r[0] in tables] for k, rows in catalog.items()}
 
 
 def test_an_existing_unversioned_database_is_stamped_not_recreated(scratch_dbs):
@@ -119,7 +127,11 @@ def test_an_existing_unversioned_database_is_stamped_not_recreated(scratch_dbs):
         with engine.connect() as conn:
             assert conn.execute(text("SELECT value FROM settings WHERE key = 'keep_me'")).scalar() == "yes"
             assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == head_revision()
-        assert _catalog(name) == before, "stamping must not change the schema"
+        after = _catalog(name)
+        assert _only_tables(after, {row[0] for row in before["columns"]}) == before, \
+            "stamping must not change the existing tables"
+        assert {"firms", "users", "invites"} <= {row[0] for row in after["columns"]}, \
+            "the upgrade after stamping must add the later revisions' tables"
     finally:
         engine.dispose()
 

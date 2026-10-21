@@ -645,7 +645,9 @@ def create_tables():
     with engine.connect() as conn:
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS jobs_short_id_seq"))
         conn.commit()
-    Base.metadata.create_all(bind=engine)
+    # Tables added after the Alembic baseline (models/tenancy.py) exist only through their revisions.
+    legacy_tables = [t for t in Base.metadata.sorted_tables if not t.info.get("alembic_only")]
+    Base.metadata.create_all(bind=engine, tables=legacy_tables)
     # Idempotent column adds for tables that already existed before the column was introduced.
     # Postgres-native; no-op on second run.
     with engine.connect() as conn:
