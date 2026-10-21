@@ -326,7 +326,7 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
 | **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit; **build `/admin/system` and AI spend on the overview** from the approved docs/02 §3.2 contracts (Q33, Q34)                                                                                                   | P, B             | Planned                            |
 | **L**  | Sign-in with seeded accounts (Q25–Q27) — `/sign-in` against the mock layer's seeded accounts; dev principal switcher removed; user-menu sign-out; mock session shared across tabs | T, P1–P2         | Built, in review — before P3       |
-| **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Backend side first (Q38); UI with the frontend cut-over |
+| **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Backend side first (Q38); M1, M2 built 2026-10-21 (`settings/team`: invite, copy link = resend, revoke, the seat block; mock and live). M3 (firm pages read pending invites) next |
 | **D**  | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks                                                                                                           | backend D1/D2    | Later                              |
 
 **Why C moves before B (change from v1):** the audit checks that controls a principal can't use
@@ -621,6 +621,11 @@ History (`docs/06`, `docs/CURRENT_STATE.md`, `docs/archive/`, the A/A2/T rows ab
 ---
 
 ## Phase M — Firm members and invites (firm side) — approved 2026-10-18 (Q23)
+
+> **2026-10-21 (Q38):** M1 and M2 are built: `teamApi.invites / invite / resendInvite / revokeInvite`
+> (`src/mocks/member-invites.ts`, the same rules as `backend/api/routes_team.py`) and the invites card on
+> `settings/team`. As Q38 decided, the link is shown once when an invite is sent or resent, so "Copy link" is a
+> resend. M4's ledger actions are logged by both. M3 (the OWNER card's "Seats used") is still to do.
 
 The firm half of the invite flow. Today only the Super Admin side is planned (S: the OWNER's invite
 when a firm is created, resend / revoke on `/admin/firms/[firmId]/users`). `/invite/[token]`, which

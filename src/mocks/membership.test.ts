@@ -22,6 +22,8 @@ import { allDocuments, documentsMock } from "./documents";
 import { allMessages, inboxMock } from "./inbox";
 import { ledgerMock } from "./ledger";
 import { teamMock } from "./team";
+import { memberInvitesMock } from "./member-invites";
+import { invites } from "./tenancy";
 import { agentsMock } from "./agents";
 import { FIRM_SCOPED_RESOURCES } from "./membership";
 import { signInAs } from "@/mocks/sign-in-as";
@@ -48,6 +50,7 @@ const idsOf = (firmId: string) => {
     resumeVersion: resume.versions[0]!.id,
     document: of(allDocuments, firmId).id,
     message: of(allMessages, firmId).id,
+    invite: invites.find((invite) => invite.firmId === firmId && invite.role !== "OWNER" && invite.status === "PENDING")!.id,
   };
 };
 type Ids = ReturnType<typeof idsOf>;
@@ -78,6 +81,10 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["inbox", "markRead", (f, i) => inboxApi.markRead(f, i.message), true],
   ["ledger", "list", (f) => ledgerApi.list(f), false],
   ["team", "list", (f) => teamApi.list(f), false],
+  ["memberInvites", "list", (f) => teamApi.invites(f), false],
+  ["memberInvites", "invite", (f) => teamApi.invite(f, { email: "isolation@example.test", role: "BDE", inviteeName: null }), true],
+  ["memberInvites", "resend", (f, i) => teamApi.resendInvite(f, i.invite), true],
+  ["memberInvites", "revoke", (f, i) => teamApi.revokeInvite(f, i.invite), true],
   ["jobMarks", "list", (f) => jobMarksApi.list(f), false],
   ["jobMarks", "mark", (f, i) => jobMarksApi.mark(f, i.job, "SAVED"), true],
   ["jobMarks", "unmark", (f, i) => jobMarksApi.unmark(f, i.job, "SAVED"), true],
@@ -86,7 +93,7 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
 
 const MOCKS: Record<(typeof FIRM_SCOPED_RESOURCES)[number], object> = {
   candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock,
-  records: recordsMock, documents: documentsMock, inbox: inboxMock, ledger: ledgerMock, team: teamMock, agents: agentsMock, jobMarks: jobMarksMock,
+  records: recordsMock, documents: documentsMock, inbox: inboxMock, ledger: ledgerMock, team: teamMock, memberInvites: memberInvitesMock, agents: agentsMock, jobMarks: jobMarksMock,
 };
 /** Mock methods that take no firm (they work on text alone). */
 const UNSCOPED = new Set(["agents.rewrite"]);
@@ -113,10 +120,10 @@ describe("membership: a firm-A principal can't reach firm B through any adapter 
   });
 
   it("leaves firm B's records untouched after every refused write", async () => {
-    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)));
+    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks, invites].map((rows) => rows.filter((row) => row.firmId === B)));
     await signInAs("user_imran");
     for (const [, , call, isWrite] of CALLS) if (isWrite) await status(call(B, idsOf(B)));
-    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
+    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks, invites].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
   });
 
   it("answers another firm exactly like a firm that doesn't exist", async () => {

@@ -14,6 +14,7 @@ import { recordsMock } from "./records";
 import { resumesMock } from "./resumes";
 import { signInAs } from "./sign-in-as";
 import { teamMock } from "./team";
+import { memberInvitesMock } from "./member-invites";
 
 /**
  * The mock backend refuses every write from a principal the UI never offers it to (07 §4, Q32): a
@@ -25,7 +26,7 @@ import { teamMock } from "./team";
 type AnyMethod = (firmId: string, ...args: unknown[]) => Promise<unknown>;
 const MOCKS: Record<string, Record<string, AnyMethod>> = {
   candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock, records: recordsMock,
-  documents: documentsMock, inbox: inboxMock, ledger: ledgerMock, team: teamMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
+  documents: documentsMock, inbox: inboxMock, ledger: ledgerMock, team: teamMock, memberInvites: memberInvitesMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
 } as unknown as Record<string, Record<string, AnyMethod>>;
 
 const FIRM = "firm_hts";
@@ -43,6 +44,9 @@ const ARGS: Record<string, unknown[]> = {
   "jobMarks.mark": ["job_001", "SAVED"],
   "jobMarks.unmark": ["job_001", "SAVED"],
   "agents.tailorResume": [{ resumeVersionId: "rv", jobId: "job" }],
+  "memberInvites.invite": [{ email: "policy@example.test", role: "BDE", inviteeName: null }],
+  "memberInvites.resend": ["inv_hts_01"],
+  "memberInvites.revoke": ["inv_hts_01"],
 };
 
 const writes = Object.entries(WRITE_ACTIONS).flatMap(([resource, methods]) => Object.entries(methods).map(([name, action]) => ({ resource, name, action })));
@@ -65,6 +69,7 @@ describe("the write inventory", () => {
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
       "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture",
+      "memberInvites.invite", "memberInvites.resend", "memberInvites.revoke",
     ]);
   });
 

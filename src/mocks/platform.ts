@@ -24,8 +24,8 @@ import { mockResult, notFound } from "./_shared";
  * Mock data, not a backend: Phase D replaces it.
  */
 
-const INVITE_DAYS = 7;
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const INVITE_DAYS = 7;
+export const DAY_MS = 24 * 60 * 60 * 1000;
 
 const conflict = (message: string, code = "CONFLICT") => new ApiError(message, code, 409);
 const invalid = (message: string) => new ApiError(message, "INVALID", 400);
@@ -69,14 +69,14 @@ function checkLimits(limits: { seatLimit: number; candidateLimit: number }): voi
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function checkEmail(email: string): string {
+export function checkEmail(email: string): string {
   const address = email.trim().toLowerCase();
   if (!EMAIL.test(address)) throw invalid("Enter a valid email address.");
   return address;
 }
 
 /** A person already holds this email, or has a pending invite for it: one account per email. */
-function checkEmailFree(address: string, now: Date): void {
+export function checkEmailFree(address: string, now: Date): void {
   const inUse = allUsers.some((user) => user.email.toLowerCase() === address) || platformUsers.some((user) => user.email.toLowerCase() === address);
   const invited = invites.some((invite) => invite.email.toLowerCase() === address && effectiveInviteStatus(invite, now) === "PENDING");
   if (inUse || invited) throw conflict("Someone with this email already has an account or a pending invite.", "EMAIL_TAKEN");
