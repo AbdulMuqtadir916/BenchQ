@@ -15,35 +15,6 @@ if not TEST_DATABASE_URL.split("?")[0].endswith("_test"):
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 
-# A bug SQLite hid and Postgres does not (found when the tests moved to Postgres, F1): the model declares
-# tracer_links.token as VARCHAR(10), but routes_resumes._rewrite_urls_with_tracers mints
-# secrets.token_urlsafe(8), which is 11 characters. On Postgres that insert fails with
-# StringDataRightTruncation, so any résumé that needs a random tracer token errors in production.
-# Fixing it is a behaviour change (widen the column in a new Alembic revision); until the backend
-# owner decides, these tests are strict expected failures, so fixing the bug makes them XPASS and
-# forces this list to be deleted.
-_TRACER_TOKEN_TOO_LONG = {
-    "backend/tests/test_tracer_token_collision.py::test_two_jobless_resumes_with_the_same_stubs",
-    "backend/tests/test_tracer_token_collision.py::test_second_owner_still_gets_working_links",
-    "backend/tests/test_tracer_token_collision.py::test_disabled_and_styles_never_raise[path]",
-    "backend/tests/test_tracer_token_collision.py::test_disabled_and_styles_never_raise[param]",
-    "backend/tests/test_routes_cover_letters.py::test_base_resume_without_stub_stays_random",
-    "backend/tests/test_r4_t5.py::test_random_tokens_come_from_secrets",
-    "backend/tests/test_r4_t5.py::test_random_tokens_are_long_and_unguessable",
-    "backend/tests/test_r4_t5.py::test_a_web_url_still_gets_a_tracer",
-    "backend/tests/test_preview_tracer_rewrite.py::test_preview_then_pdf_mints_no_extra_links",
-    "backend/tests/test_preview_tracer_rewrite.py::test_preview_serves_the_tracked_urls",
-    "backend/tests/test_preview_tracer_rewrite.py::test_preview_and_pdf_carry_the_same_tokens",
-}
-
-
-def pytest_collection_modifyitems(config, items):
-    for item in items:
-        if item.nodeid in _TRACER_TOKEN_TOO_LONG:
-            item.add_marker(pytest.mark.xfail(
-                strict=True, reason="tracer_links.token is VARCHAR(10) but 11-char tokens are minted (see conftest)"))
-
-
 def pytest_configure(config):
     """Register markers here too — the container runs pytest from /app, where the
     repo's pytest.ini is not mounted."""

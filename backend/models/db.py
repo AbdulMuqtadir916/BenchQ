@@ -540,7 +540,7 @@ class TracerLink(Base):
     __tablename__ = "tracer_links"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    token = Column(String(10), unique=True, nullable=False, index=True)
+    token = Column(String(16), unique=True, nullable=False, index=True)
     # A tracer link belongs to a resume, a cover letter, or — when the two share the
     # same job and token — both at once; each document's /tracer-stats filters on its own FK.
     resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="CASCADE"), nullable=True)
