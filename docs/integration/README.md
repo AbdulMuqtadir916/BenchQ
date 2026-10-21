@@ -262,6 +262,8 @@ the backend outside Docker.
 | Start backend + database | `docker compose up -d db backend` (add `--build` after backend code changes) |
 | Backend health | `curl http://localhost:8000/health` |
 | Backend logs | `docker compose logs -f backend` |
+| Demo accounts (local only) | `docker compose exec backend python -m backend.scripts.seed_demo`: the mocks' firms, users and invites; every account in docs/03 §3.2 signs in with `benchq-demo-2026`. `--reset` starts over. Refused when `BENCHQ_ENV` is production |
+| First Super Admin (any environment) | `docker compose exec backend python -m backend.scripts.create_platform_admin --email you@example.com --name "Your Name"` (asks for the password twice); everyone else joins by invite |
 | Stop backend + database | `docker compose stop` (data is kept in the `pgdata` volume) |
 | Frontend | `pnpm dev`, then `http://localhost:3000/health` shows the backend's JSON |
 | Switch a module to the backend | add it to `NEXT_PUBLIC_LIVE_MODULES` in `.env.local`, restart `pnpm dev` |

@@ -73,6 +73,8 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app/backend
+      # The mocks' demo data, read by `python -m backend.scripts.seed_demo` (never copied, so it can't drift).
+      - ./src/mocks/data:/app/src/mocks/data:ro
       - ./backups:/app/backups
       - ./backend/.linkedin_api:/root/.linkedin_api
       - codex_auth:/root/.codex
