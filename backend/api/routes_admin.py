@@ -1,10 +1,10 @@
-"""The platform tier's firms, plans and invites (docs/04 §14, docs/07 §2.3): Super Admin only (backend/auth/access.py
+"""The platform tier's firms, plans, users, invites, platform team and audit log (docs/04 §14, docs/07 §2.3): Super Admin only (backend/auth/access.py
 classifies every route here PLATFORM), each write gated by its platform action and logged in the ledger.
 The frontend mock is the spec: src/mocks/platform.ts."""
 import uuid
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
@@ -13,10 +13,10 @@ from backend.auth import ledger
 from backend.auth.invites import (bad_request, check_email_free, conflict, invite_json, normal_email, resend_invite,
                                   revoke_invite, send_invite, slug_problem)
 from backend.auth.policy import require
-from backend.auth.serialize import firm_json
+from backend.auth.serialize import firm_json, ledger_entry_json, platform_user_json, user_json
 from backend.auth.sessions import Principal
 from backend.models.db import get_db, utcnow
-from backend.models.tenancy import Firm, Invite, Plan, PlatformUser
+from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, User
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -159,3 +159,29 @@ def revoke(invite_id: uuid.UUID, principal: Principal = Depends(require("invite.
     revoke_invite(db, invite, actor=db.get(PlatformUser, principal.user_id), now=now)
     db.commit()
     return invite_json(invite, now)
+
+
+# ── Users, the platform team and the audit log (read only) ───────────────────
+
+@router.get("/users", summary="Every firm user, or one firm's")
+def list_users(firm_id: uuid.UUID | None = None, db: DbSession = Depends(get_db)):
+    query = db.query(User)
+    if firm_id is not None:
+        query = query.filter(User.firm_id == firm_id)
+    return [user_json(u) for u in query.order_by(User.created_at, User.name)]
+
+
+@router.get("/team", summary="The platform team (Super Admins)")
+def list_team(db: DbSession = Depends(get_db)):
+    return [platform_user_json(a) for a in db.query(PlatformUser).order_by(PlatformUser.created_at, PlatformUser.name)]
+
+
+AUDIT_LIMIT = 500
+
+
+@router.get("/audit", summary="The ledger across the platform and every firm, newest first")
+def list_audit(limit: int = Query(default=AUDIT_LIMIT, ge=1, le=2000), db: DbSession = Depends(get_db)):
+    """Platform events and every firm's (A13). The newest `limit` entries; paging comes with the audit screen's
+    filters."""
+    entries = db.query(LedgerEntry).order_by(LedgerEntry.created_at.desc(), LedgerEntry.id).limit(limit)
+    return [ledger_entry_json(e) for e in entries]

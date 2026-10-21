@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth.sessions import Principal
-from backend.models.tenancy import Firm, PlatformUser, SupportView, User
+from backend.models.tenancy import Firm, LedgerEntry, PlatformUser, SupportView, User
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -42,6 +42,19 @@ def support_view_json(view: SupportView) -> dict:
     return {
         "id": str(view.id), "firm_id": str(view.firm_id), "reason": view.reason,
         "started_at": _iso(view.started_at), "expires_at": _iso(view.expires_at),
+    }
+
+
+def ledger_entry_json(entry: LedgerEntry) -> dict:
+    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case."""
+    return {
+        "id": str(entry.id), "firm_id": str(entry.firm_id) if entry.firm_id else None,
+        "actor_user_id": str(entry.actor_user_id) if entry.actor_user_id else None, "actor_type": entry.actor_type,
+        "actor_name": entry.actor_name, "entity_type": entry.entity_type, "entity_id": entry.entity_id,
+        "entity_label": entry.entity_label, "action": entry.action, "summary": entry.summary,
+        "model_id": entry.model_id, "prompt_version": entry.prompt_version,
+        "evidence_ids": list(entry.evidence_ids or []), "claim_state": entry.claim_state,
+        "created_at": _iso(entry.created_at),
     }
 
 
