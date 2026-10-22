@@ -1,6 +1,12 @@
 # 07 — Auth and tenancy in the backend
 
 **Status:** approved (Q37), reordered by Q38 (2026-10-21). F1 is built (#29, then 0002 in #30); CI runs on every PR (#31).
+**2026-10-22:** onboarding PRs 1–7 are merged (#33–#41): F2a, F3 (without the support-view endpoints), F4 (the policy
+table and `require`; the firm-scoping dependency and its lint test wait for F2b), F5, the Admin API's firms, invites
+and read lists, Phase M's backend, and F6 for the session, invites, team and admin adapters **as an opt-in**
+(`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **Still to do:**
+F2b, F2c, the support-view endpoints, F7, and the rest of F6 (live by default, mock sign-in removed, the session read
+on the server, the legacy schema path deleted).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
 
