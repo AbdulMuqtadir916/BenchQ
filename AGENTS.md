@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# BenchQ rules (Codex and any other agent)
+
+Read `CLAUDE.md` first and follow it: it is the contract for every agent in this repo, not only Claude. Then
+`CONTRIBUTING.md` for branches and PRs, and, for backend integration work, `docs/integration/README.md` and the
+module file you were assigned.

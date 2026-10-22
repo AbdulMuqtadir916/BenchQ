@@ -1,0 +1,14 @@
+# Changes to these files need a review from a code owner (CONTRIBUTING.md, "Reviews").
+# The product owner, Abdul Muqtadir, is the only code owner (CONTRIBUTING.md says how his own PRs are approved).
+# Any other file needs one approval from any teammate.
+
+# Contracts and permissions: product-owner sign-off (CLAUDE.md).
+/src/lib/schemas/                  @AbdulMuqtadir916
+/src/lib/auth/                     @AbdulMuqtadir916
+/src/lib/routes/registry.ts        @AbdulMuqtadir916
+/backend/auth/                     @AbdulMuqtadir916
+/backend/migrations/               @AbdulMuqtadir916
+/backend/models/                   @AbdulMuqtadir916
+/docs/02-DATA-CONTRACTS.md         @AbdulMuqtadir916
+/docs/07-ROUTES-AND-RBAC.md        @AbdulMuqtadir916
+/.github/                          @AbdulMuqtadir916
