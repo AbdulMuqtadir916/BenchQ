@@ -25,8 +25,9 @@ import { BdeDashboard } from "./bde-dashboard";
  * the real hooks and the mock backend; failures come from the dev fault switch.
  */
 
-type Resource = "candidates" | "applications" | "followups" | "team" | "jobs";
-type Dashboard = { name: string; component: ComponentType; queries: Resource[]; groups: Record<string, { reads: Resource[]; labels: string[] }> };
+type Resource = "candidates" | "applications" | "followups" | "team" | "memberInvites" | "jobs";
+/** `as`: the seeded account the dashboard is rendered for (the OWNER one reads invites, which needs `team.view`). */
+type Dashboard = { name: string; as: string; component: ComponentType; queries: Resource[]; groups: Record<string, { reads: Resource[]; labels: string[] }> };
 
 const floorGroups = {
   throughput: { reads: ["candidates", "applications", "team"] as Resource[], labels: ["Applied today", "Active BDEs", "Candidates on bench"] },
@@ -36,10 +37,10 @@ const floorGroups = {
 };
 
 const DASHBOARDS: Dashboard[] = [
-  { name: "OWNER", component: OwnerDashboard, queries: ["candidates", "applications", "followups", "team"], groups: { rollups: { reads: ["applications", "candidates", "team"], labels: ["Time to place", "Active users", "Active candidates"] }, ...floorGroups } },
-  { name: "MANAGER", component: () => createElement(ManagerDashboard, { role: "MANAGER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
-  { name: "VIEWER", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
-  { name: "BDE", component: BdeDashboard, queries: ["candidates", "applications", "followups", "jobs"], groups: {
+  { name: "OWNER", as: "user_imran", component: OwnerDashboard, queries: ["candidates", "applications", "followups", "team", "memberInvites"], groups: { rollups: { reads: ["applications", "candidates", "team", "memberInvites"], labels: ["Time to place", "Seats used", "Active candidates"] }, ...floorGroups } },
+  { name: "MANAGER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "MANAGER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
+  { name: "VIEWER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
+  { name: "BDE", as: "user_adnan", component: BdeDashboard, queries: ["candidates", "applications", "followups", "jobs"], groups: {
     numbers: { reads: ["candidates", "applications", "followups"], labels: ["Unverified claims", "Responses"] },
     mine: { reads: ["candidates", "applications"], labels: ["apps</span>"] }, // per-candidate app counts in the list body
     queue: { reads: ["candidates", "applications", "jobs"], labels: ["Tailor resume"] }, // the queue rows' action
@@ -62,25 +63,24 @@ async function render(component: ComponentType, failing: Resource[]): Promise<st
 }
 const count = (html: string, text: string) => html.split(text).length - 1;
 
-// Signed in as a member of firm A, in the mock backend (it checks membership, T8) and in the client
-// store (the BDE dashboard reads the signed-in user), as the app is after /sign-in.
-beforeAll(async () => {
-  useSession.getState().setSession(await signInAs("user_adnan"));
-});
-afterAll(async () => {
-  useSession.getState().reset();
-  await sessionApi.signOut();
-});
 afterEach(() => {
   fault.__BENCHQ_MOCK_FAIL__ = [];
 });
 
-describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 }, ({ component, queries, groups }) => {
+describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 }, ({ as, component, queries, groups }) => {
+  // Signed in as a member of firm A, in the mock backend (it checks membership, T8) and in the client
+  // store (the BDE dashboard reads the signed-in user), as the app is after /sign-in.
+  beforeAll(async () => {
+    useSession.getState().setSession(await signInAs(as));
+  });
+  afterAll(async () => {
+    useSession.getState().reset();
+    await sessionApi.signOut();
+  });
+
   it("renders every group, with no error, when the data loads", async () => {
     const html = await render(component, []);
     expect(count(html, ERROR)).toBe(0);
-    // Firm pages can't read pending invites yet, so no firm page may claim a seat count (A1): /admin's would differ.
-    expect(html).not.toContain("Seats used");
     for (const group of Object.values(groups)) for (const label of group.labels) expect(html, label).toContain(label);
   });
 

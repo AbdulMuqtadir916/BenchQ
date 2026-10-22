@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
-import { useTeam } from "@/lib/hooks/use-team";
-import { daysBetween, isActiveCandidate } from "@/lib/derive";
+import { useMemberInvites, useTeam } from "@/lib/hooks/use-team";
+import { daysBetween, deriveFirmUsage } from "@/lib/derive";
 import { StatCard } from "@/components/app/stat-card";
 import { PageHeader } from "@/components/app/page-header";
 import { SkeletonCard } from "@/components/app/skeleton-card";
@@ -20,15 +20,17 @@ export function OwnerDashboard() {
   const applicationsQuery = useApplications();
   const candidatesQuery = useCandidates();
   const teamQuery = useTeam();
+  const invitesQuery = useMemberInvites();
   // FloorContent reads the follow-ups too (same cache entry): needed to know if the whole page failed.
   const followupsQuery = useFollowups();
   const firm = useFirm();
-  const rollups = queryGroup(applicationsQuery, candidatesQuery, teamQuery);
-  const page = queryGroup(applicationsQuery, candidatesQuery, teamQuery, followupsQuery);
+  const rollups = queryGroup(applicationsQuery, candidatesQuery, teamQuery, invitesQuery);
+  const page = queryGroup(applicationsQuery, candidatesQuery, teamQuery, invitesQuery, followupsQuery);
 
   const applications = applicationsQuery.data ?? EMPTY;
   const candidates = candidatesQuery.data ?? EMPTY;
   const team = teamQuery.data ?? EMPTY;
+  const invites = invitesQuery.data ?? EMPTY;
 
   const placements = useMemo(
     () => applications.filter((a) => a.status === "PLACED"),
@@ -48,14 +50,15 @@ export function OwnerDashboard() {
     return Math.round(spans.reduce((s, d) => s + d, 0) / spans.length);
   }, [placements]);
 
-  // Limits come from the firm (copied from its plan, A3); active = ON_BENCH / INTERVIEWING / OFFER (A2).
-  // "Active users", not "Seats used": a seat also counts pending invites (A1), which firm pages can't
-  // read yet. Showing active users as seats would disagree with /admin. Phase M turns this card into
-  // "Seats used" (deriveFirmUsage, the same function /admin uses) once firm pages read invites.
-  const activeUsers = team.filter((u) => u.isActive).length;
-  const candidateUsage = `${candidates.filter(isActiveCandidate).length} / ${firm.candidateLimit}`;
+  // Limits come from the firm (copied from its plan, A3). A seat is an active user or a pending invite (A1);
+  // active candidates are ON_BENCH / INTERVIEWING / OFFER (A2). deriveFirmUsage is the function /admin
+  // uses on the same data, so the two pages show the same numbers (docs/07 M3).
+  const usage = deriveFirmUsage(firm, { users: team, invites, candidates }, new Date());
+  const activeUsers = team.filter((u) => u.firmId === firm.id && u.isActive).length;
+  const pendingInvites = usage.seatsUsed - activeUsers;
+  const seatDetail = `${activeUsers} user${activeUsers === 1 ? "" : "s"} + ${pendingInvites} pending`;
 
-  if (hasPageFailed(applicationsQuery, candidatesQuery, teamQuery, followupsQuery)) {
+  if (hasPageFailed(applicationsQuery, candidatesQuery, teamQuery, invitesQuery, followupsQuery)) {
     return (
       <div className="bq-page">
         <PageHeader title="The business" subtitle="Placements, throughput, and plan usage at a glance." />
@@ -77,8 +80,8 @@ export function OwnerDashboard() {
           <>
             <StatCard label="Placements" value={`${placedThisQuarter}`} delta="this quarter" trend="up" window="closed won" />
             <StatCard label="Time to place" value={`${avgTimeToPlace}d`} trend="neutral" window="apply → placed avg" />
-            <StatCard label="Active users" value={`${activeUsers}`} window="on the team" />
-            <StatCard label="Active candidates" value={candidateUsage} window="of plan" />
+            <StatCard label="Seats used" value={`${usage.seatsUsed} / ${usage.seatLimit}`} window={seatDetail} />
+            <StatCard label="Active candidates" value={`${usage.activeCandidates} / ${usage.candidateLimit}`} window="of plan" />
           </>
         )}
       </section>

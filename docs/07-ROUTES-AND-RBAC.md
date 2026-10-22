@@ -327,7 +327,7 @@ Each area has its own `not-found.tsx`, `error.tsx`, `loading.tsx`.
 | **B**  | UI completion audit — every route × principal against `docs/04`                                                                                                                            | C                | Planned                            |
 | **S**  | Super Admin flow polish (UI-first) — create firm, invites, plans, suspend, audit; **build `/admin/system` and AI spend on the overview** from the approved docs/02 §3.2 contracts (Q33, Q34)                                                                                                   | P, B             | Planned                            |
 | **L**  | Sign-in with seeded accounts (Q25–Q27) — `/sign-in` against the mock layer's seeded accounts; dev principal switcher removed; user-menu sign-out; mock session shared across tabs | T, P1–P2         | Built, in review — before P3       |
-| **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Backend side first (Q38); M1, M2 built 2026-10-21 (`settings/team`: invite, copy link = resend, revoke, the seat block; mock and live). M3 (firm pages read pending invites) next |
+| **M**  | Firm members and invites (firm side) — OWNER invites / resends / revokes on settings/team (Q15); firm pages read pending invites; OWNER card becomes "Seats used"                             | C, S             | Backend side first (Q38); M1, M2 built 2026-10-21 (`settings/team`: invite, copy link = resend, revoke, the seat block; mock and live). M3 built 2026-10-22 (the OWNER card is "Seats used x / seatLimit") |
 | **D**  | Real enforcement — server session, `src/proxy.ts`, `forbidden()`, backend checks                                                                                                           | backend D1/D2    | Later                              |
 
 **Why C moves before B (change from v1):** the audit checks that controls a principal can't use
@@ -517,7 +517,7 @@ As v1 Phase C, typed on `Principal`:
 
 As v1 Phase B (per-route checklist), with the audit board extended to the platform tier and the
 Support column. Known gaps carried over: ledger filters + diff expander (the BDE "own" scope is done, Phase P); the
-dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: sign-out in the user menu moved to Phase L (L3: without the switcher it is the only way to change accounts); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates"). From PR 4: outreach has no skeleton or empty state for its thread list; the candidates search box is squeezed at 390 px. (The dashboards' missing error states were fixed before Phase P: docs/04 §13.) ~~Two scripted navigations didn't happen~~ **Closed 2026-10-19:** on a production build (`pnpm build && pnpm start`) sign-in → landing took 142 ms, job page → studio 71 ms and a `router.push` row click 118 ms; the misses seen in dev were the dev server compiling each route on first visit (10–25 s), not a navigation bug. The OWNER rollup is labelled "Active users" until firm pages read pending invites (Phase M).
+dangling `·` when `promptVersion` is null; full settings UIs. From Phase T: sign-out in the user menu moved to Phase L (L3: without the switcher it is the only way to change accounts); **"Not found" as the tab title on not-found pages** (the title comes from the path, so a gate not-found under `/[firm]/candidates` still reads "Candidates"). From PR 4: outreach has no skeleton or empty state for its thread list; the candidates search box is squeezed at 390 px. (The dashboards' missing error states were fixed before Phase P: docs/04 §13.) ~~Two scripted navigations didn't happen~~ **Closed 2026-10-19:** on a production build (`pnpm build && pnpm start`) sign-in → landing took 142 ms, job page → studio 71 ms and a `router.push` row click 118 ms; the misses seen in dev were the dev server compiling each route on first visit (10–25 s), not a navigation bug. ~~The OWNER rollup is labelled "Active users" until firm pages read pending invites (Phase M).~~ **Closed 2026-10-22 (M3):** it is "Seats used x / seatLimit".
 
 ---
 
@@ -626,7 +626,11 @@ History (`docs/06`, `docs/CURRENT_STATE.md`, `docs/archive/`, the A/A2/T rows ab
 > **2026-10-21 (Q38):** M1 and M2 are built: `teamApi.invites / invite / resendInvite / revokeInvite`
 > (`src/mocks/member-invites.ts`, the same rules as `backend/api/routes_team.py`) and the invites card on
 > `settings/team`. As Q38 decided, the link is shown once when an invite is sent or resent, so "Copy link" is a
-> resend. M4's ledger actions are logged by both. M3 (the OWNER card's "Seats used") is still to do.
+> resend. M4's ledger actions are logged by both.
+>
+> **2026-10-22:** M3 is built. The OWNER dashboard reads the firm's invites (`useMemberInvites`) and its card is
+> "Seats used x / seatLimit" from `deriveFirmUsage`; `seats-agree.test.ts` renders it and `/admin/firms/[firmId]`
+> from one mock state and checks they match.
 
 The firm half of the invite flow. Today only the Super Admin side is planned (S: the OWNER's invite
 when a firm is created, resend / revoke on `/admin/firms/[firmId]/users`). `/invite/[token]`, which
@@ -652,9 +656,9 @@ both halves rely on, arrives in P4 (Q26); until then nothing in the UI accepts a
 - **Not in P:** P is the platform tier on mock data; this is a firm screen with firm permissions.
   **Not folded into S:** S is the Super Admin's flow and is planned with its own screen specs;
   keeping the firm side separate keeps each phase reviewable, while M1 reuses S's adapter.
-- **Until M:** the OWNER card says "Active users" (a count, no limit) and nothing on a firm page
-  claims a seat count (asserted in `dashboard-errors.test.ts`), so firm and admin numbers can't
-  disagree.
+- **Until M3 (built 2026-10-22):** the OWNER card said "Active users" (a count, no limit) and nothing
+  on a firm page claimed a seat count, so firm and admin numbers couldn't disagree. Now both read
+  `deriveFirmUsage` on the same records.
 
 ---
 
