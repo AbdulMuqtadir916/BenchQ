@@ -1,0 +1,14 @@
+# Changes to these files need a review from a code owner (CONTRIBUTING.md, "Reviews").
+# Two owners, so a PR opened by one of them can be approved by the other.
+# Any other file needs one approval from any teammate.
+
+# Contracts and permissions: product-owner sign-off (CLAUDE.md).
+/src/lib/schemas/                  @AbdulMuqtadir916 @samad-012
+/src/lib/auth/                     @AbdulMuqtadir916 @samad-012
+/src/lib/routes/registry.ts        @AbdulMuqtadir916 @samad-012
+/backend/auth/                     @AbdulMuqtadir916 @samad-012
+/backend/migrations/               @AbdulMuqtadir916 @samad-012
+/backend/models/                   @AbdulMuqtadir916 @samad-012
+/docs/02-DATA-CONTRACTS.md         @AbdulMuqtadir916 @samad-012
+/docs/07-ROUTES-AND-RBAC.md        @AbdulMuqtadir916 @samad-012
+/.github/                          @AbdulMuqtadir916 @samad-012
