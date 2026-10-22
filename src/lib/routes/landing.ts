@@ -44,3 +44,18 @@ export function signInTarget(session: Session, returnTo: string | null): string 
   }
   return returnTo;
 }
+
+/**
+ * /sign-in for someone already signed in (07 Q35): where to send them instead of showing the form, the
+ * same place a sign-in would (`signInTarget`). `"wait"` while the session isn't settled yet; null shows
+ * the form (signed out, or the backend no longer knows the session). Switching accounts is Sign out first.
+ */
+export function signedInRedirect(
+  state: { isSignedIn: boolean; isSettling: boolean; session: Session | null | undefined },
+  returnTo: string | null,
+): string | "wait" | null {
+  if (state.isSettling) return "wait";
+  if (!state.isSignedIn || state.session === null) return null;
+  if (state.session === undefined) return "wait";
+  return signInTarget(state.session, returnTo);
+}
