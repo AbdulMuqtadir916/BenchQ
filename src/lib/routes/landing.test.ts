@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { sessionApi } from "@/lib/api/session";
 import { allUsers, firms } from "@/mocks/team";
-import { landingHref, safeReturnTo, signInTarget } from "./landing";
+import { landingHref, safeReturnTo, signedInRedirect, signInTarget } from "./landing";
 import { matchRoute } from "./registry";
 import { signInAs, signInAsFirmUser } from "@/mocks/sign-in-as";
 
@@ -57,5 +57,25 @@ describe("sign-in target: returnTo only if the new account can open it", () => {
     const rohan = await signInAs("user_rohan");
     expect(signInTarget(rohan, "/admin")).toBe("/hyderabad-tech-staffing/dashboard");
     expect(signInTarget(rohan, "/hyderabad-tech-staffing/nope")).toBe("/hyderabad-tech-staffing/dashboard");
+  });
+});
+
+describe("/sign-in when already signed in (07 Q35)", () => {
+  it("sends a signed-in account where a sign-in would, never to the form", async () => {
+    const owner = await signInAs("user_imran");
+    const signedIn = { isSignedIn: true, isSettling: false, session: owner };
+    expect(signedInRedirect(signedIn, null)).toBe("/hyderabad-tech-staffing/dashboard");
+    expect(signedInRedirect(signedIn, "/hyderabad-tech-staffing/candidates")).toBe("/hyderabad-tech-staffing/candidates");
+    expect(signedInRedirect(signedIn, "/admin")).toBe("/hyderabad-tech-staffing/dashboard");
+    const sana = await signInAs("padm_sana");
+    expect(signedInRedirect({ ...signedIn, session: sana }, null)).toBe("/admin");
+  });
+
+  it("waits while the session settles, and shows the form when signed out or the backend has no session", async () => {
+    const owner = await signInAs("user_imran");
+    expect(signedInRedirect({ isSignedIn: true, isSettling: true, session: owner }, null)).toBe("wait");
+    expect(signedInRedirect({ isSignedIn: true, isSettling: false, session: undefined }, null)).toBe("wait");
+    expect(signedInRedirect({ isSignedIn: false, isSettling: false, session: undefined }, null)).toBeNull();
+    expect(signedInRedirect({ isSignedIn: true, isSettling: false, session: null }, null)).toBeNull();
   });
 });

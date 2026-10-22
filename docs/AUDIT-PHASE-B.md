@@ -293,7 +293,7 @@ Small PRs, one concern each, in the order I'd do them. Each closes the IDs liste
 | 8 | **Contrast tokens**: propose the `text-3` change in `design.md` (and `text-2` for inactive tabs where needed), dark badge, timer, separators; axe from PR 7 confirms | W21–W24, C6 | Decided: propose the token change in this PR |
 | 9 | **Responsive**: sidebar collapse at 1024, drawer at 768–1023, 390 grid/nav fixes, kanban → list, candidates search row | W17–W20, C5 | Shell-level change; after 6 so the drawer gets keyboard paths from the shared table |
 | 10 | **Ledger**: filters (URL), diff expander, `·` join | W25, C4 | Self-contained; known gap |
-| 11 | **Sign-in**: redirect when signed in (Q35), forgot-password confirmation state | W26, W10 | Small; spec exists (§2.1) |
+| 11 | **Sign-in**: ~~redirect when signed in (Q35)~~ (W26 fixed 2026-10-22), forgot-password confirmation state | W26, W10 | Small; spec exists (§2.1) |
 | 12 | **Settings and welcome**: settings/firm shows "Not set" for shift window and cadence (fields once docs/02 §3.3 is approved), templates, welcome wizard steps 1/3/4 | W7, W8, W9 | Spec-heavy; may need docs/04 detail first. Step 2 and the team invite controls wait for Phase M |
 | 13 | **Intake from a resume**: drop zone, simulated parse, `UNVERIFIED` drafted fields with the review strip, the rest of §4.2's fields | W27 | Builds on PR 1's create; spec exists (docs/04 §4.2); the claim-state rules apply to drafted fields, so it gets its own review |
 | 14 | **Capture tabs**: Paste with parse and side-by-side review, Bulk paste with per-row status, Extension states; duplicate comparison with merge / keep separate | W28 | Builds on PR 1's capture and dedup; merge needs a rule for which fields win (ask before building) |

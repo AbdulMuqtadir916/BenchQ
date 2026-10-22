@@ -1,22 +1,45 @@
 "use client";
 
-import { Suspense, useId, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useId, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
 import { ApiError } from "@/lib/api/client";
-import { useSignIn } from "@/lib/hooks/use-session";
-import { safeReturnTo } from "@/lib/routes/landing";
+import { GateSkeleton } from "@/components/routes/gate-screen";
+import { useCurrentSession, useSignIn } from "@/lib/hooks/use-session";
+import { safeReturnTo, signedInRedirect } from "@/lib/routes/landing";
+import { useIsSessionSettling, useSession } from "@/lib/stores/session-store";
 
 /** useSearchParams needs a Suspense boundary for the static build. */
 export default function SignInPage() {
   return (
     <Suspense>
-      <SignInForm />
+      <SignedOutOnly />
     </Suspense>
   );
+}
+
+/**
+ * Someone already signed in never sees the form (07 Q35): they go where a sign-in would take them, their
+ * landing or a `returnTo` their account can open. To use another account, they sign out first.
+ */
+function SignedOutOnly() {
+  const router = useRouter();
+  const returnTo = safeReturnTo(useSearchParams().get("returnTo"));
+  const isSignedIn = useSession((s) => s.principal !== null);
+  const isSettling = useIsSessionSettling();
+  const session = useCurrentSession();
+  // A failed session check shows the form rather than a skeleton that never ends.
+  const target = signedInRedirect({ isSignedIn, isSettling, session: session.isError ? null : session.data }, returnTo);
+
+  useEffect(() => {
+    if (target && target !== "wait") router.replace(target);
+  }, [target, router]);
+
+  if (target) return <GateSkeleton label="Opening BenchQ" />;
+  return <SignInForm />;
 }
 
 /** Any failed sign-in reads the same, so the page never reveals which emails have an account (docs/07 L1). */
