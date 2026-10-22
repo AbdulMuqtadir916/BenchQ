@@ -85,7 +85,6 @@ def test_tailor_endpoint_rejects_empty_persona(test_db, api_client):
     job = Job(id=uuid.uuid4(), title="PM", company="Acme",
               description="JD", external_id="ext-empty-persona")
     test_db.add_all([job, Persona(id=1, resume_content={})])
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.add(Setting(key="cv_tailor_prompt", value="t"))
     test_db.commit()
     resp = api_client.post("/api/resumes/tailor",

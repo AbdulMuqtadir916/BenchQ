@@ -8,7 +8,6 @@ from backend.models.db import Setting, Resume, Job
 
 @pytest.mark.asyncio
 async def test_tailor_end_to_end(api_client, test_db, monkeypatch):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.add(Setting(key="cv_tailor_prompt", value="p {resume_json} {job_description}"))
     test_db.add(Setting(key="tailor_auto_quick_score", value="false"))  # keep test simple
 

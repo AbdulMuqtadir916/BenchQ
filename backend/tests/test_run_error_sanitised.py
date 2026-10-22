@@ -68,9 +68,8 @@ def test_finishing_a_run_stores_the_sanitised_text(test_db, monkeypatch):
 
 def test_the_history_endpoint_never_returns_a_stored_driver_error(api_client, test_db):
     """Rows written before the sanitiser landed must still come back clean."""
-    from backend.models.db import JobRun, Setting
+    from backend.models.db import JobRun
 
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.add(JobRun(job_type="scrape_all", trigger="scheduler", status="failed"))
     test_db.commit()
     # Write past the sanitising writer: this is what the column already holds

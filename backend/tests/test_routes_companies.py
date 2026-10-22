@@ -2,12 +2,6 @@
 import pytest
 
 
-def _seed_first_run(db):
-    from backend.models.db import Setting
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 @pytest.fixture(autouse=True)
 def _stub_h1b_background(monkeypatch):
     """Prevent real H-1B network fetches from any create/patch flow."""
@@ -31,7 +25,6 @@ def _stub_h1b_background(monkeypatch):
 
 
 def test_create_company(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.post("/api/companies", json={
         "name": "TestCoAlpha",
         "scrape_urls": ["https://nvidia.wd5.myworkdayjobs.com/CareerSite"],
@@ -45,7 +38,6 @@ def test_create_company(api_client, test_db):
 
 def test_create_company_rejects_duplicate(api_client, test_db):
     """POST with an existing name should return 409."""
-    _seed_first_run(test_db)
     from backend.models.db import Company
     test_db.add(Company(name="DupCo", scrape_urls=[]))
     test_db.commit()
@@ -58,7 +50,6 @@ def test_create_company_rejects_duplicate(api_client, test_db):
 
 
 def test_list_companies(api_client, test_db):
-    _seed_first_run(test_db)
     from backend.models.db import Company
     test_db.add(Company(name="ListedCo", scrape_urls=[]))
     test_db.commit()
@@ -73,7 +64,6 @@ def test_list_companies(api_client, test_db):
 
 
 def test_update_company(api_client, test_db):
-    _seed_first_run(test_db)
     from backend.models.db import Company
     co = Company(name="BeforeName", scrape_urls=[], tier=1)
     test_db.add(co)
@@ -90,7 +80,6 @@ def test_update_company(api_client, test_db):
 
 def test_update_company_not_found(api_client, test_db):
     """PATCH on unknown ID returns 404."""
-    _seed_first_run(test_db)
     import uuid
     resp = api_client.patch(f"/api/companies/{uuid.uuid4()}", json={"tier": 2})
     assert resp.status_code == 404

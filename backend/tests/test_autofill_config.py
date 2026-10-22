@@ -1,9 +1,7 @@
-from backend.models.db import Setting, Persona
+from backend.models.db import Persona
 
 
 def _seed(test_db):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.commit()
     from backend.seed import seed_settings, seed_persona
     seed_settings(test_db)
     seed_persona(test_db)

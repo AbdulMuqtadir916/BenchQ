@@ -1,7 +1,7 @@
 """A copy tailored from a pasted job description is still scoreable: the JD lives on the copy itself (json_data["_tailor_context"]) and the score lands on the copy (json_data["_score"]) instead of on a job's cv_scores."""
 import pytest
 
-from backend.models.db import Resume, Job, Setting
+from backend.models.db import Resume, Job
 
 
 def _seed_llm(monkeypatch, payload):
@@ -96,7 +96,6 @@ async def test_score_impl_skips_a_copy_with_neither_job_nor_jd(test_db, monkeypa
 
 
 def test_score_check_accepts_a_job_less_copy_with_a_saved_jd(api_client, test_db, monkeypatch):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     copy = _rich_copy(_tailor_context={"job_description": "Payments PM", "source": "freeform"})
     test_db.add(copy)
     test_db.commit()
@@ -118,7 +117,6 @@ def test_score_check_accepts_a_job_less_copy_with_a_saved_jd(api_client, test_db
 
 
 def test_score_check_400s_a_copy_with_neither(api_client, test_db):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     copy = _rich_copy()
     test_db.add(copy)
     test_db.commit()
@@ -130,7 +128,6 @@ def test_score_check_400s_a_copy_with_neither(api_client, test_db):
 
 def test_linked_job_path_is_unchanged(api_client, test_db, monkeypatch):
     """The Job-backed score-check still scopes to the job and passes its uuid."""
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     job = Job(external_id="rf1", content_hash="rf1c", company="Acme", title="PM",
               description="Looking for a senior PM with payments experience")
     test_db.add(job)

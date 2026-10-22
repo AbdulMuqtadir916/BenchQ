@@ -2,16 +2,8 @@
 import pytest
 
 
-def _seed_first_run(test_db):
-    """Seed an empty dashboard_api_key row so the auth middleware allows requests (first-run mode)."""
-    from backend.models.db import Setting
-    test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.commit()
-
-
 def test_linkedin_import_empty_ids(api_client, test_db):
     """Empty list -> 200 with accepted=0; no background task dispatched."""
-    _seed_first_run(test_db)
     resp = api_client.post("/api/jobs/linkedin-import", json={"linkedin_ids": []})
     assert resp.status_code == 200
     data = resp.json()
@@ -20,7 +12,6 @@ def test_linkedin_import_empty_ids(api_client, test_db):
 
 def test_linkedin_import_dispatches_via_launch_background(api_client, test_db, monkeypatch):
     """Non-empty IDs -> background task launched via launch_background, not bare create_task."""
-    _seed_first_run(test_db)
     launched = []
 
     def fake_launch(job_type, coro_func, *args, **kwargs):
@@ -59,7 +50,6 @@ def test_linkedin_import_dispatches_via_launch_background(api_client, test_db, m
 
 def test_linkedin_import_returns_run_id(api_client, test_db, monkeypatch):
     """Response should include run_id so callers can poll progress."""
-    _seed_first_run(test_db)
 
     monkeypatch.setattr(
         "backend.job_monitor.launch_background",

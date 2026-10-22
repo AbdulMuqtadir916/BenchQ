@@ -8,7 +8,6 @@ from backend.models.db import Setting, Resume, Job
 
 
 def _seed(test_db):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.add(Setting(key="cv_tailor_prompt", value="p {resume_json} {job_description}"))
 
 

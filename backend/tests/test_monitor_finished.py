@@ -1,13 +1,8 @@
 """GET /api/monitor/finished — recently-finished per-job runs, with status; lets the dashboard resolve OK/NOK using the run's actual status, which can't be inferred from job fields for re-runs."""
 import uuid
 from datetime import datetime, timezone, timedelta
-from backend.models.db import Job, Setting, JobRun
+from backend.models.db import Job, JobRun
 from backend.tests.r4_support import make_job
-
-
-def _seed(test_db):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.commit()
 
 
 def _run(test_db, job_id, job_type, status, finished_at):
@@ -21,7 +16,6 @@ def _run(test_db, job_id, job_type, status, finished_at):
 
 
 def test_finished_reports_status_by_job(api_client, test_db):
-    _seed(test_db)
     job_a = uuid.uuid4()
     now = datetime.now(timezone.utc)
     _run(test_db, job_a, "tailor_resume", "completed", now)
@@ -35,7 +29,6 @@ def test_finished_reports_status_by_job(api_client, test_db):
 
 
 def test_finished_excludes_still_running(api_client, test_db):
-    _seed(test_db)
     job_a = uuid.uuid4()
     _run(test_db, job_a, "tailor_resume", "running", None)
     resp = api_client.get(f"/api/monitor/finished?job_ids={job_a}")
@@ -43,7 +36,6 @@ def test_finished_excludes_still_running(api_client, test_db):
 
 
 def test_finished_filters_by_job_ids(api_client, test_db):
-    _seed(test_db)
     job_a, job_b = uuid.uuid4(), uuid.uuid4()
     now = datetime.now(timezone.utc)
     _run(test_db, job_a, "tailor_resume", "completed", now)
@@ -53,7 +45,6 @@ def test_finished_filters_by_job_ids(api_client, test_db):
 
 
 def test_finished_filters_by_since(api_client, test_db):
-    _seed(test_db)
     job_a = uuid.uuid4()
     now = datetime.now(timezone.utc)
     _run(test_db, job_a, "tailor_resume", "completed", now - timedelta(minutes=10))

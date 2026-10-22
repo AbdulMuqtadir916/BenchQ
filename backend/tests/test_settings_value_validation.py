@@ -9,12 +9,6 @@ from backend.seed import (
 )
 
 
-def _seed_first_run(db):
-    """Empty dashboard_api_key means first-run mode, so the auth middleware lets the TestClient through."""
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 needs_container = pytest.mark.skipif(
     importlib.util.find_spec("apscheduler") is None,
     reason="imports backend.main (apscheduler) — run in the container",
@@ -153,7 +147,6 @@ def test_all_offenders_listed_in_one_pass():
 
 @needs_container
 def test_patch_rejects_non_integer_interval(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"scrape_interval_minutes": "abc"})
     assert resp.status_code == 400
     assert "scrape_interval_minutes" in resp.json()["detail"]
@@ -163,7 +156,6 @@ def test_patch_rejects_non_integer_interval(api_client, test_db):
 
 @needs_container
 def test_patch_rejects_negative_integer(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"job_archive_after_days": -3})
     assert resp.status_code == 400
     assert "must not be negative" in resp.json()["detail"]
@@ -171,7 +163,6 @@ def test_patch_rejects_negative_integer(api_client, test_db):
 
 @needs_container
 def test_patch_rejects_bad_cron(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"backup_cron": "0 3 * *"})
     assert resp.status_code == 400
     assert "backup_cron" in resp.json()["detail"]
@@ -179,7 +170,6 @@ def test_patch_rejects_bad_cron(api_client, test_db):
 
 @needs_container
 def test_patch_rejects_unknown_enum(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"scoring_default_depth": "deep"})
     assert resp.status_code == 400
     assert "scoring_default_depth" in resp.json()["detail"]
@@ -187,7 +177,6 @@ def test_patch_rejects_unknown_enum(api_client, test_db):
 
 @needs_container
 def test_patch_lists_every_invalid_key_in_one_message(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={
         "scrape_interval_minutes": "abc",
         "backup_cron": "nope",
@@ -204,7 +193,6 @@ def test_patch_lists_every_invalid_key_in_one_message(api_client, test_db):
 
 @needs_container
 def test_patch_accepts_valid_values(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={
         "scrape_interval_minutes": "15",
         "backup_cron": "0 3 * * *",
@@ -218,7 +206,6 @@ def test_patch_accepts_valid_values(api_client, test_db):
 @needs_container
 def test_patch_ignores_the_redacted_placeholder(api_client, test_db):
     """A GET returns '••••••' for secrets; PATCHing that back must not be validated or written as a real value."""
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"llm_api_key": "•" * 6})
     assert resp.status_code == 200
     assert resp.json()["updated"] == []

@@ -2,14 +2,12 @@
 import uuid
 from unittest.mock import patch
 import pytest
-from backend.models.db import Job, Setting
+from backend.models.db import Job
 
 
 @pytest.mark.asyncio
 async def test_analyze_endpoint_threads_target_job_id(test_db, api_client):
     """After POST, /api/monitor/in-flight?job_ids=<id> should return [analyze_job] for that job."""
-    # First-run mode: empty dashboard_api_key → no auth required.
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     job = Job(id=uuid.uuid4(), title="PM", company="Acme",
               description="Looking for a PM", external_id="ext-target-test")
     test_db.add(job)

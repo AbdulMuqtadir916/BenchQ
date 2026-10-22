@@ -47,7 +47,6 @@ async def test_tailor_endpoint_returns_202_with_run_id(api_client, test_db, monk
     from backend.models.db import Resume, Job
     import uuid as _uuid
 
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.add(Setting(key="cv_tailor_prompt", value="prompt {resume_json} {job_description}"))
     test_db.add(Setting(key="tailor_auto_quick_score", value="false"))
 
@@ -84,7 +83,6 @@ async def test_tailor_creates_job_run_with_target_job_id(api_client, test_db, mo
     """Launched JobRun has target_job_id set to the Job we're tailoring for."""
     from backend.models.db import Resume, Job, JobRun
 
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.add(Setting(key="cv_tailor_prompt", value="prompt {resume_json} {job_description}"))
     test_db.add(Setting(key="tailor_auto_quick_score", value="false"))
 
