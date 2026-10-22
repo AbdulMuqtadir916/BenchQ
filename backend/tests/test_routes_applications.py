@@ -7,13 +7,6 @@ from backend.api.routes_applications import (
 )
 
 
-def _seed_first_run(test_db):
-    """Seed an empty dashboard_api_key row so the auth middleware allows requests (first-run mode)."""
-    from backend.models.db import Setting
-    test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.commit()
-
-
 @pytest.fixture(autouse=True)
 def _stub_background_tasks(monkeypatch):
     """Stub slow / network-hitting background work so tests are fast + isolated."""
@@ -44,7 +37,6 @@ def _stub_background_tasks(monkeypatch):
 
 def test_create_application_returns_id(api_client, test_db):
     """POST /api/applications with valid body → 200 + id."""
-    _seed_first_run(test_db)
     resp = api_client.post("/api/applications", json={
         "company": "Acme",
         "title": "Senior Product Manager",
@@ -59,7 +51,6 @@ def test_create_application_returns_id(api_client, test_db):
 
 def test_create_application_dedups_by_url(api_client, test_db):
     """Same URL with different UTM params → single Job row (external_id collision)."""
-    _seed_first_run(test_db)
     api_client.post("/api/applications", json={
         "company": "Acme",
         "title": "Senior PM",
@@ -80,7 +71,6 @@ def test_create_application_dedups_by_url(api_client, test_db):
 
 def test_create_application_auto_creates_company(api_client, test_db):
     """POST with an unknown company name → Company row auto-created."""
-    _seed_first_run(test_db)
     api_client.post("/api/applications", json={
         "company": "NewCoTestAbc",
         "title": "Senior PM",
@@ -94,7 +84,6 @@ def test_create_application_auto_creates_company(api_client, test_db):
 
 def test_patch_application_status_records_transition(api_client, test_db):
     """PATCH status → Application.status_transitions has an entry with source='ui'."""
-    _seed_first_run(test_db)
     created = api_client.post("/api/applications", json={
         "company": "Acme",
         "title": "Senior PM",
@@ -117,7 +106,6 @@ def test_patch_application_status_records_transition(api_client, test_db):
 
 def test_list_applications_filters_by_status(api_client, test_db):
     """GET /api/applications?status=rejected returns only rejected apps."""
-    _seed_first_run(test_db)
     api_client.post("/api/applications", json={
         "company": "Acme",
         "title": "PM1",
@@ -143,7 +131,6 @@ def test_list_applications_filters_by_status(api_client, test_db):
 
 def test_create_application_twice_returns_409(api_client, test_db):
     """A second POST for the same posting must not overwrite the first."""
-    _seed_first_run(test_db)
     body = {"company": "Acme", "title": "PM", "url": "https://acme.example/jobs/1", "notes": "first"}
     first = api_client.post("/api/applications", json=body)
     assert first.status_code == 200
@@ -167,7 +154,6 @@ def test_log_schedules_a_description_fetch(api_client, test_db, monkeypatch):
     async def _spy(job_id, url):
         seen.append((job_id, url))
 
-    _seed_first_run(test_db)
     monkeypatch.setattr(ra, "_fetch_and_store_description", _spy, raising=False)
     resp = api_client.post("/api/applications", json={
         "url": "https://acme.com/jobs/7", "title": "Senior PM", "company": "Acme"})
@@ -194,7 +180,6 @@ def test_log_skips_the_fetch_when_the_job_already_has_a_description(api_client, 
     async def _spy(job_id, url):
         seen.append(job_id)
 
-    _seed_first_run(test_db)
     monkeypatch.setattr(ra, "_fetch_and_store_description", _spy, raising=False)
     resp = api_client.post("/api/applications", json={
         "url": url, "title": "Senior PM", "company": "Acme"})

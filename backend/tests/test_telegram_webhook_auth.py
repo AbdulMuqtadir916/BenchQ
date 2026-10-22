@@ -2,12 +2,6 @@
 from backend.models.db import Setting
 
 
-def _seed_first_run(test_db):
-    """Empty dashboard_api_key → first-run auth bypass for admin endpoints."""
-    test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.commit()
-
-
 def _seed_secret(test_db, value: str):
     test_db.add(Setting(key="telegram_webhook_secret", value=value, description="x"))
     test_db.commit()
@@ -76,7 +70,6 @@ def test_webhook_accepts_correct_header(api_client, test_db, monkeypatch):
 
 def test_rotate_webhook_secret_changes_value(api_client, test_db):
     """POST /api/telegram/rotate-webhook-secret returns a new value + persists it."""
-    _seed_first_run(test_db)
     _seed_secret(test_db, "old-secret")
     resp = api_client.post("/api/telegram/rotate-webhook-secret")
     assert resp.status_code == 200
@@ -91,7 +84,6 @@ def test_rotate_webhook_secret_changes_value(api_client, test_db):
 
 def test_register_webhook_rejects_non_https(api_client, test_db):
     """register-webhook must reject http:// — Telegram only accepts https."""
-    _seed_first_run(test_db)
     _seed_secret(test_db, "abc")
     resp = api_client.post(
         "/api/telegram/register-webhook",

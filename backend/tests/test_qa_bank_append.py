@@ -1,9 +1,8 @@
 """POST /api/persona/qa-bank — flywheel save."""
-from backend.models.db import Setting, Persona
+from backend.models.db import Persona
 
 
 def _seed(test_db):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.add(Persona(id=1, qa_bank=[{"question": "Why fintech?", "answer": "Payments."}]))
     test_db.commit()
 

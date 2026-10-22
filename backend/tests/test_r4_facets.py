@@ -7,12 +7,6 @@ a selected company can still be swapped for another one.
 from urllib.parse import quote
 
 
-def _seed_first_run(db):
-    from backend.models.db import Setting
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 def _seed_jobs(db):
     """Acme has one new + one saved job, Beta one new, Gamma one skipped."""
     from backend.models.db import Job
@@ -40,7 +34,6 @@ def _by_name(rows):
 
 
 def test_facets_unfiltered_lists_every_dimension(api_client, test_db):
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     data = api_client.get("/api/jobs/facets").json()
     assert _by_name(data["companies"]) == {"Acme": 2, "Beta Corp": 1, "Gamma Inc": 1}
@@ -53,7 +46,6 @@ def test_facets_unfiltered_lists_every_dimension(api_client, test_db):
 
 def test_status_new_narrows_companies_and_sources(api_client, test_db):
     """The bug: with Status = New the Company/Source menus still listed everything."""
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     data = api_client.get("/api/jobs/facets?status=new").json()
     assert _by_name(data["companies"]) == {"Acme": 1, "Beta Corp": 1}
@@ -66,7 +58,6 @@ def test_status_new_narrows_companies_and_sources(api_client, test_db):
 
 def test_default_open_set_semantics(api_client, test_db):
     """The feed's default view sends status=new,saved — facets must scope to it."""
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     data = api_client.get("/api/jobs/facets?status=new,saved").json()
     assert _by_name(data["companies"]) == {"Acme": 2, "Beta Corp": 1}
@@ -75,7 +66,6 @@ def test_default_open_set_semantics(api_client, test_db):
 
 def test_selected_company_still_lists_the_others(api_client, test_db):
     """A dimension never filters itself, so you can switch companies while one is picked."""
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     data = api_client.get("/api/jobs/facets?company=Acme").json()
     companies = _by_name(data["companies"])
@@ -86,7 +76,6 @@ def test_selected_company_still_lists_the_others(api_client, test_db):
 
 
 def test_selected_source_still_lists_the_others(api_client, test_db):
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     data = api_client.get("/api/jobs/facets?source=playwright_url").json()
     assert _by_name(data["sources"]) == {"jobspy_linkedin": 1, "jobspy_indeed": 2, "playwright_url": 1}
@@ -95,7 +84,6 @@ def test_selected_source_still_lists_the_others(api_client, test_db):
 
 def test_selected_value_that_no_longer_matches_stays_at_zero(api_client, test_db):
     """Gamma Inc has only a skipped job: under Status = New it stays listed, at 0."""
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     data = api_client.get(f"/api/jobs/facets?status=new&company={quote('Gamma Inc')}").json()
     assert _by_name(data["companies"])["Gamma Inc"] == 0
@@ -107,7 +95,6 @@ def test_selected_value_that_no_longer_matches_stays_at_zero(api_client, test_db
 
 def test_facet_counts_match_the_list_totals(api_client, test_db):
     """Every facet count is the `total` GET /jobs reports for that same filter set."""
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     base = "status=new,saved"
     data = api_client.get(f"/api/jobs/facets?{base}").json()
@@ -119,7 +106,6 @@ def test_facet_counts_match_the_list_totals(api_client, test_db):
 
 
 def test_facets_honour_title_search_and_salary(api_client, test_db):
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     data = api_client.get("/api/jobs/facets?title_search=Engineer").json()
     assert _by_name(data["companies"]) == {"Acme": 1}
@@ -129,7 +115,6 @@ def test_facets_honour_title_search_and_salary(api_client, test_db):
 def test_company_aliases_collapse_onto_the_parent(api_client, test_db):
     """A job filed under an alias counts towards the canonical company, as in /jobs/companies/list."""
     from backend.models.db import Company, Job
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     test_db.add(Company(name="Acme", aliases=["Acme Labs"]))
     test_db.add(Job(external_id="f5", content_hash="fh5", company="Acme Labs", title="Researcher",

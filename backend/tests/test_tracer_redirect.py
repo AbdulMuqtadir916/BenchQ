@@ -3,15 +3,8 @@ import uuid
 import pytest
 
 
-def _seed_first_run(db):
-    from backend.models.db import Setting
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 def test_tracer_redirect_succeeds_normally(api_client, test_db):
     """Happy path: valid token -> 302 to destination URL + click recorded."""
-    _seed_first_run(test_db)
     from backend.models.db import Resume, TracerLink
     resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
@@ -90,16 +83,12 @@ def test_tracer_redirect_param_style_needs_no_session(anonymous_client, test_db)
 
 def test_root_without_cv_is_not_a_tracer(api_client, test_db):
     """Bare root path (no ?cv) must not be treated as a tracer redirect."""
-    from backend.models.db import Setting
-    test_db.add(Setting(key="dashboard_api_key", value=""))  # first-run: middleware allows /
-    test_db.commit()
     resp = api_client.get("/", follow_redirects=False)
     assert resp.status_code == 404
 
 
 def test_tracer_redirect_survives_commit_failure(api_client, test_db, monkeypatch):
     """A commit failure in click-log must NOT break the 302 redirect."""
-    _seed_first_run(test_db)
     from backend.models.db import Resume, TracerLink
     resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)

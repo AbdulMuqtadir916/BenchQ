@@ -1,10 +1,5 @@
 """Company aliases collapse in filter list + expand in filter application (#aliases)."""
-from backend.models.db import Company, Job, Setting
-
-
-def _seed_first_run(test_db):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.commit()
+from backend.models.db import Company, Job
 
 
 def _seed_amazon_with_aliases(test_db):
@@ -23,7 +18,6 @@ def _seed_amazon_with_aliases(test_db):
 
 def test_companies_list_collapses_aliases(api_client, test_db):
     """Three jobs under three Amazon aliases -> /api/jobs/companies/list returns just 'Amazon'."""
-    _seed_first_run(test_db)
     _seed_amazon_with_aliases(test_db)
     test_db.add_all([
         Job(external_id="a1", content_hash="ah1", company="Amazon", title="PM", status="new"),
@@ -39,7 +33,6 @@ def test_companies_list_collapses_aliases(api_client, test_db):
 
 def test_companies_list_passes_orphans_through(api_client, test_db):
     """A job with a company that has no Company record stays as its raw name."""
-    _seed_first_run(test_db)
     _seed_amazon_with_aliases(test_db)
     test_db.add_all([
         Job(external_id="o1", content_hash="oh1", company="Amazon", title="PM", status="new"),
@@ -53,7 +46,6 @@ def test_companies_list_passes_orphans_through(api_client, test_db):
 
 def test_jobs_filter_expands_aliases(api_client, test_db):
     """company=Amazon should match jobs whose raw Job.company is 'Audible' or 'AWS'."""
-    _seed_first_run(test_db)
     _seed_amazon_with_aliases(test_db)
     test_db.add_all([
         Job(external_id="f1", content_hash="fh1", company="Amazon", title="PM", status="new"),
@@ -71,8 +63,7 @@ def test_jobs_filter_expands_aliases(api_client, test_db):
 
 def test_update_application_returns_canonical_company(api_client, test_db):
     """PATCH /api/applications/{id} response should include canonical company name when alias matched."""
-    from backend.models.db import Company, Job, Application, Setting
-    test_db.add(Setting(key="dashboard_api_key", value=""))
+    from backend.models.db import Company, Job, Application
     test_db.add(Company(
         name="Amazon",
         tier=1,

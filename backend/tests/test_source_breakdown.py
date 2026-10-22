@@ -49,13 +49,6 @@ def _row(site, title, company, url):
     }
 
 
-def _first_run_auth(db):
-    """Empty dashboard_api_key triggers the middleware's first-run bypass, so endpoint tests exercise the serializer, not the 401."""
-    from backend.models.db import Setting
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 def _search(db, sources):
     s = Search(name="ZZ Search", search_mode="keyword", active=True, sources=sources,
                search_term="program manager", title_include_keywords=[],
@@ -610,7 +603,6 @@ def test_search_dict_exposes_last_source_errors(test_db):
 
 def test_scrape_log_endpoint_serializes_source_breakdown(test_db, api_client):
     """The run-history endpoint has to carry the per-board outcome — a populated row is still useless if the endpoint drops the column on the way out."""
-    _first_run_auth(test_db)
     search = _search(test_db, ["indeed", "zip_recruiter"])
     test_db.add(ScrapeLog(
         search_id=search.id, source="jobspy", jobs_found=9, new_jobs=0,
@@ -627,7 +619,6 @@ def test_scrape_log_endpoint_serializes_source_breakdown(test_db, api_client):
 
 
 def test_scrape_log_endpoint_source_breakdown_is_null_when_absent(test_db, api_client):
-    _first_run_auth(test_db)
     search = _search(test_db, ["indeed"])
     test_db.add(ScrapeLog(search_id=search.id, source="jobspy", jobs_found=1, new_jobs=1,
                           is_warning=False, duration_seconds=1.0))

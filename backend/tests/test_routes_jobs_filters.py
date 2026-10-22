@@ -2,12 +2,6 @@
 import pytest
 
 
-def _seed_first_run(db):
-    from backend.models.db import Setting
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 def _seed_jobs(db):
     """Add 3 jobs with varied attributes."""
     from backend.models.db import Job
@@ -41,7 +35,6 @@ def _seed_jobs(db):
 
 
 def test_list_jobs_filters_by_status(api_client, test_db):
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     resp = api_client.get("/api/jobs?status=saved")
     assert resp.status_code == 200
@@ -52,7 +45,6 @@ def test_list_jobs_filters_by_status(api_client, test_db):
 
 
 def test_list_jobs_filters_by_company_single(api_client, test_db):
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     resp = api_client.get("/api/jobs?company=Acme")
     data = resp.json()
@@ -63,7 +55,6 @@ def test_list_jobs_filters_by_company_single(api_client, test_db):
 
 def test_list_jobs_filters_by_min_score(api_client, test_db):
     """best_cv_score column makes this SQLite-portable."""
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     resp = api_client.get("/api/jobs?min_score=70")
     data = resp.json()
@@ -74,7 +65,6 @@ def test_list_jobs_filters_by_min_score(api_client, test_db):
 
 
 def test_list_jobs_filters_by_title_search(api_client, test_db):
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     resp = api_client.get("/api/jobs?title_search=Senior")
     data = resp.json()
@@ -84,7 +74,6 @@ def test_list_jobs_filters_by_title_search(api_client, test_db):
 
 
 def test_list_jobs_filters_by_source(api_client, test_db):
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     resp = api_client.get("/api/jobs?source=jobspy_linkedin")
     data = resp.json()
@@ -94,7 +83,6 @@ def test_list_jobs_filters_by_source(api_client, test_db):
 
 def test_list_jobs_sort_by_score(api_client, test_db):
     """sort_by=score descends on best_cv_score with NULLs last; asserting order on the response's best_score (mirrors best_cv_score here) validates the ORDER BY."""
-    _seed_first_run(test_db)
     _seed_jobs(test_db)
     resp = api_client.get("/api/jobs?sort_by=score")
     data = resp.json()

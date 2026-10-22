@@ -9,12 +9,6 @@ from backend.seed import (
 )
 
 
-def _seed_first_run(db):
-    """Empty dashboard_api_key = first-run mode, so the auth middleware lets the TestClient through."""
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 needs_container = pytest.mark.skipif(
     importlib.util.find_spec("apscheduler") is None,
     reason="imports backend.main (apscheduler) — run in the container",
@@ -39,7 +33,6 @@ def test_runtime_keys_are_not_duplicated_in_defaults():
 
 @needs_container
 def test_patch_rejects_unknown_key(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"not_a_real_setting": "x"})
     assert resp.status_code == 400
     assert "Unknown setting: not_a_real_setting" in resp.json()["detail"]
@@ -48,7 +41,6 @@ def test_patch_rejects_unknown_key(api_client, test_db):
 
 @needs_container
 def test_patch_lists_all_unknown_keys_in_one_message(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"bogus_b": 1, "bogus_a": 2,
                                                    "scrape_interval_minutes": "15"})
     assert resp.status_code == 400
@@ -60,7 +52,6 @@ def test_patch_lists_all_unknown_keys_in_one_message(api_client, test_db):
 
 @needs_container
 def test_patch_accepts_seeded_key(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"scrape_interval_minutes": "15"})
     assert resp.status_code == 200
     assert resp.json()["updated"] == ["scrape_interval_minutes"]
@@ -70,7 +61,6 @@ def test_patch_accepts_seeded_key(api_client, test_db):
 
 @needs_container
 def test_patch_accepts_runtime_only_key(api_client, test_db):
-    _seed_first_run(test_db)
     resp = api_client.patch("/api/settings", json={"gmail_processed_ids": ["a", "b"]})
     assert resp.status_code == 200
     assert resp.json()["updated"] == ["gmail_processed_ids"]

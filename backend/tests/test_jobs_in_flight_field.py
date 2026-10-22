@@ -3,12 +3,11 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
-from backend.models.db import Setting, Job
+from backend.models.db import Job
 
 
 def test_list_jobs_includes_in_flight_for_running_ops(api_client, test_db, monkeypatch):
     """Job with running tailor op → in_flight:['tailor_resume'] in list response."""
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     job = Job(external_id="lf1", content_hash="lf1", company="Acme", title="PM", status="new")
     test_db.add(job)
     test_db.commit()
@@ -34,7 +33,6 @@ def test_list_jobs_includes_in_flight_for_running_ops(api_client, test_db, monke
 
 
 def test_list_jobs_in_flight_defaults_to_empty(api_client, test_db, monkeypatch):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     job = Job(external_id="lf2", content_hash="lf2", company="Acme", title="PM", status="new")
     test_db.add(job)
     test_db.commit()

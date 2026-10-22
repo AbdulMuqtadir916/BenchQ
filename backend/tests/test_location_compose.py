@@ -44,13 +44,6 @@ def _record_kwargs(monkeypatch, calls):
     monkeypatch.setattr(jobspy, "scrape_jobs", scrape_jobs)
 
 
-def _first_run_auth(db):
-    """Empty dashboard_api_key triggers the middleware's first-run bypass."""
-    from backend.models.db import Setting
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 # ── the composition ──────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("location,country,expected", [
@@ -124,7 +117,6 @@ def test_the_scraper_and_the_test_preview_send_the_same_location(
     """One composition, two callers. This test fails if either side drifts."""
     from backend.scraper.sources.jobspy import _run_sync
 
-    _first_run_auth(test_db)
     search = _search(test_db, location=location, country=country)
 
     calls = []
@@ -381,7 +373,6 @@ def test_create_rejects_a_location_that_names_another_country(api_client, test_d
     """The pair used to fail loudly: Indeed answered zero rows and the health
     check raised a warning. Composed, it becomes a silent wrong-country scrape,
     so the API refuses it instead of choosing a side for the user."""
-    _first_run_auth(test_db)
     resp = api_client.post("/api/searches",
                            json=_payload(location="Toronto, Canada", country="usa"))
 
@@ -392,7 +383,6 @@ def test_create_rejects_a_location_that_names_another_country(api_client, test_d
 
 def test_create_rejects_a_location_that_is_another_country(api_client, test_db):
     """The case the composition would otherwise swallow whole: the text vanishes."""
-    _first_run_auth(test_db)
     resp = api_client.post("/api/searches",
                            json=_payload(location="Canada", country="usa"))
     assert resp.status_code == 400, f"Unexpected {resp.status_code}: {resp.text}"
@@ -407,14 +397,12 @@ def test_create_rejects_a_location_that_is_another_country(api_client, test_db):
 ])
 def test_create_accepts_a_location_that_does_not_disagree(api_client, test_db,
                                                           location, country):
-    _first_run_auth(test_db)
     resp = api_client.post("/api/searches",
                            json=_payload(location=location, country=country))
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
 
 
 def test_patch_rejects_a_location_that_contradicts_the_stored_country(api_client, test_db):
-    _first_run_auth(test_db)
     search = _search(test_db, location="Austin", country="usa")
 
     resp = api_client.patch(f"/api/searches/{search.id}",
@@ -427,7 +415,6 @@ def test_patch_rejects_a_location_that_contradicts_the_stored_country(api_client
 
 def test_patch_rejects_a_country_that_contradicts_the_stored_location(api_client, test_db):
     """The same pair, reached from the other field."""
-    _first_run_auth(test_db)
     search = _search(test_db, location="Toronto, Canada", country="canada")
 
     resp = api_client.patch(f"/api/searches/{search.id}", json={"country": "usa"})
@@ -439,7 +426,6 @@ def test_patch_rejects_a_country_that_contradicts_the_stored_location(api_client
 
 def test_patch_accepts_the_pair_when_both_fields_move_together(api_client, test_db):
     """Changing both at once is how a user moves a search to another country."""
-    _first_run_auth(test_db)
     search = _search(test_db, location="Toronto, Canada", country="canada")
 
     resp = api_client.patch(f"/api/searches/{search.id}",
@@ -452,7 +438,6 @@ def test_patch_accepts_the_pair_when_both_fields_move_together(api_client, test_
 
 def test_patch_leaves_the_pair_alone_when_neither_field_moves(api_client, test_db):
     """A legacy row stays editable: renaming it must not fail on its own text."""
-    _first_run_auth(test_db)
     search = _search(test_db, location="Toronto, Canada", country="usa")
 
     resp = api_client.patch(f"/api/searches/{search.id}", json={"name": "Renamed"})
@@ -538,7 +523,6 @@ def test_a_new_jobright_search_sends_no_location(api_client, test_db, monkeypatc
     import asyncio
     from backend.scraper.sources import jobright
 
-    _first_run_auth(test_db)
     resp = api_client.post("/api/searches", json={
         "name": "New jobright", "search_mode": "jobright", "search_term": "program manager",
     })

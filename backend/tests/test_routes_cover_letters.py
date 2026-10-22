@@ -6,7 +6,6 @@ from backend.models.db import Setting, Resume, Job
 
 
 def _seed_first_run(db):
-    db.add(Setting(key="dashboard_api_key", value=""))
     db.add(Setting(key="cover_letter_prompt", value="Voice {voice_instruction} Len {length_instruction} JD {job_description}"))
     db.commit()
 

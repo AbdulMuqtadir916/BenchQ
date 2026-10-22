@@ -5,7 +5,6 @@ from backend.models.db import Setting, Job
 
 
 def _seed(test_db, on_save="light"):
-    test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.add(Setting(key="on_save_action", value=on_save))
     test_db.commit()
 

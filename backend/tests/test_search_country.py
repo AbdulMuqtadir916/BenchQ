@@ -46,13 +46,6 @@ def _with_null_country(db, search):
     return search
 
 
-def _first_run_auth(db):
-    """Empty dashboard_api_key triggers the middleware's first-run bypass."""
-    from backend.models.db import Setting
-    db.add(Setting(key="dashboard_api_key", value=""))
-    db.commit()
-
-
 # ── the scraper hands the search's own country to jobspy ─────────────────────
 
 @pytest.mark.parametrize("stored,expected", [
@@ -87,7 +80,6 @@ def test_country_indeed_is_not_a_constant(test_db, monkeypatch):
 
 def test_test_preview_sends_the_search_country(api_client, test_db, monkeypatch):
     """The /test preview built the same kwargs dict and carried the same literal."""
-    _first_run_auth(test_db)
     search = _search(test_db, location="Toronto, Canada", country="canada")
 
     calls = []
@@ -107,7 +99,6 @@ def _payload(**kw):
 
 
 def test_create_rejects_an_unknown_country(api_client, test_db):
-    _first_run_auth(test_db)
     resp = api_client.post("/api/searches", json=_payload(country="Atlantis"))
     assert resp.status_code == 400, f"Unexpected {resp.status_code}: {resp.text}"
     assert "Atlantis" in resp.json()["detail"]
@@ -115,7 +106,6 @@ def test_create_rejects_an_unknown_country(api_client, test_db):
 
 def test_create_stores_the_canonical_spelling(api_client, test_db):
     """jobspy accepts several aliases per country; one of them is stored."""
-    _first_run_auth(test_db)
     resp = api_client.post("/api/searches", json=_payload(country="United States"))
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
     assert resp.json()["country"] == "usa"
@@ -126,14 +116,12 @@ def test_create_stores_the_canonical_spelling(api_client, test_db):
 
 
 def test_create_defaults_to_usa(api_client, test_db):
-    _first_run_auth(test_db)
     resp = api_client.post("/api/searches", json=_payload())
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
     assert resp.json()["country"] == "usa"
 
 
 def test_patch_rejects_an_unknown_country(api_client, test_db):
-    _first_run_auth(test_db)
     search = _search(test_db, country="usa")
     resp = api_client.patch(f"/api/searches/{search.id}", json={"country": "Narnia"})
     assert resp.status_code == 400, f"Unexpected {resp.status_code}: {resp.text}"
@@ -143,7 +131,6 @@ def test_patch_rejects_an_unknown_country(api_client, test_db):
 
 
 def test_patch_accepts_a_known_country(api_client, test_db):
-    _first_run_auth(test_db)
     search = _search(test_db, country="usa")
     resp = api_client.patch(f"/api/searches/{search.id}", json={"country": "Canada"})
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
@@ -151,7 +138,6 @@ def test_patch_accepts_a_known_country(api_client, test_db):
 
 
 def test_countries_endpoint_lists_the_library_names(api_client, test_db):
-    _first_run_auth(test_db)
     resp = api_client.get("/api/searches/countries")
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
     rows = resp.json()
