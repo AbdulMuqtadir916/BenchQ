@@ -21,9 +21,8 @@ mapping needs a product decision, stop and ask.
 "Known setup pitfalls" in `00-foundation.md`).
 
 ```bash
-# 1. Get the code. All integration work starts from the main branch.
+# 1. Get the code. All work starts from the main branch (the default after cloning).
 git clone https://github.com/samad-012/BenchQ.git && cd BenchQ
-git checkout codex/json-data-migration
 
 # 2. Frontend dependencies
 nvm use                      # reads .nvmrc (Node 22)
@@ -54,10 +53,10 @@ pnpm dev                                 # http://localhost:3000
 1. Choose the next free track on the [module board](#module-board) — respect **Depends on** — and
    put your name in **Owner**.
 2. Read that module's file end to end.
-3. Create your branch from `codex/json-data-migration`: `git checkout -b integrate/<module>`.
+3. Create your branch from `main`: `git checkout -b integrate/<module>`.
 4. Follow [the workflow for one module](#the-workflow-for-one-module). If you use Claude, start it
    with the prompt in [Briefing a Claude session](#briefing-a-claude-session).
-5. Open your PR **into `codex/json-data-migration`**.
+5. Open your PR **into `main`**.
 
 Until foundation step F5 lands, the database starts empty apart from a few seeded companies; add data
 through the backend's API docs at `http://localhost:8000/docs`. After F5, `backend/scripts/seed_demo.py`
@@ -183,7 +182,7 @@ schemas reject both. Declare every backend timestamp as `z.string()` and convert
 
 ## The workflow for one module
 
-1. **Branch** `integrate/<module>` from `codex/json-data-migration`.
+1. **Branch** `integrate/<module>` from `main`.
 2. **Run both apps** (see "Running locally" below) and confirm `GET /health` through the proxy.
 3. **Capture real responses** from the backend for each endpoint you need, by browser or
    `curl -b cookies.txt`, and save them to `src/lib/api/dto/__samples__/<module>.json`. Trim to a few
@@ -328,7 +327,7 @@ instead of in the container, set `TEST_DATABASE_URL=postgresql://jobnavigator:pa
 A test that needs a row another table points to (a `Job` for `job_runs.target_job_id`, a `Search` for
 `scrape_log.search_id`) must create it first: the foreign keys are real now (`tests/r4_support.make_job`).
 CI (`.github/workflows/ci.yml`) runs the same command, plus the frontend's typecheck, lint, test and build,
-on every PR into `codex/json-data-migration`. Run them locally before you open one.
+on every PR into `main`. Run them locally before you open one.
 
 ---
 
