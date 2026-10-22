@@ -23,6 +23,7 @@ switches it to the backend. **Integrating a module? Start at
 | File | What it owns | Read it when |
 |---|---|---|
 | `CLAUDE.md` | The agent contract — scope, rules, conventions, definition of done | Every session, first |
+| `CONTRIBUTING.md` | How the team works — branches, PRs, reviews, code owners, migrations, secrets | Your first day; before your first PR |
 | `product.md` | Why it exists — the user, his night, vocabulary, constraints, judgment principles | Once per session; whenever a spec doesn't cover a case |
 | `design.md` | v3 visual language, colour, type, spacing, motion and component rules | Anything visual |
 | `docs/01-FRONTEND-ARCHITECTURE.md` | Stack, versions, folder structure, the adapter rule, routing, env | Setting up, adding a dependency, wiring data |
