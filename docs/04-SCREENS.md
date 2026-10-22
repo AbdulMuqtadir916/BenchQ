@@ -236,10 +236,10 @@ behind, and on which candidate" in under five seconds of looking at this screen.
 
 Manager content plus placements this quarter, time-to-placement trend, cost per placement, and
 seat / usage against plan. Read-only rollups; the owner drills into the manager views for detail.
-Until firm pages can read pending invites (07 Phase M), the usage card is **"Active users"** (a count,
-no limit), never "Seats used": a seat also counts pending invites (A1), and a firm number must never
-disagree with the same number in `/admin`. Phase M makes it "Seats used x / seatLimit" from
-`deriveFirmUsage`, the function `/admin` uses.
+The usage card is **"Seats used x / seatLimit"** with the breakdown "N users + M pending": a seat is an
+active user or a pending, unexpired invite (A1). It comes from `deriveFirmUsage` on the firm's users,
+invites and candidates, the function `/admin` uses, so the firm number never disagrees with `/admin`'s
+(07 M3, asserted in `seats-agree.test.ts`). The invites query is one of the rollups group's reads.
 
 ### 3.4 VIEWER view
 
