@@ -12,7 +12,7 @@ in **Owner** on the row you take.
 
 ## Branches and pull requests
 
-- **Base branch:** `codex/json-data-migration`. Every branch starts from it, and every PR goes into it.
+- **Base branch:** `main`. Every branch starts from it, and every PR goes into it.
 - **One branch per PR, one concern per PR.** Name it `feat/…`, `fix/…`, `docs/…`, `chore/…`, or
   `integrate/<module>` for a module track.
 - **No stacked PRs.** If your work needs another open PR, wait for it to merge, then rebase onto the base
@@ -26,8 +26,10 @@ in **Owner** on the row you take.
 
 - Every PR needs **one approval** before merge.
 - Contracts, permissions, auth, models, migrations, the route registry and `.github/` are listed in
-  [`.github/CODEOWNERS`](.github/CODEOWNERS). They need a code owner's approval: **Abdul Muqtadir
-  (@AbdulMuqtadir916) is the product owner**, and @samad-012 approves PRs Abdul opened himself.
+  [`.github/CODEOWNERS`](.github/CODEOWNERS). They need the code owner's approval: **Abdul Muqtadir
+  (@AbdulMuqtadir916), the product owner and only code owner.**
+- GitHub doesn't let anyone approve their own PR. On a PR Abdul opens, a teammate reviews and approves it, and
+  Abdul merges it with the branch-protection bypass that only he has.
 - **No new entity, field or contract** without the product owner's sign-off, written into
   `docs/02-DATA-CONTRACTS.md` or `docs/07-ROUTES-AND-RBAC.md` first (CLAUDE.md, "Conventions").
 - When a doc and the code disagree, or a module file needs a product decision, stop and ask in the PR. Don't
