@@ -264,6 +264,7 @@ the backend outside Docker.
 | Backend logs | `docker compose logs -f backend` |
 | Demo accounts (local only) | `docker compose exec backend python -m backend.scripts.seed_demo`: the mocks' firms, users and invites; every account in docs/03 §3.2 signs in with `benchq-demo-2026`. `--reset` starts over. Refused when `BENCHQ_ENV` is production |
 | First Super Admin (any environment) | `docker compose exec backend python -m backend.scripts.create_platform_admin --email you@example.com --name "Your Name"` (asks for the password twice); everyone else joins by invite |
+| Reset someone's password (any environment) | `docker compose exec backend python -m backend.scripts.reset_password --email someone@example.com` (asks for the new password twice). Works for firm users and Super Admins, signs the account out everywhere and logs it. There is no self-service reset until email exists (07 Q39) |
 | Stop backend + database | `docker compose stop` (data is kept in the `pgdata` volume) |
 | Frontend | `pnpm dev`, then `http://localhost:3000/health` shows the backend's JSON |
 | Switch a module to the backend | add it to `NEXT_PUBLIC_LIVE_MODULES` in `.env.local`, restart `pnpm dev` |
