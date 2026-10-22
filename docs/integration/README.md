@@ -27,7 +27,8 @@ git checkout codex/json-data-migration
 
 # 2. Frontend dependencies
 nvm use                      # reads .nvmrc (Node 22)
-corepack enable && pnpm install
+npm i -g pnpm@12.5.1   # the version in package.json; corepack's pnpm shim breaks on 12.5.1
+pnpm install
 
 # 3. Env files (both git-ignored; the defaults work for local development)
 cp .env.example .env.local
@@ -253,7 +254,7 @@ breaks joins, unless both use the seeded ids (F5 derives backend UUIDs from the 
 
 ## Running locally
 
-**Requirements:** Node 22+ (`nvm use`), pnpm via corepack, Docker. Python 3.12 only if you run
+**Requirements:** Node 22+ (`nvm use`), pnpm 12.5.1 (`npm i -g pnpm@12.5.1`), Docker. Python 3.12 only if you run
 the backend outside Docker.
 
 | Task | Command |

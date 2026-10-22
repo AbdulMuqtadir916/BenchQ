@@ -1,5 +1,9 @@
 # Current state
 
+> **Out of date (2026-10-19, before Phase B and the backend onboarding work #29–#47).** For what is done and
+> what is next, read `CLAUDE.md` "Current phase" and the board in `docs/integration/README.md`. This snapshot is
+> regenerated at the end of the foundation.
+
 Factual snapshot of the frontend, regenerated at the end of Phase P. Read-only inventory: it
 describes the code as it is; decisions and plans live in `docs/07` and the other docs. Anything not
 confirmed is marked **(unverified)**.

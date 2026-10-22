@@ -1,5 +1,8 @@
 # plan.md — BenchQ Demo Prototype
 
+> **Archived.** The plan for the September demo prototype, kept for history. Its decisions (the role switcher,
+> heavy AI theater, no tests) no longer apply: `CLAUDE.md` and `docs/07-ROUTES-AND-RBAC.md` are current.
+
 **Goal:** a clickable, frontend-only prototype to pitch a bench-sales CEO. Every page built and
 walkable so the founder can explain the pipeline, process flow, and automation at the UI level.
 No backend — idea validation only. Depth of *feel* over depth of engineering.

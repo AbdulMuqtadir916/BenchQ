@@ -26,13 +26,13 @@ permissions must be final-shape for a **multi-tenant** product with two tiers:
 permission policy are production structure from day one. Routes, roles and permissions are owned
 by `docs/07-ROUTES-AND-RBAC.md`.
 
-**Backend integration is paused after Module 01 (ledger).** The backend is JobNavigator (FastAPI,
-Python) in `backend/`. It has per-user cookie sessions and auth on every endpoint
-(`backend/auth/access.py`, 07 Q37–Q38), but its data is not firm-scoped yet, and it has no candidates,
-evidence or claims. Modules 02–05 wait until tenancy (decisions D1/D2 in
-`docs/integration/06-open-decisions.md`) is designed, because every firm-owned record will need
-`firmId` scoping. Integration rules, when you do integration work, start at
-`docs/integration/README.md`.
+**Backend integration runs foundation first.** The backend is JobNavigator (FastAPI, Python) in `backend/`. It has
+per-user cookie sessions and auth on every endpoint (`backend/auth/access.py`, 07 Q37–Q38), but its existing data is
+not firm-scoped yet, and it has no candidates, evidence or claims. The foundation (F2b–F7 in
+`docs/integration/07-auth-and-tenancy.md` §3) comes first. The module tracks (Ledger, Jobs, Candidates, then
+Applications, Resumes, Analytics) start after it, and every firm-owned record carries `firm_id`. Integration rules,
+when you do integration work, start at `docs/integration/README.md`. How the team works (branches, reviews,
+migrations) is in `CONTRIBUTING.md`.
 
 Each data module is served either by its mock (`src/mocks/`) or by the backend, decided **only** in
 its adapter (`src/lib/api/<module>.ts`). Swapping a module to the backend must never require
