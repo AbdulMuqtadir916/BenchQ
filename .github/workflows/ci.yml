@@ -1,11 +1,11 @@
-# Checks every PR into codex/json-data-migration (handoff step 3, after F1/0002). No push trigger and no
-# pip-audit, by decision. The commands are the same ones a contributor runs locally (CLAUDE.md "Commands",
+# Checks every PR into main (named codex/json-data-migration until 2026-10-22; handoff step 3, after F1/0002).
+# No push trigger and no pip-audit, by decision. The commands are the same ones a contributor runs locally (CLAUDE.md "Commands",
 # docs/integration/README.md "Tests run on Postgres").
 name: CI
 
 on:
   pull_request:
-    branches: [codex/json-data-migration]
+    branches: [main]
 
 permissions:
   contents: read
