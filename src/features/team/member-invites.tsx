@@ -53,7 +53,8 @@ export function MemberInvites({ members }: { members: readonly User[] }) {
   if (invitesQuery.isLoading) return <SkeletonCard aria-label="Loading invites" />;
   if (invitesQuery.error) return <ErrorState error={invitesQuery.error} onRetry={() => void invitesQuery.refetch()} />;
 
-  const open = invites.filter((invite) => invite.status === "PENDING" || invite.status === "EXPIRED");
+  // Accepted ones stay listed, so the owner can tell a link was already used (07 Q38 follow-up).
+  const shown = invites.filter((invite) => invite.status !== "REVOKED");
   return (
     <Card className="p-0">
       <CardHeader className="flex-wrap items-start justify-between gap-3 p-4">
@@ -65,8 +66,8 @@ export function MemberInvites({ members }: { members: readonly User[] }) {
         </div>
         {canInvite ? <InviteMemberButton blockedReason={blocked} onSent={showLink} /> : null}
       </CardHeader>
-      {open.length === 0 ? (
-        <p className="border-t border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-3)]">No pending invites.</p>
+      {shown.length === 0 ? (
+        <p className="border-t border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-3)]">No invites yet.</p>
       ) : (
         <table className="w-full text-sm">
           <thead>
@@ -74,12 +75,12 @@ export function MemberInvites({ members }: { members: readonly User[] }) {
               <th className="px-4 py-2 font-medium">Email</th>
               <th className="px-4 py-2 font-medium">Role</th>
               <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Expires</th>
+              <th className="px-4 py-2 font-medium">Date</th>
               {canInvite ? <th className="px-4 py-2 font-medium"><span className="sr-only">Actions</span></th> : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border)]">
-            {open.map((invite) => (
+            {shown.map((invite) => (
               <tr key={invite.id}>
                 <td className="px-4 py-3">
                   <span className="text-body-strong">{invite.inviteeName ?? invite.email}</span>
@@ -87,8 +88,10 @@ export function MemberInvites({ members }: { members: readonly User[] }) {
                 </td>
                 <td className="px-4 py-3">{ROLE_LABEL[invite.role]}</td>
                 <td className="px-4 py-3"><Tag tone={STATUS_TONE[invite.status]}>{STATUS_LABEL[invite.status]}</Tag></td>
-                <td className="px-4 py-3 text-[var(--color-text-3)]"><AdminDate iso={invite.expiresAt} /></td>
-                {canInvite && invite.role !== "OWNER" ? (
+                <td className="px-4 py-3 text-[var(--color-text-3)]">
+                  {invite.status === "ACCEPTED" ? <>Sent <AdminDate iso={invite.createdAt} /></> : <>Expires <AdminDate iso={invite.expiresAt} /></>}
+                </td>
+                {canInvite && invite.role !== "OWNER" && invite.status !== "ACCEPTED" ? (
                   <td className="px-4 py-3">
                     <InviteActions invite={invite} blockedReason={invite.status === "EXPIRED" ? blocked : null} onLink={showLink} />
                   </td>

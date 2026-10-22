@@ -27,10 +27,12 @@ const INVALID = "Email or password is incorrect.";
  * auth until Phase D). On success: back to the same-origin `returnTo`, or the principal's landing.
  */
 function SignInForm() {
-  const returnTo = safeReturnTo(useSearchParams().get("returnTo"));
+  const searchParams = useSearchParams();
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
   const signIn = useSignIn(returnTo);
   const errorId = useId();
-  const [email, setEmail] = useState("");
+  // Prefilled from an accepted invite's link ("Go to sign in" on /invite/[token]).
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
 
   const handleSubmit = (event: React.FormEvent) => {
