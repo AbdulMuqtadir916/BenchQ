@@ -13,8 +13,10 @@ from fastapi.responses import HTMLResponse, Response, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from backend.models.db import get_db, Resume, TracerLink, TracerClickEvent, Setting, Job, Application, SessionLocal, utcnow, Persona
+from backend.models.db import get_db, Resume, TracerLink, TracerClickEvent, Setting, Job, Application, SessionLocal, utcnow, Persona, CoverLetter
 from backend.api._input import str_field
+from backend.auth.scoping import writer_firm_id
+from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, ModelReplyError, parse_model_json
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 
@@ -336,8 +338,13 @@ def _rewrite_urls_with_tracers(json_data: dict, resume_id: str, db,
     owner_filter = (TracerLink.cover_letter_id == cover_letter_id) if owner_is_cl \
         else (TracerLink.resume_id == resume_id)
 
+    # A link belongs to its document's firm (F2b).
+    owner_model = CoverLetter if owner_is_cl else Resume
+    owner_firm_id = db.query(owner_model.firm_id).filter(
+        owner_model.id == (cover_letter_id if owner_is_cl else resume_id)).scalar()
+
     def _new_link(token, dest_url, label):
-        kwargs = {"token": token, "destination_url": dest_url, "source_label": label}
+        kwargs = {"firm_id": owner_firm_id, "token": token, "destination_url": dest_url, "source_label": label}
         if owner_is_cl:
             kwargs["cover_letter_id"] = cover_letter_id
         else:
@@ -650,7 +657,7 @@ def resume_shelf(db: Session = Depends(get_db)):
 
 
 @router.post("", status_code=201)
-def create_resume(body: dict, db: Session = Depends(get_db)):
+def create_resume(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
     """Create a new resume from name/is_base/parent_id/job_id/template/page_format/json_data."""
     # str_field turns a wrongly typed name into the same 400 a blank one already
     # gets, instead of an AttributeError 500 (R4-T1-20).
@@ -659,6 +666,7 @@ def create_resume(body: dict, db: Session = Depends(get_db)):
         validate_template_name(body["template"], TEMPLATES_DIR)
 
     resume = Resume(
+        firm_id=firm_id,
         name=name,
         is_base=body.get("is_base", True),
         parent_id=body.get("parent_id"),
@@ -674,7 +682,7 @@ def create_resume(body: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/copy")
-def copy_resume_for_job(body: dict, db: Session = Depends(get_db)):
+def copy_resume_for_job(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
     """Copy a base resume for a job — no LLM, just exact copy with tracer links."""
     import json as _json
     base_resume_id = body.get("base_resume_id")
@@ -693,6 +701,7 @@ def copy_resume_for_job(body: dict, db: Session = Depends(get_db)):
 
     job_name = f"{job.company} \u2014 {job.title}" if job.company else job.title or ""
     copy = Resume(
+        firm_id=firm_id,
         name=f"{base.name} \u2192 {job_name}",
         is_base=False,
         parent_id=base.id,
@@ -720,7 +729,7 @@ def _resolve_chain_score_depth(db) -> str | None:
 
 
 @router.post("/tailor", status_code=202)
-async def tailor_resume(body: dict, db: Session = Depends(get_db)):
+async def tailor_resume(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
     """Tailor a base resume for a job in the background, returning a run_id to track via GET /api/monitor/in-flight; the response's `chain_score` reports the depth of any scoring run that will follow ('light'/'full'/'off'), since only job-linked tailors chain."""
     base_resume_id = body.get("base_resume_id")
     job_id = body.get("job_id")
@@ -778,6 +787,7 @@ async def tailor_resume(body: dict, db: Session = Depends(get_db)):
                 "base_resume_id": base_resume_id,
                 "job_id": job_id,
                 "job_description_override": job_description,
+                "firm_id": str(firm_id),
             },
         )
         chain_depth = _resolve_chain_score_depth(db) if job_id else None
@@ -837,8 +847,10 @@ _JSON_ONLY_NUDGE = (
 )
 
 
-async def _tailor_impl(base_resume_id: str, job_id: str | None, job_description_override: str | None):
-    """Background worker: does the actual LLM tailoring work.
+async def _tailor_impl(base_resume_id: str, job_id: str | None, job_description_override: str | None,
+                       firm_id: str | None = None):
+    """Background worker: does the actual LLM tailoring work. The copy goes into `firm_id`, the firm of the user who
+    asked for it; without one (a direct call), into the base résumé's firm, or the Default firm for the Persona.
 
     Phased so no DB connection is held across the JD fetch or the LLM call:
     read what the prompt needs -> release -> fetch/generate -> write. Gated by
@@ -865,6 +877,7 @@ async def _tailor_impl(base_resume_id: str, job_id: str | None, job_description_
                 base_template = None
                 base_page_format = None
                 base_id_for_parent = None
+                copy_firm_id = firm_id or DEFAULT_FIRM_ID
             else:
                 base = db.query(Resume).filter(Resume.id == base_resume_id).first()
                 if not base:
@@ -875,6 +888,7 @@ async def _tailor_impl(base_resume_id: str, job_id: str | None, job_description_
                 base_template = base.template
                 base_page_format = base.page_format
                 base_id_for_parent = base.id
+                copy_firm_id = firm_id or base.firm_id
 
             jd_text = job_description_override or ""
             job_name = ""
@@ -994,6 +1008,7 @@ async def _tailor_impl(base_resume_id: str, job_id: str | None, job_description_
         db = SessionLocal()
         try:
             tailored = Resume(
+                firm_id=copy_firm_id,
                 name=name,
                 is_base=False,
                 parent_id=base_id_for_parent,
@@ -1299,7 +1314,8 @@ async def parse_resume_pdf(pdf_bytes: bytes, db: Session) -> dict:
 
 
 @router.post("/import-pdf", status_code=201)
-async def import_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def import_pdf(file: UploadFile = File(...), db: Session = Depends(get_db),
+                     firm_id=Depends(writer_firm_id)):
     """Upload a PDF résumé, extract text with pdfplumber, and use an LLM to parse it into structured json_data, returning the created Resume."""
     check_pdf_name(file.filename)
     pdf_bytes = await file.read()
@@ -1309,6 +1325,7 @@ async def import_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
 
     name = file.filename.rsplit(".", 1)[0] if "." in file.filename else file.filename
     resume = Resume(
+        firm_id=firm_id,
         name=name,
         is_base=True,
         template=_default_template_id(),

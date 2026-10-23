@@ -18,6 +18,9 @@ from backend.models.db import (
     Application, Company, Persona, Resume, Search, Setting, VisaCache,
 )
 from backend.tests.r4_support import make_job
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 @pytest.fixture(autouse=True)
@@ -31,7 +34,7 @@ def _restore_dedup_cache():
 
 def _app(db, status="applied", transitions=None):
     job = make_job(db)
-    a = Application(job_id=job.id, status=status, status_transitions=transitions)
+    a = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status=status, status_transitions=transitions)
     db.add(a)
     db.commit()
     db.refresh(a)
@@ -390,7 +393,7 @@ def test_seed_searches_seeds_one_per_mode(test_db):
 
 def test_seed_searches_renames_the_legacy_extension_search(test_db):
     """A pre-existing "LinkedIn Extension" row is renamed in place, not duplicated."""
-    test_db.add(Search(name="LinkedIn Extension", search_mode="linkedin_extension"))
+    test_db.add(Search(firm_id=DEFAULT_FIRM_ID, name="LinkedIn Extension", search_mode="linkedin_extension"))
     test_db.commit()
 
     seed.seed_searches(test_db)
@@ -402,7 +405,7 @@ def test_seed_searches_renames_the_legacy_extension_search(test_db):
 
 def test_a_user_renamed_search_of_a_seeded_mode_blocks_the_seed(test_db):
     """Mode — not name — is the identity, so an existing mode is never re-seeded."""
-    test_db.add(Search(name="My Own Keywords", search_mode="keyword"))
+    test_db.add(Search(firm_id=DEFAULT_FIRM_ID, name="My Own Keywords", search_mode="keyword"))
     test_db.commit()
     seed.seed_searches(test_db)
     assert [s.name for s in test_db.query(Search).filter(Search.search_mode == "keyword").all()] \
@@ -432,7 +435,7 @@ def test_mock_resume_is_seeded_and_wired_up(test_db):
 
 def test_mock_resume_is_skipped_when_a_base_resume_exists(test_db):
     """A user with their own base résumé never gets the sample."""
-    test_db.add(Resume(name="Mine", is_base=True, json_data={}))
+    test_db.add(Resume(firm_id=DEFAULT_FIRM_ID, name="Mine", is_base=True, json_data={}))
     test_db.commit()
     seed.seed_mock_resume(test_db)
     assert [r.name for r in test_db.query(Resume).all()] == ["Mine"]
@@ -447,7 +450,7 @@ def test_mock_resume_seeds_even_without_a_default_resume_setting(test_db):
 
 def test_a_tailored_copy_does_not_count_as_a_base_resume(test_db):
     """`is_base = False` copies do not suppress the seed."""
-    test_db.add(Resume(name="Tailored", is_base=False, json_data={}))
+    test_db.add(Resume(firm_id=DEFAULT_FIRM_ID, name="Tailored", is_base=False, json_data={}))
     test_db.commit()
     seed.seed_mock_resume(test_db)
     assert test_db.query(Resume).filter(Resume.name == "Sample PM").count() == 1

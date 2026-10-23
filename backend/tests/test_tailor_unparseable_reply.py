@@ -9,6 +9,9 @@ import pytest
 
 from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, ModelReplyError
 from backend.models.db import Job, Resume, Setting
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 PROSE = ("Before I produce the tailored resume, I need to flag something: the first "
@@ -23,7 +26,7 @@ def _seed(test_db):
               description="We need a PM.")
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template="inter",
                   json_data={"summary": "s", "experience": [], "skills": {}})
     test_db.add(base)
     test_db.commit()

@@ -93,8 +93,9 @@ def test_alembic_baseline_equals_the_old_startup_schema(scratch_dbs):
     _run("backend.scripts.db_upgrade", scratch_dbs["alembic"])
 
     old, new = _catalog(scratch_dbs["legacy"]), _catalog(scratch_dbs["alembic"])
-    # Tables added after the baseline (models/tenancy.py) exist only through Alembic; compare the rest.
-    new = _only_tables(new, {row[0] for row in old["columns"]})
+    # Tables added after the baseline (models/tenancy.py) exist only through Alembic, and so do the columns later
+    # revisions added to the old tables (firm_id, 0005); compare the rest.
+    new = _without_later_columns(_only_tables(new, {row[0] for row in old["columns"]}))
     assert old["columns"] and new["columns"], "the catalog query found nothing; the comparison would be vacuous"
 
     for kind in _CATALOG_QUERIES:
@@ -108,6 +109,28 @@ def test_alembic_baseline_equals_the_old_startup_schema(scratch_dbs):
 def _only_tables(catalog: dict, tables: set) -> dict:
     """The catalog limited to `tables` (sequences have no table and are kept whole)."""
     return {k: rows if k == "sequences" else [r for r in rows if r[0] in tables] for k, rows in catalog.items()}
+
+
+def _later_columns() -> set:
+    """(table, column) pairs added to the old tables after the baseline: models marked alembic_only."""
+    from backend.models.db import Base
+    return {(t.name, c.name) for t in Base.metadata.sorted_tables if not t.info.get("alembic_only")
+            for c in t.columns if c.info.get("alembic_only")}
+
+
+def _without_later_columns(catalog: dict) -> dict:
+    """The catalog without those columns, or the constraints and indexes on them (whose names and definitions
+    name the column)."""
+    later = _later_columns()
+
+    def keep(kind, row):
+        if kind == "sequences":
+            return True
+        if kind == "columns":
+            return (row[0], row[1]) not in later
+        return not any(row[0] == table and any(column in str(part) for part in row[1:]) for table, column in later)
+
+    return {k: [r for r in rows if keep(k, r)] for k, rows in catalog.items()}
 
 
 def test_an_existing_unversioned_database_is_stamped_not_recreated(scratch_dbs):
@@ -128,8 +151,10 @@ def test_an_existing_unversioned_database_is_stamped_not_recreated(scratch_dbs):
             assert conn.execute(text("SELECT value FROM settings WHERE key = 'keep_me'")).scalar() == "yes"
             assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == head_revision()
         after = _catalog(name)
-        assert _only_tables(after, {row[0] for row in before["columns"]}) == before, \
-            "stamping must not change the existing tables"
+        assert _without_later_columns(_only_tables(after, {row[0] for row in before["columns"]})) == before, \
+            "stamping must not change the existing tables, beyond what later revisions add"
+        assert ("resumes", "firm_id") in {(row[0], row[1]) for row in after["columns"]}, \
+            "the upgrade after stamping must add the later revisions' columns"
         assert {"firms", "users", "invites"} <= {row[0] for row in after["columns"]}, \
             "the upgrade after stamping must add the later revisions' tables"
     finally:

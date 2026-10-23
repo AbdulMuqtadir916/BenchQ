@@ -8,6 +8,10 @@ delete) and must answer 400 — never 500 — for any malformed body.
 import uuid
 
 from backend.models.db import Application, Interview, Job
+import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _make_app(test_db, title="Bulk Role", status="applied", company="Bulk Co", job_status="applied"):
@@ -16,7 +20,7 @@ def _make_app(test_db, title="Bulk Role", status="applied", company="Bulk Co", j
               url=f"https://example.com/{uuid.uuid4().hex}", status=job_status)
     test_db.add(job)
     test_db.flush()
-    app = Application(job_id=job.id, status=status, status_transitions=[])
+    app = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status=status, status_transitions=[])
     test_db.add(app)
     test_db.commit()
     return app
@@ -119,8 +123,8 @@ def test_bulk_delete_removes_rows_and_cascades_interviews(api_client, test_db):
     a = _make_app(test_db, "Bulk Del A")
     b = _make_app(test_db, "Bulk Del B")
     a_id, b_id = a.id, b.id       # read before the delete — the instances expire with it
-    test_db.add(Interview(application_id=a_id, what="Screen"))
-    test_db.add(Interview(application_id=a_id, what="Onsite"))
+    test_db.add(Interview(firm_id=DEFAULT_FIRM_ID, application_id=a_id, what="Screen"))
+    test_db.add(Interview(firm_id=DEFAULT_FIRM_ID, application_id=a_id, what="Onsite"))
     test_db.commit()
     assert test_db.query(Interview).filter(Interview.application_id == a_id).count() == 2
 

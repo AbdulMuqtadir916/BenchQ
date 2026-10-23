@@ -2,6 +2,9 @@
 import pytest
 
 from backend.models.db import Company, Job, Resume, Search, Setting
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 @pytest.mark.asyncio
@@ -10,7 +13,7 @@ async def test_score_single_job_returns_summary(test_db, monkeypatch):
 
     job = Job(company="Acme", title="Staff PM", url="https://acme.test/1",
               external_id="e1", description="Long job description " * 20, status="new")
-    resume = Resume(name="PM", is_base=True, json_data={"summary": "x " * 60})
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, name="PM", is_base=True, json_data={"summary": "x " * 60})
     test_db.add_all([job, resume])
     test_db.commit()
 
@@ -39,7 +42,7 @@ async def test_search_run_worker_returns_counts(test_db, monkeypatch):
     import backend.api.routes_searches as rs
     import backend.scraper.orchestrator as orch
 
-    search = Search(name="Remote PM", search_mode="keyword", active=True)
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="Remote PM", search_mode="keyword", active=True)
     test_db.add(search)
     test_db.commit()
 
@@ -102,7 +105,7 @@ async def test_score_resume_worker_returns_summary(test_db, monkeypatch):
               external_id="e2", description="d " * 200, status="new")
     test_db.add(job)
     test_db.commit()
-    copy = Resume(name="PM -> Acme", is_base=False, job_id=job.id,
+    copy = Resume(firm_id=DEFAULT_FIRM_ID, name="PM -> Acme", is_base=False, job_id=job.id,
                   json_data={"summary": "tailored summary " * 20})
     test_db.add(copy)
     test_db.commit()
@@ -122,7 +125,7 @@ async def test_tailor_worker_returns_summary(test_db, monkeypatch):
     pytest.importorskip("multipart")
     import backend.api.routes_resumes as rr
 
-    base = Resume(name="Base PM", is_base=True,
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base PM", is_base=True,
                   json_data={"summary": "s", "experience": [], "skills": []})
     job = Job(company="Acme", title="Staff PM", url="https://acme.test/3",
               external_id="e3", description="d " * 200, status="new")

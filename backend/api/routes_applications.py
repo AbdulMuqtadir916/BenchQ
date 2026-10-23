@@ -1,11 +1,16 @@
 """Application management endpoints."""
 import logging
+import uuid
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from backend.models.db import get_db, Application, Job, Company, Setting, utcnow, SessionLocal
+from backend.models.tenancy import link_job_to_firm
+from backend.api.routes_auth import current_principal
+from backend.auth.scoping import writer_firm_id
+from backend.auth.sessions import Principal
 from backend.scraper._shared.bot_wall import is_bot_wall
 
 logger = logging.getLogger("jobnavigator.applications")
@@ -296,6 +301,8 @@ def create_application(
     data: ApplicationCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    firm_id: uuid.UUID = Depends(writer_firm_id),
+    principal: Principal = Depends(current_principal),
 ):
     """Create application (used by Chrome extension). Also creates job record if needed."""
     # Generate external_id for dedup (use same normalization as scrapers)
@@ -326,6 +333,8 @@ def create_application(
         db.flush()
     else:
         job.status = "applied"
+    # The firm sees the job it logged, whether it was new or already in the shared pool (07 Q37).
+    link_job_to_firm(db, firm_id, job.id, "CAPTURED", captured_by_user_id=principal.user_id)
 
     # One application per job — a duplicate log is refused with 409.
     from backend.models.db import record_transition
@@ -338,7 +347,7 @@ def create_application(
         except ValueError:
             logger.info("ignoring unparseable applied_at %r", data.applied_at)
 
-    app = db.query(Application).filter(Application.job_id == job.id).first()
+    app = db.query(Application).filter(Application.job_id == job.id, Application.firm_id == firm_id).first()
     if app:
         # Refuse a second log for the same posting — it would silently overwrite
         # notes and reset the stage, creating a bogus funnel edge.
@@ -348,6 +357,7 @@ def create_application(
             detail={"message": "An application already exists for this job", "application_id": str(app.id)},
         )
     app = Application(
+        firm_id=firm_id,
         job_id=job.id,
         status=new_status,
         cv_version_used=data.cv_version_used,
@@ -802,7 +812,7 @@ def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_
     app = db.query(Application).filter(Application.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
-    iv = Interview(application_id=app.id, what=data.what, where_text=data.where_text,
+    iv = Interview(firm_id=app.firm_id, application_id=app.id, what=data.what, where_text=data.where_text,
                    when_at=_parse_dt(data.when_at), status=data.status or "scheduled", prep=data.prep)
     db.add(iv)
     app.updated_at = utcnow()

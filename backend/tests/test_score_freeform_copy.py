@@ -2,6 +2,9 @@
 import pytest
 
 from backend.models.db import Resume, Job
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _seed_llm(monkeypatch, payload):
@@ -20,7 +23,7 @@ def _seed_llm(monkeypatch, payload):
 
 def _rich_copy(**kw):
     """A copy with enough text to clear the 50-char pre-check."""
-    return Resume(
+    return Resume(firm_id=DEFAULT_FIRM_ID, 
         name="Base → (tailored)",
         is_base=False,
         template="inter",

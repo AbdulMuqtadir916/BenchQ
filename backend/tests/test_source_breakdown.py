@@ -6,6 +6,9 @@ import types
 import pytest
 
 from backend.models.db import ScrapeLog, Search
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _board_logger(name):
@@ -50,7 +53,7 @@ def _row(site, title, company, url):
 
 
 def _search(db, sources):
-    s = Search(name="ZZ Search", search_mode="keyword", active=True, sources=sources,
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="ZZ Search", search_mode="keyword", active=True, sources=sources,
                search_term="program manager", title_include_keywords=[],
                title_exclude_keywords=[], company_filter=[], company_exclude=[])
     db.add(s)

@@ -9,6 +9,9 @@ from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
     make_job, make_resume, make_persona, set_setting, big_string, EMOJI, MISSING_UUID,
 )
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 PERSONA_NODES = ["contact", "work_auth", "demographics", "compensation",
                  "preferences", "resume_content", "qa_bank"]
@@ -559,7 +562,7 @@ def test_cover_letters_malformed_job_id_filter_is_422_not_404(client):
 def test_cover_letters_valid_job_id_filter_still_works(client, test_db):
     from backend.models.db import CoverLetter
     job = make_job(test_db)
-    test_db.add(CoverLetter(name="L", job_id=job.id, json_data={}))
+    test_db.add(CoverLetter(firm_id=DEFAULT_FIRM_ID, name="L", job_id=job.id, json_data={}))
     test_db.commit()
     r = assert_clean(client.get(f"/api/cover-letters?job_id={job.id}"), 200)
     assert len(r.json()) == 1

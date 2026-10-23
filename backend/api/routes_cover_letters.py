@@ -13,6 +13,8 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.db import get_db, CoverLetter, Resume, Job, Setting, Persona, TracerLink, TracerClickEvent, SessionLocal
 from backend.api._input import str_field, uuid_filter
+from backend.auth.scoping import writer_firm_id
+from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 from backend.api.routes_resumes import _get_browser, _rewrite_urls_with_tracers, _resolve_tailoring_jd  # shared with resumes
 
@@ -162,12 +164,13 @@ def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_d
 
 
 @router.post("", status_code=201)
-def create_cover_letter(body: dict, db: Session = Depends(get_db)):
+def create_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
     # See R4-T1-20: a non-string name used to raise AttributeError -> 500.
     name = str_field(body, "name", required=True)
     if "template" in body:
         _validate_template(body["template"])
     cl = CoverLetter(
+        firm_id=firm_id,
         name=name,
         job_id=body.get("job_id"),
         resume_id=body.get("resume_id"),
@@ -307,7 +310,7 @@ async def export_pdf(cl_id: str, db: Session = Depends(get_db)):
 # ── AI generation ─────────────────────────────────────────────────────────────
 
 @router.post("/generate", status_code=202)
-async def generate_cover_letter(body: dict, db: Session = Depends(get_db)):
+async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
     """Generate a cover letter for a (resume, job) pair in the background; returns 202 + run_id, and with cover_letter_id rewrites that existing letter in place instead of creating a new one."""
     resume_id = body.get("resume_id")
     job_id = body.get("job_id")
@@ -366,6 +369,7 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db)):
                 "template": body.get("template"),
                 "page_format": body.get("page_format"),
                 "cover_letter_id": target_id,
+                "firm_id": str(firm_id),
             },
         )
         return {"run_id": run_id, "status": "running"}
@@ -375,7 +379,7 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db)):
 
 async def _generate_impl(resume_id: str, job_id: str, voice: str | None, length: str,
                          template: str | None, page_format: str | None,
-                         cover_letter_id: str | None = None):
+                         cover_letter_id: str | None = None, firm_id: str | None = None):
     """Background worker: generate the letter and persist a CoverLetter row; semaphore-guarded (shared with tailoring) so concurrent generations don't blow the LLM rate limit."""
     from backend.analyzer.cover_letter_generator import (
         resolve_voice_instruction, generate_cover_letter_body,
@@ -387,14 +391,16 @@ async def _generate_impl(resume_id: str, job_id: str, voice: str | None, length:
         # Returned string becomes JobRun.result_summary (Stats -> Run history).
         return await _generate_inner(resume_id, job_id, voice, length, template, page_format,
                                      resolve_voice_instruction, generate_cover_letter_body, track_llm_call,
-                                     cover_letter_id=cover_letter_id)
+                                     cover_letter_id=cover_letter_id, firm_id=firm_id)
 
 
 async def _generate_inner(resume_id, job_id, voice, length, template, page_format,
                           resolve_voice_instruction, generate_cover_letter_body, track_llm_call,
-                          cover_letter_id=None):
+                          cover_letter_id=None, firm_id=None):
     """Read -> LLM -> write, each with its own short session, so no pooled
-    connection is held while the generation call is awaited."""
+    connection is held while the generation call is awaited. A new letter goes into `firm_id`, the firm of the
+    user who asked for it; without one (a direct call), into the résumé's firm, or the Default firm for the
+    Persona."""
     from types import SimpleNamespace
 
     # -- Phase 1: read the evidence and the prompt, then release -------------
@@ -421,6 +427,7 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
             base_template = None
             base_page_format = None
             stored_resume_id = None
+            letter_firm_id = firm_id or DEFAULT_FIRM_ID
         else:
             resume = db.query(Resume).filter(Resume.id == resume_id).first()
             if not resume:
@@ -429,6 +436,7 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
             base_template = resume.template
             base_page_format = resume.page_format
             stored_resume_id = resume_id
+            letter_firm_id = firm_id or resume.firm_id
 
         prompt_template = db.query(Setting).filter(Setting.key == "cover_letter_prompt").first().value
         voice_id, voice_instruction = resolve_voice_instruction(db, voice)
@@ -494,6 +502,7 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
             action = "regenerated"
         else:
             cl = CoverLetter(
+                firm_id=letter_firm_id,
                 name=job_label,
                 job_id=job_id,
                 resume_id=stored_resume_id,

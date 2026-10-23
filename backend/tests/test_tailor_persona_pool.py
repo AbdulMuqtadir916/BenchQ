@@ -3,12 +3,15 @@ import uuid
 import pytest
 from backend.models.db import Resume, Persona, Setting, Job
 from backend.api import routes_resumes
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 @pytest.mark.asyncio
 async def test_tailor_with_resume_base_does_not_include_persona(test_db, monkeypatch):
     """When tailoring against a base Resume, persona content must NOT appear in the LLM prompt."""
-    base_resume = Resume(
+    base_resume = Resume(firm_id=DEFAULT_FIRM_ID, 
         id=uuid.uuid4(), name="PM-base", is_base=True,
         json_data={
             "summary": "Base summary.",
@@ -60,7 +63,7 @@ async def test_tailor_with_resume_base_does_not_include_persona(test_db, monkeyp
 @pytest.mark.asyncio
 async def test_tailor_works_when_persona_empty(test_db, monkeypatch):
     """Tailor still works when persona has no resume_content (no merge happens)."""
-    base_resume = Resume(
+    base_resume = Resume(firm_id=DEFAULT_FIRM_ID, 
         id=uuid.uuid4(), name="PM-base", is_base=True,
         json_data={"summary": "Just summary",
                    "experience": [{"title": "PM", "company": "X", "dates": "2024",

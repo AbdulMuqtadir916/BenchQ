@@ -32,7 +32,7 @@ def test_create_makes_an_onboarding_firm_with_the_plans_limits_and_an_owner_invi
     body = r.json()
     firm = body["firm"]
     assert firm["status"] == "ONBOARDING"
-    assert (firm["seat_limit"], firm["candidate_limit"]) == (10, 100)       # copied from the Default plan (A3)
+    assert (firm["seat_limit"], firm["candidate_limit"]) == (10, 100)       # copied from the plan (A3)
     assert firm["contact_phone"] == "+91 98"
     invite = body["invite"]
     assert invite["role"] == "OWNER"
@@ -51,7 +51,7 @@ def test_create_logs_firm_created_and_invite_sent_in_the_firms_ledger(api_client
     firm_id = _create(api_client, accounts).json()["firm"]["id"]
     entries = {e.action: e for e in test_db.query(LedgerEntry).filter(LedgerEntry.firm_id == firm_id)}
     assert set(entries) == {"FIRM_CREATED", "INVITE_SENT"}
-    assert entries["FIRM_CREATED"].summary == "Created firm on Default (10 seats, 100 candidates)"
+    assert entries["FIRM_CREATED"].summary == "Created firm on Test plan (10 seats, 100 candidates)"
     assert entries["INVITE_SENT"].summary == "Invited Nora North (nora@northwind.test) as OWNER"
     assert all(e.actor_type == "PLATFORM_ADMIN" and e.actor_user_id == accounts.admin_id for e in entries.values())
 
@@ -131,7 +131,7 @@ def test_the_reserved_slugs_match_the_frontends():
 
 def test_lists(api_client, accounts):
     _create(api_client, accounts)
-    assert [p["name"] for p in api_client.get("/api/admin/plans").json()] == ["Default"]
+    assert [p["name"] for p in api_client.get("/api/admin/plans").json()] == ["Test plan"]
     firms = api_client.get(ADMIN_FIRMS).json()
     assert [f["slug"] for f in firms] == ["acme", "northwind"]
     northwind = firms[1]["id"]

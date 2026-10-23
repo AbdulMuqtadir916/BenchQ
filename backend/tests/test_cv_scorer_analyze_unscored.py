@@ -3,6 +3,9 @@ import pytest
 import asyncio
 from sqlalchemy import null as sa_null
 from sqlalchemy.orm import sessionmaker
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 @pytest.fixture
@@ -26,7 +29,7 @@ def scorer_ready_db(test_db, monkeypatch):
     test_db.commit()
 
     # Seed a default Resume (the only scoring source); its flattened text must contain the phrase the assertions check for.
-    resume = Resume(
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, 
         name="Default",
         is_base=True,
         template="inter",

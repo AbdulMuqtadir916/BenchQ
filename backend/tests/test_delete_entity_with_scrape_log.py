@@ -5,6 +5,9 @@ from fastapi import HTTPException
 from backend.api.routes_companies import delete_company
 from backend.api.routes_searches import delete_search
 from backend.models.db import Company, Job, ScrapeLog, Search
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 CO_ID = "8b888888-88b8-48b8-8888-888888888888"
 SE_ID = "9c999999-99c9-49c9-8999-999999999999"
@@ -27,8 +30,8 @@ def test_company_with_scrape_history_is_deletable(test_db):
 
 
 def test_search_with_runs_and_stored_jobs_is_deletable(test_db):
-    test_db.add(Search(id=SE_ID, name="ZZ Search"))
-    test_db.add(Search(id=OTHER_SE_ID, name="Keep me"))
+    test_db.add(Search(firm_id=DEFAULT_FIRM_ID, id=SE_ID, name="ZZ Search"))
+    test_db.add(Search(firm_id=DEFAULT_FIRM_ID, id=OTHER_SE_ID, name="Keep me"))
     test_db.flush()   # parents first: the scrape_log foreign key is enforced on Postgres
     test_db.add(ScrapeLog(search_id=SE_ID, source="jobspy", jobs_found=4))
     test_db.add(ScrapeLog(search_id=OTHER_SE_ID, source="jobspy", jobs_found=9))
@@ -59,7 +62,7 @@ def test_missing_entities_still_404(test_db):
 
 
 def test_built_in_extension_search_is_still_protected(test_db):
-    test_db.add(Search(id=SE_ID, name="Extension LI", search_mode="linkedin_extension"))
+    test_db.add(Search(firm_id=DEFAULT_FIRM_ID, id=SE_ID, name="Extension LI", search_mode="linkedin_extension"))
     test_db.flush()
     test_db.add(ScrapeLog(search_id=SE_ID, source="linkedin_extension", jobs_found=2))
     test_db.commit()

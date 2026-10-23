@@ -7,6 +7,7 @@ import httpx
 
 from backend.config import TELEGRAM_BOT_TOKEN
 from backend.models.db import SessionLocal, Setting, Job, Application
+from backend.models.tenancy import DEFAULT_FIRM_ID
 
 logger = logging.getLogger("jobnavigator.telegram")
 
@@ -331,9 +332,11 @@ async def handle_callback(callback_data: str, message_id: int = None):
             job = db.query(Job).filter(Job.id == job_id).first()
             if job:
                 job.status = "applied"
-                existing = db.query(Application).filter(Application.job_id == job.id).first()
+                # Telegram is the platform's own bot, so what it records goes to the Default firm (F2b).
+                existing = db.query(Application).filter(Application.job_id == job.id,
+                                                        Application.firm_id == DEFAULT_FIRM_ID).first()
                 if not existing:
-                    app = Application(job_id=job.id, status="applied",
+                    app = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status="applied",
                                      status_transitions=[{"from": None, "to": "applied", "at": datetime.now(timezone.utc).isoformat(), "source": "telegram"}])
                     db.add(app)
                 db.commit()

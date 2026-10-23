@@ -4,13 +4,14 @@ from fastapi import BackgroundTasks, HTTPException
 
 from backend.api.routes_jobs import create_manual_job
 from backend.models.db import Application, Job
+from backend.tests.firm_support import default_firm_writer
 
 
 def _add(db, **over):
     body = {"title": "Senior Backend Engineer", "company": "Acme",
             "url": "https://acme.test/jobs/1"}
     body.update(over)
-    return create_manual_job(body, BackgroundTasks(), db=db)
+    return create_manual_job(body, BackgroundTasks(), db=db, **default_firm_writer(db))
 
 
 def test_new_status_writes_the_row(test_db):
@@ -65,5 +66,5 @@ def test_enrichment_is_queued_for_a_new_row(test_db):
     """Without the JD fetch the first score, tailor or cover letter pays for it."""
     bg = BackgroundTasks()
     create_manual_job({"title": "Dev", "company": "Acme", "url": "https://acme.test/j/2"},
-                      bg, db=test_db)
+                      bg, db=test_db, **default_firm_writer(test_db))
     assert [t.func.__name__ for t in bg.tasks] == ["_cache_job_page", "_fetch_and_store_description"]

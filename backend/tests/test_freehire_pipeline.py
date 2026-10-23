@@ -3,6 +3,9 @@ import json
 import pytest
 
 from backend.models.db import Setting, Search, Job
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _job(title, company, url, desc="Great role", slug="s"):
@@ -15,14 +18,14 @@ def _job(title, company, url, desc="Great role", slug="s"):
 
 def test_validity_requires_url_or_term():
     from backend.scraper import orchestrator
-    assert orchestrator._search_mode_is_valid(Search(search_mode="freehire", search_term="go")) is True
-    assert orchestrator._search_mode_is_valid(Search(search_mode="freehire", direct_url="https://freehire.me/?x=1")) is True
-    assert orchestrator._search_mode_is_valid(Search(search_mode="freehire")) is False
+    assert orchestrator._search_mode_is_valid(Search(firm_id=DEFAULT_FIRM_ID, search_mode="freehire", search_term="go")) is True
+    assert orchestrator._search_mode_is_valid(Search(firm_id=DEFAULT_FIRM_ID, search_mode="freehire", direct_url="https://freehire.me/?x=1")) is True
+    assert orchestrator._search_mode_is_valid(Search(firm_id=DEFAULT_FIRM_ID, search_mode="freehire")) is False
 
 
 def test_source_label():
     from backend.scraper import orchestrator
-    assert orchestrator._source_for_search(Search(search_mode="freehire")) == "freehire"
+    assert orchestrator._source_for_search(Search(firm_id=DEFAULT_FIRM_ID, search_mode="freehire")) == "freehire"
 
 
 @pytest.mark.asyncio
@@ -36,7 +39,7 @@ async def test_dispatch_routes_to_freehire(monkeypatch):
         return {"jobs_found": 0, "new_jobs": 0, "error": None, "duration": 0}
 
     monkeypatch.setattr(fh, "run", fake_run)
-    await orchestrator.run_search(Search(search_mode="freehire", search_term="go"))
+    await orchestrator.run_search(Search(firm_id=DEFAULT_FIRM_ID, search_mode="freehire", search_term="go"))
     assert called.get("ok") is True
 
 
@@ -58,7 +61,7 @@ async def test_preview_applies_title_and_body_filters(monkeypatch, test_db):
         return jobs
     monkeypatch.setattr(fh, "_collect", fake_collect)
 
-    search = Search(name="t", search_mode="freehire", search_term="engineer",
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="t", search_mode="freehire", search_term="engineer",
                     title_exclude_keywords=["intern"], company_exclude=[])
     r = await fh.preview(search, test_db)
 
@@ -74,7 +77,7 @@ async def test_preview_applies_title_and_body_filters(monkeypatch, test_db):
 
 @pytest.mark.asyncio
 async def test_run_saves_dedups_and_filters(monkeypatch, test_db):
-    search = Search(name="t", search_mode="freehire", search_term="engineer",
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="t", search_mode="freehire", search_term="engineer",
                     results_wanted=10, title_exclude_keywords=["intern"], company_exclude=[])
     test_db.add(search)
     test_db.commit()
@@ -107,7 +110,7 @@ async def test_run_saves_dedups_and_filters(monkeypatch, test_db):
 
 @pytest.mark.asyncio
 async def test_run_skips_body_excluded_jobs(monkeypatch, test_db):
-    search = Search(name="t", search_mode="freehire", results_wanted=10,
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="t", search_mode="freehire", results_wanted=10,
                     search_term="engineer", title_exclude_keywords=[], company_exclude=[])
     test_db.add(search)
     test_db.commit()
@@ -137,7 +140,7 @@ async def test_run_skips_body_excluded_jobs(monkeypatch, test_db):
 
 @pytest.mark.asyncio
 async def test_run_applies_annual_salary_only(monkeypatch, test_db):
-    search = Search(name="t", search_mode="freehire", results_wanted=10,
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="t", search_mode="freehire", results_wanted=10,
                     search_term="e", title_exclude_keywords=[], company_exclude=[])
     test_db.add(search)
     test_db.commit()

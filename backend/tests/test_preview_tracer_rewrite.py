@@ -3,6 +3,9 @@ import pytest
 
 from backend.api.routes_resumes import _rewrite_urls_with_tracers, preview_resume
 from backend.models.db import Resume, Setting, TracerLink
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 RESUME_ID = "4d444444-44d4-44d4-8444-444444444444"
 
@@ -20,7 +23,7 @@ def _setup(db, enabled="true"):
                  ("tracer_links_base_url", "https://track.example"),
                  ("tracer_links_url_style", "path")]:
         db.add(Setting(key=k, value=v))
-    db.add(Resume(id=RESUME_ID, name="Base", is_base=True, json_data=_header()))
+    db.add(Resume(firm_id=DEFAULT_FIRM_ID, id=RESUME_ID, name="Base", is_base=True, json_data=_header()))
     db.commit()
 
 

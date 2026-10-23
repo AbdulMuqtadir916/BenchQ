@@ -2,6 +2,10 @@
 from datetime import datetime, timezone, timedelta
 
 from backend.models.db import Company, Search, ScrapeLog
+import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _log(company_id=None, search_id=None, error=None, is_warning=False, ago_min=0):
@@ -85,7 +89,7 @@ def test_inactive_company_not_flagged(test_db):
 
 
 def test_search_flagged_and_count(test_db):
-    s = Search(name="DeadSearch", search_mode="keyword", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="DeadSearch", search_mode="keyword", active=True)
     test_db.add(s)
     test_db.commit()
     for i in range(3):
@@ -120,7 +124,7 @@ def _reason_for(name):
 
 
 def test_reason_names_a_board_quiet_across_the_whole_window(test_db):
-    s = Search(name="QuietIndeed", search_mode="keyword", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="QuietIndeed", search_mode="keyword", active=True)
     test_db.add(s)
     test_db.commit()
     for i in range(3):
@@ -131,7 +135,7 @@ def test_reason_names_a_board_quiet_across_the_whole_window(test_db):
 
 
 def test_reason_names_every_board_quiet_across_the_whole_window(test_db):
-    s = Search(name="QuietTwo", search_mode="keyword", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="QuietTwo", search_mode="keyword", active=True)
     test_db.add(s)
     test_db.commit()
     for i in range(3):
@@ -151,7 +155,7 @@ def test_reason_names_no_board_when_the_quiet_one_changes(test_db):
     did deliver rows must never be named. The fallback can be false about a run
     that found 40 jobs; the user accepts that cost and keeps the wording.
     """
-    s = Search(name="Alternating", search_mode="keyword", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="Alternating", search_mode="keyword", active=True)
     test_db.add(s)
     test_db.commit()
     test_db.add(_quiet_log(s.id, ["indeed"], ago_min=2))
@@ -166,7 +170,7 @@ def test_reason_names_no_board_when_the_quiet_one_changes(test_db):
 
 def test_reason_keeps_the_old_wording_without_board_evidence(test_db):
     """A row with no source_breakdown is every non-JobSpy source and every row an older build wrote."""
-    s = Search(name="PlainEmpty", search_mode="levels_fyi", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="PlainEmpty", search_mode="levels_fyi", active=True)
     test_db.add(s)
     test_db.commit()
     for i in range(3):
@@ -178,7 +182,7 @@ def test_reason_keeps_the_old_wording_without_board_evidence(test_db):
 
 def test_a_refused_board_still_wins_over_the_quiet_wording(test_db):
     """A board that refused the request is reported on the last run alone — that branch runs first and must keep doing so."""
-    s = Search(name="RefusedBoard", search_mode="keyword", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="RefusedBoard", search_mode="keyword", active=True)
     test_db.add(s)
     test_db.commit()
     row = _quiet_log(s.id, ["indeed"], ago_min=0)
@@ -191,7 +195,7 @@ def test_a_refused_board_still_wins_over_the_quiet_wording(test_db):
 
 def test_inactive_search_not_flagged(test_db):
     """A paused search was switched off deliberately, so its failed history must not drive the rail dot or header count."""
-    s = Search(name="OffSearch", search_mode="keyword", active=False)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="OffSearch", search_mode="keyword", active=False)
     test_db.add(s)
     test_db.commit()
     for i in range(3):
@@ -221,7 +225,7 @@ def test_acknowledged_company_not_flagged(test_db):
 
 
 def test_acknowledged_search_not_flagged(test_db):
-    s = Search(name="AckSearch", search_mode="keyword", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="AckSearch", search_mode="keyword", active=True)
     test_db.add(s)
     test_db.commit()
     for i in range(3):
@@ -256,7 +260,7 @@ def test_failed_run_after_acknowledge_flags_again(test_db):
 
 def test_acknowledge_also_covers_a_failed_board_on_the_last_run(test_db):
     """The single-board branch (e.g. "ZipRecruiter failed") honours the acknowledgement too, so it doesn't stay amber forever."""
-    s = Search(name="BoardSearch", search_mode="keyword", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="BoardSearch", search_mode="keyword", active=True)
     test_db.add(s)
     test_db.commit()
     log = _log(search_id=s.id, ago_min=1)

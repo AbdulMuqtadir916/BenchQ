@@ -252,3 +252,12 @@ def mock_telegram(monkeypatch):
     import httpx
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: client)
     return sent
+
+
+@pytest.fixture
+def default_firm(test_db):
+    """The Default firm (migration 0003) for tests that write firm-owned rows directly (tests/firm_support.py)."""
+    from backend.tests.firm_support import default_firm_id
+    firm_id = default_firm_id(test_db)
+    test_db.commit()
+    return firm_id

@@ -14,9 +14,12 @@ frozen pre-Alembic bootstrap (models.db.create_tables) from creating them.
 import uuid
 
 from sqlalchemy import (
-    ARRAY, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, text,
+    ARRAY, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
+    text,
 )
+from sqlalchemy import event
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Session as OrmSession
 
 from backend.models.db import Base, utcnow
 
@@ -34,13 +37,17 @@ LEDGER_ACTIONS = (
     "INVITE_SENT", "INVITE_ACCEPTED", "INVITE_REVOKED",
 )
 CLAIM_STATES = ("VERIFIED", "UNVERIFIED", "CONTRADICTED")
+FIRM_JOB_ORIGINS = ("SCRAPED", "CAPTURED")
+# Job.source values a person captured by hand (migration 0005 backfills these as CAPTURED). Their routes link them.
+CAPTURED_SOURCES = ("manual", "extension")
 
 # The same pattern as the frontend's SlugSchema (src/lib/schemas/tenancy.ts): 3-32 characters, a letter first,
 # lowercase letters, digits and single inner hyphens. Reserved words are refused in code, not here.
 SLUG_PATTERN = r"^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){2,31}$"
 SHA256_HEX = r"^[0-9a-f]{64}$"
 
-# Fixed ids for the rows migration 0003 creates; F2b fills `firm_id` on today's data with DEFAULT_FIRM_ID.
+# Fixed ids for the rows migration 0003 creates; migration 0005 (F2b) fills `firm_id` on the rows that existed before
+# it with DEFAULT_FIRM_ID.
 DEFAULT_PLAN_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
 DEFAULT_FIRM_ID = uuid.UUID("00000000-0000-4000-8000-000000000002")
 
@@ -283,3 +290,55 @@ class LedgerEntry(Base):
         Index("ix_ledger_entries_created", "created_at"),
         ALEMBIC_ONLY,
     )
+
+
+class FirmJob(Base):
+    """Which jobs a firm sees (07 Q37): `jobs` is one shared pool, and a firm sees the jobs its own searches found
+    plus the ones its people captured by hand. The API gives a job its firm through this link. A captured job is
+    linked only to the firm that captured it."""
+    __tablename__ = "firm_jobs"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False)   # leads uq_firm_jobs_firm_job
+    # The link means nothing without the posting, and old skipped jobs are cleaned up, so it goes with the job.
+    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    origin = Column(String, nullable=False)
+    search_id = Column(UUID(as_uuid=True), ForeignKey("searches.id", ondelete="SET NULL"), nullable=True)
+    captured_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True)
+    created_at = _created_at()
+    updated_at = _updated_at()
+
+    __table_args__ = (
+        CheckConstraint(_in("origin", FIRM_JOB_ORIGINS), name="ck_firm_jobs_origin"),
+        CheckConstraint("origin = 'CAPTURED' OR captured_by_user_id IS NULL", name="ck_firm_jobs_scraped_no_capturer"),
+        UniqueConstraint("firm_id", "job_id", name="uq_firm_jobs_firm_job"),
+        ALEMBIC_ONLY,
+    )
+
+
+def link_job_to_firm(db, firm_id: uuid.UUID, job_id: uuid.UUID, origin: str, *, search_id: uuid.UUID | None = None,
+                     captured_by_user_id: uuid.UUID | None = None) -> None:
+    """Let a firm see a job (07 Q37). Idempotent: a job the firm already sees keeps its first link."""
+    with db.no_autoflush:
+        exists = db.query(FirmJob.id).filter(FirmJob.firm_id == firm_id, FirmJob.job_id == job_id).first()
+        pending = any(isinstance(o, FirmJob) and o.firm_id == firm_id and o.job_id == job_id for o in db.new)
+    if not exists and not pending:
+        db.add(FirmJob(firm_id=firm_id, job_id=job_id, origin=origin, search_id=search_id,
+                       captured_by_user_id=captured_by_user_id))
+
+
+@event.listens_for(OrmSession, "before_flush")
+def _link_scraped_jobs(db, _flush_context, _instances) -> None:
+    """Every scraper source creates `Job` rows its own way, so the link to a firm is made here, once, for all of
+    them: a new job that a search found goes to that search's firm. Jobs captured by hand are linked by the route
+    that captures them. Left for the Jobs track: jobs from company pages (companies are global reference data
+    with no firm yet, 07 §6.4), and a job already in the pool that another firm's search finds again."""
+    from backend.models.db import Job, Search
+    for job in [o for o in db.new
+                if isinstance(o, Job) and o.search_id is not None and o.source not in CAPTURED_SOURCES]:
+        if job.id is None:
+            job.id = uuid.uuid4()
+        with db.no_autoflush:
+            firm_id = db.query(Search.firm_id).filter(Search.id == job.search_id).scalar()
+        if firm_id is not None:
+            link_job_to_firm(db, firm_id, job.id, "SCRAPED", search_id=job.search_id)

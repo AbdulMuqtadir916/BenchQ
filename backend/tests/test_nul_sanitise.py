@@ -22,6 +22,9 @@ import pytest
 import sqlalchemy.orm as sa_orm
 
 from backend.models.db import Job, Search, sanitize_text
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 # ── 1. sanitize_text() the raw helper ───────────────────────────────────────
@@ -138,7 +141,7 @@ def test_jobright_run_saves_clean_jobs_when_one_job_fails_to_insert(test_db, mon
     """
     from backend.scraper.sources import jobright as jobright_mod
 
-    search = Search(name="JR test", search_mode="jobright", search_term="engineer",
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="JR test", search_mode="jobright", search_term="engineer",
                      location="", min_fit_score=0, require_salary=False,
                      title_include_keywords=[], title_exclude_keywords=[],
                      company_exclude=[])

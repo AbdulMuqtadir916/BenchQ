@@ -1,15 +1,18 @@
 """Tracer /cv/{token} endpoint: redirect must succeed even if click-log commit fails."""
 import uuid
 import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def test_tracer_redirect_succeeds_normally(api_client, test_db):
     """Happy path: valid token -> 302 to destination URL + click recorded."""
     from backend.models.db import Resume, TracerLink
-    resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
     test_db.commit()
-    link = TracerLink(
+    link = TracerLink(firm_id=DEFAULT_FIRM_ID, 
         id=uuid.uuid4(),
         token="abc123",
         resume_id=resume.id,
@@ -30,10 +33,10 @@ def test_tracer_redirect_succeeds_normally(api_client, test_db):
 def test_tracer_redirect_needs_no_session(anonymous_client, test_db):
     """The public /cv/{token} redirect works with no session: recruiters click it from a PDF."""
     from backend.models.db import Resume, TracerLink
-    resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
     test_db.commit()
-    link = TracerLink(
+    link = TracerLink(firm_id=DEFAULT_FIRM_ID, 
         id=uuid.uuid4(),
         token="pub789",
         resume_id=resume.id,
@@ -60,10 +63,10 @@ def test_tracer_redirect_needs_no_session(anonymous_client, test_db):
 def test_tracer_redirect_param_style_needs_no_session(anonymous_client, test_db):
     """Param-style links (?cv=token on root) also need no session, since resumes were exported in both /cv/{token} and ?cv={token} shapes."""
     from backend.models.db import Resume, TracerLink
-    resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
     test_db.commit()
-    link = TracerLink(
+    link = TracerLink(firm_id=DEFAULT_FIRM_ID, 
         id=uuid.uuid4(),
         token="qp123",
         resume_id=resume.id,
@@ -90,10 +93,10 @@ def test_root_without_cv_is_not_a_tracer(api_client, test_db):
 def test_tracer_redirect_survives_commit_failure(api_client, test_db, monkeypatch):
     """A commit failure in click-log must NOT break the 302 redirect."""
     from backend.models.db import Resume, TracerLink
-    resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
     test_db.commit()
-    link = TracerLink(
+    link = TracerLink(firm_id=DEFAULT_FIRM_ID, 
         id=uuid.uuid4(),
         token="def456",
         resume_id=resume.id,

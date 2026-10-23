@@ -238,6 +238,7 @@ async def _tracer_click_and_redirect(token: str, request: Request):
 
         try:
             event = TracerClickEvent(
+                firm_id=link.firm_id,
                 tracer_link_id=link.id,
                 device_type=device_type,
                 ua_family=ua_family,

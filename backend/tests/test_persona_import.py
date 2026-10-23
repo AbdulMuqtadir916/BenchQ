@@ -4,6 +4,9 @@ import uuid
 import pytest
 
 from backend.models.db import ActivityLog, Persona, Resume
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _seed(test_db):
@@ -39,7 +42,7 @@ RESUME_JSON = {
 
 
 def _make_base(test_db, name="Platform PM", json_data=None, is_base=True, parent_id=None):
-    r = Resume(name=name, is_base=is_base, parent_id=parent_id,
+    r = Resume(firm_id=DEFAULT_FIRM_ID, name=name, is_base=is_base, parent_id=parent_id,
                template="garamond_alt", page_format="letter",
                json_data=json_data if json_data is not None else RESUME_JSON)
     test_db.add(r)
