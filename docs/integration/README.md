@@ -51,8 +51,8 @@ pnpm dev                                 # http://localhost:3000
 
 **Then pick up a module:**
 
-1. Choose the next free track on the [module board](#module-board) — respect **Depends on** — and
-   put your name in **Owner**.
+1. Find your track on the [module board](#module-board) (owners are assigned; see "Team and order" under it).
+   Respect **Depends on**.
 2. Read that module's file end to end.
 3. Create your branch from `main`: `git checkout -b integrate/<module>`.
 4. Follow [the workflow for one module](#the-workflow-for-one-module). If you use Claude, start it
@@ -221,25 +221,43 @@ dependencies are live; only switching the adapter to live waits.
 
 | # | Foundation step | Depends on | Owner | Status |
 |---|---|---|---|---|
-| 00 | [Monorepo + proxy](./00-foundation.md) (Part A); Parts B/C are replaced by F3/F6 | — | | Part A done |
-| F1 | Alembic baseline | 00 | | Done (#29, #30) |
-| F2 | Auth + tenancy tables; `firm_id` on existing tables, backfilled to a default firm | F1 | | F2a tables done (#33); F2b (`firm_id`, `firm_jobs`, migration 0005) built; **F2c** (settings) not started |
-| F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | | Done except the support-view endpoints (#34, #36) |
-| F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | | Policy table + `require` done (#35); the firm-scoping dependency and its lint test wait for F2b |
-| F5 | Seed script: the mocks' firms, accounts and data | F2 | | Done for firms, plans, accounts and invites (#38); module data lands with each track |
-| F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | | Live behind flag (#40, #41): `NEXT_PUBLIC_LIVE_MODULES=session`. Server-side principal, mock sign-in removal and the legacy schema path not started |
-| F7 | Reusable cross-firm isolation test over every route | F4 | | Not started |
+| 00 | [Monorepo + proxy](./00-foundation.md) (Part A); Parts B/C are replaced by F3/F6 | — | — | Part A done |
+| F1 | Alembic baseline | 00 | — | Done (#29, #30) |
+| F2 | Auth + tenancy tables; `firm_id` on existing tables, backfilled to a default firm | F1 | Abdul | F2a tables done (#33); F2b (`firm_id`, `firm_jobs`, migration 0005) built; **F2c** (settings) not started |
+| F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | Abdul | Done except the support-view endpoints (#34, #36) |
+| F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | Abdul | Policy table + `require` done (#35); the firm-scoping dependency and its lint test wait for F2b |
+| F5 | Seed script: the mocks' firms, accounts and data | F2 | Abdul | Done for firms, plans, accounts and invites (#38); module data lands with each track |
+| F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | Abdul | Live behind flag (#40, #41): `NEXT_PUBLIC_LIVE_MODULES=session`. Server-side principal, mock sign-in removal and the legacy schema path not started |
+| F7 | Reusable cross-firm isolation test over every route | F4 | Uzair | Not started |
 
 | Track | Module | Depends on | Owner | Status |
 |---|---|---|---|---|
-| 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6) | F1–F7 | | Not started |
-| 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md) | F1–F7; shared-pool decision (07 §2) | | Not started |
-| — | Candidates (D1) | F1–F7; D1 | | Not started |
-| — | Admin API (firms, plans, users, invites, platform team, audit) | F1–F7 | | In progress: create firm, invites, read lists live behind flag (#36, #39, #40); firm edits, suspend, plans, limits, user deactivate, platform-team invites not started |
-| 03 | [Applications](./03-applications.md) (10 statuses, D3) | 02, Candidates, D3 | | Not started |
-| 04 | [Resumes + claims + AI tailoring](./04-resumes-and-tailoring.md) (D4) | 02, Candidates, D4 | | Not started |
-| 05 | [Analytics](./05-analytics.md) | 03 | | Not started |
+| 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6) | F1–F7 | Abdul | Not started |
+| 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md) | F1–F7; shared-pool decision (07 §2) | Zuhair | Not started |
+| — | Candidates (D1) | F1–F7; D1 | Zuhair | Not started |
+| — | Admin API (firms, plans, users, invites, platform team, audit) | F1–F7 | Uzair (after F7) | In progress: create firm, invites, read lists live behind flag (#36, #39, #40); firm edits, suspend, plans, limits, user deactivate, platform-team invites not started |
+| 03 | [Applications](./03-applications.md) (10 statuses, D3) | 02, Candidates, D3 | Samad | Not started |
+| 04 | [Resumes + claims + AI tailoring](./04-resumes-and-tailoring.md) (D4), then resume scoring (`cv_score`, `score-check`) | 02, Candidates, D4 | Zuhair | Not started |
+| 05 | [Analytics](./05-analytics.md) | 03 | First free owner, after 03 | Not started |
+| — | Job extension: capture and autofill, per-user access tokens (07 §2). Not in this repo yet (`backend/UPSTREAM.md`) | 02; a proposal signed off by the product owner | Samad | Proposal first |
+| — | Gmail inbox per candidate (D8): OAuth, token storage, status updates on applications | Candidates, 03; a design signed off by the product owner | Samad | Design first |
+| — | Production readiness: prod Docker config, the scheduler out of the API process (one worker until then), logging, a security pass; CI and test health | F7 | Uzair | Not started |
 | 06 | [Open decisions](./06-open-decisions.md) | Product decision | Product owner | D1–D4 recommended in 07 §2 |
+
+### Team and order (agreed 2026-10-23)
+
+Abdul Muqtadir is the product owner, the only code owner and the reviewer of every PR (`CONTRIBUTING.md`).
+
+- **Wave 1:** each owner rewrites their own module file for tenancy (`firm_id`, scoping, the ledger, Q37's
+  D1–D4) against [`07-auth-and-tenancy.md`](./07-auth-and-tenancy.md), as their first PR. Abdul approves it
+  before any code. Samad's wave-1 PR is the job-extension proposal and the Gmail (D8) design.
+- **Abdul:** F2b (`firm_id` on the existing tables, `firm_jobs`), the firm-scoping helper, Ledger as the worked
+  example, then F2c, the support-view endpoints and the rest of F6.
+- **Zuhair:** Candidates, then job scraping (live once `firm_jobs` lands), then resume tailoring and claims,
+  then resume scoring.
+- **Samad:** the extension and Gmail designs, then the extension after Jobs, then Applications with the Gmail
+  inbox after Candidates.
+- **Uzair:** F7, CI and test health, production readiness, then the rest of the Admin API.
 
 Status values: `Not started` → `In progress` → `Live behind flag` → `Done (mock deleted)`.
 
