@@ -3,12 +3,15 @@ import pytest
 from unittest.mock import AsyncMock
 
 from backend.models.db import Resume, Job, Setting
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 @pytest.mark.asyncio
 async def test_score_unscored_jobs_uses_resumes(test_db, monkeypatch):
     """Seed 1 base Resume + 1 unscored Job → analyze_unscored_jobs scores it using the Resume's text, with the Resume's name as the key."""
-    pm = Resume(
+    pm = Resume(firm_id=DEFAULT_FIRM_ID, 
         name="PM",
         is_base=True,
         template="inter",

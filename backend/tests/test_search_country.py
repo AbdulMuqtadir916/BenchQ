@@ -8,6 +8,9 @@ a per-search value and pin the backfill that derives it from existing rows.
 import pytest
 
 from backend.models.db import Search
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _search(db, **kw):
@@ -16,7 +19,7 @@ def _search(db, **kw):
     kw.setdefault("title_exclude_keywords", [])
     kw.setdefault("company_filter", [])
     kw.setdefault("company_exclude", [])
-    s = Search(name="Country probe", search_mode="keyword", active=True,
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="Country probe", search_mode="keyword", active=True,
                search_term="program manager", **kw)
     db.add(s)
     db.commit()

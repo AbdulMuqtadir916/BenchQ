@@ -1,10 +1,13 @@
 """Tests for /api/searches guards on the built-in extension searches ("Extension"/"Extension LI" have no scraper; the v2 UI hides Run/Test/Delete for them, and PATCH stays allowed)."""
 import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _mk_search(db, mode):
     from backend.models.db import Search
-    s = Search(name=f"Extension {mode}", search_mode=mode, active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name=f"Extension {mode}", search_mode=mode, active=True)
     db.add(s)
     db.commit()
     return str(s.id)
@@ -63,7 +66,7 @@ def _mk_keyword_search(db, **kw):
     # title_exclude_keywords defaults to ["intern", "junior", "associate"]; blank it so these
     # tests measure only the global list, unless a test deliberately exercises the per-search layer.
     kw.setdefault("title_exclude_keywords", [])
-    s = Search(name="Global exclude probe", search_mode="keyword", active=True,
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="Global exclude probe", search_mode="keyword", active=True,
                sources=["indeed"], search_term="program manager", **kw)
     db.add(s)
     db.commit()

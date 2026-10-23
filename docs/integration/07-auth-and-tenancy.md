@@ -4,8 +4,8 @@
 **2026-10-22:** onboarding PRs 1–7 are merged (#33–#41): F2a, F3 (without the support-view endpoints), F4 (the policy
 table and `require`; the firm-scoping dependency and its lint test wait for F2b), F5, the Admin API's firms, invites
 and read lists, Phase M's backend, and F6 for the session, invites, team and admin adapters **as an opt-in**
-(`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **Still to do:**
-F2b, F2c, the support-view endpoints, F7, and the rest of F6 (live by default, mock sign-in removed, the session read
+(`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **2026-10-23:** F2b built (migration 0005, see
+F2 below). **Still to do:** F2c, the support-view endpoints, F7, and the rest of F6 (live by default, mock sign-in removed, the session read
 on the server, the legacy schema path deleted).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
@@ -208,6 +208,24 @@ backend only; the frontend keeps running on mocks until F6.**
 - `jobs.short_id` (a global sequence used in URLs) is not exposed to firms; firm URLs use the UUID (§6.7).
 - **Done when:** upgrade and downgrade both run on a copy of a dev database; nothing reads the new
   columns yet.
+
+**F2b as built (migration 0005, agreed 2026-10-23):**
+
+- `firm_id` NOT NULL (FK `firms` RESTRICT, indexed) on `searches`, `applications`, `interviews`, `resumes`,
+  `cover_letters`, `tracer_links`, `tracer_click_events`; each child carries its own column, so one scoping rule
+  covers every table. Nullable on `job_runs` and `llm_call_log`; nothing writes it there yet. `personas` is
+  untouched. Existing rows go to the Default firm, which migration 0003 already creates on every database.
+- `firm_jobs` (`firm_id`, `job_id`, `origin` SCRAPED | CAPTURED, `search_id`, `captured_by_user_id`), unique per
+  firm and job. Existing jobs are linked to the Default firm: CAPTURED when `source` is `manual` or `extension`,
+  else SCRAPED. `job_id` is ON DELETE CASCADE (not RESTRICT), so the job cleanup keeps working.
+- Writes: every firm route that creates a firm-owned row takes `firm_id` from the signed-in user
+  (`backend/auth/scoping.py` `writer_firm_id`; a Super Admin gets 403). A hand-added, extension-saved or
+  logged job is linked CAPTURED by that user. A new job a search finds is linked SCRAPED to the search's firm
+  (a `before_flush` listener in `models/tenancy.py`). Searches (Super Admin routes), Telegram and the startup
+  seeds write to the Default firm. Tracer links and clicks take their document's firm.
+- **Left for the Jobs track:** a job already in the pool that another firm's search finds again, and jobs from
+  company pages, are not linked yet. Who owns a search (a firm, or the platform for every firm) is decided there.
+- Reads are not filtered yet: the firm-scoping dependency and its lint test (F4) are the next PR.
 
 ### F3 — Auth endpoints, returning the frontend's `Session`
 

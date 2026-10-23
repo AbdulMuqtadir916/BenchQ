@@ -1,5 +1,9 @@
 """Company aliases collapse in filter list + expand in filter application (#aliases)."""
 from backend.models.db import Company, Job
+import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _seed_amazon_with_aliases(test_db):
@@ -75,7 +79,7 @@ def test_update_application_returns_canonical_company(api_client, test_db):
     job = Job(external_id="upd1", content_hash="uh1", company="Audible", title="PM", status="applied")
     test_db.add(job)
     test_db.flush()
-    app_row = Application(job_id=job.id, status="applied")
+    app_row = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status="applied")
     test_db.add(app_row)
     test_db.commit()
 

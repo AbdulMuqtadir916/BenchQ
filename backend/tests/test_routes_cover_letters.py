@@ -3,6 +3,9 @@ import uuid
 import pytest
 
 from backend.models.db import Setting, Resume, Job
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _seed_first_run(db):
@@ -11,7 +14,7 @@ def _seed_first_run(db):
 
 
 def _make_resume(db, name="PM"):
-    r = Resume(id=uuid.uuid4(), name=name, is_base=True,
+    r = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name=name, is_base=True,
                json_data={"header": {"name": "Viktor"}, "summary": "PM."})
     db.add(r)
     db.commit()
@@ -211,9 +214,9 @@ def test_tracer_link_is_shared_by_both_owners(test_db):
     job = Job(id=uuid.uuid4(), external_id=uuid.uuid4().hex, company="Acme", title="PM",
               url="https://acme.com/1", status="saved", short_id=7777)
     test_db.add(job)
-    resume = Resume(id=uuid.uuid4(), name="PM", is_base=False, job_id=job.id,
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="PM", is_base=False, job_id=job.id,
                     json_data={"header": {"name": "V", "contact_items": [{"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "l"}]}})
-    cl = CoverLetter(id=uuid.uuid4(), name="PM CL", job_id=job.id,
+    cl = CoverLetter(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="PM CL", job_id=job.id,
                      json_data={"header": {"name": "V", "contact_items": [{"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "l"}]}})
     test_db.add(resume)
     test_db.add(cl)
@@ -241,7 +244,7 @@ def test_base_resume_stub_uses_zero_prefix(test_db):
     test_db.add(Setting(key="tracer_links_enabled", value="true"))
     test_db.add(Setting(key="tracer_links_base_url", value="https://t.example.com"))
     test_db.add(Setting(key="tracer_links_url_style", value="path_jobid"))
-    resume = Resume(id=uuid.uuid4(), name="Base", is_base=True, job_id=None,
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="Base", is_base=True, job_id=None,
                     json_data={"header": {"name": "V", "contact_items": [
                         {"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "li"}]}})
     test_db.add(resume)
@@ -265,7 +268,7 @@ def test_base_resume_without_stub_stays_random(test_db):
     test_db.add(Setting(key="tracer_links_enabled", value="true"))
     test_db.add(Setting(key="tracer_links_base_url", value="https://t.example.com"))
     test_db.add(Setting(key="tracer_links_url_style", value="path_jobid"))
-    resume = Resume(id=uuid.uuid4(), name="Base", is_base=True, job_id=None,
+    resume = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="Base", is_base=True, job_id=None,
                     json_data={"header": {"name": "V", "contact_items": [
                         {"text": "Portfolio", "url": "example.com/v"}]}})
     test_db.add(resume)

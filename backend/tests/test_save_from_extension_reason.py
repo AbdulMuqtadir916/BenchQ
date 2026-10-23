@@ -2,6 +2,9 @@
 import pytest
 
 from backend.models.db import Job, Search, Setting
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 @pytest.fixture
@@ -16,7 +19,7 @@ def _no_h1b(monkeypatch):
 
 
 def _ext_search(db, exclude=None, include=None, company_exclude=None):
-    s = Search(name="Extension", search_mode="extension", active=True,
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="Extension", search_mode="extension", active=True,
                title_include_keywords=include or [],
                title_exclude_keywords=exclude or [],
                company_filter=[], company_exclude=company_exclude or [],
@@ -29,9 +32,10 @@ def _ext_search(db, exclude=None, include=None, company_exclude=None):
 async def _save(db, title="Product Manager", company="Acme",
                 url="https://acme.test/jobs/1"):
     from backend.api.routes_jobs import save_from_extension
+    from backend.tests.firm_support import default_firm_writer
     return await save_from_extension(
         {"title": title, "company": company, "url": url,
-         "description": "An ordinary description."}, db=db)
+         "description": "An ordinary description."}, db=db, **default_firm_writer(db))
 
 
 @pytest.mark.asyncio

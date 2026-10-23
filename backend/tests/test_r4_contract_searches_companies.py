@@ -10,6 +10,9 @@ from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
     make_company, make_search, big_string, EMOJI, MISSING_UUID,
 )
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 # ══ Searches ═════════════════════════════════════════════════════════════════
@@ -37,7 +40,7 @@ def test_create_search_applies_every_documented_default(client):
 
 
 def test_create_search_drops_unknown_fields(client):
-    """extra='ignore' — a stray key must never reach Search(**model_dump())."""
+    """extra='ignore' — a stray key must never reach Search(firm_id=DEFAULT_FIRM_ID, **model_dump())."""
     assert_clean(client.post("/api/searches",
                              json={"name": "S", "id": MISSING_UUID, "bogus": 1}), 200)
 

@@ -14,6 +14,9 @@ from backend.tests.r4_support import (  # noqa: F401  (fixtures)
     client, _clear_running_state, _no_outbound,
     make_job, make_resume, set_setting,
 )
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _install_fake_running(monkeypatch, entries):
@@ -200,7 +203,7 @@ def test_tailor_meta_replaces_true_when_a_copy_exists(client, test_db, monkeypat
     set_setting(test_db, "cv_tailor_prompt", "do it")
     base = make_resume(test_db, name="PM")
     job = make_job(test_db, description="JD")
-    test_db.add(Resume(name="PM → Acme", is_base=False, job_id=job.id,
+    test_db.add(Resume(firm_id=DEFAULT_FIRM_ID, name="PM → Acme", is_base=False, job_id=job.id,
                        json_data={"header": {"name": "A"}}))
     test_db.commit()
     gate = asyncio.Event()
@@ -238,7 +241,7 @@ def test_score_check_meta_labels_a_job_linked_copy_tailored(client, test_db, mon
     import backend.api.routes_resumes as rr
     from backend.models.db import Resume
     job = make_job(test_db, description="A long enough job description to score against.")
-    copy = Resume(name="PM → Acme", is_base=False, job_id=job.id,
+    copy = Resume(firm_id=DEFAULT_FIRM_ID, name="PM → Acme", is_base=False, job_id=job.id,
                   json_data={"summary": "A tailored summary that is comfortably "
                                         "longer than the fifty character floor."})
     test_db.add(copy)

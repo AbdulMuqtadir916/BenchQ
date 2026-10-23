@@ -14,6 +14,7 @@ import uuid
 from unittest.mock import MagicMock
 
 import pytest
+from backend.tests.firm_support import default_firm_id
 
 # Text that must never appear in a response body reaching the browser.
 LEAK_MARKERS = (
@@ -166,7 +167,7 @@ def make_company(db, name="Acme", **kw):
 
 def make_search(db, name="S1", **kw):
     from backend.models.db import Search
-    s = Search(name=name, **kw)
+    s = Search(firm_id=default_firm_id(db), name=name, **kw)
     db.add(s)
     db.commit()
     db.refresh(s)
@@ -175,7 +176,8 @@ def make_search(db, name="S1", **kw):
 
 def make_resume(db, name="Base", is_base=True, **kw):
     from backend.models.db import Resume
-    r = Resume(name=name, is_base=is_base, json_data=kw.pop("json_data", {"header": {"name": "A"}}), **kw)
+    r = Resume(firm_id=default_firm_id(db), name=name, is_base=is_base,
+               json_data=kw.pop("json_data", {"header": {"name": "A"}}), **kw)
     db.add(r)
     db.commit()
     db.refresh(r)

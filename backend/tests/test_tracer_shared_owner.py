@@ -2,6 +2,10 @@
 from backend.api.routes_resumes import _rewrite_urls_with_tracers, get_tracer_stats
 from backend.api.routes_cover_letters import get_tracer_stats as get_cl_tracer_stats
 from backend.models.db import CoverLetter, Job, Resume, Setting, TracerClickEvent, TracerLink
+import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 JOB_ID = "1a111111-11a1-41a1-8111-111111111111"
 RESUME_ID = "2b222222-22b2-42b2-8222-222222222222"
@@ -21,8 +25,8 @@ def _setup(db):
         db.add(Setting(key=k, value=v))
     db.add(Job(id=JOB_ID, short_id=20892, external_id="ext-r3b03", title="PM",
                 company="Anthropic", url="https://x.test/1"))
-    db.add(Resume(id=RESUME_ID, name="Base → Anthropic", job_id=JOB_ID, json_data=_header()))
-    db.add(CoverLetter(id=CL_ID, name="Anthropic", job_id=JOB_ID, resume_id=RESUME_ID,
+    db.add(Resume(firm_id=DEFAULT_FIRM_ID, id=RESUME_ID, name="Base → Anthropic", job_id=JOB_ID, json_data=_header()))
+    db.add(CoverLetter(firm_id=DEFAULT_FIRM_ID, id=CL_ID, name="Anthropic", job_id=JOB_ID, resume_id=RESUME_ID,
                        json_data=_header()))
     db.commit()
 
@@ -64,7 +68,7 @@ def test_clicks_stay_attributed_across_renders(test_db):
     _setup(test_db)
     _render_resume(test_db)
     link = test_db.query(TracerLink).one()
-    test_db.add(TracerClickEvent(tracer_link_id=link.id, is_likely_bot=False))
+    test_db.add(TracerClickEvent(firm_id=DEFAULT_FIRM_ID, tracer_link_id=link.id, is_likely_bot=False))
     test_db.commit()
 
     _render_letter(test_db)

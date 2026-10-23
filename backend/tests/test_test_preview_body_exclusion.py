@@ -5,6 +5,9 @@ import types
 import pytest
 
 from backend.models.db import Company, Search, Setting
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 PHRASE = "sponsorship is not available"
 BODY_HIT = "We are a great team. Sponsorship is not available for this role. Apply now."
@@ -42,7 +45,7 @@ async def test_search_preview_marks_the_body_excluded_row(test_db):
         _jrow("Program Manager", BODY_CLEAN),
         _jrow("Delivery Manager", BODY_HIT),
     ])
-    search = Search(name="ZZ", search_mode="keyword", sources=["indeed"],
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="ZZ", search_mode="keyword", sources=["indeed"],
                     title_include_keywords=[], title_exclude_keywords=[],
                     company_filter=[], company_exclude=[])
     test_db.add(search)
@@ -74,7 +77,7 @@ async def test_search_preview_says_when_it_cannot_check(test_db):
 
     _phrases(test_db)
     _fake_jobspy([_jrow("Program Manager", "")])
-    search = Search(name="ZZ", search_mode="keyword", sources=["indeed"],
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="ZZ", search_mode="keyword", sources=["indeed"],
                     title_include_keywords=[], title_exclude_keywords=[],
                     company_filter=[], company_exclude=[])
     test_db.add(search)
@@ -93,7 +96,7 @@ async def test_search_preview_unchanged_with_no_phrases_configured(test_db):
     from backend.api.routes_searches import test_search
 
     _fake_jobspy([_jrow("Program Manager", BODY_HIT)])
-    search = Search(name="ZZ", search_mode="keyword", sources=["indeed"],
+    search = Search(firm_id=DEFAULT_FIRM_ID, name="ZZ", search_mode="keyword", sources=["indeed"],
                     title_include_keywords=[], title_exclude_keywords=[],
                     company_filter=[], company_exclude=[])
     test_db.add(search)

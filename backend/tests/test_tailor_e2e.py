@@ -4,6 +4,9 @@ import uuid
 import pytest
 
 from backend.models.db import Setting, Resume, Job
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 @pytest.mark.asyncio
@@ -14,7 +17,7 @@ async def test_tailor_end_to_end(api_client, test_db, monkeypatch):
     job = Job(external_id="e2e1", content_hash="e2e1c", company="Acme", title="PM", description="jd")
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template="inter",
                   json_data={"summary": "s", "experience": [], "skills": {}})
     test_db.add(base)
     test_db.commit()

@@ -6,6 +6,9 @@ from backend.api.routes_resumes import _rewrite_urls_with_tracers
 import uuid
 
 from backend.models.db import Resume, Setting, TracerLink
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _settings(db, style="param_jobid"):
@@ -27,7 +30,7 @@ def _render(header, resume_id, db):
     """tracer_links.resume_id is a foreign key, which Postgres enforces (SQLite didn't): the résumé must exist,
     or every insert fails and the rewrite quietly mints nothing."""
     if db.get(Resume, uuid.UUID(resume_id)) is None:
-        db.add(Resume(id=uuid.UUID(resume_id), name="Base", is_base=True))
+        db.add(Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.UUID(resume_id), name="Base", is_base=True))
         db.commit()
     return _rewrite_urls_with_tracers(header, resume_id, db)
 

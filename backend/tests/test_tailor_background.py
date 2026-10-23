@@ -4,6 +4,9 @@ import pytest
 from unittest.mock import AsyncMock
 
 from backend.models.db import Setting
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 # The gate itself lives in job_monitor now (launch_background has to take it
@@ -54,7 +57,7 @@ async def test_tailor_endpoint_returns_202_with_run_id(api_client, test_db, monk
               description="Looking for PM with 3 years exp")
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template="inter",
                   json_data={"summary": "s", "experience": [], "skills": {}})
     test_db.add(base)
     test_db.commit()
@@ -89,7 +92,7 @@ async def test_tailor_creates_job_run_with_target_job_id(api_client, test_db, mo
     job = Job(external_id="t2", content_hash="t2c", company="Acme", title="PM", description="jd")
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template="inter",
                   json_data={"summary": "s", "experience": [], "skills": {}})
     test_db.add(base)
     test_db.commit()

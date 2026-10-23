@@ -1,6 +1,10 @@
 """Deleting a tailored copy must clear its `Tailored` cv_scores entry, scoring_report entry, and any best_cv pointing at it."""
 from backend.api.routes_resumes import delete_resume
 from backend.models.db import Job, Resume
+import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 JOB_ID = "4d444444-44d4-44d4-8444-444444444444"
 BASE_ID = "5e555555-55e5-45e5-8555-555555555555"
@@ -15,9 +19,9 @@ def _job(db, scores, report=None, best="Tailored", best_score=35.0):
 
 
 def _copies(db, *ids):
-    db.add(Resume(id=BASE_ID, name="PM", is_base=True, json_data={}))
+    db.add(Resume(firm_id=DEFAULT_FIRM_ID, id=BASE_ID, name="PM", is_base=True, json_data={}))
     for rid in ids:
-        db.add(Resume(id=rid, name="PM → Anthropic", is_base=False,
+        db.add(Resume(firm_id=DEFAULT_FIRM_ID, id=rid, name="PM → Anthropic", is_base=False,
                       parent_id=BASE_ID, job_id=JOB_ID, json_data={}))
 
 

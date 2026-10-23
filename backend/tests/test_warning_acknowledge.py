@@ -7,6 +7,9 @@ from fastapi import HTTPException
 from backend.api.routes_companies import acknowledge_company_warning
 from backend.api.routes_searches import acknowledge_search_warning
 from backend.models.db import Company, Search, ScrapeLog, is_acknowledged
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 MISSING_ID = "d4dddddd-ddd4-4dd4-8ddd-dddddddddddd"
 
@@ -44,7 +47,7 @@ def test_acknowledge_company_404_on_unknown_id(test_db):
 # ── POST /api/searches/{id}/acknowledge ──────────────────────────────────────
 
 def test_acknowledge_search_stamps_now(test_db):
-    s = Search(name="AckEndpointSearch", search_mode="keyword", active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="AckEndpointSearch", search_mode="keyword", active=True)
     test_db.add(s)
     test_db.commit()
 
@@ -64,7 +67,7 @@ def test_acknowledge_search_404_on_unknown_id(test_db):
 @pytest.mark.parametrize("mode", ["extension", "linkedin_extension"])
 def test_acknowledge_search_409_on_builtin_extension_searches(test_db, mode):
     """The seeded extension searches never scrape, so there is no scrape health to acknowledge — same guard /run and DELETE use."""
-    s = Search(name=f"Extension {mode}", search_mode=mode, active=True)
+    s = Search(firm_id=DEFAULT_FIRM_ID, name=f"Extension {mode}", search_mode=mode, active=True)
     test_db.add(s)
     test_db.commit()
 
@@ -96,8 +99,8 @@ def test_is_acknowledged_tolerates_naive_datetimes():
 
 def test_scrape_summary_ignores_switched_off_entities(test_db):
     from backend.scheduler import _scrape_summary
-    live = Search(name="Live", search_mode="keyword", active=True)
-    paused = Search(name="Paused", search_mode="keyword", active=False)
+    live = Search(firm_id=DEFAULT_FIRM_ID, name="Live", search_mode="keyword", active=True)
+    paused = Search(firm_id=DEFAULT_FIRM_ID, name="Paused", search_mode="keyword", active=False)
     off_co = Company(name="OffCo", active=False)
     test_db.add_all([live, paused, off_co])
     test_db.commit()
@@ -126,7 +129,7 @@ def test_scrape_summary_does_not_call_a_productive_run_empty(test_db):
     was true only while is_warning meant jobs_found == 0.
     """
     from backend.scheduler import _scrape_summary
-    live = Search(name="Live", search_mode="keyword", active=True)
+    live = Search(firm_id=DEFAULT_FIRM_ID, name="Live", search_mode="keyword", active=True)
     test_db.add(live)
     test_db.commit()
 
@@ -148,7 +151,7 @@ def test_scrape_summary_does_not_call_a_productive_run_empty(test_db):
 def test_scrape_summary_still_counts_a_genuinely_empty_run(test_db):
     """The control: no error, no board detail, nothing found — still "empty"."""
     from backend.scheduler import _scrape_summary
-    live = Search(name="Live", search_mode="keyword", active=True)
+    live = Search(firm_id=DEFAULT_FIRM_ID, name="Live", search_mode="keyword", active=True)
     test_db.add(live)
     test_db.commit()
     test_db.add(ScrapeLog(search_id=live.id, source="levels_fyi", jobs_found=0,
@@ -160,7 +163,7 @@ def test_scrape_summary_still_counts_a_genuinely_empty_run(test_db):
 
 def test_scrape_summary_still_reports_active_entities(test_db):
     from backend.scheduler import _scrape_summary
-    live = Search(name="Live", search_mode="keyword", active=True)
+    live = Search(firm_id=DEFAULT_FIRM_ID, name="Live", search_mode="keyword", active=True)
     test_db.add(live)
     test_db.commit()
     test_db.add(ScrapeLog(search_id=live.id, source="indeed", jobs_found=0, error="403"))

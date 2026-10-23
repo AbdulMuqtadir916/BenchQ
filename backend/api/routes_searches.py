@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.countries import (DEFAULT_COUNTRY, compose_location, normalize_country,
                                split_country_suffix, supported_countries)
 from backend.models.db import get_db, Search, Setting, ScrapeLog, Job, is_acknowledged
+from backend.models.tenancy import DEFAULT_FIRM_ID
 
 logger = logging.getLogger("jobnavigator.routes_searches")
 
@@ -117,7 +118,9 @@ def create_search(data: SearchCreate, db: Session = Depends(get_db)):
     # (Jobright, Levels.fyi, freehire, LinkedIn Personal) country means nothing and must not reject a row.
     if payload.get("search_mode", "keyword") == "keyword":
         payload["location"] = _validated_location(payload["location"], payload["country"])
-    search = Search(**payload)
+    # Searches are run by the platform today (Super Admin routes), so each one belongs to the Default firm until
+    # the Jobs track lets a firm own its searches (F2b).
+    search = Search(firm_id=DEFAULT_FIRM_ID, **payload)
     db.add(search)
     db.commit()
     return _search_to_dict(search)

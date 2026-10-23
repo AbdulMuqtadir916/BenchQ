@@ -2,6 +2,9 @@
 import pytest
 from backend.models.db import Persona
 from backend.analyzer import cv_scorer
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def test_get_persona_text_empty_returns_empty_dict(test_db):
@@ -42,7 +45,7 @@ def _seed_persona(db, summary="P-summary"):
 
 
 def _seed_resume(db, name="PM"):
-    r = Resume(id=uuid.uuid4(), name=name, is_base=True,
+    r = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name=name, is_base=True,
                json_data={"summary": f"{name}-summary"})
     db.add(r)
     db.commit()

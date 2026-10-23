@@ -22,6 +22,9 @@ from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean,
     make_job, make_company, make_resume, set_setting,
 )
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -86,7 +89,7 @@ def _break_commit(monkeypatch):
 def _make_app(db, **job_kw):
     from backend.models.db import Application
     job = make_job(db, **job_kw)
-    app = Application(job_id=job.id, status="applied")
+    app = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status="applied")
     db.add(app)
     db.commit()
     db.refresh(app)
@@ -461,7 +464,7 @@ def test_list_applications_reports_the_latest_tailored_resume(client, test_db):
 def test_list_applications_flags_a_cover_letter(client, test_db):
     from backend.models.db import CoverLetter
     app, job = _make_app(test_db)
-    test_db.add(CoverLetter(name="CL", job_id=job.id, json_data={}))
+    test_db.add(CoverLetter(firm_id=DEFAULT_FIRM_ID, name="CL", job_id=job.id, json_data={}))
     test_db.commit()
     row = assert_clean(client.get("/api/applications"), 200).json()["applications"][0]
     assert row["has_cover_letter"] is True
@@ -743,10 +746,10 @@ def test_prep_bundle_assembles_role_resume_posting_and_ask(client, test_db):
 def test_prep_bundle_lists_booked_interviews_with_their_prep_notes(client, test_db):
     from backend.models.db import Interview
     app, _ = _make_app(test_db)
-    test_db.add(Interview(application_id=app.id, what="Hiring manager",
+    test_db.add(Interview(firm_id=DEFAULT_FIRM_ID, application_id=app.id, what="Hiring manager",
                           when_at=datetime(2026, 9, 9, 14, 0, tzinfo=timezone.utc),
                           where_text="Zoom", status="scheduled", prep="read the S-1"))
-    test_db.add(Interview(application_id=app.id, what="Panel", status="done"))
+    test_db.add(Interview(firm_id=DEFAULT_FIRM_ID, application_id=app.id, what="Panel", status="done"))
     test_db.commit()
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert "- Interviews booked:" in text

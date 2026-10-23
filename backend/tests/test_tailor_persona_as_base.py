@@ -3,6 +3,9 @@ import uuid
 import pytest
 from backend.models.db import Resume, Persona, Setting, Job
 from backend.api import routes_resumes
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 @pytest.mark.asyncio
@@ -158,7 +161,7 @@ async def test_tailor_persona_falls_back_when_persona_prompt_empty(test_db, monk
 @pytest.mark.asyncio
 async def test_tailor_resume_does_not_use_persona_prompt(test_db, monkeypatch):
     """When base is a regular Resume (not persona), persona_tailor_prompt is NOT used."""
-    base_resume = Resume(id=uuid.uuid4(), name="PM", is_base=True,
+    base_resume = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="PM", is_base=True,
                          json_data={"summary": "s", "experience": [], "skills": {}})
     job = Job(id=uuid.uuid4(), title="PM", company="Acme",
               description="JD", external_id="ext-resume-base")

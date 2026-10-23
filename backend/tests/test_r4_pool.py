@@ -24,6 +24,9 @@ import asyncio
 import pytest
 
 from backend.tests.r4_support import client  # noqa: F401
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 class SessionCounter:
@@ -90,7 +93,7 @@ def _seed_resume(test_db):
     import uuid
     from backend.models.db import Resume
 
-    test_db.add(Resume(id=uuid.uuid4(), name="PM", is_base=True,
+    test_db.add(Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="PM", is_base=True,
                        json_data={"summary": "Ten years of product work.",
                                   "skills": {"core": ["Python"]}}))
     test_db.commit()

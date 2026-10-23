@@ -15,6 +15,9 @@ import logging
 import pytest
 
 from backend.models.db import Search
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _search(db, **kw):
@@ -25,7 +28,7 @@ def _search(db, **kw):
     kw.setdefault("company_exclude", [])
     kw.setdefault("country", "usa")
     kw.setdefault("search_mode", "keyword")
-    s = Search(name="Location probe", active=True,
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="Location probe", active=True,
                search_term="program manager", **kw)
     db.add(s)
     db.commit()

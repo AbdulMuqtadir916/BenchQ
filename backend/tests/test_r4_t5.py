@@ -19,6 +19,9 @@ from backend.api.routes_resumes import (
 )
 from backend.api.routes_cover_letters import TEMPLATES_DIR as CL_TEMPLATES_DIR
 from backend.models.db import Resume, Setting, TracerLink
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _a_real_template() -> str:
@@ -85,7 +88,7 @@ def test_cover_letter_render_rejects_a_traversal(test_db):
 
 
 def _make_resume(test_db) -> Resume:
-    r = Resume(name="Base", is_base=True, template=_a_real_template(),
+    r = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template=_a_real_template(),
                page_format="letter", json_data={"header": {"name": "V"}})
     test_db.add(r)
     test_db.commit()
@@ -124,7 +127,7 @@ def test_create_resume_rejects_a_bad_template(api_client, test_db):
 
 def test_patch_cover_letter_rejects_a_bad_template(api_client, test_db):
     from backend.models.db import CoverLetter
-    cl = CoverLetter(name="CL", template="inter", page_format="letter", json_data={})
+    cl = CoverLetter(firm_id=DEFAULT_FIRM_ID, name="CL", template="inter", page_format="letter", json_data={})
     test_db.add(cl)
     test_db.commit()
     resp = api_client.patch(f"/api/cover-letters/{cl.id}", json={"template": "../resume_templates/inter"})
@@ -161,7 +164,7 @@ def tracer_on(test_db):
 
 
 def _rewrite(test_db, items):
-    r = Resume(name="R", is_base=True, template=_a_real_template(),
+    r = Resume(firm_id=DEFAULT_FIRM_ID, name="R", is_base=True, template=_a_real_template(),
                page_format="letter", json_data={"header": {"contact_items": items}})
     test_db.add(r)
     test_db.commit()

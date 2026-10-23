@@ -223,7 +223,7 @@ dependencies are live; only switching the adapter to live waits.
 |---|---|---|---|---|
 | 00 | [Monorepo + proxy](./00-foundation.md) (Part A); Parts B/C are replaced by F3/F6 | — | | Part A done |
 | F1 | Alembic baseline | 00 | | Done (#29, #30) |
-| F2 | Auth + tenancy tables; `firm_id` on existing tables, backfilled to a default firm | F1 | | F2a tables done (#33); **F2b** (`firm_id`, `firm_jobs`) and **F2c** (settings) not started |
+| F2 | Auth + tenancy tables; `firm_id` on existing tables, backfilled to a default firm | F1 | | F2a tables done (#33); F2b (`firm_id`, `firm_jobs`, migration 0005) built; **F2c** (settings) not started |
 | F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | | Done except the support-view endpoints (#34, #36) |
 | F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | | Policy table + `require` done (#35); the firm-scoping dependency and its lint test wait for F2b |
 | F5 | Seed script: the mocks' firms, accounts and data | F2 | | Done for firms, plans, accounts and invites (#38); module data lands with each track |

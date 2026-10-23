@@ -3,7 +3,9 @@ import logging
 import json
 import secrets
 from backend.models.db import SessionLocal, Setting, Company, Search, Resume
+from backend.models.tenancy import DEFAULT_FIRM_ID
 from sqlalchemy import text
+from sqlalchemy.orm import load_only
 from backend.analyzer.llm_client import REASONING_EFFORTS
 
 logger = logging.getLogger("jobnavigator.seed")
@@ -792,7 +794,8 @@ def _backfill_search_country(db):
     from backend.countries import DEFAULT_COUNTRY, country_from_location, split_country_suffix
     from backend.models.db import Search
 
-    rows = db.query(Search).filter(Search.country.is_(None)).all()
+    # load_only: the frozen bootstrap runs this on a pre-0005 schema, which has no firm_id column.
+    rows = db.query(Search).options(load_only(Search.country, Search.location)).filter(Search.country.is_(None)).all()
     if not rows:
         return
     for search in rows:
@@ -840,7 +843,7 @@ def _strip_country_from_search_location(db):
     from backend.models.db import Search
 
     changed = 0
-    rows = db.query(Search).filter(
+    rows = db.query(Search).options(load_only(Search.name, Search.location, Search.country)).filter(
         Search.location.isnot(None), Search.search_mode == "keyword"
     ).all()
     for search in rows:
@@ -879,7 +882,7 @@ def _rewrite_retired_status_transitions(db):
     """One-shot: remap retired statuses in Application.status_transitions, drop resulting self-transitions and collapse duplicates, so Sankey shows no ghost nodes."""
     from backend.models.db import Application
     retired = tuple(_RETIRED_STATUS_REMAP)
-    rows = db.query(Application).filter(
+    rows = db.query(Application).options(load_only(Application.status_transitions)).filter(
         Application.status_transitions.isnot(None)
     ).all()
     changed = 0
@@ -1151,7 +1154,7 @@ def seed_searches(db):
     existing_modes = {s.search_mode for s in db.query(Search).all()}
     for s in SEED_SEARCHES:
         if s["search_mode"] not in existing_modes:
-            db.add(Search(**s))
+            db.add(Search(firm_id=DEFAULT_FIRM_ID, **s))   # platform searches live in the Default firm (F2b)
     # Idempotent rename: self-heal any linkedin_extension search still named
     # "LinkedIn Extension" so fresh DB clones end up labeled "Extension LI".
     legacy = db.query(Search).filter(
@@ -1171,6 +1174,7 @@ def seed_mock_resume(db):
     resume = db.query(Resume).filter(Resume.name == "Sample PM", Resume.is_base == True).first()
     if resume is None:
         resume = Resume(
+            firm_id=DEFAULT_FIRM_ID,
             name="Sample PM",
             is_base=True,
             template="garamond_alt",

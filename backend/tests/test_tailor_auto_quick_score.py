@@ -5,6 +5,9 @@ import pytest
 from unittest.mock import AsyncMock
 
 from backend.models.db import Setting, Resume, Job
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _seed(test_db):
@@ -20,7 +23,7 @@ async def test_auto_score_launches_when_setting_is_true(test_db, monkeypatch):
     job = Job(external_id="chain1", content_hash="c1", company="Acme", title="PM", description="jd")
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template="inter",
                   json_data={"summary": "s", "experience": [], "skills": {}})
     test_db.add(base)
     test_db.commit()
@@ -53,7 +56,7 @@ async def test_auto_score_skipped_when_setting_is_false(test_db, monkeypatch):
     job = Job(external_id="chain2", content_hash="c2", company="Acme", title="PM", description="jd")
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template="inter",
                   json_data={"summary": "s", "experience": [], "skills": {}})
     test_db.add(base)
     test_db.commit()
@@ -107,7 +110,7 @@ async def test_tailor_response_reports_chain_score(test_db, monkeypatch):
     job = Job(external_id="chain3", content_hash="c3", company="Acme", title="PM", description="jd")
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template="inter",
                   json_data={"summary": "s", "experience": [], "skills": {}})
     test_db.add(base)
     test_db.commit()
@@ -133,7 +136,7 @@ async def test_tailor_response_reports_off_when_chain_disabled(test_db, monkeypa
     job = Job(external_id="chain4", content_hash="c4", company="Acme", title="PM", description="jd")
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
+    base = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template="inter",
                   json_data={"summary": "s", "experience": [], "skills": {}})
     test_db.add(base)
     test_db.commit()

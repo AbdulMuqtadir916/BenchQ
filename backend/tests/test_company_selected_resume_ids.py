@@ -1,6 +1,10 @@
 """Company.selected_resume_ids replaces selected_cv_ids (Task 6)."""
 import uuid
 from backend.models.db import Company, Resume
+import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def test_company_has_selected_resume_ids_column():
@@ -19,9 +23,9 @@ def test_company_default_is_empty_list(test_db):
 def test_get_resume_texts_for_company_uses_selected_ids(test_db):
     """When the column has UUIDs of base resumes, those resumes' texts are returned."""
     from backend.analyzer.cv_scorer import _get_resume_texts_for_company
-    pm = Resume(name="PM", is_base=True, template="inter",
+    pm = Resume(firm_id=DEFAULT_FIRM_ID, name="PM", is_base=True, template="inter",
                 json_data={"summary": "PM summary", "experience": [], "skills": {}})
-    other = Resume(name="Other", is_base=True, template="inter",
+    other = Resume(firm_id=DEFAULT_FIRM_ID, name="Other", is_base=True, template="inter",
                    json_data={"summary": "Other summary", "experience": [], "skills": {}})
     test_db.add_all([pm, other])
     test_db.flush()

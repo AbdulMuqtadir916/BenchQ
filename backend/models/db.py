@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, Text, DateTime, Date,
-    ForeignKey, JSON, Index, UniqueConstraint, create_engine, text
+    ForeignKey, JSON, Index, MetaData, UniqueConstraint, create_engine, text
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import backref, column_property, declarative_base, deferred, relationship, sessionmaker
@@ -57,11 +57,20 @@ class Setting(Base):
     description = Column(String, nullable=True)
 
 
+def firm_id_column(nullable: bool = False) -> Column:
+    """The owning firm on a firm-owned table (docs/integration/07, F2b; migration 0005). ON DELETE RESTRICT:
+    firms are suspended, never deleted. Marked alembic_only so the frozen pre-Alembic bootstrap
+    (create_tables) leaves it out and keeps building the baseline schema."""
+    return Column(UUID(as_uuid=True), ForeignKey("firms.id", ondelete="RESTRICT"), nullable=nullable, index=True,
+                  info={"alembic_only": True})
+
+
 # ── Searches ─────────────────────────────────────────────────────────────────
 class Search(Base):
     __tablename__ = "searches"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()   # searches are firm-owned (07 Q37)
     name = Column(String, nullable=False)
     active = Column(Boolean, default=True)
     sources = Column(JSON, default=["linkedin", "indeed", "zip_recruiter", "google", "direct"])
@@ -304,6 +313,7 @@ class Application(Base):
     __tablename__ = "applications"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()
     job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=False)
     status = Column(String, default="applied")
     # applied|interview|offer|rejected. Retired screening/phone_screen/final_round
@@ -328,6 +338,7 @@ class Interview(Base):
     __tablename__ = "interviews"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()   # the application's firm, stored so one scoping rule fits every table
     application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="CASCADE"),
                             nullable=False, index=True)
     what = Column(String, nullable=False)
@@ -403,6 +414,7 @@ class JobRun(Base):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column(nullable=True)   # for a firm-triggered run once runs carry their firm; null for platform runs
     job_type = Column(String, nullable=False)          # scrape_all, email_check, etc.
     trigger = Column(String, nullable=False)            # scheduler | manual
     status = Column(String, nullable=False, default="running")  # running | completed | failed
@@ -426,6 +438,7 @@ class LlmCallLog(Base):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column(nullable=True)   # required for new rows once AI spend is built (Q33)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     purpose = Column(String, nullable=False)  # score_light, score_full, tailor, email, pdf
     provider = Column(String, nullable=False, default="")  # claude_api, claude_code, codex_cli, antigravity_cli, openai, ollama
@@ -469,6 +482,7 @@ class Resume(Base):
     __tablename__ = "resumes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()
     name = Column(String, nullable=False)
     is_base = Column(Boolean, default=True)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
@@ -490,6 +504,7 @@ class CoverLetter(Base):
     __tablename__ = "cover_letters"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()
     name = Column(String, nullable=False)
     job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
     resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
@@ -540,6 +555,7 @@ class TracerLink(Base):
     __tablename__ = "tracer_links"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()   # the link's firm: a public click is attributed to it (07 §2)
     token = Column(String(16), unique=True, nullable=False, index=True)
     # A tracer link belongs to a resume, a cover letter, or — when the two share the
     # same job and token — both at once; each document's /tracer-stats filters on its own FK.
@@ -562,6 +578,7 @@ class TracerClickEvent(Base):
     __tablename__ = "tracer_click_events"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()
     tracer_link_id = Column(UUID(as_uuid=True), ForeignKey("tracer_links.id", ondelete="CASCADE"), nullable=False)
     clicked_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     device_type = Column(String, default="unknown")
@@ -640,14 +657,33 @@ def build_company_lookup(db) -> dict:
 
 
 # ── Table creation ───────────────────────────────────────────────────────────
+def _baseline_metadata() -> MetaData:
+    """Copies of the pre-Alembic tables without their alembic_only columns (and the foreign keys and indexes on
+    them). Only the frozen create_tables uses it."""
+    baseline = MetaData()
+    for table in Base.metadata.sorted_tables:
+        if table.info.get("alembic_only"):
+            continue
+        copy = table.to_metadata(baseline)
+        for column in [c for c in copy.columns if c.info.get("alembic_only")]:
+            for fk in [f for f in copy.foreign_key_constraints if column.name in f.column_keys]:
+                copy.constraints.discard(fk)
+                copy.foreign_keys.difference_update(fk.elements)
+            for index in [i for i in copy.indexes if column.name in i.columns]:
+                copy.indexes.discard(index)
+            copy._columns.remove(column)  # no public API for this; frozen code, deleted at F6
+    return baseline
+
+
 def create_tables():
     # Create sequence before tables (Job.short_id references it in server_default)
     with engine.connect() as conn:
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS jobs_short_id_seq"))
         conn.commit()
-    # Tables added after the Alembic baseline (models/tenancy.py) exist only through their revisions.
-    legacy_tables = [t for t in Base.metadata.sorted_tables if not t.info.get("alembic_only")]
-    Base.metadata.create_all(bind=engine, tables=legacy_tables)
+    # Tables added after the Alembic baseline (models/tenancy.py) exist only through their revisions, and so do
+    # columns added to the old tables later (firm_id_column): the baseline is built without them.
+    baseline = _baseline_metadata()
+    baseline.create_all(bind=engine)
     # Idempotent column adds for tables that already existed before the column was introduced.
     # Postgres-native; no-op on second run.
     with engine.connect() as conn:

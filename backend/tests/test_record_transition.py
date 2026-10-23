@@ -1,11 +1,14 @@
 """Tests for models/db.record_transition — append status transitions + update status."""
 import pytest
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _make_app(status="new", transitions=None):
     """Minimal Application stub — function is pure w.r.t. the ORM object."""
     from backend.models.db import Application
-    return Application(
+    return Application(firm_id=DEFAULT_FIRM_ID, 
         id="app-1",
         status=status,
         status_transitions=transitions if transitions is not None else [],

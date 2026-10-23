@@ -1,11 +1,14 @@
 """Resume scoring reads résumés from the Resume table."""
 import pytest
 from backend.models.db import Resume, Setting
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _seed_resume(test_db, name, summary):
     """Create a base Resume with a minimal json_data containing summary + one job."""
-    r = Resume(
+    r = Resume(firm_id=DEFAULT_FIRM_ID, 
         name=name,
         is_base=True,
         template="inter",
@@ -37,7 +40,7 @@ def test_get_resume_texts_skips_tailored_resumes(test_db):
     """is_base=False rows must NOT show up in scoring."""
     from backend.analyzer.cv_scorer import _get_resume_texts
     base = _seed_resume(test_db, "PM", "summary")
-    test_db.add(Resume(
+    test_db.add(Resume(firm_id=DEFAULT_FIRM_ID, 
         name="PM → Acme tailored",
         is_base=False,
         parent_id=base.id,

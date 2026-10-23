@@ -32,7 +32,7 @@ class Accounts:
     admin_token: str
 
 
-def make_plan(db, name="Default", seat_limit=10, candidate_limit=100):
+def make_plan(db, name="Test plan", seat_limit=10, candidate_limit=100):
     from backend.models.tenancy import Plan
     plan = Plan(name=name, seat_limit=seat_limit, candidate_limit=candidate_limit)
     db.add(plan)

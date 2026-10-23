@@ -6,6 +6,10 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, text, func
 from backend.models.db import get_db, Job, find_company_by_name
+from backend.models.tenancy import link_job_to_firm
+from backend.api.routes_auth import current_principal
+from backend.auth.scoping import writer_firm_id
+from backend.auth.sessions import Principal
 from backend.api._input import str_field, uuid_filter
 from backend.scraper._shared.dedup import make_external_id, make_content_hash
 from backend.analyzer.salary_extractor import apply_salary_to_job
@@ -681,7 +685,8 @@ def job_facets(
 
 
 @router.post("/save-from-extension")
-async def save_from_extension(body: dict, db: Session = Depends(get_db)):
+async def save_from_extension(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id),
+                              principal: Principal = Depends(current_principal)):
     """Save a job from the Chrome Extension to the Job Feed (no application created), running the same enrichment as LinkedIn passive capture: Extension search title/company filters, salary extraction, H-1B/body-exclusion scan, and auto-score when configured."""
     from backend.analyzer.h1b_checker import check_job_h1b
     from backend.models.db import Search
@@ -719,6 +724,7 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
             apply_salary_to_job(existing, (_hd or {}).get("median_salary"))
             apply_arrangement_to_job(existing)
             apply_location_to_job(existing)
+        link_job_to_firm(db, firm_id, existing.id, "CAPTURED", captured_by_user_id=principal.user_id)
         db.commit()
         # `saved` is the field the extension reads — a row sitting at `ignored` never
         # reaches the feed, and re-saving it will not change that.
@@ -793,6 +799,8 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
         reject_message = f"description matched the excluded phrase '{_phrase}'"
 
     db.add(job)
+    db.flush()
+    link_job_to_firm(db, firm_id, job.id, "CAPTURED", search_id=job.search_id, captured_by_user_id=principal.user_id)
     db.commit()
     db.refresh(job)
 
@@ -844,7 +852,8 @@ MANUAL_JOB_STATUSES = {"new", "saved"}
 
 
 @router.post("/manual")
-def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db),
+                      firm_id=Depends(writer_firm_id), principal: Principal = Depends(current_principal)):
     """Add one job to the feed by hand (Log-application modal, statuses new/saved), with no application attached; an already-known posting keeps the status it has and is returned with created=false."""
     title = str_field(body, "title")
     company = str_field(body, "company")
@@ -865,7 +874,9 @@ def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session
     ).first()
     if existing:
         # Report the row, change nothing: an `applied` or `ignored` posting must
-        # not fall back to `new` because the user pasted its URL a second time.
+        # not fall back to `new` because the user pasted its URL a second time. The firm does see it now.
+        link_job_to_firm(db, firm_id, existing.id, "CAPTURED", captured_by_user_id=principal.user_id)
+        db.commit()
         return {"id": str(existing.id), "created": False, "status": existing.status}
 
     job = Job(
@@ -887,6 +898,8 @@ def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session
     apply_arrangement_to_job(job)
     apply_location_to_job(job)
     db.add(job)
+    db.flush()
+    link_job_to_firm(db, firm_id, job.id, "CAPTURED", captured_by_user_id=principal.user_id)
     db.commit()
     db.refresh(job)
 
@@ -978,7 +991,8 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{job_id}")
-async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db),
+                     firm_id=Depends(writer_firm_id)):
     # Must be async — launch_background() uses asyncio.create_task(), which needs a running
     # event loop; a sync endpoint's threadpool has none, so the task would silently never start.
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -1027,9 +1041,10 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
 
         from backend.models.db import Application
         from datetime import datetime, timezone
-        existing_app = db.query(Application).filter(Application.job_id == job.id).first()
+        existing_app = db.query(Application).filter(Application.job_id == job.id,
+                                                    Application.firm_id == firm_id).first()
         if not existing_app:
-            app = Application(job_id=job.id, status="applied",
+            app = Application(firm_id=firm_id, job_id=job.id, status="applied",
                               status_transitions=[{"from": None, "to": "applied", "at": datetime.now(timezone.utc).isoformat(), "source": "ui"}])
             db.add(app)
             db.commit()

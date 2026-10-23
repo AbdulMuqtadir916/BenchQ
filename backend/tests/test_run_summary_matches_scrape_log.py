@@ -5,6 +5,9 @@ import types
 import pytest
 
 from backend.models.db import Job, ScrapeLog, Search
+from backend.models.tenancy import DEFAULT_FIRM_ID
+
+pytestmark = pytest.mark.usefixtures("default_firm")
 
 
 def _fake_jobspy(rows):
@@ -26,7 +29,7 @@ def _row(site, title, company, url):
 
 
 def _search(db, sources, exclude=None):
-    s = Search(name="ZZ Summary", search_mode="keyword", active=True, sources=sources,
+    s = Search(firm_id=DEFAULT_FIRM_ID, name="ZZ Summary", search_mode="keyword", active=True, sources=sources,
                search_term="program manager", title_include_keywords=[],
                title_exclude_keywords=exclude or [], company_filter=[],
                company_exclude=[], auto_scoring_depth="off")
