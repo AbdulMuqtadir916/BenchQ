@@ -2,7 +2,7 @@
 
 Every firm-owned row needs a `firm_id` now. Production databases always hold the "Default firm" (migration 0003),
 but the tests empty every table before each test, so `default_firm_id` puts it back, with the same fixed ids,
-when a test needs it. Pass the id explicitly (`Resume(firm_id=default_firm_id(db), ...)`): a row with no firm is a
+when a test needs it. A signed-in test user's firm reuses that id (auth_support.seed_accounts). Pass the id explicitly (`Resume(firm_id=default_firm_id(db), ...)`): a row with no firm is a
 bug the database should keep refusing.
 """
 import uuid
@@ -13,7 +13,11 @@ from backend.models.tenancy import DEFAULT_FIRM_ID, DEFAULT_PLAN_ID
 
 
 def default_firm_id(db) -> uuid.UUID:
-    """The Default firm's id, inserting it (and its plan) the way migration 0003 does when it isn't there."""
+    """The Default firm's id, inserting it (and its plan) the way migration 0003 does when it isn't there. The
+    signed-in test firm (auth_support.seed_accounts) has the same id, so these rows are the signed-in user's."""
+    from backend.models.tenancy import Firm
+    if db.get(Firm, DEFAULT_FIRM_ID) is not None:
+        return DEFAULT_FIRM_ID
     db.execute(text("""
         INSERT INTO plans (id, name, seat_limit, candidate_limit) VALUES (:plan, 'Default', 10, 100)
         ON CONFLICT DO NOTHING

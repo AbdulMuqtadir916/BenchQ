@@ -15,7 +15,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.db import get_db, Resume, TracerLink, TracerClickEvent, Setting, Job, Application, SessionLocal, utcnow, Persona, CoverLetter
 from backend.api._input import str_field
-from backend.auth.scoping import writer_firm_id
+from backend.auth.scoping import reader_firm_id, scoped, writer_firm_id
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, ModelReplyError, parse_model_json
 from backend.job_monitor import launch_background, JobAlreadyRunningError
@@ -499,9 +499,9 @@ def list_templates():
 # ── CRUD ────────────────────────────────────────────────────────────────────
 
 @router.get("")
-def list_resumes(is_base: Optional[bool] = None, db: Session = Depends(get_db)):
+def list_resumes(is_base: Optional[bool] = None, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """List all resumes. Optional filter: is_base=true for base resumes only."""
-    q = db.query(Resume).order_by(Resume.updated_at.desc())
+    q = scoped(db, Resume, firm_id).order_by(Resume.updated_at.desc())
     if is_base is not None:
         q = q.filter(Resume.is_base == is_base)
     resumes = q.all()
@@ -509,9 +509,9 @@ def list_resumes(is_base: Optional[bool] = None, db: Session = Depends(get_db)):
 
 
 @router.get("/shelf")
-def resume_shelf(db: Session = Depends(get_db)):
+def resume_shelf(db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Assembled résumé shelf for the v2 UI: base résumés with tailored copies grouped underneath (company/role/fit score) plus a per-base average fit, built from one pass over resumes plus a single jobs query to avoid N+1 fetches."""
-    resumes = db.query(Resume).order_by(Resume.updated_at.desc()).all()
+    resumes = scoped(db, Resume, firm_id).order_by(Resume.updated_at.desc()).all()
     bases = [r for r in resumes if r.is_base]
     copies = [r for r in resumes if not r.is_base]
 
@@ -523,7 +523,7 @@ def resume_shelf(db: Session = Depends(get_db)):
         for j in db.query(Job).filter(Job.id.in_(job_ids)).all():
             jobs[j.id] = j
         # application status per job (rejected → archived); most-recent wins
-        for a in db.query(Application).filter(Application.job_id.in_(job_ids)).order_by(Application.updated_at.asc()).all():
+        for a in scoped(db, Application, firm_id).filter(Application.job_id.in_(job_ids)).order_by(Application.updated_at.asc()).all():
             app_status[a.job_id] = a.status
             app_updated[a.job_id] = a.updated_at
 
@@ -690,7 +690,7 @@ def copy_resume_for_job(body: dict, db: Session = Depends(get_db), firm_id=Depen
     if not base_resume_id or not job_id:
         raise HTTPException(400, "base_resume_id and job_id are required")
 
-    base = db.query(Resume).filter(Resume.id == base_resume_id).first()
+    base = scoped(db, Resume, firm_id).filter(Resume.id == base_resume_id).first()
     if not base:
         raise HTTPException(404, "Base resume not found")
 
@@ -748,7 +748,7 @@ async def tailor_resume(body: dict, db: Session = Depends(get_db), firm_id=Depen
             raise HTTPException(400, "Persona has no resume_content — fill it in /persona first")
         base_name = "Persona"
     else:
-        base = db.query(Resume).filter(Resume.id == base_resume_id).first()
+        base = scoped(db, Resume, firm_id).filter(Resume.id == base_resume_id).first()
         if not base:
             raise HTTPException(404, "Base resume not found")
         base_name = base.name
@@ -771,7 +771,7 @@ async def tailor_resume(body: dict, db: Session = Depends(get_db), firm_id=Depen
     scope = f"{base_resume_id}:{job_id or 'freeform'}"
 
     # A tailored copy for this job already exists, so the run supersedes it.
-    replaces = bool(job_id) and db.query(Resume.id).filter(
+    replaces = bool(job_id) and scoped(db, Resume, firm_id, Resume.id).filter(
         Resume.job_id == target_uuid, Resume.is_base == False
     ).first() is not None
 
@@ -1053,18 +1053,18 @@ async def _tailor_impl(base_resume_id: str, job_id: str | None, job_description_
 
 
 @router.get("/{resume_id}")
-def get_resume(resume_id: str, db: Session = Depends(get_db)):
+def get_resume(resume_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Get a single resume with its full json_data."""
-    resume = db.query(Resume).filter(Resume.id == resume_id).first()
+    resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
     return _resume_to_dict(resume, include_json_data=True)
 
 
 @router.patch("/{resume_id}")
-def update_resume(resume_id: str, body: dict, db: Session = Depends(get_db)):
+def update_resume(resume_id: str, body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Update resume fields (partial); accepts any subset of name/is_base/parent_id/job_id/template/page_format/json_data."""
-    resume = db.query(Resume).filter(Resume.id == resume_id).first()
+    resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -1088,23 +1088,23 @@ def update_resume(resume_id: str, body: dict, db: Session = Depends(get_db)):
 
 
 @router.delete("/{resume_id}")
-def delete_resume(resume_id: str, db: Session = Depends(get_db)):
+def delete_resume(resume_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Delete a resume and cascade-delete its tailored children."""
-    resume = db.query(Resume).filter(Resume.id == resume_id).first()
+    resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
 
-    children = db.query(Resume).filter(Resume.parent_id == resume_id).all()
+    children = scoped(db, Resume, firm_id).filter(Resume.parent_id == resume_id).all()
     child_ids = [c.id for c in children]
     all_ids = [resume.id] + child_ids
     # A tracer link can be shared with a cover letter for the same job (same token);
     # the letter outlives the résumé (ON DELETE SET NULL), so release our side of a shared row instead of deleting it and taking the letter's link with it.
-    shared = db.query(TracerLink).filter(
+    shared = scoped(db, TracerLink, firm_id).filter(
         TracerLink.resume_id.in_(all_ids), TracerLink.cover_letter_id.isnot(None),
     ).all()
     for link in shared:
         link.resume_id = None
-    db.query(TracerLink).filter(
+    scoped(db, TracerLink, firm_id).filter(
         TracerLink.resume_id.in_(all_ids), TracerLink.cover_letter_id.is_(None),
     ).delete(synchronize_session=False)
     # The "Tailored" cv_scores/report/best_cv entries a copy wrote onto its job outlive
@@ -1167,9 +1167,9 @@ def _clear_orphan_tailored_score(db: Session, job_id) -> bool:
 # ── Preview & PDF ───────────────────────────────────────────────────────────
 
 @router.get("/{resume_id}/preview")
-def preview_resume(resume_id: str, db: Session = Depends(get_db)):
+def preview_resume(resume_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Render resume as HTML for preview, using the same `_rewrite_urls_with_tracers` rewrite /pdf uses (reusing an existing link per owner+destination) so the preview and PDF always agree on contact URLs."""
-    resume = db.query(Resume).filter(Resume.id == resume_id).first()
+    resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -1179,9 +1179,9 @@ def preview_resume(resume_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{resume_id}/pdf")
-async def export_pdf(resume_id: str, template: Optional[str] = None, format: Optional[str] = None, db: Session = Depends(get_db)):
+async def export_pdf(resume_id: str, template: Optional[str] = None, format: Optional[str] = None, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Render resume as PDF via Playwright; `template`/`format` query params override the stored values so a rapid template switch in the live editor doesn't race the debounced PATCH."""
-    resume = db.query(Resume).filter(Resume.id == resume_id).first()
+    resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -1476,11 +1476,11 @@ async def _score_resume_impl(resume_id: str, depth: str):
 
 
 @router.post("/{resume_id}/score-check", status_code=202)
-async def score_check(resume_id: str, request_body: dict = None, db: Session = Depends(get_db)):
+async def score_check(resume_id: str, request_body: dict = None, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Score a tailored resume against its linked job in the background, returning 202 + run_id trackable via GET /api/monitor/active (job_type=score_resume); the result lands in the job's cv_scores under 'Tailored'."""
     import uuid as _uuid
 
-    resume = db.query(Resume).filter(Resume.id == resume_id).first()
+    resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -1529,10 +1529,10 @@ async def score_check(resume_id: str, request_body: dict = None, db: Session = D
 # ── Tracer Stats ───────────────────────────────────────────────────────────
 
 @router.get("/{resume_id}/tracer-stats")
-def get_tracer_stats(resume_id: str, db: Session = Depends(get_db)):
+def get_tracer_stats(resume_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Get click stats per tracer link for a resume."""
     from sqlalchemy import func
-    links = db.query(TracerLink).filter(TracerLink.resume_id == resume_id).all()
+    links = scoped(db, TracerLink, firm_id).filter(TracerLink.resume_id == resume_id).all()
     result = []
     for link in links:
         total_clicks = db.query(func.count(TracerClickEvent.id)).filter(

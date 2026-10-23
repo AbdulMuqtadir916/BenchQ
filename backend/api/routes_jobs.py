@@ -8,7 +8,7 @@ from sqlalchemy import desc, asc, text, func
 from backend.models.db import get_db, Job, find_company_by_name
 from backend.models.tenancy import link_job_to_firm
 from backend.api.routes_auth import current_principal
-from backend.auth.scoping import writer_firm_id
+from backend.auth.scoping import reader_firm_id, scoped, writer_firm_id
 from backend.auth.sessions import Principal
 from backend.api._input import str_field, uuid_filter
 from backend.scraper._shared.dedup import make_external_id, make_content_hash
@@ -122,7 +122,7 @@ def list_jobs(
     # brief=1 drops the long text fields (description, scoring report, H-1B snippet) for
     # pickers that only need title/company/scores; 200 full rows are several MB.
     brief: bool = False,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
 ):
     search_id = uuid_filter(search_id, "search_id")
     q = db.query(Job)
@@ -181,7 +181,7 @@ def list_jobs(
     job_ids = [j.id for j in jobs]
     tailored_map = {}
     if job_ids:
-        rows = db.query(Resume.job_id, Resume.id).filter(
+        rows = scoped(db, Resume, firm_id, Resume.job_id, Resume.id).filter(
             Resume.job_id.in_(job_ids), Resume.is_base == False
         ).order_by(Resume.updated_at.desc()).all()
         for jid, rid in rows:
@@ -972,12 +972,12 @@ def bulk_update_jobs(body: dict, db: Session = Depends(get_db)):
 
 
 @router.get("/{job_id}")
-def get_job(job_id: str, db: Session = Depends(get_db)):
+def get_job(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     from backend.models.db import Resume
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    tailored = db.query(Resume.id).filter(
+    tailored = scoped(db, Resume, firm_id, Resume.id).filter(
         Resume.job_id == job.id, Resume.is_base == False
     ).order_by(Resume.updated_at.desc()).first()
     import backend.job_monitor as _mon
@@ -1041,8 +1041,7 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
 
         from backend.models.db import Application
         from datetime import datetime, timezone
-        existing_app = db.query(Application).filter(Application.job_id == job.id,
-                                                    Application.firm_id == firm_id).first()
+        existing_app = scoped(db, Application, firm_id).filter(Application.job_id == job.id).first()
         if not existing_app:
             app = Application(firm_id=firm_id, job_id=job.id, status="applied",
                               status_transitions=[{"from": None, "to": "applied", "at": datetime.now(timezone.utc).isoformat(), "source": "ui"}])

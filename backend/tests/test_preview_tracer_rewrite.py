@@ -28,7 +28,7 @@ def _setup(db, enabled="true"):
 
 
 def _html(db):
-    return preview_resume(RESUME_ID, db=db).body.decode()
+    return preview_resume(RESUME_ID, db=db, firm_id=DEFAULT_FIRM_ID).body.decode()
 
 
 def test_preview_serves_the_tracked_urls(test_db):
@@ -82,5 +82,5 @@ def test_preview_still_404s_for_a_missing_resume(test_db):
     from fastapi import HTTPException
     _setup(test_db)
     with pytest.raises(HTTPException) as e:
-        preview_resume("5e555555-55e5-45e5-8555-555555555555", db=test_db)
+        preview_resume("5e555555-55e5-45e5-8555-555555555555", db=test_db, firm_id=DEFAULT_FIRM_ID)
     assert e.value.status_code == 404

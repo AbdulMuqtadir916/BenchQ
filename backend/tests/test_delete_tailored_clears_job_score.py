@@ -31,7 +31,7 @@ def test_tailored_score_and_report_are_dropped_and_best_recomputed(test_db):
     _copies(test_db, COPY_ID)
     test_db.commit()
 
-    delete_resume(COPY_ID, db=test_db)
+    delete_resume(COPY_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
 
     job = test_db.query(Job).one()
     assert job.cv_scores == {"PM": 40}
@@ -47,7 +47,7 @@ def test_best_is_cleared_when_tailored_was_the_only_score(test_db):
     _copies(test_db, COPY_ID)
     test_db.commit()
 
-    delete_resume(COPY_ID, db=test_db)
+    delete_resume(COPY_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
 
     job = test_db.query(Job).one()
     assert job.cv_scores == {}
@@ -61,7 +61,7 @@ def test_another_tailored_copy_keeps_the_score(test_db):
     _copies(test_db, COPY_ID, COPY2_ID)
     test_db.commit()
 
-    delete_resume(COPY_ID, db=test_db)
+    delete_resume(COPY_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
 
     job = test_db.query(Job).one()
     assert job.cv_scores == {"PM": 40, "Tailored": 35}
@@ -74,7 +74,7 @@ def test_deleting_the_base_clears_its_children_jobs_too(test_db):
     _copies(test_db, COPY_ID)
     test_db.commit()
 
-    out = delete_resume(BASE_ID, db=test_db)
+    out = delete_resume(BASE_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
 
     assert out["children_deleted"] == 1
     job = test_db.query(Job).one()
@@ -87,7 +87,7 @@ def test_job_without_a_tailored_score_is_left_alone(test_db):
     _copies(test_db, COPY_ID)
     test_db.commit()
 
-    delete_resume(COPY_ID, db=test_db)
+    delete_resume(COPY_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
 
     job = test_db.query(Job).one()
     assert job.cv_scores == {"PM": 40}

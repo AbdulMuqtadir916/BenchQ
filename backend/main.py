@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import FastAPI, Query, Request, HTTPException
+from fastapi import Depends, FastAPI, Query, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,6 +11,7 @@ from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun
 from backend.seed import run_seeds
 from backend.auth.access import enforce as enforce_access
+from backend.auth.scoping import reader_firm_id, scoped
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
 
@@ -1225,12 +1226,12 @@ def get_score_distribution(detail: bool = False):
 
 
 @app.get("/api/stats/sankey", tags=["stats"], summary="Application flow data for Sankey diagram")
-def get_stats_sankey():
-    """Return status transition flows aggregated across all applications."""
+def get_stats_sankey(firm_id=Depends(reader_firm_id)):
+    """Return status transition flows aggregated across the firm's applications."""
     from backend.models.db import Application
     db = SessionLocal()
     try:
-        apps = db.query(Application).filter(Application.status_transitions != None).all()
+        apps = scoped(db, Application, firm_id).filter(Application.status_transitions != None).all()
         flows = {}  # (from, to) -> count
         for app in apps:
             transitions = app.status_transitions or []
@@ -1315,8 +1316,9 @@ async def llm_costs(days: int = 7):
 
 
 @app.get("/api/stats", tags=["stats"], summary="Dashboard statistics")
-def get_stats():
-    """Aggregate counts: total jobs, new jobs, saved jobs, total applications, and application status breakdown."""
+def get_stats(firm_id=Depends(reader_firm_id)):
+    """Aggregate counts: total jobs, new jobs, saved jobs, total applications, and application status breakdown.
+    Applications are the firm's; the job counts are the shared pool's until the Jobs track scopes them."""
     from backend.models.db import Job, Application
     from sqlalchemy import func
     db = SessionLocal()
@@ -1324,10 +1326,11 @@ def get_stats():
         total_jobs = db.query(Job).count()
         new_jobs = db.query(Job).filter(Job.status == "new").count()
         saved_jobs = db.query(Job).filter(Job.status == "saved").count()
-        total_apps = db.query(Application).count()
+        total_apps = scoped(db, Application, firm_id).count()
 
         status_counts = {}
-        for status, count in db.query(Application.status, func.count()).group_by(Application.status).all():
+        for status, count in (scoped(db, Application, firm_id, Application.status, func.count())
+                              .group_by(Application.status).all()):
             status_counts[status] = count
 
         return {
