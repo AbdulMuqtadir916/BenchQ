@@ -4,7 +4,7 @@ from backend.models.db import Job, Resume
 import pytest
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 JOB_ID = "4d444444-44d4-44d4-8444-444444444444"
 BASE_ID = "5e555555-55e5-45e5-8555-555555555555"

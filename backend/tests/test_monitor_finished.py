@@ -3,6 +3,9 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from backend.models.db import Job, JobRun
 from backend.tests.r4_support import make_job
+import pytest
+
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _run(test_db, job_id, job_type, status, finished_at):

@@ -7,6 +7,8 @@ from sqlalchemy import event
 from backend.models.db import JobRun
 from backend.tests.r4_support import make_job
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 @pytest.fixture(autouse=True)
 def _utc_tz_on_jobrun_load():

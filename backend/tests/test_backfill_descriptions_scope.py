@@ -6,6 +6,8 @@ import pytest
 
 from backend.models.db import Job
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def _job(db, status, description=""):
     j = Job(id=uuid.uuid4(), external_id=uuid.uuid4().hex, company="Acme",

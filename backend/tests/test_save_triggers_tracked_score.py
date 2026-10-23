@@ -3,6 +3,8 @@ import uuid
 import pytest
 from backend.models.db import Setting, Job
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def _seed(test_db, on_save="light"):
     test_db.add(Setting(key="on_save_action", value=on_save))

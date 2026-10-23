@@ -12,6 +12,8 @@ from backend.tests.r4_support import (  # noqa: F401
     make_job, make_search, big_string, EMOJI, MISSING_UUID,
 )
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 # ── GET /api/jobs — filters and paging ───────────────────────────────────────
 

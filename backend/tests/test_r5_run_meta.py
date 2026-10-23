@@ -16,7 +16,7 @@ from backend.tests.r4_support import (  # noqa: F401  (fixtures)
 )
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _install_fake_running(monkeypatch, entries):

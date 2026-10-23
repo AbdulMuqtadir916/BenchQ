@@ -20,6 +20,8 @@ from backend.tests.r4_support import (  # noqa: F401
     make_company, make_search, make_job, MISSING_UUID,
 )
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 @pytest.fixture(autouse=True)
 def _utc_tz_on_jobrun_load():

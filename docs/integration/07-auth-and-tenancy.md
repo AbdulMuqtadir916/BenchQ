@@ -272,8 +272,11 @@ are ported as backend tests, case for case.
 `backend/tests/test_firm_scoping_lint.py` fails when a route in `backend/api/` or `main.py` queries a model with a
 NOT NULL `firm_id` any other way, unless the function is on its `ALLOWED` list with a reason (platform routes,
 the public tracer link, background workers whose route checked the ids). Applications, interviews, résumés, cover
-letters, tracer stats, `/api/stats` and the Sankey are scoped; another firm's id answers 404. **Next PR:** the jobs
-feed through `firm_jobs`. **Known gaps:** the Persona is one shared row until the Candidates track (D1); a job's
+letters, tracer stats, `/api/stats` and the Sankey are scoped; another firm's id answers 404 (#53). The jobs feed,
+its menus, facets and counts, a job's detail and pages, bulk update, analyze, and the job lookups of the résumé and
+cover-letter routes read through `scoped_jobs()`, the firm's links in `firm_jobs`; the lint test also fails on raw
+SQL over `jobs` without a `firm_jobs` filter. Capture routes still dedup over the whole pool, then link the job.
+**Known gaps:** the Persona is one shared row until the Candidates track (D1); a job's
 status and scores are shared across firms until the Jobs track's `JobMark` (Q36).
 
 ### F5 — Seed script: the mocks' world, in the database

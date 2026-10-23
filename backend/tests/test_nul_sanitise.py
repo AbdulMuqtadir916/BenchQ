@@ -24,7 +24,7 @@ import sqlalchemy.orm as sa_orm
 from backend.models.db import Job, Search, sanitize_text
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 # ── 1. sanitize_text() the raw helper ───────────────────────────────────────

@@ -2,6 +2,8 @@
 import pytest
 import inspect
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def test_jobspy_does_not_use_asyncio_run():
     """The source must NOT contain asyncio.run() calls — they fail nested in worker threads."""

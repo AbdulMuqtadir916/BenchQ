@@ -11,6 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from backend.models.db import get_db, Company, Job, Application, Setting, ScrapeLog, is_acknowledged
 from backend.api.routes_auth import current_principal
+from backend.auth.scoping import firm_job_ids, scoped_jobs
 from backend.auth.sessions import Principal
 
 logger = logging.getLogger("jobnavigator.companies")
@@ -108,6 +109,8 @@ def list_companies(
     if principal.firm_id is not None:
         app_job_ids = app_job_ids.where(Application.firm_id == principal.firm_id)
     applied_job_ids = select(Job.id.label("jid")).where(Job.status == "applied")
+    if principal.firm_id is not None:
+        applied_job_ids = applied_job_ids.where(Job.id.in_(firm_job_ids(principal.firm_id)))
     all_applied = union(app_job_ids, applied_job_ids).subquery()
     raw_counts = (
         db.query(Job.company, func.count(all_applied.c.jid))
@@ -129,11 +132,17 @@ def list_companies(
     from datetime import timedelta
     def _norm(s):
         return (s or "").lower().replace(" ", "")
+
+    def _jobs(*entities):
+        """A firm user counts the firm's jobs (scoped_jobs); a Super Admin counts the whole pool."""
+        if principal.firm_id is not None:
+            return scoped_jobs(db, principal.firm_id, *entities)
+        return db.query(*entities)
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     open_by_key, week_by_key = {}, {}
     # "open roles" = jobs currently sitting in the feed (new or saved)
     for name, cnt in (
-        db.query(Job.company, func.count(Job.id))
+        _jobs(Job.company, func.count(Job.id))
         .filter(Job.status.in_(("new", "saved")))
         .group_by(Job.company).all()
     ):
@@ -141,14 +150,14 @@ def list_companies(
     # "+7d" = every job that landed (was discovered) in the last 7 days, whatever
     # its status is now — recent scraper yield, not just what's still unactioned
     for name, cnt in (
-        db.query(Job.company, func.count(Job.id))
+        _jobs(Job.company, func.count(Job.id))
         .filter(Job.discovered_at >= week_ago)
         .group_by(Job.company).all()
     ):
         week_by_key[_norm(name)] = week_by_key.get(_norm(name), 0) + (cnt or 0)
     fitsum_by_key, fitcnt_by_key = {}, {}
     for name, s, cnt in (
-        db.query(Job.company, func.sum(Job.best_cv_score), func.count(Job.best_cv_score))
+        _jobs(Job.company, func.sum(Job.best_cv_score), func.count(Job.best_cv_score))
         .filter(Job.best_cv_score.isnot(None))
         .group_by(Job.company).all()
     ):

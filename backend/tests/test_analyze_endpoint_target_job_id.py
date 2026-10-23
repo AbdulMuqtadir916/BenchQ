@@ -4,6 +4,8 @@ from unittest.mock import patch
 import pytest
 from backend.models.db import Job
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 @pytest.mark.asyncio
 async def test_analyze_endpoint_threads_target_job_id(test_db, api_client):

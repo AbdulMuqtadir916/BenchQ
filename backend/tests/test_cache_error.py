@@ -2,6 +2,8 @@
 import pytest
 from unittest.mock import AsyncMock
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def test_cache_error_column_exists(test_db):
     from backend.models.db import Job

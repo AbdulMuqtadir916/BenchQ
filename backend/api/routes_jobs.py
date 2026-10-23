@@ -8,7 +8,7 @@ from sqlalchemy import desc, asc, text, func
 from backend.models.db import get_db, Job, find_company_by_name
 from backend.models.tenancy import link_job_to_firm
 from backend.api.routes_auth import current_principal
-from backend.auth.scoping import reader_firm_id, scoped, writer_firm_id
+from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs, writer_firm_id
 from backend.auth.sessions import Principal
 from backend.api._input import str_field, uuid_filter
 from backend.scraper._shared.dedup import make_external_id, make_content_hash
@@ -125,7 +125,7 @@ def list_jobs(
     db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
 ):
     search_id = uuid_filter(search_id, "search_id")
-    q = db.query(Job)
+    q = scoped_jobs(db, firm_id)
 
     if status:
         vals = [s.strip() for s in status.split(",") if s.strip()]
@@ -342,28 +342,30 @@ def _apply_common_filters(q, status=None, company=None, source=None, h1b_verdict
 
 
 @router.get("/feed-stats")
-def feed_stats(db: Session = Depends(get_db)):
+def feed_stats(db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Global counts for the v2 feed header — arrived today + not-yet-scored — since the paged /jobs response only sees the current page."""
     from datetime import datetime, timezone
     from sqlalchemy import func, text
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    arrived_today = db.query(func.count(Job.id)).filter(Job.discovered_at >= start).scalar() or 0
+    arrived_today = scoped_jobs(db, firm_id, func.count(Job.id)).filter(Job.discovered_at >= start).scalar() or 0
     unscored = db.execute(text(
         "select count(*) from jobs where status in ('new','saved') "
-        "and (cv_scores is null or cv_scores::text = '{}')"
-    )).scalar() or 0
+        "and (cv_scores is null or cv_scores::text = '{}') "
+        "and id in (select job_id from firm_jobs where firm_id = :firm)"   # the firm's jobs only (scoped_jobs)
+    ), {"firm": firm_id}).scalar() or 0
     return {"arrived_today": int(arrived_today), "unscored": int(unscored)}
 
 
 @router.get("/unscored-ids")
-def unscored_ids(limit: Annotated[int, Query(ge=0, le=10000)] = 500, db: Session = Depends(get_db)):
+def unscored_ids(limit: Annotated[int, Query(ge=0, le=10000)] = 500, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """IDs of not-yet-scored new/saved jobs; the header's "Score N unscored" action scores exactly these, since they sort to the bottom by score and won't be on the feed page."""
     from sqlalchemy import text
     rows = db.execute(text(
         "select id from jobs where status in ('new','saved') "
         "and (cv_scores is null or cv_scores::text = '{}') "
+        "and id in (select job_id from firm_jobs where firm_id = :firm) "   # the firm's jobs only (scoped_jobs)
         "order by discovered_at desc limit :lim"
-    ), {"lim": limit}).fetchall()
+    ), {"lim": limit, "firm": firm_id}).fetchall()
     return {"ids": [str(r[0]) for r in rows]}
 
 
@@ -382,13 +384,13 @@ def list_job_companies(
     max_salary: Optional[int] = None,
     search_id: Optional[str] = None,
     counts: Optional[bool] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
 ):
     """Return distinct canonical company names from jobs matching current filters, sorted, with aliases collapsed to their parent (e.g. 'Audible' -> 'Amazon'); with ?counts=1, returns [{name, count}] sorted by open-role count."""
     from backend.models.db import build_company_lookup
     if counts:
         from sqlalchemy import func
-        cq = db.query(Job.company, func.count(Job.id)).filter(Job.company.isnot(None), Job.company != "")
+        cq = scoped_jobs(db, firm_id, Job.company, func.count(Job.id)).filter(Job.company.isnot(None), Job.company != "")
         cq = _apply_common_filters(cq, status=status, source=source, h1b_verdict=h1b_verdict,
                                    min_score=min_score, saved=saved, title_search=title_search,
                                    remote=remote, location=location, arrangement=arrangement, min_salary=min_salary, max_salary=max_salary,
@@ -400,7 +402,7 @@ def list_job_companies(
             cname = co.name if co else name
             agg[cname] = agg.get(cname, 0) + cnt
         return [{"name": n, "count": c} for n, c in sorted(agg.items(), key=lambda x: (-x[1], x[0].lower()))]
-    q = db.query(Job.company).distinct().filter(Job.company.isnot(None), Job.company != "")
+    q = scoped_jobs(db, firm_id, Job.company).distinct().filter(Job.company.isnot(None), Job.company != "")
     q = _apply_common_filters(q, status=status, source=source, h1b_verdict=h1b_verdict,
                               min_score=min_score, saved=saved, title_search=title_search,
                               remote=remote, location=location, arrangement=arrangement, min_salary=min_salary, max_salary=max_salary,
@@ -429,12 +431,12 @@ def list_job_sources(
     min_salary: Optional[int] = None,
     max_salary: Optional[int] = None,
     search_id: Optional[str] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
 ):
     """Return distinct source values from jobs matching current filters, sorted."""
     company = _expand_company_filter(db, company)
     # ?counts=1 returns [{name, count}] so the dropdown can show how many jobs each value has
-    q = (db.query(Job.source, func.count(Job.id)) if counts else db.query(Job.source).distinct()).filter(Job.source.isnot(None), Job.source != "")
+    q = (scoped_jobs(db, firm_id, Job.source, func.count(Job.id)) if counts else scoped_jobs(db, firm_id, Job.source).distinct()).filter(Job.source.isnot(None), Job.source != "")
     q = _apply_common_filters(q, status=status, company=company, h1b_verdict=h1b_verdict,
                               min_score=min_score, saved=saved, title_search=title_search,
                               remote=remote, location=location, arrangement=arrangement, min_salary=min_salary, max_salary=max_salary,
@@ -460,12 +462,12 @@ def list_job_verdicts(
     min_salary: Optional[int] = None,
     max_salary: Optional[int] = None,
     search_id: Optional[str] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
 ):
     """Return distinct h1b_verdict values from jobs matching current filters."""
     company = _expand_company_filter(db, company)
     # ?counts=1 returns [{name, count}] so the dropdown can show how many jobs each value has
-    q = (db.query(Job.h1b_verdict, func.count(Job.id)) if counts else db.query(Job.h1b_verdict).distinct()).filter(Job.h1b_verdict.isnot(None), Job.h1b_verdict != "")
+    q = (scoped_jobs(db, firm_id, Job.h1b_verdict, func.count(Job.id)) if counts else scoped_jobs(db, firm_id, Job.h1b_verdict).distinct()).filter(Job.h1b_verdict.isnot(None), Job.h1b_verdict != "")
     q = _apply_common_filters(q, status=status, company=company, source=source,
                               min_score=min_score, saved=saved, title_search=title_search,
                               remote=remote, location=location, arrangement=arrangement, min_salary=min_salary, max_salary=max_salary,
@@ -498,7 +500,7 @@ def job_facets(
     min_salary: Optional[int] = None,
     max_salary: Optional[int] = None,
     search_id: Optional[str] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
 ):
     """Every filter menu's options and counts in one answer, so the feed's menus
     narrow each other instead of each showing global totals.
@@ -529,7 +531,7 @@ def job_facets(
         """(value, count) rows for one column with that column's own filter lifted."""
         kw = dict(base)
         kw[drop] = None
-        q = db.query(col, func.count(Job.id)).filter(col.isnot(None), col != "")
+        q = scoped_jobs(db, firm_id, col, func.count(Job.id)).filter(col.isnot(None), col != "")
         return _apply_common_filters(q, **kw).group_by(col).all()
 
     def _pad(rows, selected):
@@ -575,7 +577,7 @@ def job_facets(
     loc_kw["location"] = None
     from backend.models.db import JobLocation
     loc_rows = _apply_common_filters(
-        db.query(JobLocation.country, JobLocation.region, JobLocation.city,
+        scoped_jobs(db, firm_id, JobLocation.country, JobLocation.region, JobLocation.city,
                  func.count(func.distinct(Job.id))),
         **loc_kw
     ).join(JobLocation, JobLocation.job_id == Job.id).filter(
@@ -659,7 +661,7 @@ def job_facets(
     arrangements = []
     for value in ARRANGEMENTS:
         clause = _arrangement_clause(value)
-        q = _apply_common_filters(db.query(func.count(func.distinct(Job.id))), **arr_kw)
+        q = _apply_common_filters(scoped_jobs(db, firm_id, func.count(func.distinct(Job.id))), **arr_kw)
         arrangements.append({"name": value,
                              "count": int(q.filter(clause).scalar() or 0)})
 
@@ -669,7 +671,7 @@ def job_facets(
     score_kw["min_score"] = None
     score_bands = []
     for n in _SCORE_BANDS:
-        q = _apply_common_filters(db.query(func.count(Job.id)), **score_kw)
+        q = _apply_common_filters(scoped_jobs(db, firm_id, func.count(Job.id)), **score_kw)
         score_bands.append({"name": str(n),
                             "count": int(q.filter(Job.best_cv_score >= float(n)).scalar() or 0)})
 
@@ -937,7 +939,7 @@ def _validate_job_updates(updates: dict, allowed: set) -> None:
 
 
 @router.post("/bulk-update")
-def bulk_update_jobs(body: dict, db: Session = Depends(get_db)):
+def bulk_update_jobs(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Bulk update multiple jobs at once (status, seen, saved); returns {"updated": count, "not_found": [<ids>]} so the frontend can reconcile stale client-side selections."""
     import uuid as _uuid
     job_ids = body.get("job_ids") or []
@@ -959,7 +961,7 @@ def bulk_update_jobs(body: dict, db: Session = Depends(get_db)):
         except (ValueError, AttributeError, TypeError):
             not_found.append(str(job_id))
             continue
-        job = db.query(Job).filter(Job.id == parsed).first()
+        job = scoped_jobs(db, firm_id).filter(Job.id == parsed).first()
         if job:
             for k, v in updates.items():
                 if k in allowed:
@@ -974,7 +976,7 @@ def bulk_update_jobs(body: dict, db: Session = Depends(get_db)):
 @router.get("/{job_id}")
 def get_job(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     from backend.models.db import Resume
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     tailored = scoped(db, Resume, firm_id, Resume.id).filter(
@@ -995,7 +997,7 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
                      firm_id=Depends(writer_firm_id)):
     # Must be async — launch_background() uses asyncio.create_task(), which needs a running
     # event loop; a sync endpoint's threadpool has none, so the task would silently never start.
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -1073,9 +1075,9 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
 
 
 @router.post("/cache-applied")
-def cache_applied_jobs(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def cache_applied_jobs(background_tasks: BackgroundTasks, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Cache pages for all applied jobs that don't have a cached page yet."""
-    jobs = db.query(Job).filter(
+    jobs = scoped_jobs(db, firm_id).filter(
         Job.status == "applied",
         Job.url.isnot(None),
         Job.cached_page_html.is_(None),
@@ -1121,9 +1123,9 @@ _READER_CSP = {"Content-Security-Policy": "sandbox; default-src 'unsafe-inline';
 
 
 @router.get("/{job_id}/cached-page")
-def get_cached_page(job_id: str, db: Session = Depends(get_db)):
+def get_cached_page(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Return the cached page as clean, readable HTML."""
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if not job.cached_page_html:
@@ -1133,9 +1135,9 @@ def get_cached_page(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{job_id}/frame-check")
-async def frame_check(job_id: str, db: Session = Depends(get_db)):
+async def frame_check(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Report whether the posting can be embedded in an iframe without the extension; blocks only on a confident framing signal (X-Frame-Options or a CSP frame-ancestors directive) on a successful fetch, and treats a fetch error as embeddable so the feed still tries the live preview."""
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if not job.url:
@@ -1170,9 +1172,9 @@ def _inject_base(raw_html: str, url: str) -> str:
 
 
 @router.get("/{job_id}/live-page")
-async def get_live_page(job_id: str, db: Session = Depends(get_db)):
+async def get_live_page(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Fetch the posting from the backend (SSRF-guarded) and return its own HTML so the feed can show the real page even when the extension isn't stripping X-Frame-Options; warms the cached_page_* columns as a side effect."""
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if not job.url:

@@ -4,7 +4,7 @@ import pytest
 from backend.models.db import Company, Job, Resume, Search, Setting
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 @pytest.mark.asyncio

@@ -20,7 +20,7 @@ from backend.models.db import (
 from backend.tests.r4_support import make_job
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 @pytest.fixture(autouse=True)

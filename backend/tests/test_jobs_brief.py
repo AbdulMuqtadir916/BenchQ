@@ -1,5 +1,8 @@
 """`GET /jobs?brief=1` drops the long text fields; the default shape is unchanged."""
 from backend.tests.r4_support import client, make_job  # noqa: F401 — client is a fixture
+import pytest
+
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def test_brief_drops_long_fields(client, test_db):

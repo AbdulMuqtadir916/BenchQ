@@ -26,7 +26,7 @@ import pytest
 from backend.tests.r4_support import client  # noqa: F401
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 class SessionCounter:

@@ -2,6 +2,8 @@
 import pytest
 import uuid
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def test_bulk_update_all_valid_ids(api_client, test_db):
     from backend.models.db import Job

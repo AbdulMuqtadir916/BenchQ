@@ -62,7 +62,7 @@ def _root_name(node):
     return node.id if isinstance(node, ast.Name) else None
 
 
-def _violations(path: Path, models: set[str]) -> list[str]:
+def _violations(path: Path, models: set[str], allowed: dict = ALLOWED) -> list[str]:
     tree = ast.parse(path.read_text())
     found = []
 
@@ -74,9 +74,10 @@ def _violations(path: Path, models: set[str]) -> list[str]:
             is_query = isinstance(func, ast.Attribute) and func.attr == "query"
             is_select = isinstance(func, ast.Name) and func.id == "select"
             if is_query or is_select:
-                named = {_root_name(arg) for arg in node.args} & models
+                # Every name inside the selected entities, so `db.query(func.count(Job.id))` counts too.
+                named = {n.id for arg in node.args for n in ast.walk(arg) if isinstance(n, ast.Name)} & models
                 # A nested helper is covered by the function it sits in.
-                if named and not any((path.name, fn) in ALLOWED for fn in functions):
+                if named and not any((path.name, fn) in allowed for fn in functions):
                     where = functions[-1] if functions else "<module>"
                     found.append(f"{path.name}:{node.lineno} {where}() queries {', '.join(sorted(named))}")
         for child in ast.iter_child_nodes(node):
@@ -106,3 +107,52 @@ def test_every_allowed_function_exists():
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 defined.add((path.name, node.name))
     assert set(ALLOWED) - defined == set()
+
+
+# Jobs are one shared pool; a firm sees the ones `firm_jobs` links it to (07 Q37), read through `scoped_jobs()`.
+# (file, function) -> why it may query `Job` across the whole pool.
+JOBS_ALLOWED = {
+    # Capture: a posting is looked up in the whole pool first (dedup), then linked to the firm (F2b).
+    ("routes_applications.py", "create_application"): "dedup over the pool, then links the job to the firm",
+    ("routes_jobs.py", "save_from_extension"): "dedup over the pool, then links the job to the firm",
+    ("routes_jobs.py", "create_manual_job"): "dedup over the pool, then links the job to the firm",
+    ("routes_applications.py", "_known_posting"): "names a public posting by its URL; reveals no firm's data",
+    # Platform routes and jobs.
+    ("routes_jobs.py", "linkedin_import"): "platform route",
+    ("routes_companies.py", "auto_create_from_jobs"): "platform route",
+    ("routes_companies.py", "backfill_h1b_jobs"): "platform route",
+    ("routes_companies.py", "list_companies"): "counts a firm user's jobs through scoped_jobs itself",
+    ("routes_searches.py", "delete_search"): "platform route",
+    ("main.py", "trigger_job_cleanup"): "platform route",
+    ("main.py", "trigger_backfill_descriptions"): "platform route",
+    # Background workers and helpers given a job id their route already checked.
+    ("routes_applications.py", "_set_job_cache_error"): "worker; job id checked by its route",
+    ("routes_applications.py", "_cache_job_page"): "worker; job id checked by its route",
+    ("routes_applications.py", "_fetch_and_store_description"): "worker; job id checked by its route",
+    ("routes_resumes.py", "_persist_job_description"): "worker; job id checked by its route",
+    ("routes_resumes.py", "_tailor_impl"): "worker; ids checked by tailor_resume",
+    ("routes_resumes.py", "_score_resume_impl"): "worker; ids checked by score_check",
+    ("routes_cover_letters.py", "_generate_inner"): "worker; ids checked by generate_cover_letter",
+    ("routes_resumes.py", "_rewrite_urls_with_tracers"): "reads the job's short id for a token; job checked by its route",
+    ("routes_resumes.py", "_clear_orphan_tailored_score"): "job scores are shared across firms for now",
+}
+
+
+def test_routes_read_jobs_only_through_scoped_jobs():
+    found = [v for path in ROUTE_FILES for v in _violations(path, {"Job"}, JOBS_ALLOWED)]
+    assert not found, ("Query jobs with backend.auth.scoping.scoped_jobs(), or add the function to JOBS_ALLOWED "
+                       "with the reason it may see the whole pool:\n" + "\n".join(found))
+
+
+def test_raw_sql_on_jobs_names_the_firms_links():
+    """A `text()` query over `jobs` can't go through scoped_jobs(), so it must filter on `firm_jobs` itself."""
+    import re
+    found = []
+    for path in ROUTE_FILES:
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "text":
+                sql = " ".join(n.value for a in node.args for n in ast.walk(a)
+                               if isinstance(n, ast.Constant) and isinstance(n.value, str))
+                if re.search(r"\b(from|join)\s+jobs\b", sql, re.I) and "firm_jobs" not in sql:
+                    found.append(f"{path.name}:{node.lineno}")
+    assert not found, "Raw SQL over jobs without a firm_jobs filter:\n" + "\n".join(found)

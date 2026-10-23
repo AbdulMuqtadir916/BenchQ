@@ -9,6 +9,9 @@ import uuid
 
 from backend.models.db import Job, JobLocation
 from backend.scripts.backfill_location import run
+import pytest
+
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _job(db, location, country=None, region=None, city=None, places=()):

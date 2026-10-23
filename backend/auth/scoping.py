@@ -7,6 +7,7 @@ F2b, F4).
   of another firm is never found, and a route answers 404 for it, the same as for a missing row (07 F4,
   principle 4). `backend/tests/test_firm_scoping_lint.py` fails when a route queries a firm-owned model any other
   way.
+- `scoped_jobs()`: the same for the shared job pool, through the firm's links in `firm_jobs`.
 
 A Super Admin's read-only support view (07 F3) will resolve `reader_firm_id` to the viewed firm when the
 support-view endpoints are built; until then FIRM routes refuse a Super Admin (backend/auth/access.py).
@@ -34,6 +35,22 @@ def reader_firm_id(principal: Principal = Depends(current_principal)) -> uuid.UU
     if principal.firm_id is None:
         raise HTTPException(status_code=403, detail=PLATFORM_ADMIN_REFUSED)
     return principal.firm_id
+
+
+def firm_job_ids(firm_id: uuid.UUID):
+    """The ids of the jobs a firm sees: the ones `firm_jobs` links it to (07 Q37)."""
+    from sqlalchemy import select
+
+    from backend.models.tenancy import FirmJob
+    return select(FirmJob.job_id).where(FirmJob.firm_id == firm_id)
+
+
+def scoped_jobs(db, firm_id: uuid.UUID, *entities):
+    """`db.query(Job)` limited to the jobs a firm sees. Jobs are one shared pool (07 Q37), so the limit is the
+    firm's links in `firm_jobs`, not a column on the job. Pass `entities` to select columns: works for any query
+    whose rows come from `jobs`, `scoped_jobs(db, firm_id, Job.company, func.count(Job.id))`."""
+    from backend.models.db import Job
+    return db.query(*(entities or (Job,))).filter(Job.id.in_(firm_job_ids(firm_id)))
 
 
 def scoped(db, model, firm_id: uuid.UUID, *entities):
