@@ -118,12 +118,12 @@ async def test_tailor_response_reports_chain_score(test_db, monkeypatch):
     monkeypatch.setattr(rr, "launch_background",
                         lambda *a, **kw: str(uuid.uuid4()), raising=False)
 
-    resp = await rr.tailor_resume({"base_resume_id": str(base.id), "job_id": str(job.id)}, db=test_db)
+    resp = await rr.tailor_resume({"base_resume_id": str(base.id), "job_id": str(job.id)}, db=test_db, firm_id=DEFAULT_FIRM_ID)
     assert resp["chain_score"] == "full"
 
     # A freeform tailor has no job to score against, so nothing is chained.
     resp = await rr.tailor_resume({"base_resume_id": str(base.id),
-                                   "job_description": "a pasted description"}, db=test_db)
+                                   "job_description": "a pasted description"}, db=test_db, firm_id=DEFAULT_FIRM_ID)
     assert resp["chain_score"] == "off"
 
 
@@ -144,5 +144,5 @@ async def test_tailor_response_reports_off_when_chain_disabled(test_db, monkeypa
     monkeypatch.setattr(rr, "launch_background",
                         lambda *a, **kw: str(uuid.uuid4()), raising=False)
 
-    resp = await rr.tailor_resume({"base_resume_id": str(base.id), "job_id": str(job.id)}, db=test_db)
+    resp = await rr.tailor_resume({"base_resume_id": str(base.id), "job_id": str(job.id)}, db=test_db, firm_id=DEFAULT_FIRM_ID)
     assert resp["chain_score"] == "off"

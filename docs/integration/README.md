@@ -225,7 +225,7 @@ dependencies are live; only switching the adapter to live waits.
 | F1 | Alembic baseline | 00 | — | Done (#29, #30) |
 | F2 | Auth + tenancy tables; `firm_id` on existing tables, backfilled to a default firm | F1 | Abdul | F2a tables done (#33); F2b (`firm_id`, `firm_jobs`, migration 0005) built; **F2c** (settings) not started |
 | F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | Abdul | Done except the support-view endpoints (#34, #36) |
-| F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | Abdul | Policy table + `require` done (#35); the firm-scoping dependency and its lint test wait for F2b |
+| F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | Abdul | Policy table + `require` done (#35); `scoped()` + its lint test done for applications, interviews, résumés, cover letters, tracer stats and stats; the jobs feed is next |
 | F5 | Seed script: the mocks' firms, accounts and data | F2 | Abdul | Done for firms, plans, accounts and invites (#38); module data lands with each track |
 | F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | Abdul | Live behind flag (#40, #41): `NEXT_PUBLIC_LIVE_MODULES=session`. Server-side principal, mock sign-in removal and the legacy schema path not started |
 | F7 | Reusable cross-firm isolation test over every route | F4 | Uzair | Not started |

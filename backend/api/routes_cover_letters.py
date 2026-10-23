@@ -13,7 +13,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.db import get_db, CoverLetter, Resume, Job, Setting, Persona, TracerLink, TracerClickEvent, SessionLocal
 from backend.api._input import str_field, uuid_filter
-from backend.auth.scoping import writer_firm_id
+from backend.auth.scoping import reader_firm_id, scoped, writer_firm_id
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 from backend.api.routes_resumes import _get_browser, _rewrite_urls_with_tracers, _resolve_tailoring_jd  # shared with resumes
@@ -119,7 +119,7 @@ def _to_dict(cl: CoverLetter, include_json_data: bool = False, ctx: dict | None 
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
-def _build_ctx(rows: list[CoverLetter], db: Session) -> dict:
+def _build_ctx(rows: list[CoverLetter], db: Session, firm_id) -> dict:
     """Batch-load the job, its application stage and the source resume name for a set of letters — three queries total rather than three per row."""
     from backend.models.db import Application, Job, Resume
     job_ids = {cl.job_id for cl in rows if cl.job_id}
@@ -128,12 +128,12 @@ def _build_ctx(rows: list[CoverLetter], db: Session) -> dict:
     if job_ids:
         for j in db.query(Job).filter(Job.id.in_(job_ids)).all():
             jobs[j.id] = j
-        for a in (db.query(Application)
+        for a in (scoped(db, Application, firm_id)
                     .filter(Application.job_id.in_(job_ids))
                     .order_by(Application.updated_at.desc()).all()):
             stages.setdefault(a.job_id, a.status)      # newest wins
     if res_ids:
-        for r in db.query(Resume).filter(Resume.id.in_(res_ids)).all():
+        for r in scoped(db, Resume, firm_id).filter(Resume.id.in_(res_ids)).all():
             names[r.id] = r.name
     out = {}
     for cl in rows:
@@ -150,8 +150,8 @@ def _build_ctx(rows: list[CoverLetter], db: Session) -> dict:
 
 
 @router.get("")
-def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_db)):
-    q = db.query(CoverLetter).order_by(CoverLetter.updated_at.desc())
+def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    q = scoped(db, CoverLetter, firm_id).order_by(CoverLetter.updated_at.desc())
     # A malformed filter value is a request error (422), not a missing resource —
     # the global DataError handler would otherwise call this list "Not found"
     # (R4-T1-09). Path ids keep their 404.
@@ -159,7 +159,7 @@ def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_d
     if job_id:
         q = q.filter(CoverLetter.job_id == job_id)
     rows = q.all()
-    ctx = _build_ctx(rows, db)
+    ctx = _build_ctx(rows, db, firm_id)
     return [_to_dict(cl, ctx=ctx.get(cl.id)) for cl in rows]
 
 
@@ -181,20 +181,20 @@ def create_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depen
     db.add(cl)
     db.commit()
     db.refresh(cl)
-    return _to_dict(cl, include_json_data=True, ctx=_build_ctx([cl], db).get(cl.id))
+    return _to_dict(cl, include_json_data=True, ctx=_build_ctx([cl], db, firm_id).get(cl.id))
 
 
 @router.get("/{cl_id}")
-def get_cover_letter(cl_id: str, db: Session = Depends(get_db)):
-    cl = db.query(CoverLetter).filter(CoverLetter.id == cl_id).first()
+def get_cover_letter(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    cl = scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == cl_id).first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
-    return _to_dict(cl, include_json_data=True, ctx=_build_ctx([cl], db).get(cl.id))
+    return _to_dict(cl, include_json_data=True, ctx=_build_ctx([cl], db, firm_id).get(cl.id))
 
 
 @router.patch("/{cl_id}")
-def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db)):
-    cl = db.query(CoverLetter).filter(CoverLetter.id == cl_id).first()
+def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    cl = scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == cl_id).first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
     allowed = {"name", "template", "page_format", "json_data", "job_id", "resume_id",
@@ -206,14 +206,14 @@ def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db)):
             setattr(cl, k, v)
     db.commit()
     db.refresh(cl)
-    return _to_dict(cl, include_json_data=True, ctx=_build_ctx([cl], db).get(cl.id))
+    return _to_dict(cl, include_json_data=True, ctx=_build_ctx([cl], db, firm_id).get(cl.id))
 
 
 @router.get("/{cl_id}/tracer-stats")
-def get_tracer_stats(cl_id: str, db: Session = Depends(get_db)):
+def get_tracer_stats(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Click stats per tracer link for a cover letter (mirrors the resume endpoint)."""
     from sqlalchemy import func
-    links = db.query(TracerLink).filter(TracerLink.cover_letter_id == cl_id).all()
+    links = scoped(db, TracerLink, firm_id).filter(TracerLink.cover_letter_id == cl_id).all()
     result = []
     for link in links:
         total = db.query(func.count(TracerClickEvent.id)).filter(
@@ -236,19 +236,19 @@ def get_tracer_stats(cl_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/{cl_id}")
-def delete_cover_letter(cl_id: str, db: Session = Depends(get_db)):
-    cl = db.query(CoverLetter).filter(CoverLetter.id == cl_id).first()
+def delete_cover_letter(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    cl = scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == cl_id).first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
     # Drop tracer links first (DB has ON DELETE CASCADE, but delete explicitly so
     # the ORM doesn't try to NULL the FK on this nullable column).
     # A link shared with the résumé this letter was written from stays — release
     # only our side of it, so the résumé keeps reporting it and its click history survives.
-    for link in db.query(TracerLink).filter(
+    for link in scoped(db, TracerLink, firm_id).filter(
         TracerLink.cover_letter_id == cl.id, TracerLink.resume_id.isnot(None),
     ).all():
         link.cover_letter_id = None
-    db.query(TracerLink).filter(
+    scoped(db, TracerLink, firm_id).filter(
         TracerLink.cover_letter_id == cl.id, TracerLink.resume_id.is_(None),
     ).delete(synchronize_session=False)
     db.delete(cl)
@@ -259,8 +259,8 @@ def delete_cover_letter(cl_id: str, db: Session = Depends(get_db)):
 # ── PDF export ────────────────────────────────────────────────────────────────
 
 @router.get("/{cl_id}/pdf")
-async def export_pdf(cl_id: str, db: Session = Depends(get_db)):
-    cl = db.query(CoverLetter).filter(CoverLetter.id == cl_id).first()
+async def export_pdf(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    cl = scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == cl_id).first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
 
@@ -322,7 +322,7 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_
 
     target_id = body.get("cover_letter_id")
     if target_id:
-        if not db.query(CoverLetter).filter(CoverLetter.id == target_id).first():
+        if not scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == target_id).first():
             raise HTTPException(404, "Cover letter not found")
 
     # Reserved id 'persona' bases the letter on the Persona's resume_content
@@ -332,7 +332,7 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_
         if not persona or not (persona.resume_content or {}):
             raise HTTPException(400, "Persona has no resume_content — fill it in /persona first")
     else:
-        resume = db.query(Resume).filter(Resume.id == resume_id).first()
+        resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
         if not resume:
             raise HTTPException(404, "Resume not found")
         if not (resume.json_data or {}):

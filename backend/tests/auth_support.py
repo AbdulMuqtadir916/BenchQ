@@ -40,9 +40,9 @@ def make_plan(db, name="Test plan", seat_limit=10, candidate_limit=100):
     return plan
 
 
-def make_firm(db, plan, slug="acme", status="ACTIVE", name=None):
+def make_firm(db, plan, slug="acme", status="ACTIVE", name=None, id=None):
     from backend.models.tenancy import Firm
-    firm = Firm(name=name or slug.title(), slug=slug, status=status, plan_id=plan.id,
+    firm = Firm(id=id, name=name or slug.title(), slug=slug, status=status, plan_id=plan.id,
                 seat_limit=plan.seat_limit, candidate_limit=plan.candidate_limit)
     db.add(firm)
     db.flush()
@@ -66,10 +66,24 @@ def make_admin(db, email="admin@benchq.test", name="Sam Admin", is_active=True):
     return admin
 
 
+def _signed_in_firm(db, plan):
+    """The signed-in firm, "acme", takes the Default firm's id, so the rows a test writes with DEFAULT_FIRM_ID
+    (tests/firm_support.py) are the signed-in user's. When the `default_firm` fixture put the Default firm in
+    first, that row becomes acme."""
+    from backend.models.tenancy import DEFAULT_FIRM_ID, Firm
+    firm = db.get(Firm, DEFAULT_FIRM_ID)
+    if firm is None:
+        return make_firm(db, plan, id=DEFAULT_FIRM_ID)
+    firm.name, firm.slug, firm.status, firm.plan_id = "Acme", "acme", "ACTIVE", plan.id
+    firm.seat_limit, firm.candidate_limit = plan.seat_limit, plan.candidate_limit
+    db.flush()
+    return firm
+
+
 def seed_accounts(db) -> Accounts:
     from backend.auth.sessions import start_session
     plan = make_plan(db)
-    firm = make_firm(db, plan)
+    firm = _signed_in_firm(db, plan)
     user = make_user(db, firm)
     admin = make_admin(db)
     firm_token, _ = start_session(db, user)

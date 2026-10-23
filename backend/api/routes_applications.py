@@ -9,7 +9,7 @@ from sqlalchemy import desc
 from backend.models.db import get_db, Application, Job, Company, Setting, utcnow, SessionLocal
 from backend.models.tenancy import link_job_to_firm
 from backend.api.routes_auth import current_principal
-from backend.auth.scoping import writer_firm_id
+from backend.auth.scoping import reader_firm_id, scoped, writer_firm_id
 from backend.auth.sessions import Principal
 from backend.scraper._shared.bot_wall import is_bot_wall
 
@@ -347,7 +347,7 @@ def create_application(
         except ValueError:
             logger.info("ignoring unparseable applied_at %r", data.applied_at)
 
-    app = db.query(Application).filter(Application.job_id == job.id, Application.firm_id == firm_id).first()
+    app = scoped(db, Application, firm_id).filter(Application.job_id == job.id).first()
     if app:
         # Refuse a second log for the same posting — it would silently overwrite
         # notes and reset the stage, creating a bogus funnel edge.
@@ -415,10 +415,10 @@ def list_applications(
     status: Optional[str] = None,
     limit: Annotated[int, Query(ge=0, le=2000)] = 200,
     offset: Annotated[int, Query(ge=0)] = 0,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
 ):
     from sqlalchemy.orm import selectinload
-    q = db.query(Application).options(selectinload(Application.interviews))
+    q = scoped(db, Application, firm_id).options(selectinload(Application.interviews))
     if status:
         q = q.filter(Application.status == status)
 
@@ -430,11 +430,11 @@ def list_applications(
     job_ids = [a.job_id for a in apps]
     with_letter = set()
     if job_ids:
-        with_letter = {str(r[0]) for r in db.query(CoverLetter.job_id)
+        with_letter = {str(r[0]) for r in scoped(db, CoverLetter, firm_id, CoverLetter.job_id)
                        .filter(CoverLetter.job_id.in_(job_ids)).distinct().all()}
     tailored = {}
     if job_ids:
-        for r in (db.query(Resume)
+        for r in (scoped(db, Resume, firm_id)
                   .filter(Resume.job_id.in_(job_ids), Resume.is_base == False)  # noqa: E712
                   .order_by(Resume.updated_at.asc()).all()):
             tailored[str(r.job_id)] = r      # asc → last write wins = most recent
@@ -446,8 +446,8 @@ def list_applications(
 
 
 @router.patch("/{app_id}")
-def update_application(app_id: str, updates: dict, db: Session = Depends(get_db)):
-    app = db.query(Application).filter(Application.id == app_id).first()
+def update_application(app_id: str, updates: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    app = scoped(db, Application, firm_id).filter(Application.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
@@ -481,8 +481,8 @@ def update_application(app_id: str, updates: dict, db: Session = Depends(get_db)
 
 
 @router.delete("/{app_id}")
-def delete_application(app_id: str, db: Session = Depends(get_db)):
-    app = db.query(Application).filter(Application.id == app_id).first()
+def delete_application(app_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    app = scoped(db, Application, firm_id).filter(Application.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
     # Deleting the application must also release the job, otherwise it stays
@@ -519,7 +519,7 @@ def _parse_app_id(raw):
 
 
 @router.post("/bulk-update")
-def bulk_update_applications(body: dict, db: Session = Depends(get_db)):
+def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Move several applications to one status.
 
     Each row goes through the same path as PATCH /{app_id}: record_transition()
@@ -545,7 +545,7 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db)):
         if parsed is None:
             not_found.append(str(raw))
             continue
-        app = db.query(Application).filter(Application.id == parsed).first()
+        app = scoped(db, Application, firm_id).filter(Application.id == parsed).first()
         if app is None:
             not_found.append(str(raw))
             continue
@@ -563,7 +563,7 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/bulk-delete")
-def bulk_delete_applications(body: dict, db: Session = Depends(get_db)):
+def bulk_delete_applications(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Delete several applications, exactly as DELETE /{app_id} deletes one.
 
     The job each row points at is released back to 'saved' so it stops counting
@@ -577,7 +577,7 @@ def bulk_delete_applications(body: dict, db: Session = Depends(get_db)):
         if parsed is None:
             not_found.append(str(raw))
             continue
-        app = db.query(Application).filter(Application.id == parsed).first()
+        app = scoped(db, Application, firm_id).filter(Application.id == parsed).first()
         if app is None:
             not_found.append(str(raw))
             continue
@@ -807,9 +807,9 @@ async def extract_posting(payload: ExtractRequest):
 
 
 @router.post("/{app_id}/interviews", status_code=201)
-def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_db)):
+def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     from backend.models.db import Interview
-    app = db.query(Application).filter(Application.id == app_id).first()
+    app = scoped(db, Application, firm_id).filter(Application.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
     iv = Interview(firm_id=app.firm_id, application_id=app.id, what=data.what, where_text=data.where_text,
@@ -821,9 +821,9 @@ def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_
 
 
 @router.patch("/interviews/{interview_id}")
-def update_interview(interview_id: str, updates: dict, db: Session = Depends(get_db)):
+def update_interview(interview_id: str, updates: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     from backend.models.db import Interview
-    iv = db.query(Interview).filter(Interview.id == interview_id).first()
+    iv = scoped(db, Interview, firm_id).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
     for key in ("what", "where_text", "status", "prep"):
@@ -836,9 +836,9 @@ def update_interview(interview_id: str, updates: dict, db: Session = Depends(get
 
 
 @router.delete("/interviews/{interview_id}")
-def delete_interview(interview_id: str, db: Session = Depends(get_db)):
+def delete_interview(interview_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     from backend.models.db import Interview
-    iv = db.query(Interview).filter(Interview.id == interview_id).first()
+    iv = scoped(db, Interview, firm_id).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
     db.delete(iv)
@@ -847,10 +847,10 @@ def delete_interview(interview_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{app_id}/prep")
-def prep_bundle(app_id: str, db: Session = Depends(get_db)):
+def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Assemble the interview prep handover (role, résumé, posting, and the editable `prep_ask` closing question) as plain context for an external model; no LLM call happens here."""
     from backend.models.db import Resume
-    app = db.query(Application).filter(Application.id == app_id).first()
+    app = scoped(db, Application, firm_id).filter(Application.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
     job = app.job
@@ -901,13 +901,13 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db)):
     # ── 2. my résumé, flattened to plain text ────────────────────────────────
     tailored = None
     if app.job_id:
-        tailored = (db.query(Resume)
+        tailored = (scoped(db, Resume, firm_id)
                     .filter(Resume.job_id == app.job_id, Resume.is_base == False)  # noqa: E712
                     .order_by(Resume.updated_at.desc()).first())
     cv_name = (tailored.name if tailored else None) or app.cv_version_used or (job.best_cv if job else None)
     src = tailored
     if not src and cv_name:
-        src = db.query(Resume).filter(Resume.name == cv_name).first()
+        src = scoped(db, Resume, firm_id).filter(Resume.name == cv_name).first()
     resume_text = ""
     if src and src.json_data:
         try:

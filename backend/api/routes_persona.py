@@ -10,6 +10,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.db import get_db, Persona, Resume, utcnow
 from backend.api._input import str_field
+from backend.auth.scoping import reader_firm_id, scoped
 
 logger = logging.getLogger("jobnavigator.persona")
 
@@ -222,7 +223,7 @@ def _import_summary(contact: dict, content: dict, source: str) -> dict:
 
 
 @router.post("/import")
-async def import_persona(request: Request, file: Optional[UploadFile] = File(None), db: Session = Depends(get_db)):
+async def import_persona(request: Request, file: Optional[UploadFile] = File(None), db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Populate the persona from a base résumé (`{"resume_id": ...}`) or an uploaded résumé PDF (same parser as POST /api/resumes/import-pdf, stores nothing as a Resume row), replacing `contact` and `resume_content` wholesale while leaving the other nodes untouched."""
     p = db.query(Persona).filter(Persona.id == 1).first()
     if not p:
@@ -244,7 +245,7 @@ async def import_persona(request: Request, file: Optional[UploadFile] = File(Non
         resume_id = str((body or {}).get("resume_id") or "").strip() if isinstance(body, dict) else ""
         if not resume_id:
             raise HTTPException(status_code=400, detail="Send a resume_id, or upload a PDF file")
-        r = db.query(Resume).filter(Resume.id == resume_id).first()
+        r = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
         if not r:
             raise HTTPException(status_code=404, detail="Resume not found")
         if not r.is_base:

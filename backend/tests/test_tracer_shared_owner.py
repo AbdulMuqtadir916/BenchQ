@@ -43,17 +43,17 @@ def test_both_documents_report_after_every_render_order(test_db):
     _setup(test_db)
 
     _render_resume(test_db)
-    assert len(get_tracer_stats(RESUME_ID, db=test_db)) == 1
+    assert len(get_tracer_stats(RESUME_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)) == 1
 
     _render_letter(test_db)
     # the letter now reports it, and so does the résumé
-    assert len(get_cl_tracer_stats(CL_ID, db=test_db)) == 1
-    assert len(get_tracer_stats(RESUME_ID, db=test_db)) == 1, \
+    assert len(get_cl_tracer_stats(CL_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)) == 1
+    assert len(get_tracer_stats(RESUME_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)) == 1, \
         "rendering the letter must not empty the résumé's tracer stats"
 
     _render_resume(test_db)
-    assert len(get_tracer_stats(RESUME_ID, db=test_db)) == 1
-    assert len(get_cl_tracer_stats(CL_ID, db=test_db)) == 1, \
+    assert len(get_tracer_stats(RESUME_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)) == 1
+    assert len(get_cl_tracer_stats(CL_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)) == 1, \
         "re-rendering the résumé must not empty the letter's tracer stats"
 
     # one shared row, one token, owned by both
@@ -74,8 +74,8 @@ def test_clicks_stay_attributed_across_renders(test_db):
     _render_letter(test_db)
     _render_resume(test_db)
 
-    assert get_tracer_stats(RESUME_ID, db=test_db)[0]["clicks"] == 1
-    assert get_cl_tracer_stats(CL_ID, db=test_db)[0]["clicks"] == 1
+    assert get_tracer_stats(RESUME_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)[0]["clicks"] == 1
+    assert get_cl_tracer_stats(CL_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)[0]["clicks"] == 1
     # the row was never recreated, so the event still hangs off the same link
     assert test_db.query(TracerLink).one().id == link.id
 
@@ -86,9 +86,9 @@ def test_deleting_the_letter_leaves_the_resume_its_link(test_db):
     _render_resume(test_db)
     _render_letter(test_db)
 
-    delete_cover_letter(CL_ID, db=test_db)
+    delete_cover_letter(CL_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
 
-    rows = get_tracer_stats(RESUME_ID, db=test_db)
+    rows = get_tracer_stats(RESUME_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
     assert len(rows) == 1 and rows[0]["token"] == "20892li"
     assert test_db.query(TracerLink).one().cover_letter_id is None
 
@@ -99,9 +99,9 @@ def test_deleting_the_resume_leaves_the_letter_its_link(test_db):
     _render_resume(test_db)
     _render_letter(test_db)
 
-    delete_resume(RESUME_ID, db=test_db)
+    delete_resume(RESUME_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
 
-    rows = get_cl_tracer_stats(CL_ID, db=test_db)
+    rows = get_cl_tracer_stats(CL_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
     assert len(rows) == 1 and rows[0]["token"] == "20892li"
     assert test_db.query(TracerLink).one().resume_id is None
 
@@ -112,6 +112,6 @@ def test_unshared_links_are_still_deleted_with_their_owner(test_db):
     _setup(test_db)
     _render_resume(test_db)          # résumé-only link, no letter rendered
 
-    delete_resume(RESUME_ID, db=test_db)
+    delete_resume(RESUME_ID, db=test_db, firm_id=DEFAULT_FIRM_ID)
 
     assert test_db.query(TracerLink).count() == 0

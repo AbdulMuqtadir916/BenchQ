@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from backend.models.db import get_db, Company, Job, Application, Setting, ScrapeLog, is_acknowledged
+from backend.api.routes_auth import current_principal
+from backend.auth.sessions import Principal
 
 logger = logging.getLogger("jobnavigator.companies")
 
@@ -89,6 +91,7 @@ def list_companies(
     active: Optional[bool] = None,
     tier: Optional[int] = None,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
 ):
     q = db.query(Company)
     if active is not None:
@@ -100,7 +103,10 @@ def list_companies(
     # Count applications: Application records + jobs with status='applied' (no double-counting)
     # Uses UNION of job IDs from both sources, then groups by company name
     from sqlalchemy import union, select
+    # Companies are global, but a firm user counts only the firm's applications; a Super Admin counts every firm's.
     app_job_ids = select(Application.job_id.label("jid")).distinct()
+    if principal.firm_id is not None:
+        app_job_ids = app_job_ids.where(Application.firm_id == principal.firm_id)
     applied_job_ids = select(Job.id.label("jid")).where(Job.status == "applied")
     all_applied = union(app_job_ids, applied_job_ids).subquery()
     raw_counts = (
