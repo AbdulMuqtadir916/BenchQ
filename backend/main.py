@@ -31,6 +31,7 @@ from backend.api.routes_admin import router as admin_router
 from backend.api.routes_firms import router as firms_router
 from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
+from backend.api.routes_ledger import router as ledger_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("jobnavigator")
@@ -138,6 +139,7 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
+app.include_router(ledger_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
 app.include_router(applications_router, prefix="/api")

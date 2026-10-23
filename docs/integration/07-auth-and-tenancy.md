@@ -325,7 +325,7 @@ status and scores are shared across firms until the Jobs track's `JobMark` (Q36)
 
 | Track | What | Depends on | Notes |
 |---|---|---|---|
-| **01 Ledger** | `ledger_entries` read API (`GET /api/firms/{firm}/ledger`, BDE `own` scope); every write in every later track logs here | F1–F7 | **Changes from today's 01-ledger.md:** the ledger is the new table, not `activity_log_v2` (system events, §6.6) |
+| **01 Ledger** | `ledger_entries` read API (`GET /api/firms/{firm}/ledger`, BDE `own` scope); every write in every later track logs here | F1–F4 | Live behind flag: the worked example every track copies (`01-ledger.md`). The ledger is the new table, not `activity_log_v2` (system events, §6.6) |
 | **02 Jobs** | The shared pool + `firm_jobs`; capture (dedup on the canonical URL, as fix PR 1); `JobMark` (Q36) | F1–F7; the jobs decision (§2) | Scraping stays platform-side |
 | **Candidates (D1)** | `candidates`, assignments, the Persona → candidate move; create with the over-limit block (A4) | F1–F7, D1 | Unblocks 03, 04 |
 | **Admin API** | Firms, plans, users, invites, platform team, audit: the `/admin` screens' `platformApi` | F1–F7 | Can run beside 01 / 02 / Candidates |
@@ -384,8 +384,8 @@ tests can be written before its dependencies are live; only "switch the adapter 
    also runs inside the API process, so a second API worker would run every job twice. That needs a
    separate worker process or a lock before scaling out.
 6. **`activity_log_v2` is an operations log, not the ledger.** It has no actor, entity, action or firm, and
-   its `type` values are system events. Today's 01-ledger.md maps it to `LedgerEntry`; that mapping gets
-   the "who did what" part of the product wrong. The ledger becomes its own table (F2), and the activity log
+   its `type` values are system events. The first 01-ledger.md mapped it to `LedgerEntry`; that mapping got
+   the "who did what" part of the product wrong (rewritten with track 01). The ledger becomes its own table (F2), and the activity log
    stays as the platform's system log (it feeds `/admin/system` in Phase S).
 7. **Singletons and global uniques**: `personas.id = 1` (D1 replaces it); `jobs.external_id` unique
    globally (fine for the shared pool; a per-firm copy would need `(firm_id, external_id)`);

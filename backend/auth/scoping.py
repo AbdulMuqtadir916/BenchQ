@@ -8,6 +8,8 @@ F2b, F4).
   principle 4). `backend/tests/test_firm_scoping_lint.py` fails when a route queries a firm-owned model any other
   way.
 - `scoped_jobs()`: the same for the shared job pool, through the firm's links in `firm_jobs`.
+- `own_scope()`: the `own` scope of 07 §2.2 (src/lib/auth/policy.ts `isOwnScope`): a BDE reads only their own
+  work, so a route adds `<model>.<owner column> == own_scope(principal)` when it isn't None.
 
 A Super Admin's read-only support view (07 F3) will resolve `reader_firm_id` to the viewed firm when the
 support-view endpoints are built; until then FIRM routes refuse a Super Admin (backend/auth/access.py).
@@ -35,6 +37,14 @@ def reader_firm_id(principal: Principal = Depends(current_principal)) -> uuid.UU
     if principal.firm_id is None:
         raise HTTPException(status_code=403, detail=PLATFORM_ADMIN_REFUSED)
     return principal.firm_id
+
+
+def own_scope(principal: Principal) -> uuid.UUID | None:
+    """The user whose rows alone a principal may read, or None for the whole firm: a BDE's own id, as the
+    frontend's `scopeLedger` / `scopeApplications`. Pair it with `scoped()`, never instead of it."""
+    if principal.kind == "firm" and principal.role == "BDE":
+        return principal.user_id
+    return None
 
 
 def firm_job_ids(firm_id: uuid.UUID):
