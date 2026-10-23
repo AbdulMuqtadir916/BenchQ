@@ -67,6 +67,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/firms/{firm_id}/invites": F,
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": F,
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": F,
+    "GET /api/firms/{firm_id}/ledger": F,          # a BDE gets their own entries only (routes_ledger)
     "POST /api/analyze/{job_id}": F,
     "GET /api/applications": F,
     "POST /api/applications": F,

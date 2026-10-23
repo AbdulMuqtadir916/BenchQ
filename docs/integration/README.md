@@ -127,53 +127,27 @@ Rules that keep this clean:
 Shared files you should **not** need to edit: `http.ts`, `config.ts` (every module name is
 already listed), `client.ts`, `dto/shared.ts`. If you do, say so in the PR.
 
-### Adapter template
+### Adapter, DTO and mapper
+
+Copy the ledger: [`01-ledger.md`](./01-ledger.md) walks the whole chain, backend and frontend, with the real
+files (`src/lib/api/analytics.ts`, `LedgerEntryDto` / `toLedgerEntry` in `src/lib/api/dto/session.ts`,
+`src/lib/api/live-ledger.test.ts`). In short:
 
 ```ts
-// src/lib/api/analytics.ts — the ledger, as an example
-import type { LedgerEntry } from "@/lib/schemas/analytics";
-import { arrayOf } from "./client";
-import { isLive } from "./config";
-import { http } from "./http";
-import { BackendLedgerEntrySchema, toLedgerEntry } from "./dto/ledger";
-
-const mock = () => import("@/mocks/ledger").then((m) => m.ledgerMock);
+const live = {
+  list: async (firmId: string, params?: { limit?: number; offset?: number }) =>
+    (await http.get(`/api/firms/${toBackendId(firmId)}/ledger`, arrayOf(LedgerEntryDto), { query: params })).map(toLedgerEntry),
+};
 
 export const ledgerApi = {
-  // Firm-scoped: every call names the firm (07-auth-and-tenancy §5, rule 1).
-  list: async (firmId: string, params?: { limit?: number; offset?: number }): Promise<LedgerEntry[]> => {
-    if (!isLive("ledger")) return (await mock()).list(firmId, params);
-    const rows = await http.get(`/api/firms/${firmId}/ledger`, arrayOf(BackendLedgerEntrySchema), { query: params });
-    return rows.map(toLedgerEntry);
-  },
+  list: async (firmId: string, params?: { limit?: number; offset?: number }): Promise<LedgerEntry[]> =>
+    isLive("ledger") ? live.list(firmId, params) : (await mock()).list(firmId, params),
 };
 ```
 
-When the module is finished, the `isLive` check, the `mock` import and the mock files all go.
-
-### DTO + mapper template
-
-```ts
-// src/lib/api/dto/ledger.ts
-import { z } from "zod";
-import type { LedgerEntry } from "@/lib/schemas/analytics";
-import { toIso } from "./shared";
-
-export const BackendLedgerEntrySchema = z.object({
-  id: z.string(),
-  firm_id: z.string().nullable(),
-  actor_user_id: z.string().nullable(),
-  action: z.string(),
-  entity_type: z.string(),
-  entity_id: z.string(),
-  summary: z.string(),
-  created_at: z.string(),            // timestamps are ALWAYS z.string() here — see below
-  // …the rest of LedgerEntry's fields, snake_case
-});
-export type BackendLedgerEntry = z.infer<typeof BackendLedgerEntrySchema>;
-
-export function toLedgerEntry(row: BackendLedgerEntry): LedgerEntry { /* … */ }
-```
+The DTO is a Zod object in snake_case that mirrors the backend serializer exactly; the mapper returns the
+frontend type parsed by its own schema. When the module is finished, the `isLive` check, the `mock` import
+and the mock files all go.
 
 **Timestamps:** FastAPI sends `2026-10-03T10:00:00+00:00` or a zone-less value, and the frontend
 schemas reject both. Declare every backend timestamp as `z.string()` and convert with `toIso` /
@@ -191,7 +165,7 @@ schemas reject both. Declare every backend timestamp as `z.string()` and convert
    parses the sample.
 4. **Write the mapper and its tests** against the sample. Every frontend field must be produced;
    anything the backend can't supply gets the default your module file specifies.
-5. **Add the live branch** to the adapter. Set `NEXT_PUBLIC_LIVE_MODULES=<module>` (plus any
+5. **Add the live branch** to the adapter. Set `NEXT_PUBLIC_LIVE_MODULES=session,<module>` (plus any
    dependencies listed in your module file) and click through every screen listed in your module
    file.
 6. **Check the states:** loading skeleton shows, an empty backend shows the empty state, and
@@ -225,14 +199,14 @@ dependencies are live; only switching the adapter to live waits.
 | F1 | Alembic baseline | 00 | — | Done (#29, #30) |
 | F2 | Auth + tenancy tables; `firm_id` on existing tables, backfilled to a default firm | F1 | Abdul | F2a tables done (#33); F2b (`firm_id`, `firm_jobs`, migration 0005) built; **F2c** (settings) not started |
 | F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | Abdul | Done except the support-view endpoints (#34, #36) |
-| F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | Abdul | Policy table + `require` done (#35); `scoped()` / `scoped_jobs()` + their lint test done for every firm route (#53, jobs feed next PR); support-view reads come with the support-view endpoints |
+| F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | Abdul | Policy table + `require` done (#35); `scoped()` / `scoped_jobs()` + their lint test done for every firm route (#53, #54); support-view reads come with the support-view endpoints |
 | F5 | Seed script: the mocks' firms, accounts and data | F2 | Abdul | Done for firms, plans, accounts and invites (#38); module data lands with each track |
 | F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | Abdul | Live behind flag (#40, #41): `NEXT_PUBLIC_LIVE_MODULES=session`. Server-side principal, mock sign-in removal and the legacy schema path not started |
 | F7 | Reusable cross-firm isolation test over every route | F4 | Uzair | Not started |
 
 | Track | Module | Depends on | Owner | Status |
 |---|---|---|---|---|
-| 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6) | F1–F7 | Abdul | Not started |
+| 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6). **The worked example: copy it** | F1–F4 | Abdul | Live behind flag (`session,ledger`) |
 | 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md) | F1–F7; shared-pool decision (07 §2) | Zuhair | Not started |
 | — | Candidates (D1) | F1–F7; D1 | Zuhair | Not started |
 | — | Admin API (firms, plans, users, invites, platform team, audit) | F1–F7 | Uzair (after F7) | In progress: create firm, invites, read lists live behind flag (#36, #39, #40); firm edits, suspend, plans, limits, user deactivate, platform-team invites not started |
