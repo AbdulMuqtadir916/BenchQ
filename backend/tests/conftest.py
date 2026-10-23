@@ -1,5 +1,6 @@
 """Pytest fixtures for JobNavigator tests."""
 import os
+import uuid
 import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
@@ -261,3 +262,26 @@ def default_firm(test_db):
     firm_id = default_firm_id(test_db)
     test_db.commit()
     return firm_id
+
+
+@pytest.fixture
+def jobs_in_default_firm(default_firm):
+    """Every job a test writes is linked to the Default firm in `firm_jobs` (tests/firm_support.py), so it shows
+    in the signed-in test user's feed. Jobs are one shared pool and a firm sees the ones linked to it (07 Q37);
+    tests about the feed itself shouldn't each have to link their jobs. Tests about linking leave this out."""
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session as OrmSession
+
+    from backend.models.db import Job
+    from backend.models.tenancy import CAPTURED_SOURCES, link_job_to_firm
+
+    def _link(db, _ctx, _instances):
+        for job in [o for o in db.new if isinstance(o, Job)]:
+            if job.id is None:
+                job.id = uuid.uuid4()
+            origin = "CAPTURED" if job.source in CAPTURED_SOURCES else "SCRAPED"
+            link_job_to_firm(db, default_firm, job.id, origin, search_id=None)
+
+    event.listen(OrmSession, "before_flush", _link)
+    yield default_firm
+    event.remove(OrmSession, "before_flush", _link)

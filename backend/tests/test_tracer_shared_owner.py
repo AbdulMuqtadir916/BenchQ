@@ -5,7 +5,7 @@ from backend.models.db import CoverLetter, Job, Resume, Setting, TracerClickEven
 import pytest
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 JOB_ID = "1a111111-11a1-41a1-8111-111111111111"
 RESUME_ID = "2b222222-22b2-42b2-8222-222222222222"

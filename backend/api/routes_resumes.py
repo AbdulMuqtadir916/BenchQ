@@ -15,7 +15,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.db import get_db, Resume, TracerLink, TracerClickEvent, Setting, Job, Application, SessionLocal, utcnow, Persona, CoverLetter
 from backend.api._input import str_field
-from backend.auth.scoping import reader_firm_id, scoped, writer_firm_id
+from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs, writer_firm_id
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, ModelReplyError, parse_model_json
 from backend.job_monitor import launch_background, JobAlreadyRunningError
@@ -520,7 +520,7 @@ def resume_shelf(db: Session = Depends(get_db), firm_id=Depends(reader_firm_id))
     app_status = {}
     app_updated = {}   # when the application last moved — the archive date for a rejection
     if job_ids:
-        for j in db.query(Job).filter(Job.id.in_(job_ids)).all():
+        for j in scoped_jobs(db, firm_id).filter(Job.id.in_(job_ids)).all():
             jobs[j.id] = j
         # application status per job (rejected → archived); most-recent wins
         for a in scoped(db, Application, firm_id).filter(Application.job_id.in_(job_ids)).order_by(Application.updated_at.asc()).all():
@@ -695,7 +695,7 @@ def copy_resume_for_job(body: dict, db: Session = Depends(get_db), firm_id=Depen
         raise HTTPException(404, "Base resume not found")
 
 
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(404, "Job not found")
 
@@ -756,7 +756,7 @@ async def tailor_resume(body: dict, db: Session = Depends(get_db), firm_id=Depen
     # Fast-fail: job must exist and have some JD source; the worker resolves the actual
     # text (description → live fetch → cached page) later, so this just confirms something exists without the slow fetch.
     if job_id:
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
         if not job:
             raise HTTPException(404, "Job not found")
         if not ((job.description or "").strip() or (job.url or "").strip() or (job.cached_page_text or "").strip()):
@@ -1218,7 +1218,7 @@ async def export_pdf(resume_id: str, template: Optional[str] = None, format: Opt
     base_name = base_name.replace(" ", "")
     number = ""
     if resume.job_id:
-        job_for_name = db.query(Job).filter(Job.id == resume.job_id).first()
+        job_for_name = scoped_jobs(db, firm_id).filter(Job.id == resume.job_id).first()
         if job_for_name and job_for_name.short_id:
             number = f"_{job_for_name.short_id}"
     filename = f"{header_name}_{base_name}_Resume{number}".encode("ascii", "replace").decode()
@@ -1485,7 +1485,7 @@ async def score_check(resume_id: str, request_body: dict = None, db: Session = D
         raise HTTPException(status_code=404, detail="Resume not found")
 
     if resume.job_id:
-        job = db.query(Job).filter(Job.id == resume.job_id).first()
+        job = scoped_jobs(db, firm_id).filter(Job.id == resume.job_id).first()
         if not job:
             raise HTTPException(status_code=404, detail="Linked job not found")
         # Pre-check matches the worker's text-resolution: cv_scorer._get_job_text() falls
@@ -1535,11 +1535,11 @@ def get_tracer_stats(resume_id: str, db: Session = Depends(get_db), firm_id=Depe
     links = scoped(db, TracerLink, firm_id).filter(TracerLink.resume_id == resume_id).all()
     result = []
     for link in links:
-        total_clicks = db.query(func.count(TracerClickEvent.id)).filter(
+        total_clicks = scoped(db, TracerClickEvent, firm_id, func.count(TracerClickEvent.id)).filter(
             TracerClickEvent.tracer_link_id == link.id,
             TracerClickEvent.is_likely_bot == False,
         ).scalar()
-        last_click = db.query(func.max(TracerClickEvent.clicked_at)).filter(
+        last_click = scoped(db, TracerClickEvent, firm_id, func.max(TracerClickEvent.clicked_at)).filter(
             TracerClickEvent.tracer_link_id == link.id,
             TracerClickEvent.is_likely_bot == False,
         ).scalar()

@@ -7,7 +7,7 @@ from backend.api.routes_searches import delete_search
 from backend.models.db import Company, Job, ScrapeLog, Search
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 CO_ID = "8b888888-88b8-48b8-8888-888888888888"
 SE_ID = "9c999999-99c9-49c9-8999-999999999999"

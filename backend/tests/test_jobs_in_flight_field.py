@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 import pytest
 from backend.models.db import Job
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def test_list_jobs_includes_in_flight_for_running_ops(api_client, test_db, monkeypatch):
     """Job with running tailor op → in_flight:['tailor_resume'] in list response."""

@@ -5,6 +5,9 @@ not its own, so Status = New leaves only the companies/sources New jobs have, wh
 a selected company can still be swapped for another one.
 """
 from urllib.parse import quote
+import pytest
+
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _seed_jobs(db):

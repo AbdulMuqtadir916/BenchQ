@@ -11,7 +11,7 @@ from backend.tests.r4_support import (  # noqa: F401
 )
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 PERSONA_NODES = ["contact", "work_auth", "demographics", "compensation",
                  "preferences", "resume_content", "qa_bank"]

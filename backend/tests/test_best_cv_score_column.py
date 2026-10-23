@@ -1,6 +1,8 @@
 """Tests for the best_cv_score indexed numeric column on Job."""
 import pytest
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def test_best_cv_score_column_exists(test_db):
     from backend.models.db import Job

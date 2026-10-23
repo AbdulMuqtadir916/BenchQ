@@ -3,6 +3,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 @pytest.fixture
 def test_db(monkeypatch):

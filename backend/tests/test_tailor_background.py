@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 from backend.models.db import Setting
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 # The gate itself lives in job_monitor now (launch_background has to take it

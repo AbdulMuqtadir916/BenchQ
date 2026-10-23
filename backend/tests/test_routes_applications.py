@@ -6,6 +6,8 @@ from backend.api.routes_applications import (
     _fetch_and_store_description as real_fetch_and_store_description,
 )
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 @pytest.fixture(autouse=True)
 def _stub_background_tasks(monkeypatch):

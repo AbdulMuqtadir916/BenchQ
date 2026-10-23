@@ -11,7 +11,7 @@ from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, ModelReplyError
 from backend.models.db import Job, Resume, Setting
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 PROSE = ("Before I produce the tailored resume, I need to flag something: the first "

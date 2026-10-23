@@ -14,6 +14,8 @@ from sqlalchemy.dialects import postgresql
 from backend.analyzer.cv_scorer import unscored_filter
 from backend.models.db import Job
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def _count_unscored():
     return select(func.count(Job.id)).where(unscored_filter())

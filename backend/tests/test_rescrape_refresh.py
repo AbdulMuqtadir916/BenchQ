@@ -3,6 +3,9 @@ import uuid
 
 from backend.models.db import Job
 from backend.scraper.sources.company_pages import _refresh_known_jobs
+import pytest
+
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _job(db, ext, **kw):

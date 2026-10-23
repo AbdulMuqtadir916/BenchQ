@@ -1,6 +1,8 @@
 """Integration test: _cache_job_page refuses SSRF-style URLs (#4)."""
 import pytest
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 @pytest.mark.asyncio
 async def test_cache_job_page_rejects_aws_metadata_url(monkeypatch, test_db):

@@ -11,7 +11,7 @@ from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun
 from backend.seed import run_seeds
 from backend.auth.access import enforce as enforce_access
-from backend.auth.scoping import reader_firm_id, scoped
+from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
 
@@ -366,7 +366,7 @@ async def trigger_h1b_refresh():
 
 
 @app.post("/api/analyze/{job_id}", tags=["triggers"], summary="Analyze a single job", status_code=202)
-async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None):
+async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, firm_id=Depends(reader_firm_id)):
     """Re-run resume scoring for a specific job. depth: 'light' or 'full' (default)."""
     import uuid as _uuid
     # uuid.UUID(job_id) used to be evaluated inside the launch_background(...)
@@ -385,7 +385,7 @@ async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None):
     cv_ids = (body or {}).get("cv_ids")
     db = SessionLocal()
     try:
-        job_row = db.query(_Job).filter(_Job.id == target_job_uuid).first()
+        job_row = scoped_jobs(db, firm_id).filter(_Job.id == target_job_uuid).first()
         if not job_row:
             raise HTTPException(status_code=404, detail="Job not found")
         # Names the run will write into cv_scores, resolved while the session is open.
@@ -1076,7 +1076,7 @@ def get_scrape_log(
 
 
 @app.get("/api/stats/timeline", tags=["stats"], summary="Job discovery timeline")
-def get_stats_timeline(days: Annotated[int, Query(le=3650)] = 30):
+def get_stats_timeline(days: Annotated[int, Query(le=3650)] = 30, firm_id=Depends(reader_firm_id)):
     """Daily job counts for the last N days.
 
     Only the upper bound is enforced: `days <= 0` is a legal "everything from now
@@ -1090,7 +1090,8 @@ def get_stats_timeline(days: Annotated[int, Query(le=3650)] = 30):
     db = SessionLocal()
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        rows = db.query(
+        rows = scoped_jobs(
+            db, firm_id,
             cast(Job.discovered_at, Date).label("date"),
             func.count().label("total"),
             func.count().filter(Job.status == "new").label("new"),
@@ -1177,7 +1178,7 @@ def get_failing_entities(window: Annotated[int, Query(ge=1, le=100)] = 3):
 
 
 @app.get("/api/stats/score-distribution", tags=["stats"], summary="Resume score distribution")
-def get_score_distribution(detail: bool = False):
+def get_score_distribution(detail: bool = False, firm_id=Depends(reader_firm_id)):
     """Distribution of best resume scores across all scored jobs; `detail=true` adds scored_count/avg/tailored_count/tailored_avg on top of the bare bucket list."""
     from backend.models.db import Job
 
@@ -1185,7 +1186,7 @@ def get_score_distribution(detail: bool = False):
     try:
         # Only the scores column: loading whole Job rows to read one JSON field
         # cost ~800ms on a few thousand jobs and was the single thing Stats waited on.
-        rows = db.query(Job.cv_scores).filter(Job.cv_scores != None).all()
+        rows = scoped_jobs(db, firm_id, Job.cv_scores).filter(Job.cv_scores != None).all()
         buckets = {"0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0}
         bests: list[float] = []
         tailored: list[float] = []
@@ -1318,14 +1319,14 @@ async def llm_costs(days: int = 7):
 @app.get("/api/stats", tags=["stats"], summary="Dashboard statistics")
 def get_stats(firm_id=Depends(reader_firm_id)):
     """Aggregate counts: total jobs, new jobs, saved jobs, total applications, and application status breakdown.
-    Applications are the firm's; the job counts are the shared pool's until the Jobs track scopes them."""
+    Every count is the firm's: its applications, and the jobs firm_jobs links it to."""
     from backend.models.db import Job, Application
     from sqlalchemy import func
     db = SessionLocal()
     try:
-        total_jobs = db.query(Job).count()
-        new_jobs = db.query(Job).filter(Job.status == "new").count()
-        saved_jobs = db.query(Job).filter(Job.status == "saved").count()
+        total_jobs = scoped_jobs(db, firm_id).count()
+        new_jobs = scoped_jobs(db, firm_id).filter(Job.status == "new").count()
+        saved_jobs = scoped_jobs(db, firm_id).filter(Job.status == "saved").count()
         total_apps = scoped(db, Application, firm_id).count()
 
         status_counts = {}

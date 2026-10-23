@@ -9,6 +9,8 @@ import pytest
 from backend.api.routes_jobs import _location_clause
 from backend.models.db import Job
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def _make(db, index, places):
     """`make_external_id` hashes the URL alone, so each row needs its own.

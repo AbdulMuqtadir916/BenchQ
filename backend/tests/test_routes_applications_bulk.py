@@ -11,7 +11,7 @@ from backend.models.db import Application, Interview, Job
 import pytest
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _make_app(test_db, title="Bulk Role", status="applied", company="Bulk Co", job_status="applied"):

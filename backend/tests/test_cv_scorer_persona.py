@@ -4,7 +4,7 @@ from backend.models.db import Persona
 from backend.analyzer import cv_scorer
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def test_get_persona_text_empty_returns_empty_dict(test_db):

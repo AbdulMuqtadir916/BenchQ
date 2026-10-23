@@ -1,6 +1,8 @@
 """Tests for GET /api/jobs filter and sort combinations."""
 import pytest
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 def _seed_jobs(db):
     """Add 3 jobs with varied attributes."""

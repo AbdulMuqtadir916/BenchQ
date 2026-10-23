@@ -16,6 +16,8 @@ from backend.tests.r4_support import (  # noqa: F401
     make_job, make_resume, set_setting,
 )
 
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
+
 
 @pytest.fixture(autouse=True)
 def _utc_tz_on_jobrun_load():

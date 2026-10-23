@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 from backend.models.db import Setting, Resume, Job
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
-pytestmark = pytest.mark.usefixtures("default_firm")
+pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _seed(test_db):
