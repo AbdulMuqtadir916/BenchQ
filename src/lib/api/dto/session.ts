@@ -125,6 +125,13 @@ export const InviteLookupDto = z.union([
 export const InviteWithTokenDto = z.object({ invite: InviteDto, invite_token: z.string() });
 export const CreatedFirmDto = InviteWithTokenDto.extend({ firm: FirmDto });
 
+/** What exiting a support view returns (backend/api/routes_support.py): the session, and the firm it was of. */
+export const SupportExitDto = z.object({ session: SessionDto, firm_id: nullableId });
+
+export function toSupportExit(dto: z.infer<typeof SupportExitDto>): { session: Session; firmId: string | null } {
+  return { session: toSession(dto.session), firmId: mapNullableId(dto.firm_id) };
+}
+
 export function toFirm(dto: z.infer<typeof FirmDto>): Firm {
   return FirmSchema.parse({
     id: mapId(dto.id),

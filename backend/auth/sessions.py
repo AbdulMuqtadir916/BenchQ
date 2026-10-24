@@ -11,6 +11,7 @@ import uuid
 
 from sqlalchemy.orm import Session as DbSession
 
+from backend.auth import support
 from backend.auth.tokens import hash_token, new_token
 from backend.config import SESSION_COOKIE_SECURE
 from backend.models.db import utcnow
@@ -25,7 +26,9 @@ SLIDE_EVERY = timedelta(minutes=5)
 
 @dataclass(frozen=True)
 class Principal:
-    """Who is calling (docs/02 §3.1 Principal). `firm_id` and `firm_status` are set for a firm user only."""
+    """Who is calling (docs/02 §3.1 Principal). `firm_id` and `firm_status` are set for a firm user only;
+    `support_view_id` and `support_firm_id` for a Super Admin inside an open support view, which may read that firm
+    and never write it (backend/auth/support.py)."""
     kind: Literal["firm", "platform"]
     user_id: uuid.UUID
     session_id: uuid.UUID
@@ -33,6 +36,7 @@ class Principal:
     firm_id: uuid.UUID | None = None
     firm_status: str | None = None
     support_view_id: uuid.UUID | None = None
+    support_firm_id: uuid.UUID | None = None
 
     @property
     def is_platform(self) -> bool:
@@ -107,29 +111,33 @@ def principal_for(db: DbSession, row: Session, now: datetime | None = None) -> P
     admin = db.get(PlatformUser, row.platform_user_id)
     if admin is None or not admin.is_active:
         return None
-    view_id = None
+    view = None
     if row.support_view_id is not None:
         view = db.get(SupportView, row.support_view_id)
-        if view is not None and view.ended_at is None and view.expires_at > now:
-            view_id = view.id
+        if view is None or view.ended_at is not None or view.expires_at <= now:
+            view = None
     return Principal(kind="platform", user_id=admin.id, session_id=row.id, role="PLATFORM_ADMIN",
-                     support_view_id=view_id)
+                     support_view_id=view.id if view else None, support_firm_id=view.firm_id if view else None)
 
 
 def end_session(db: DbSession, token: str | None) -> Session | None:
-    """Delete the session behind a cookie (sign-out). Returns the deleted row, if there was one."""
+    """Delete the session behind a cookie (sign-out, or a sign-in replacing it). Its open support view ends with it,
+    logged. Returns the deleted row, if there was one."""
     if not token:
         return None
     row = db.query(Session).filter(Session.token_hash == hash_token(token)).first()
     if row is not None:
+        support.end_with_session(db, row)
         db.delete(row)
         db.flush()
     return row
 
 
 def end_all_sessions(db: DbSession, account: User | PlatformUser) -> int:
-    """Sign an account out everywhere (deactivation, password change)."""
+    """Sign an account out everywhere (deactivation, password change); a Super Admin's open support view ends too."""
     column = Session.user_id if isinstance(account, User) else Session.platform_user_id
+    for row in db.query(Session).filter(column == account.id).all():
+        support.end_with_session(db, row)
     return db.query(Session).filter(column == account.id).delete(synchronize_session=False)
 
 

@@ -19,7 +19,7 @@ and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 | 1. Table | `backend/models/tenancy.py` `LedgerEntry`, migration 0003 | `firm_id` (null only for platform events, A13), actor, entity, action, summary. CHECK constraints, not enums; RESTRICT foreign keys (Q38) |
 | 2. Write | `backend/auth/ledger.py` `record()` | Every write a person makes calls it **in the same transaction** as the change; the caller commits |
 | 3. Read route | `backend/api/routes_ledger.py` | `GET /api/firms/{firm_id}/ledger?limit&offset` |
-| 4. Access class | `backend/auth/access.py` `ROUTE_ACCESS` | `F`: firm users only; a Super Admin and a suspended firm are refused before the route runs |
+| 4. Access class | `backend/auth/access.py` `ROUTE_ACCESS` | `F`: firm users, and a Super Admin inside a support view of the firm for GET only; a Super Admin without one and a suspended firm's users are refused before the route runs |
 | 5. Firm scoping | `backend/auth/scoping.py` `reader_firm_id`, `scoped()`, `own_scope()` | The firm comes from the session, never the request; the path's firm must equal it, or 404 |
 | 6. Lint | `backend/tests/test_firm_scoping_lint.py` | Fails any route that queries a firm-owned model without `scoped()` |
 | 7. Backend tests | `backend/tests/test_ledger.py`, `backend/tests/ledger_support.py` | Each role's view, BDE own scope, paging, another firm 404, Super Admin 403, signed out 401, a write shows up |
@@ -100,7 +100,7 @@ Copy `backend/tests/test_ledger.py`'s list of cases. For a firm-scoped read:
 - a BDE's `own` scope, if the module has one;
 - paging and its limits (422 past the max);
 - another firm's id is 404, and so is a missing one;
-- a Super Admin is 403 until the support view (07 F3); signed out is 401;
+- a Super Admin is 403 without a support view, reads inside one, and is 403 on every write; signed out is 401;
 - the response keys match the frontend's type exactly.
 
 Sign in other roles with `make_user` + `start_session` and send the cookie (see `_session_for` in the
@@ -150,10 +150,10 @@ restart `pnpm dev`, sign in at `http://localhost:3000` and open `/<firm>/ledger`
 ## Gaps
 
 - **Only auth and invite events so far:** `LOGIN`, `FIRM_CREATED`, `INVITE_SENT`, `INVITE_ACCEPTED`,
-  `INVITE_REVOKED`, `ADMIN_ACCESS_END`. The ledger fills up as each track logs its writes.
+  `INVITE_REVOKED`, `ADMIN_ACCESS`, `ADMIN_ACCESS_END`. The ledger fills up as each track logs its writes.
 - **No claim states or evidence** until track 04, so that column shows "—".
-- **Super Admin reading a firm's ledger** waits for the support-view endpoints (07 F3). `/admin/audit`
-  already shows every firm's entries to a Super Admin.
+- ~~**Super Admin reading a firm's ledger**~~ Done (issue #56): inside a support view the Super Admin reads the
+  viewed firm's whole ledger; `/admin/audit` shows every firm's entries.
 - **AI runs are logged elsewhere** today (`JobRun`, `llm_call_log`). Track 04 writes `AI_GENERATE` entries.
 - The screen renders `modelId · promptVersion`. A row with a model and no prompt version shows a dangling
   "·". Track 04 must always send both.

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
-from backend.auth import ledger
+from backend.auth import ledger, support
 from backend.auth.invites import (bad_request, check_email_free, conflict, invite_json, normal_email, resend_invite,
                                   revoke_invite, send_invite, slug_problem)
 from backend.auth.policy import require
@@ -182,6 +182,8 @@ AUDIT_LIMIT = 500
 @router.get("/audit", summary="The ledger across the platform and every firm, newest first")
 def list_audit(limit: int = Query(default=AUDIT_LIMIT, ge=1, le=2000), db: DbSession = Depends(get_db)):
     """Platform events and every firm's (A13). The newest `limit` entries; paging comes with the audit screen's
-    filters."""
+    filters. A support view that ran out is settled first, so the overview never counts it as open."""
+    support.settle_expired(db)
+    db.commit()
     entries = db.query(LedgerEntry).order_by(LedgerEntry.created_at.desc(), LedgerEntry.id).limit(limit)
     return [ledger_entry_json(e) for e in entries]

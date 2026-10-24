@@ -32,8 +32,9 @@ def _not_found() -> HTTPException:
 
 
 def _member_of(firm_id: uuid.UUID, principal: Principal) -> None:
-    """The principal must belong to the firm the path names."""
-    if principal.is_platform or principal.firm_id != firm_id:
+    """The principal must belong to the firm the path names, or be in a support view of it (reads only: the
+    middleware refuses a view's writes, and so does each write's action)."""
+    if (principal.firm_id or principal.support_firm_id) != firm_id:
         raise _not_found()
 
 

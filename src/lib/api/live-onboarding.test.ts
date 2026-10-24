@@ -132,11 +132,7 @@ describe("the session on the live backend", () => {
     stop();
     otherTab.close();
   });
-
-  it("says a support view isn't on the live backend yet", async () => {
-    await expect(sessionApi.startSupportView("firm_hts", "Checking a reported issue")).rejects.toMatchObject({ status: 501, code: "NOT_AVAILABLE" });
-    expect(calls).toEqual([]);
-  });
+  // The support view on the live backend: ./live-support.test.ts.
 });
 
 describe("invite links on the live backend", () => {

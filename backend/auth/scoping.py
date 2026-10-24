@@ -11,14 +11,17 @@ F2b, F4).
 - `own_scope()`: the `own` scope of 07 §2.2 (src/lib/auth/policy.ts `isOwnScope`): a BDE reads only their own
   work, so a route adds `<model>.<owner column> == own_scope(principal)` when it isn't None.
 
-A Super Admin's read-only support view (07 F3) will resolve `reader_firm_id` to the viewed firm when the
-support-view endpoints are built; until then FIRM routes refuse a Super Admin (backend/auth/access.py).
+A Super Admin inside a read-only support view (07 §4, backend/auth/support.py) reads the viewed firm, the whole of
+it, and writes nothing. backend/auth/access.py already refuses every non-GET FIRM route inside a view;
+`reader_firm_id` refuses them again, because many write routes take it rather than `writer_firm_id`, so a write
+needs two mistakes to get through.
 """
 import uuid
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 
 from backend.api.routes_auth import current_principal
+from backend.auth.access import SUPPORT_VIEW_READ_ONLY
 from backend.auth.sessions import Principal
 
 PLATFORM_ADMIN_REFUSED = "A platform admin can't act inside a firm."
@@ -32,16 +35,28 @@ def writer_firm_id(principal: Principal = Depends(current_principal)) -> uuid.UU
     return principal.firm_id
 
 
-def reader_firm_id(principal: Principal = Depends(current_principal)) -> uuid.UUID:
-    """The firm whose rows a request may read: the signed-in firm user's own."""
-    if principal.firm_id is None:
-        raise HTTPException(status_code=403, detail=PLATFORM_ADMIN_REFUSED)
-    return principal.firm_id
+def reader_firm_id(request: Request, principal: Principal = Depends(current_principal)) -> uuid.UUID:
+    """The firm whose rows a request may read: the signed-in firm user's own, or the firm a support view is of,
+    on GET only."""
+    if principal.firm_id is not None:
+        return principal.firm_id
+    if principal.support_firm_id is not None:
+        if request.method != "GET":
+            raise HTTPException(status_code=403, detail=SUPPORT_VIEW_READ_ONLY)
+        return principal.support_firm_id
+    raise HTTPException(status_code=403, detail=PLATFORM_ADMIN_REFUSED)
+
+
+def viewed_firm_id(principal: Principal) -> uuid.UUID | None:
+    """The firm a principal's reads are limited to on a route open to every signed-in account: a firm user's own,
+    a support view's, or None for a Super Admin with no view (global reference data counted over every firm)."""
+    return principal.firm_id or principal.support_firm_id
 
 
 def own_scope(principal: Principal) -> uuid.UUID | None:
     """The user whose rows alone a principal may read, or None for the whole firm: a BDE's own id, as the
-    frontend's `scopeLedger` / `scopeApplications`. Pair it with `scoped()`, never instead of it."""
+    frontend's `scopeLedger` / `scopeApplications`. A support view sees the whole firm, as the OWNER does. Pair it
+    with `scoped()`, never instead of it."""
     if principal.kind == "firm" and principal.role == "BDE":
         return principal.user_id
     return None

@@ -135,6 +135,9 @@ function requireAccount() {
 
 export function currentPrincipal(): Principal {
   const account = requireAccount();
+  // On the live backend the principal is the backend's, a support view included; the mock's own views are mock mode's.
+  const live = isLive("session") ? liveSession() : null;
+  if (live) return live.principal;
   if (account.kind === "platform") {
     const view = activeSupportView(account.admin.id, new Date());
     return { kind: "platform", userId: account.admin.id, role: "PLATFORM_ADMIN", support: view ? asContract(view) : null };

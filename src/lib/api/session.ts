@@ -1,8 +1,9 @@
 import { z } from "zod";
 import type { Firm, FirmSession, Session } from "@/lib/schemas/session";
-import { ApiError, notLiveYet } from "./client";
+import { ApiError } from "./client";
 import { isLive } from "./config";
-import { FirmDto, SessionDto, toFirm, toSession } from "./dto/session";
+import { toBackendId } from "./dto/demo-ids";
+import { FirmDto, SessionDto, SupportExitDto, toFirm, toSession, toSupportExit } from "./dto/session";
 import { http } from "./http";
 import { rememberLiveSession, watchLiveSession } from "./live-session";
 
@@ -43,6 +44,17 @@ const live = {
     if (!("user" in session)) throw new ApiError("Only a firm user has a first run.", "FORBIDDEN", 403);
     return session;
   },
+  // A view changes the principal for every tab on this cookie, so other tabs are told, as on sign-in.
+  startSupportView: async (firmId: string, reason: string): Promise<Session> => {
+    const session = toSession(await http.post("/api/support-views", SessionDto, { body: { firm_id: toBackendId(firmId), reason } }));
+    rememberLiveSession(session);
+    return session;
+  },
+  exitSupportView: async (): Promise<{ session: Session; firmId: string | null }> => {
+    const exited = toSupportExit(await http.delete("/api/support-views/current", SupportExitDto));
+    rememberLiveSession(exited.session);
+    return exited;
+  },
 };
 
 /**
@@ -65,11 +77,11 @@ export const sessionApi = {
 
   /** Start a read-only support view of a firm (07 §4, PLATFORM_ADMIN only). Ends any open one first. */
   startSupportView: async (firmId: string, reason: string): Promise<Session> =>
-    isLive("session") ? notLiveYet() : (await mock()).startSupportView(firmId, reason),
+    isLive("session") ? live.startSupportView(firmId, reason) : (await mock()).startSupportView(firmId, reason),
 
   /** End the open support view; `firmId` is the firm it was of, for the way back. */
   exitSupportView: async (): Promise<{ session: Session; firmId: string | null }> =>
-    isLive("session") ? notLiveYet() : (await mock()).exitSupportView(),
+    isLive("session") ? live.exitSupportView() : (await mock()).exitSupportView(),
 
   /**
    * Call `onChange` when the session changes in another tab (signed in, out, or as someone else); then
