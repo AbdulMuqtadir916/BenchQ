@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
+from backend.auth import support
 from backend.auth.scoping import own_scope, reader_firm_id, scoped
 from backend.auth.serialize import ledger_entry_json
 from backend.auth.sessions import Principal
@@ -26,6 +27,8 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
                 db: DbSession = Depends(get_db)):
     if firm_id != my_firm:
         raise HTTPException(status_code=404, detail="Not found.")
+    support.settle_expired(db)      # a support view that ran out shows its end here, dated at its expiry
+    db.commit()
     entries = scoped(db, LedgerEntry, my_firm)
     if (actor := own_scope(principal)) is not None:
         entries = entries.filter(LedgerEntry.actor_user_id == actor)

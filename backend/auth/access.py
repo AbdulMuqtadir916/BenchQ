@@ -2,9 +2,10 @@
 
   PUBLIC     no session: sign-in, invite links, health, tracer links, the Telegram webhook (its own secret)
   SIGNED_IN  any signed-in account
-  FIRM       a signed-in firm user whose firm is not SUSPENDED. JobNavigator's firm data (jobs, résumés,
-             applications…) has no firm_id filters yet, so a Super Admin is refused until each module's
-             track scopes it (Q38)
+  FIRM       a signed-in firm user whose firm is not SUSPENDED; and a Super Admin inside an open support view
+             (07 §4), for GET only: every other method is 403, and so are the GETs in SUPPORT_VIEW_REFUSED.
+             Which firm a view reads is backend/auth/scoping.py's `reader_firm_id`, so any other firm is 404.
+             A Super Admin with no view is refused
   PLATFORM   a Super Admin: scraping, backups, database cleanup, monitoring, global settings, Telegram
   DEV_ONLY   API docs: open outside production, absent (404) in production
 
@@ -131,6 +132,8 @@ ROUTE_ACCESS: dict[str, Access] = {
 
     # ── Super Admin ───────────────────────────────────────────────────────────
     # The platform tier (docs/04 §14). Each write also needs its platform action (backend/auth/policy.py).
+    "POST /api/support-views": A,                  # open a read-only support view of a firm (07 §4)
+    "DELETE /api/support-views/current": A,
     "GET /api/admin/plans": A,
     "GET /api/admin/firms": A,
     "POST /api/admin/firms": A,
@@ -191,6 +194,14 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/telegram/rotate-webhook-secret": A,
     "POST /api/telegram/test": A,
 }
+
+
+# FIRM GETs a support view may not use: they act rather than read. A view never exports a resume (07 §4).
+SUPPORT_VIEW_REFUSED: frozenset[str] = frozenset({
+    "GET /api/resumes/{resume_id}/pdf",
+    "GET /api/cover-letters/{cl_id}/pdf",
+})
+SUPPORT_VIEW_READ_ONLY = "A support view is read-only."
 
 
 def route_key(app: FastAPI, request: Request) -> str | None:
@@ -257,8 +268,11 @@ async def enforce(request: Request, call_next):
         return _refuse(403, "Platform admins only.")
     if access is Access.FIRM:
         if principal.is_platform:
-            return _refuse(403, "A platform admin can't act inside a firm.")
-        if principal.firm_status == "SUSPENDED":
+            if principal.support_view_id is None:
+                return _refuse(403, "A platform admin can't act inside a firm.")
+            if request.method != "GET" or key in SUPPORT_VIEW_REFUSED:
+                return _refuse(403, SUPPORT_VIEW_READ_ONLY)
+        elif principal.firm_status == "SUSPENDED":
             return _refuse(403, "This workspace is suspended.")
 
     request.state.principal = principal
