@@ -1539,6 +1539,7 @@ async def score_check(resume_id: str, request_body: dict = None, db: Session = D
 def get_tracer_stats(resume_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Get click stats per tracer link for a resume."""
     from sqlalchemy import func
+    firm_ref(db, firm_id, Resume, resume_id, "Resume")     # another firm's or a missing résumé: 404 (07 F7)
     links = scoped(db, TracerLink, firm_id).filter(TracerLink.resume_id == resume_id).all()
     result = []
     for link in links:

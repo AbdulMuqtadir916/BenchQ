@@ -218,6 +218,7 @@ def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db), f
 def get_tracer_stats(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Click stats per tracer link for a cover letter (mirrors the resume endpoint)."""
     from sqlalchemy import func
+    firm_ref(db, firm_id, CoverLetter, cl_id, "Cover letter")   # another firm's or a missing letter: 404 (07 F7)
     links = scoped(db, TracerLink, firm_id).filter(TracerLink.cover_letter_id == cl_id).all()
     result = []
     for link in links:

@@ -8,6 +8,7 @@ from sqlalchemy import desc, asc, text, func
 from backend.models.db import get_db, Job, find_company_by_name
 from backend.models.tenancy import link_job_to_firm
 from backend.api.routes_auth import current_principal
+from backend.auth.policy import is_support_view
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs, writer_firm_id
 from backend.auth.sessions import Principal
 from backend.api._input import str_field, uuid_filter
@@ -1172,7 +1173,8 @@ def _inject_base(raw_html: str, url: str) -> str:
 
 
 @router.get("/{job_id}/live-page")
-async def get_live_page(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+async def get_live_page(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                        principal: Principal = Depends(current_principal)):
     """Fetch the posting from the backend (SSRF-guarded) and return its own HTML so the feed can show the real page even when the extension isn't stripping X-Frame-Options; warms the cached_page_* columns as a side effect."""
     job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
     if not job:
@@ -1202,8 +1204,9 @@ async def get_live_page(job_id: str, db: Session = Depends(get_db), firm_id=Depe
     clean_html, text = _extract_clean_content(raw)
     if len((text or "").strip()) < 200:
         raise HTTPException(status_code=502, detail="Posting is rendered client-side — needs the extension")
-    # warm the cache with cleaned text for scoring; never overwrite an existing snapshot
-    if not job.cached_page_html and clean_html:
+    # warm the cache with cleaned text for scoring; never overwrite an existing snapshot. A support view only reads
+    # (07 §4), so it leaves the job as it found it.
+    if not job.cached_page_html and clean_html and not is_support_view(principal):
         try:
             job.cached_page_html = clean_html
             job.cached_page_text = text
