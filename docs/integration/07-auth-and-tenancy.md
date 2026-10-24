@@ -240,10 +240,11 @@ needs a contract first). Every key is classified in `backend/settings_scope.py`,
 | A firm's choice, platform-wide for now | `default_resume_id`, on-save scoring, auto quick-score, default cover-letter voice, tracer links on/off, prep sections, autofill dictionaries, the Gmail query and tokens | The track named next to each key (04, 02, 03, the extension, D8) |
 | Unused, to delete | LinkedIn and Jobright logins and sessions, Telegram (chat, webhook secret, digest, fit alert), the JobNavigator feed zoom | 02 Jobs (scraper logins) and production readiness (Telegram), with the code that reads them |
 
-**Known leak, found by F2c:** scoring a job for a firm (`cv_scorer.score_single_job`, from `POST /api/analyze`,
-on-save scoring and the tailor auto-score) uses the company's `selected_resume_ids`, else `default_resume_id`, else
-**every firm's base résumés**. So one firm's résumé text can be scored for another firm's job, and the result sits
-on the shared job row (Q36). Fixed by passing the firm down to the scorer (see the PR that follows F2c).
+**Leak found by F2c, fixed (#58):** scoring a job for a firm used the company's `selected_resume_ids`, else
+`default_resume_id`, else **every firm's base résumés**. Now every résumé lookup in `cv_scorer` takes the firm the
+run scores for and skips another firm's résumés; `score_single_job` and `resolve_score_resume_names` require
+`firm_id`. The scheduler's pass (no signed-in firm) scores only the Default firm's jobs with its résumés
+(`PIPELINE_FIRM_ID`). Still shared: the Persona (D1) and the scores on the job row (Q36).
 
 ### F3 — Auth endpoints, returning the frontend's `Session`
 
