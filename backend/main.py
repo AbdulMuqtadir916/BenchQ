@@ -393,7 +393,7 @@ async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, 
         # Names the run will write into cv_scores, resolved while the session is open.
         try:
             from backend.analyzer.cv_scorer import resolve_score_resume_names
-            resume_names = resolve_score_resume_names(db, job=job_row, cv_ids=cv_ids)
+            resume_names = resolve_score_resume_names(db, job=job_row, cv_ids=cv_ids, firm_id=firm_id)
         except Exception:
             resume_names = []
     finally:
@@ -402,7 +402,7 @@ async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, 
     async def _do():
         from backend.analyzer.cv_scorer import score_single_job
         # Forwarded so the run's summary reaches JobRun.result_summary.
-        return await score_single_job(job_id, cv_ids=cv_ids, depth=depth)
+        return await score_single_job(job_id, cv_ids=cv_ids, depth=depth, firm_id=firm_id)
 
     # Include cv_ids in scope_key so scoring the same job with different CVs doesn't conflict
     scope = f"{job_id}:{','.join(sorted(cv_ids))}" if cv_ids else job_id

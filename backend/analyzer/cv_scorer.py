@@ -8,6 +8,7 @@ from backend.analyzer.llm_client import call_llm
 from backend.analyzer.llm_logger import log_llm_call
 from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, parse_model_json
 from backend.models.db import SessionLocal, Job, Setting
+from backend.models.tenancy import DEFAULT_FIRM_ID
 
 logger = logging.getLogger("jobnavigator.cv_scorer")
 
@@ -131,6 +132,11 @@ def _flatten_resume(json_data: dict) -> str:
     return "\n".join(p for p in parts if p)
 
 
+# The batch pipeline (analyze_unscored_jobs: the scheduler and the scrapers) runs for the platform, with no
+# signed-in firm. The searches that find jobs belong to the Default firm (07 F2b), so it scores the Default firm's
+# jobs with the Default firm's résumés; a firm's own jobs are scored when it saves or analyzes them.
+PIPELINE_FIRM_ID = DEFAULT_FIRM_ID
+
 # Reserved id used in selected_resume_ids / default_resume_id to mean
 # "score against Persona.resume_content as a virtual Resume named 'Persona'".
 _PERSONA_KEY = "persona"
@@ -149,11 +155,14 @@ def _get_persona_text(db) -> dict:
     return {_PERSONA_DISPLAY: text}
 
 
-def _get_resume_texts(db) -> dict:
-    """Return {Resume.name: flattened_text} for every base Resume + Persona (if populated, always last), ordered by Resume.id for stable cache keys."""
+def _get_resume_texts(db, firm_id) -> dict:
+    """Return {Resume.name: flattened_text} for every base Resume of the firm + Persona (if populated, always last), ordered by Resume.id for stable cache keys.
+
+    Every résumé lookup here takes the firm the run scores for (07 F2c, "known leak"): a résumé is firm data, so
+    another firm's never reaches the LLM or the job's scores. The Persona is still one shared row (D1)."""
     from backend.models.db import Resume
     out = {}
-    for r in db.query(Resume).filter(Resume.is_base == True).order_by(Resume.id).all():
+    for r in db.query(Resume).filter(Resume.is_base == True, Resume.firm_id == firm_id).order_by(Resume.id).all():
         text = _flatten_resume(r.json_data or {})
         if text:
             out[r.name] = text
@@ -161,15 +170,15 @@ def _get_resume_texts(db) -> dict:
     return out
 
 
-def _get_default_resume(db) -> dict:
-    """Return {Resume.name: flat_text} for the default Resume (special id 'persona' returns persona text); empty dict if not set or not found."""
+def _get_default_resume(db, firm_id) -> dict:
+    """Return {Resume.name: flat_text} for the default Resume (special id 'persona' returns persona text); empty dict if not set, not found, or another firm's (`default_resume_id` is one platform-wide setting until the Resumes track)."""
     from backend.models.db import Resume
     row = db.query(Setting).filter(Setting.key == "default_resume_id").first()
     if not row or not row.value:
         return {}
     if row.value == _PERSONA_KEY:
         return _get_persona_text(db)
-    r = db.query(Resume).filter(Resume.id == row.value, Resume.is_base == True).first()
+    r = db.query(Resume).filter(Resume.id == row.value, Resume.is_base == True, Resume.firm_id == firm_id).first()
     if not r:
         return {}
     text = _flatten_resume(r.json_data or {})
@@ -178,7 +187,7 @@ def _get_default_resume(db) -> dict:
     return {r.name: text}
 
 
-def _get_resume_texts_for_company(db, company) -> dict:
+def _get_resume_texts_for_company(db, company, firm_id) -> dict:
     """Return resume texts for a company from company.selected_resume_ids (which can mix Resume UUIDs with 'persona'), falling back to the default, then all base resumes."""
     from backend.models.db import Resume
     selected = getattr(company, "selected_resume_ids", None) or []
@@ -186,7 +195,9 @@ def _get_resume_texts_for_company(db, company) -> dict:
         out = {}
         resume_ids = [s for s in selected if s != _PERSONA_KEY]
         if resume_ids:
-            for r in db.query(Resume).filter(Resume.is_base == True, Resume.id.in_(resume_ids)).order_by(Resume.id).all():
+            # A company is global; its selection may name another firm's résumés, which are skipped.
+            for r in (db.query(Resume).filter(Resume.is_base == True, Resume.id.in_(resume_ids), Resume.firm_id == firm_id)
+                      .order_by(Resume.id).all()):
                 text = _flatten_resume(r.json_data or {})
                 if text:
                     out[r.name] = text
@@ -194,23 +205,23 @@ def _get_resume_texts_for_company(db, company) -> dict:
             out.update(_get_persona_text(db))
         if out:
             return out
-    default = _get_default_resume(db)
+    default = _get_default_resume(db, firm_id)
     if default:
         return default
-    return _get_resume_texts(db)
+    return _get_resume_texts(db, firm_id)
 
 
-def _cv_texts_for_ids(db, cv_ids: list) -> dict:
+def _cv_texts_for_ids(db, cv_ids: list, firm_id) -> dict:
     """Return {display label: flattened_text} for explicit cv ids.
 
     cv_ids may reference base Resumes, tailored Resumes, or the reserved
-    'persona' id; no is_base filter — explicit IDs are the caller's responsibility.
+    'persona' id; no is_base filter. Ids of another firm's résumés are skipped, as if missing.
     """
     from backend.models.db import Resume
     cv_texts = {}
     resume_ids = [c for c in cv_ids if c != _PERSONA_KEY]
     if resume_ids:
-        resumes = db.query(Resume).filter(Resume.id.in_(resume_ids)).order_by(Resume.id).all()
+        resumes = db.query(Resume).filter(Resume.id.in_(resume_ids), Resume.firm_id == firm_id).order_by(Resume.id).all()
         # A single tailored resume is labeled "Tailored" so the frontend's tailored-link
         # handler picks it up; multiple in one batch fall back to Resume.name to avoid a dict-key collision.
         tailored_count = sum(1 for r in resumes if not r.is_base)
@@ -230,17 +241,17 @@ def _cv_texts_for_ids(db, cv_ids: list) -> dict:
     return cv_texts
 
 
-def resolve_score_resume_names(db, job=None, cv_ids: list | None = None) -> list[str]:
+def resolve_score_resume_names(db, job=None, cv_ids: list | None = None, *, firm_id) -> list[str]:
     """The names a scoring run will write into job.cv_scores, in scoring order.
 
     Mirrors score_single_job's résumé selection so a launcher can name the
     résumés of an in-flight run before any score exists.
     """
     if cv_ids:
-        return list(_cv_texts_for_ids(db, cv_ids))
+        return list(_cv_texts_for_ids(db, cv_ids, firm_id))
     company = _find_company_for_job(db, job) if job is not None else None
-    texts = (_get_resume_texts_for_company(db, company) if company
-             else (_get_default_resume(db) or _get_resume_texts(db)))
+    texts = (_get_resume_texts_for_company(db, company, firm_id) if company
+             else (_get_default_resume(db, firm_id) or _get_resume_texts(db, firm_id)))
     return list(texts)
 
 
@@ -520,7 +531,7 @@ async def analyze_unscored_jobs(status: str = "saved"):
     # -- Phase 0: per-run constants (short session, no network) --------------
     db = SessionLocal()
     try:
-        default_cv_texts = _get_default_resume(db) or _get_resume_texts(db)
+        default_cv_texts = _get_default_resume(db, PIPELINE_FIRM_ID) or _get_resume_texts(db, PIPELINE_FIRM_ID)
         if not default_cv_texts:
             logger.warning("No CVs uploaded yet, skipping analysis pipeline")
             return
@@ -565,7 +576,11 @@ async def analyze_unscored_jobs(status: str = "saved"):
         needs_fetch = []  # (job_ref, cv_texts, depth, url)
         db = SessionLocal()
         try:
-            q = db.query(Job).filter(unscored_filter())
+            # Only the pipeline firm's jobs: scoring another firm's saved job with these résumés would leak them.
+            from sqlalchemy import select
+            from backend.models.tenancy import FirmJob
+            pipeline_jobs = select(FirmJob.job_id).where(FirmJob.firm_id == PIPELINE_FIRM_ID)
+            q = db.query(Job).filter(unscored_filter(), Job.id.in_(pipeline_jobs))
             if status == "saved":
                 q = q.filter(Job.saved == True)
             else:
@@ -584,7 +599,7 @@ async def analyze_unscored_jobs(status: str = "saved"):
             for job in unscored:
                 attempted.add(job.id)
                 company = _find_company_for_job(db, job)
-                cv_texts = _get_resume_texts_for_company(db, company) if company else default_cv_texts
+                cv_texts = _get_resume_texts_for_company(db, company, PIPELINE_FIRM_ID) if company else default_cv_texts
 
                 if status == "saved":
                     depth = "full"  # Saved jobs always get full report
@@ -747,8 +762,8 @@ async def analyze_unscored_jobs(status: str = "saved"):
         db.close()
 
 
-async def score_single_job(job_id: str, cv_ids: list = None, depth: str = "full"):
-    """Re-run CV analysis for a job, optionally against specific CV IDs.
+async def score_single_job(job_id: str, cv_ids: list = None, depth: str = "full", *, firm_id):
+    """Re-run CV analysis for a job, optionally against specific CV IDs, with the résumés of `firm_id` only.
 
     Sessions are opened and closed per phase: read → (live fetch) → LLM → write.
     No connection is held while the page fetch or the LLM call is awaited, so N
@@ -770,10 +785,11 @@ async def score_single_job(job_id: str, cv_ids: list = None, depth: str = "full"
         job_url = job.url
 
         if cv_ids:
-            cv_texts = _cv_texts_for_ids(db, cv_ids)
+            cv_texts = _cv_texts_for_ids(db, cv_ids, firm_id)
         else:
             company = _find_company_for_job(db, job)
-            cv_texts = _get_resume_texts_for_company(db, company) if company else (_get_default_resume(db) or _get_resume_texts(db))
+            cv_texts = (_get_resume_texts_for_company(db, company, firm_id) if company
+                        else (_get_default_resume(db, firm_id) or _get_resume_texts(db, firm_id)))
         if not cv_texts:
             logger.warning(
                 "score_single_job: empty cv_texts (job=%s, cv_ids=%r) — nothing to score against",

@@ -119,7 +119,7 @@ def test_analyze_job_trigger_is_409_for_the_same_scope(client, test_db, monkeypa
     import backend.analyzer.cv_scorer as scorer
     gate = asyncio.Event()
 
-    async def _slow(job_id, cv_ids=None, depth="full"):
+    async def _slow(job_id, cv_ids=None, depth="full", *, firm_id):
         await gate.wait()
         return "done"
     monkeypatch.setattr(scorer, "score_single_job", _slow)
@@ -135,7 +135,7 @@ def test_analyze_job_different_cv_sets_are_different_scopes(client, test_db, mon
     import backend.analyzer.cv_scorer as scorer
     gate = asyncio.Event()
 
-    async def _slow(job_id, cv_ids=None, depth="full"):
+    async def _slow(job_id, cv_ids=None, depth="full", *, firm_id):
         await gate.wait()
         return "done"
     monkeypatch.setattr(scorer, "score_single_job", _slow)
@@ -160,7 +160,7 @@ def test_analyze_trigger_accepts_any_depth_string(client, test_db, monkeypatch, 
     """Current contract: `depth` is a free query string, normalised downstream."""
     import backend.analyzer.cv_scorer as scorer
 
-    async def _noop(job_id, cv_ids=None, depth="full"):
+    async def _noop(job_id, cv_ids=None, depth="full", *, firm_id):
         return "done"
     monkeypatch.setattr(scorer, "score_single_job", _noop)
     job = make_job(test_db)

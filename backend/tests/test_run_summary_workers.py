@@ -22,7 +22,7 @@ async def test_score_single_job_returns_summary(test_db, monkeypatch):
 
     monkeypatch.setattr(scorer, "score_job_sync", fake_score)
 
-    summary = await scorer.score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
+    summary = await scorer.score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light", firm_id=DEFAULT_FIRM_ID)
     assert isinstance(summary, str) and summary
     assert "Staff PM" in summary and "84" in summary and "light" in summary
 
@@ -33,7 +33,7 @@ async def test_score_single_job_summarises_a_no_op(test_db, monkeypatch):
     import uuid
     import backend.analyzer.cv_scorer as scorer
 
-    summary = await scorer.score_single_job(str(uuid.uuid4()))
+    summary = await scorer.score_single_job(str(uuid.uuid4()), firm_id=DEFAULT_FIRM_ID)
     assert summary == "Job not found"
 
 
