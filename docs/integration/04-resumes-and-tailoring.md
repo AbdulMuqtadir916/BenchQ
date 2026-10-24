@@ -6,6 +6,10 @@
 This is the product's centerpiece: AI drafts land `UNVERIFIED`, a human verifies, and the export
 gate blocks until every claim is clean. Do it in phases; each phase is its own PR.
 
+**Every LLM call reads its model and prompts through `ai_config("tailoring")` / `ai_config("scoring")`**
+(`backend/ai/config.py`), never `settings` directly, so the Super Admin's AI presets plug in later without a
+rewrite ([08-ai-presets.md](./08-ai-presets.md)). Output formats stay in code.
+
 ## What exists today (read before planning)
 
 - **The studio never calls the API to tailor.** `src/components/app/resume-studio/tailor-run.tsx`

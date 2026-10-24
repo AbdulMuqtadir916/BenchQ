@@ -216,6 +216,7 @@ dependencies are live; only switching the adapter to live waits.
 | — | Job extension: capture and autofill, per-user access tokens (07 §2). Not in this repo yet (`backend/UPSTREAM.md`) | 02; a proposal signed off by the product owner | Samad | Proposal first |
 | — | Gmail inbox per candidate (D8): OAuth, token storage, status updates on applications | Candidates, 03; a design signed off by the product owner | Samad | Design first |
 | — | Production readiness: prod Docker config, the scheduler out of the API process (one worker until then), logging, a security pass; CI and test health | F7 | Uzair | Not started |
+| — | [AI presets](./08-ai-presets.md): per-module presets (model + prompts) a Super Admin creates and switches. Every AI track reads its setup through `ai_config()` now | Zuhair's AI tracks | Abdul | Decided, not built (`ai_config` seam only) |
 | 06 | [Open decisions](./06-open-decisions.md) | Product decision | Product owner | D1–D4 recommended in 07 §2 |
 
 ### Team and order (agreed 2026-10-23)
