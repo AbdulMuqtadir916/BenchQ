@@ -4,6 +4,7 @@ Every dependency here is remote and will fail in production sooner or later. The
 contract under test is that a failure degrades one feature and never takes the
 scheduler, the run history or the job row with it.
 """
+from backend.models.tenancy import DEFAULT_FIRM_ID
 import asyncio
 import uuid
 from datetime import datetime, timezone
@@ -98,7 +99,7 @@ async def test_llm_failure_leaves_the_job_unscored(test_db, monkeypatch, fault):
         raise FAULTS[fault]
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
-    summary = await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
+    summary = await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light", firm_id=DEFAULT_FIRM_ID)
     assert summary == "Scoring failed"
     test_db.expire_all()
     fresh = test_db.query(Job).filter(Job.id == job.id).first()
@@ -120,7 +121,7 @@ async def test_llm_failure_is_recorded_in_the_llm_call_log(test_db, monkeypatch,
         raise FAULTS[fault]
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
-    await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
+    await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light", firm_id=DEFAULT_FIRM_ID)
     test_db.expire_all()
     rows = test_db.query(LlmCallLog).all()
     assert len(rows) == 1
@@ -146,7 +147,7 @@ async def test_llm_failure_run_is_visible_in_the_run_history(test_db, monkeypatc
     jm.launch_background("analyze_job", score_single_job, trigger="manual",
                          scope_key=str(job.id), target_job_id=job.id,
                          func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light"})
+                                      "depth": "light", "firm_id": DEFAULT_FIRM_ID})
     await asyncio.sleep(0.2)
     test_db.expire_all()
     row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()
@@ -172,7 +173,7 @@ async def test_llm_failure_marks_the_run_failed_not_completed(test_db, monkeypat
     jm.launch_background("analyze_job", score_single_job, trigger="manual",
                          scope_key=str(job.id), target_job_id=job.id,
                          func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light"})
+                                      "depth": "light", "firm_id": DEFAULT_FIRM_ID})
     await asyncio.sleep(0.2)
     test_db.expire_all()
     row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()
@@ -192,7 +193,7 @@ async def test_a_malformed_llm_response_is_not_persisted(test_db, monkeypatch):
         return {"text": '{"scores": null}', "usage": {}}
     monkeypatch.setattr(lc, "_dispatch", _junk)
 
-    assert await score_single_job(str(job.id), cv_ids=[str(resume.id)],
+    assert await score_single_job(str(job.id), cv_ids=[str(resume.id)], firm_id=DEFAULT_FIRM_ID,
                                   depth="light") == "Scoring failed"
     test_db.expire_all()
     assert not test_db.query(Job).filter(Job.id == job.id).first().cv_scores
@@ -211,7 +212,7 @@ async def test_partial_llm_scores_still_persist_what_arrived(test_db, monkeypatc
         return {"text": '{"scores": {"Base": 72}, "best_cv": "Base"}', "usage": {}}
     monkeypatch.setattr(lc, "_dispatch", _ok)
 
-    await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
+    await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light", firm_id=DEFAULT_FIRM_ID)
     test_db.expire_all()
     fresh = test_db.query(Job).filter(Job.id == job.id).first()
     assert fresh.cv_scores == {"Base": 72} and fresh.best_cv_score == 72
@@ -320,7 +321,7 @@ async def test_the_fallback_pair_is_what_gets_logged(test_db, monkeypatch):
         return {"text": '{"scores": {"Base": 60}}', "usage": {}}
     monkeypatch.setattr(lc, "_dispatch", _dispatch)
 
-    await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
+    await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light", firm_id=DEFAULT_FIRM_ID)
     test_db.expire_all()
     row = test_db.query(LlmCallLog).first()
     assert row.provider == "openai" and row.model == "fallback-model"
@@ -547,7 +548,7 @@ async def test_every_llm_fault_kind_marks_the_run_failed(test_db, monkeypatch, f
     jm.launch_background("analyze_job", score_single_job, trigger="manual",
                          scope_key=str(job.id), target_job_id=job.id,
                          func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light"})
+                                      "depth": "light", "firm_id": DEFAULT_FIRM_ID})
     await asyncio.sleep(0.2)
     test_db.expire_all()
     row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()

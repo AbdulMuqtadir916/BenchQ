@@ -30,7 +30,7 @@ def test_get_resume_texts_returns_dict_keyed_by_name(test_db):
     _seed_resume(test_db, "PM", "Product manager focused on fintech")
     _seed_resume(test_db, "TPgM", "Technical program manager")
 
-    texts = _get_resume_texts(test_db)
+    texts = _get_resume_texts(test_db, DEFAULT_FIRM_ID)
     assert set(texts.keys()) == {"PM", "TPgM"}
     assert "Product manager" in texts["PM"]
     assert "Technical program" in texts["TPgM"]
@@ -49,7 +49,7 @@ def test_get_resume_texts_skips_tailored_resumes(test_db):
     ))
     test_db.commit()
 
-    texts = _get_resume_texts(test_db)
+    texts = _get_resume_texts(test_db, DEFAULT_FIRM_ID)
     assert list(texts.keys()) == ["PM"]
 
 
@@ -59,5 +59,5 @@ def test_get_default_resume_reads_from_setting(test_db):
     test_db.add(Setting(key="default_resume_id", value=str(pm.id)))
     test_db.commit()
 
-    default = _get_default_resume(test_db)
+    default = _get_default_resume(test_db, DEFAULT_FIRM_ID)
     assert list(default.keys()) == ["PM"]

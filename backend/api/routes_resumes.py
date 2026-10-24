@@ -1021,6 +1021,7 @@ async def _tailor_impl(base_resume_id: str, job_id: str | None, job_description_
             db.commit()
             db.refresh(tailored)
             tailored_id = str(tailored.id)
+            tailored_firm_id = tailored.firm_id
             # Optional: chain a score against the newly tailored CV.
             chain_depth = _resolve_chain_score_depth(db)
         finally:
@@ -1041,6 +1042,7 @@ async def _tailor_impl(base_resume_id: str, job_id: str | None, job_description_
                         "job_id": job_id,
                         "cv_ids": [tailored_id],
                         "depth": chain_depth,
+                        "firm_id": tailored_firm_id,
                     },
                 )
             except Exception as _e:

@@ -50,7 +50,7 @@ async def test_score_unscored_jobs_uses_resumes(test_db, monkeypatch):
 
     # score_job_sync directly since analyze_unscored_jobs is async + DB-heavy
     from backend.analyzer.cv_scorer import score_job_sync, _get_resume_texts
-    cv_texts = _get_resume_texts(test_db)
+    cv_texts = _get_resume_texts(test_db, DEFAULT_FIRM_ID)
     assert cv_texts == {"PM": pytest.approx(cv_texts["PM"], abs=0)}, "Resume must be the source"
     assert "fintech expertise" in cv_texts["PM"]
 

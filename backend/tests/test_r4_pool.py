@@ -145,7 +145,7 @@ async def test_thirty_scoring_tasks_keep_open_sessions_under_the_gate(
     for i, jid in enumerate(job_ids):
         jm.launch_background("analyze_job", scorer.score_single_job, trigger="manual",
                              scope_key=f"pool-{i}",
-                             func_kwargs={"job_id": jid, "depth": "light"})
+                             func_kwargs={"job_id": jid, "depth": "light", "firm_id": DEFAULT_FIRM_ID})
 
     # …and the app answers while all 30 are queued.
     assert client.get("/health").status_code == 200
@@ -191,7 +191,7 @@ async def test_the_gate_is_taken_before_a_session_is_opened(
     for i, jid in enumerate(job_ids):
         jm.launch_background("analyze_job", scorer.score_single_job, trigger="manual",
                              scope_key=f"gate-{i}",
-                             func_kwargs={"job_id": jid, "depth": "light"})
+                             func_kwargs={"job_id": jid, "depth": "light", "firm_id": DEFAULT_FIRM_ID})
 
     await asyncio.wait_for(entered.wait(), timeout=5)
     # One task is mid-LLM and four are queued behind the gate: no session at all
@@ -227,7 +227,7 @@ async def test_no_session_is_open_while_the_llm_call_is_awaited(
     monkeypatch.setattr(scorer, "call_llm", fake_call_llm)
     monkeypatch.setattr(scorer, "log_llm_call", lambda **kw: None)
 
-    await scorer.score_single_job(job_id, depth="light")
+    await scorer.score_single_job(job_id, depth="light", firm_id=DEFAULT_FIRM_ID)
 
     assert seen["open_during_llm"] == 0, (
         f"{seen['open_during_llm']} session(s) held across the LLM call"

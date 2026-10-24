@@ -35,5 +35,5 @@ def test_get_resume_texts_for_company_uses_selected_ids(test_db):
     test_db.add(co)
     test_db.commit()
 
-    texts = _get_resume_texts_for_company(test_db, co)
+    texts = _get_resume_texts_for_company(test_db, co, DEFAULT_FIRM_ID)
     assert list(texts.keys()) == ["PM"]

@@ -27,11 +27,11 @@ logger = logging.getLogger("jobnavigator.jobs")
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-def _score_resume_names(db, job) -> list[str]:
-    """Résumé names an auto-score launch will cover; never fatal to the save itself."""
+def _score_resume_names(db, job, firm_id) -> list[str]:
+    """Résumé names an auto-score launch will cover, from the firm's résumés; never fatal to the save itself."""
     try:
         from backend.analyzer.cv_scorer import resolve_score_resume_names
-        return resolve_score_resume_names(db, job=job)
+        return resolve_score_resume_names(db, job=job, firm_id=firm_id)
     except Exception as e:
         logger.warning(f"Could not resolve resume names for job {getattr(job, 'id', '?')}: {e}")
         return []
@@ -822,10 +822,10 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db), firm_id
                 scope_key=f"{job.id}:extension",
                 target_job_id=_uuid.UUID(str(job.id)),
                 meta={
-                    "resume_names": _score_resume_names(db, job),
+                    "resume_names": _score_resume_names(db, job, firm_id),
                     "depth": ext_search.auto_scoring_depth,
                 },
-                func_kwargs={"job_id": str(job.id), "depth": ext_search.auto_scoring_depth},
+                func_kwargs={"job_id": str(job.id), "depth": ext_search.auto_scoring_depth, "firm_id": firm_id},
             )
         except JobAlreadyRunningError:
             pass
@@ -1023,8 +1023,8 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
                     trigger="manual",
                     scope_key=f"{job.id}:on-save",
                     target_job_id=job.id,
-                    meta={"resume_names": _score_resume_names(db, job), "depth": on_save},
-                    func_kwargs={"job_id": str(job.id), "depth": on_save},
+                    meta={"resume_names": _score_resume_names(db, job, firm_id), "depth": on_save},
+                    func_kwargs={"job_id": str(job.id), "depth": on_save, "firm_id": firm_id},
                 )
             except JobAlreadyRunningError:
                 pass  # already scoring this job — the save itself still succeeds
