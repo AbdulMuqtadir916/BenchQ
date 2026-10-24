@@ -6,7 +6,8 @@ table and `require`; the firm-scoping dependency and its lint test wait for F2b)
 and read lists, Phase M's backend, and F6 for the session, invites, team and admin adapters **as an opt-in**
 (`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **2026-10-23:** F2b built (migration 0005, see
 F2 below). **2026-10-24:** the support-view endpoints built (issue #56): F3 is done, and so are F4's support-view
-reads. **Still to do:** F2c, F7, and the rest of F6 (live by default, mock sign-in removed, the session read
+reads. **2026-10-24:** F7 built: the isolation test runs over every route (see F7 below). **Still to do:** F2c and
+the rest of F6 (live by default, mock sign-in removed, the session read
 on the server, the legacy schema path deleted).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
@@ -361,6 +362,39 @@ status and scores are shared across firms until the Jobs track's `JobMark` (Q36)
   must be listed as scoped, platform or public, or the test fails, so a new endpoint is covered by default.
 - It ports the frontend's `src/mocks/membership.test.ts` and `write-authorization.test.ts` to the real
   backend. Every track (§4) adds its fixtures, not a new test.
+
+**As built (2026-10-24):** three files in `backend/tests/`.
+- `test_isolation.py` enumerates the app's own routes (what the middleware sees). A FIRM route without a case or a
+  known gap fails, and so does any entry naming a route that's gone. For every FIRM case:
+  - **firm A's OWNER with B's ids:** 404, the same status and body as ids that exist nowhere. None of B's canaries
+    or ids appear in the answer, and B's rows are unchanged.
+  - **every GET:** A's answer is byte-identical before and after B's rows exist, which catches count leaks.
+  - **a support view of A:** B's ids are as missing, and every write is 403.
+  - **a support view of B:** GETs answer; writes and PDF exports are 403; B's rows are unchanged.
+  - **firm B's OWNER:** gets through for real, with LLM workers, page fetches and the PDF browser stubbed.
+  - **signed out:** 401.
+
+  Also: PLATFORM routes refuse a firm user, another firm's slug gets the unknown-slug 404, `/api/companies` counts
+  only the caller's firm, and `live-page` in a view writes nothing. The attacker is the OWNER, the widest firm
+  role; a BDE's `own` scope stays in each module's tests.
+- `isolation_cases.py` is the case table, in sections by track: which rows a route's path names, its body, and
+  whether the body names rows (`body_ids`) or answers `not_found` lists (`bulk`). It also holds `KNOWN_GAPS` and
+  the reasons for the other classes.
+- `isolation_support.py` builds firms A and B with a row of every firm-owned kind; B's rows carry canaries.
+
+**A track adds its routes to `isolation_cases.py` and its table's rows to `isolation_support.build_firm` and
+`snapshot_of`, not a new test** (§5 rule 1).
+
+**Known gaps, from F4:** the Persona and autofill routes skip the matrix until the Candidates track (D1). A shared
+job's status is checked to still leak, until the Jobs track's `JobMark` (Q36), so the entry fails once that is fixed.
+
+**Fixed on the way:**
+- `POST/PATCH /api/resumes` and `/api/cover-letters` check that body ids (`parent_id`, `job_id`, `resume_id`) are
+  the firm's own (`scoping.firm_ref`): another firm's id was accepted and a random one wasn't, an existence oracle.
+- Both `tracer-stats` routes 404 another firm's id; they answered `200 []`.
+- `live-page` no longer warms a job's cached page inside a support view.
+
+`test_firm_scoped_reads.py` was folded in and deleted.
 
 ---
 

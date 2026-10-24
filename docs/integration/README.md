@@ -173,7 +173,11 @@ schemas reject both. Declare every backend timestamp as `z.string()` and convert
    the browser console.
 7. **Delete the mock:** remove the `isLive` branch, the `mock` import, `src/mocks/<module>.ts` and
    its JSON file. Fix anything that imported them, such as `src/lib/derive/derive.test.ts`.
-8. **Update the status board** below and open a PR. The checks must pass.
+8. **Add your isolation cases.** Each new route goes into `backend/tests/isolation_cases.py`, and a new
+   firm-owned table gets a row in `isolation_support.build_firm` (with a canary) and in `snapshot_of`.
+   `test_isolation.py` then proves your routes never cross firms. Don't write your own isolation test
+   ([07-auth F7](./07-auth-and-tenancy.md)).
+9. **Update the status board** below and open a PR. The checks must pass.
 
 ### Definition of done (per module)
 
@@ -184,6 +188,7 @@ schemas reject both. Declare every backend timestamp as `z.string()` and convert
 - [ ] No `SCHEMA_MISMATCH` in the console
 - [ ] Mock code and JSON for the module deleted; no `isLive("<module>")` left
 - [ ] Gaps you hit are written into the module file's "Gaps" section
+- [ ] Every new route is in `backend/tests/isolation_cases.py`, and `test_isolation.py` passes
 
 ---
 
@@ -202,7 +207,7 @@ dependencies are live; only switching the adapter to live waits.
 | F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | Abdul | Policy table + `require` done (#35); `scoped()` / `scoped_jobs()` + their lint test done for every firm route (#53, #54); support-view reads done (issue #56) |
 | F5 | Seed script: the mocks' firms, accounts and data | F2 | Abdul | Done for firms, plans, accounts and invites (#38); module data lands with each track |
 | F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | Abdul | Live behind flag (#40, #41): `NEXT_PUBLIC_LIVE_MODULES=session`. Server-side principal, mock sign-in removal and the legacy schema path not started |
-| F7 | Reusable cross-firm isolation test over every route | F4 | Uzair | Not started |
+| F7 | Reusable cross-firm isolation test over every route | F4 | Uzair | Done (`backend/tests/test_isolation.py`) |
 
 | Track | Module | Depends on | Owner | Status |
 |---|---|---|---|---|
