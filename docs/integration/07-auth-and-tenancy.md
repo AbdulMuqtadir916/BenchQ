@@ -227,6 +227,24 @@ backend only; the frontend keeps running on mocks until F6.**
   company pages, are not linked yet. Who owns a search (a firm, or the platform for every firm) is decided there.
 - Reads are not filtered yet: the firm-scoping dependency and its lint test (F4) are the next PR.
 
+**F2c as built (agreed 2026-10-23):** `settings` stays one platform table, Super Admin only (`/api/settings` is
+PLATFORM). Firms never configure models, prompts, scraper logins or Telegram (product owner, 2026-10-23). There is
+no `firm_settings` table: a firm's own choice moves to a firm table when its track needs one (a new entity, so it
+needs a contract first). Every key is classified in `backend/settings_scope.py`, and
+`backend/tests/test_settings_scope.py` fails on a key that isn't:
+
+| Scope | Keys | Who moves them |
+|---|---|---|
+| Platform (stays) | schedules and crons, intervals, concurrency limits, job archive / auto-reject days, scraping filters (company, title, body exclusions), proxy, dedup params, tracer-link URL format | — (auto-reject per firm: 03 Applications, D3) |
+| AI presets | every `*_llm_*` provider, model, effort and key, the fallback model, the models list, prompt caching, the scoring rubric and output schemas, the tailoring, persona, cover-letter, email and autofill prompts, the cover-letter voices | The AI presets module (Super Admin: one active preset per module), after the AI tracks |
+| A firm's choice, platform-wide for now | `default_resume_id`, on-save scoring, auto quick-score, default cover-letter voice, tracer links on/off, prep sections, autofill dictionaries, the Gmail query and tokens | The track named next to each key (04, 02, 03, the extension, D8) |
+| Unused, to delete | LinkedIn and Jobright logins and sessions, Telegram (chat, webhook secret, digest, fit alert), the JobNavigator feed zoom | 02 Jobs (scraper logins) and production readiness (Telegram), with the code that reads them |
+
+**Known leak, found by F2c:** scoring a job for a firm (`cv_scorer.score_single_job`, from `POST /api/analyze`,
+on-save scoring and the tailor auto-score) uses the company's `selected_resume_ids`, else `default_resume_id`, else
+**every firm's base résumés**. So one firm's résumé text can be scored for another firm's job, and the result sits
+on the shared job row (Q36). Fixed by passing the firm down to the scorer (see the PR that follows F2c).
+
 ### F3 — Auth endpoints, returning the frontend's `Session`
 
 The wire shape is snake_case and the frontend maps it in `src/lib/api/dto/session.ts` (the CLAUDE.md rule:
