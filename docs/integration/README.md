@@ -206,7 +206,7 @@ dependencies are live; only switching the adapter to live waits.
 | F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | Abdul, Uzair | Done (#34, #36; support views: issue #56) |
 | F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | Abdul | Policy table + `require` done (#35); `scoped()` / `scoped_jobs()` + their lint test done for every firm route (#53, #54); support-view reads done (issue #56) |
 | F5 | Seed script: the mocks' firms, accounts and data | F2 | Abdul | Done for firms, plans, accounts and invites (#38); module data lands with each track |
-| F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | Abdul | Live behind flag (#40, #41): `NEXT_PUBLIC_LIVE_MODULES=session`. Server-side principal, mock sign-in removal and the legacy schema path not started |
+| F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | Abdul | Live behind flag (#40, #41): `NEXT_PUBLIC_LIVE_MODULES=session`. Legacy schema path deleted (issue #62). Server-side principal and mock sign-in removal not started (issues #63–#66) |
 | F7 | Reusable cross-firm isolation test over every route | F4 | Uzair | Done (`backend/tests/test_isolation.py`) |
 
 | Track | Module | Depends on | Owner | Status |
@@ -301,17 +301,20 @@ newest revision. Run **exactly one backend worker** until the scheduler leaves t
    revision fails the tests.
 
 Never edit a revision that has been merged: add a new one. Never put schema changes in `seed.py`: it seeds
-and tidies **data** only. `seed.run_migrations`, `models.db.create_tables` and `migrate_h1b_to_visa_cache`
-are frozen: only `backend/migrations/legacy_bootstrap.py` calls them, for databases that predate Alembic.
+and tidies **data** only. The pre-Alembic startup path (`create_tables`, `seed.run_migrations`,
+`migrate_h1b_to_visa_cache` and the bootstrap that called them) was deleted at F6 (issue #62).
 
 ### An existing dev database
 
-**Your existing database is stamped automatically on first start.** You do nothing: pull, then
-`docker compose up -d --build backend`. The first time `db_upgrade` sees tables but no `alembic_version`, it
-runs the legacy bootstrap once (a no-op on a database that is already current), then **stamps** it at
-revision `0001` and upgrades it to head like any other database. Nothing is re-created and no data changes. Do not drop your database or its volume.
-The legacy path is deleted at F6 ([07-auth-and-tenancy.md](./07-auth-and-tenancy.md)), so start the backend
-once on this version before then.
+`db_upgrade` only runs `alembic upgrade head`. A database that has tables but **no `alembic_version`** (one the
+old startup path built and nobody started since Alembic landed) is refused with the fix in the message, and
+nothing is changed. You are fine if `SELECT version_num FROM alembic_version` returns a row. If it doesn't, either:
+
+1. keep the data: `git checkout 14ba662` (the last commit that still stamps), `docker compose up -d --build backend`
+   once, then come back to your branch; or
+2. start empty: `docker compose down -v` (this deletes the database volume), then `docker compose up -d db backend`.
+
+The legacy schema path was deleted at F6 ([07-auth-and-tenancy.md](./07-auth-and-tenancy.md)).
 
 ### Tests run on Postgres
 

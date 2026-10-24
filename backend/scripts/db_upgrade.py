@@ -2,8 +2,8 @@
 
     python -m backend.scripts.db_upgrade
 
-The Dockerfile CMD does this. A fresh database is built by the migrations; an existing one that has no
-`alembic_version` yet is repaired and stamped at the baseline (backend/db_schema.py).
+The Dockerfile CMD does this. The database is built by the migrations only; one that has tables but no
+`alembic_version` is refused with the fix (backend/db_schema.py).
 """
 import logging
 

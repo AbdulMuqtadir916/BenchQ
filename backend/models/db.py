@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, Text, DateTime, Date,
-    ForeignKey, JSON, Index, MetaData, UniqueConstraint, create_engine, text
+    ForeignKey, JSON, Index, UniqueConstraint, create_engine, text
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import backref, column_property, declarative_base, deferred, relationship, sessionmaker
@@ -59,10 +59,8 @@ class Setting(Base):
 
 def firm_id_column(nullable: bool = False) -> Column:
     """The owning firm on a firm-owned table (docs/integration/07, F2b; migration 0005). ON DELETE RESTRICT:
-    firms are suspended, never deleted. Marked alembic_only so the frozen pre-Alembic bootstrap
-    (create_tables) leaves it out and keeps building the baseline schema."""
-    return Column(UUID(as_uuid=True), ForeignKey("firms.id", ondelete="RESTRICT"), nullable=nullable, index=True,
-                  info={"alembic_only": True})
+    firms are suspended, never deleted."""
+    return Column(UUID(as_uuid=True), ForeignKey("firms.id", ondelete="RESTRICT"), nullable=nullable, index=True)
 
 
 # ── Searches ─────────────────────────────────────────────────────────────────
@@ -86,7 +84,7 @@ class Search(Base):
     # a question about a Canadian city with HTTP 200 and an empty result list, so
     # the country is an explicit field instead of a literal. Values are jobspy
     # Country aliases — see backend/countries.py.
-    # server_default mirrors what the database has had since seed.run_migrations set it (baseline 0001).
+    # server_default mirrors what the database has had since the baseline (0001).
     country = Column(String, default=DEFAULT_COUNTRY, server_default=DEFAULT_COUNTRY)
     is_remote = Column(Boolean, nullable=True)  # null=any
     job_type = Column(String, default="fulltime")
@@ -317,7 +315,7 @@ class Application(Base):
     job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=False)
     status = Column(String, default="applied")
     # applied|interview|offer|rejected. Retired screening/phone_screen/final_round
-    # values are backfilled by seed.run_migrations; status_transitions is left unchanged.
+    # values were backfilled before the baseline (0001); status_transitions is left unchanged.
     applied_at = Column(DateTime(timezone=True), default=utcnow)
     cv_version_used = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
@@ -654,40 +652,3 @@ def build_company_lookup(db) -> dict:
             for alias in company.aliases:
                 lookup[alias.lower()] = company
     return lookup
-
-
-# ── Table creation ───────────────────────────────────────────────────────────
-def _baseline_metadata() -> MetaData:
-    """Copies of the pre-Alembic tables without their alembic_only columns (and the foreign keys and indexes on
-    them). Only the frozen create_tables uses it."""
-    baseline = MetaData()
-    for table in Base.metadata.sorted_tables:
-        if table.info.get("alembic_only"):
-            continue
-        copy = table.to_metadata(baseline)
-        for column in [c for c in copy.columns if c.info.get("alembic_only")]:
-            for fk in [f for f in copy.foreign_key_constraints if column.name in f.column_keys]:
-                copy.constraints.discard(fk)
-                copy.foreign_keys.difference_update(fk.elements)
-            for index in [i for i in copy.indexes if column.name in i.columns]:
-                copy.indexes.discard(index)
-            copy._columns.remove(column)  # no public API for this; frozen code, deleted at F6
-    return baseline
-
-
-def create_tables():
-    # Create sequence before tables (Job.short_id references it in server_default)
-    with engine.connect() as conn:
-        conn.execute(text("CREATE SEQUENCE IF NOT EXISTS jobs_short_id_seq"))
-        conn.commit()
-    # Tables added after the Alembic baseline (models/tenancy.py) exist only through their revisions, and so do
-    # columns added to the old tables later (firm_id_column): the baseline is built without them.
-    baseline = _baseline_metadata()
-    baseline.create_all(bind=engine)
-    # Idempotent column adds for tables that already existed before the column was introduced.
-    # Postgres-native; no-op on second run.
-    with engine.connect() as conn:
-        conn.execute(text(
-            "ALTER TABLE searches ADD COLUMN IF NOT EXISTS exclude_active_companies BOOLEAN DEFAULT FALSE"
-        ))
-        conn.commit()

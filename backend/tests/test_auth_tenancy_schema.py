@@ -16,7 +16,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.pool import NullPool
 
 import backend.models.db as db_mod
-from backend.tests.test_schema_matches_legacy import _admin_engine, _url_for
+from backend.tests.scratch_db import _admin_engine, _url_for
 
 
 def _run(sql: str, **params):

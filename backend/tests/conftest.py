@@ -116,27 +116,6 @@ def _clean_db(_schema):
 
 
 @pytest.fixture
-def add_legacy_h1b_columns(test_db):
-    """Returns a function that adds the old companies.h1b_* columns (a database from before visa_cache).
-    The schema is built once per run, so they are always dropped again afterwards."""
-    from sqlalchemy import text
-    cols = [("h1b_lca_count", "INTEGER"), ("h1b_approval_rate", "DOUBLE PRECISION"),
-            ("h1b_median_salary", "INTEGER"), ("h1b_last_checked", "TIMESTAMPTZ")]
-
-    def _add():
-        for col, typ in cols:
-            test_db.execute(text(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {col} {typ}"))
-        test_db.commit()
-
-    yield _add
-    test_db.rollback()
-    import backend.models.db as db_mod
-    with db_mod.engine.begin() as conn:   # own connection: a test may have patched test_db.execute
-        for col, _ in cols:
-            conn.execute(text(f"ALTER TABLE companies DROP COLUMN IF EXISTS {col}"))
-
-
-@pytest.fixture
 def test_db():
     """A session on the Postgres test database (tables are emptied around every test by _clean_db)."""
     import backend.models.db as db_mod

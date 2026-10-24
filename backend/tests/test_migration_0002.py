@@ -15,7 +15,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DataError
 from sqlalchemy.pool import NullPool
 
-from backend.tests.test_schema_matches_legacy import _admin_engine, _url_for
+from backend.tests.scratch_db import _admin_engine, _url_for
 
 _TOKEN_TYPE = """
     SELECT format_type(a.atttypid, a.atttypmod) FROM pg_attribute a

@@ -6,9 +6,9 @@ table and `require`; the firm-scoping dependency and its lint test wait for F2b)
 and read lists, Phase M's backend, and F6 for the session, invites, team and admin adapters **as an opt-in**
 (`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **2026-10-23:** F2b built (migration 0005, see
 F2 below). **2026-10-24:** the support-view endpoints built (issue #56): F3 is done, and so are F4's support-view
-reads. **2026-10-24:** F7 built: the isolation test runs over every route (see F7 below). **Still to do:** F2c and
-the rest of F6 (live by default, mock sign-in removed, the session read
-on the server, the legacy schema path deleted).
+reads. **2026-10-24:** F2c done (#57–#59); F7 built: the isolation test runs over every route (#61, see F7 below);
+the legacy schema path deleted (issue #62). **Still to do:** the rest of F6 (live by default, mock sign-in removed,
+the session read on the server; issues #63–#66).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
 
@@ -184,7 +184,8 @@ backend only; the frontend keeps running on mocks until F6.**
   is deleted. A test builds two scratch databases, one the old way and one by Alembic, and compares tables,
   columns (type, nullability, default), constraints, indexes and sequences, so the two can't drift. The repo
   has no CI workflow; the command is in `docs/integration/README.md`.
-- **Remove the legacy path by F6 at the latest.** Once every dev database is stamped, delete
+- **Remove the legacy path by F6 at the latest** (**done, issue #62**; a database that was never stamped is now refused
+  with the fix, see README "An existing dev database"). Once every dev database is stamped, delete
   `models.db.create_tables`, `seed.run_migrations` (with `run_migration_statements` and the helpers only it
   calls), `seed.migrate_h1b_to_visa_cache`, `backend/migrations/legacy_bootstrap.py`, the stamp branch in
   `db_schema.py`, and the tests that exist only for them. The equivalence test
@@ -349,7 +350,8 @@ status and scores are shared across firms until the Jobs track's `JobMark` (Q36)
   mocked module reads the principal from the session the way it does today.
 - **Delete the legacy schema path** (F1's list): `create_tables`, `run_migrations`,
   `migrate_h1b_to_visa_cache`, `backend/migrations/legacy_bootstrap.py` and the stamp branch in
-  `db_schema.py`. By now every dev database has been stamped by starting the backend once.
+  `db_schema.py`. **Done (issue #62)**, after every teammate started the backend once. `db_upgrade` now stops on a
+  database with tables but no `alembic_version`, and the `alembic_only` model markers are gone.
 - **Done when:** every seeded account signs in on a production build and lands where docs/03 §3.2 says;
   the support view starts and ends with its ledger entries; signing out in one tab signs out the others;
   the legacy schema path is gone.
