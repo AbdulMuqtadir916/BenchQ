@@ -78,6 +78,23 @@ def scoped_jobs(db, firm_id: uuid.UUID, *entities):
     return db.query(*(entities or (Job,))).filter(Job.id.in_(firm_job_ids(firm_id)))
 
 
+def firm_ref(db, firm_id: uuid.UUID, model, value, what: str) -> uuid.UUID | None:
+    """An id a request body names, to be stored on the firm's own row (a résumé's job or parent, a letter's résumé):
+    None stays None, anything else must be one of the firm's own rows. Another firm's id and a malformed one are the
+    same 404 as a missing one, so a body can't probe which ids exist (07 F7, principle 4)."""
+    from backend.models.db import Job
+    if value is None:
+        return None
+    try:
+        key = uuid.UUID(str(value))
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"{what} not found")
+    rows = scoped_jobs(db, firm_id) if model is Job else scoped(db, model, firm_id)
+    if rows.filter(model.id == key).first() is None:
+        raise HTTPException(status_code=404, detail=f"{what} not found")
+    return key
+
+
 def scoped(db, model, firm_id: uuid.UUID, *entities):
     """`db.query(model)` limited to one firm's rows. Pass `entities` to select columns instead of the model:
     `scoped(db, Resume, firm_id, Resume.id)`."""

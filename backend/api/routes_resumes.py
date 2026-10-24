@@ -15,7 +15,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.db import get_db, Resume, TracerLink, TracerClickEvent, Setting, Job, Application, SessionLocal, utcnow, Persona, CoverLetter
 from backend.api._input import str_field
-from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs, writer_firm_id
+from backend.auth.scoping import firm_ref, reader_firm_id, scoped, scoped_jobs, writer_firm_id
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, ModelReplyError, parse_model_json
 from backend.job_monitor import launch_background, JobAlreadyRunningError
@@ -669,8 +669,8 @@ def create_resume(body: dict, db: Session = Depends(get_db), firm_id=Depends(wri
         firm_id=firm_id,
         name=name,
         is_base=body.get("is_base", True),
-        parent_id=body.get("parent_id"),
-        job_id=body.get("job_id"),
+        parent_id=firm_ref(db, firm_id, Resume, body.get("parent_id"), "Resume"),
+        job_id=firm_ref(db, firm_id, Job, body.get("job_id"), "Job"),
         template=body.get("template", _default_template_id()),
         page_format=body.get("page_format", "letter"),
         json_data=body.get("json_data", {}),
@@ -1075,6 +1075,11 @@ def update_resume(resume_id: str, body: dict, db: Session = Depends(get_db), fir
     # (it is also the value every later render reads — R4-T5-01).
     if "template" in body:
         validate_template_name(body["template"], TEMPLATES_DIR)
+    # A linked résumé or job must be the firm's own (07 F7); checked before anything is set.
+    if "parent_id" in body:
+        body["parent_id"] = firm_ref(db, firm_id, Resume, body["parent_id"], "Resume")
+    if "job_id" in body:
+        body["job_id"] = firm_ref(db, firm_id, Job, body["job_id"], "Job")
     for key, value in body.items():
         if key in allowed:
             setattr(resume, key, value)

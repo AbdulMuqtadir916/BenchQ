@@ -13,7 +13,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.db import get_db, CoverLetter, Resume, Job, Setting, Persona, TracerLink, TracerClickEvent, SessionLocal
 from backend.api._input import str_field, uuid_filter
-from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs, writer_firm_id
+from backend.auth.scoping import firm_ref, reader_firm_id, scoped, scoped_jobs, writer_firm_id
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 from backend.api.routes_resumes import _get_browser, _rewrite_urls_with_tracers, _resolve_tailoring_jd  # shared with resumes
@@ -172,8 +172,8 @@ def create_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depen
     cl = CoverLetter(
         firm_id=firm_id,
         name=name,
-        job_id=body.get("job_id"),
-        resume_id=body.get("resume_id"),
+        job_id=firm_ref(db, firm_id, Job, body.get("job_id"), "Job"),
+        resume_id=firm_ref(db, firm_id, Resume, body.get("resume_id"), "Resume"),
         template=body.get("template", _default_template_id()),
         page_format=body.get("page_format", "letter"),
         json_data=body.get("json_data", {}),
@@ -201,6 +201,11 @@ def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db), f
                "voice", "length"}
     if "template" in body:
         _validate_template(body["template"])
+    # A linked job or résumé must be the firm's own (07 F7); checked before anything is set.
+    if "job_id" in body:
+        body["job_id"] = firm_ref(db, firm_id, Job, body["job_id"], "Job")
+    if "resume_id" in body:
+        body["resume_id"] = firm_ref(db, firm_id, Resume, body["resume_id"], "Resume")
     for k, v in body.items():
         if k in allowed:
             setattr(cl, k, v)
