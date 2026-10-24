@@ -5,7 +5,8 @@
 table and `require`; the firm-scoping dependency and its lint test wait for F2b), F5, the Admin API's firms, invites
 and read lists, Phase M's backend, and F6 for the session, invites, team and admin adapters **as an opt-in**
 (`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **2026-10-23:** F2b built (migration 0005, see
-F2 below). **Still to do:** F2c, the support-view endpoints, F7, and the rest of F6 (live by default, mock sign-in removed, the session read
+F2 below). **2026-10-24:** the support-view endpoints built (issue #56): F3 is done, and so are F4's support-view
+reads. **Still to do:** F2c, F7, and the rest of F6 (live by default, mock sign-in removed, the session read
 on the server, the legacy schema path deleted).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
@@ -266,6 +267,21 @@ The mock's behaviour is the spec: `src/mocks/session.ts`, `auth.ts`, `invites.ts
 `support.ts` and their tests (`support.test.ts`, `invite-flow.test.ts`, `session-persistence.test.ts`)
 are ported as backend tests, case for case.
 
+**Support views as built (2026-10-24, issue #56):** `backend/auth/support.py` holds the rules (start, end, expiry),
+`backend/api/routes_support.py` the two endpoints, `backend/tests/test_support_views.py` every case of
+`src/mocks/support.test.ts` plus the read / write / other-firm matrix.
+- A view lives on the session that started it (`sessions.support_view_id`); the admin's other browser is a plain
+  Super Admin. One open view per admin: starting another, of any firm or the same one, ends the first ("another
+  support view started"). Start and exit lock the admin's `platform_users` row, so two at once never fail.
+- It ends by exit ("Support view ended"), expiry ("Support view ended after 60 minutes", dated at `expires_at`) or
+  **any** end of its session ("Support view ended: signed out"): sign-out, signing in as someone else in that
+  browser, accepting an invite there, `reset_password`. The session row's `support_view_id` is then null.
+- Expiry is settled lazily, every expired view (anyone's), once, on `/api/auth/me`, start, exit, every session end,
+  the firm's ledger read and `/api/admin/audit`, so the firm's ledger and the admin overview's "open now" are true
+  even if the admin never comes back. `ledger.record(..., at=)` dates the entry.
+- Ledger entries: the admin's name, never their email; `entity_label` is the firm's name.
+- A malformed or unknown `firm_id` is 404; any firm status can be viewed (Q29).
+
 ### F4 — The permission table in Python, and one firm-scoping dependency
 
 - `backend/auth/policy.py`: the same table as `src/lib/auth/policy.ts`: firm actions, team actions (Q15),
@@ -295,6 +311,14 @@ letters, tracer stats, `/api/stats` and the Sankey are scoped; another firm's id
 its menus, facets and counts, a job's detail and pages, bulk update, analyze, and the job lookups of the résumé and
 cover-letter routes read through `scoped_jobs()`, the firm's links in `firm_jobs`; the lint test also fails on raw
 SQL over `jobs` without a `firm_jobs` filter. Capture routes still dedup over the whole pool, then link the job.
+**Support views (2026-10-24, issue #56):** `Principal.support_firm_id` is the viewed firm. A FIRM route lets a view
+through for **GET only** (`backend/auth/access.py`): every other method is 403 "A support view is read-only.", and so
+are the GETs in `SUPPORT_VIEW_REFUSED` (the résumé and cover-letter PDF exports: a view never exports, 07 §4).
+`reader_firm_id` gives a view its firm on GET only and refuses any other method itself, because many write routes
+take it rather than `writer_firm_id`: a write needs two mistakes to get through. `writer_firm_id` refuses every
+platform principal. `own_scope` gives a view the whole firm, as the OWNER. The team routes accept the viewed firm
+(reads only); `/api/companies` counts the viewed firm's rows. **Follow-up:** move the write routes that take
+`reader_firm_id` to `writer_firm_id`.
 **Known gaps:** the Persona is one shared row until the Candidates track (D1); a job's
 status and scores are shared across firms until the Jobs track's `JobMark` (Q36).
 
