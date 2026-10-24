@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
 
-from backend.auth import ledger, throttle
+from backend.auth import ledger, support, throttle
 from backend.auth.passwords import hash_password, needs_rehash, verify_password
 from backend.auth.serialize import session_json
 from backend.auth.sessions import (COOKIE_NAME, Principal, clear_cookie_kwargs, cookie_kwargs, end_session,
                                    principal_for, start_session)
 from backend.models.db import get_db, utcnow
-from backend.models.tenancy import PlatformUser, SupportView, User
+from backend.models.tenancy import PlatformUser, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -67,18 +67,9 @@ def sign_in(body: SignInBody, request: Request, response: Response, db: DbSessio
 
 @router.post("/sign-out", status_code=204, summary="Sign out")
 def sign_out(request: Request, db: DbSession = Depends(get_db)):
-    """Deletes the session and clears the cookie; ends an open support view (logged in the firm's ledger).
-    Answers 204 even when there was no session, so a stale tab can always sign out."""
-    row = end_session(db, request.cookies.get(COOKIE_NAME))
-    if row is not None and row.support_view_id is not None:
-        view = db.get(SupportView, row.support_view_id)
-        if view is not None and view.ended_at is None:
-            now = utcnow()
-            view.ended_at = min(now, view.expires_at)
-            admin = db.get(PlatformUser, view.platform_user_id)
-            ledger.record(db, actor=admin, action="ADMIN_ACCESS_END", entity_type="support_view", entity_id=view.id,
-                          entity_label=admin.name, summary=f"{admin.name} ended a support view by signing out",
-                          firm_id=view.firm_id)
+    """Deletes the session and clears the cookie; ends an open support view (logged in the firm's ledger,
+    backend/auth/support.py). Answers 204 even when there was no session, so a stale tab can always sign out."""
+    end_session(db, request.cookies.get(COOKIE_NAME))
     db.commit()
     response = Response(status_code=204)
     response.delete_cookie(**clear_cookie_kwargs())
@@ -87,7 +78,10 @@ def sign_out(request: Request, db: DbSession = Depends(get_db)):
 
 @router.get("/me", summary="The current session")
 def me(principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
-    """A firm session or a platform session. 401 when signed out (the middleware answers that)."""
+    """A firm session or a platform session. 401 when signed out (the middleware answers that). Logs the end of any
+    support view that ran out: the banner asks here when its 60 minutes are up."""
+    support.settle_expired(db)
+    db.commit()
     return session_json(db, principal)
 
 
