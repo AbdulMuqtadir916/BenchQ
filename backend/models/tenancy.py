@@ -8,8 +8,7 @@ The rules that must never break live in the database itself, so no endpoint bug 
 OWNER per firm, `firm_id` null exactly for a platform invite, one email per account across `users` and
 `platform_users` (a trigger, migration 0003), the 60-minute support view.
 
-These tables exist only through Alembic (migrations/versions/0003_auth_tenancy.py): `ALEMBIC_ONLY` keeps the
-frozen pre-Alembic bootstrap (models.db.create_tables) from creating them.
+These tables exist only through Alembic (migrations/versions/0003_auth_tenancy.py).
 """
 import uuid
 
@@ -22,8 +21,6 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Session as OrmSession
 
 from backend.models.db import Base, utcnow
-
-ALEMBIC_ONLY = {"info": {"alembic_only": True}}
 
 FIRM_ROLES = ("OWNER", "MANAGER", "BDE", "VIEWER")
 FIRM_STATUSES = ("ONBOARDING", "ACTIVE", "SUSPENDED")
@@ -88,7 +85,6 @@ class Plan(Base):
 
     __table_args__ = (
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_plans_limits_not_negative"),
-        ALEMBIC_ONLY,
     )
 
 
@@ -118,7 +114,6 @@ class Firm(Base):
         CheckConstraint(_in("truth_guard_mode", TRUTH_GUARD_MODES), name="ck_firms_truth_guard_mode"),
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_firms_limits_not_negative"),
         CheckConstraint("application_expiry_days > 0", name="ck_firms_application_expiry_days_positive"),
-        ALEMBIC_ONLY,
     )
 
 
@@ -144,7 +139,6 @@ class User(Base):
         # At most one active OWNER per firm (A10); an ONBOARDING firm has none until its owner accepts.
         Index("uq_users_one_active_owner_per_firm", "firm_id", unique=True,
               postgresql_where=text("role = 'OWNER' AND is_active")),
-        ALEMBIC_ONLY,
     )
 
 
@@ -163,7 +157,6 @@ class PlatformUser(Base):
 
     __table_args__ = (
         CheckConstraint("email = lower(email)", name="ck_platform_users_email_lowercase"),
-        ALEMBIC_ONLY,
     )
 
 
@@ -203,7 +196,6 @@ class Invite(Base):
         # One pending OWNER invite per firm (implication 4).
         Index("uq_invites_one_pending_owner_per_firm", "firm_id", unique=True,
               postgresql_where=text("status = 'PENDING' AND role = 'OWNER'")),
-        ALEMBIC_ONLY,
     )
 
 
@@ -228,7 +220,6 @@ class SupportView(Base):
         # One view at a time per admin (07 §4).
         Index("uq_support_views_one_open_per_admin", "platform_user_id", unique=True,
               postgresql_where=text("ended_at IS NULL")),
-        ALEMBIC_ONLY,
     )
 
 
@@ -255,7 +246,6 @@ class Session(Base):
                         name="ck_sessions_support_view_is_platform"),
         CheckConstraint("expires_at <= absolute_expires_at", name="ck_sessions_expiry_within_cap"),
         CheckConstraint("absolute_expires_at <= created_at + interval '30 days'", name="ck_sessions_thirty_day_cap"),
-        ALEMBIC_ONLY,
     )
 
 
@@ -288,7 +278,6 @@ class LedgerEntry(Base):
                         name="ck_ledger_entries_claim_state"),
         Index("ix_ledger_entries_firm_created", "firm_id", "created_at"),
         Index("ix_ledger_entries_created", "created_at"),
-        ALEMBIC_ONLY,
     )
 
 
@@ -312,7 +301,6 @@ class FirmJob(Base):
         CheckConstraint(_in("origin", FIRM_JOB_ORIGINS), name="ck_firm_jobs_origin"),
         CheckConstraint("origin = 'CAPTURED' OR captured_by_user_id IS NULL", name="ck_firm_jobs_scraped_no_capturer"),
         UniqueConstraint("firm_id", "job_id", name="uq_firm_jobs_firm_job"),
-        ALEMBIC_ONLY,
     )
 
 

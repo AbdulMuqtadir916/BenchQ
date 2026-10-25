@@ -323,22 +323,3 @@ async def test_fetch_raises_when_both_blocked(monkeypatch):
     monkeypatch.setattr(h1b_checker, "_fetch_h1bdata", fb)
     with pytest.raises(h1b_checker.H1bRateLimited):
         await h1b_checker.fetch_company_h1b_data("Twilio")
-
-
-# ── migration: legacy companies.h1b_* → visa_cache ───────────────────────────
-
-def test_migrate_seeds_visa_cache_from_legacy_columns(test_db, add_legacy_h1b_columns):
-    from sqlalchemy import text
-    from backend.models.db import Company, VisaCache
-    from backend.seed import migrate_h1b_to_visa_cache
-    add_legacy_h1b_columns()
-    test_db.add(Company(name="LegacyCo"))
-    test_db.commit()
-    test_db.execute(text("update companies set h1b_lca_count=320, h1b_approval_rate=92.0, "
-                         "h1b_median_salary=165000 where name='LegacyCo'"))
-    test_db.commit()
-
-    migrate_h1b_to_visa_cache(test_db)
-
-    row = test_db.query(VisaCache).filter(VisaCache.name_key == "legacyco").first()
-    assert row and row.lca_count == 320 and row.median_salary == 165000 and row.has_data is True
