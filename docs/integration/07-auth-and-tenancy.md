@@ -7,8 +7,8 @@ and read lists, Phase M's backend, and F6 for the session, invites, team and adm
 (`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **2026-10-23:** F2b built (migration 0005, see
 F2 below). **2026-10-24:** the support-view endpoints built (issue #56): F3 is done, and so are F4's support-view
 reads. **2026-10-24:** F2c done (#57–#59); F7 built: the isolation test runs over every route (#61, see F7 below);
-the legacy schema path deleted (issue #62). **Still to do:** the rest of F6 (live by default, mock sign-in removed,
-the session read on the server; issues #63–#66).
+the legacy schema path deleted (issue #62); the signed-out redirect in `src/proxy.ts` (issue #63). **Still to do:** the rest of F6
+(live by default, mock sign-in removed, the session read on the server; issues #64–#66).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
 
@@ -348,6 +348,12 @@ status and scores are shared across firms until the Jobs track's `JobMark` (Q36)
   `current()`.
 - **The other modules stay on mocks**, but now under a real signed-in principal. Until its track lands, a
   mocked module reads the principal from the session the way it does today.
+- **The signed-out redirect (issue #63, built):** `src/proxy.ts` sends a request without the `bq_session` cookie to
+  `/sign-in?returnTo=…` unless the registry says the route is public (`/dev/*` only where it is served). A path the
+  registry doesn't know redirects too, so existence is never confirmed. It looks for the cookie, not for a valid
+  session (UX; the backend's 401 is the enforcement), and runs only while `session` is a live module, so mock mode
+  keeps working until live is the default (issue #65 drops that condition). The rule is `signedOutRedirect()` in
+  `src/lib/routes/proxy-access.ts`.
 - **Delete the legacy schema path** (F1's list): `create_tables`, `run_migrations`,
   `migrate_h1b_to_visa_cache`, `backend/migrations/legacy_bootstrap.py` and the stamp branch in
   `db_schema.py`. **Done (issue #62)**, after every teammate started the backend once. `db_upgrade` now stops on a
