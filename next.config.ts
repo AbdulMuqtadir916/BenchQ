@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   // lucide-react exports hundreds of icons; rewrite named imports so only the ones used are bundled.
   experimental: {
     optimizePackageImports: ["lucide-react"],
+    // forbidden() and forbidden.tsx: a real 403 for a route the principal may not open (docs/07 Phase D).
+    authInterrupts: true,
   },
   // Proxy the FastAPI backend so browser requests stay same-origin (no CORS,
   // and the backend's HTTP-only session cookie is sent automatically).
