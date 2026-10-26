@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
@@ -9,5 +9,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Claude Code worktrees (`.claude/worktrees/*`) hold whole copies of the repo: their tests are not this checkout's.
+    exclude: [...configDefaults.exclude, ".claude/**"],
   },
 });
