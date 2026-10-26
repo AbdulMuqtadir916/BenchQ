@@ -244,7 +244,7 @@ passed the heuristic check except table headers (W21).
 
 ## 6. Accessibility: adding axe (proposal, not installed)
 
-There is no axe tooling in the repo (CURRENT_STATE §8). docs/01 §2 already names the testing stack as
+There is no axe tooling in the repo (`docs/archive/CURRENT_STATE.md` §8). docs/01 §2 already names the testing stack as
 "Vitest + Playwright + @axe-core/playwright", so these are the planned dependencies. The §3 checks
 apply all the same:
 

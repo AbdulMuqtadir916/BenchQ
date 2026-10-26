@@ -231,21 +231,27 @@ try/catch, with a working default when storage is unavailable.
 
 ---
 
-## 7. Signing in (mock auth)
+## 7. Signing in
 
-There is no real auth yet, and no principal switcher (docs/07 Q25). Everyone signs in on `/sign-in`
-with email + password against the **seeded accounts** of the mock layer (`docs/03` §3.2): every
-fixture firm user (each role in firm A, the second firm's and the suspended firm's users) and the
-Super Admin, all with one demo password. The mock backend (`src/mocks/auth.ts`) keeps the signed-in
-account in `localStorage`, standing in for the session cookie: it survives a reload and is shared by
-every tab, so signing out (user menu) or in as someone else in one tab reaches them all (Q27). Two
-accounts at once: a private window or a second browser profile. The app starts signed out; the
-client store (`useSession`: principal and user, never the firm) is filled from the session layer
-(`sessionApi`), and firm data reads `useFirmId()` from the URL.
+Everyone signs in on `/sign-in` with email + password against the backend; there is no principal switcher
+(docs/07 Q25). The session is the backend's `bq_session` cookie, and the browser never decides who someone is
+(F6, `docs/integration/07-auth-and-tenancy.md`).
 
-This is how you verify that a BDE never sees `/analytics`, that a VIEWER has no mutating controls in
-the DOM at all, and that a BDE sees only their assigned candidates: sign in as each seeded account.
-Mock auth is not security; real enforcement is docs/07 Phase D.
+- **Signed out:** `src/proxy.ts` redirects any request without the cookie to `/sign-in?returnTo=`. Unknown paths
+  are closed.
+- **Who is signed in:** the `/[firm]` and `/admin` layouts read the principal on the server
+  (`src/lib/server/gate.ts`, `principal.ts`) and answer with a redirect, `notFound()` or `forbidden()`.
+  The client store (`useSession`: principal and user, never the firm) is filled from that, and firm data reads
+  `useFirmId()` from the URL.
+- **Accounts:** the seeded demo accounts, `docs/03` §3.2 (`seed_demo`, one demo password). Two accounts at once:
+  a private window or a second browser profile.
+- **Tabs:** signing out in one tab reaches the others (`BroadcastChannel` `benchq.session`).
+- **Modules still on mocks** read the signed-in principal through `liveSession()` (`src/lib/api/live-session.ts`);
+  tests sign in with `src/mocks/sign-in-as.ts`.
+
+This is how you verify that a BDE never sees `/analytics`, that a VIEWER has no mutating controls in the DOM at
+all, and that a BDE sees only their assigned candidates: sign in as each seeded account. The client guards are
+UX; enforcement is the backend (`backend/auth/access.py`).
 
 ---
 

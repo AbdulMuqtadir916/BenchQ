@@ -2,8 +2,8 @@
 
 **Project:** BenchQ · **Version:** 2.1 (2026-10-14) — supersedes v2.0 (2026-10-13) and v1 (2026-10-06)
 **Status:** Phase A done and committed (`feat/routes`) · Phase A2 done (`feat/routes-a2`) · Phase T0 in progress (`feat/routes-t0`) · Q11, Q14, Q15 decided and **§7 contracts approved 2026-10-14 (Q16–Q21)** · next: **Phase T**, now unblocked
-**Facts about the code** come from `docs/CURRENT_STATE.md` (2026-10-13). If the code has moved on,
-trust the code and update this file.
+**Facts about the code** were taken from `docs/archive/CURRENT_STATE.md` (2026-10-13). The code is the source of
+truth: where it has moved on, trust the code and update this file.
 
 This doc owns: every URL, who can open it, how the firm is resolved, how the platform tier
 (Super Admin) works, and the order the work happens in. Screens are owned by `docs/04-SCREENS.md`;
@@ -43,7 +43,7 @@ All decisions live here. Change a decision here first, then the sections below.
 | Q24 | How a resend is logged | **Another `INVITE_SENT`** in the firm's ledger, summary **"Invite resent to <email>"** (approved 2026-10-18). No new ledger action, no contract change |
 | Q25 | How people sign in until real auth | **Through `/sign-in` only** (decided 2026-10-19): email + password against **seeded dummy accounts** in the mock layer, one per fixture user plus the Super Admin, one shared demo password (`docs/03` §3.2). The **dev principal switcher is removed** in development and production. Dummy data stays per firm (the existing fixtures). Still mock auth, not security; real enforcement stays Phase D. Implemented in **Phase L**, before P3 |
 | Q26 | `/welcome` and `/invite/[token]` without the switcher | **Phase L covers `/welcome` with unit tests only; no mock invite page** (decided 2026-10-19). The real **`/invite/[token]` moves from Phase S to P4**, alongside the support view: it is how a new firm's OWNER joins, and the browser check of `/welcome` happens there (accept GSC's pending OWNER invite → `/welcome`) |
-| Q27 | Where the mock session lives | **`localStorage`, shared across tabs** (decided 2026-10-19), like the production cookie session will be: one signed-in account per browser profile. Signing out (or in as someone else) in any tab applies to every open tab (`storage` event). Two accounts at once = a private window or a second browser profile |
+| Q27 | Where the mock session lives | *(Superseded by F6: the session is the backend's `bq_session` cookie, shared across tabs by the browser; the mock session is gone.)* **`localStorage`, shared across tabs** (decided 2026-10-19), like the production cookie session will be: one signed-in account per browser profile. Signing out (or in as someone else) in any tab applies to every open tab (`storage` event). Two accounts at once = a private window or a second browser profile |
 | Q28 | Opening `/invite/[token]` for a `SUSPENDED` firm | **Blocked** with the "Workspace suspended" message (decided 2026-10-19): the invite is **not accepted and stays `PENDING`**. Answers Phase S open question 1, needed before P4 builds the page. Whether a suspended firm's pending invites hold seats (Phase S question 2) still waits for Phase S |
 | Q29 | Super Admin area decisions (docs/04 §14.11) | Decided 2026-10-19: (1) **`/admin/system`** is a placeholder page for now; `HealthCheck`, `ScraperRun` and `AiUsage` contracts are drafted for sign-off separately; the **demo-data reset moves onto that placeholder**; **AI spend stays hidden** on the overview until its contract is approved. (2) **Custom limits per firm: yes**, logged as `PLAN_CHANGED`, the firm marked "custom limits". (3) **View workspace of an `ONBOARDING` firm with no users: allowed**; it shows empty states. (4) **Suspend: `ACTIVE` firms only.** (5) **Stalled onboarding alert after 7 days.** (7) **Over-limit block: yes**, as the second docs/04 §0 exception to "not rendered": the control stays visible, disabled, with the reason inline. (8) All PROPOSED defaults in docs/04 §14 accepted |
 | Q30 | Two gaps in docs/04 §14 | Decided 2026-10-19: (1) **"Custom limits" is derived from the ledger**, no new field: Adjust limits logs `PLAN_CHANGED` with `entityType: "firm_limits"`, a plan change logs it with `entityType: "firm"` (as the fixtures already do); a firm shows "custom limits" while its latest `PLAN_CHANGED` is a limits adjustment, so a plan change clears it. (Comparing the firm's limits to its plan's would mark every firm on a plan after a catalogue edit, A3.) (2) **Deactivating or reactivating** a firm user or a staff member logs **`STATE_CHANGE`**, `entityType: "user"` (with the firm's `firmId`) or `"platform_user"` (`firmId` null). Entity types follow the ledger fixtures' lowercase convention (`firm`, `invite`, `platform_user`; plan catalogue edits `plan`) |
@@ -506,7 +506,7 @@ As v1 Phase C, typed on `Principal`:
 - `useCan`, `<Can>`; scope helpers `scopeCandidates`, `scopeApplications`, `scopeLedger`,
   `scopeFollowups`.
 - Replace the **11** `role !== "VIEWER"` checks and **8** BDE filters (file:line list in
-  `CURRENT_STATE.md` §5); delete the unreachable analytics BDE branch.
+  `docs/archive/CURRENT_STATE.md` §5); delete the unreachable analytics BDE branch.
 - Route access becomes `can(principal, "route.view", route)`.
 - Exit: `grep -rE "role (===|!==)"` returns nothing outside `src/lib/auth/` and the registry;
   table test covers every principal × action.
@@ -617,7 +617,7 @@ support-required screen (the suspended screen has its own Sign out). Tests sign 
 Docs that also mention the switcher, to update with L (not history files): `docs/01` (auth section,
 env var), `docs/05` (topbar contents), `docs/04` §1 (topbar diagram: `[role] [me]`), `docs/03`
 (§3.1 notes), `docs/integration/05-analytics.md` (its check says "via the role switcher").
-History (`docs/06`, `docs/CURRENT_STATE.md`, `docs/archive/`, the A/A2/T rows above) stays as written.
+History (`docs/06`, `docs/archive/` (including `CURRENT_STATE.md`), the A/A2/T rows above) stays as written.
 
 ---
 

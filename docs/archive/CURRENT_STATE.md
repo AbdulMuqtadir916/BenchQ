@@ -1,5 +1,9 @@
 # Current state
 
+> **Archived 2026-10-26.** A snapshot of the code as of 2026-10-19, kept for history. It describes the mock
+> sign-in, the `localStorage` session and the demo-data store, all of which F6 removed. For the present:
+> `CLAUDE.md`, `docs/07-ROUTES-AND-RBAC.md` and `docs/integration/07-auth-and-tenancy.md`; the code is the source of truth.
+
 > **Out of date (2026-10-19, before Phase B and the backend onboarding work #29–#47).** For what is done and
 > what is next, read `CLAUDE.md` "Current phase" and the board in `docs/integration/README.md`. This snapshot is
 > regenerated at the end of the foundation.

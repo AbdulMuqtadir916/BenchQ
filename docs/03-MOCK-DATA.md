@@ -137,10 +137,8 @@ they read, through `signInAs(accountId)` (`src/mocks/sign-in-as.ts`, tests only)
 `["*"]`), then load the screen with an empty cache (e.g. after a principal switch); set it to `[]`
 and press Retry to recover. Inert in production builds.
 
-**The session survives a full page load** and is shared by tabs (docs/07 Q27): the mock backend keeps
-the signed-in account's id in `localStorage` (`benchq.session`), standing in for the session cookie. Mock
-data persists too (§3.3), so an account created by a change (an accepted invite) survives reloads; a
-stored account the data no longer has (after a reset) is dropped and the visitor is signed out.
+**The session is the backend's cookie** (F6): it survives a reload and is shared by tabs. Mock data persists
+separately (§3.3).
 
 ### 3.2 Seed accounts (Q25–Q27, Phase L) — in effect
 

@@ -2,6 +2,7 @@
 
 **Project:** BenchQ · frontend only
 **Version:** 1.0 · September 2026
+**Status:** complete. Every phase below is done; foundation and integration status is in `docs/integration/README.md`.
 
 Nine phases. Each has a scope, a definition of done, and exit criteria you can actually check.
 **Do not start a phase until the previous one's exit criteria pass.** The temptation on a UI build
