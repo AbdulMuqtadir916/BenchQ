@@ -164,7 +164,7 @@ export type Session = z.infer<typeof SessionSchema>;
 > **Implemented in Phase T PR 1 (T1–T3):** the Zod schemas (`src/lib/schemas/tenancy.ts`, `firmId` on
 > the records below, `Firm` additions), the derived usage (`src/lib/derive/tenancy.ts`) and the fixtures
 > (four firms, plans, invites, a platform admin). **Phase T PR 2 (T4–T5):** the firm session
-> (`FirmSessionSchema`: principal + user + firm) in the client store, the dev principal switcher, the query
+> (`FirmSessionSchema`: principal + user + firm) in the client store, the dev principal switcher (removed in Phase L, Q25), the query
 > key factory (`src/lib/query/keys.ts`, every firm key starts with `firmId`) and `firmId` on every adapter
 > and mock. **Not yet:** platform sessions (Phase P) and firm URLs (`[firm]`, T6). Five rules the owner did not state
 > but approved on 2026-10-16 are marked **(approved 2026-10-16)** and listed under *Implications*.

@@ -167,7 +167,7 @@ dependencies are live; only switching the adapter to live waits.
 
 | # | Foundation step | Depends on | Owner | Status |
 |---|---|---|---|---|
-| 00 | [Monorepo + proxy](./00-foundation.md) (Part A); Parts B/C are replaced by F3/F6 | — | — | Part A done |
+| 00 | [Monorepo + proxy](./00-foundation.md) (Part A; the old Parts B/C are in `docs/archive/`, replaced by F3/F6) | — | — | Done |
 | F1 | Alembic baseline | 00 | — | Done (#29, #30) |
 | F2 | Auth + tenancy tables; `firm_id` on existing tables, backfilled to a default firm | F1 | Abdul | F2a tables done (#33); F2b (`firm_id`, `firm_jobs`, migration 0005) built; F2c settings classified (`backend/settings_scope.py`) |
 | F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | Abdul, Uzair | Done (#34, #36; support views: issue #56) |
