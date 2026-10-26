@@ -12,4 +12,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Read `CLAUDE.md` first and follow it: it is the contract for every agent in this repo, not only Claude. Then
 `CONTRIBUTING.md` for branches and PRs, and, for backend integration work, `docs/integration/README.md` and the
-module file you were assigned.
+module file you were assigned. Setup problems: `docs/troubleshooting.md`.
