@@ -10,11 +10,10 @@ shell, white workspace, monospace tags, subtly raised gradient primary buttons, 
 
 ## Scope — read this first
 
-**Current focus: production-grade routes and access control, then the Super Admin flow.**
+**Current focus: connecting the modules to the backend, one track at a time.**
 
-The UI prototype is built (all screens render on mocks) and was demoed to leads. BenchQ is now
-moving to a production app. Before more backend work, the route tree, guards, layouts and
-permissions must be final-shape for a **multi-tenant** product with two tiers:
+The UI is built (every screen renders) and the route tree, guards, layouts and permissions are final-shape for a
+**multi-tenant** product with two tiers:
 
 - **Platform tier** — `PLATFORM_ADMIN` (UI label "Super Admin"; BenchQ staff): onboards client
   firms, manages plans/seats, suspends firms, supports firms through a read-only support view,
@@ -26,13 +25,11 @@ permissions must be final-shape for a **multi-tenant** product with two tiers:
 permission policy are production structure from day one. Routes, roles and permissions are owned
 by `docs/07-ROUTES-AND-RBAC.md`.
 
-**Backend integration runs foundation first.** The backend is JobNavigator (FastAPI, Python) in `backend/`. It has
-per-user cookie sessions and auth on every endpoint (`backend/auth/access.py`, 07 Q37–Q38), but its existing data is
-not firm-scoped yet, and it has no candidates, evidence or claims. The foundation (F2b–F7 in
-`docs/integration/07-auth-and-tenancy.md` §3) comes first. The module tracks (Ledger, Jobs, Candidates, then
-Applications, Resumes, Analytics) start after it, and every firm-owned record carries `firm_id`. Integration rules,
-when you do integration work, start at `docs/integration/README.md`. How the team works (branches, reviews,
-migrations) is in `CONTRIBUTING.md`.
+**Backend integration.** The backend is JobNavigator (FastAPI, Python) in `backend/`: per-user cookie sessions, auth on
+every endpoint (`backend/auth/access.py`, 07 Q37–Q38), and `firm_id` on every firm-owned record. The foundation
+(F1–F7 in `docs/integration/07-auth-and-tenancy.md` §3) is done. The module tracks (Ledger, Jobs, Candidates, then
+Applications, Resumes, Analytics) are next; the backend has no candidates, evidence or claims yet. Start integration
+work at `docs/integration/README.md`. How the team works (branches, reviews, migrations) is in `CONTRIBUTING.md`.
 
 Each data module is served either by its mock (`src/mocks/`) or by the backend, decided **only** in
 its adapter (`src/lib/api/<module>.ts`). Swapping a module to the backend must never require
@@ -100,7 +97,7 @@ Details and the full route map: `docs/07-ROUTES-AND-RBAC.md`.
    | Components and props | `docs/05-COMPONENTS.md` |
    | Original UI build phases (complete) | `docs/06-IMPLEMENTATION-PLAN.md` |
    | Connecting a module to the backend | `docs/integration/` |
-   | Current repo state (generated snapshot) | `docs/CURRENT_STATE.md` |
+   | Setup, and what to do when it fails | `README.md` Quick start, `docs/troubleshooting.md` |
    | Colour, type, spacing, motion | `design.md` |
 
 3. **Do not work ahead into a later phase.** If a task needs something from a later phase, say so
@@ -193,17 +190,9 @@ Respect `prefers-reduced-motion`.
 
 ## Commands
 
-Node 22+ (`.nvmrc`); Vitest won't start on older Node. On Apple silicon, `node -p process.arch`
-must print `arm64`.
-
-```bash
-pnpm dev          # dev server (reads .env.local)
-pnpm build        # production build
-pnpm typecheck    # tsc --noEmit
-pnpm lint         # eslint
-pnpm test         # vitest
-docker compose up -d db backend   # backend + Postgres (only for integration work)
-```
+Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the backend, so run
+`docker compose up -d db backend` alongside `pnpm dev`. Setup and failures: `README.md` Quick start,
+`docs/troubleshooting.md`.
 
 ---
 
@@ -255,62 +244,14 @@ A stopped task with a clear question beats a confident wrong implementation.
 
 ## Current phase
 
-> **Update this section as you progress.** It's the first thing the next session reads.
+> Update this section when a phase ends. Status lives in the board, decisions in the 07 docs.
 
-**Phase: Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md` §3, reordered by 07 Q38 on
-2026-10-21). **The onboarding flow is done end to end on the real backend** (#32–#41, then #42–#46): a Super Admin
-creates a firm and its OWNER invite, the owner accepts and signs in at `/[firm]`, invites MANAGER / BDE / VIEWER, and
-they accept and sign in. The session is always the backend's (F6): sign-in, the team, invites, `/admin` and the ledger are live, and
-the other modules run on mocks under the real signed-in user. **Done since:** F2b (`firm_id` on the existing tables, `firm_jobs`), F2c (platform vs per-firm settings),
-the support-view endpoints (issue #56), F7 (the isolation test over every route, #61), the legacy schema path
-(issue #62), the signed-out redirect in `src/proxy.ts` (issue #63), and the principal read on the server with real 404 / 403
-(issue #64), and live by default with the mock sign-in removed (issue #65). **F6 is done**: the exit check on a production
-build passed on 2026-10-26 (issue #66, recorded in 07). **Next:** the module tracks
- (`docs/integration/README.md` board). Phase B fixes stay **paused** (PRs 3–14; W26 of PR 11 done in #46). Repo snapshot:
-`docs/CURRENT_STATE.md` (2026-10-19, predates Phase B).
+**Foundation done (F1–F7, 2026-10-26).** The session, the team, invites, `/admin` and the ledger run on the
+backend. Every other module runs on mock data under the real signed-in user. Phase B fix PRs 3–14 and Phase S
+stay paused.
 
-| Step | Status |
-|---|---|
-| UI build phases 0–8 (`docs/06`) — all screens on mocks | Done |
-| Integration Module 00 Part A — backend in repo, proxy verified | Done |
-| 07 Phases A, A2, T0 — registry, guards, access/error screens, `hrefFor`, route groups, no `/sign-up` | Done |
-| 07 Phase T — tenancy in the frontend: approved contracts, `Principal` session, `/[firm]` URLs, firm-scoped mocks and query keys | Done (exit check in 07) |
-| Dashboard error states (docs/04 §13) | Done (#10) |
-| 07 Phase L — sign-in with seeded accounts, no principal switcher, session shared across tabs | Done (#16) |
-| Demo data persists in the browser; "Reset demo data" on `/admin/system` (docs/03 §3.3) | Done (#17) |
-| 07 Phase P — `/admin/*` screens, invites and `/invite/[token]`, read-only support view, ⌘K for admins, platform tests | Done (#12, #13, #18, #20, #21; exit check in 07) |
-| `docs/CURRENT_STATE.md` regenerated | Done (2026-10-19) |
-| 07 Phase C — the permission policy (firm, team and platform actions, `<Can>`, route access via `can`, full principal × action table test, exit grep) | Done (#23) |
-| 07 Phase B — UI completion audit (`docs/AUDIT-PHASE-B.md`) | Audit done (#24, #25). Fix PRs 1–2 done (#26 real create, #27 read-only leaks + `JobMark`); W26 (sign-in redirect when signed in, Q35) done in #46; **PRs 3–14 otherwise paused** (2026-10-21) |
-| **Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md`): decisions D1–D4, D2, sessions, jobs pool (Q37); onboarding first (Q38) | F1 + 0002 (#29, #30), CI (#31). Onboarding PRs 1–7 done: tables (#33), sign-in + auth on every endpoint (#34), policy table (#35), Super Admin firms + invites (#36, #39), OWNER member invites (#37), first-admin command + demo seed (#38), frontend live opt-in (#40, #41). Fixes from testing: invite guards (#42, Q39), `reset_password` (#43). Support views on the backend (issue #56). F2b (#52), F2c (#57–#59), F7 isolation test (#61), legacy schema path deleted (issue #62), signed-out redirect (issue #63), server-side principal with real 404 / 403 (issue #64), live by default and the mock sign-in removed (issue #65), F6 exit check passed (issue #66). **Next: the module tracks** |
-| 07 Phase S — Super Admin flow polish (UI-first), including building `/admin/system` and AI spend from docs/02 §3.2 | Planned, after B resumes |
-| 07 Phase M — firm-side invite flow (OWNER invites members) | Done: M1, M2 (#37, #41), M3 "Seats used" (#44), M4 ledger and M5 tests (#37, #41). Deactivate and role change come later |
-| System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Approved (Q33, Q34), not built — built in Phase S |
-| Module tracks (01 Ledger, 02 Jobs, Candidates, Admin API, then 03 Applications, 04 Resumes + claims, 05 Analytics) and 07 Phase D | After the foundation, whose last step is F6 (`docs/integration/README.md` board) |
+**Next:** the module tracks. Owners, order and dependencies: the board in `docs/integration/README.md`.
 
-**Decided (07 §0):** firm in the URL (Q8); one firm per user (Q9); read-only support view, no
-impersonation (Q10); role name `PLATFORM_ADMIN`, label "Super Admin" (Q7); invite-only, no public
-sign-up (Q11); no role in URLs — route groups `(workspace)` / `(manage)` plus per-role view files
-(Q14); only OWNER manages members, MANAGER reads the team and assigns candidates (Q15).
-**Contracts approved 2026-10-14 (07 §0 Q16–Q21; shapes in `docs/02` §3.1):** seat = every active user
-plus pending invites; active candidate = `ON_BENCH` / `INTERVIEWING` / `OFFER`; a plan is a template whose
-limits are *copied* onto the firm; over a limit, block new additions and never auto-remove; slug rules
-and `contactPhone` only on `Firm`; invites last 7 days, exactly one OWNER per firm, `firmId` null ⇔
-`PLATFORM_ADMIN`; support view is 60 minutes with no extension; firm events carry `firmId`; no
-`PlanChange` entity; agent and tailoring runs are firm-scoped.
-**Since then:** slug-less URLs are not-found (Q22); Phase M comes after S (Q23); a resend logs another
-`INVITE_SENT` "Invite resent to …" (Q24); everyone signs in on `/sign-in` with seeded accounts, no
-principal switcher (Q25); `/invite/[token]` belongs to P4 (Q26); the session is shared across tabs (Q27);
-an invite to a SUSPENDED firm is blocked and stays PENDING (Q28); the Super Admin decisions of docs/04
-§14.11 — `/admin/system` placeholder, custom limits, view an empty ONBOARDING firm, suspend ACTIVE only,
-stalled onboarding at 7 days, over-limit block visible-disabled-with-reason (§0's second exception) (Q29);
-"custom limits" derived from the ledger, (de)activation logs `STATE_CHANGE`, lowercase entity types (Q30);
-`Invite.inviteeName` (Q31); a Phase C slice came into P4 (Q32); system contracts' first answers — USD
-micro-dollars, reportable health checks only, firm attachment, retention (Q33); the rest — health history
-with 7/30-day uptime, backend pricing, the AI purpose list, spend Super Admin only, no budgets yet, IST
-periods, billed failed calls count (Q34).
-**Since then (2026-10-21):** backend auth decisions (Q37); onboarding on the real backend first, auth on every
-endpoint, the shared key removed in PR 2, invite links shown once, seat rule for suspended firms, table conventions (Q38).
-**2026-10-22:** an invite link opened in a signed-in browser asks to sign out first, the accepted screen names the
-email, no self-service password reset until email exists (staff use `reset_password`) (Q39).
-**Still open:** nothing. docs/02 §3.2 is approved, not built.
+**Decisions** (Q1–Q39: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
+rules) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
+The system contracts in `docs/02` §3.2 are approved and not built.
