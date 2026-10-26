@@ -9,6 +9,16 @@ import { ApiError } from "./client";
 
 type QueryValue = string | number | boolean | null | undefined;
 
+/**
+ * Where a client sends its requests. The default is the browser's: relative paths, the same origin, the
+ * `bq_session` cookie attached by `credentials: "include"`. A server render (src/lib/server/) has no
+ * origin and no cookie jar, so it passes the backend's own URL and the incoming request's cookie.
+ */
+export interface HttpTarget {
+  baseUrl?: string;
+  headers?: Record<string, string>;
+}
+
 interface RequestOptions {
   query?: Record<string, QueryValue>;
   body?: unknown;
@@ -55,14 +65,17 @@ async function toApiError(response: Response): Promise<ApiError> {
   return new ApiError(message, STATUS_CODES[response.status] ?? `HTTP_${response.status}`, response.status);
 }
 
-async function request<T>(method: string, path: string, schema: ZodType<T>, options: RequestOptions = {}): Promise<T> {
+async function request<T>(target: HttpTarget, method: string, path: string, schema: ZodType<T>, options: RequestOptions = {}): Promise<T> {
   const hasBody = options.body !== undefined;
   let response: Response;
   try {
-    response = await fetch(buildUrl(path, options.query), {
+    const headers = { ...(hasBody ? { "Content-Type": "application/json" } : {}), ...target.headers };
+    response = await fetch(`${target.baseUrl ?? ""}${buildUrl(path, options.query)}`, {
       method,
       credentials: "include",
-      headers: hasBody ? { "Content-Type": "application/json" } : undefined,
+      // A server read is never cached: it is somebody's session.
+      cache: target.baseUrl ? "no-store" : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body: hasBody ? JSON.stringify(options.body) : undefined,
       signal: options.signal,
     });
@@ -84,11 +97,13 @@ async function request<T>(method: string, path: string, schema: ZodType<T>, opti
   return parsed.data;
 }
 
-export const http = {
-  get: <T>(path: string, schema: ZodType<T>, options?: Omit<RequestOptions, "body">) =>
-    request("GET", path, schema, options),
-  post: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => request("POST", path, schema, options),
-  patch: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => request("PATCH", path, schema, options),
-  delete: <T>(path: string, schema: ZodType<T>, options?: Omit<RequestOptions, "body">) =>
-    request("DELETE", path, schema, options),
-};
+export function createHttp(target: HttpTarget = {}) {
+  return {
+    get: <T>(path: string, schema: ZodType<T>, options?: Omit<RequestOptions, "body">) => request(target, "GET", path, schema, options),
+    post: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => request(target, "POST", path, schema, options),
+    patch: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => request(target, "PATCH", path, schema, options),
+    delete: <T>(path: string, schema: ZodType<T>, options?: Omit<RequestOptions, "body">) => request(target, "DELETE", path, schema, options),
+  };
+}
+
+export const http = createHttp();

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isLive } from "@/lib/api/config";
 import { devRoutesEnabled } from "@/lib/routes/registry";
 import { SESSION_COOKIE, signedOutRedirect } from "@/lib/routes/proxy-access";
+import { PATH_HEADER } from "@/lib/server/path-header";
 
 /**
  * Next.js 16 middleware. Sends a signed-out visitor to sign-in before any page renders. UX, not security:
@@ -14,7 +15,11 @@ export function proxy(request: NextRequest) {
     live: isLive("session"),
     devRoutes: devRoutesEnabled(),
   });
-  return target ? NextResponse.redirect(new URL(target, request.url)) : NextResponse.next();
+  if (target) return NextResponse.redirect(new URL(target, request.url));
+  // A layout can't see its own URL; the server gates (src/lib/server/principal.ts) read it from here.
+  const headers = new Headers(request.headers);
+  headers.set(PATH_HEADER, `${pathname}${search}`);
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {

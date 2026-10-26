@@ -668,7 +668,7 @@ both halves rely on, arrives in P4 (Q26); until then nothing in the UI accepts a
    by `firmId` and checks the principal.
 2. Server-readable session cookie; the frontend reads the principal server-side.
 3. `src/proxy.ts` for optimistic redirects only (signed out → `/sign-in`).
-4. `forbidden()` + `forbidden.tsx`; firm and admin layouts check the principal on the server. Until then the gates run in the browser, so a not-found under `/[firm]/…` or `/admin/…` (unknown slug, another firm, a non-admin at `/admin`, an unknown admin URL) answers **HTTP 200** with the not-found screen; the 404 status arrives with this step.
+4. `forbidden()` + `forbidden.tsx`; firm and admin layouts check the principal on the server. **Built (F6, issue #64), while the session is live:** the `/[firm]` and `/admin` layouts ask `src/lib/server/principal.ts`, which decides with `src/lib/server/gate.ts` (the same `firmOutcome` / `platformOutcome` and the policy). Signed out or a stale cookie → redirect to sign-in; an unknown slug, another firm, a path the registry doesn't know, or a non-admin at `/admin` → **404**; a route the role may not open → **403** (`forbidden()`, `src/app/forbidden.tsx`, no shell). A suspended firm, the support interstitial and a backend error stay **200** in place. A layout doesn't re-run on a client-side navigation, so the browser gates stay for those; on the mock session they decide everything and the status is still **200**.
 5. Client `scope*` helpers deleted. The mock sign-in (seeded accounts, demo password, the session kept
    in `sessionStorage`) is replaced by the backend's users, passwords and session cookie. (The dev
    principal switcher was already removed in Phase L, Q25.)

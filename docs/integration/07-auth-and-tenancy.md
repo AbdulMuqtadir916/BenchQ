@@ -7,8 +7,8 @@ and read lists, Phase M's backend, and F6 for the session, invites, team and adm
 (`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **2026-10-23:** F2b built (migration 0005, see
 F2 below). **2026-10-24:** the support-view endpoints built (issue #56): F3 is done, and so are F4's support-view
 reads. **2026-10-24:** F2c done (#57–#59); F7 built: the isolation test runs over every route (#61, see F7 below);
-the legacy schema path deleted (issue #62); the signed-out redirect in `src/proxy.ts` (issue #63). **Still to do:** the rest of F6
-(live by default, mock sign-in removed, the session read on the server; issues #64–#66).
+the legacy schema path deleted (issue #62); the signed-out redirect in `src/proxy.ts` (issue #63); the principal read on the server (issue #64). **Still to do:** the rest of F6
+(live by default, mock sign-in removed; issues #65–#66).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
 
@@ -354,6 +354,11 @@ status and scores are shared across firms until the Jobs track's `JobMark` (Q36)
   session (UX; the backend's 401 is the enforcement), and runs only while `session` is a live module, so mock mode
   keeps working until live is the default (issue #65 drops that condition). The rule is `signedOutRedirect()` in
   `src/lib/routes/proxy-access.ts`.
+- **The principal on the server (issue #64, built):** the firm and admin layouts read `bq_session` off the request and ask
+  `GET /api/auth/me` (and `/api/firms/by-slug/…`) through `createHttp()` in `http.ts`, the one place that calls `fetch`.
+  `src/lib/server/gate.ts` decides (pure, table-tested): redirect to sign-in, real 404, real 403, or render. `src/proxy.ts`
+  passes the path in `x-pathname`. `forbidden()` needs `experimental.authInterrupts`. Live mode only, like the redirect;
+  #65 drops that condition. The browser gates stay for client-side navigation: UX, with the backend as enforcement.
 - **Delete the legacy schema path** (F1's list): `create_tables`, `run_migrations`,
   `migrate_h1b_to_visa_cache`, `backend/migrations/legacy_bootstrap.py` and the stamp branch in
   `db_schema.py`. **Done (issue #62)**, after every teammate started the backend once. `db_upgrade` now stops on a
