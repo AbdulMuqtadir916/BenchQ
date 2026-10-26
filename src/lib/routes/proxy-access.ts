@@ -12,8 +12,6 @@ import { hrefFor, matchRoute } from "./registry";
 export const SESSION_COOKIE = "bq_session";
 
 export interface SignedOutOptions {
-  /** `isLive("session")`: the cookie only exists when the backend owns the session. On mocks it is `localStorage`. */
-  live: boolean;
   /** `devRoutesEnabled()`: `/dev/*` stays open only where it is served. */
   devRoutes: boolean;
 }
@@ -24,7 +22,7 @@ export interface SignedOutOptions {
  * a missing firm or page from a real one (07 §1: never confirm existence).
  */
 export function signedOutRedirect(pathname: string, search: string, hasSession: boolean, options: SignedOutOptions): string | null {
-  if (!options.live || hasSession) return null;
+  if (hasSession) return null;
   const route = matchRoute(pathname);
   if (route?.area === "public") return null;
   if (route?.area === "dev" && options.devRoutes) return null;

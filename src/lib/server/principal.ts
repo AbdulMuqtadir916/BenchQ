@@ -8,6 +8,7 @@ import { SESSION_COOKIE } from "@/lib/routes/proxy-access";
 import { hrefFor } from "@/lib/routes/registry";
 import type { Session } from "@/lib/schemas/session";
 import type { FirmLookup } from "@/lib/tenancy/firm-outcome";
+import { backendUrl } from "./backend-url";
 import { firmGate, platformGate, type ServerGate } from "./gate";
 import { PATH_HEADER } from "./path-header";
 
@@ -19,7 +20,7 @@ import { PATH_HEADER } from "./path-header";
 
 const serverHttp = async () => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  return createHttp({ baseUrl: process.env.BACKEND_URL, headers: token ? { cookie: `${SESSION_COOKIE}=${token}` } : undefined });
+  return createHttp({ baseUrl: backendUrl(), headers: token ? { cookie: `${SESSION_COOKIE}=${token}` } : undefined });
 };
 
 /** Who is signed in, or null when there is no session or the backend no longer knows it. */

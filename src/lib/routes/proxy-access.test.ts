@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ROUTES, hrefFor } from "./registry";
 import { signedOutRedirect } from "./proxy-access";
 
-const live = { live: true, devRoutes: false };
+const live = { devRoutes: false };
 const signedOut = (path: string, search = "", options = live) => signedOutRedirect(path, search, false, options);
 
 describe("signedOutRedirect", () => {
@@ -34,14 +34,10 @@ describe("signedOutRedirect", () => {
 
   it("opens /dev only where dev routes are served", () => {
     expect(signedOut("/dev/design-system")).not.toBeNull();
-    expect(signedOut("/dev/design-system", "", { live: true, devRoutes: true })).toBeNull();
+    expect(signedOut("/dev/design-system", "", { devRoutes: true })).toBeNull();
   });
 
   it("lets a request with a session cookie through", () => {
     expect(signedOutRedirect("/gsc/dashboard", "", true, live)).toBeNull();
-  });
-
-  it("does nothing while the session is on mocks", () => {
-    expect(signedOut("/gsc/dashboard", "", { live: false, devRoutes: false })).toBeNull();
   });
 });

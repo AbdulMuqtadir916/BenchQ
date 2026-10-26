@@ -3,7 +3,6 @@ import type { Candidate } from "@/lib/schemas/candidate";
 import type { Firm, User } from "@/lib/schemas/session";
 import type { Invite, Plan, PlatformUser } from "@/lib/schemas/tenancy";
 import { arrayOf, notLiveYet } from "./client";
-import { isLive } from "./config";
 import { toBackendId } from "./dto/demo-ids";
 import {
   CreatedFirmDto, FirmDto, InviteDto, InviteWithTokenDto, LedgerEntryDto, PlanDto, PlatformUserDto, UserDto,
@@ -11,7 +10,7 @@ import {
 } from "./dto/session";
 import { http } from "./http";
 
-const mock = () => import("@/mocks/platform").then((m) => m.platformMock);
+const usageMock = () => import("@/mocks/usage").then((m) => m.candidateUsageMock);
 
 /** docs/04 §14.4 Create firm. The owner's name becomes the invite's `inviteeName` (07 Q31). */
 export interface CreateFirmInput {
@@ -73,7 +72,11 @@ const live = {
   },
 };
 
-const on = () => isLive("session");
+/** An admin action the backend has no endpoint for yet: the screen shows "Not available on the live backend yet". */
+const unavailable = <A extends unknown[], R>() => async (...args: A): Promise<R> => {
+  void args;
+  return notLiveYet();
+};
 
 /**
  * The platform tier (docs/07 §2.3, docs/04 §14): PLATFORM_ADMIN only, across every firm. Not
@@ -81,45 +84,45 @@ const on = () => isLive("session");
  */
 export const platformApi = {
   firms: {
-    list: async (): Promise<Firm[]> => (on() ? live.firms.list() : (await mock()).firms.list()),
-    get: async (firmId: string): Promise<Firm> => (on() ? live.firms.get(firmId) : (await mock()).firms.get(firmId)),
-    create: async (input: CreateFirmInput): Promise<Firm> => (on() ? live.firms.create(input) : (await mock()).firms.create(input)),
-    update: async (firmId: string, input: FirmProfileInput): Promise<Firm> => (on() ? notLiveYet() : (await mock()).firms.update(firmId, input)),
-    changeSlug: async (firmId: string, slug: string): Promise<Firm> => (on() ? notLiveYet() : (await mock()).firms.changeSlug(firmId, slug)),
-    suspend: async (firmId: string, reason: string): Promise<Firm> => (on() ? notLiveYet() : (await mock()).firms.suspend(firmId, reason)),
-    reactivate: async (firmId: string): Promise<Firm> => (on() ? notLiveYet() : (await mock()).firms.reactivate(firmId)),
-    changePlan: async (firmId: string, planId: string): Promise<Firm> => (on() ? notLiveYet() : (await mock()).firms.changePlan(firmId, planId)),
-    adjustLimits: async (firmId: string, limits: LimitsInput): Promise<Firm> => (on() ? notLiveYet() : (await mock()).firms.adjustLimits(firmId, limits)),
+    list: async (): Promise<Firm[]> => live.firms.list(),
+    get: async (firmId: string): Promise<Firm> => live.firms.get(firmId),
+    create: async (input: CreateFirmInput): Promise<Firm> => live.firms.create(input),
+    update: unavailable<[string, FirmProfileInput], Firm>(),
+    changeSlug: unavailable<[string, string], Firm>(),
+    suspend: unavailable<[string, string], Firm>(),
+    reactivate: unavailable<[string], Firm>(),
+    changePlan: unavailable<[string, string], Firm>(),
+    adjustLimits: unavailable<[string, LimitsInput], Firm>(),
   },
   users: {
-    list: async (firmId?: string): Promise<User[]> => (on() ? live.users.list(firmId) : (await mock()).users.list(firmId)),
-    deactivate: async (userId: string): Promise<User> => (on() ? notLiveYet() : (await mock()).users.deactivate(userId)),
-    reactivate: async (userId: string): Promise<User> => (on() ? notLiveYet() : (await mock()).users.reactivate(userId)),
+    list: async (firmId?: string): Promise<User[]> => live.users.list(firmId),
+    deactivate: unavailable<[string], User>(),
+    reactivate: unavailable<[string], User>(),
   },
   invites: {
     /** Omit the firm for every invite; `null` for the platform team's. */
-    list: async (firmId?: string | null): Promise<Invite[]> => (on() ? live.invites.list(firmId) : (await mock()).invites.list(firmId)),
-    resend: async (inviteId: string): Promise<Invite> => (on() ? live.invites.resend(inviteId) : (await mock()).invites.resend(inviteId)),
-    revoke: async (inviteId: string): Promise<Invite> => (on() ? live.invites.revoke(inviteId) : (await mock()).invites.revoke(inviteId)),
+    list: async (firmId?: string | null): Promise<Invite[]> => live.invites.list(firmId),
+    resend: async (inviteId: string): Promise<Invite> => live.invites.resend(inviteId),
+    revoke: async (inviteId: string): Promise<Invite> => live.invites.revoke(inviteId),
     /** The live token of a pending invite: the link is /invite/[token] (07 P4). */
-    link: async (inviteId: string): Promise<{ token: string }> => (on() ? live.invites.link(inviteId) : (await mock()).invites.link(inviteId)),
+    link: async (inviteId: string): Promise<{ token: string }> => live.invites.link(inviteId),
   },
   plans: {
-    list: async (): Promise<Plan[]> => (on() ? live.plans.list() : (await mock()).plans.list()),
-    create: async (input: PlanInput): Promise<Plan> => (on() ? notLiveYet() : (await mock()).plans.create(input)),
-    update: async (planId: string, input: PlanInput): Promise<Plan> => (on() ? notLiveYet() : (await mock()).plans.update(planId, input)),
-    setActive: async (planId: string, isActive: boolean): Promise<Plan> => (on() ? notLiveYet() : (await mock()).plans.setActive(planId, isActive)),
+    list: async (): Promise<Plan[]> => live.plans.list(),
+    create: unavailable<[PlanInput], Plan>(),
+    update: unavailable<[string, PlanInput], Plan>(),
+    setActive: unavailable<[string, boolean], Plan>(),
   },
   audit: {
-    list: async (): Promise<LedgerEntry[]> => (on() ? live.audit.list() : (await mock()).audit.list()),
+    list: async (): Promise<LedgerEntry[]> => live.audit.list(),
   },
   team: {
-    list: async (): Promise<PlatformUser[]> => (on() ? live.team.list() : (await mock()).team.list()),
-    invite: async (email: string): Promise<Invite> => (on() ? notLiveYet() : (await mock()).team.invite(email)),
-    deactivate: async (userId: string): Promise<PlatformUser> => (on() ? notLiveYet() : (await mock()).team.deactivate(userId)),
+    list: async (): Promise<PlatformUser[]> => live.team.list(),
+    invite: unavailable<[string], Invite>(),
+    deactivate: unavailable<[string], PlatformUser>(),
   },
   candidates: {
-    /** Firm and status of every candidate, for usage counts (A2). Candidates are still mocks, even on a live session. */
-    usage: async (): Promise<CandidateUsageRow[]> => (await mock()).candidates.usage(),
+    /** Firm and status of every candidate, for usage counts (A2). Candidates are still mocks, read under the real signed-in principal. */
+    usage: async (): Promise<CandidateUsageRow[]> => (await usageMock()).usage(),
   },
 };

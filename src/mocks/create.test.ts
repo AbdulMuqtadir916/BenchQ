@@ -4,7 +4,7 @@ import type { CaptureJob } from "@/lib/schemas/job";
 
 /**
  * Phase B fix PR 1 (audit B1, B2): New candidate and Capture job save for real. Both persist across a
- * reload, write their ledger CREATE, follow the policy (a BDE's candidate is their own; a VIEWER and a
+ * reload, follow the policy (a BDE's candidate is their own; a VIEWER and a
  * support view are refused, write-authorization.test.ts), and a new candidate respects the plan's
  * candidate limit (A4). Each "reload" is a fresh set of mock modules over the same stub storage.
  */
@@ -20,15 +20,13 @@ class StubStorage {
 type Globals = { __BENCHQ_DEMO_STORAGE__?: Storage | null };
 const g = globalThis as Globals;
 const FIRM = "firm_hts";
-const EMAIL = { imran: "imran@hyderabad-tech-staffing.benchq.test", adnan: "adnan@hyderabad-tech-staffing.benchq.test", lakshmi: "lakshmi@secunderabad-talent.benchq.test", sana: "sana@admin.benchq.test" };
+const EMAIL = { imran: "user_imran", adnan: "user_adnan", lakshmi: "user_lakshmi", sana: "padm_sana" }; // seeded account ids (./sign-in-as.ts)
 
 async function load(email: string | null) {
   vi.resetModules();
-  const [db, auth, candidates, jobs, ledger, platform] = await Promise.all([
-    import("./db"), import("./auth"), import("./candidates"), import("./jobs"), import("./ledger"), import("./platform"),
-  ]);
-  if (email) auth.signInWithPassword(email, auth.DEMO_PASSWORD);
-  return { db, auth, candidates: candidates.candidatesMock, allCandidates: candidates.allCandidates, jobs: jobs.jobsMock, DuplicateJobError: jobs.DuplicateJobError, ledger: ledger.allLedger, platform: platform.platformMock };
+  const [db, signIn, candidates, jobs] = await Promise.all([import("./db"), import("./sign-in-as"), import("./candidates"), import("./jobs")]);
+  if (email) await signIn.signInAs(email);
+  return { db, signInAs: signIn.signInAs, candidates: candidates.candidatesMock, allCandidates: candidates.allCandidates, jobs: jobs.jobsMock, DuplicateJobError: jobs.DuplicateJobError };
 }
 
 const candidate = (overrides: Partial<CreateCandidate> = {}): CreateCandidate => ({
@@ -52,17 +50,15 @@ afterEach(() => {
 });
 
 describe("New candidate", () => {
-  it("an OWNER adds one: ON_BENCH, assigned to the BDE chosen, CREATE in the ledger, still there after a reload", async () => {
+  it("an OWNER adds one: ON_BENCH, assigned to the BDE chosen, still there after a reload", async () => {
     const m = await load(EMAIL.imran);
     const created = await m.candidates.create(FIRM, candidate({ assignedUserId: "user_adnan" }));
     expect(created).toMatchObject({ firmId: FIRM, fullName: "Nisha Verma", status: "ON_BENCH", workAuth: "H1B", assignedUserIds: ["user_adnan"], primaryUserId: "user_adnan", primaryRole: "Data Engineer" });
     expect((await m.candidates.list(FIRM))[0]?.id).toBe(created.id);
-    expect(m.ledger[0]).toMatchObject({ firmId: FIRM, action: "CREATE", entityType: "candidate", entityId: created.id, actorUserId: "user_imran", actorType: "USER", summary: "Added candidate Nisha Verma, assigned to Adnan Khan" });
     m.db.flush();
 
     const later = await load(EMAIL.imran);
     expect(await later.candidates.byId(FIRM, created.id)).toMatchObject({ fullName: "Nisha Verma" });
-    expect(later.ledger[0]?.entityId).toBe(created.id);
   });
 
   it("an OWNER may leave it unassigned, and may only assign an active BDE of the firm", async () => {
@@ -76,20 +72,17 @@ describe("New candidate", () => {
     const m = await load(EMAIL.adnan);
     const created = await m.candidates.create(FIRM, candidate());
     expect(created).toMatchObject({ assignedUserIds: ["user_adnan"], primaryUserId: "user_adnan" });
-    expect(m.ledger[0]).toMatchObject({ actorUserId: "user_adnan", summary: "Added candidate Nisha Verma, assigned to Adnan Khan" });
     await expect(m.candidates.create(FIRM, candidate({ assignedUserId: "user_sneha" }))).rejects.toMatchObject({ status: 403 });
   });
 
   it("at the candidate limit it is refused with the reason, and nothing is added (A4)", async () => {
-    const m = await load(EMAIL.sana);
+    const m = await load(EMAIL.imran);
     const active = m.allCandidates.filter((row) => row.firmId === FIRM && ["ON_BENCH", "INTERVIEWING", "OFFER"].includes(row.status)).length;
-    const firm = await m.platform.firms.get(FIRM);
-    await m.platform.firms.adjustLimits(FIRM, { seatLimit: firm.seatLimit, candidateLimit: active });
-    m.auth.signInWithPassword(EMAIL.imran, m.auth.DEMO_PASSWORD);
+    const { firms } = await import("./team-data");
+    firms.find((item) => item.id === FIRM)!.candidateLimit = active; // the plan's limit, as the backend would hold it
     const before = m.allCandidates.length;
     await expect(m.candidates.create(FIRM, candidate())).rejects.toMatchObject({ status: 409, code: "CANDIDATE_LIMIT", message: `Your plan allows ${active} active candidates; ${active} are active.` });
     expect(m.allCandidates.length).toBe(before);
-    expect(m.ledger[0]?.action).not.toBe("CREATE");
   });
 
   it("checks the fields", async () => {
@@ -100,7 +93,7 @@ describe("New candidate", () => {
 });
 
 describe("Capture job", () => {
-  it("captures one: first in the list, by id, provenance USER_SUBMITTED by the user, the known company reused, CREATE in the ledger, kept after a reload", async () => {
+  it("captures one: first in the list, by id, provenance USER_SUBMITTED by the user, the known company reused, kept after a reload", async () => {
     const m = await load(EMAIL.adnan);
     const captured = await m.jobs.capture(FIRM, job());
     expect(captured).toMatchObject({
@@ -111,7 +104,6 @@ describe("Capture job", () => {
     });
     expect(captured.requirements.map((requirement) => [requirement.category, requirement.value])).toEqual([["SKILL", "Spark"], ["SKILL", "AWS"], ["EXPERIENCE_YEARS", "5+ years"]]);
     expect((await m.jobs.list(FIRM))[0]?.id).toBe(captured.id);
-    expect(m.ledger[0]).toMatchObject({ firmId: FIRM, action: "CREATE", entityType: "job", entityId: captured.id, actorUserId: "user_adnan", summary: "Captured Senior Data Engineer at JPMorgan Chase" });
     m.db.flush();
 
     const later = await load(EMAIL.adnan);
@@ -134,7 +126,7 @@ describe("Capture job", () => {
     const fixture = (await m.jobs.list(FIRM))[1]!;
     await expect(m.jobs.capture(FIRM, job({ sourceUrl: `${fixture.dedupe.canonicalUrl}?ref=x` }))).rejects.toMatchObject({ jobId: fixture.id });
 
-    m.auth.signInWithPassword(EMAIL.lakshmi, m.auth.DEMO_PASSWORD);
+    await m.signInAs(EMAIL.lakshmi);
     await expect(m.jobs.capture("firm_stl", job())).resolves.toMatchObject({ firmId: "firm_stl" });
   });
 });

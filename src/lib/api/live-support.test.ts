@@ -3,11 +3,10 @@ import { SessionSchema } from "@/lib/schemas/session";
 import demoIds from "./dto/demo-ids.json";
 
 /**
- * The read-only support view on the live backend (NEXT_PUBLIC_LIVE_MODULES=session; 07 §4, issue #56): start and
+ * The read-only support view on the live backend (07 §4, issue #56): start and
  * exit call backend/api/routes_support.py with the backend's firm id, map its session back to fixture ids, and the
  * modules still on mocks then read the viewed firm, and only it.
  */
-vi.mock("@/lib/api/config", () => ({ isLive: (module: string) => module === "session" }));
 
 const { sessionApi } = await import("./session");
 const { rememberLiveSession } = await import("./live-session");

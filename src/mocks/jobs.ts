@@ -7,7 +7,6 @@ import jobsSeed from "./data/jobs.json";
 import { findInFirm, inFirm, mockResult, newId } from "./_shared";
 import { currentUser } from "./auth";
 import { changed, table } from "./db";
-import { logFirmAction } from "./ledger";
 import { firmScoped } from "./membership";
 
 /** The fixture jobs (2 MB: never written to the browser's demo data). */
@@ -114,7 +113,6 @@ export const jobsMock = firmScoped("jobs", {
     });
     capturedJobs.unshift(job);
     changed("capturedJobs");
-    logFirmAction({ firmId, entityType: "job", entityId: job.id, entityLabel: `${job.title} · ${company.name}`, action: "CREATE", summary: `Captured ${job.title} at ${company.name}` }, now);
     return mockResult(job);
   },
 }, { capture: "job.capture" });

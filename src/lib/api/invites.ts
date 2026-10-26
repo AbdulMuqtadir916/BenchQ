@@ -1,12 +1,9 @@
 import type { Session } from "@/lib/schemas/session";
 import { InviteBaseSchema, type Invite } from "@/lib/schemas/tenancy";
-import { isLive } from "./config";
 import { InviteLookupDto, SessionDto, toSession } from "./dto/session";
 import { toIso } from "./dto/shared";
 import { http } from "./http";
 import { rememberLiveSession } from "./live-session";
-
-const mock = () => import("@/mocks/invite-flow").then((m) => m.inviteFlowMock);
 
 /**
  * What /invite/[token] may show before anyone signs in (docs/04 §2.1, 07 P4). `INVALID` (an unknown or
@@ -25,8 +22,8 @@ export interface AcceptInviteInput {
 const LookupFields = InviteBaseSchema.pick({ email: true, inviteeName: true, role: true, expiresAt: true });
 const tokenPath = (token: string) => `/api/invites/${encodeURIComponent(token)}`;
 
-/** The backend's invite links (backend/api/routes_invites.py), behind the session switch. */
-const live = {
+/** The public side of an invite: no session needed. Accepting signs the new account in (backend/api/routes_invites.py). */
+export const invitesApi = {
   lookup: async (token: string): Promise<InviteLookup> => {
     const dto = await http.get(tokenPath(token), InviteLookupDto);
     if (dto.status === "INVALID") return { status: "INVALID" };
@@ -38,11 +35,4 @@ const live = {
     rememberLiveSession(session);
     return session;
   },
-};
-
-/** The public side of an invite: no session needed. Accepting signs the new account in. */
-export const invitesApi = {
-  lookup: async (token: string): Promise<InviteLookup> => (isLive("session") ? live.lookup(token) : (await mock()).lookup(token)),
-  accept: async (token: string, input: AcceptInviteInput): Promise<Session> =>
-    isLive("session") ? live.accept(token, input) : (await mock()).accept(token, input),
 };

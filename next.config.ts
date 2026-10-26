@@ -13,7 +13,8 @@ const nextConfig: NextConfig = {
   // Proxy the FastAPI backend so browser requests stay same-origin (no CORS,
   // and the backend's HTTP-only session cookie is sent automatically).
   async rewrites() {
-    const backend = process.env.BACKEND_URL;
+    // In development the backend defaults to the local compose one (src/lib/server/backend-url.ts).
+    const backend = process.env.BACKEND_URL || (process.env.NODE_ENV === "production" ? undefined : "http://localhost:8000");
     if (!backend) return [];
     return [
       { source: "/api/:path*", destination: `${backend}/api/:path*` },

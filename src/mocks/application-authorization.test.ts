@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { applicationsApi } from "@/lib/api/applications";
-import { sessionApi } from "@/lib/api/session";
-import { signInAs } from "./sign-in-as";
+import { signInAs, signOutForTest } from "./sign-in-as";
 import { allApplications } from "./applications";
 
 /**
@@ -13,7 +12,7 @@ import { allApplications } from "./applications";
  */
 
 afterEach(async () => {
-  await sessionApi.signOut();
+  signOutForTest();
 });
 
 const statusOf = (id: string) => allApplications.find((app) => app.id === id)!.status;

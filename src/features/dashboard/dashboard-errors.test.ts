@@ -12,8 +12,8 @@ vi.mock("@/lib/stores/session-store", async (importOriginal) => {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firms } from "@/mocks/team";
-import { sessionApi } from "@/lib/api/session";
-import { signInAs } from "@/mocks/sign-in-as";
+import { stubBackendReads } from "@/mocks/fixture-backend";
+import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "@/lib/stores/session-store";
 import { OwnerDashboard } from "./owner-dashboard";
 import { ManagerDashboard } from "./manager-dashboard";
@@ -71,11 +71,13 @@ describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 },
   // Signed in as a member of firm A, in the mock backend (it checks membership, T8) and in the client
   // store (the BDE dashboard reads the signed-in user), as the app is after /sign-in.
   beforeAll(async () => {
+    stubBackendReads();
     useSession.getState().setSession(await signInAs(as));
   });
-  afterAll(async () => {
+  afterAll(() => {
+    vi.restoreAllMocks();
     useSession.getState().reset();
-    await sessionApi.signOut();
+    signOutForTest();
   });
 
   it("renders every group, with no error, when the data loads", async () => {

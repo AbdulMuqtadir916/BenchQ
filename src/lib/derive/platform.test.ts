@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { allCandidates } from "@/mocks/candidates";
 import { allUsers, firms } from "@/mocks/team";
 import { FIXTURE_NOW, invitesAt } from "@/mocks/tenancy";
-import { ledgerAt } from "@/mocks/ledger";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import {
   firmsByStatus, firmsOnPlan, hasCustomLimits, lastActivityAt, needsAttention, openSupportViews, ownerStatus, planHistory, seatBlockReason, seatTotals, slugProblem, suggestSlug,
@@ -10,13 +9,20 @@ import {
 
 const NOW = FIXTURE_NOW;
 const DAY = 86_400_000;
-const data = { firms, users: allUsers, invites: invitesAt(NOW), candidates: allCandidates, ledger: ledgerAt(NOW) };
 const later = (days: number) => new Date(NOW.getTime() + days * DAY);
 
 const entry = (over: Partial<LedgerEntry>): LedgerEntry => ({
   id: "e", firmId: "firm_stl", actorUserId: "padm_sana", actorType: "PLATFORM_ADMIN", actorName: "Sana Mirza", entityType: "firm", entityId: "firm_stl",
   entityLabel: "STL", action: "PLAN_CHANGED", summary: "", modelId: null, promptVersion: null, evidenceIds: [], claimState: null, createdAt: NOW.toISOString(), ...over,
 });
+
+/** What the backend's ledger holds for a firm that was created, moved to a smaller plan and then suspended. */
+const cbwLedger = [
+  entry({ id: "l1", firmId: "firm_cbw", entityId: "firm_cbw", action: "FIRM_CREATED", summary: "Created firm on Growth (10 seats, 100 candidates)", createdAt: later(-60).toISOString() }),
+  entry({ id: "l2", firmId: "firm_cbw", entityId: "firm_cbw", action: "PLAN_CHANGED", summary: "Growth → Starter, seats 10 → 4, candidates 100 → 25", createdAt: later(-45).toISOString() }),
+  entry({ id: "l3", firmId: "firm_cbw", entityId: "firm_cbw", action: "FIRM_SUSPENDED", summary: "Suspended: account on hold pending contract renewal", createdAt: later(-20).toISOString() }),
+];
+const data = { firms, users: allUsers, invites: invitesAt(NOW), candidates: allCandidates, ledger: cbwLedger };
 
 describe("overview numbers (docs/04 §14.2), from the fixtures", () => {
   it("counts firms by status", () => {
@@ -59,7 +65,7 @@ describe("firm rows (docs/04 §14.3, §14.5)", () => {
   });
 
   it("last activity is the firm's latest ledger entry", () => {
-    expect(lastActivityAt("firm_cbw", data.ledger)).toBe(data.ledger.filter((item) => item.firmId === "firm_cbw").map((item) => item.createdAt).sort().at(-1));
+    expect(lastActivityAt("firm_cbw", data.ledger)).toBe(later(-20).toISOString());
     expect(lastActivityAt("firm_nope", data.ledger)).toBeNull();
   });
 

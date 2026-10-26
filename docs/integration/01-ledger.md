@@ -136,9 +136,8 @@ export const ledgerApi = {
 
 ### Try it
 
-`.env.local`: `NEXT_PUBLIC_LIVE_MODULES=session,ledger` and `BACKEND_URL=http://localhost:8000`. Every live
-module needs `session`, because its endpoints answer only a signed-in cookie. Seed the demo accounts,
-restart `pnpm dev`, sign in at `http://localhost:3000` and open `/<firm>/ledger`.
+The ledger is always the backend's (F6): no switch. Start the backend, seed the demo accounts, `pnpm dev`,
+sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 
 - An OWNER sees sign-ins and invites (the events the backend records today).
 - A BDE sees only their own entries (their own sign-ins).

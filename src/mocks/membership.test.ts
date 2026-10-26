@@ -7,10 +7,7 @@ import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
 import { inboxApi } from "@/lib/api/inbox";
-import { ledgerApi } from "@/lib/api/analytics";
-import { teamApi } from "@/lib/api/team";
 import { agentsApi } from "@/lib/api/agents";
-import { sessionApi } from "@/lib/api/session";
 import { allCandidates, candidatesMock } from "./candidates";
 import { allJobs, jobsMock } from "./jobs";
 import { allJobMarks, jobMarksMock } from "./job-marks";
@@ -20,19 +17,16 @@ import { allResumes, resumesMock } from "./resumes";
 import { recordsMock } from "./records";
 import { allDocuments, documentsMock } from "./documents";
 import { allMessages, inboxMock } from "./inbox";
-import { ledgerMock } from "./ledger";
-import { teamMock } from "./team";
-import { memberInvitesMock } from "./member-invites";
-import { invites } from "./tenancy";
 import { agentsMock } from "./agents";
 import { FIRM_SCOPED_RESOURCES } from "./membership";
-import { signInAs } from "@/mocks/sign-in-as";
+import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 
 /**
  * docs/07 T8: a firm-A principal can't read or change firm-B data through any hook. Every hook calls
  * one of these adapter methods with the URL's firm id; here each one is called as a firm-A member
  * with firm B's id and firm B's OWN valid record ids, so the only thing that can refuse it is the
- * mock backend's membership check (not the per-firm filtering, which isolation.test.ts covers).
+ * mock backend's membership check (not the per-firm filtering, which isolation.test.ts covers). The
+ * modules that moved to the backend (team, invites, ledger) are covered by backend/tests/test_isolation.py.
  */
 
 const A = "firm_hts";
@@ -50,7 +44,6 @@ const idsOf = (firmId: string) => {
     resumeVersion: resume.versions[0]!.id,
     document: of(allDocuments, firmId).id,
     message: of(allMessages, firmId).id,
-    invite: invites.find((invite) => invite.firmId === firmId && invite.role !== "OWNER" && invite.status === "PENDING")!.id,
   };
 };
 type Ids = ReturnType<typeof idsOf>;
@@ -79,12 +72,6 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["inbox", "connect", (f, i) => inboxApi.connect(f, i.candidate), true],
   ["inbox", "disconnect", (f, i) => inboxApi.disconnect(f, i.candidate), true],
   ["inbox", "markRead", (f, i) => inboxApi.markRead(f, i.message), true],
-  ["ledger", "list", (f) => ledgerApi.list(f), false],
-  ["team", "list", (f) => teamApi.list(f), false],
-  ["memberInvites", "list", (f) => teamApi.invites(f), false],
-  ["memberInvites", "invite", (f) => teamApi.invite(f, { email: "isolation@example.test", role: "BDE", inviteeName: null }), true],
-  ["memberInvites", "resend", (f, i) => teamApi.resendInvite(f, i.invite), true],
-  ["memberInvites", "revoke", (f, i) => teamApi.revokeInvite(f, i.invite), true],
   ["jobMarks", "list", (f) => jobMarksApi.list(f), false],
   ["jobMarks", "mark", (f, i) => jobMarksApi.mark(f, i.job, "SAVED"), true],
   ["jobMarks", "unmark", (f, i) => jobMarksApi.unmark(f, i.job, "SAVED"), true],
@@ -93,15 +80,15 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
 
 const MOCKS: Record<(typeof FIRM_SCOPED_RESOURCES)[number], object> = {
   candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock,
-  records: recordsMock, documents: documentsMock, inbox: inboxMock, ledger: ledgerMock, team: teamMock, memberInvites: memberInvitesMock, agents: agentsMock, jobMarks: jobMarksMock,
+  records: recordsMock, documents: documentsMock, inbox: inboxMock, agents: agentsMock, jobMarks: jobMarksMock,
 };
 /** Mock methods that take no firm (they work on text alone). */
 const UNSCOPED = new Set(["agents.rewrite"]);
 
 const status = (promise: Promise<unknown>) => promise.then(() => 200, (error: unknown) => (error instanceof ApiError ? error.status : -1));
 
-afterEach(async () => {
-  await sessionApi.signOut();
+afterEach(() => {
+  signOutForTest();
 });
 
 describe("membership: a firm-A principal can't reach firm B through any adapter a hook calls (docs/07 T8)", () => {
@@ -120,10 +107,10 @@ describe("membership: a firm-A principal can't reach firm B through any adapter 
   });
 
   it("leaves firm B's records untouched after every refused write", async () => {
-    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks, invites].map((rows) => rows.filter((row) => row.firmId === B)));
+    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)));
     await signInAs("user_imran");
     for (const [, , call, isWrite] of CALLS) if (isWrite) await status(call(B, idsOf(B)));
-    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks, invites].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
+    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
   });
 
   it("answers another firm exactly like a firm that doesn't exist", async () => {
@@ -133,7 +120,7 @@ describe("membership: a firm-A principal can't reach firm B through any adapter 
   });
 
   it("refuses every call while signed out (401)", async () => {
-    await sessionApi.signOut();
+    signOutForTest();
     for (const [, , call] of CALLS) expect(await status(call(A, idsOf(A)))).toBe(401);
   });
 });

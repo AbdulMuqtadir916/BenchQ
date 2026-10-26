@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { sessionApi } from "@/lib/api/session";
 import { can } from "@/lib/auth/policy";
 import { agentsMock } from "./agents";
 import { applicationsMock, followupsMock } from "./applications";
@@ -8,13 +7,10 @@ import { documentsMock } from "./documents";
 import { inboxMock } from "./inbox";
 import { jobsMock } from "./jobs";
 import { jobMarksMock } from "./job-marks";
-import { ledgerMock } from "./ledger";
 import { FIRM_SCOPED_RESOURCES, WRITE_ACTIONS, isReadMethod } from "./membership";
 import { recordsMock } from "./records";
 import { resumesMock } from "./resumes";
-import { signInAs } from "./sign-in-as";
-import { teamMock } from "./team";
-import { memberInvitesMock } from "./member-invites";
+import { signInAs, signInAsSupportView, signOutForTest } from "./sign-in-as";
 
 /**
  * The mock backend refuses every write from a principal the UI never offers it to (07 §4, Q32): a
@@ -26,7 +22,7 @@ import { memberInvitesMock } from "./member-invites";
 type AnyMethod = (firmId: string, ...args: unknown[]) => Promise<unknown>;
 const MOCKS: Record<string, Record<string, AnyMethod>> = {
   candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock, records: recordsMock,
-  documents: documentsMock, inbox: inboxMock, ledger: ledgerMock, team: teamMock, memberInvites: memberInvitesMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
+  documents: documentsMock, inbox: inboxMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
 } as unknown as Record<string, Record<string, AnyMethod>>;
 
 const FIRM = "firm_hts";
@@ -44,9 +40,6 @@ const ARGS: Record<string, unknown[]> = {
   "jobMarks.mark": ["job_001", "SAVED"],
   "jobMarks.unmark": ["job_001", "SAVED"],
   "agents.tailorResume": [{ resumeVersionId: "rv", jobId: "job" }],
-  "memberInvites.invite": [{ email: "policy@example.test", role: "BDE", inviteeName: null }],
-  "memberInvites.resend": ["inv_hts_01"],
-  "memberInvites.revoke": ["inv_hts_01"],
 };
 
 const writes = Object.entries(WRITE_ACTIONS).flatMap(([resource, methods]) => Object.entries(methods).map(([name, action]) => ({ resource, name, action })));
@@ -56,7 +49,7 @@ beforeAll(() => {
   process.env.NEXT_PUBLIC_MOCK_DELAY_MS = "0";
 });
 afterAll(async () => {
-  await sessionApi.signOut();
+  signOutForTest();
 });
 
 describe("the write inventory", () => {
@@ -69,7 +62,6 @@ describe("the write inventory", () => {
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
       "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture",
-      "memberInvites.invite", "memberInvites.resend", "memberInvites.revoke",
     ]);
   });
 
@@ -101,11 +93,10 @@ describe("a VIEWER is refused every write (403), with the UI's table", () => {
 
 describe("a support view is refused every write (403)", () => {
   beforeAll(async () => {
-    await signInAs("padm_sana");
-    await sessionApi.startSupportView(FIRM, "Checking every write is refused");
+    await signInAsSupportView("padm_sana", FIRM);
   });
-  afterAll(async () => {
-    await sessionApi.exitSupportView();
+  afterAll(() => {
+    signOutForTest();
   });
 
   it.each(writes)("$resource · $name", async ({ resource, name }) => {
@@ -126,46 +117,5 @@ describe("control: an OWNER is not refused by the policy", () => {
     // It may fail for its own reasons (an id that doesn't exist: 404), never with 403.
     const outcome = await call(resource, name).then(() => "ok", (error: { status?: number }) => error.status);
     expect(outcome).not.toBe(403);
-  });
-});
-
-describe("ledger scope (07 §2.2: BDE `own`)", () => {
-  it("a BDE gets only the entries they made; OWNER, MANAGER and VIEWER the whole firm's", async () => {
-    await signInAs("user_adnan"); // BDE, firm_hts
-    const mine = await ledgerMock.list(FIRM, { limit: 1000 });
-    expect(mine.length).toBeGreaterThan(0);
-    expect(mine.every((entry) => entry.actorUserId === "user_adnan")).toBe(true);
-    for (const userId of ["user_imran", "user_fatima", "user_rohan"]) {
-      await signInAs(userId);
-      const all = await ledgerMock.list(FIRM, { limit: 1000 });
-      expect(all.some((entry) => entry.actorUserId !== "user_adnan"), userId).toBe(true);
-      expect(all.length, userId).toBeGreaterThan(mine.length);
-    }
-  });
-});
-
-describe("platform writes (07 Phase C): every one names its platform action; a firm user is refused", () => {
-  it("the inventory: every platform method is a read or a declared write", async () => {
-    const { platformMock, PLATFORM_WRITE_ACTIONS } = await import("./platform");
-    for (const [resource, methods] of Object.entries(platformMock)) {
-      for (const name of Object.keys(methods)) {
-        const isRead = ["list", "get", "usage"].includes(name);
-        expect(isRead || Boolean(PLATFORM_WRITE_ACTIONS[resource]?.[name]), `${resource}.${name}`).toBe(true);
-      }
-    }
-  });
-
-  it("an OWNER is refused (403) on every platform write; a Super Admin is not refused by the policy", async () => {
-    const { platformMock, PLATFORM_WRITE_ACTIONS } = await import("./platform");
-    const writesList = Object.entries(PLATFORM_WRITE_ACTIONS).flatMap(([resource, methods]) => Object.keys(methods).map((name) => [resource, name] as const));
-    expect(writesList.length).toBe(17);
-    const callPlatform = (resource: string, name: string) => (platformMock as unknown as Record<string, Record<string, (...args: unknown[]) => Promise<unknown>>>)[resource]![name]!("nope", "nope");
-    await signInAs("user_imran");
-    for (const [resource, name] of writesList) await expect(callPlatform(resource, name), `${resource}.${name}`).rejects.toMatchObject({ status: 403 });
-    await signInAs("padm_sana");
-    for (const [resource, name] of writesList) {
-      const outcome = await callPlatform(resource, name).then(() => "ok", (error: { status?: number }) => error.status);
-      expect(outcome, `${resource}.${name}`).not.toBe(403);
-    }
   });
 });

@@ -7,12 +7,7 @@ import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
 import { inboxApi } from "@/lib/api/inbox";
-import { ledgerApi } from "@/lib/api/analytics";
-import { teamApi } from "@/lib/api/team";
-import { sessionApi } from "@/lib/api/session";
-import { allLedger } from "./ledger";
-import { inFirm } from "./_shared";
-import { signInAs } from "@/mocks/sign-in-as";
+import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 
 /**
  * Firm isolation at the adapter boundary (docs/07 T5): what a firm asks for is all it gets, and a
@@ -27,7 +22,7 @@ const B = "firm_stl";
 const MEMBER: Record<string, string> = { firm_hts: "user_imran", firm_stl: "user_lakshmi", firm_cbw: "user_naveen" };
 const as = (firmId: string) => signInAs(MEMBER[firmId]!);
 afterEach(async () => {
-  await sessionApi.signOut();
+  signOutForTest();
 });
 const onlyFirm = (rows: readonly { firmId: string | null }[], firmId: string) => rows.length > 0 && rows.every((row) => row.firmId === firmId);
 const is404 = async (promise: Promise<unknown>) => {
@@ -36,15 +31,13 @@ const is404 = async (promise: Promise<unknown>) => {
 };
 
 describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
-  it("lists: candidates, jobs, applications, follow-ups, resumes, ledger, team", async () => {
+  it("lists: candidates, jobs, applications, follow-ups, resumes", async () => {
     await as(mine);
     expect(onlyFirm(await candidatesApi.list(mine), mine)).toBe(true);
     expect(onlyFirm(await jobsApi.list(mine, { limit: 1000 }), mine)).toBe(true);
     expect(onlyFirm(await applicationsApi.list(mine), mine)).toBe(true);
     expect(onlyFirm(await followupsApi.list(mine), mine)).toBe(true);
     expect(onlyFirm(await resumesApi.list(mine), mine)).toBe(true);
-    expect(onlyFirm(await ledgerApi.list(mine, { limit: 1000 }), mine)).toBe(true);
-    expect(onlyFirm(await teamApi.list(mine), mine)).toBe(true);
   });
 
   it("reads by id or candidate: the other firm's records are 404", async () => {
@@ -80,14 +73,4 @@ describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
     await as(other);
     expect((await applicationsApi.byId(other, theirApplication.id)).status).toBe(theirApplication.status);
   });
-});
-
-it("keeps platform-only ledger events (firmId null) out of every firm's ledger", async () => {
-  for (const firmId of [A, B, "firm_cbw"]) {
-    await as(firmId);
-    const entries = await ledgerApi.list(firmId, { limit: 1000 });
-    expect(entries.some((entry) => entry.firmId === null)).toBe(false);
-  }
-  // GSC has no member to sign in as until its OWNER accepts: check the filter itself.
-  expect(inFirm(allLedger, "firm_gsc").some((entry) => entry.firmId === null)).toBe(false);
 });

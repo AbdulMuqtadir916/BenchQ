@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { sessionApi } from "@/lib/api/session";
 import { hrefFor } from "@/lib/routes/registry";
 import type { Session } from "@/lib/schemas/session";
 import type { FirmLookup } from "@/lib/tenancy/firm-outcome";
-import { signInAs } from "@/mocks/sign-in-as";
+import { signInAs, signOutForTest, firmBySlugForTest } from "@/mocks/sign-in-as";
 import { firms } from "@/mocks/team";
 import { firmGate, platformGate } from "./gate";
 
@@ -20,7 +19,7 @@ const analytics = (slug: string) => hrefFor("analytics", { firm: slug });
 
 async function lookup(slug: string): Promise<FirmLookup> {
   try {
-    return { status: "success", firm: await sessionApi.firmBySlug(slug) };
+    return { status: "success", firm: await firmBySlugForTest(slug) };
   } catch (error) {
     return { status: "error", error: error as Error };
   }
@@ -31,7 +30,7 @@ async function sessionFor(userId: string): Promise<Session> {
 }
 
 afterEach(async () => {
-  await sessionApi.signOut();
+  signOutForTest();
 });
 
 describe("firmGate", () => {

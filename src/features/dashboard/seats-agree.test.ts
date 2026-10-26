@@ -1,6 +1,6 @@
 import { createElement, type ComponentProps, type ComponentType } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // See dashboard-errors.test.ts: in a server render the signed-in hooks read the live store.
 vi.mock("@/lib/stores/session-store", async (importOriginal) => {
@@ -17,8 +17,8 @@ import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firms } from "@/mocks/team";
 import { invites } from "@/mocks/tenancy";
 import { isSeatReservingInvite } from "@/lib/derive";
-import { sessionApi } from "@/lib/api/session";
-import { signInAs } from "@/mocks/sign-in-as";
+import { stubBackendReads } from "@/mocks/fixture-backend";
+import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "@/lib/stores/session-store";
 import { FirmOverviewTab } from "@/features/admin/firm/overview-tab";
 import { OwnerDashboard } from "./owner-dashboard";
@@ -42,9 +42,11 @@ async function textAs(accountId: string, component: ComponentType): Promise<stri
 
 const seatsUsed = (text: string) => text.match(/Seats used (\d+ \/ \d+)/)?.[1];
 
-afterEach(async () => {
+beforeEach(() => stubBackendReads());
+afterEach(() => {
+  vi.restoreAllMocks();
   useSession.getState().reset();
-  await sessionApi.signOut();
+  signOutForTest();
 });
 
 describe("Seats used (docs/07 M3, A1)", { timeout: 20_000 }, () => {

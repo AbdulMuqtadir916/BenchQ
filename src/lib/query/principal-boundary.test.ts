@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { candidatesApi } from "@/lib/api/candidates";
-import { sessionApi } from "@/lib/api/session";
 import { useSession } from "@/lib/stores/session-store";
 import { queryKeys } from "./keys";
 import { clearCacheOnPrincipalChange } from "./principal-boundary";
-import { signInAs } from "@/mocks/sign-in-as";
+import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 
 const FIRM = "firm_hts";
 const key = queryKeys.candidates.list(FIRM);
@@ -17,7 +16,7 @@ const firstRender = (client: QueryClient) => new QueryObserver(client, query).ge
 
 afterEach(async () => {
   useSession.getState().reset();
-  await sessionApi.signOut();
+  signOutForTest();
 });
 
 describe("principal change clears the query cache (sign-in, sign-out, an account change in another tab)", () => {

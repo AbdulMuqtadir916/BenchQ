@@ -16,13 +16,13 @@ class StubStorage {
 type Globals = { __BENCHQ_DEMO_STORAGE__?: Storage | null };
 const g = globalThis as Globals;
 const FIRM = "firm_hts";
-const EMAIL = { adnan: "adnan@hyderabad-tech-staffing.benchq.test", sneha: "sneha@hyderabad-tech-staffing.benchq.test", rohan: "rohan@hyderabad-tech-staffing.benchq.test", sana: "sana@admin.benchq.test" };
+const EMAIL = { adnan: "user_adnan", sneha: "user_sneha", rohan: "user_rohan", sana: "padm_sana" };
 
 async function load(email: string) {
   vi.resetModules();
-  const [db, auth, marks, session] = await Promise.all([import("./db"), import("./auth"), import("./job-marks"), import("./session")]);
-  auth.signInWithPassword(email, auth.DEMO_PASSWORD);
-  return { db, auth, marks: marks.jobMarksMock, session: session.sessionMock, signIn: (to: string) => auth.signInWithPassword(to, auth.DEMO_PASSWORD) };
+  const [db, signIn, marks] = await Promise.all([import("./db"), import("./sign-in-as"), import("./job-marks")]);
+  await signIn.signInAs(email);
+  return { db, marks: marks.jobMarksMock, signIn: signIn.signInAs, supportView: signIn.signInAsSupportView };
 }
 
 const kinds = (rows: { jobId: string; kind: string }[]) => rows.map((row) => `${row.jobId}:${row.kind}`).sort();
@@ -55,11 +55,11 @@ describe("job marks", () => {
   it("marks are personal: another BDE doesn't see them, and their own don't touch yours", async () => {
     const m = await load(EMAIL.adnan);
     await m.marks.mark(FIRM, "job_001", "HIDDEN");
-    m.signIn(EMAIL.sneha);
+    await m.signIn(EMAIL.sneha);
     expect(await m.marks.list(FIRM)).toEqual([]);
     await m.marks.mark(FIRM, "job_003", "SAVED");
     await m.marks.unmark(FIRM, "job_001", "HIDDEN"); // not hers: nothing happens
-    m.signIn(EMAIL.adnan);
+    await m.signIn(EMAIL.adnan);
     expect(kinds(await m.marks.list(FIRM))).toEqual(["job_001:HIDDEN"]);
   });
 
@@ -71,12 +71,12 @@ describe("job marks", () => {
   it("a VIEWER reads no marks of anyone else; a support view reads none at all and can't write", async () => {
     const m = await load(EMAIL.adnan);
     await m.marks.mark(FIRM, "job_001", "SAVED");
-    m.signIn(EMAIL.rohan);
+    await m.signIn(EMAIL.rohan);
     expect(await m.marks.list(FIRM)).toEqual([]);
     await expect(m.marks.mark(FIRM, "job_001", "SAVED")).rejects.toMatchObject({ status: 403 });
 
-    m.signIn(EMAIL.sana);
-    await m.session.startSupportView(FIRM, "Checking saved jobs are personal");
+    await m.signIn(EMAIL.sana);
+    await m.supportView(EMAIL.sana, FIRM);
     expect(await m.marks.list(FIRM)).toEqual([]);
     await expect(m.marks.unmark(FIRM, "job_001", "SAVED")).rejects.toMatchObject({ status: 403 });
   });

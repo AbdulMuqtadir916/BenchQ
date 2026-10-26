@@ -28,6 +28,7 @@ git clone https://github.com/samad-012/BenchQ.git && cd BenchQ
 nvm use                      # reads .nvmrc (Node 22)
 npm i -g pnpm@12.5.1   # the version in package.json; corepack's pnpm shim breaks on 12.5.1
 pnpm install
+ls node_modules/.pnpm | grep lightningcss-darwin   # Apple silicon: must print lightningcss-darwin-arm64
 
 # 3. Env files (both git-ignored; the defaults work for local development)
 cp .env.example .env.local
@@ -37,16 +38,22 @@ cp backend/.env.example backend/.env
 docker compose up -d --build db backend
 curl http://localhost:8000/health        # {"status":"ok","service":"JobNavigator",...}
 
-# 5. Frontend
+# 5. Demo accounts (local only), then the frontend
+docker compose exec backend python -m backend.scripts.seed_demo
 pnpm dev                                 # http://localhost:3000
 ```
+
+**The backend is always required** (F6): the session is the backend's cookie, so without
+`docker compose up -d db backend` nobody can sign in, and `/sign-in` says "Can't reach the BenchQ backend".
+Open `http://localhost:3000`, not `127.0.0.1` (the backend checks the origin).
 
 **Check it works:**
 
 - `http://localhost:3000/health` shows the backend's health JSON. That means the frontend → backend
   proxy works.
-- `http://localhost:3000/sign-in` renders, and a seeded account (docs/03 §3.2) signs in. Every screen
-  still runs on mock data until a module is switched on (and, until foundation step F6, so does sign-in).
+- `http://localhost:3000/sign-in` renders, and a seeded account (docs/03 §3.2) signs in with
+  `benchq-demo-2026`. The session, the team, invites, `/admin` and the ledger are the backend's; every other screen
+  still runs on mock data, under that real signed-in user, until its module is switched on.
 - `pnpm typecheck && pnpm lint && pnpm test` all pass.
 
 **Then pick up a module:**
@@ -165,8 +172,8 @@ schemas reject both. Declare every backend timestamp as `z.string()` and convert
    parses the sample.
 4. **Write the mapper and its tests** against the sample. Every frontend field must be produced;
    anything the backend can't supply gets the default your module file specifies.
-5. **Add the live branch** to the adapter. Set `NEXT_PUBLIC_LIVE_MODULES=session,<module>` (plus any
-   dependencies listed in your module file) and click through every screen listed in your module
+5. **Add the live branch** to the adapter. Set `NEXT_PUBLIC_LIVE_MODULES=<module>` (plus any
+   dependencies listed in your module file; the session is always the backend's) and click through every screen listed in your module
    file.
 6. **Check the states:** loading skeleton shows, an empty backend shows the empty state, and
    stopping the backend shows the error state (not a crash). There must be no `SCHEMA_MISMATCH` in
@@ -206,7 +213,7 @@ dependencies are live; only switching the adapter to live waits.
 | F3 | Auth endpoints (sign-in/out, me, firm by slug, invites, support view) returning the frontend's `Session` | F2 | Abdul, Uzair | Done (#34, #36; support views: issue #56) |
 | F4 | Python permission table mirroring `src/lib/auth/policy.ts` (comparison test) + the firm-scoping dependency | F2 | Abdul | Policy table + `require` done (#35); `scoped()` / `scoped_jobs()` + their lint test done for every firm route (#53, #54); support-view reads done (issue #56) |
 | F5 | Seed script: the mocks' firms, accounts and data | F2 | Abdul | Done for firms, plans, accounts and invites (#38); module data lands with each track |
-| F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | Abdul | Live behind flag (#40, #41): `NEXT_PUBLIC_LIVE_MODULES=session`. Legacy schema path deleted (issue #62). Signed-out redirect in `src/proxy.ts` (issue #63) and the principal read on the server with real 404 / 403 (issue #64), both live mode only. Live by default and mock sign-in removal not started (issues #65–#66) |
+| F6 | Frontend session goes live (cookie, server-side principal, mock sign-in removed) | F3, F4, F5 | Abdul | Live behind a flag at first (#40, #41). Legacy schema path deleted (issue #62). Signed-out redirect in `src/proxy.ts` (issue #63) and the principal read on the server with real 404 / 403 (issue #64). Live by default: the mock sign-in, session store, credentials and ledger mock are gone (issue #65). Exit check on a production build (issue #66) is next |
 | F7 | Reusable cross-firm isolation test over every route | F4 | Uzair | Done (`backend/tests/test_isolation.py`) |
 
 | Track | Module | Depends on | Owner | Status |
@@ -265,8 +272,8 @@ the backend outside Docker.
 | Reset someone's password (any environment) | `docker compose exec backend python -m backend.scripts.reset_password --email someone@example.com` (asks for the new password twice). Works for firm users and Super Admins, signs the account out everywhere and logs it. There is no self-service reset until email exists (07 Q39) |
 | Stop backend + database | `docker compose stop` (data is kept in the `pgdata` volume) |
 | Frontend | `pnpm dev`, then `http://localhost:3000/health` shows the backend's JSON |
-| Switch a module to the backend | add it to `NEXT_PUBLIC_LIVE_MODULES` in `.env.local`, restart `pnpm dev` |
-| Onboarding on the real backend (07 Q38) | `NEXT_PUBLIC_LIVE_MODULES=session` and `BACKEND_URL=http://localhost:8000` in `.env.local`, seed the demo accounts (above), restart `pnpm dev`, open `http://localhost:3000` (not `127.0.0.1`: the backend checks the origin). Sign-in, `/invite/[token]`, the team list and `/admin` firms, plans, users, invites, team and audit are live; every other module stays on mock data, and a demo account keeps its mock dashboards. Admin actions without an endpoint yet say "Not available on the live backend yet" |
+| Switch a module to the backend | add it to `NEXT_PUBLIC_LIVE_MODULES` in `.env.local` (not `session` or `ledger`: those are always on), restart `pnpm dev` |
+| Sign in, onboarding, `/admin` (F6) | Always the backend's. `docker compose up -d db backend`, seed the demo accounts (above), `pnpm dev`, open `http://localhost:3000` (not `127.0.0.1`: the backend checks the origin). Sign-in, `/invite/[token]`, the team list, the ledger and `/admin` firms, plans, users, invites, team and audit are live; every other module stays on mock data, and a demo account keeps its mock dashboards. Admin actions without an endpoint yet say "Not available on the live backend yet" |
 | Backend tests (Postgres) | `docker compose up -d db-test backend`, then `docker compose exec -T backend python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider` (details in "Schema changes and the test database" below) |
 | Create a migration | `docker compose exec backend alembic -c backend/alembic.ini revision --autogenerate -m "what changed"`, then review the file (below) |
 | Look inside the database | [`database-viewer.md`](./database-viewer.md) (Adminer at `http://localhost:8081`) |

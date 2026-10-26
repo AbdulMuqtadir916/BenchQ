@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { sessionApi } from "@/lib/api/session";
 import { allUsers, firms } from "@/mocks/team";
 import { landingHref, safeReturnTo, signedInRedirect, signInTarget } from "./landing";
 import { matchRoute } from "./registry";
-import { signInAs, signInAsFirmUser } from "@/mocks/sign-in-as";
+import { signInAs, signInAsFirmUser, signOutForTest } from "@/mocks/sign-in-as";
 
 afterEach(async () => {
-  await sessionApi.signOut();
+  signOutForTest();
 });
 
 describe("landing per principal (docs/07 §2.1, T7)", () => {

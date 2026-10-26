@@ -7,7 +7,6 @@ import { allResumes } from "./resumes";
 import { allRecords } from "./records";
 import { allDocuments } from "./documents";
 import { allMessages } from "./inbox";
-import { allLedger, ledgerAt } from "./ledger";
 import { allUsers, firms } from "./team";
 import { FIXTURE_NOW, invitesAt, plans, platformUsers } from "./tenancy";
 
@@ -56,7 +55,7 @@ describe("firms, plans, users and invites", () => {
     expect(platformIds.has(ownerInvite!.invitedByUserId)).toBe(true);
   });
 
-  it("records how each active firm's OWNER joined: an accepted OWNER invite from a Super Admin, plus INVITE_ACCEPTED in the firm's ledger", () => {
+  it("records how each active firm's OWNER joined: an accepted OWNER invite from a Super Admin", () => {
     const platformIds = new Set(platformUsers.map((user) => user.id));
     for (const firmId of ["firm_stl", "firm_cbw"]) {
       const accepted = invites.find((invite) => invite.firmId === firmId && isOwner(invite) && invite.status === "ACCEPTED");
@@ -64,7 +63,6 @@ describe("firms, plans, users and invites", () => {
       expect(platformIds.has(accepted!.invitedByUserId)).toBe(true);
       const owner = allUsers.find((user) => user.firmId === firmId && isOwner(user));
       expect(accepted!.email).toBe(owner!.email);
-      expect(allLedger.some((entry) => entry.firmId === firmId && entry.action === "INVITE_ACCEPTED" && entry.entityId === accepted!.id)).toBe(true);
     }
   });
 
@@ -77,27 +75,6 @@ describe("firms, plans, users and invites", () => {
       expect(invite.role, invite.id).not.toBe("OWNER");
     }
   });
-});
-
-describe("invite ledger entries match their invites' dates (docs/07 P3)", () => {
-  // Any "now": both move together, so the tie holds however long after FIXTURE_NOW the data is seeded.
-  for (const now of [FIXTURE_NOW, new Date("2026-12-25T18:30:00.000Z")]) {
-    it(`at ${now.toISOString()}: INVITE_SENT on the invite's createdAt, INVITE_ACCEPTED / REVOKED within its life`, () => {
-      const inviteById = byId(invitesAt(now));
-      const entries = ledgerAt(now).filter((entry) => entry.action.startsWith("INVITE_"));
-      expect(entries.length).toBeGreaterThan(0);
-      for (const entry of entries) {
-        const invite = inviteById.get(entry.entityId);
-        expect(invite, entry.id).toBeDefined();
-        expect(entry.entityType, entry.id).toBe("invite");
-        if (entry.action === "INVITE_SENT") expect(entry.createdAt, entry.id).toBe(invite!.createdAt);
-        else {
-          expect(entry.createdAt >= invite!.createdAt, entry.id).toBe(true);
-          expect(entry.createdAt <= invite!.expiresAt, entry.id).toBe(true);
-        }
-      }
-    });
-  }
 });
 
 describe("firmId on every firm-scoped record", () => {
@@ -134,14 +111,6 @@ describe("firmId on every firm-scoped record", () => {
     for (const c of allCandidates) {
       for (const userId of c.assignedUserIds) same(`${c.id} assignee ${userId}`, allUsers.find((user) => user.id === userId)?.firmId, c.firmId);
     }
-  });
-
-  it("puts firm events in that firm's ledger and only platform-only events at null (A13)", () => {
-    const platformOnly = allLedger.filter((entry) => entry.firmId === null);
-    expect(platformOnly.map((entry) => entry.action).sort()).toEqual(["INVITE_SENT", "LOGIN"]);
-    for (const entry of allLedger) if (entry.firmId !== null) expect(firmIds.has(entry.firmId), entry.id).toBe(true);
-    const firmEvents = allLedger.filter((entry) => ["FIRM_CREATED", "FIRM_SUSPENDED", "PLAN_CHANGED"].includes(entry.action));
-    expect(firmEvents.every((entry) => entry.firmId !== null)).toBe(true);
   });
 });
 

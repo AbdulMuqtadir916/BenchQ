@@ -2,11 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import demoIds from "./dto/demo-ids.json";
 
 /**
- * The onboarding adapters on the live backend (NEXT_PUBLIC_LIVE_MODULES=session, 07 Q38): the wire shapes
+ * The onboarding adapters on the live backend (07 Q38): the wire shapes
  * of backend/auth/serialize.py, the demo id translation at the edge, and the modules still on mocks reading
  * the live principal.
  */
-vi.mock("@/lib/api/config", () => ({ isLive: (module: string) => module === "session" }));
 
 const { sessionApi } = await import("./session");
 const { invitesApi } = await import("./invites");
