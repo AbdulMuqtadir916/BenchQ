@@ -29,7 +29,7 @@ from backend.config import IS_PRODUCTION
 from backend.models.db import SessionLocal, utcnow
 from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, Session, User
 
-DEMO_PASSWORD = "benchq-demo-2026"                                     # docs/03 §3.2; DEMO_PASSWORD in src/mocks/auth.ts
+DEMO_PASSWORD = "benchq-demo-2026"                                     # docs/03 §3.2
 NAMESPACE = uuid.UUID("6f1d4c2e-0b7a-5e3c-9a41-b3c0e5d2a7f8")           # fixed: changing it re-ids every demo row
 FIXTURE_NOW = datetime.fromisoformat("2026-10-18T12:00:00+00:00")       # FIXTURE_NOW in src/mocks/tenancy.ts
 DATA_DIR = pathlib.Path(os.getenv("BENCHQ_MOCK_DATA", pathlib.Path(__file__).resolve().parents[2] / "src/mocks/data"))

@@ -145,22 +145,22 @@ stored account the data no longer has (after a reset) is dropped and the visitor
 ### 3.2 Seed accounts (Q25–Q27, Phase L) — in effect
 
 Everyone signs in on `/sign-in` with one of these accounts; there is no principal switcher (docs/07
-Q25). Mock auth, not security: the accounts and the password exist only in the mock layer (never on
-the `User` contract) until the backend has real users (Phase D).
+Q25). **Since F6 these are the backend's demo accounts**, not a mock layer: load them with
+`docker compose exec backend python -m backend.scripts.seed_demo` (local only; docs/integration/README.md) and sign in with
+the password below. The session is the backend's cookie. The fixtures in this doc are still what the mocked modules serve.
 
 - **Email pattern:** `firstname@<firm-slug>.benchq.test`, lowercase. The Super Admin uses the reserved
   slug `admin` (`sana@admin.benchq.test`), which can never be a firm's slug (docs/07 §2.4), so the two
   tiers can't collide. `.test` is a reserved top-level domain: no address here can reach a real mailbox.
 - **Password:** one shared demo password for every account: **`benchq-demo-2026`** (`DEMO_PASSWORD` in
-  `src/mocks/auth.ts`).
+  `backend/scripts/seed_demo.py`).
 - **Fixture emails change to the pattern** (`User.email`, `PlatformUser.email`), so the address you
   sign in with is the one the app shows. Invite emails move to the same pattern, keeping each accepted
   OWNER invite equal to its user's email (`fixtures.test.ts` checks it).
 - **Landing** follows docs/07 §2.1 (T7): every fixture firm user has been active before, so none lands
   on `/welcome` (it stays covered by unit tests until `/invite/[token]` in P4, Q26).
-- **One account per browser profile** (Q27): the session lives in `localStorage` and is shared by
-  every tab, like the production cookie will be. Signing out, or in as someone else, in any tab
-  applies to all open tabs. **To use two accounts at once** (e.g. a BDE and their OWNER side by side),
+- **One account per browser profile** (Q27): the session is the backend's cookie, shared by every
+  tab. Signing out, or in as someone else, in any tab applies to all open tabs (a `BroadcastChannel` ping, then `current()`). **To use two accounts at once** (e.g. a BDE and their OWNER side by side),
   use a private window or a second browser profile. The demo data persists across reloads and accounts in this browser (§3.3).
 
 | Name | Sign-in email | Firm | Role | Lands on | Current fixture email |

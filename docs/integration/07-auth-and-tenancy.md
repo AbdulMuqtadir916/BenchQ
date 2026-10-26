@@ -7,8 +7,8 @@ and read lists, Phase M's backend, and F6 for the session, invites, team and adm
 (`NEXT_PUBLIC_LIVE_MODULES=session`). Since then: invite guards (#42, Q39), `reset_password` (#43). **2026-10-23:** F2b built (migration 0005, see
 F2 below). **2026-10-24:** the support-view endpoints built (issue #56): F3 is done, and so are F4's support-view
 reads. **2026-10-24:** F2c done (#57–#59); F7 built: the isolation test runs over every route (#61, see F7 below);
-the legacy schema path deleted (issue #62); the signed-out redirect in `src/proxy.ts` (issue #63); the principal read on the server (issue #64); live by default with the mock sign-in removed (issue #65). **Still to do:**
-the F6 exit check on a production build (issue #66).
+the legacy schema path deleted (issue #62); the signed-out redirect in `src/proxy.ts` (issue #63); the principal read on the server (issue #64); live by default with the mock sign-in removed (issue #65); **F6 is done**: the exit check ran on a production build on
+2026-10-26 (issue #66, recorded under F6 below). **Still to do:** the module tracks (§4).
 **Goal:** make the backend multi-tenant, with real users, firms, roles and sessions, so that teammates
 can then integrate the data modules in parallel, each one firm-scoped from its first endpoint.
 
@@ -375,6 +375,21 @@ status and scores are shared across firms until the Jobs track's `JobMark` (Q36)
 - **Done when:** every seeded account signs in on a production build and lands where docs/03 §3.2 says;
   the support view starts and ends with its ledger entries; signing out in one tab signs out the others;
   the legacy schema path is gone.
+
+**Exit check, 2026-10-26 (issue #66): all four pass.** A production build (`pnpm build`, `pnpm start` on port 3000) against the
+local Docker backend with the demo seed. The backend stays in development mode, because `seed_demo` refuses production, so
+"production build" means the frontend.
+
+| Check | How | Result |
+|---|---|---|
+| Every seeded account signs in and lands where docs/03 §3.2 says | All 15 accounts: sign in through the production server, read `/api/auth/me`, compute the landing with the app's own `landingHref`, request it with that account's cookie | 15 of 15 sign in (200). Each landing equals the table: 6 Hyderabad, 3 Secunderabad and 5 Cyberabad accounts at `/<firm>/dashboard`, Sana at `/admin`. Every landing answers 200 |
+| What a person sees there | In a browser: Naveen (Cyberabad, suspended firm); Imran (Hyderabad OWNER) | Naveen: the "Workspace suspended" screen. Imran: the dashboard ("Seats used 7 / 10", from the backend's team and invites, with mocked placements) and the candidates list, both under the real principal |
+| The support view starts and ends with its ledger entries | Sana starts a view of Secunderabad with a reason, reads the ledger inside it, tries a write, ends it; Lakshmi (the firm's OWNER) reads her firm's ledger | Start 200, the view is on the principal. A write inside it: 403. End 200, no view left. The owner's ledger has `ADMIN_ACCESS` ("Support view started: <reason>") and `ADMIN_ACCESS_END`, both by "Sana Mirza", no email anywhere |
+| Signing out in one tab signs out the others | Two tabs on `/admin` as Sana in one Chrome profile; sign out in the first, the second is not touched | The second tab went to `/sign-in?returnTo=%2Fadmin` by itself. A later sign-in in one tab was followed by the other |
+| The legacy schema path is gone | Grep of `backend/` for `create_tables`, `run_migrations` (the legacy one), `migrate_h1b_to_visa_cache`, `legacy_bootstrap`, `ALEMBIC_ONLY`; `test_models_and_migrations.py` and `test_migration_0002.py` | None found outside the untouched `0001_baseline.py` comments and Alembic's own `env.py` functions; `legacy_bootstrap.py` and `test_schema_matches_legacy.py` don't exist; 6 tests pass (`alembic check`, an empty database built by migrations, an unstamped database refused) |
+
+Left for the tracks, not F6: the mocked modules (jobs, candidates, applications and so on) still run on mock data, and admin
+actions without an endpoint (suspend, change plan, plans) answer "Not available on the live backend yet".
 
 ### F7 — The cross-firm isolation test, reusable
 
