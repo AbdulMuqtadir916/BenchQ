@@ -3,11 +3,10 @@ import { LedgerEntrySchema } from "@/lib/schemas/analytics";
 import demoIds from "./dto/demo-ids.json";
 
 /**
- * The ledger on the live backend (NEXT_PUBLIC_LIVE_MODULES=session,ledger; docs/integration/01-ledger.md): the
+ * The ledger on the live backend (docs/integration/01-ledger.md): the
  * path names the backend's firm id, paging goes through as query params, and the wire shape of
  * backend/auth/serialize.py `ledger_entry_json` maps to LedgerEntry with the demo ids translated back.
  */
-vi.mock("@/lib/api/config", () => ({ isLive: (module: string) => module === "session" || module === "ledger" }));
 
 const { ledgerApi } = await import("./analytics");
 

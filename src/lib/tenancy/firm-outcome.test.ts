@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { sessionApi } from "@/lib/api/session";
 import type { Firm } from "@/lib/schemas/session";
 import type { FirmPrincipal, Principal } from "@/lib/schemas/tenancy";
 import { allUsers, firms } from "@/mocks/team";
 import { firmOutcome, type FirmLookup } from "./firm-outcome";
-import { signInAs } from "@/mocks/sign-in-as";
+import { signInAs, signOutForTest, firmBySlugForTest } from "@/mocks/sign-in-as";
 
 /**
  * docs/07 §2.5 for every fixture principal: sign the mock backend in, resolve each firm's slug (and
@@ -17,7 +16,7 @@ const slugs = [...firms.map((firm) => firm.slug), UNKNOWN_SLUG];
 
 async function lookup(slug: string): Promise<FirmLookup> {
   try {
-    return { status: "success", firm: await sessionApi.firmBySlug(slug) };
+    return { status: "success", firm: await firmBySlugForTest(slug) };
   } catch (error) {
     return { status: "error", error: error as Error };
   }
@@ -30,7 +29,7 @@ async function outcomesFor(principal: Principal | null): Promise<Record<string, 
 }
 
 afterEach(async () => {
-  await sessionApi.signOut();
+  signOutForTest();
 });
 
 describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every firm slug", () => {
@@ -49,8 +48,8 @@ describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every
     const expected = Object.fromEntries(slugs.map((slug) => [slug, slug === UNKNOWN_SLUG ? "not-found" : "support-required"]));
     expect(await outcomesFor(principal)).toEqual(expected);
     // The lookup answers an admin for any existing firm (they manage them all), but its data stays closed: support view is P4.
-    expect((await sessionApi.firmBySlug(firms[0]!.slug)).id).toBe(firms[0]!.id);
-    await expect(sessionApi.firmBySlug(UNKNOWN_SLUG)).rejects.toMatchObject({ status: 404 });
+    expect((await firmBySlugForTest(firms[0]!.slug)).id).toBe(firms[0]!.id);
+    await expect(firmBySlugForTest(UNKNOWN_SLUG)).rejects.toMatchObject({ status: 404 });
   });
 
   it("covers a user of every firm that has users, including the suspended one", () => {
@@ -58,16 +57,16 @@ describe("firm layout outcomes (docs/07 §2.5), every fixture principal × every
   });
 
   it("signed out: every slug, known or not, goes to sign-in (and the backend answers 401, not 404)", async () => {
-    await sessionApi.signOut();
+    signOutForTest();
     expect(Object.values(await outcomesFor(null))).toEqual(slugs.map(() => "signed-out"));
-    await expect(sessionApi.firmBySlug(firms[0]!.slug)).rejects.toMatchObject({ status: 401 });
+    await expect(firmBySlugForTest(firms[0]!.slug)).rejects.toMatchObject({ status: 401 });
   });
 
   it("answers an unknown slug and another firm's slug with the same 404, so a URL never confirms a firm exists", async () => {
     await signInAs("user_adnan");
     const otherFirm = firms.find((firm) => firm.id === "firm_stl")!.slug;
     expect(firms.some((firm) => firm.slug === UNKNOWN_SLUG)).toBe(false);
-    const errors = await Promise.all([UNKNOWN_SLUG, otherFirm].map((slug) => sessionApi.firmBySlug(slug).catch((error: ApiError) => [error.status, error.code, error.message])));
+    const errors = await Promise.all([UNKNOWN_SLUG, otherFirm].map((slug) => firmBySlugForTest(slug).catch((error: ApiError) => [error.status, error.code, error.message])));
     expect(errors[0]).toEqual(errors[1]);
     expect(errors[0]).toEqual([404, "NOT_FOUND", "Not found."]);
   });
@@ -118,12 +117,12 @@ describe("slug → firm resolution (docs/07 T8)", () => {
     for (const [userId, firmId] of [["user_imran", "firm_hts"], ["user_lakshmi", "firm_stl"], ["user_naveen", "firm_cbw"]] as const) {
       await signInAs(userId);
       const slug = firms.find((firm) => firm.id === firmId)!.slug;
-      expect((await sessionApi.firmBySlug(slug)).id).toBe(firmId);
+      expect((await firmBySlugForTest(slug)).id).toBe(firmId);
     }
   });
 
   it.each(["Hyderabad-Tech-Staffing", "hyderabad-tech-staffing-", "hyderabad", " hyderabad-tech-staffing", "hyderabad-tech-staffing/", "firm_hts"])("matches only the exact slug: %j is not-found", async (slug) => {
     await signInAs("user_imran");
-    await expect(sessionApi.firmBySlug(slug)).rejects.toMatchObject({ status: 404 });
+    await expect(firmBySlugForTest(slug)).rejects.toMatchObject({ status: 404 });
   });
 });

@@ -1,14 +1,14 @@
+import { liveSession } from "@/lib/api/live-session";
 import { afterEach, describe, expect, it } from "vitest";
-import { sessionApi } from "@/lib/api/session";
 import { applySession } from "@/lib/hooks/use-session";
-import { signInAs } from "@/mocks/sign-in-as";
+import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "./session-store";
 
 /** The client session store (docs/07 §3, Phase L): who is signed in, never which firm a page shows. */
 
 afterEach(async () => {
   useSession.getState().reset();
-  await sessionApi.signOut();
+  signOutForTest();
 });
 
 const state = () => useSession.getState();
@@ -70,7 +70,7 @@ describe("applySession: start-up and other tabs (docs/07 L4, Q27)", () => {
       if (next.principal?.userId !== previous.principal?.userId) commits.push(next.principal?.userId ?? "signed out");
     });
     applySession(await signInAs("padm_sana"));
-    applySession(await sessionApi.current()); // the same principal again: no change
+    applySession(liveSession()); // the same principal again: no change
     stop();
     expect(commits).toEqual(["padm_sana"]);
   });

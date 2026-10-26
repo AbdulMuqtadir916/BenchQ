@@ -8,7 +8,6 @@ import candidatesSeed from "./data/candidates.json";
 import { findInFirm, inFirm, mockResult, newId } from "./_shared";
 import { currentPrincipal, currentUser } from "./auth";
 import { changed, table } from "./db";
-import { logFirmAction } from "./ledger";
 import { firmScoped } from "./membership";
 import { allUsers, firms } from "./team-data";
 
@@ -80,15 +79,6 @@ export const candidatesMock = firmScoped("candidates", {
     });
     allCandidates.unshift(candidate);
     changed("candidates");
-    const assignee = assigneeId ? allUsers.find((user) => user.id === assigneeId) : null;
-    logFirmAction({
-      firmId,
-      entityType: "candidate",
-      entityId: candidate.id,
-      entityLabel: candidate.fullName,
-      action: "CREATE",
-      summary: `Added candidate ${candidate.fullName}${assignee ? `, assigned to ${assignee.name}` : ", unassigned"}`,
-    }, now);
     return mockResult(candidate);
   },
 

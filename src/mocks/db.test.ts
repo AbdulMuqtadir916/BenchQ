@@ -26,21 +26,21 @@ type Globals = { __BENCHQ_DEMO_STORAGE__?: Storage | null; __BENCHQ_DEMO_NOW__?:
 const g = globalThis as Globals;
 let storage: StubStorage;
 
-/** A page load: fresh mock modules over the same storage, at `now`, signed in as `email` if given. */
+/** A page load: fresh mock modules over the same storage, at `now`, signed in as the seeded account `email` names if given. */
 async function load(now = T0, email?: string) {
   vi.resetModules();
   g.__BENCHQ_DEMO_NOW__ = now;
-  const [db, auth, applications, candidates, documents, inbox, invitesModule, tenancy, team, ledger, demo] = await Promise.all([
-    import("./db"), import("./auth"), import("./applications"), import("./candidates"), import("./documents"), import("./inbox"),
-    import("./invites"), import("./tenancy"), import("./team"), import("./ledger"), import("./demo-data"),
+  const [db, signIn, applications, candidates, documents, inbox, tenancy, team, demo] = await Promise.all([
+    import("./db"), import("./sign-in-as"), import("./applications"), import("./candidates"), import("./documents"), import("./inbox"),
+    import("./tenancy"), import("./team"), import("./demo-data"),
   ]);
-  if (email) auth.signInWithPassword(email, auth.DEMO_PASSWORD);
-  return { db, auth, applications, candidates, documents, inbox, invitesModule, tenancy, team, ledger, demo };
+  if (email) await signIn.signInAs(email);
+  return { db, signIn, applications, candidates, documents, inbox, tenancy, team, demo };
 }
 const stored = () => JSON.parse(storage.getItem(KEY) ?? "null") as { version: string; seededAt: string; tables: Record<string, unknown[]> } | null;
-const ADNAN = "adnan@hyderabad-tech-staffing.benchq.test";
-const FATIMA = "fatima@hyderabad-tech-staffing.benchq.test";
-const SANA = "sana@admin.benchq.test";
+const ADNAN = "user_adnan"; // seeded account ids (./sign-in-as.ts)
+const FATIMA = "user_fatima";
+const SANA = "padm_sana";
 
 beforeEach(() => {
   storage = new StubStorage();
@@ -77,7 +77,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
     const before = app.status;
     await first.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "WITHDRAWN", note: "persist me" });
     first.db.flush();
-    first.auth.signOut();
+    first.signIn.signOutForTest();
     expect(Object.keys(stored()!.tables)).toEqual(["applications"]);
 
     const second = await load(at(1), FATIMA); // next day, another account in the same browser
@@ -110,13 +110,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
     m.db.flush();
     expect(Object.keys(stored()!.tables)).toContain("inboxMessages");
 
-    m.invitesModule.acceptInvite("inv_gsc_owner", { userId: "user_gsc_owner", name: "Sunita Rao" });
-    m.db.flush();
-    expect(Object.keys(stored()!.tables)).toEqual(expect.arrayContaining(["users", "invites", "firms", "ledger"]));
-
-    const reloaded = await load(at(1), "owner@gachibowli-staffing.benchq.test"); // the accepted owner still exists after a reload
-    expect(reloaded.team.firms.find((f) => f.id === "firm_gsc")?.status).toBe("ACTIVE");
-    expect(reloaded.auth.currentPrincipal()).toMatchObject({ userId: "user_gsc_owner" });
+    const reloaded = await load(at(1), ADNAN);
     expect(reloaded.candidates.allCandidates.find((c) => c.id === candidate.id)?.noticePeriodDays).toBe(45);
   });
 

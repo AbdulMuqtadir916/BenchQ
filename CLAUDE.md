@@ -233,9 +233,9 @@ docker compose up -d db backend   # backend + Postgres (only for integration wor
 - Produce a `VERIFIED` claim — in mock data or a mapper — without an `evidenceId`.
 - Bypass the export gate on resumes with unverified claims.
 - Store a derived counter as a literal.
-- Treat the mock sign-in, the seeded accounts, the demo password or the client session store as
-  security (they are mock auth until Phase D), or bring back a principal switcher (Q25: everyone signs
-  in on `/sign-in`).
+- Bring back a mock sign-in, a client-side session store or a principal switcher (Q25: everyone signs in on
+  `/sign-in`, and the session is the backend's cookie). The seeded demo accounts and the demo password are
+  local data, not secrets to build on; the browser never decides who someone is.
 - Give a platform admin any write path into a firm, or read the current firm from anywhere but the
   URL.
 - Add a dependency without checking `docs/01-FRONTEND-ARCHITECTURE.md §3`.
@@ -260,11 +260,12 @@ A stopped task with a clear question beats a confident wrong implementation.
 **Phase: Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md` §3, reordered by 07 Q38 on
 2026-10-21). **The onboarding flow is done end to end on the real backend** (#32–#41, then #42–#46): a Super Admin
 creates a firm and its OWNER invite, the owner accepts and signs in at `/[firm]`, invites MANAGER / BDE / VIEWER, and
-they accept and sign in. Live mode is **opt-in** (`NEXT_PUBLIC_LIVE_MODULES=session`); without it every module runs
-on mocks. **Done since:** F2b (`firm_id` on the existing tables, `firm_jobs`), F2c (platform vs per-firm settings),
+they accept and sign in. The session is always the backend's (F6): sign-in, the team, invites, `/admin` and the ledger are live, and
+the other modules run on mocks under the real signed-in user. **Done since:** F2b (`firm_id` on the existing tables, `firm_jobs`), F2c (platform vs per-firm settings),
 the support-view endpoints (issue #56), F7 (the isolation test over every route, #61), the legacy schema path
 (issue #62), the signed-out redirect in `src/proxy.ts` (issue #63), and the principal read on the server with real 404 / 403
-(issue #64). **Next:** the rest of F6, one PR at a time (issues #65–#66): live by default with the mock sign-in removed.
+(issue #64), and live by default with the mock sign-in removed (issue #65). **Next:** the F6 exit check on a production
+build (issue #66).
 Then the module tracks (`docs/integration/README.md` board). Phase B fixes stay **paused** (PRs 3–14; W26 of PR 11 done in #46). Repo snapshot:
 `docs/CURRENT_STATE.md` (2026-10-19, predates Phase B).
 
@@ -281,7 +282,7 @@ Then the module tracks (`docs/integration/README.md` board). Phase B fixes stay 
 | `docs/CURRENT_STATE.md` regenerated | Done (2026-10-19) |
 | 07 Phase C — the permission policy (firm, team and platform actions, `<Can>`, route access via `can`, full principal × action table test, exit grep) | Done (#23) |
 | 07 Phase B — UI completion audit (`docs/AUDIT-PHASE-B.md`) | Audit done (#24, #25). Fix PRs 1–2 done (#26 real create, #27 read-only leaks + `JobMark`); W26 (sign-in redirect when signed in, Q35) done in #46; **PRs 3–14 otherwise paused** (2026-10-21) |
-| **Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md`): decisions D1–D4, D2, sessions, jobs pool (Q37); onboarding first (Q38) | F1 + 0002 (#29, #30), CI (#31). Onboarding PRs 1–7 done: tables (#33), sign-in + auth on every endpoint (#34), policy table (#35), Super Admin firms + invites (#36, #39), OWNER member invites (#37), first-admin command + demo seed (#38), frontend live opt-in (#40, #41). Fixes from testing: invite guards (#42, Q39), `reset_password` (#43). Support views on the backend (issue #56). F2b (#52), F2c (#57–#59), F7 isolation test (#61), legacy schema path deleted (issue #62), signed-out redirect (issue #63), server-side principal with real 404 / 403 (issue #64). **Next: rest of F6 (issues #65–#66)** |
+| **Backend auth + tenancy** (`docs/integration/07-auth-and-tenancy.md`): decisions D1–D4, D2, sessions, jobs pool (Q37); onboarding first (Q38) | F1 + 0002 (#29, #30), CI (#31). Onboarding PRs 1–7 done: tables (#33), sign-in + auth on every endpoint (#34), policy table (#35), Super Admin firms + invites (#36, #39), OWNER member invites (#37), first-admin command + demo seed (#38), frontend live opt-in (#40, #41). Fixes from testing: invite guards (#42, Q39), `reset_password` (#43). Support views on the backend (issue #56). F2b (#52), F2c (#57–#59), F7 isolation test (#61), legacy schema path deleted (issue #62), signed-out redirect (issue #63), server-side principal with real 404 / 403 (issue #64), live by default and the mock sign-in removed (issue #65). **Next: F6 exit check (issue #66)** |
 | 07 Phase S — Super Admin flow polish (UI-first), including building `/admin/system` and AI spend from docs/02 §3.2 | Planned, after B resumes |
 | 07 Phase M — firm-side invite flow (OWNER invites members) | Done: M1, M2 (#37, #41), M3 "Seats used" (#44), M4 ledger and M5 tests (#37, #41). Deactivate and role change come later |
 | System contracts (`HealthCheck`, `ScraperRun`, `AiUsage`, docs/02 §3.2) | Approved (Q33, Q34), not built — built in Phase S |
