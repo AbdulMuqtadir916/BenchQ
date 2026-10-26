@@ -14,47 +14,10 @@ mapping needs a product decision, stop and ask.
 
 ---
 
-## First day — from clone to your first module
+## First day
 
-**You need:** Git, Docker Desktop (running), and Node 22+. On an Apple-silicon Mac,
-`node -p process.arch` must print `arm64`. If it prints `x64`, install an arm64 build first (see
-"Known setup pitfalls" in `00-foundation.md`).
-
-```bash
-# 1. Get the code. All work starts from the main branch (the default after cloning).
-git clone https://github.com/samad-012/BenchQ.git && cd BenchQ
-
-# 2. Frontend dependencies
-nvm use                      # reads .nvmrc (Node 22)
-npm i -g pnpm@12.5.1   # the version in package.json; corepack's pnpm shim breaks on 12.5.1
-pnpm install
-ls node_modules/.pnpm | grep lightningcss-darwin   # Apple silicon: must print lightningcss-darwin-arm64
-
-# 3. Env files (both git-ignored; the defaults work for local development)
-cp .env.example .env.local
-cp backend/.env.example backend/.env
-
-# 4. Backend + database. The first build takes several minutes (Playwright).
-docker compose up -d --build db backend
-curl http://localhost:8000/health        # {"status":"ok","service":"JobNavigator",...}
-
-# 5. Demo accounts (local only), then the frontend
-docker compose exec backend python -m backend.scripts.seed_demo
-pnpm dev                                 # http://localhost:3000
-```
-
-**The backend is always required** (F6): the session is the backend's cookie, so without
-`docker compose up -d db backend` nobody can sign in, and `/sign-in` says "Can't reach the BenchQ backend".
-Open `http://localhost:3000`, not `127.0.0.1` (the backend checks the origin).
-
-**Check it works:**
-
-- `http://localhost:3000/health` shows the backend's health JSON. That means the frontend → backend
-  proxy works.
-- `http://localhost:3000/sign-in` renders, and a seeded account (docs/03 §3.2) signs in with
-  `benchq-demo-2026`. The session, the team, invites, `/admin` and the ledger are the backend's; every other screen
-  still runs on mock data, under that real signed-in user, until its module is switched on.
-- `pnpm typecheck && pnpm lint && pnpm test` all pass.
+Follow the **Quick start** in the root [`README.md`](../../README.md): clone, install, env files, backend, demo accounts,
+`pnpm dev`, checks. A step that fails: [`docs/troubleshooting.md`](../troubleshooting.md).
 
 **Then pick up a module:**
 
@@ -66,9 +29,6 @@ Open `http://localhost:3000`, not `127.0.0.1` (the backend checks the origin).
    with the prompt in [Briefing a Claude session](#briefing-a-claude-session).
 5. Open your PR **into `main`**.
 
-Until foundation step F5 lands, the database starts empty apart from a few seeded companies; add data
-through the backend's API docs at `http://localhost:8000/docs`. After F5, `backend/scripts/seed_demo.py`
-loads the same firms, accounts and data as the mocks.
 To look inside the database, see [`database-viewer.md`](./database-viewer.md).
 
 ---
@@ -258,8 +218,8 @@ breaks joins, unless both use the seeded ids (F5 derives backend UUIDs from the 
 
 ## Running locally
 
-**Requirements:** Node 22+ (`nvm use`), pnpm 12.5.1 (`npm i -g pnpm@12.5.1`), Docker. Python 3.12 only if you run
-the backend outside Docker.
+**Requirements:** Node 22+, pnpm 12.5.1 (`corepack enable`), Docker; the Quick start in the root `README.md` sets them up. Python
+3.12 only if you run the backend outside Docker.
 
 | Task | Command |
 |---|---|

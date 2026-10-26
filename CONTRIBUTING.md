@@ -5,8 +5,8 @@ agents alike. Read it first, then `product.md` once.
 
 ## First day
 
-Follow "First day" in [`docs/integration/README.md`](docs/integration/README.md): clone, env files, Docker,
-`pnpm dev`, then sign in with a seeded account. Then ask for a starter task. Module tracks are handed out from
+Follow the Quick start in [`README.md`](README.md): clone, install, env files, Docker, demo accounts, `pnpm dev`, then
+sign in. A step that fails: [`docs/troubleshooting.md`](docs/troubleshooting.md). Then ask for a starter task. Module tracks are handed out from
 the [module board](docs/integration/README.md#module-board) once the foundation (F1–F7) is done. Put your name
 in **Owner** on the row you take.
 
@@ -45,7 +45,7 @@ in **Owner** on the row you take.
 
 ## Secrets
 
-Each person uses their own keys (AI providers, Telegram, Gmail) in `backend/.env`, which is git-ignored.
+Each person uses their own keys (AI providers, Gmail) in `backend/.env`, which is git-ignored.
 Nothing secret goes in the repo, a fixture, a test or a PR description. There is no shared staging server
 yet.
 

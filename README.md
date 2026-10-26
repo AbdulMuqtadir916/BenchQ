@@ -1,104 +1,76 @@
-# BenchQ — Frontend Documentation Set
+# BenchQ
 
-## Current design system
+A multi-tenant B2B SaaS for US-focused IT staffing firms: bench-sales recruiters (BDEs) submit applications for
+their candidates, and owners and managers see all of it as it happens. The frontend is Next.js; the backend is
+JobNavigator (FastAPI + PostgreSQL) in `backend/`. The session, the team, invites, `/admin` and the ledger run
+on the backend; every other module runs on mock data until its track connects it.
 
-Run `pnpm dev` and open `http://localhost:3000/dev/design-system`.
-The v3 system uses a frosted collapsible shell, rounded white workspace, compact
-tables/forms, raised gradient primary buttons, and colored monospace tags.
-Overview, Foundations, Patterns, and Interactive lab show the working components.
-`design.md` is the visual specification; `src/app/globals.css` contains theme tokens.
-Use `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm build` to verify.
+## Quick start
 
-Context pack for building the **BenchQ** frontend with Claude Code.
+**Prerequisites:** Git, Docker Desktop (running), Node 22 or newer (`.nvmrc`). On an Apple-silicon Mac,
+`node -p process.arch` prints `arm64`.
 
-**Status: the UI is built and is being connected to the JobNavigator backend (FastAPI), one module
-at a time.** Each module runs on mock data (`src/mocks/`) until its adapter in `src/lib/api/`
-switches it to the backend. **Integrating a module? Start at
-[`docs/integration/README.md`](docs/integration/README.md).**
+1. **Clone.**
+   `git clone https://github.com/AbdulMuqtadir916/BenchQ.git && cd BenchQ`
+   *Done when* `git branch --show-current` prints `main`.
+2. **Install the frontend.**
+   `nvm use` (skip without nvm), `corepack enable`, `pnpm install`
+   *Done when* `pnpm -v` prints `12.5.1`. On Apple silicon, `ls node_modules/.pnpm | grep lightningcss-darwin` lists
+   `lightningcss-darwin-arm64` and no `x64`.
+3. **Copy the env files** (both are git-ignored; the defaults work locally).
+   `cp .env.example .env.local && cp backend/.env.example backend/.env`
+   *Done when* both files exist. AI-provider and Gmail keys are only for the features that call them.
+4. **Start the backend and database.** The first build takes several minutes.
+   `docker compose up -d --build db backend`
+   *Done when* `curl http://localhost:8000/health` returns JSON with `"status":"ok"`.
+5. **Load the demo accounts** (local only).
+   `docker compose exec backend python -m backend.scripts.seed_demo`
+   *Done when* it prints `Seeded: …`.
+6. **Start the frontend.**
+   `pnpm dev`, then open `http://localhost:3000` (not `127.0.0.1`: the backend checks the origin).
+   *Done when* `imran@hyderabad-tech-staffing.benchq.test` with the password `benchq-demo-2026` signs in and lands
+   on `/hyderabad-tech-staffing/dashboard`. The other demo accounts are in `docs/03-MOCK-DATA.md` §3.2.
+7. **Run the checks.**
+   `pnpm typecheck && pnpm lint && pnpm test`
+   *Done when* all three exit 0. Backend tests run on Postgres: `docs/integration/README.md`, "Tests run on Postgres".
 
----
+A step that doesn't end as described: [`docs/troubleshooting.md`](docs/troubleshooting.md). Then read
+[`CONTRIBUTING.md`](CONTRIBUTING.md) (branches, reviews) and pick up a task from the
+[module board](docs/integration/README.md#module-board).
 
-## Files
+## Where things live
 
 | File | What it owns | Read it when |
 |---|---|---|
-| `CLAUDE.md` | The agent contract — scope, rules, conventions, definition of done | Every session, first |
-| `CONTRIBUTING.md` | How the team works — branches, PRs, reviews, code owners, migrations, secrets | Your first day; before your first PR |
-| `product.md` | Why it exists — the user, his night, vocabulary, constraints, judgment principles | Once per session; whenever a spec doesn't cover a case |
-| `design.md` | v3 visual language, colour, type, spacing, motion and component rules | Anything visual |
-| `docs/01-FRONTEND-ARCHITECTURE.md` | Stack, versions, folder structure, the adapter rule, routing, env | Setting up, adding a dependency, wiring data |
-| `docs/02-DATA-CONTRACTS.md` | Every Zod schema; JobNavigator alignment | Defining a type, shaping a fixture |
-| `docs/03-MOCK-DATA.md` | Fixture volumes, MSW setup, AI simulation, derived counters | Building the mock layer, adding fixtures |
-| `docs/04-SCREENS.md` | Every route: layout, states, permissions, keyboard map | Building any screen |
-| `docs/05-COMPONENTS.md` | Component inventory with props and variants | Building any component |
-| `docs/06-IMPLEMENTATION-PLAN.md` | Nine phases with exit criteria | Starting work, closing a phase |
-| `docs/07-ROUTES-AND-RBAC.md` | Route registry, access per role, UI completion audit, then RBAC | Touching routes, navigation, permissions or role checks |
-| `docs/integration/` | Backend integration: data flow, per-module plans, open product decisions | Connecting any module to the backend |
-| `docs/archive/` | Backend endpoint reference (`BACKEND_API_FEATURES.md`) and the old JSON-migration notes | Looking up a backend endpoint |
+| `CLAUDE.md` | The agent contract: scope, rules, conventions, definition of done. `AGENTS.md` points other agents to it | Every session, first |
+| `CONTRIBUTING.md` | How the team works: branches, PRs, reviews, code owners, migrations, secrets | Before your first PR |
+| `docs/troubleshooting.md` | Setup failures: symptom, cause, fix | A Quick start step fails |
+| `product.md` | Why it exists: the user, his night, vocabulary, judgment principles | Once per session; when a spec doesn't cover a case |
+| `design.md` | Visual language: colour, type, spacing, motion, component rules (`/dev/design-system` shows it running) | Anything visual |
+| `docs/01-FRONTEND-ARCHITECTURE.md` | Stack, folder structure, the adapter rule, routing, env | Adding a dependency, wiring data |
+| `docs/02-DATA-CONTRACTS.md` | Every Zod schema; JobNavigator alignment | Defining a type or fixture |
+| `docs/03-MOCK-DATA.md` | Fixture volumes, the demo accounts (§3.2), derived counters | Adding fixtures |
+| `docs/04-SCREENS.md` | Every route: layout, states, permissions, keyboard map | Building a screen |
+| `docs/05-COMPONENTS.md` | Component inventory with props and variants | Building a component |
+| `docs/06-IMPLEMENTATION-PLAN.md` | The nine UI build phases (complete) | Checking what a phase promised |
+| `docs/07-ROUTES-AND-RBAC.md` | Route registry, access per role, the permission policy | Routes, navigation, permissions |
+| `docs/integration/` | Backend integration: the board, the module plans, auth and tenancy (07), open decisions | Connecting a module to the backend |
+| `docs/archive/` | Backend endpoint reference and retired notes | Looking up a backend endpoint |
 
----
+## The three rules everything follows
 
-## Setup
+**One architectural rule.** Components talk to hooks, hooks talk to typed adapters in `src/lib/api/`, and only
+adapters decide between mock data and the backend. Backend responses are mapped to the frontend types in
+`src/lib/api/dto/`, so screens never change.
 
-1. Scaffold the app, then drop this doc set at the repo root:
+**Verified, unverified, contradicted.** `VERIFIED` is evidence-backed and shippable. `UNVERIFIED` is drafted and
+needs review. `CONTRADICTED` conflicts with the evidence and never ships. A resume with any unverified claim cannot
+be exported. This is the product, not a feature of it.
 
-```
-benchq-frontend/
-├── CLAUDE.md
-├── product.md
-├── design.md          ← your existing file, copied here
-└── docs/
-    ├── 01-FRONTEND-ARCHITECTURE.md
-    ├── 02-DATA-CONTRACTS.md
-    ├── 03-MOCK-DATA.md
-    ├── 04-SCREENS.md
-    ├── 05-COMPONENTS.md
-    └── 06-IMPLEMENTATION-PLAN.md
-```
+**Every number is derived.** Counters are computed from event arrays, never stored as a literal.
 
-2. `product.md` and `design.md` both live at the **root**, not in `docs/` — `CLAUDE.md` references
-   them there. `design.md` is the single source of truth for every token; `product.md` is the
-   single source of truth for every judgment call a spec doesn't cover.
+Two features drive every design decision: **time compression** (every extra click costs at 11pm on application
+forty) and **total transparency** (the owner and manager see who is working on what, at what stage, at any moment).
 
-3. Start Claude Code in the repo and begin Phase 0. A good opening prompt:
-
-> Read CLAUDE.md and docs/06-IMPLEMENTATION-PLAN.md. Execute Phase 0 — Foundation. Stop at the
-> exit criteria and report against each one.
-
-4. Update the **Current phase** line at the bottom of `CLAUDE.md` as you progress. It is the first
-   thing every new session reads.
-
----
-
-## The three ideas everything else follows from
-
-**One architectural rule.** Components talk to hooks, hooks talk to typed adapters in
-`src/lib/api/`, and only adapters decide between mock data and the real backend. Backend responses
-are mapped to the frontend types in `src/lib/api/dto/`, so screens never change.
-
-**Verified, unverified, contradicted.** `VERIFIED` is evidence-backed and shippable. `UNVERIFIED` is drafted and needs
-review. `CONTRADICTED` conflicts with the evidence and never ships. A resume with any unverified claim cannot be
-exported. This is the product, not a feature of it.
-
-**Every number is derived.** Counters are computed from event arrays, never stored as a literal in
-a fixture. It mirrors the real backend contract and it catches drift on day one instead of month
-four.
-
----
-
-## Two features drive every decision
-
-1. **Time compression.** Cut the BDE's manual work. Every extra click is a real cost at 11pm on
-   application forty.
-2. **Total transparency.** The owner and manager can see how many BDEs are working on how many
-   applications, for how many candidates, at what stage, at any moment.
-
-If a design choice doesn't serve one of those, it needs a reason.
-
----
-
-## Related
-
-The full-stack spec set — BRD, PRD, TRD, data model, API spec, AI layer, OSS stack, full
-implementation plan — lives in the BenchQ project under `specs/`. This frontend pack is
-deliberately narrower and supersedes it wherever the two disagree **on frontend matters only**.
+The full-stack spec set (BRD, PRD, TRD, data model, API spec) lives in the BenchQ project under `specs/`. This repo
+supersedes it on frontend matters only.
