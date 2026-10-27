@@ -115,6 +115,11 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                manager_id=manager.id, password_hash=password_hash())
     db.add(bde)
     db.flush()
+    from backend.models.candidates import Candidate
+    candidate = Candidate(firm_id=firm.id, manager_id=manager.id, bde_id=bde.id, created_by_user_id=owner.id,
+                          full_name=f"{tag} candidate", primary_role=f"{tag} Java Developer", work_auth="H1B")
+    db.add(candidate)
+    db.flush()
     invite, _ = send_invite(db, inviter=owner, firm=firm, email=f"bde@{tag.lower()}.test", role="BDE",
                             invitee_name=f"{tag} invitee", summary=f"Invited a BDE to {tag}", now=utcnow(),
                             manager_id=manager.id)
@@ -123,7 +128,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.flush()
     return {"firm": firm.id, "slug": firm.slug, "job": job.id, "app": app.id, "interview": interview.id,
             "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id,
-            "manager": manager.id, "bde_user": bde.id}
+            "manager": manager.id, "bde_user": bde.id, "candidate": candidate.id}
 
 
 def make_world(db, accounts) -> World:
