@@ -58,6 +58,8 @@ export const queryKeys = {
   },
   /** /invite/[token]: public, before anyone signs in. */
   invite: (token: string) => ["invite", token] as const,
+  /** The mock parser's sample résumé names (not firm data: the same fixtures for every firm). */
+  resumeSamples: () => ["resume-samples"] as const,
   companies: {
     all: () => ["companies"] as const,
     detail: (id: string) => ["companies", "detail", id] as const,
