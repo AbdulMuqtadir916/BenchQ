@@ -6,6 +6,8 @@ import { TriangleAlert, ArrowRight } from "lucide-react";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
+import { scopeApplications, scopeCandidates, scopeFollowups, scopeTeam } from "@/lib/auth/permissions";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { deriveBdePerformance, deriveFunnel, deriveCandidateStats, daysBetween } from "@/lib/derive";
 import { StatCard } from "@/components/app/stat-card";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,10 +59,15 @@ export function FloorContent() {
   const pipeline = queryGroup(applicationsQuery);
   const risk = queryGroup(candidatesQuery, applicationsQuery);
 
-  const candidates = candidatesQuery.data ?? EMPTY;
-  const applications = applicationsQuery.data ?? EMPTY;
-  const followups = followupsQuery.data ?? EMPTY;
-  const team = teamQuery.data ?? EMPTY;
+  // A MANAGER's floor is their team's (07 Q47); the OWNER's (and a support view's) is the whole firm.
+  const principal = useSignedInPrincipal();
+  const firmCandidates = candidatesQuery.data ?? EMPTY;
+  const firmTeam = teamQuery.data ?? EMPTY;
+  const context = useMemo(() => ({ users: firmTeam, candidates: firmCandidates }), [firmTeam, firmCandidates]);
+  const candidates = useMemo(() => scopeCandidates(principal, firmCandidates), [principal, firmCandidates]);
+  const applications = useMemo(() => scopeApplications(principal, applicationsQuery.data ?? EMPTY, firmCandidates), [principal, applicationsQuery.data, firmCandidates]);
+  const followups = useMemo(() => scopeFollowups(principal, followupsQuery.data ?? EMPTY, context), [principal, followupsQuery.data, context]);
+  const team = useMemo(() => scopeTeam(principal, firmTeam, firmCandidates), [principal, firmTeam, firmCandidates]);
 
   const perBde = useMemo(
     () => deriveBdePerformance(team, candidates, applications),

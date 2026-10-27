@@ -5,6 +5,7 @@ import applicationsSeed from "./data/applications.json";
 import followupsSeed from "./data/followups.json";
 import { scopeApplications } from "@/lib/auth/policy";
 import { currentPrincipal, currentUser } from "./auth";
+import { allCandidates } from "./candidates";
 import { findInFirm, inFirm, mockResult, notFound } from "./_shared";
 import { firmScoped } from "./membership";
 import { changed, table } from "./db";
@@ -27,8 +28,9 @@ export const applicationsMock = firmScoped("applications", {
     const application = findInFirm(allApplications, firmId, id, "Application");
     // Who may move it is the policy (docs/07 Phase C): `application.move` is checked by firmScoped (a
     // VIEWER or a support view → 403); the record must be in the principal's scope (a BDE, someone
-    // else's → 404, exactly like a missing one, so the call never confirms it exists, principle 4).
-    if (scopeApplications(currentPrincipal(), [application]).length === 0) notFound("Application", id);
+    // else's; a MANAGER, another team's → 404, exactly like a missing one, so the call never confirms it
+    // exists, principle 4).
+    if (scopeApplications(currentPrincipal(), [application], inFirm(allCandidates, firmId)).length === 0) notFound("Application", id);
     const update = UpdateApplicationStatusSchema.parse(body);
     const now = new Date().toISOString();
 

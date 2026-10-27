@@ -12,7 +12,7 @@ import type { CandidateStatus } from "@/lib/schemas/enums";
 import { useCandidateBlock, useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
-import { can, hasOwnScope, scopeCandidates } from "@/lib/auth/permissions";
+import { can, hasOwnScope, hasTeamScope, scopeCandidates } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { deriveCandidateStats } from "@/lib/derive";
 import { DataTable } from "@/components/app/data-table";
@@ -174,7 +174,7 @@ export default function CandidatesPage() {
     <div className="bq-page">
       <PageHeader
         title="Candidates"
-        subtitle={isOwnScope ? "Your assigned bench." : "Every candidate on the firm's bench."}
+        subtitle={isOwnScope ? "Your assigned bench." : hasTeamScope(principal) ? "Your team's bench: your BDEs' candidates and the ones waiting for a BDE." : "Every candidate on the firm's bench."}
         actions={
           canCreate ? <NewCandidateAction href={toHref("candidates.new")} /> : undefined
         }

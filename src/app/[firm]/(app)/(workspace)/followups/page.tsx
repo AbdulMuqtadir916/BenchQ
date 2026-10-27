@@ -6,7 +6,9 @@ import { motion, AnimatePresence } from "motion/react";
 import type { FollowUpTask } from "@/lib/schemas/application";
 import type { FollowUpKind } from "@/lib/schemas/enums";
 import { useFollowups } from "@/lib/hooks/use-applications";
-import { can, scopeFollowupsUserId } from "@/lib/auth/permissions";
+import { useCandidates } from "@/lib/hooks/use-candidates";
+import { useTeam } from "@/lib/hooks/use-team";
+import { can, hasTeamScope, scopeFollowups, scopeFollowupsUserId } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { PageHeader } from "@/components/app/page-header";
 import { Card } from "@/components/ui/card";
@@ -47,12 +49,20 @@ const BUCKETS: { key: Bucket; label: string; tone: "red" | "amber" | "blue" | "n
 export default function FollowupsPage() {
   const principal = useSignedInPrincipal();
   const followupsQuery = useFollowups(scopeFollowupsUserId(principal));
+  // A MANAGER's follow-ups are their team's (07 Q47): who is on it comes from the team and the candidates they manage.
+  const teamQuery = useTeam();
+  const candidatesQuery = useCandidates();
+  const contextQueries = hasTeamScope(principal) ? [teamQuery, candidatesQuery] : [];
+  const loadError = followupsQuery.error ?? contextQueries.find((query) => query.error)?.error ?? null;
+  const isLoading = followupsQuery.isLoading || contextQueries.some((query) => query.isLoading);
+  const retry = () => { void followupsQuery.refetch(); for (const query of contextQueries) void query.refetch(); };
   const [done, setDone] = useState<Set<string>>(new Set());
   const canAct = can(principal, "followup.act");
 
   const pending = useMemo(
-    () => (followupsQuery.data ?? []).filter((f) => f.state === "PENDING" && !done.has(f.id)),
-    [followupsQuery.data, done],
+    () => scopeFollowups(principal, followupsQuery.data ?? [], { users: teamQuery.data ?? [], candidates: candidatesQuery.data ?? [] })
+      .filter((f) => f.state === "PENDING" && !done.has(f.id)),
+    [followupsQuery.data, teamQuery.data, candidatesQuery.data, principal, done],
   );
 
   const grouped = useMemo(() => {
@@ -69,9 +79,9 @@ export default function FollowupsPage() {
     <div className="bq-page">
       <PageHeader title="Follow-ups" subtitle="Day-3 LinkedIn, day-7 email — generated when an application is sent." />
 
-      {followupsQuery.error ? (
-        <ErrorState error={followupsQuery.error} onRetry={() => void followupsQuery.refetch()} />
-      ) : followupsQuery.isLoading ? (
+      {loadError ? (
+        <ErrorState error={loadError} onRetry={retry} />
+      ) : isLoading ? (
         <Card className="p-0"><SkeletonList rows={6} /></Card>
       ) : pending.length === 0 ? (
         <EmptyState icon={BellOff} title="Nothing due" description="Every follow-up is handled. New ones appear as applications go out." variant="first-run" />

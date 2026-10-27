@@ -5,6 +5,8 @@ import { useApplications } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { useTeam } from "@/lib/hooks/use-team";
+import { hasTeamScope, scopeApplications, scopeCandidates, scopeTeam } from "@/lib/auth/permissions";
+import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { deriveFunnel, deriveBdePerformance, daysBetween } from "@/lib/derive";
 import type { JobSourceType } from "@/lib/schemas/enums";
 import { PageHeader } from "@/components/app/page-header";
@@ -28,16 +30,19 @@ export default function AnalyticsPage() {
   const teamQuery = useTeam();
 
   const days = PERIODS.find((p) => p.key === period)!.days;
+  // A MANAGER's analytics are their team's (07 Q47); everyone else who opens the page sees the firm.
+  const principal = useSignedInPrincipal();
+  const allCandidates = candidatesQuery.data;
 
   const applications = useMemo(
-    () => (applicationsQuery.data ?? []).filter((a) => !a.appliedAt || daysBetween(a.appliedAt, new Date()) <= days),
-    [applicationsQuery.data, days],
+    () => scopeApplications(principal, applicationsQuery.data ?? [], allCandidates ?? []).filter((a) => !a.appliedAt || daysBetween(a.appliedAt, new Date()) <= days),
+    [applicationsQuery.data, allCandidates, principal, days],
   );
 
   const funnel = useMemo(() => deriveFunnel(applications), [applications]);
   const perBde = useMemo(
-    () => deriveBdePerformance(teamQuery.data ?? [], candidatesQuery.data ?? [], applications),
-    [teamQuery.data, candidatesQuery.data, applications],
+    () => deriveBdePerformance(scopeTeam(principal, teamQuery.data ?? [], allCandidates ?? []), scopeCandidates(principal, allCandidates ?? []), applications),
+    [teamQuery.data, allCandidates, applications, principal],
   );
 
   const sourceRoi = useMemo(() => {
@@ -57,7 +62,7 @@ export default function AnalyticsPage() {
       .sort((a, b) => b.apps - a.apps);
   }, [jobsQuery.data, applications]);
 
-  const isLoading = applicationsQuery.isLoading || teamQuery.isLoading;
+  const isLoading = applicationsQuery.isLoading || teamQuery.isLoading || (hasTeamScope(principal) && candidatesQuery.isLoading);
   // Failed data must never render as real zeros (CLAUDE.md: every number is derived, three states).
   const loadError = (applicationsQuery.error ?? candidatesQuery.error ?? jobsQuery.error ?? teamQuery.error) as Error | null;
   const maxApps = Math.max(1, ...perBde.map((b) => b.applicationsSubmitted));
@@ -76,7 +81,7 @@ export default function AnalyticsPage() {
     <div className="bq-page">
       <PageHeader
         title="Analytics"
-        subtitle="Funnel, throughput, and source effectiveness."
+        subtitle={hasTeamScope(principal) ? "Your team's funnel, throughput, and source effectiveness." : "Funnel, throughput, and source effectiveness."}
         actions={
           <div className="bq-tabs" role="tablist" aria-label="Period">
             {PERIODS.map((p) => (

@@ -60,7 +60,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
     return (userId: string | null) => (userId ? (names.get(userId) ?? null) : null);
   }, [teamQuery.data]);
 
-  if (appQuery.isLoading) return <div className="bq-page space-y-4"><SkeletonCard /><SkeletonCard /></div>;
+  // A MANAGER's access is their team's (07 Q47): the application's candidate must be one they manage.
+  if (appQuery.isLoading || (access === "team" && candidateQuery.isLoading)) return <div className="bq-page space-y-4"><SkeletonCard /><SkeletonCard /></div>;
   // A missing record and a record outside the user's scope look the same: not-found (07 Q6).
   const notFoundState = <NotFoundState title="Application not found" description="This application doesn't exist or isn't available to you." backHref={toHref("applications")} backLabel="Back to applications" />;
   if (isNotFoundError(appQuery.error)) return notFoundState;
@@ -72,7 +73,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
       </div>
     );
   }
-  if (!isInScope(access, principal.userId, { ownerUserId: app.submittedByUserId })) return notFoundState;
+  if (!isInScope(access, principal.userId, { ownerUserId: app.submittedByUserId, managerId: candidateQuery.data?.managerId ?? null })) return notFoundState;
 
   const candidate = candidateQuery.data;
   const job = jobQuery.data;

@@ -15,7 +15,8 @@ from backend.auth.sessions import Principal
 
 FIRM_ACTIONS = ("candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit",
                 "outreach.act", "followup.act")
-TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "candidate.assign")
+TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
+                "candidate.assign", "firmSettings.edit")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
                     "invite.revoke", "platformTeam.manage")
 ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + ("team.view",) + PLATFORM_ACTIONS
@@ -26,7 +27,7 @@ _OWNER_AND_MANAGER = ("OWNER", "MANAGER")
 
 # Who in a firm may take each action. VIEWER reads everything it can open and acts on nothing.
 _FIRM_TABLE: dict[str, tuple[str, ...]] = {
-    "candidate.create": _ALL_ACTING,
+    "candidate.create": _OWNER_AND_MANAGER,      # 07 Q41: a BDE no longer adds candidates
     "candidate.edit": _ALL_ACTING,
     "job.capture": _ALL_ACTING,
     "job.apply": _ALL_ACTING,
@@ -38,7 +39,9 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "member.remove": _OWNER_ONLY,
     "member.changeRole": _OWNER_ONLY,
     "member.deactivate": _OWNER_ONLY,
+    "member.changeManager": _OWNER_ONLY,          # 07 Q40
     "candidate.assign": _OWNER_AND_MANAGER,
+    "firmSettings.edit": _OWNER_ONLY,             # 07 Q46
     "team.view": _OWNER_AND_MANAGER,
 }
 

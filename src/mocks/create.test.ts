@@ -71,11 +71,16 @@ describe("New candidate", () => {
     expect(await m.candidates.create(FIRM, candidate({ bdeId: "user_vikram" }))).toMatchObject({ managerId: "user_priya", bdeId: "user_vikram" });
   });
 
-  it("a BDE's new candidate is their own (so it is in their scope); a BDE can't assign someone else", async () => {
+  it("a BDE can't add a candidate (07 Q41)", async () => {
     const m = await load(EMAIL.adnan);
-    const created = await m.candidates.create(FIRM, candidate());
-    expect(created).toMatchObject({ managerId: "user_fatima", bdeId: "user_adnan" });
-    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_sneha" }))).rejects.toMatchObject({ status: 403 });
+    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_adnan" }))).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("a MANAGER adds one for a BDE of their own team only, never to their queue alone (07 Q41)", async () => {
+    const m = await load("user_fatima");
+    expect(await m.candidates.create(FIRM, candidate({ bdeId: "user_sneha" }))).toMatchObject({ managerId: "user_fatima", bdeId: "user_sneha" });
+    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_vikram" }))).rejects.toMatchObject({ status: 403 }); // Priya's BDE
+    await expect(m.candidates.create(FIRM, candidate())).rejects.toMatchObject({ status: 403 }); // no BDE
   });
 
   it("at the candidate limit it is refused with the reason, and nothing is added (A4)", async () => {

@@ -3,7 +3,7 @@
 import { useAllResumes } from "@/lib/hooks/use-resumes";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { can } from "@/lib/auth/permissions";
+import { can, scopeByCandidate, scopeCandidates } from "@/lib/auth/permissions";
 import { ResumeLibrary } from "@/components/app/resumes/resume-library";
 
 export default function ResumesPage() {
@@ -14,8 +14,8 @@ export default function ResumesPage() {
 
   return (
     <ResumeLibrary
-      resumes={resumesQuery.data ?? []}
-      candidates={candidatesQuery.data ?? []}
+      resumes={scopeByCandidate(principal, resumesQuery.data ?? [], candidatesQuery.data ?? [])}
+      candidates={scopeCandidates(principal, candidatesQuery.data ?? [])}
       isLoading={resumesQuery.isLoading || candidatesQuery.isLoading}
       error={error}
       onRetry={() => { void resumesQuery.refetch(); void candidatesQuery.refetch(); }}
