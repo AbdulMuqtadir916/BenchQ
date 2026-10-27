@@ -5,6 +5,13 @@
 
 The team side of the hierarchy: who reports to whom, the new candidate-limit count and BDE load.
 
+> **Built 2026-10-28** (needs backend #84, which carries PRs 2–5). Built: the invite form's Manager field (BDE disabled
+> with `NO_MANAGER_REASON` while the firm has no manager), "Reports to" with Change / Set manager (`members-table.tsx`;
+> the mock's candidates follow via `candidatesApi.followBde` until module 07), the BDE capacity form on `settings/firm`,
+> `WORKING_STATUSES` / `countsTowardLimit` / `deriveBdeLoad`, and `assignBlockReason`. "New candidate" is disabled only
+> while the firm has no manager. Not done: a demo BDE without a manager in the fixtures (a local database that had BDEs
+> before 0006 shows them anyway).
+
 > **Changed 2026-10-27.** The BDE-only **seat** rule, its message, the "BDE seats" labels and the seat fixtures were
 > built in module 01 (see its note); what §1–§3 and §7 say about seats is done. And since F6 the **team, invites,
 > ledger and session are served only by the backend** (`src/lib/api/config.ts`): there is no mock for them. So §4–§6
