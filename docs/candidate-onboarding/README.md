@@ -21,7 +21,7 @@ Two things that only work together:
 Why it matters (`product.md` §2): the OWNER and MANAGER must see who works which candidate at any moment
 (transparency), and onboarding a candidate must take minutes, not a long form (time compression).
 
-## 2. The decisions (docs/07 §0 Q40–Q50, 2026-10-26)
+## 2. The decisions (docs/07 §0 Q40–Q51, 2026-10-26 and 27)
 
 | # | Rule |
 |---|---|
@@ -36,6 +36,7 @@ Why it matters (`product.md` §2): the OWNER and MANAGER must see who works whic
 | Q48 | **The flow:** replaces `/[firm]/candidates/new` at the same URL, full page; the intercepted modal and the old form are deleted. No drafts: closing with anything entered asks "Discard this candidate?". Required: full name, "Marketed as", email, and the assignment. The screens say **"Assigned BDE"** / **"BDE"**, never "Owner". |
 | Q49 | **Resume parsing and Truth Guard:** the backend parses the file and returns a draft without saving anything ("Nothing is saved until you create the candidate"). Onboarding never produces a `VERIFIED` claim: profile fields are plain facts; skills, summary, experience and education land in the candidate's Record as `UNVERIFIED` with their `FieldSource`; fields filled from the resume show a "Drafted from resume" marker until edited or confirmed. docs/04 §4.2's "typed fields are VERIFIED" is withdrawn. |
 | Q50 | **No notifications.** The "Notify the BDE" toggle is dropped. The handoff note is saved with the assignment and shown on the candidate page; the BDE sees **"New assignments"** on their dashboard (derived from `ASSIGN` entries of the last 7 days). The new candidate fields are **provisional**: the frontend uses them on mocks; **Zuhair** owns the production contract and the backend Candidates track. Deactivating a MANAGER or BDE is out of scope (rule for later in §8). |
+| Q51 | **BDEs from before the hierarchy** keep no manager ("No manager") until the OWNER sets one in `settings/team`; they can't be given candidates until then. The database enforces only "a non-BDE has no manager" until every BDE has one (06 §2). |
 
 ## 3. Vocabulary (also in `product.md` §4)
 

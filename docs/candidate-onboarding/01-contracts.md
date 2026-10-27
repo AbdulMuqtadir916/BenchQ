@@ -79,8 +79,10 @@ export const ResumeDraftSchema = z.object({
 
 ### User and Invite (`session.ts`, `tenancy.ts`, docs/02 §3.1)
 
-- `UserSchema` gains `managerId: string | null`. **Set if and only if `role` is `BDE`** (Q40). Add the refinement the
-  same way `InviteSchema` does it (a base object plus `superRefine`), so `.pick`/`.extend` keep working.
+- `UserSchema` gains `managerId: string | null`. **A user who isn't a BDE has `null`** (refinement). A BDE has a
+  manager, except a BDE from before the hierarchy, who may be `null` until the OWNER sets one (Q51); the UI shows
+  "No manager". Add the refinement the same way `InviteSchema` does it (a base object plus `superRefine`), so
+  `.pick`/`.extend` keep working.
 - `InviteBaseSchema` gains `managerId: string | null`, with the same rule in `InviteSchema`'s refinement: set if and
   only if the role is `BDE`.
 
@@ -140,7 +142,7 @@ Mark that branch `// removed in onboarding module 04`.
 
 ## 5. Tests
 
-- `tenancy.test.ts`: `UserSchema` and `InviteSchema` reject a BDE without `managerId` and a non-BDE with one.
+- `tenancy.test.ts`: `InviteSchema` rejects a BDE invite without `managerId` and a non-BDE invite with one; `UserSchema` rejects a non-BDE with one and accepts a BDE with `null` (Q51).
 - Candidate schema: `bdeId` null is valid; a fixture whose `bdeId`'s manager differs from `managerId` fails a new
   fixture test (`mocks/fixtures.test.ts`).
 - Ledger: an `ASSIGN` entry parses; every existing entry has `note: null`.

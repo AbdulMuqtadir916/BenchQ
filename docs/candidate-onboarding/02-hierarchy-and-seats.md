@@ -65,6 +65,10 @@ disagree (`features/dashboard/seats-agree.test.ts` keeps proving it):
 
 - On `settings/team`, each BDE row has **"Change manager"** (OWNER only, through `<Can action="member.changeManager">`).
   A small dialog: pick the new MANAGER, confirm "Vikram Desai's {n} candidates move with them."
+- A BDE with no manager (from before the hierarchy, Q51) shows **"No manager"** (icon + label) and, for the OWNER,
+  **"Set manager"**, the same dialog. Such a BDE can't be given candidates until it has one (`canAssignTo` needs the
+  BDE's manager to match), and the OWNER dashboard shows "{n} BDEs have no manager" linking to `settings/team`. Add one
+  such BDE to the demo data.
 - Mock: in one write, set the user's `managerId` and set `managerId` on **every candidate whose `bdeId` is that BDE**
   (Q43: candidates move with the BDE). One ledger entry: `UPDATE`, entityType `"user"`, summary
   "Vikram Desai now reports to Sneha Rao (was Priya Shah); 6 candidates moved". Queue candidates of the old manager stay.

@@ -28,8 +28,12 @@ table).
 
 ## 2. Tables (Q38 conventions: plural snake_case, UUID keys, timestamps with time zone, CHECKs not enums, `ON DELETE RESTRICT`)
 
-- `users.manager_id UUID NULL REFERENCES users(id)`, with `CHECK ((role = 'BDE') = (manager_id IS NOT NULL))`. The
-  manager being an active MANAGER of the same firm is checked in code (a CHECK can't read another row).
+- `users.manager_id UUID NULL REFERENCES users(id)`, with `CHECK (role = 'BDE' OR manager_id IS NULL)` only (Q51).
+  "A BDE has a manager" is enforced in code: accepting a BDE invite, changing a manager, and never clearing it. Existing
+  BDEs stay `NULL` until the OWNER sets one. **Not `NOT VALID` on the full rule:** Postgres checks a `NOT VALID`
+  constraint on every update of a row, so a manager-less BDE's sign-in (`last_active_at`) would fail. A later migration
+  adds `CHECK ((role = 'BDE') = (manager_id IS NOT NULL))` once no BDE is `NULL`. The manager being an active MANAGER of
+  the same firm is checked in code (a CHECK can't read another row).
 - `invites.manager_id UUID NULL REFERENCES users(id)`, same CHECK on the invite's role.
 - `firms.bde_capacity INTEGER NOT NULL DEFAULT 10 CHECK (bde_capacity BETWEEN 1 AND 50)`.
 - `ledger_entries.note TEXT NULL`; add `ASSIGN` to the action CHECK.
@@ -40,8 +44,8 @@ table).
   (`evidence` + `claims`). If those tables don't exist yet, store the parse result as JSON on a `candidate_resumes`
   row (`candidate_id`, `file_name`, storage key, `parse` JSONB) and let Track 04 build the Record from it. Decide this
   in PR 1 and write it into docs/integration (§8).
-- **Backfill.** The migration must succeed on databases with BDEs and no MANAGER (the "Default firm"). Open question
-  for Abdul before PR 1 (§8 Q1).
+- **Backfill** (Q51): nothing to backfill. Existing BDEs keep `manager_id NULL`; the OWNER sets each one's manager
+  through `PATCH …/members/{user_id}/manager` (§3). Such a BDE can't be given candidates until then.
 
 ## 3. Hierarchy, seats, settings (PR 2)
 
@@ -140,10 +144,8 @@ Found while mapping the format to the form (04 §5). None blocks onboarding; eac
 
 ## 8. Before PR 1
 
-- **Q1 (Abdul): backfilling BDEs without a manager.** The "Default firm" may have BDEs and no MANAGER. Options:
-  (a) the migration creates the CHECK as `NOT VALID` and a one-off admin command assigns managers later; (b) the
-  migration refuses to run until every firm with BDEs has a MANAGER. *Recommended: (a); the frontend shows those BDEs
-  as "No manager" to the OWNER.*
+- ~~Q1: backfilling BDEs without a manager~~ **Decided (Q51, 2026-10-27):** no backfill; the half CHECK in §2; the
+  OWNER sets managers in `settings/team`; the full CHECK in a later migration.
 - Where the parse and the Record live (§2), written into `docs/integration/04-resumes-and-tailoring.md`.
 
 ## Done when
