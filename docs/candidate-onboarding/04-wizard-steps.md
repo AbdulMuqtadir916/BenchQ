@@ -2,7 +2,8 @@
 
 **Owner:** — · **Depends on:** 01 · **Branch:** `feat/onboarding-04-wizard`
 
-> **Built 2026-10-27** behind `NEXT_PUBLIC_CANDIDATE_WIZARD`, with these notes for module 05:
+> **Built 2026-10-27** behind `NEXT_PUBLIC_CANDIDATE_WIZARD` (the flag is gone since module 05a), with these notes for
+> module 05:
 > - **The step is changed with `history.replaceState`, not `router.replace`.** Next keys a page by its search params,
 >   so a router navigation remounts the page and loses everything entered (found in the browser check).
 > - **The parser call is `candidatesMock.parseResume`** (a write that needs `candidate.create`), so the existing

@@ -49,6 +49,14 @@ describe("validateStep", () => {
     expect(validateStep("work", { ...valid, rateTarget: "85", rateMin: "70", noticePeriodDays: "0" })).toEqual({});
   });
 
+  it("assign: a manager always; a BDE when the person is a MANAGER (07 Q41)", () => {
+    expect(validateStep("assign", valid)).toEqual({ managerId: "Choose the manager." });
+    expect(validateStep("assign", { ...valid, managerId: "m" })).toEqual({});
+    expect(validateStep("assign", { ...valid, managerId: "m" }, { requiresBde: true })).toHaveProperty("bdeId");
+    expect(validateStep("assign", { ...valid, managerId: "m", bdeId: "b" }, { requiresBde: true })).toEqual({});
+    expect(isDirty({ ...EMPTY_VALUES, managerId: "m", bdeId: "b" })).toBe(false);
+  });
+
   it("résumé and preferences never block", () => {
     expect(validateStep("resume", EMPTY_VALUES)).toEqual({});
     expect(validateStep("preferences", EMPTY_VALUES)).toEqual({});
@@ -57,7 +65,8 @@ describe("validateStep", () => {
 
 describe("the flow", () => {
   it("a reload lands on the first step that can't be passed yet", () => {
-    expect(firstOpenStep("preferences", EMPTY_VALUES)).toBe("basic");
+    expect(firstOpenStep("preferences", EMPTY_VALUES)).toBe("resume");
+    expect(firstOpenStep("preferences", { ...EMPTY_VALUES, city: "Irving" })).toBe("basic");
     expect(firstOpenStep("preferences", { ...valid, workAuth: null })).toBe("work");
     expect(firstOpenStep("preferences", valid)).toBe("preferences");
     expect(firstOpenStep("resume", EMPTY_VALUES)).toBe("resume");
@@ -76,12 +85,13 @@ describe("toCreateCandidate", () => {
       ...applyDraft(EMPTY_VALUES, draft).values, phone: " ", rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
       employmentTypes: ["C2C", "W2"], workSettings: ["REMOTE"], contactNotes: "Prefers WhatsApp.",
     };
-    const body = toCreateCandidate(values, { managerId: "user_fatima", bdeId: "user_adnan", handoffNote: null });
+    const body = toCreateCandidate({ ...values, managerId: "user_fatima", bdeId: "user_adnan", handoffNote: "  Push banking.  " });
     expect(CreateCandidateSchema.parse(body)).toEqual(body);
     expect(body).toMatchObject({
       phone: null, yearsExperience: 9, rateTarget: 85, rateMin: 70, workAuthExpiry: "2027-03-01T00:00:00.000Z",
       needsSponsorship: true, needsTransfer: true, resumeParseId: "parse_1", managerId: "user_fatima", bdeId: "user_adnan",
+      handoffNote: "Push banking.",
     });
-    expect(toCreateCandidate({ ...valid, workAuth: "GC" }, { managerId: "m", bdeId: null, handoffNote: null })).toMatchObject({ needsSponsorship: false, needsTransfer: false, resumeParseId: null });
+    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ needsSponsorship: false, needsTransfer: false, resumeParseId: null, bdeId: null, handoffNote: null });
   });
 });

@@ -3,6 +3,8 @@ import { canAssignTo } from "@/lib/auth/policy";
 import { isBde, isManager } from "@/lib/auth/roles";
 import { assignBlockReason } from "@/lib/derive/platform";
 import { candidateCapacity } from "@/lib/derive/tenancy";
+import { CandidateDocumentSchema } from "@/lib/schemas/document";
+import { RecordSchema } from "@/lib/schemas/record";
 import { CandidateSchema, CreateCandidateSchema, UpdateCandidateSchema, type Candidate, type CreateCandidate, type UpdateCandidate } from "@/lib/schemas/candidate";
 import type { z } from "zod";
 import type { BackendResumeParseResponseSchema } from "@/lib/api/dto/resume-parse";
@@ -10,10 +12,15 @@ import { resumeFileProblem } from "@/lib/constants/candidate-intake";
 import candidatesSeed from "./data/candidates.json";
 import resumeParses from "./data/resume-parses.json";
 import { findInFirm, inFirm, mockResult, newId } from "./_shared";
-import { currentPrincipal } from "./auth";
+import { currentPrincipal, currentUser } from "./auth";
 import { changed, table } from "./db";
+import { allDocuments } from "./documents";
+import { allRecords } from "./records";
 import { firmScoped } from "./membership";
 import { allUsers, firms } from "./team-data";
+
+/** The files behind this tab's parses, so create can name the résumé it keeps (the mock holds no file). */
+const parsedFiles = new Map<string, { fileName: string; mimeType: string; sizeBytes: number }>();
 
 /** Every firm's candidates, validated. */
 export const allCandidates: Candidate[] = table("candidates", CandidateSchema, () => arrayOf(CandidateSchema).parse(candidatesSeed));
@@ -39,7 +46,11 @@ export const candidatesMock = firmScoped("candidates", {
 
   byId: (firmId: string, id: string): Promise<Candidate> => mockResult(findInFirm(allCandidates, firmId, id, "Candidate")),
 
-  /** A new candidate starts ON_BENCH. Given a BDE, it counts toward the plan, so at the limit it is refused (07 Q45, A4). */
+  /**
+   * A new candidate starts ON_BENCH. Given a BDE, it counts toward the plan, so at the limit it is refused (07 Q45, A4).
+   * All or nothing (05 §2): the candidate, its Record with every claim UNVERIFIED and no evidence (Q49), and the kept
+   * résumé as a RESUME document. No ledger entries: the ledger is the backend's (F6); its create writes CREATE + ASSIGN.
+   */
   create: (firmId: string, body: CreateCandidate): Promise<Candidate> => {
     const input = CreateCandidateSchema.parse(body);
     const firm = firms.find((item) => item.id === firmId)!;
@@ -79,13 +90,47 @@ export const candidatesMock = firmScoped("candidates", {
       workSettings: input.workSettings,
       preferredLocations: input.preferredLocations,
       contactNotes: input.contactNotes,
-      persona: null,
+      persona: input.summary || input.preferredIndustries.length > 0 || input.dealBreakers.length > 0
+        ? { summary: input.summary ?? "", toneNotes: null, willRelocate: input.willingToRelocate, noticePeriodDays: input.noticePeriodDays, preferredIndustries: input.preferredIndustries, dealBreakers: input.dealBreakers }
+        : null,
       qaBank: [],
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     });
+    // Nothing here is ever VERIFIED (Q49): verification needs evidence, which onboarding never has.
+    const record = RecordSchema.parse({
+      id: newId("rec", now),
+      firmId,
+      candidateId: candidate.id,
+      headline: input.primaryRole,
+      summary: input.summary,
+      summaryState: "UNVERIFIED",
+      experiences: [],
+      educations: [],
+      skills: input.skills.map((skill) => ({
+        id: newId("skill", now), name: skill.name, canonicalName: skill.name.toLowerCase(), family: skill.family,
+        yearsUsed: null, lastUsedYear: null, proficiency: null, source: skill.source, state: "UNVERIFIED",
+      })),
+      certificates: [],
+      evidence: [],
+      lastVerifiedAt: null,
+    });
+    const file = input.resumeParseId ? parsedFiles.get(input.resumeParseId) ?? { fileName: "resume.pdf", mimeType: "application/pdf", sizeBytes: 1024 } : null;
+    const documentId = newId("doc", now);
+    const document = file ? CandidateDocumentSchema.parse({
+      id: documentId, firmId, candidateId: candidate.id, kind: "RESUME", title: "Original resume", fileName: file.fileName, mimeType: file.mimeType,
+      sizeKb: Math.max(1, Math.round(file.sizeBytes / 1024)), uploadedAt: now.toISOString(), uploadedByUserId: currentUser().id, expiresAt: null,
+      shareUrl: `https://files.benchq.app/s/${documentId}`,
+    }) : null;
+
     allCandidates.unshift(candidate);
+    allRecords.unshift(record);
     changed("candidates");
+    changed("records");
+    if (document) {
+      allDocuments.unshift(document);
+      changed("documents");
+    }
     return mockResult(candidate);
   },
 
@@ -104,7 +149,9 @@ export const candidatesMock = firmScoped("candidates", {
     const problem = resumeFileProblem({ name: file.fileName, size: file.sizeBytes, type: file.mimeType });
     if (problem) throw new ApiError(problem, problem.startsWith("PDF") ? "UNSUPPORTED_FILE" : "FILE_TOO_LARGE", problem.startsWith("PDF") ? 415 : 413);
     const sample = resumeParses.find((item) => item.file_name === file.fileName) ?? resumeParses[0]!;
-    return mockResult({ parse_id: newId("parse"), file_name: file.fileName, parse: sample.parse });
+    const parseId = newId("parse");
+    parsedFiles.set(parseId, file);
+    return mockResult({ parse_id: parseId, file_name: file.fileName, parse: sample.parse });
   },
 
   /**

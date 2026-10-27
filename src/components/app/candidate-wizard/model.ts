@@ -55,6 +55,10 @@ export interface WizardValues {
   preferredIndustries: string[];
   dealBreakers: string[];
   contactNotes: string;
+  /** Step 5 (07 Q41): the candidate's manager, its BDE (null = the manager's "Needs a BDE" queue) and the handoff note. */
+  managerId: string;
+  bdeId: string | null;
+  handoffNote: string;
 }
 
 /** The fields the parser can fill, and so can carry the "Drafted from résumé" marker. */
@@ -65,7 +69,8 @@ export const EMPTY_VALUES: WizardValues = {
   resume: null, fullName: "", primaryRole: "", yearsExperience: "", email: "", phone: "", linkedinUrl: "", city: "", state: "",
   skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
   rateMin: "", availableFrom: "", noticePeriodDays: "", targetRoles: [], workSettings: [], preferredLocations: [],
-  willingToRelocate: false, preferredIndustries: [], dealBreakers: [], contactNotes: "",
+  willingToRelocate: false, preferredIndustries: [], dealBreakers: [], contactNotes: "", managerId: "", bdeId: null,
+  handoffNote: "",
 };
 
 const isBlank = (value: unknown) => value === "" || value === null || (Array.isArray(value) && value.length === 0);
@@ -107,9 +112,16 @@ export type Errors = Partial<Record<keyof WizardValues, string>>;
 const asNumber = (value: string): number | null => (value.trim() === "" ? null : Number(value));
 const isWhole = (value: number | null, min: number, max: number) => value === null || (Number.isInteger(value) && value >= min && value <= max);
 
-/** The step's problems, by field; empty when it may continue. Steps without required fields never block. */
-export function validateStep(step: StepId, values: WizardValues): Errors {
+/**
+ * The step's problems, by field; empty when it may continue. Steps without required fields never block. On step 5 a
+ * MANAGER must pick a BDE (`requiresBde`, 07 Q41); the OWNER may leave the candidate in the manager's queue.
+ */
+export function validateStep(step: StepId, values: WizardValues, context: { requiresBde?: boolean } = {}): Errors {
   const errors: Errors = {};
+  if (step === "assign") {
+    if (!values.managerId) errors.managerId = "Choose the manager.";
+    else if (context.requiresBde && values.bdeId === null) errors.bdeId = "Choose the BDE who will work this candidate.";
+  }
   if (step === "basic") {
     if (!values.fullName.trim()) errors.fullName = "Enter the candidate's name.";
     if (!values.primaryRole.trim()) errors.primaryRole = "Enter the title they're marketed as.";
@@ -133,6 +145,8 @@ export function validateStep(step: StepId, values: WizardValues): Errors {
 
 /** The first step that can't be passed yet, at or before `requested` (a reload starts empty: no drafts, Q48). */
 export function firstOpenStep(requested: StepId, values: WizardValues): StepId {
+  // Nothing entered (a reload, or just after creating one): start where the flow starts.
+  if (!isDirty(values)) return "resume";
   for (const step of STEPS) {
     if (step.id === requested) return requested;
     if (Object.keys(validateStep(step.id, values)).length > 0) return step.id;
@@ -140,16 +154,19 @@ export function firstOpenStep(requested: StepId, values: WizardValues): StepId {
   return requested;
 }
 
+/** The assignment is chosen on step 5, not typed in, so picking one alone doesn't make the flow dirty. */
+const CHOSEN: readonly (keyof WizardValues)[] = ["managerId", "bdeId"];
+
 /** Anything entered at all, so closing asks first (Q48). */
 export function isDirty(values: WizardValues): boolean {
-  return (Object.keys(EMPTY_VALUES) as (keyof WizardValues)[]).some((field) => JSON.stringify(values[field]) !== JSON.stringify(EMPTY_VALUES[field]));
+  return (Object.keys(EMPTY_VALUES) as (keyof WizardValues)[]).some((field) => !CHOSEN.includes(field) && JSON.stringify(values[field]) !== JSON.stringify(EMPTY_VALUES[field]));
 }
 
 const toIsoDate = (value: string): string | null => (value ? new Date(`${value}T00:00:00.000Z`).toISOString() : null);
 const orNull = (value: string): string | null => (value.trim() === "" ? null : value.trim());
 
 /** The create payload (docs/02 §4), once every step is valid. Sponsorship and transfer follow the work authorization (README A3). */
-export function toCreateCandidate(values: WizardValues, assignment: { managerId: string; bdeId: string | null; handoffNote: string | null }): CreateCandidate {
+export function toCreateCandidate(values: WizardValues): CreateCandidate {
   const workAuth = values.workAuth ?? "OTHER";
   return {
     fullName: values.fullName.trim(),
@@ -179,6 +196,8 @@ export function toCreateCandidate(values: WizardValues, assignment: { managerId:
     preferredIndustries: values.preferredIndustries,
     dealBreakers: values.dealBreakers,
     resumeParseId: values.resume?.parseId ?? null,
-    ...assignment,
+    managerId: values.managerId,
+    bdeId: values.bdeId,
+    handoffNote: orNull(values.handoffNote),
   };
 }
