@@ -5,11 +5,15 @@ import secrets
 from backend.models.db import SessionLocal, Setting, Company, Search, Resume
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.analyzer.llm_client import REASONING_EFFORTS
+from backend.candidates.parse import DEFAULT_PROMPT as RESUME_PARSE_PROMPT
 
 logger = logging.getLogger("jobnavigator.seed")
 
 
 DEFAULT_SETTINGS = {
+    # The new-candidate résumé parser (docs/candidate-onboarding/06-backend.md §4): Zuhair's format, as an AI preset.
+    "resume_parse_prompt": (RESUME_PARSE_PROMPT, "Editable résumé parser prompt for the new-candidate flow. "
+                            "{format} (the JSON format) and {resume_text} are filled in."),
     "fit_score_threshold": ("60", "Minimum fit score to trigger Telegram alert"),
     "scrape_interval_minutes": ("60", "How often the job checker runs"),
     "email_check_interval_minutes": ("30", "How often Gmail is polled"),

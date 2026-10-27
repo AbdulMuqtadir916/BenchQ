@@ -246,3 +246,12 @@ def offline(monkeypatch):
     if hasattr(routes_cover_letters, "_get_browser"):
         monkeypatch.setattr(routes_cover_letters, "_get_browser", browser)
     monkeypatch.setattr(routes_resumes, "parse_resume_pdf", parsed_pdf)
+    # The new-candidate parser (onboarding 06 PR 3): no text extraction, no model.
+    from backend.api import routes_candidates
+    from backend.candidates.parse import checked
+
+    async def read_resume(text, db):
+        return checked({"header": {"name": "Isolation Reader"}})
+
+    monkeypatch.setattr(routes_candidates, "extract_text", lambda kind, content: "isolation résumé text")
+    monkeypatch.setattr(routes_candidates, "read_resume", read_resume)

@@ -28,6 +28,12 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 > `PATCH /api/firms/{id}/members/{user_id}/manager` (OWNER) moves a BDE and the candidates they work; it is also how a
 > manager-less BDE gets one. `PATCH /api/firms/{id}/settings {bde_capacity}` (OWNER). **The frontend's invite form must
 > send `manager_id` for BDEs (module 02) before this reaches users:** today's form doesn't, and the backend now refuses.
+>
+> **PR 3 built:** `POST /api/firms/{id}/candidates/parse-resume` (OWNER, MANAGER: `candidate.create`). PDF via
+> pdfplumber, `.docx` via python-docx (tables included), `.doc` refused; 413/415/422 with the frontend's wording. One
+> call to AI module `resume_parse` (primary model; prompt in setting `resume_parse_prompt`, an AI preset), logged to
+> `llm_call_log` as `resume_parse`. The answer is held to Zuhair's format (unknown keys dropped, missing ones "" or [])
+> and kept 60 minutes in `resume_parses`; expired unused parses are cleared on the firm's next read.
 
 ## 1. PRs, in order
 

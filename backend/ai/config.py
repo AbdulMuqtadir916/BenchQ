@@ -33,6 +33,8 @@ AI_MODULES: dict[str, AiModule] = {
     # (routes_resumes.parse_resume_pdf) and moves into the module's preset with the Candidates track.
     "resume_building": AiModule(""),
     "cover_letter": AiModule("cover_letter", {"letter": "cover_letter_prompt"}),
+    # The new-candidate parser (docs/candidate-onboarding/06-backend.md §4), on the primary model; Zuhair's format.
+    "resume_parse": AiModule("", {"parse": "resume_parse_prompt"}),
 }
 
 

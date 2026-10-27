@@ -52,6 +52,9 @@ CASES: dict[str, Case] = {
     "PATCH /api/firms/{firm_id}/members/{user_id}/manager": Case(body=lambda i: {"manager_id": str(i["manager"])},
                                                                  body_ids=True),
     "PATCH /api/firms/{firm_id}/settings": Case(body=lambda i: {"bde_capacity": 7}),
+
+    # ── Candidates (onboarding 06): the firm is in the path ──────────────────
+    "POST /api/firms/{firm_id}/candidates/parse-resume": Case(upload=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": Case(),
 
