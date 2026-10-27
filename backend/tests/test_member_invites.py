@@ -18,6 +18,17 @@ def _session_for(test_db, user):
     return _cookie(token)
 
 
+@pytest.fixture(autouse=True)
+def lead(test_db, accounts):
+    """The firm's standing MANAGER: every BDE invite names the manager the BDE will report to (07 Q40)."""
+    from backend.models.tenancy import Firm
+    manager = make_user(test_db, test_db.get(Firm, accounts.firm_id), email="lead@acme.test", role="MANAGER",
+                        name="Lena Lead")
+    test_db.commit()
+    accounts.lead_id = manager.id
+    return manager
+
+
 @pytest.fixture
 def owner(accounts):
     return _cookie(accounts.firm_token)
@@ -38,7 +49,11 @@ def _invites(accounts):
 
 
 def _invite(client, accounts, cookie, **body):
-    return client.post(_invites(accounts), json={"email": "bea@acme.test", "role": "BDE", **body}, headers=cookie)
+    """A BDE invite names the firm's lead as the manager unless the test says otherwise."""
+    payload = {"email": "bea@acme.test", "role": "BDE", **body}
+    if payload["role"] == "BDE" and "manager_id" not in payload:
+        payload["manager_id"] = str(accounts.lead_id)
+    return client.post(_invites(accounts), json=payload, headers=cookie)
 
 
 # ── Inviting ─────────────────────────────────────────────────────────────────
@@ -231,22 +246,29 @@ def test_onboarding_end_to_end(test_db, accounts, api_client):
                             json={"name": "Nora North", "password": "nora-pass-1"}).json()
         assert session["firm"]["status"] == "ACTIVE"
         assert nora.get("/api/firms/by-slug/northwind").json()["id"] == firm_id
-        links = {}
-        for email, role in (("mo@northwind.test", "MANAGER"), ("bo@northwind.test", "BDE")):
-            r = nora.post(f"/api/firms/{firm_id}/invites", json={"email": email, "role": role})
-            assert r.status_code == 201, r.text
-            links[role] = r.json()["invite_token"]
 
-    for role, token in links.items():
+    def invite(role: str, email: str, **extra) -> str:
+        with browser() as nora:
+            nora.post("/api/auth/sign-in", json={"email": "nora@northwind.test", "password": "nora-pass-1"})
+            r = nora.post(f"/api/firms/{firm_id}/invites", json={"email": email, "role": role, **extra})
+            assert r.status_code == 201, r.text
+            return r.json()["invite_token"]
+
+    def accept(token: str, role: str, email: str) -> dict:
         with browser() as member:
             session = member.post(f"/api/invites/{token}/accept",
                                   json={"name": role.title(), "password": f"{role.lower()}-pass-1"}).json()
             assert session["principal"] == {**session["principal"], "kind": "firm", "firm_id": firm_id, "role": role}
             member.post("/api/auth/sign-out")
-            email = f"{'mo' if role == 'MANAGER' else 'bo'}@northwind.test"
             assert member.post("/api/auth/sign-in",
                                json={"email": email, "password": f"{role.lower()}-pass-1"}).status_code == 200
             assert member.get("/api/auth/me").json()["firm"]["slug"] == "northwind"
+            return session
+
+    # A BDE reports to a manager (07 Q40), so the manager joins first and the BDE's invite names them.
+    manager = accept(invite("MANAGER", "mo@northwind.test"), "MANAGER", "mo@northwind.test")
+    bde = accept(invite("BDE", "bo@northwind.test", manager_id=manager["user"]["id"]), "BDE", "bo@northwind.test")
+    assert bde["user"]["manager_id"] == manager["user"]["id"]
 
     with browser() as nora:
         nora.post("/api/auth/sign-in", json={"email": "nora@northwind.test", "password": "nora-pass-1"})

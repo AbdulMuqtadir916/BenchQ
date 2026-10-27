@@ -104,13 +104,26 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.add(link)
     db.flush()
     db.add(TracerClickEvent(firm_id=firm.id, tracer_link_id=link.id))
+    # The hierarchy (07 Q40): a MANAGER and a BDE who reports to them.
+    from backend.models.tenancy import User
+    from backend.tests.auth_support import password_hash
+    manager = User(firm_id=firm.id, role="MANAGER", name=f"{tag} manager", email=f"manager@{tag.lower()}.test",
+                   password_hash=password_hash())
+    db.add(manager)
+    db.flush()
+    bde = User(firm_id=firm.id, role="BDE", name=f"{tag} bde", email=f"bde-user@{tag.lower()}.test",
+               manager_id=manager.id, password_hash=password_hash())
+    db.add(bde)
+    db.flush()
     invite, _ = send_invite(db, inviter=owner, firm=firm, email=f"bde@{tag.lower()}.test", role="BDE",
-                            invitee_name=f"{tag} invitee", summary=f"Invited a BDE to {tag}", now=utcnow())
+                            invitee_name=f"{tag} invitee", summary=f"Invited a BDE to {tag}", now=utcnow(),
+                            manager_id=manager.id)
     ledger.record(db, actor=owner, action="UPDATE", entity_type="candidate", entity_id=uuid.uuid4(),
                   entity_label=f"{tag} candidate", summary=f"{tag} edited a candidate", firm_id=firm.id)
     db.flush()
     return {"firm": firm.id, "slug": firm.slug, "job": job.id, "app": app.id, "interview": interview.id,
-            "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id}
+            "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id,
+            "manager": manager.id, "bde_user": bde.id}
 
 
 def make_world(db, accounts) -> World:
