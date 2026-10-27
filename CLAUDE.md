@@ -97,6 +97,7 @@ Details and the full route map: `docs/07-ROUTES-AND-RBAC.md`.
    | Components and props | `docs/05-COMPONENTS.md` |
    | Original UI build phases (complete) | `docs/06-IMPLEMENTATION-PLAN.md` |
    | Connecting a module to the backend | `docs/integration/` |
+   | Candidate onboarding and the firm hierarchy (07 Q40–Q50) | `docs/candidate-onboarding/` |
    | Setup, and what to do when it fails | `README.md` Quick start, `docs/troubleshooting.md` |
    | Colour, type, spacing, motion | `design.md` |
 
@@ -252,6 +253,10 @@ stay paused.
 
 **Next:** the module tracks. Owners, order and dependencies: the board in `docs/integration/README.md`.
 
-**Decisions** (Q1–Q39: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
-rules) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
+**Planned 2026-10-26: candidate onboarding and the firm hierarchy** (Q40–Q50: OWNER → MANAGER → BDE, BDE-only seats,
+a five-step new-candidate flow). Modules 01–07 in `docs/candidate-onboarding/`; frontend 01–05 run on mocks, 06 is the
+backend Candidates track (Zuhair).
+
+**Decisions** (Q1–Q51: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
+rules, the firm hierarchy) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
 The system contracts in `docs/02` §3.2 are approved and not built.
