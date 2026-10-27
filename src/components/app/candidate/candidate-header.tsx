@@ -11,7 +11,9 @@ import { Tag, type TagTone } from "@/components/ui/tag";
 import { WorkAuthChip } from "@/components/app/work-auth-chip";
 import { AvatarStack } from "@/components/app/avatar-stack";
 import { CandidateAvatar } from "@/components/app/candidate-avatar";
+import { Can } from "@/lib/auth/can";
 import type { CandidateTabId } from "./candidate-tabs";
+import { ReassignAction } from "./reassign-dialog";
 import { useHref } from "@/lib/routes/use-href";
 
 const STATUS: Record<CandidateStatus, { label: string; tone: TagTone }> = {
@@ -84,12 +86,15 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
             </div>
           </div>
         </div>
-        {canAct ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" onClick={onFindJobs}><Sparkles size={14} aria-hidden />Find jobs</Button>
-            <Button asChild><Link href={resumeHref}><FileText size={14} aria-hidden />Build resume</Link></Button>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Can action="candidate.assign"><ReassignAction candidate={candidate} /></Can>
+          {canAct ? (
+            <>
+              <Button variant="secondary" onClick={onFindJobs}><Sparkles size={14} aria-hidden />Find jobs</Button>
+              <Button asChild><Link href={resumeHref}><FileText size={14} aria-hidden />Build resume</Link></Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       {statItems.length ? (

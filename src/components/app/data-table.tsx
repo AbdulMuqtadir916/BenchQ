@@ -257,7 +257,7 @@ export function DataTable<TData, TValue>({
   const isOutside = toolbarPlacement === "outside";
   const toolbar = (
       <div className={cn("flex flex-wrap items-center gap-2", isOutside ? "mb-3" : "border-b border-[var(--color-border)] p-3")}>
-        <div className="relative min-w-0 w-full sm:max-w-72 flex-1">
+        <div className="relative w-full min-w-48 flex-1 sm:max-w-72">
           <Search
             size={16}
             aria-hidden="true"

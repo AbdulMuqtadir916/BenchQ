@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { Suspense, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, Plus, Table2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CandidateCardGrid } from "@/components/app/candidate/candidate-card-grid";
+import { AssignmentToggle, CandidateListQuery, NeedsBdeTag } from "@/components/app/candidate/assignment-filter";
+import { isWaitingForBde } from "@/lib/derive/assignment";
+import { useUrlState } from "@/lib/routes/use-url-state";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { CandidateStatus } from "@/lib/schemas/enums";
@@ -77,7 +80,16 @@ type Row = {
   lastActivity: string | null;
 };
 
+/** useSearchParams (the `?assignment=` filter) needs a Suspense boundary for the static build. */
 export default function CandidatesPage() {
+  return (
+    <Suspense>
+      <CandidatesList />
+    </Suspense>
+  );
+}
+
+function CandidatesList() {
   const toHref = useHref();
   const router = useRouter();
   const principal = useSignedInPrincipal();
@@ -86,6 +98,7 @@ export default function CandidatesPage() {
   const applicationsQuery = useApplications();
   const teamQuery = useTeam();
   const [statusFilter, setStatusFilter] = useState<CandidateStatusFilter>("ALL");
+  const [{ assignment }, setQuery] = useUrlState(CandidateListQuery);
   const view = useSyncExternalStore(subscribeView, readView, () => "table" as View);
 
 
@@ -96,9 +109,10 @@ export default function CandidatesPage() {
     const visible = scopeCandidates(principal, candidates);
     return visible
       .filter((c) => statusFilter === "ALL" || c.status === statusFilter)
+      .filter((c) => assignment === "all" || isWaitingForBde(c))
       .map((c) => {
         const stats = deriveCandidateStats(c, applications.filter((a) => a.candidateId === c.id));
-        const bde = team.find((u) => u.id === c.bdeId)?.name ?? "Unassigned";
+        const bde = c.bdeId === null ? "Needs a BDE" : team.find((u) => u.id === c.bdeId)?.name ?? "—";
         return {
           candidate: c,
           bde,
@@ -108,7 +122,8 @@ export default function CandidatesPage() {
           lastActivity: stats.lastActivityAt,
         };
       });
-  }, [candidatesQuery.data, applicationsQuery.data, teamQuery.data, principal, statusFilter]);
+  }, [candidatesQuery.data, applicationsQuery.data, teamQuery.data, principal, statusFilter, assignment]);
+  const waiting = useMemo(() => scopeCandidates(principal, candidatesQuery.data ?? []).filter(isWaitingForBde).length, [principal, candidatesQuery.data]);
 
   const columns = useMemo<ColumnDef<Row, unknown>[]>(() => {
     const cols: ColumnDef<Row, unknown>[] = [
@@ -151,7 +166,7 @@ export default function CandidatesPage() {
         id: "bde",
         accessorFn: (r) => r.bde,
         header: "Assigned BDE",
-        cell: ({ row }) => <span className="text-[var(--color-text-2)]">{row.original.bde}</span>,
+        cell: ({ row }) => (row.original.candidate.bdeId === null ? <NeedsBdeTag /> : <span className="text-[var(--color-text-2)]">{row.original.bde}</span>),
       });
     }
     return cols;
@@ -160,7 +175,8 @@ export default function CandidatesPage() {
   const canCreate = can(principal, "candidate.create");
 
   const toolbar = (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {isOwnScope ? null : <AssignmentToggle value={assignment} waiting={waiting} onChange={(next) => setQuery({ assignment: next })} />}
       <CandidateStatusSelect className="w-40" value={statusFilter} onValueChange={setStatusFilter} />
       <div role="group" aria-label="View" className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5">
         {([["table", "Table", Table2], ["cards", "Cards", LayoutGrid]] as const).map(([id, label, Icon]) => (

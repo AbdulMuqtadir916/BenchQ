@@ -8,6 +8,7 @@ import type { CandidateActions } from "../candidate-actions";
 import { AttentionCard } from "./attention-card";
 import { PipelineCard } from "./pipeline-card";
 import { InboxPreview } from "./inbox-preview";
+import { HandoffNote } from "./handoff-note";
 import { SubmissionFacts } from "./submission-facts";
 import { ResumeReadiness, TopMatches } from "./side-cards";
 
@@ -38,6 +39,7 @@ export function OverviewTab({ ws, actions, canAct, onNotify }: { ws: CandidateWo
         </div>
       </div>
       <div className="space-y-5">
+        <HandoffNote candidateId={candidate.id} />
         <TopMatches matches={matches} onFindJobs={actions.findJobs} />
         <SubmissionFacts candidate={candidate} canEdit={canAct} onSaved={() => onNotify("Submission facts updated")} />
         <ResumeReadiness master={ws.master} reviewHref={masterReviewHref(ws.master, toHref)} />

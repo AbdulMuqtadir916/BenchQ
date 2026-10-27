@@ -19,7 +19,21 @@ Finishes the flow: step 5, creating the candidate, the done screen, the "Needs a
 > - **Not run:** `axe` (not installed in the repo). Checked by hand: radios are native, every row has a label, the
 >   error is text, the done screen's check icon has a text label.
 >
-> **05b** (§5–§7) is next: the "Needs a BDE" queue, reassigning, and "New assignments".
+> **05b built 2026-10-27** (§5–§8). Notes:
+> - **The picker is shared:** `src/components/app/assign/assign-picker.tsx` (`AssignPicker`) and `assign-option.tsx`
+>   serve step 5 and the reassign dialog, with the same load, capacity and limit rules.
+> - **Derivations in `src/lib/derive/assignment.ts`:** `isWaitingForBde` (no BDE *and* a working status: a placed
+>   candidate waits for nobody), `queueByManager`, `latestAssignments`, `deriveNewAssignments`, `latestHandoff`.
+> - **"New assignments" reads who holds the candidate from the candidate**, not the ledger: an ASSIGN entry names the
+>   BDE only in its summary text. A candidate whose latest ASSIGN is under 7 days old and whose `bdeId` is this BDE.
+> - **Reassign** is `candidatesApi.reassign` → mock `reassign` (action `candidate.assign`; refuses no-ops, other
+>   teams, and a queue candidate getting a BDE at the limit). The button is "Pick a BDE" on a queue candidate.
+> - **The handoff note** (`overview/handoff-note.tsx`) shows nothing while loading, on error, or without a note: it's
+>   an annotation, not a list. Both it and "New assignments" read the first 500 ledger entries.
+> - **Fixed in passing:** the data table's search box shrank to nothing when the toolbar was crowded; it now has a
+>   minimum width and the toolbar wraps.
+> - **For 07 (backend):** a BDE's ledger read returns only entries *they* wrote, so they never see the ASSIGN entries
+>   that "New assignments" and the note need; and the ledger has no per-candidate filter. See 07 §1.
 
 Read first: [README](./README.md) §2 (Q41–Q46, Q48, Q50), §7 (A4–A6), [03 §1](./03-scope-and-permissions.md) (`canAssignTo`),
 [02 §1–§2](./02-hierarchy-and-seats.md) (load, limit, messages), `src/components/app/candidate-wizard/` (04).

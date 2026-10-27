@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CreateCandidate, UpdateCandidate } from "@/lib/schemas/candidate";
+import type { CreateCandidate, ReassignCandidate, UpdateCandidate } from "@/lib/schemas/candidate";
 import { candidatesApi } from "@/lib/api/candidates";
 import { queryKeys } from "@/lib/query/keys";
 import { candidateCapacity } from "@/lib/derive/tenancy";
@@ -45,6 +45,20 @@ export function useCreateCandidate() {
     mutationFn: (body: CreateCandidate) => candidatesApi.create(firmId, body),
     onSuccess: (candidate) => {
       queryClient.setQueryData(queryKeys.candidates.detail(firmId, candidate.id), candidate);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.candidates.lists(firmId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
+    },
+  });
+}
+
+/** Reassign a candidate (07 Q43). The lists, the dashboards' cards and the ledger all move with it. */
+export function useReassignCandidate(id: string) {
+  const firmId = useFirmId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ReassignCandidate) => candidatesApi.reassign(firmId, id, body),
+    onSuccess: (candidate) => {
+      queryClient.setQueryData(queryKeys.candidates.detail(firmId, id), candidate);
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidates.lists(firmId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
     },

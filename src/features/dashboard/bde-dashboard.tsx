@@ -23,6 +23,7 @@ import { GroupBody, GroupRowError } from "@/components/app/card-group";
 import { hasPageFailed, queryGroup } from "@/lib/query/query-group";
 import { PageHeader } from "@/components/app/page-header";
 import { Users } from "lucide-react";
+import { NewAssignmentsCard } from "./new-assignments-card";
 import { useHref } from "@/lib/routes/use-href";
 
 const EMPTY: never[] = [];
@@ -126,42 +127,45 @@ export function BdeDashboard() {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
-        <Card className="p-0">
-          <CardHeader className="p-4">
-            <CardTitle>My candidates{mine.status === "success" ? ` (${myCandidates.length})` : ""}</CardTitle>
-            <Link href={toHref("candidates")} className="text-sm text-[var(--color-primary)] hover:underline">
-              View all
-            </Link>
-          </CardHeader>
-          <GroupBody group={mine} skeleton={<div className="p-4"><SkeletonCard /></div>}>{() => myCandidates.length === 0 ? (
-            <EmptyState icon={Users} title="No candidates assigned" description="Your manager assigns candidates to your bench." variant="first-run" />
-          ) : (
-            <ul className="divide-y divide-[var(--color-border)]">
-              {myCandidates.slice(0, 6).map((c) => {
-                const stats = deriveCandidateStats(c, applications.filter((a) => a.candidateId === c.id));
-                const momentum = Math.min(5, Math.round(stats.responseRatePct / 20) + (stats.interviewsScheduled > 0 ? 1 : 0));
-                return (
-                  <li key={c.id}>
-                    <Link href={toHref("candidates.detail", { id: c.id })} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-body-strong truncate">{c.fullName}</span>
-                          <WorkAuthChip workAuth={c.workAuth} expiry={c.workAuthExpiry} />
+        <div className="min-w-0 space-y-6">
+          <NewAssignmentsCard userId={userId} />
+          <Card className="p-0">
+            <CardHeader className="p-4">
+              <CardTitle>My candidates{mine.status === "success" ? ` (${myCandidates.length})` : ""}</CardTitle>
+              <Link href={toHref("candidates")} className="text-sm text-[var(--color-primary)] hover:underline">
+                View all
+              </Link>
+            </CardHeader>
+            <GroupBody group={mine} skeleton={<div className="p-4"><SkeletonCard /></div>}>{() => myCandidates.length === 0 ? (
+              <EmptyState icon={Users} title="No candidates assigned" description="Your manager assigns candidates to your bench." variant="first-run" />
+            ) : (
+              <ul className="divide-y divide-[var(--color-border)]">
+                {myCandidates.slice(0, 6).map((c) => {
+                  const stats = deriveCandidateStats(c, applications.filter((a) => a.candidateId === c.id));
+                  const momentum = Math.min(5, Math.round(stats.responseRatePct / 20) + (stats.interviewsScheduled > 0 ? 1 : 0));
+                  return (
+                    <li key={c.id}>
+                      <Link href={toHref("candidates.detail", { id: c.id })} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-body-strong truncate">{c.fullName}</span>
+                            <WorkAuthChip workAuth={c.workAuth} expiry={c.workAuthExpiry} />
+                          </div>
+                          <div className="text-caption text-[var(--color-text-3)] truncate">{c.primaryRole}</div>
                         </div>
-                        <div className="text-caption text-[var(--color-text-3)] truncate">{c.primaryRole}</div>
-                      </div>
-                      <div className="hidden shrink-0 items-center gap-4 text-mono-sm text-[var(--color-text-2)] sm:flex">
-                        <span className="tabular">{stats.applicationsSubmitted} apps</span>
-                        <span className="tabular">{stats.interviewsScheduled} int</span>
-                        <ResponseDots filled={momentum} />
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}</GroupBody>
-        </Card>
+                        <div className="hidden shrink-0 items-center gap-4 text-mono-sm text-[var(--color-text-2)] sm:flex">
+                          <span className="tabular">{stats.applicationsSubmitted} apps</span>
+                          <span className="tabular">{stats.interviewsScheduled} int</span>
+                          <ResponseDots filled={momentum} />
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}</GroupBody>
+          </Card>
+        </div>
 
         <Card className="p-0">
           <CardHeader className="p-4">
