@@ -34,6 +34,13 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 > call to AI module `resume_parse` (primary model; prompt in setting `resume_parse_prompt`, an AI preset), logged to
 > `llm_call_log` as `resume_parse`. The answer is held to Zuhair's format (unknown keys dropped, missing ones "" or [])
 > and kept 60 minutes in `resume_parses`; expired unused parses are cleared on the firm's next read.
+>
+> **PR 4 built:** `GET/POST /api/firms/{id}/candidates`, `GET/PATCH …/candidates/{cid}`, `POST …/{cid}/assign`. Reads
+> are scoped (`team_scope` for a MANAGER, `own_scope` for a BDE; outside is 404). Create and assign check
+> `can_assign_to` (the Python mirror of the frontend's `canAssignTo`, in `backend/auth/policy.py`). Assigning a BDE to
+> a candidate that had none is blocked at the candidate limit, with the frontend's `assignBlockReason`. Create keeps
+> the résumé parse (once; expired or reused is 404) and writes `CREATE` and `ASSIGN` with the handoff note. Skills
+> and the summary are stored UNVERIFIED.
 
 ## 1. PRs, in order
 
