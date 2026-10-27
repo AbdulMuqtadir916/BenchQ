@@ -22,7 +22,7 @@ export interface PlatformData {
   firms: readonly Firm[];
   users: readonly User[];
   invites: readonly Invite[];
-  candidates: readonly Pick<Candidate, "firmId" | "status">[];
+  candidates: readonly Pick<Candidate, "firmId" | "status" | "bdeId">[];
   ledger: readonly LedgerEntry[];
 }
 
@@ -34,10 +34,17 @@ export function seatBlockReason(usage: Pick<FirmUsage, "seatsUsed" | "seatLimit"
   return `Your plan allows ${usage.seatLimit} BDE seat${usage.seatLimit === 1 ? "" : "s"}; ${usage.seatsUsed} ${usage.seatsUsed === 1 ? "is" : "are"} in use.`;
 }
 
-/** The over-limit block on a new candidate (A4), word for word on the button and from the mock. */
-export function candidateBlockReason(usage: Pick<FirmUsage, "activeCandidates" | "candidateLimit">): string {
-  return `Your plan allows ${usage.candidateLimit} active candidate${usage.candidateLimit === 1 ? "" : "s"}; ${usage.activeCandidates} ${usage.activeCandidates === 1 ? "is" : "are"} active.`;
+/**
+ * The block on assigning a BDE at the candidate limit (07 Q45, A4), word for word on the control, from the mock and from
+ * the backend (assign_block_reason in backend/api/routes_candidates.py). Handing a candidate to a manager is never blocked.
+ */
+export function assignBlockReason(usage: Pick<FirmUsage, "assignedCandidates" | "candidateLimit">): string {
+  const { candidateLimit: limit, assignedCandidates: used } = usage;
+  return `Your plan allows ${limit} assigned candidate${limit === 1 ? "" : "s"}; ${used} ${used === 1 ? "is" : "are"} assigned. Hand this candidate to a manager instead, or free a slot.`;
 }
+
+/** 07 Q40: every BDE reports to a manager, so a firm without one can't invite BDEs or add candidates. The backend's NO_MANAGER_REASON. */
+export const NO_MANAGER_REASON = "Invite a manager first. Every BDE reports to a manager.";
 
 export type OwnerStatus =
   | { kind: "active"; name: string; email: string; userId: string; isActive: boolean }
@@ -105,7 +112,7 @@ export function needsAttention(data: PlatformData, now: Date): AttentionItem[] {
   for (const firm of data.firms) {
     const usage = usageOf(firm, data, now);
     if (usage.isOverSeatLimit) items.push({ kind: "over-limit", firm, limit: "seats", used: usage.seatsUsed, allowed: usage.seatLimit });
-    if (usage.isOverCandidateLimit) items.push({ kind: "over-limit", firm, limit: "candidates", used: usage.activeCandidates, allowed: usage.candidateLimit });
+    if (usage.isOverCandidateLimit) items.push({ kind: "over-limit", firm, limit: "candidates", used: usage.assignedCandidates, allowed: usage.candidateLimit });
     if (firm.status !== "ONBOARDING") continue;
     const owner = ownerStatus(firm.id, data, now);
     if (owner.kind === "expired") items.push({ kind: "owner-invite-expired", firm, email: owner.email });

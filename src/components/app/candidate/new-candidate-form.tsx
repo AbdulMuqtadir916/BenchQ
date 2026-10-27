@@ -9,7 +9,7 @@ import { Select, type SelectOption } from "@/components/ui/select";
 import { WORK_AUTH_LABEL } from "@/components/app/work-auth-chip";
 import { useCan } from "@/lib/auth/permissions";
 import { isBde, isManager } from "@/lib/auth/roles";
-import { useCandidateBlock, useCreateCandidate } from "@/lib/hooks/use-candidates";
+import { useAssignBlock, useCreateCandidate } from "@/lib/hooks/use-candidates";
 import { useTeam } from "@/lib/hooks/use-team";
 import { useHref } from "@/lib/routes/use-href";
 import { CreateCandidateSchema } from "@/lib/schemas/candidate";
@@ -32,7 +32,7 @@ export function NewCandidateForm({ idPrefix, onCancel }: { idPrefix: string; onC
   const canAssign = useCan("candidate.assign");
   const me = useSignedInUser();
   const team = useTeam();
-  const block = useCandidateBlock();
+  const block = useAssignBlock();
   const create = useCreateCandidate();
   const [workAuth, setWorkAuth] = useState<WorkAuth>("H1B");
   const [assignee, setAssignee] = useState(UNASSIGNED);
@@ -90,7 +90,8 @@ export function NewCandidateForm({ idPrefix, onCancel }: { idPrefix: string; onC
     });
   }
 
-  const isBlocked = block.reason !== null;
+  // 07 Q45: only giving the candidate a BDE counts toward the limit (a BDE's own candidate always has one).
+  const isBlocked = block.reason !== null && (isBde(me) || assignee !== UNASSIGNED);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6" noValidate>

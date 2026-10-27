@@ -11,6 +11,8 @@ export interface InviteMemberInput {
   role: "MANAGER" | "BDE" | "VIEWER";
   /** Prefilled on /invite/[token] (Q31); null = not given. */
   inviteeName: string | null;
+  /** 07 Q40: the MANAGER a BDE will report to. Required for a BDE, null for anyone else. */
+  managerId: string | null;
 }
 
 /** The invite and its link's token: shown once, when sent or resent (07 Q38). The link is /invite/[token]. */
@@ -27,11 +29,15 @@ const live = {
   list: async (firmId: string) => (await http.get(`${firmPath(firmId)}/members`, arrayOf(UserDto))).map(toUser),
   invites: async (firmId: string) => (await http.get(`${firmPath(firmId)}/invites`, arrayOf(InviteDto))).map(toInvite),
   invite: async (firmId: string, input: InviteMemberInput) =>
-    withLink(await http.post(`${firmPath(firmId)}/invites`, InviteWithTokenDto, { body: { email: input.email, role: input.role, invitee_name: input.inviteeName } })),
+    withLink(await http.post(`${firmPath(firmId)}/invites`, InviteWithTokenDto, {
+      body: { email: input.email, role: input.role, invitee_name: input.inviteeName, manager_id: input.managerId ? toBackendId(input.managerId) : null },
+    })),
   resendInvite: async (firmId: string, inviteId: string) =>
     withLink(await http.post(`${firmPath(firmId)}/invites/${toBackendId(inviteId)}/resend`, InviteWithTokenDto)),
   revokeInvite: async (firmId: string, inviteId: string) =>
     toInvite(await http.post(`${firmPath(firmId)}/invites/${toBackendId(inviteId)}/revoke`, InviteDto)),
+  changeManager: async (firmId: string, userId: string, managerId: string) =>
+    toUser(await http.patch(`${firmPath(firmId)}/members/${toBackendId(userId)}/manager`, UserDto, { body: { manager_id: toBackendId(managerId) } })),
 };
 
 /** Firm-scoped (docs/07 T5): every call names the firm, and the backend serves only that firm's rows. */
@@ -48,4 +54,7 @@ export const teamApi = {
   resendInvite: async (firmId: string, inviteId: string): Promise<InviteWithLink> => live.resendInvite(firmId, inviteId),
 
   revokeInvite: async (firmId: string, inviteId: string): Promise<Invite> => live.revokeInvite(firmId, inviteId),
+
+  /** OWNER only (`member.changeManager`, 07 Q40): move a BDE to another manager; their candidates follow (Q43). Also how a BDE with no manager gets one (Q51). */
+  changeManager: async (firmId: string, userId: string, managerId: string): Promise<User> => live.changeManager(firmId, userId, managerId),
 };

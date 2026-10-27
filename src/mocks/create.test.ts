@@ -83,14 +83,18 @@ describe("New candidate", () => {
     await expect(m.candidates.create(FIRM, candidate())).rejects.toMatchObject({ status: 403 }); // no BDE
   });
 
-  it("at the candidate limit it is refused with the reason, and nothing is added (A4)", async () => {
+  it("at the candidate limit, giving it a BDE is refused with the reason; a manager's queue never is (07 Q45)", async () => {
     const m = await load(EMAIL.imran);
-    const active = m.allCandidates.filter((row) => row.firmId === FIRM && ["ON_BENCH", "INTERVIEWING", "OFFER"].includes(row.status)).length;
+    const assigned = m.allCandidates.filter((row) => row.firmId === FIRM && row.bdeId !== null && ["ON_BENCH", "INTERVIEWING", "OFFER"].includes(row.status)).length;
     const { firms } = await import("./team-data");
-    firms.find((item) => item.id === FIRM)!.candidateLimit = active; // the plan's limit, as the backend would hold it
+    firms.find((item) => item.id === FIRM)!.candidateLimit = assigned; // the plan's limit, as the backend would hold it
     const before = m.allCandidates.length;
-    await expect(m.candidates.create(FIRM, candidate())).rejects.toMatchObject({ status: 409, code: "CANDIDATE_LIMIT", message: `Your plan allows ${active} active candidates; ${active} are active.` });
+    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_adnan" }))).rejects.toMatchObject({
+      status: 409, code: "CANDIDATE_LIMIT",
+      message: `Your plan allows ${assigned} assigned candidates; ${assigned} are assigned. Hand this candidate to a manager instead, or free a slot.`,
+    });
     expect(m.allCandidates.length).toBe(before);
+    expect(await m.candidates.create(FIRM, candidate())).toMatchObject({ bdeId: null });
   });
 
   it("checks the fields", async () => {

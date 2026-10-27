@@ -12,8 +12,8 @@ import { AdminDialog, DialogFrame, Field, errorMessage, fieldAria } from "@/feat
 import { AdminDate } from "@/features/admin/admin-time";
 import type { InviteMemberInput } from "@/lib/api/team";
 import { useCan } from "@/lib/auth/permissions";
-import { ROLE_LABEL } from "@/lib/auth/roles";
-import { seatBlockReason } from "@/lib/derive/platform";
+import { isManager, ROLE_LABEL } from "@/lib/auth/roles";
+import { NO_MANAGER_REASON, seatBlockReason } from "@/lib/derive/platform";
 import { deriveFirmUsage } from "@/lib/derive/tenancy";
 import { useInviteMember, useMemberInvites, useResendMemberInvite, useRevokeMemberInvite, useTeam } from "@/lib/hooks/use-team";
 import { hrefFor } from "@/lib/routes/registry";
@@ -25,7 +25,8 @@ import { useFirm } from "@/lib/tenancy/firm-context";
  * The firm side of invites on /settings/team (docs/07 Phase M, M2; 07 Q38). The OWNER invites a MANAGER, BDE or
  * VIEWER, resends and revokes; a MANAGER sees the invites read-only. There is no email yet: the OWNER copies the
  * link and sends it. A link is shown once, when the invite is sent or resent, so "Copy link" makes a new one and
- * the old link stops. Blocked at the seat limit (A4): visible, disabled, the reason inline (docs/04 §0).
+ * the old link stops. Blocked at the seat limit (A4): visible, disabled, the reason inline (docs/04 §0). A BDE invite
+ * names the manager the BDE will report to (07 Q40); with no active manager, inviting a BDE waits for one.
  */
 
 const ROLES: InviteMemberInput["role"][] = ["BDE", "MANAGER", "VIEWER"];
@@ -64,7 +65,7 @@ export function MemberInvites({ members }: { members: readonly User[] }) {
             {canInvite ? "Invite a member, then send them the link. A pending invite holds a seat for 7 days." : "Read-only: only the firm's owner invites members."}
           </p>
         </div>
-        {canInvite ? <InviteMemberButton blockedReason={blocked} onSent={showLink} /> : null}
+        {canInvite ? <InviteMemberButton blockedReason={blocked} managers={members.filter((user) => user.isActive && isManager(user))} onSent={showLink} /> : null}
       </CardHeader>
       {shown.length === 0 ? (
         <p className="border-t border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-3)]">No invites yet.</p>
@@ -106,23 +107,27 @@ export function MemberInvites({ members }: { members: readonly User[] }) {
   );
 }
 
-function InviteMemberButton({ blockedReason, onSent }: { blockedReason: string | null; onSent: (email: string, token: string) => void }) {
+function InviteMemberButton({ blockedReason, managers, onSent }: { blockedReason: string | null; managers: readonly User[]; onSent: (email: string, token: string) => void }) {
   const invite = useInviteMember();
   const [isOpen, setIsOpen] = useState(false);
-  const [form, setForm] = useState<{ email: string; name: string; role: InviteMemberInput["role"] }>({ email: "", name: "", role: "BDE" });
+  // A firm with no manager starts on MANAGER: a BDE can't be invited until one exists (07 Q40).
+  const empty = { email: "", name: "", role: (managers.length > 0 ? "BDE" : "MANAGER") as InviteMemberInput["role"], managerId: managers[0]?.id ?? "" };
+  const [form, setForm] = useState(empty);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const emailError = EMAIL.test(form.email.trim()) ? null : "Enter a valid email address.";
+  const isBdeInvite = form.role === "BDE";
+  const managerError = isBdeInvite && !managers.some((manager) => manager.id === form.managerId) ? "Choose the manager this BDE reports to." : null;
   const close = () => {
     invite.reset();
     setIsOpen(false);
     setIsSubmitted(false);
-    setForm({ email: "", name: "", role: "BDE" });
+    setForm(empty);
   };
   function send() {
     setIsSubmitted(true);
-    if (emailError) return;
+    if (emailError || managerError) return;
     invite.mutate(
-      { email: form.email.trim(), role: form.role, inviteeName: form.name.trim() || null },
+      { email: form.email.trim(), role: form.role, inviteeName: form.name.trim() || null, managerId: isBdeInvite ? form.managerId : null },
       { onSuccess: ({ invite: sent, token }) => { close(); onSent(sent.email, token); } },
     );
   }
@@ -150,11 +155,18 @@ function InviteMemberButton({ blockedReason, onSent }: { blockedReason: string |
           <Field id="invite-name" label="Name (optional)" hint="Shown on their invite page; they can change it.">
             <Input {...fieldAria("invite-name", null, true)} autoComplete="off" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
           </Field>
-          <Field id="invite-role" label="Role">
-            <select id="invite-role" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as InviteMemberInput["role"] })} className="bq-input w-full">
-              {ROLES.map((role) => <option key={role} value={role}>{ROLE_LABEL[role]}</option>)}
+          <Field id="invite-role" label="Role" hint={managers.length === 0 ? NO_MANAGER_REASON : undefined}>
+            <select {...fieldAria("invite-role", null, managers.length === 0)} value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as InviteMemberInput["role"] })} className="bq-input w-full">
+              {ROLES.map((role) => <option key={role} value={role} disabled={role === "BDE" && managers.length === 0}>{ROLE_LABEL[role]}</option>)}
             </select>
           </Field>
+          {isBdeInvite ? (
+            <Field id="invite-manager" label="Manager" hint="The manager this BDE reports to." error={isSubmitted ? managerError : null}>
+              <select {...fieldAria("invite-manager", isSubmitted ? managerError : null, true)} value={form.managerId} onChange={(event) => setForm({ ...form, managerId: event.target.value })} className="bq-input w-full">
+                {managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}
+              </select>
+            </Field>
+          ) : null}
         </AdminDialog>
       ) : null}
     </span>

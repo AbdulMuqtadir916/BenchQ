@@ -1,17 +1,16 @@
 "use client";
 
-import { ROLE_TONE } from "@/lib/auth/roles";
 import { Users } from "lucide-react";
 import { useTeam } from "@/lib/hooks/use-team";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tag } from "@/components/ui/tag";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { hasTeamScope, scopeTeam, useCan } from "@/lib/auth/permissions";
 import { TeamInvitesSection } from "@/features/team/member-invites";
+import { MembersTable } from "@/features/team/members-table";
 
 /**
  * /settings/team (docs/04 §10, 07 Q15). The route lets OWNER and MANAGER in (`team.view`); what each may
@@ -46,26 +45,7 @@ export default function TeamSettingsPage() {
             {canManageMembers ? "You manage the team. Removing members and changing roles come later." : isTeamScope ? "Your team, read-only: only the firm's owner manages members." : "Read-only: only the firm's owner manages members."}
           </p>
         </CardHeader>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-y border-[var(--color-border)] bg-[var(--color-surface-3)] text-left text-caption text-[var(--color-text-3)]">
-              <th className="px-4 py-2 font-medium">Name</th>
-              <th className="px-4 py-2 font-medium">Email</th>
-              <th className="px-4 py-2 font-medium">Role</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--color-border)]">
-            {members.map((u) => (
-              <tr key={u.id}>
-                <td className="px-4 py-3 text-body-strong">{u.name}</td>
-                <td className="px-4 py-3 text-[var(--color-text-3)]">{u.email}</td>
-                <td className="px-4 py-3"><Tag tone={ROLE_TONE[u.role]}>{u.role}</Tag></td>
-                <td className="px-4 py-3">{u.isActive ? <Tag tone="green">Active</Tag> : <Tag tone="neutral">Inactive</Tag>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <MembersTable members={members} allMembers={teamQuery.data ?? []} />
       </Card>
       <TeamInvitesSection />
     </div>

@@ -9,7 +9,9 @@ import { CandidateCardGrid } from "@/components/app/candidate/candidate-card-gri
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { CandidateStatus } from "@/lib/schemas/enums";
-import { useCandidateBlock, useCandidates } from "@/lib/hooks/use-candidates";
+import { useCandidates } from "@/lib/hooks/use-candidates";
+import { NO_MANAGER_REASON } from "@/lib/derive/platform";
+import { isManager } from "@/lib/auth/roles";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
 import { can, hasOwnScope, hasTeamScope, scopeCandidates } from "@/lib/auth/permissions";
@@ -213,10 +215,14 @@ export default function CandidatesPage() {
   );
 }
 
-/** New candidate — or, at the firm's candidate limit, the same control disabled with the reason (A4, docs/04 §0). */
+/**
+ * New candidate — or, while the firm has no active manager, the same control disabled with the reason (07 Q40: every
+ * candidate has a manager; docs/04 §0). The candidate limit never blocks adding one, only assigning a BDE (Q45).
+ */
 function NewCandidateAction({ href }: { href: string }) {
-  const block = useCandidateBlock();
-  if (block.reason === null) {
+  const teamQuery = useTeam();
+  const reason = teamQuery.data && !teamQuery.data.some((user) => user.isActive && isManager(user)) ? NO_MANAGER_REASON : null;
+  if (reason === null) {
     return (
       <Button asChild>
         <Link href={href}><Plus size={14} aria-hidden />New candidate</Link>
@@ -225,7 +231,7 @@ function NewCandidateAction({ href }: { href: string }) {
   }
   return (
     <>
-      <span id="new-candidate-blocked" className="text-sm text-[var(--color-text-2)]">{block.reason}</span>
+      <span id="new-candidate-blocked" className="text-sm text-[var(--color-text-2)]">{reason}</span>
       <Button disabled aria-describedby="new-candidate-blocked"><Plus size={14} aria-hidden />New candidate</Button>
     </>
   );
