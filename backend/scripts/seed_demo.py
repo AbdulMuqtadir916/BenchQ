@@ -5,7 +5,8 @@
     docker compose exec backend python -m backend.scripts.seed_demo
 
 It reads the same JSON the mocks use (src/mocks/data/*.json; docker-compose mounts it read-only), never a
-copy, so the two can't drift. Today: the plans, the four firms, their users, the Super Admin and the invites.
+copy, so the two can't drift. Today: the plans, the four firms, their users, the Super Admin, the invites and the
+candidates (onboarding 06 PR 5).
 Each module's data joins as its track lands. Every seeded account signs in with the one demo password
 (docs/03 §3.2).
 
@@ -114,6 +115,7 @@ def _fixture_ids() -> dict[str, list[uuid.UUID]]:
         "users": [demo_id(u["id"]) for u in firm["users"]],
         "platform_users": [demo_id(p["id"]) for p in _load("platform-users.json")],
         "invites": [demo_id(i["id"]) for i in _load("invites.json")],
+        "candidates": [demo_id(c["id"]) for c in _load("candidates.json")],
     }
 
 
@@ -122,7 +124,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
     now = now or utcnow()
     password_hash = hash_password(DEMO_PASSWORD)
     firm_data = _load("firm.json")
-    added = {"plans": 0, "firms": 0, "users": 0, "platform_users": 0, "invites": 0}
+    added = {"plans": 0, "firms": 0, "users": 0, "platform_users": 0, "invites": 0, "candidates": 0}
 
     for p in _load("plans.json"):
         added["plans"] += _add_missing(db, Plan, demo_id(p["id"]), name=p["name"], seat_limit=p["seatLimit"],
@@ -162,7 +164,39 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             token_hash=hash_token(new_token()), expires_at=_shift(i["expiresAt"], now), created_at=created,
             accepted_at=created + timedelta(hours=1) if i["status"] == "ACCEPTED" else None,
             revoked_at=created + timedelta(hours=1) if i["status"] == "REVOKED" else None)
+    for c in _load("candidates.json"):
+        added["candidates"] += _add_missing(db, Candidate, demo_id(c["id"]), **_candidate_fields(c))
     return added
+
+
+def _snake(key: str) -> str:
+    return "".join(f"_{ch.lower()}" if ch.isupper() else ch for ch in key)
+
+
+def _snake_keys(value):
+    """The mocks' camelCase JSON (persona, answer bank) as the API sends it: snake_case keys, ids mapped."""
+    if isinstance(value, list):
+        return [_snake_keys(item) for item in value]
+    if isinstance(value, dict):
+        return {_snake(k): _snake_keys(v) for k, v in value.items()}
+    return value
+
+
+def _candidate_fields(c: dict) -> dict:
+    """A mock candidate (src/mocks/data/candidates.json) as a `candidates` row. Its manager added it."""
+    return dict(
+        firm_id=demo_id(c["firmId"]), manager_id=demo_id(c["managerId"]),
+        bde_id=demo_id(c["bdeId"]) if c["bdeId"] else None, created_by_user_id=demo_id(c["managerId"]),
+        full_name=c["fullName"], email=c["email"], phone=c["phone"], linkedin_url=c["linkedinUrl"], city=c["city"],
+        state=c["state"], country=c["country"], willing_to_relocate=c["willingToRelocate"], work_auth=c["workAuth"],
+        work_auth_expiry=_when(c["workAuthExpiry"]), needs_sponsorship=c["needsSponsorship"],
+        needs_transfer=c["needsTransfer"], employment_types=c["employmentTypes"], rate_min=c["rateMin"],
+        rate_target=c["rateTarget"], status=c["status"], bench_start_date=_when(c["benchStartDate"]),
+        available_from=_when(c["availableFrom"]), notice_period_days=c["noticePeriodDays"],
+        years_experience=c["yearsExperience"], primary_role=c["primaryRole"], target_roles=c["targetRoles"],
+        work_settings=c["workSettings"], preferred_locations=c["preferredLocations"], contact_notes=c["contactNotes"],
+        persona=_snake_keys(c["persona"]), qa_bank=_snake_keys(c["qaBank"]),
+        created_at=_when(c["createdAt"]), updated_at=_when(c["updatedAt"]))
 
 
 def main(argv: list[str] | None = None) -> int:

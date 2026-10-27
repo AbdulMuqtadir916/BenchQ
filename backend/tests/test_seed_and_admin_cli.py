@@ -56,7 +56,8 @@ def test_the_seed_loads_the_mocks_world_and_is_idempotent(test_db):
     test_db.commit()
     firm = json.loads((DATA / "firm.json").read_text())
     assert added == {"plans": 3, "firms": len(firm["firms"]), "users": len(firm["users"]), "platform_users": 1,
-                     "invites": len(json.loads((DATA / "invites.json").read_text()))}
+                     "invites": len(json.loads((DATA / "invites.json").read_text())),
+                     "candidates": len(json.loads((DATA / "candidates.json").read_text()))}
     assert set(seed_demo.seed(test_db).values()) == {0}
 
 
