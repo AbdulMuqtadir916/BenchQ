@@ -186,7 +186,8 @@ authorisation statuses into something invented.
 Same routes, different compositions. A control a role can't use is **not rendered** — not disabled.
 A disabled button advertises a feature the user can't have, which is worse than silence.
 
-A BDE sees only their assigned candidates and their own applications. This isn't a security
+A BDE sees only their assigned candidates and their own applications; a MANAGER sees their team — the candidates
+they manage and their BDEs' work (docs/07 Q47); a BDE doesn't add candidates, the OWNER and MANAGERs do (Q41). This isn't a security
 boundary in this repo (there's no backend) but the UI must behave as though it is, because verifying
 it now is how it stays correct when the backend lands.
 

@@ -115,6 +115,9 @@ describe("record scope", () => {
     expect(isInScope("assigned", "u1", { bdeId: "u1" })).toBe(true);
     expect(isInScope("assigned", "u3", { bdeId: "u1" })).toBe(false);
     expect(isInScope("assigned", "u3", { bdeId: null })).toBe(false);
+    expect(isInScope("team", "m1", { bdeId: "u1", managerId: "m1" })).toBe(true);   // 07 Q47: a MANAGER's candidate
+    expect(isInScope("team", "m1", { bdeId: null, managerId: "m1" })).toBe(true);   // their queue
+    expect(isInScope("team", "m1", { bdeId: "u2", managerId: "m2" })).toBe(false);  // another team's → not-found
     expect(isInScope("own", "u1", { ownerUserId: "u1" })).toBe(true);
     expect(isInScope("own", "u1", { ownerUserId: "u2" })).toBe(false);
     expect(isInScope("read", "u1", {})).toBe(true);
@@ -168,24 +171,24 @@ describe("hrefFor", () => {
 const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Access]> = [
   ["welcome", "full", "none", "none", "none"], // OWNER first run; others → landing
   ["dashboard", "full", "full", "full", "read"],
-  ["candidates", "full", "full", "assigned", "read"],
-  ["candidates.new", "full", "full", "full", "none"],
-  ["candidates.detail", "full", "full", "assigned", "read"],
+  ["candidates", "full", "team", "assigned", "read"],
+  ["candidates.new", "full", "full", "none", "none"], // 07 Q41: a BDE no longer adds candidates
+  ["candidates.detail", "full", "team", "assigned", "read"],
   ["jobs", "full", "full", "full", "read"],
   ["jobs.detail", "full", "full", "full", "read"],
   ["jobs.capture", "full", "full", "full", "none"],
-  ["applications", "full", "full", "own", "read"],
-  ["applications.detail", "full", "full", "own", "read"],
-  ["resumes", "full", "full", "assigned", "read"],
-  ["resumes.studio", "full", "full", "assigned", "read"],
-  ["outreach", "full", "full", "own", "read"],
-  ["followups", "full", "full", "own", "none"],
+  ["applications", "full", "team", "own", "read"],
+  ["applications.detail", "full", "team", "own", "read"],
+  ["resumes", "full", "team", "assigned", "read"],
+  ["resumes.studio", "full", "team", "assigned", "read"],
+  ["outreach", "full", "team", "own", "read"],
+  ["followups", "full", "team", "own", "none"],
   ["focus", "full", "full", "full", "none"],
-  ["analytics", "full", "full", "none", "read"],
-  ["ledger", "full", "full", "own", "read"],
+  ["analytics", "full", "team", "none", "read"],
+  ["ledger", "full", "team", "own", "read"],
   ["settings", "full", "full", "full", "full"], // index: redirects to the first allowed section
   ["settings.firm", "full", "none", "none", "none"],
-  ["settings.team", "full", "full", "none", "none"], // MANAGER: openable; read-only + assign is a Phase C can() rule (Q15)
+  ["settings.team", "full", "team", "none", "none"], // MANAGER: their team, read-only + assign through can() (Q15, Q47)
   ["settings.templates", "full", "full", "none", "none"],
   ["settings.preferences", "full", "full", "full", "full"],
 ];

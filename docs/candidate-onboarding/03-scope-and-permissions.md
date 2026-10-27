@@ -2,6 +2,16 @@
 
 **Owner:** — · **Depends on:** 01 · **Branch:** `feat/onboarding-03-scope-permissions`
 
+> **Built 2026-10-27.** As specified, with three notes:
+> - **The team is worked out as** the MANAGER, the BDEs whose `managerId` is theirs, **and the BDE of any candidate
+>   they manage** (`teamMemberIds`). The live team list has no `managerId` until 06 PR 1, so without that last part a
+>   MANAGER's follow-ups, ledger and team page would be empty in live mode.
+> - **Résumés** are scoped through their candidate (`scopeByCandidate`), which also narrows a BDE's library to their
+>   own candidates (it showed the whole firm's before).
+> - **Not narrowed yet:** a MANAGER's *invites* list on `settings/team`, because invites carry no manager until the
+>   backend sends `manager_id`. The candidates mock refuses creates with `canAssignTo`, after resolving a named BDE's
+>   manager from its own data.
+
 Who may add and assign candidates, and what a MANAGER sees: their team on every firm page (Q47). This module is the
 only one that edits the permission policy and the route registry. Client checks are UX; the backend enforces the same
 rules in 06 (CLAUDE.md: "Client-side guards are UX, not security").

@@ -48,9 +48,9 @@ export default function ApplicationsPage() {
 
   const apps = useMemo(() => {
     let list = applicationsQuery.data ?? [];
-    list = scopeApplications(principal, list);
+    list = scopeApplications(principal, list, candidatesQuery.data ?? []);
     return list;
-  }, [applicationsQuery.data, principal]);
+  }, [applicationsQuery.data, candidatesQuery.data, principal]);
 
   function moveTo(id: string, to: ApplicationStatus) {
     updateStatus.mutate({ id, status: to, note: null });
