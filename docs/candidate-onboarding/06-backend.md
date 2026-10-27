@@ -22,6 +22,12 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 > `CandidateSchema` in snake_case; skills JSONB and `summary_state`, which a CHECK keeps UNVERIFIED) and
 > `resume_parses`. The serializers send `manager_id`, `bde_capacity` and `note`. The demo seed fills managers and
 > capacity, including on rows seeded before. Both new tables are firm-owned in the scoping lint.
+>
+> **PR 2 built:** a BDE invite names an active MANAGER of the firm (400 if missing, 404 if not a manager, 409
+> "Invite a manager first…" when the firm has none), and accepting it keeps the manager.
+> `PATCH /api/firms/{id}/members/{user_id}/manager` (OWNER) moves a BDE and the candidates they work; it is also how a
+> manager-less BDE gets one. `PATCH /api/firms/{id}/settings {bde_capacity}` (OWNER). **The frontend's invite form must
+> send `manager_id` for BDEs (module 02) before this reaches users:** today's form doesn't, and the backend now refuses.
 
 ## 1. PRs, in order
 
