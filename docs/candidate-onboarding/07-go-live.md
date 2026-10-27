@@ -6,6 +6,21 @@ Switch the feature from mocks to the backend, module by module, without touching
 rewrites a screen). Follow `docs/integration/README.md` "The workflow for one module"; `01-ledger.md` is the worked
 example to copy.
 
+> **07b built 2026-10-28:** `candidatesApi` (list, byId, create, update, reassign) and `resumeParseApi.parse` go to the
+> backend with `NEXT_PUBLIC_LIVE_MODULES=candidates`; mapper `src/lib/api/dto/candidates.ts`, tested on the real sample
+> in `__samples__/candidates.json`; `http.postForm` for the upload; `followBde` does nothing live (the backend moves the
+> candidates itself). `team.ts` and `session.ts` were already live (module 02). Checked on the backend with
+> `session,ledger,candidates`: list, create (wizard), profile, handoff note, reassign; MANAGER sees their team only; the
+> second firm sees none of it. **Gaps, until the other tracks go live:**
+> - A candidate created on the backend exists only there. The modules still on mocks don't know it: its Record
+>   (résumé builder), and uploading a document to it (the documents mock looks candidates up in its own data) fail.
+>   Seeded candidates work, because their ids translate. Track 03/04 remove this.
+> - The live résumé parse was tested through the adapter, not in the browser (the browser tool can't pick a file, and
+>   it calls the backend's AI). Try it by hand once: upload a PDF on `/candidates/new`.
+> - The error state with the backend stopped was not re-checked here (the adapter's rejection is tested).
+> - Fixed on the way: "Skip, enter manually" did nothing since 05a (an empty flow was sent back to step 1).
+> - The candidates mock stays: Tracks 03/04 still read candidates by id from it.
+
 Read first: `docs/integration/README.md`, `src/lib/api/http.ts`, `src/lib/api/dto/session.ts` (an existing mapper),
 [06](./06-backend.md) §3–§5 and its saved sample responses.
 

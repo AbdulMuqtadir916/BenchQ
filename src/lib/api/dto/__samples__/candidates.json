@@ -1,0 +1,190 @@
+{
+  "_source": "GET /api/firms/{firm_hts}/candidates on the demo seed, 2026-10-27 (two rows: one assigned, one in a queue)",
+  "list": [
+    {
+      "id": "daea7708-33cf-52fe-9da5-44db9eb5b22c",
+      "firm_id": "d6d0fdd5-f446-5517-bef3-1df9447e2b91",
+      "manager_id": "dec7c04c-1552-5cb0-b081-cb4ddf9fa5dc",
+      "bde_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63",
+      "full_name": "Meera Krishnan",
+      "email": "meera.k@example.com",
+      "phone": "+1-214-555-0167",
+      "linkedin_url": null,
+      "city": "Dallas",
+      "state": "TX",
+      "country": "US",
+      "willing_to_relocate": false,
+      "work_auth": "USC",
+      "work_auth_expiry": null,
+      "needs_sponsorship": false,
+      "needs_transfer": false,
+      "employment_types": [
+        "W2",
+        "FTE"
+      ],
+      "rate_min": 60.0,
+      "rate_target": 72.0,
+      "status": "ON_BENCH",
+      "bench_start_date": "2026-09-28T06:17:52.966000+00:00",
+      "available_from": "2026-09-28T06:17:52.966000+00:00",
+      "notice_period_days": 0,
+      "years_experience": 5.0,
+      "primary_role": "Salesforce Developer",
+      "target_roles": [
+        "Salesforce Developer",
+        "Salesforce Admin"
+      ],
+      "work_settings": [],
+      "preferred_locations": [],
+      "contact_notes": null,
+      "persona": {
+        "summary": "Recently laid off, motivated. CPQ and Service Cloud experience.",
+        "tone_notes": null,
+        "deal_breakers": [],
+        "will_relocate": false,
+        "notice_period_days": null,
+        "preferred_industries": [
+          "any"
+        ]
+      },
+      "qa_bank": [
+        {
+          "id": "qa_cand_06_0",
+          "state": "VERIFIED",
+          "answer": "Platform Developer I, Admin",
+          "category": "EXPERIENCE",
+          "question": "Salesforce certifications?",
+          "use_count": 3,
+          "evidence_id": "ev_cand_06_qa_0",
+          "last_used_at": null
+        },
+        {
+          "id": "qa_cand_06_1",
+          "state": "VERIFIED",
+          "answer": "2 years implementing CPQ at Verizon",
+          "category": "EXPERIENCE",
+          "question": "CPQ experience?",
+          "use_count": 6,
+          "evidence_id": "ev_cand_06_qa_1",
+          "last_used_at": "2026-09-28T19:17:52.966Z"
+        }
+      ],
+      "skills": [],
+      "summary_state": "UNVERIFIED",
+      "created_at": "2026-09-26T06:17:52.966000+00:00",
+      "updated_at": "2026-10-01T00:17:52.966000+00:00"
+    },
+    {
+      "id": "dcacf450-05af-55aa-a09c-4c2e9467624e",
+      "firm_id": "d6d0fdd5-f446-5517-bef3-1df9447e2b91",
+      "manager_id": "dec7c04c-1552-5cb0-b081-cb4ddf9fa5dc",
+      "bde_id": null,
+      "full_name": "Rajesh Venkataraman",
+      "email": "rajesh.v@example.com",
+      "phone": "+1-469-555-0142",
+      "linkedin_url": "https://linkedin.com/in/rajesh-v",
+      "city": "Dallas",
+      "state": "TX",
+      "country": "US",
+      "willing_to_relocate": true,
+      "work_auth": "H1B",
+      "work_auth_expiry": "2028-03-24T06:17:52.966000+00:00",
+      "needs_sponsorship": true,
+      "needs_transfer": false,
+      "employment_types": [
+        "C2C",
+        "W2"
+      ],
+      "rate_min": 70.0,
+      "rate_target": 85.0,
+      "status": "ON_BENCH",
+      "bench_start_date": "2026-09-07T06:17:52.966000+00:00",
+      "available_from": "2026-09-29T06:17:52.966000+00:00",
+      "notice_period_days": 14,
+      "years_experience": 8.0,
+      "primary_role": "Senior Java Developer",
+      "target_roles": [
+        "Java Backend",
+        "Full Stack"
+      ],
+      "work_settings": [
+        "REMOTE",
+        "HYBRID"
+      ],
+      "preferred_locations": [
+        "Dallas, TX",
+        "Austin, TX"
+      ],
+      "contact_notes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
+      "persona": {
+        "summary": "Methodical, prefers detailed JDs. Strong on Spring Boot microservices.",
+        "tone_notes": "Formal, prefers email over calls",
+        "deal_breakers": [
+          "no travel over 25%"
+        ],
+        "will_relocate": true,
+        "notice_period_days": null,
+        "preferred_industries": [
+          "fintech",
+          "healthcare"
+        ]
+      },
+      "qa_bank": [
+        {
+          "id": "qa_cand_01_0",
+          "state": "VERIFIED",
+          "answer": "Yes, C2C through my employer or W2",
+          "category": "COMPENSATION",
+          "question": "Are you open to C2C?",
+          "use_count": 7,
+          "evidence_id": "ev_cand_01_qa_0",
+          "last_used_at": "2026-09-30T15:17:52.966Z"
+        },
+        {
+          "id": "qa_cand_01_1",
+          "state": "VERIFIED",
+          "answer": "H1B valid until 2028, no transfer needed",
+          "category": "WORK_AUTH",
+          "question": "Current visa status?",
+          "use_count": 5,
+          "evidence_id": "ev_cand_01_qa_1",
+          "last_used_at": "2026-09-29T10:17:52.966Z"
+        },
+        {
+          "id": "qa_cand_01_2",
+          "state": "VERIFIED",
+          "answer": "2 weeks from offer acceptance",
+          "category": "AVAILABILITY",
+          "question": "Notice period?",
+          "use_count": 0,
+          "evidence_id": "ev_cand_01_qa_2",
+          "last_used_at": null
+        },
+        {
+          "id": "qa_cand_01_3",
+          "state": "VERIFIED",
+          "answer": "Yes, within Texas or remote",
+          "category": "RELOCATION",
+          "question": "Willing to relocate?",
+          "use_count": 0,
+          "evidence_id": "ev_cand_01_qa_3",
+          "last_used_at": null
+        },
+        {
+          "id": "qa_cand_01_4",
+          "state": "VERIFIED",
+          "answer": "5 years building Spring Boot services at scale",
+          "category": "EXPERIENCE",
+          "question": "Microservices experience?",
+          "use_count": 9,
+          "evidence_id": "ev_cand_01_qa_4",
+          "last_used_at": "2026-09-29T23:17:52.966Z"
+        }
+      ],
+      "skills": [],
+      "summary_state": "UNVERIFIED",
+      "created_at": "2026-09-01T06:17:52.966000+00:00",
+      "updated_at": "2026-10-01T02:17:52.966000+00:00"
+    }
+  ]
+}
