@@ -112,8 +112,9 @@ describe("route registry", () => {
 
 describe("record scope", () => {
   it("applies assigned and own scopes", () => {
-    expect(isInScope("assigned", "u1", { assignedUserIds: ["u1", "u2"] })).toBe(true);
-    expect(isInScope("assigned", "u3", { assignedUserIds: ["u1"] })).toBe(false);
+    expect(isInScope("assigned", "u1", { bdeId: "u1" })).toBe(true);
+    expect(isInScope("assigned", "u3", { bdeId: "u1" })).toBe(false);
+    expect(isInScope("assigned", "u3", { bdeId: null })).toBe(false);
     expect(isInScope("own", "u1", { ownerUserId: "u1" })).toBe(true);
     expect(isInScope("own", "u1", { ownerUserId: "u2" })).toBe(false);
     expect(isInScope("read", "u1", {})).toBe(true);

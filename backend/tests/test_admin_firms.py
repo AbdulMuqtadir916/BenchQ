@@ -51,7 +51,7 @@ def test_create_logs_firm_created_and_invite_sent_in_the_firms_ledger(api_client
     firm_id = _create(api_client, accounts).json()["firm"]["id"]
     entries = {e.action: e for e in test_db.query(LedgerEntry).filter(LedgerEntry.firm_id == firm_id)}
     assert set(entries) == {"FIRM_CREATED", "INVITE_SENT"}
-    assert entries["FIRM_CREATED"].summary == "Created firm on Test plan (10 seats, 100 candidates)"
+    assert entries["FIRM_CREATED"].summary == "Created firm on Test plan (10 BDE seats, 100 candidates)"
     assert entries["INVITE_SENT"].summary == "Invited Nora North (nora@northwind.test) as OWNER"
     assert all(e.actor_type == "PLATFORM_ADMIN" and e.actor_user_id == accounts.admin_id for e in entries.values())
 
@@ -178,7 +178,8 @@ def test_resend_revives_an_expired_invite_for_seven_more_days(api_client, accoun
     assert invite.expires_at > utcnow() + timedelta(days=6, hours=23)
 
 
-def test_resending_an_expired_invite_needs_a_free_seat(api_client, accounts, test_db):
+def test_resending_an_expired_owner_invite_needs_no_seat(api_client, accounts, test_db):
+    """07 Q44: only BDEs take seats, so a full firm can still get its OWNER invite back."""
     from backend.models.db import utcnow
     from backend.models.tenancy import Firm, Invite, User
     from backend.tests.auth_support import password_hash
@@ -187,11 +188,10 @@ def test_resending_an_expired_invite_needs_a_free_seat(api_client, accounts, tes
     invite.expires_at = utcnow() - timedelta(hours=1)
     firm = test_db.get(Firm, invite.firm_id)
     firm.seat_limit = 1
-    test_db.add(User(firm_id=firm.id, role="MANAGER", name="M", email="m@northwind.test", password_hash=password_hash()))
+    test_db.add(User(firm_id=firm.id, role="BDE", name="B", email="b@northwind.test", password_hash=password_hash()))
     test_db.commit()
     r = api_client.post(f"/api/admin/invites/{invite_id}/resend")
-    assert r.status_code == 409
-    assert r.json() == {"detail": "Your plan allows 1 seat; 1 is in use."}
+    assert r.status_code == 200
 
 
 def test_revoke_kills_the_link_and_logs_it(api_client, anonymous_client, accounts, test_db):

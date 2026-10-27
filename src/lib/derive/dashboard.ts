@@ -24,7 +24,7 @@ export function deriveBdeDashboard(
   followups: FollowUpTask[],
 ): BdeDashboard {
   const now = new Date();
-  const myCandidates = candidates.filter((c) => c.assignedUserIds.includes(userId));
+  const myCandidates = candidates.filter((c) => c.bdeId === userId);
   const myCandidateIds = new Set(myCandidates.map((c) => c.id));
   const myApps = applications.filter((a) => myCandidateIds.has(a.candidateId));
   const myFollowups = followups.filter((f) => f.assignedToUserId === userId);

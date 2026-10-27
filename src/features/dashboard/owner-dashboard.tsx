@@ -1,5 +1,6 @@
 "use client";
 
+import { isBde } from "@/lib/auth/roles";
 import { useMemo } from "react";
 import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
@@ -54,9 +55,9 @@ export function OwnerDashboard() {
   // active candidates are ON_BENCH / INTERVIEWING / OFFER (A2). deriveFirmUsage is the function /admin
   // uses on the same data, so the two pages show the same numbers (docs/07 M3).
   const usage = deriveFirmUsage(firm, { users: team, invites, candidates }, new Date());
-  const activeUsers = team.filter((u) => u.firmId === firm.id && u.isActive).length;
-  const pendingInvites = usage.seatsUsed - activeUsers;
-  const seatDetail = `${activeUsers} user${activeUsers === 1 ? "" : "s"} + ${pendingInvites} pending`;
+  const activeBdes = team.filter((u) => u.firmId === firm.id && u.isActive && isBde(u)).length;
+  const pendingInvites = usage.seatsUsed - activeBdes;
+  const seatDetail = `${activeBdes} BDE${activeBdes === 1 ? "" : "s"} + ${pendingInvites} pending`;
 
   if (hasPageFailed(applicationsQuery, candidatesQuery, teamQuery, invitesQuery, followupsQuery)) {
     return (
@@ -80,7 +81,7 @@ export function OwnerDashboard() {
           <>
             <StatCard label="Placements" value={`${placedThisQuarter}`} delta="this quarter" trend="up" window="closed won" />
             <StatCard label="Time to place" value={`${avgTimeToPlace}d`} trend="neutral" window="apply → placed avg" />
-            <StatCard label="Seats used" value={`${usage.seatsUsed} / ${usage.seatLimit}`} window={seatDetail} />
+            <StatCard label="BDE seats used" value={`${usage.seatsUsed} / ${usage.seatLimit}`} window={seatDetail} />
             <StatCard label="Active candidates" value={`${usage.activeCandidates} / ${usage.candidateLimit}`} window="of plan" />
           </>
         )}

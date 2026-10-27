@@ -261,18 +261,24 @@ with a bulk bar (reassign, change status, export CSV).
 A BDE sees only assigned candidates and the assigned-BDE filter is hidden for them — there's
 nothing to filter by.
 
+**Hierarchy (07 Q40–Q47, `docs/candidate-onboarding/`):** a candidate has a manager and at most one BDE. The BDE
+column shows the BDE, or a **"Needs a BDE"** tag when the candidate waits in its manager's queue; an
+`?assignment=needs-bde` filter lists that queue (onboarding module 05). A MANAGER sees their team's candidates only
+(module 03). Bulk reassign comes later: the list has no multi-select yet.
+
 **Empty:** first-run illustration + `Add your first candidate`. Filtered-to-nothing is a *different*
 empty state with a `Clear filters` action — don't reuse the first-run one.
 
 ### 4.2 `/candidates/new`
 
-Single-column form, three sections: identity (name, email, phone, location, timezone), professional
-(title, years, work auth, employment type, rate expectation, availability), and sourcing (resume
-upload, LinkedIn URL, assigned BDE).
+**Replaced by the five-step new-candidate flow** (07 Q48–Q49): résumé → basic details → work and rate → preferences →
+assign, then a done screen. The specification, the designs and the build plan are in
+[`docs/candidate-onboarding/`](./candidate-onboarding/README.md) (modules 04 and 05). Until module 05 lands, the
+single form described here before stays in place.
 
-The resume drop zone simulates a parse. Extracted fields land as `UNVERIFIED` and the form shows a
-review strip: *"14 fields drafted from the resume — review before saving."* Fields the user types
-by hand are `VERIFIED` immediately, because the user is the evidence.
+Truth Guard (Q49): the backend parses the résumé and saves nothing until the candidate is created; parsed fields show
+"Drafted from résumé" until edited or reviewed, and **nothing in onboarding is `VERIFIED`** (this section used to say
+typed fields were; that is withdrawn).
 
 ### 4.3 `/candidates/[id]` — detail
 

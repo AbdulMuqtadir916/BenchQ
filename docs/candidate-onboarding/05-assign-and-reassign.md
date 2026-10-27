@@ -50,10 +50,12 @@ Built as `src/components/app/candidate-wizard/step-assign.tsx` (+ `bde-option.ts
 3. Its Record (`src/mocks/records.ts`): `headline` = "Marketed as", `summary` with `summaryState: UNVERIFIED`, one
    `RecordSkill` per skill with `state: UNVERIFIED` and its `source`; no evidence. **Never `VERIFIED`** (Q49).
 4. With `resumeParseId`: a `CandidateDocument` of kind `RESUME` with the file name (mock: no file content).
-5. Ledger: `CREATE` ("Added {name}") and `ASSIGN` ("Assigned to {BDE} ({manager})" or "Handed to {manager}", `note` =
-   the handoff note), both with the actor.
+5. **No ledger entries on mocks.** The ledger is served only by the backend since F6, so the mock can't write to it.
+   `CREATE` and `ASSIGN` (with the handoff note) are written by the backend's create in 06 PR 4 and appear once 07
+   switches candidates live. Until then the handoff note is kept on the mock candidate's create call only for the done
+   screen.
 
-Hook `useCreateCandidate` invalidates the firm's candidates, records, documents, ledger and dashboard keys.
+Hook `useCreateCandidate` invalidates the firm's candidates, records, documents and dashboard keys.
 
 ## 3. Done screen ([screen](./screens/6-done.webp))
 
@@ -98,7 +100,11 @@ Hook `useCreateCandidate` invalidates the firm's candidates, records, documents,
 - Bulk reassign from the list is **not** in this module (the list has no multi-select today); note it in docs/04 §4.1
   as later.
 
-## 7. "New assignments" on the BDE dashboard (Q50, A5)
+## 7. "New assignments" on the BDE dashboard (Q50, A5) — needs the ledger's `ASSIGN` entries, so it lands with 07
+
+Build the card and its derivation here against a fixture of ledger entries in the test; on screen it shows its empty
+state until 07, because no `ASSIGN` entries exist before the backend writes them. The same holds for the reassign
+dialog's ledger entry and the candidate page's "Note from …" (§6): the mock reassign changes the candidate only.
 
 `features/dashboard/bde-dashboard.tsx`: a card listing candidates whose latest `ASSIGN` entry names this BDE and is
 under 7 days old, newest first, each with the note and who assigned it. Derived in `src/lib/derive/dashboard.ts` from

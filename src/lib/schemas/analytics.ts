@@ -91,8 +91,12 @@ export const LedgerEntrySchema = z.object({
     "INVITE_SENT",
     "INVITE_ACCEPTED",
     "INVITE_REVOKED",
+    /** A candidate's manager or BDE set or changed (docs/02 §3.4, 07 Q43); `note` is the handoff note. */
+    "ASSIGN",
   ]),
   summary: z.string(),
+  /** The handoff note on an ASSIGN entry; null on every other entry. */
+  note: z.string().nullable(),
   modelId: z.string().nullable(),
   promptVersion: z.string().nullable(),
   evidenceIds: z.array(z.string()),

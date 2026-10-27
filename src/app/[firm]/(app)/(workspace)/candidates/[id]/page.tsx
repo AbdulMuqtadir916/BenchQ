@@ -110,7 +110,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     return <div className="bq-page"><ErrorState variant="page" error={ws.candidateQuery.error ?? new Error("Candidate not found.")} onRetry={() => void ws.candidateQuery.refetch()} /></div>;
   }
   const candidate = ws.candidate;
-  if (!isInScope(access, principal.userId, { assignedUserIds: candidate.assignedUserIds })) {
+  if (!isInScope(access, principal.userId, { bdeId: candidate.bdeId })) {
     return notFoundState;
   }
   const resumes = ws.resumesQuery.data ?? [];

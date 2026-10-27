@@ -1,9 +1,15 @@
 # 02 — Hierarchy and seats
 
-**Owner:** — · **Depends on:** 01 (steps 5–6 also wait for 03's new actions) · **Branch:** `feat/onboarding-02-hierarchy-seats`
+**Owner:** — · **Depends on:** 01; §1–§2 can start then. §4–§6 also need 03's new actions **and** 06 PR 2's endpoints ·
+**Branch:** `feat/onboarding-02-hierarchy-seats`
 
-The team side of the hierarchy: who reports to whom, the BDE-only seat count, the new candidate-limit count and BDE
-load. Runs on mocks; the backend's matching change is in 06 (land the two close together, see §7).
+The team side of the hierarchy: who reports to whom, the new candidate-limit count and BDE load.
+
+> **Changed 2026-10-27.** The BDE-only **seat** rule, its message, the "BDE seats" labels and the seat fixtures were
+> built in module 01 (see its note); what §1–§3 and §7 say about seats is done. And since F6 the **team, invites,
+> ledger and session are served only by the backend** (`src/lib/api/config.ts`): there is no mock for them. So §4–§6
+> are frontend UI over **backend** endpoints (06 PR 2), not mock writes; read "Mock (`src/mocks/membership.ts`)" below
+> as "06 PR 2". The candidate-limit, load and working-status parts (§1) still run on the candidates mock.
 
 Read first: [README](./README.md) §2 (Q40, Q44–Q46), `src/lib/derive/tenancy.ts`, `src/lib/derive/platform.ts`,
 `src/features/team/member-invites.tsx`, `src/app/[firm]/(app)/settings/team/page.tsx`, `src/mocks/membership.ts`,
@@ -69,8 +75,9 @@ disagree (`features/dashboard/seats-agree.test.ts` keeps proving it):
   **"Set manager"**, the same dialog. Such a BDE can't be given candidates until it has one (`canAssignTo` needs the
   BDE's manager to match), and the OWNER dashboard shows "{n} BDEs have no manager" linking to `settings/team`. Add one
   such BDE to the demo data.
-- Mock: in one write, set the user's `managerId` and set `managerId` on **every candidate whose `bdeId` is that BDE**
-  (Q43: candidates move with the BDE). One ledger entry: `UPDATE`, entityType `"user"`, summary
+- Backend (06 PR 2) sets the user's `managerId`. Candidates are still mock data until 07, so the hook then calls a mock
+  write `candidatesApi.followBde(firmId, bdeId, managerId)` that sets `managerId` on **every candidate whose `bdeId` is
+  that BDE** (Q43: candidates move with the BDE); 07 removes that call when the backend moves them itself. One ledger entry: `UPDATE`, entityType `"user"`, summary
   "Vikram Desai now reports to Sneha Rao (was Priya Shah); 6 candidates moved". Queue candidates of the old manager stay.
 - Adapter: `teamApi.changeManager(firmId, userId, managerId)` in `src/lib/api/team.ts`, a hook in
   `src/lib/hooks/use-team.ts` that invalidates team, candidates and ledger for that firm.

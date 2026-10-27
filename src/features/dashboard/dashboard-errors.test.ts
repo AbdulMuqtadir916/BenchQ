@@ -37,7 +37,7 @@ const floorGroups = {
 };
 
 const DASHBOARDS: Dashboard[] = [
-  { name: "OWNER", as: "user_imran", component: OwnerDashboard, queries: ["candidates", "applications", "followups", "team", "memberInvites"], groups: { rollups: { reads: ["applications", "candidates", "team", "memberInvites"], labels: ["Time to place", "Seats used", "Active candidates"] }, ...floorGroups } },
+  { name: "OWNER", as: "user_imran", component: OwnerDashboard, queries: ["candidates", "applications", "followups", "team", "memberInvites"], groups: { rollups: { reads: ["applications", "candidates", "team", "memberInvites"], labels: ["Time to place", "BDE seats used", "Active candidates"] }, ...floorGroups } },
   { name: "MANAGER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "MANAGER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
   { name: "VIEWER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
   { name: "BDE", as: "user_adnan", component: BdeDashboard, queries: ["candidates", "applications", "followups", "jobs"], groups: {

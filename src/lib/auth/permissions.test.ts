@@ -29,7 +29,7 @@ describe("can() (07 Phase C slice, Q32)", () => {
 });
 
 describe("scope helpers", () => {
-  const candidates = [{ id: "c1", assignedUserIds: ["u_BDE"] }, { id: "c2", assignedUserIds: ["other"] }];
+  const candidates = [{ id: "c1", bdeId: "u_BDE" }, { id: "c2", bdeId: "other" }];
   const applications = [{ id: "a1", submittedByUserId: "u_BDE" }, { id: "a2", submittedByUserId: "other" }];
 
   it("a BDE sees their own; everyone else, a support view included, the whole firm", () => {

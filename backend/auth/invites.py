@@ -99,27 +99,37 @@ def settle_expired(db: DbSession, now: datetime, *, email: str | None = None, fi
     query.update({Invite.status: "EXPIRED"}, synchronize_session=False)
 
 
-# ── Seats (A1, A4) ───────────────────────────────────────────────────────────
+# ── Seats (A1, A4; 07 Q44: a seat is a BDE) ─────────────────────────────────
+
+SEAT_ROLE = "BDE"   # 07 Q44: only BDEs take seats; OWNER, MANAGER and VIEWER are free and unlimited
+
+
+def takes_seat(role: str) -> bool:
+    return role == SEAT_ROLE
 
 def lock_firm(db: DbSession, firm_id: uuid.UUID) -> Firm | None:
     return db.query(Firm).filter(Firm.id == firm_id).with_for_update().first()
 
 
 def seats_used(db: DbSession, firm_id: uuid.UUID, now: datetime) -> int:
-    """Active users of every role, plus pending unexpired invites (A1). Derived, never stored."""
-    users = db.query(func.count(User.id)).filter(User.firm_id == firm_id, User.is_active.is_(True)).scalar()
+    """Active BDEs plus pending, unexpired BDE invites (A1, 07 Q44). Derived, never stored."""
+    users = (db.query(func.count(User.id))
+             .filter(User.firm_id == firm_id, User.is_active.is_(True), User.role == SEAT_ROLE).scalar())
     invites = (db.query(func.count(Invite.id))
-               .filter(Invite.firm_id == firm_id, Invite.status == "PENDING", Invite.expires_at > now).scalar())
+               .filter(Invite.firm_id == firm_id, Invite.role == SEAT_ROLE, Invite.status == "PENDING",
+                       Invite.expires_at > now).scalar())
     return users + invites
 
 
 def seat_block_reason(used: int, limit: int) -> str:
     """The over-limit block's message (seatBlockReason in src/lib/derive/platform.ts), word for word."""
-    return f"Your plan allows {limit} seat{'' if limit == 1 else 's'}; {used} {'is' if used == 1 else 'are'} in use."
+    return f"Your plan allows {limit} BDE seat{'' if limit == 1 else 's'}; {used} {'is' if used == 1 else 'are'} in use."
 
 
-def check_seat(db: DbSession, firm: Firm, now: datetime) -> None:
-    """A4: a new seat only below the limit. The caller holds the firm's row lock."""
+def check_seat(db: DbSession, firm: Firm, role: str, now: datetime) -> None:
+    """A4: a new seat only below the limit, and only a BDE takes one (07 Q44). The caller holds the firm's row lock."""
+    if not takes_seat(role):
+        return
     used = seats_used(db, firm.id, now)
     if used >= firm.seat_limit:
         raise conflict(seat_block_reason(used, firm.seat_limit))
@@ -147,7 +157,7 @@ def send_invite(db: DbSession, *, inviter: User | PlatformUser, firm: Firm | Non
 
 def resend_invite(db: DbSession, invite: Invite, *, actor: User | PlatformUser, now: datetime) -> str:
     """Same row, a new token, expiry now + 7 days (A9); the old link stops working. Logs INVITE_SENT
-    "Invite resent to …" (Q24). An expired firm invite takes a seat again, so it is blocked at the limit (A4).
+    "Invite resent to …" (Q24). An expired BDE invite takes a seat again, so it is blocked at the limit (A4, 07 Q44).
     "Copy link" is a resend, because only the token's hash is kept (07 Q38). Returns the new token."""
     status = effective_status(invite, now)
     if status not in ("PENDING", "EXPIRED"):
@@ -160,7 +170,7 @@ def resend_invite(db: DbSession, invite: Invite, *, actor: User | PlatformUser, 
         if other is not None:
             raise conflict("Someone with this email already has a pending invite.")
         if invite.firm_id is not None:
-            check_seat(db, lock_firm(db, invite.firm_id), now)
+            check_seat(db, lock_firm(db, invite.firm_id), invite.role, now)
     token = new_token()
     invite.status = "PENDING"
     invite.token_hash = hash_token(token)

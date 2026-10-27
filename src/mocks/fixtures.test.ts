@@ -109,7 +109,8 @@ describe("firmId on every firm-scoped record", () => {
     for (const d of allDocuments) same(`${d.id} candidate`, candidateById.get(d.candidateId)?.firmId, d.firmId);
     for (const m of allMessages) same(`${m.id} candidate`, candidateById.get(m.candidateId)?.firmId, m.firmId);
     for (const c of allCandidates) {
-      for (const userId of c.assignedUserIds) same(`${c.id} assignee ${userId}`, allUsers.find((user) => user.id === userId)?.firmId, c.firmId);
+      same(`${c.id} manager`, allUsers.find((user) => user.id === c.managerId)?.firmId, c.firmId);
+      if (c.bdeId !== null) same(`${c.id} BDE`, allUsers.find((user) => user.id === c.bdeId)?.firmId, c.firmId);
     }
   });
 });

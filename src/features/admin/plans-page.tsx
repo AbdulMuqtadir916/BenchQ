@@ -31,7 +31,7 @@ export function PlansPage() {
   const columns = useMemo<ColumnDef<Plan, unknown>[]>(
     () => [
       { id: "name", header: "Plan", enableSorting: false, cell: ({ row }) => <span className="font-[600] text-[var(--color-text)]">{row.original.name}</span> },
-      { id: "seats", header: "Seat limit", enableSorting: false, cell: ({ row }) => <span className="tabular">{row.original.seatLimit}</span> },
+      { id: "seats", header: "BDE seat limit", enableSorting: false, cell: ({ row }) => <span className="tabular">{row.original.seatLimit}</span> },
       { id: "candidates", header: "Candidate limit", enableSorting: false, cell: ({ row }) => <span className="tabular">{row.original.candidateLimit}</span> },
       {
         id: "features",
@@ -129,7 +129,7 @@ function PlanDialog({ plan, onClose }: { plan: Plan | null; onClose: () => void 
         <Input {...fieldAria("plan-name", shown(nameError))} value={name} onChange={(event) => setName(event.target.value)} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field id="plan-seats" label="Seat limit" error={shown(seatError)}>
+        <Field id="plan-seats" label="BDE seat limit" error={shown(seatError)}>
           <Input {...fieldAria("plan-seats", shown(seatError))} inputMode="numeric" value={seats} onChange={(event) => setSeats(event.target.value)} />
         </Field>
         <Field id="plan-candidates" label="Active candidate limit" error={shown(candidateError)}>

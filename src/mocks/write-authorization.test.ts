@@ -3,6 +3,7 @@ import { can } from "@/lib/auth/policy";
 import { agentsMock } from "./agents";
 import { applicationsMock, followupsMock } from "./applications";
 import { candidatesMock } from "./candidates";
+import { createCandidateBody } from "./create-candidate-body";
 import { documentsMock } from "./documents";
 import { inboxMock } from "./inbox";
 import { jobsMock } from "./jobs";
@@ -30,7 +31,7 @@ const FIRM = "firm_hts";
 const ARGS: Record<string, unknown[]> = {
   "applications.updateStatus": ["app_001", { status: "WITHDRAWN", note: null }],
   "candidates.update": ["cand_01", { headline: "Senior Java Developer" }],
-  "candidates.create": [{ fullName: "Policy Check", primaryRole: "QA", email: null, phone: null, workAuth: "USC", needsSponsorship: false, needsTransfer: false, assignedUserId: null }],
+  "candidates.create": [createCandidateBody({ fullName: "Policy Check", primaryRole: "QA", workAuth: "USC" })],
   "jobs.capture": [{ sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", remoteMode: "REMOTE", employmentType: null, payPeriod: "HOUR", payMin: null, payMax: null, sponsorsVisa: false, excludesC2C: false, experience: "", skills: [], description: "Policy check" }],
   "documents.upload": ["cand_01", { kind: "OTHER", title: "Note", fileName: "note.pdf", sizeBytes: 1000, expiresAt: null }],
   "documents.remove": ["doc_none"],

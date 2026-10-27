@@ -1,5 +1,6 @@
 "use client";
 
+import { isBde } from "@/lib/auth/roles";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SkeletonCard } from "@/components/app/skeleton-card";
@@ -51,8 +52,8 @@ function Usage({ label, used, limit, isOver, detail }: { label: string; used: nu
 function Overview({ detail }: { detail: FirmDetail }) {
   const toHref = useHref();
   const { firm, plan, usage, owner, data } = detail;
-  const activeUsers = data.users.filter((user) => user.firmId === firm.id && user.isActive).length;
-  const pendingInvites = usage.seatsUsed - activeUsers;
+  const activeBdes = data.users.filter((user) => user.firmId === firm.id && user.isActive && isBde(user)).length;
+  const pendingInvites = usage.seatsUsed - activeBdes;
   const recent = firmLedger(firm.id, data.ledger).slice(0, 5);
 
   return (
@@ -74,7 +75,7 @@ function Overview({ detail }: { detail: FirmDetail }) {
         <dl className="divide-y divide-[var(--color-border)]">
           <Row label="Plan">{plan?.name ?? "Unknown plan"}{detail.isCustom ? " · custom limits" : ""}</Row>
         </dl>
-        <Usage label="Seats used" used={usage.seatsUsed} limit={usage.seatLimit} isOver={usage.isOverSeatLimit} detail={`${activeUsers} active user${activeUsers === 1 ? "" : "s"} + ${pendingInvites} pending invite${pendingInvites === 1 ? "" : "s"}`} />
+        <Usage label="BDE seats used" used={usage.seatsUsed} limit={usage.seatLimit} isOver={usage.isOverSeatLimit} detail={`${activeBdes} active BDE${activeBdes === 1 ? "" : "s"} + ${pendingInvites} pending BDE invite${pendingInvites === 1 ? "" : "s"}`} />
         <Usage label="Active candidates" used={usage.activeCandidates} limit={usage.candidateLimit} isOver={usage.isOverCandidateLimit} detail="On bench, interviewing or offer" />
         {usage.isOverLimit ? (
           <p className="mt-2 text-sm text-[var(--color-danger-fg)]">New additions are blocked. Existing users keep working.</p>

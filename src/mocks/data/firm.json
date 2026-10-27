@@ -14,6 +14,7 @@
       "seatLimit": 10,
       "candidateLimit": 100,
       "contactPhone": "+91 40 6600 1200",
+      "bdeCapacity": 10,
       "createdAt": "2026-06-02T09:00:00.000Z"
     },
     {
@@ -30,6 +31,7 @@
       "seatLimit": 4,
       "candidateLimit": 25,
       "contactPhone": "+91 40 4012 7788",
+      "bdeCapacity": 3,
       "createdAt": "2026-08-12T06:30:00.000Z"
     },
     {
@@ -46,6 +48,7 @@
       "seatLimit": 4,
       "candidateLimit": 25,
       "contactPhone": null,
+      "bdeCapacity": 10,
       "createdAt": "2026-07-20T07:00:00.000Z"
     },
     {
@@ -62,6 +65,7 @@
       "seatLimit": 4,
       "candidateLimit": 25,
       "contactPhone": null,
+      "bdeCapacity": 10,
       "createdAt": "2026-10-15T10:00:00.000Z"
     }
   ],
@@ -72,6 +76,7 @@
       "name": "Imran Shaikh",
       "email": "imran@hyderabad-tech-staffing.benchq.test",
       "role": "OWNER",
+      "managerId": null,
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-10-01T05:17:52.943Z"
@@ -82,9 +87,21 @@
       "name": "Fatima Reddy",
       "email": "fatima@hyderabad-tech-staffing.benchq.test",
       "role": "MANAGER",
+      "managerId": null,
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-10-01T04:17:52.943Z"
+    },
+    {
+      "id": "user_priya",
+      "firmId": "firm_hts",
+      "name": "Priya Shah",
+      "email": "priya@hyderabad-tech-staffing.benchq.test",
+      "role": "MANAGER",
+      "managerId": null,
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-10-01T05:17:52.943Z"
     },
     {
       "id": "user_adnan",
@@ -92,6 +109,7 @@
       "name": "Adnan Khan",
       "email": "adnan@hyderabad-tech-staffing.benchq.test",
       "role": "BDE",
+      "managerId": "user_fatima",
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-10-01T05:47:52.943Z"
@@ -102,6 +120,7 @@
       "name": "Sneha Rao",
       "email": "sneha@hyderabad-tech-staffing.benchq.test",
       "role": "BDE",
+      "managerId": "user_fatima",
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-10-01T03:17:52.943Z"
@@ -112,6 +131,7 @@
       "name": "Vikram Desai",
       "email": "vikram@hyderabad-tech-staffing.benchq.test",
       "role": "BDE",
+      "managerId": "user_priya",
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-10-01T00:17:52.943Z"
@@ -122,6 +142,7 @@
       "name": "Rohan Kapoor",
       "email": "rohan@hyderabad-tech-staffing.benchq.test",
       "role": "VIEWER",
+      "managerId": null,
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-30T06:00:00.000Z"
@@ -132,6 +153,18 @@
       "name": "Lakshmi Iyer",
       "email": "lakshmi@secunderabad-talent.benchq.test",
       "role": "OWNER",
+      "managerId": null,
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-10-01T05:00:00.000Z"
+    },
+    {
+      "id": "user_arjun",
+      "firmId": "firm_stl",
+      "name": "Arjun Varma",
+      "email": "arjun@secunderabad-talent.benchq.test",
+      "role": "MANAGER",
+      "managerId": null,
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-10-01T05:00:00.000Z"
@@ -142,6 +175,29 @@
       "name": "Kiran Varma",
       "email": "kiran@secunderabad-talent.benchq.test",
       "role": "BDE",
+      "managerId": "user_arjun",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-10-01T05:30:00.000Z"
+    },
+    {
+      "id": "user_ravi",
+      "firmId": "firm_stl",
+      "name": "Ravi Teja",
+      "email": "ravi@secunderabad-talent.benchq.test",
+      "role": "BDE",
+      "managerId": "user_arjun",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-10-01T05:30:00.000Z"
+    },
+    {
+      "id": "user_divya",
+      "firmId": "firm_stl",
+      "name": "Divya Menon",
+      "email": "divya@secunderabad-talent.benchq.test",
+      "role": "BDE",
+      "managerId": "user_arjun",
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-10-01T05:30:00.000Z"
@@ -152,6 +208,7 @@
       "name": "Meena Joshi",
       "email": "meena@secunderabad-talent.benchq.test",
       "role": "VIEWER",
+      "managerId": null,
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-28T11:00:00.000Z"
@@ -162,6 +219,18 @@
       "name": "Naveen Reddy",
       "email": "naveen@cyberabad-bench.benchq.test",
       "role": "OWNER",
+      "managerId": null,
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-30T08:00:00.000Z"
+    },
+    {
+      "id": "user_salma",
+      "firmId": "firm_cbw",
+      "name": "Salma Begum",
+      "email": "salma@cyberabad-bench.benchq.test",
+      "role": "MANAGER",
+      "managerId": null,
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-30T08:00:00.000Z"
@@ -172,6 +241,7 @@
       "name": "Rehana Begum",
       "email": "rehana@cyberabad-bench.benchq.test",
       "role": "BDE",
+      "managerId": "user_salma",
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-30T09:00:00.000Z"
@@ -182,6 +252,7 @@
       "name": "Imtiaz Ali",
       "email": "imtiaz@cyberabad-bench.benchq.test",
       "role": "BDE",
+      "managerId": "user_salma",
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-29T10:00:00.000Z"
@@ -192,6 +263,7 @@
       "name": "Swapna Das",
       "email": "swapna@cyberabad-bench.benchq.test",
       "role": "VIEWER",
+      "managerId": null,
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-27T10:00:00.000Z"
@@ -202,6 +274,29 @@
       "name": "Farida Sheikh",
       "email": "farida@cyberabad-bench.benchq.test",
       "role": "BDE",
+      "managerId": "user_salma",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-26T10:00:00.000Z"
+    },
+    {
+      "id": "user_kareem",
+      "firmId": "firm_cbw",
+      "name": "Kareem Ali",
+      "email": "kareem@cyberabad-bench.benchq.test",
+      "role": "BDE",
+      "managerId": "user_salma",
+      "avatarUrl": null,
+      "isActive": true,
+      "lastActiveAt": "2026-09-26T10:00:00.000Z"
+    },
+    {
+      "id": "user_asma",
+      "firmId": "firm_cbw",
+      "name": "Asma Siddiqui",
+      "email": "asma@cyberabad-bench.benchq.test",
+      "role": "BDE",
+      "managerId": "user_salma",
       "avatarUrl": null,
       "isActive": true,
       "lastActiveAt": "2026-09-26T10:00:00.000Z"

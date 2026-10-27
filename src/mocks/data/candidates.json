@@ -30,10 +30,17 @@
       "Java Backend",
       "Full Stack"
     ],
-    "assignedUserIds": [
-      "user_adnan"
+    "managerId": "user_fatima",
+    "bdeId": null,
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
     ],
-    "primaryUserId": "user_adnan",
+    "preferredLocations": [
+      "Dallas, TX",
+      "Austin, TX"
+    ],
+    "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
     "persona": {
       "summary": "Methodical, prefers detailed JDs. Strong on Spring Boot microservices.",
       "toneNotes": "Formal, prefers email over calls",
@@ -132,10 +139,11 @@
       "Data Engineer",
       "Analytics Engineer"
     ],
-    "assignedUserIds": [
-      "user_adnan"
-    ],
-    "primaryUserId": "user_adnan",
+    "managerId": "user_fatima",
+    "bdeId": null,
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Very responsive, strong communicator. Snowflake + dbt expert.",
       "toneNotes": null,
@@ -224,10 +232,17 @@
       ".NET Backend",
       "C# Developer"
     ],
-    "assignedUserIds": [
-      "user_adnan"
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
     ],
-    "primaryUserId": "user_adnan",
+    "preferredLocations": [
+      "New Jersey",
+      "New York, NY"
+    ],
+    "contactNotes": null,
     "persona": {
       "summary": "Quiet but skilled. Needs transfer, limits options.",
       "toneNotes": "Prefers WhatsApp messages over calls",
@@ -307,10 +322,11 @@
       "QA Automation",
       "SDET"
     ],
-    "assignedUserIds": [
-      "user_adnan"
-    ],
-    "primaryUserId": "user_adnan",
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Eager, quick learner. Selenium + Cypress. Needs H1B sponsorship.",
       "toneNotes": null,
@@ -379,10 +395,16 @@
       "DevOps Lead",
       "SRE"
     ],
-    "assignedUserIds": [
-      "user_adnan"
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
     ],
-    "primaryUserId": "user_adnan",
+    "preferredLocations": [
+      "Bay Area, CA"
+    ],
+    "contactNotes": "Best reached by email after 7 PM IST.",
     "persona": {
       "summary": "Senior, selective about roles. AWS Solutions Architect Pro.",
       "toneNotes": "Direct, appreciates concise emails",
@@ -462,10 +484,11 @@
       "Salesforce Developer",
       "Salesforce Admin"
     ],
-    "assignedUserIds": [
-      "user_adnan"
-    ],
-    "primaryUserId": "user_adnan",
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Recently laid off, motivated. CPQ and Service Cloud experience.",
       "toneNotes": null,
@@ -531,10 +554,16 @@
       "SAP ABAP",
       "SAP S/4HANA"
     ],
-    "assignedUserIds": [
-      "user_adnan"
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
     ],
-    "primaryUserId": "user_adnan",
+    "preferredLocations": [
+      "Charlotte, NC"
+    ],
+    "contactNotes": null,
     "persona": {
       "summary": "Niche skill set, strong demand. Visa expiring soon — urgent placement.",
       "toneNotes": "Anxious about visa timeline, needs reassurance",
@@ -600,10 +629,11 @@
       "Frontend",
       "UI Engineer"
     ],
-    "assignedUserIds": [
-      "user_adnan"
-    ],
-    "primaryUserId": "user_adnan",
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Fresh STEM OPT grad. React + TypeScript, eager for first role.",
       "toneNotes": null,
@@ -671,10 +701,16 @@
       "Java Full Stack",
       "Spring Boot Developer"
     ],
-    "assignedUserIds": [
-      "user_sneha"
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
     ],
-    "primaryUserId": "user_sneha",
+    "preferredLocations": [
+      "Chicago, IL"
+    ],
+    "contactNotes": "Can interview any weekday; two weeks' notice to current vendor.",
     "persona": {
       "summary": "Very experienced, can lead teams. Angular + Spring Boot.",
       "toneNotes": null,
@@ -751,10 +787,11 @@
       "Business Analyst",
       "Product Analyst"
     ],
-    "assignedUserIds": [
-      "user_sneha"
-    ],
-    "primaryUserId": "user_sneha",
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": null,
     "qaBank": [],
     "createdAt": "2026-09-21T06:17:52.966Z",
@@ -792,10 +829,17 @@
       "SRE",
       "Platform Engineer"
     ],
-    "assignedUserIds": [
-      "user_sneha"
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
     ],
-    "primaryUserId": "user_sneha",
+    "preferredLocations": [
+      "Dallas, TX",
+      "Austin, TX"
+    ],
+    "contactNotes": null,
     "persona": {
       "summary": "Strong Kubernetes and Terraform. Prefers hands-on IC roles over management.",
       "toneNotes": null,
@@ -885,10 +929,11 @@
       "Python Backend",
       "Django Developer"
     ],
-    "assignedUserIds": [
-      "user_sneha"
-    ],
-    "primaryUserId": "user_sneha",
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Returning to work after gap year. Django + Flask, some FastAPI.",
       "toneNotes": "Prefers detailed role descriptions before applying",
@@ -952,10 +997,17 @@
       "Frontend Developer",
       "UI Developer"
     ],
-    "assignedUserIds": [
-      "user_sneha"
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
     ],
-    "primaryUserId": "user_sneha",
+    "preferredLocations": [
+      "New Jersey",
+      "New York, NY"
+    ],
+    "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
     "persona": null,
     "qaBank": [],
     "createdAt": "2026-09-01T06:17:52.966Z",
@@ -993,10 +1045,11 @@
       "ServiceNow Developer",
       "ITSM Consultant"
     ],
-    "assignedUserIds": [
-      "user_sneha"
-    ],
-    "primaryUserId": "user_sneha",
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Strong ServiceNow ITSM/ITOM. CSA and CAD certified.",
       "toneNotes": null,
@@ -1072,10 +1125,16 @@
     "targetRoles": [
       "Java Full Stack"
     ],
-    "assignedUserIds": [
-      "user_sneha"
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
     ],
-    "primaryUserId": "user_sneha",
+    "preferredLocations": [
+      "Bay Area, CA"
+    ],
+    "contactNotes": null,
     "persona": {
       "summary": "Placed at JPMorgan. Solid performer, reliable for renewals.",
       "toneNotes": null,
@@ -1129,10 +1188,11 @@
       "QA Automation",
       "Test Engineer"
     ],
-    "assignedUserIds": [
-      "user_sneha"
-    ],
-    "primaryUserId": "user_sneha",
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": null,
     "qaBank": [],
     "createdAt": "2026-09-23T06:17:52.966Z",
@@ -1170,10 +1230,16 @@
       "Data Engineer",
       "ETL Developer"
     ],
-    "assignedUserIds": [
-      "user_sneha"
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
     ],
-    "primaryUserId": "user_sneha",
+    "preferredLocations": [
+      "Charlotte, NC"
+    ],
+    "contactNotes": "Best reached by email after 7 PM IST.",
     "persona": {
       "summary": "US citizen, competitive advantage. Spark + Databricks specialist.",
       "toneNotes": null,
@@ -1251,10 +1317,11 @@
       ".NET Developer",
       "Azure Developer"
     ],
-    "assignedUserIds": [
-      "user_vikram"
-    ],
-    "primaryUserId": "user_vikram",
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": null,
     "qaBank": [],
     "createdAt": "2026-09-06T06:17:52.966Z",
@@ -1290,10 +1357,16 @@
       "Solutions Architect",
       "Cloud Architect"
     ],
-    "assignedUserIds": [
-      "user_vikram"
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
     ],
-    "primaryUserId": "user_vikram",
+    "preferredLocations": [
+      "Chicago, IL"
+    ],
+    "contactNotes": null,
     "persona": {
       "summary": "Very senior, high rate. Multi-cloud (AWS + Azure + GCP).",
       "toneNotes": "Only responds to well-matched roles, ignores spray-and-pray",
@@ -1360,10 +1433,11 @@
       "Business Analyst",
       "Data Analyst"
     ],
-    "assignedUserIds": [
-      "user_vikram"
-    ],
-    "primaryUserId": "user_vikram",
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": null,
     "qaBank": [],
     "createdAt": "2026-09-13T06:17:52.966Z",
@@ -1400,10 +1474,17 @@
       "DevOps",
       "Platform Engineer"
     ],
-    "assignedUserIds": [
-      "user_vikram"
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
     ],
-    "primaryUserId": "user_vikram",
+    "preferredLocations": [
+      "Dallas, TX",
+      "Austin, TX"
+    ],
+    "contactNotes": "Can interview any weekday; two weeks' notice to current vendor.",
     "persona": {
       "summary": "Terraform + AWS specialist. Strong CI/CD background.",
       "toneNotes": null,
@@ -1481,10 +1562,11 @@
       "Python Developer",
       "Backend Developer"
     ],
-    "assignedUserIds": [
-      "user_vikram"
-    ],
-    "primaryUserId": "user_vikram",
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Paused job search — personal reasons. Will resume in 30 days.",
       "toneNotes": null,
@@ -1538,10 +1620,17 @@
       "Java Developer",
       "Backend Developer"
     ],
-    "assignedUserIds": [
-      "user_vikram"
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
     ],
-    "primaryUserId": "user_vikram",
+    "preferredLocations": [
+      "New Jersey",
+      "New York, NY"
+    ],
+    "contactNotes": null,
     "persona": null,
     "qaBank": [],
     "createdAt": "2026-09-23T06:17:52.966Z",
@@ -1578,10 +1667,11 @@
       "Salesforce Developer",
       "Salesforce Architect"
     ],
-    "assignedUserIds": [
-      "user_vikram"
-    ],
-    "primaryUserId": "user_vikram",
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Went inactive — found role independently. May return for next contract.",
       "toneNotes": null,
@@ -1635,10 +1725,16 @@
       "Data Engineer",
       "Analytics Engineer"
     ],
-    "assignedUserIds": [
-      "user_kiran"
+    "managerId": "user_arjun",
+    "bdeId": null,
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
     ],
-    "primaryUserId": "user_kiran",
+    "preferredLocations": [
+      "Bay Area, CA"
+    ],
+    "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
     "persona": {
       "summary": "Very responsive, strong communicator. Snowflake + dbt expert.",
       "toneNotes": null,
@@ -1727,10 +1823,11 @@
       ".NET Backend",
       "C# Developer"
     ],
-    "assignedUserIds": [
-      "user_kiran"
-    ],
-    "primaryUserId": "user_kiran",
+    "managerId": "user_arjun",
+    "bdeId": "user_kiran",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Quiet but skilled. Needs transfer, limits options.",
       "toneNotes": "Prefers WhatsApp messages over calls",
@@ -1811,10 +1908,16 @@
       "DevOps Lead",
       "SRE"
     ],
-    "assignedUserIds": [
-      "user_kiran"
+    "managerId": "user_arjun",
+    "bdeId": "user_kiran",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
     ],
-    "primaryUserId": "user_kiran",
+    "preferredLocations": [
+      "Charlotte, NC"
+    ],
+    "contactNotes": null,
     "persona": {
       "summary": "Senior, selective about roles. AWS Solutions Architect Pro.",
       "toneNotes": "Direct, appreciates concise emails",
@@ -1892,10 +1995,11 @@
     "targetRoles": [
       "Java Full Stack"
     ],
-    "assignedUserIds": [
-      "user_kiran"
-    ],
-    "primaryUserId": "user_kiran",
+    "managerId": "user_arjun",
+    "bdeId": "user_kiran",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Placed at JPMorgan. Solid performer, reliable for renewals.",
       "toneNotes": null,
@@ -1950,10 +2054,16 @@
       "Python Developer",
       "Backend Developer"
     ],
-    "assignedUserIds": [
-      "user_kiran"
+    "managerId": "user_arjun",
+    "bdeId": "user_kiran",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
     ],
-    "primaryUserId": "user_kiran",
+    "preferredLocations": [
+      "Chicago, IL"
+    ],
+    "contactNotes": "Best reached by email after 7 PM IST.",
     "persona": {
       "summary": "Paused job search — personal reasons. Will resume in 30 days.",
       "toneNotes": null,
@@ -2008,10 +2118,11 @@
       "Salesforce Developer",
       "Salesforce Admin"
     ],
-    "assignedUserIds": [
-      "user_rehana"
-    ],
-    "primaryUserId": "user_rehana",
+    "managerId": "user_salma",
+    "bdeId": "user_rehana",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
     "persona": {
       "summary": "Recently laid off, motivated. CPQ and Service Cloud experience.",
       "toneNotes": null,

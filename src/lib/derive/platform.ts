@@ -31,7 +31,7 @@ export const usageOf = (firm: Firm, data: Pick<PlatformData, "users" | "invites"
 
 /** The over-limit block's reason (docs/02 A4, docs/04 §0): names the limit. */
 export function seatBlockReason(usage: Pick<FirmUsage, "seatsUsed" | "seatLimit">): string {
-  return `Your plan allows ${usage.seatLimit} seat${usage.seatLimit === 1 ? "" : "s"}; ${usage.seatsUsed} ${usage.seatsUsed === 1 ? "is" : "are"} in use.`;
+  return `Your plan allows ${usage.seatLimit} BDE seat${usage.seatLimit === 1 ? "" : "s"}; ${usage.seatsUsed} ${usage.seatsUsed === 1 ? "is" : "are"} in use.`;
 }
 
 /** The over-limit block on a new candidate (A4), word for word on the button and from the mock. */

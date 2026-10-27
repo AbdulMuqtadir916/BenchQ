@@ -126,7 +126,7 @@ export function FirmsList() {
       },
       {
         id: "seats",
-        header: "Seats",
+        header: "BDE seats",
         enableSorting: false,
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
@@ -169,7 +169,7 @@ export function FirmsList() {
     <div className="bq-page">
       <PageHeader
         title="Firms"
-        subtitle="Every client firm: status, plan, seats and owner."
+        subtitle="Every client firm: status, plan, BDE seats and owner."
         actions={
           canCreate ? (
             <Button asChild>

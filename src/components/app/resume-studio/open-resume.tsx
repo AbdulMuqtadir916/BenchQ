@@ -41,7 +41,7 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
   const load = useStudio((s) => s.load);
   const setMode = useStudio((s) => s.setMode);
   const { access } = useRouteAccess();
-  const inScope = !candidateQuery.data || isInScope(access, principal.userId, { assignedUserIds: candidateQuery.data.assignedUserIds });
+  const inScope = !candidateQuery.data || isInScope(access, principal.userId, { bdeId: candidateQuery.data.bdeId });
 
   useEffect(() => {
     if (!inScope || !resumeQuery.data || !candidateQuery.data || !recordQuery.data || loadedId === id) return;

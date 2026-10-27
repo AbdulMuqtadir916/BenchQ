@@ -103,19 +103,25 @@ src/mocks/fixtures/
 The fixtures live as JSON in `src/mocks/data/` (the tree above is the original plan). Since Phase T
 PR 1 every firm-scoped row carries `firmId`, and there are four firms, one per status:
 
-| Firm | Status | Plan (seats / candidates) | Users | Candidates (active) | Notes |
+**Seats are BDE seats (07 Q44):** only active BDEs and pending BDE invites count; OWNER, MANAGER and VIEWER are free.
+Every BDE reports to a MANAGER (07 Q40), and every candidate has a manager and at most one BDE (docs/02 §3.4).
+
+| Firm | Status | Plan (BDE seats / candidates) | Users | Candidates (active) | Notes |
 |---|---|---|---|---|---|
-| `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 6 (every role; the VIEWER, Rohan Kapoor, was added in Phase T PR 2) | 24 (21) | the original firm and the default session's. Seats 7/10 |
-| `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 3 (OWNER, BDE, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 users + 1 pending invite): can't add a seat, not over |
-| `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 5 (OWNER, 3 BDE, VIEWER) | 1 (1) | **over** its seat limit, 6/4 (5 users + 1 pending invite), and over on users alone (5/4), so it stays over whatever Phase S decides about a suspended firm's pending invites: the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
+| `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 7 (OWNER, two MANAGERs, 3 BDEs, VIEWER) | 24 (21) | the original firm. Two teams: Fatima Reddy (Adnan, Sneha) and Priya Shah (Vikram). Two candidates wait for a BDE in Fatima's queue. BDE seats 4/10 (3 BDEs + 1 pending BDE invite) |
+| `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 6 (OWNER, MANAGER, 3 BDEs, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 BDEs + 1 pending BDE invite): can't add a BDE, not over. One candidate waits in Arjun Varma's queue. `bdeCapacity` 3, so Kiran is at capacity |
+| `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 8 (OWNER, MANAGER, 5 BDEs, VIEWER) | 1 (1) | **over** its seat limit, 6/4 (5 BDEs + 1 pending BDE invite), and over on BDEs alone (5/4), so it stays over whatever Phase S decides about a suspended firm's pending invites: the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
 | `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin; nothing in the UI accepts it until `/invite/[token]` arrives in P4 (docs/07 Q26), where `/welcome` gets its browser check (the mock backend's acceptance is unit-tested, `invites.test.ts`) |
 
 Firm A's users, one per role at least, so every firm role has a seed account (§3.2):
 `user_imran` Imran Shaikh (OWNER), `user_fatima` Fatima Reddy (MANAGER), `user_adnan` Adnan Khan
 (BDE, the default session), `user_sneha` Sneha Rao (BDE), `user_vikram` Vikram Desai (BDE) and
 **`user_rohan` Rohan Kapoor (VIEWER)**, who was added in Phase T PR 2 because firm A had no VIEWER.
-He is active, counts as a seat (that is why firm A's seats are 7/10) and is assigned no candidates:
-a VIEWER reads the firm's data but works no bench.
+He is active, takes no seat (only BDEs do, 07 Q44) and is assigned no candidates: a VIEWER reads the firm's data but
+works no bench. **`user_priya` Priya Shah (MANAGER)** was added with the hierarchy (07 Q40) so firm A has two teams:
+Fatima Reddy manages Adnan and Sneha, Priya Shah manages Vikram. STL gained a MANAGER (`user_arjun` Arjun Varma) and
+two BDEs (`user_ravi`, `user_divya`); CBW a MANAGER (`user_salma` Salma Begum) and two BDEs (`user_kareem`,
+`user_asma`), so their seat edge cases still hold when only BDEs count.
 
 Plus `plans.json` (Starter, Growth, Scale), `invites.json` (pending, expired, accepted, revoked, the
 accepted OWNER invites of STL and CBW, the onboarding owner's pending invite and one platform-team
@@ -165,23 +171,30 @@ the password below. The session is the backend's cookie. The fixtures in this do
 | ---- | ------------- | ---- | ---- | -------- | --------------------- |
 | Imran Shaikh | `imran@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | OWNER | `/hyderabad-tech-staffing/dashboard` | `imran@htsstaffing.com` |
 | Fatima Reddy | `fatima@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | MANAGER | `/hyderabad-tech-staffing/dashboard` | `fatima@htsstaffing.com` |
+| Priya Shah | `priya@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | MANAGER | `/hyderabad-tech-staffing/dashboard` | — (added with the hierarchy) |
 | Adnan Khan | `adnan@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | BDE | `/hyderabad-tech-staffing/dashboard` | `adnan@htsstaffing.com` |
 | Sneha Rao | `sneha@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | BDE | `/hyderabad-tech-staffing/dashboard` | `sneha@htsstaffing.com` |
 | Vikram Desai | `vikram@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | BDE | `/hyderabad-tech-staffing/dashboard` | `vikram@htsstaffing.com` |
 | Rohan Kapoor | `rohan@hyderabad-tech-staffing.benchq.test` | Hyderabad Tech Staffing LLC | VIEWER | `/hyderabad-tech-staffing/dashboard` | `rohan@htsstaffing.com` |
 | Lakshmi Iyer | `lakshmi@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | OWNER | `/secunderabad-talent/dashboard` | `lakshmi@stlabs.com` |
 | Kiran Varma | `kiran@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | BDE | `/secunderabad-talent/dashboard` | `kiran@stlabs.com` |
+| Arjun Varma | `arjun@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | MANAGER | `/secunderabad-talent/dashboard` | — (added with the hierarchy) |
+| Ravi Teja | `ravi@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | BDE | `/secunderabad-talent/dashboard` | — (added with the hierarchy) |
+| Divya Menon | `divya@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | BDE | `/secunderabad-talent/dashboard` | — (added with the hierarchy) |
 | Meena Joshi | `meena@secunderabad-talent.benchq.test` | Secunderabad Talent Labs | VIEWER | `/secunderabad-talent/dashboard` | `meena@stlabs.com` |
 | Naveen Reddy | `naveen@cyberabad-bench.benchq.test` | Cyberabad Bench Works | OWNER | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `naveen@cbworks.in` |
 | Rehana Begum | `rehana@cyberabad-bench.benchq.test` | Cyberabad Bench Works | BDE | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `rehana@cbworks.in` |
 | Imtiaz Ali | `imtiaz@cyberabad-bench.benchq.test` | Cyberabad Bench Works | BDE | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `imtiaz@cbworks.in` |
 | Swapna Das | `swapna@cyberabad-bench.benchq.test` | Cyberabad Bench Works | VIEWER | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `swapna@cbworks.in` |
+| Salma Begum | `salma@cyberabad-bench.benchq.test` | Cyberabad Bench Works | MANAGER | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | — (added with the hierarchy) |
+| Kareem Ali | `kareem@cyberabad-bench.benchq.test` | Cyberabad Bench Works | BDE | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | — (added with the hierarchy) |
+| Asma Siddiqui | `asma@cyberabad-bench.benchq.test` | Cyberabad Bench Works | BDE | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | — (added with the hierarchy) |
 | Farida Sheikh | `farida@cyberabad-bench.benchq.test` | Cyberabad Bench Works | BDE | `/cyberabad-bench/dashboard` → **Workspace suspended** screen (§2.5) | `farida@cbworks.in` |
 | Sana Mirza | `sana@admin.benchq.test` | — (BenchQ platform) | PLATFORM_ADMIN ("Super Admin") | `/admin` | `sana@benchq.io` |
 
-All 15 accounts are active; an inactive account would be refused with the same error as a wrong
-password. Every role signs in at least once: firm A has OWNER, MANAGER, three BDEs and VIEWER; STL has
-OWNER, BDE, VIEWER; CBW (suspended) has OWNER, three BDEs and VIEWER, all of whom land on the
+All 22 accounts are active; an inactive account would be refused with the same error as a wrong
+password. Every role signs in at least once: firm A has OWNER, two MANAGERs, three BDEs and VIEWER; STL has
+OWNER, MANAGER, three BDEs and VIEWER; CBW (suspended) has OWNER, MANAGER, five BDEs and VIEWER, all of whom land on the
 suspended screen. **No account for the GSC owner:** Gachibowli Staffing has no users until its OWNER's
 invite is accepted on `/invite/[token]`, which arrives in P4 (docs/07 Q26).
 

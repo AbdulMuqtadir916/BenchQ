@@ -21,6 +21,7 @@ export const ACTION_TONE: Record<LedgerEntry["action"], TagTone> = {
   INVITE_SENT: "blue",
   INVITE_ACCEPTED: "green",
   INVITE_REVOKED: "amber",
+  ASSIGN: "teal",
 };
 
 export const ACTOR_TONE: Record<LedgerEntry["actorType"], TagTone> = {
