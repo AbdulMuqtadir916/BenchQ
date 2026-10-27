@@ -55,6 +55,7 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["candidates", "byId", (f, i) => candidatesApi.byId(f, i.candidate), false],
   ["candidates", "create", (f) => candidatesApi.create(f, createCandidateBody()), true],
   ["candidates", "update", (f, i) => candidatesApi.update(f, i.candidate, { noticePeriodDays: 99 } as never), true],
+  ["candidates", "reassign", (f, i) => candidatesApi.reassign(f, i.candidate, { managerId: "user_priya", bdeId: null, note: null }), true],
   ["candidates", "followBde", (f) => candidatesMock.followBde(f, "user_adnan", "user_fatima"), true],
   ["candidates", "parseResume", (f) => candidatesMock.parseResume(f, { fileName: "Ravi_Teja_Java_FullStack.pdf", sizeBytes: 1000, mimeType: "application/pdf" }), true],
   ["jobs", "list", (f) => jobsApi.list(f), false],

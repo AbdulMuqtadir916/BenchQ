@@ -23,6 +23,11 @@ Read first: `docs/integration/README.md`, `src/lib/api/http.ts`, `src/lib/api/dt
 - Multipart: `http.ts` is the only `fetch`; add a `postForm` there if it has none, not a second `fetch`.
 - The parse adapter in live mode: hide "Try a sample" (README A1).
 - Query keys stay firm-first (`[firmId, "candidates", …]`).
+- **Ledger, two backend gaps found in 05b** (a backend change, so agree it with the backend owner first):
+  1. `GET /ledger` gives a BDE only the entries they wrote (`own_scope`). "New assignments" and the handoff note need
+     the ASSIGN entries about the BDE's own candidates too, which a manager or the OWNER wrote.
+  2. There's no filter by entity: the candidate page and the dashboard card read the first 500 entries and filter in
+     the browser. Add `?entity_type=candidate&entity_id=…` (and `?action=ASSIGN`) and use them in `ledgerApi`.
 
 ## 2. Mapper rules
 

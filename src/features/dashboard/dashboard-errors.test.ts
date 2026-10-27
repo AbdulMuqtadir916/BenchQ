@@ -34,6 +34,7 @@ const floorGroups = {
   performance: { reads: ["team", "candidates", "applications", "followups"] as Resource[], labels: ["Interviews"] },
   pipeline: { reads: ["applications"] as Resource[], labels: [] },
   risk: { reads: ["candidates", "applications"] as Resource[], labels: [] },
+  needsBde: { reads: ["candidates", "team"] as Resource[], labels: [] }, // the "Needs a BDE" card (onboarding 05 §5)
 };
 
 const DASHBOARDS: Dashboard[] = [
@@ -44,6 +45,7 @@ const DASHBOARDS: Dashboard[] = [
     numbers: { reads: ["candidates", "applications", "followups"], labels: ["Unverified claims", "Responses"] },
     mine: { reads: ["candidates", "applications"], labels: ["apps</span>"] }, // per-candidate app counts in the list body
     queue: { reads: ["candidates", "applications", "jobs"], labels: ["Tailor resume"] }, // the queue rows' action
+    newAssignments: { reads: ["candidates"], labels: ["No new candidates this week."] }, // its empty state: no ASSIGN entries on mocks (05 §7)
   } },
 ];
 

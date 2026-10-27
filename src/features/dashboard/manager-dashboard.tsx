@@ -19,6 +19,7 @@ import { GroupBody, GroupRowError } from "@/components/app/card-group";
 import { hasPageFailed, queryGroup } from "@/lib/query/query-group";
 import { PageHeader } from "@/components/app/page-header";
 import { useHref } from "@/lib/routes/use-href";
+import { NeedsBdeCard } from "./needs-bde-card";
 
 const EMPTY: never[] = [];
 
@@ -167,6 +168,7 @@ export function FloorContent() {
         </Card>
 
         <div className="space-y-6">
+          <NeedsBdeCard />
           <Card>
             <CardHeader><CardTitle>Pipeline funnel</CardTitle><span className="text-caption text-[var(--color-text-3)]">reached each stage</span></CardHeader>
             <GroupBody group={pipeline} skeleton={<SkeletonCard />}>{() => <FunnelBars stages={funnel} />}</GroupBody>

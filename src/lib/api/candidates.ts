@@ -1,4 +1,4 @@
-import type { Candidate, CreateCandidate, UpdateCandidate } from "@/lib/schemas/candidate";
+import type { Candidate, CreateCandidate, ReassignCandidate, UpdateCandidate } from "@/lib/schemas/candidate";
 
 const mock = () => import("@/mocks/candidates").then((m) => m.candidatesMock);
 
@@ -11,6 +11,9 @@ export const candidatesApi = {
   create: async (firmId: string, body: CreateCandidate): Promise<Candidate> => (await mock()).create(firmId, body),
 
   update: async (firmId: string, id: string, body: UpdateCandidate): Promise<Candidate> => (await mock()).update(firmId, id, body),
+
+  /** Move a candidate to another manager and/or BDE (07 Q43). Applications, résumés and history stay with it. */
+  reassign: async (firmId: string, id: string, body: ReassignCandidate): Promise<Candidate> => (await mock()).reassign(firmId, id, body),
 
   /** After a BDE's manager changes, their candidates follow (07 Q43). Mock-only: the live backend moves them itself. */
   followBde: async (firmId: string, bdeId: string, managerId: string): Promise<number> => (await mock()).followBde(firmId, bdeId, managerId),

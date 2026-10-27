@@ -2,10 +2,10 @@ import { ApiError, arrayOf } from "@/lib/api/client";
 import { canAssignTo } from "@/lib/auth/policy";
 import { isBde, isManager } from "@/lib/auth/roles";
 import { assignBlockReason } from "@/lib/derive/platform";
-import { candidateCapacity } from "@/lib/derive/tenancy";
+import { candidateCapacity, countsTowardLimit } from "@/lib/derive/tenancy";
 import { CandidateDocumentSchema } from "@/lib/schemas/document";
 import { RecordSchema } from "@/lib/schemas/record";
-import { CandidateSchema, CreateCandidateSchema, UpdateCandidateSchema, type Candidate, type CreateCandidate, type UpdateCandidate } from "@/lib/schemas/candidate";
+import { CandidateSchema, CreateCandidateSchema, ReassignCandidateSchema, UpdateCandidateSchema, type Candidate, type CreateCandidate, type ReassignCandidate, type UpdateCandidate } from "@/lib/schemas/candidate";
 import type { z } from "zod";
 import type { BackendResumeParseResponseSchema } from "@/lib/api/dto/resume-parse";
 import { resumeFileProblem } from "@/lib/constants/candidate-intake";
@@ -142,6 +142,27 @@ export const candidatesMock = firmScoped("candidates", {
   },
 
   /**
+   * Another manager and/or BDE (07 Q43, 05 §6): the OWNER across teams, a MANAGER within their own (`canAssignTo`).
+   * Giving a BDE to a candidate that didn't count toward the plan is refused at the limit (Q45); moving between BDEs
+   * never changes the count. No ledger entry on mocks: the backend's assign writes the ASSIGN entry with the note.
+   */
+  reassign: (firmId: string, id: string, body: ReassignCandidate): Promise<Candidate> => {
+    const input = ReassignCandidateSchema.parse(body);
+    const candidate = findInFirm(allCandidates, firmId, id, "Candidate");
+    const team = allUsers.filter((user) => user.firmId === firmId);
+    if (!canAssignTo(currentPrincipal(), candidate, input, team)) throw new ApiError("You can't assign this candidate there.", "FORBIDDEN", 403);
+    if (input.managerId === candidate.managerId && input.bdeId === candidate.bdeId) throw new ApiError("That's who has this candidate now.", "INVALID", 400);
+    const after = { ...candidate, bdeId: input.bdeId };
+    if (!countsTowardLimit(candidate) && countsTowardLimit(after)) {
+      const capacity = candidateCapacity(firms.find((item) => item.id === firmId)!, allCandidates);
+      if (!capacity.canAssignCandidate) throw new ApiError(assignBlockReason(capacity), "CANDIDATE_LIMIT", 409);
+    }
+    Object.assign(candidate, { managerId: input.managerId, bdeId: input.bdeId, updatedAt: new Date().toISOString() });
+    changed("candidates");
+    return mockResult(CandidateSchema.parse(candidate));
+  },
+
+  /**
    * Stand-in for the backend's résumé parser (onboarding 06 §4): answers in Zuhair's format, saving nothing. A sample's
    * file name gets that sample; any other file gets the first one, under its own name (the mock can't read a file).
    */
@@ -164,7 +185,7 @@ export const candidatesMock = firmScoped("candidates", {
     if (moved.length > 0) changed("candidates");
     return mockResult(moved.length);
   },
-}, { create: "candidate.create", update: "candidate.edit", parseResume: "candidate.create", followBde: "member.changeManager" });
+}, { create: "candidate.create", update: "candidate.edit", reassign: "candidate.assign", parseResume: "candidate.create", followBde: "member.changeManager" });
 
 /** The sample résumés the mock parser knows, for step 1's "Try a sample" (README assumption A1: mocks only). */
 export const SAMPLE_RESUME_NAMES: readonly string[] = resumeParses.map((item) => item.file_name);

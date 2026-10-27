@@ -122,6 +122,43 @@ describe("New candidate", () => {
   });
 });
 
+describe("Reassign (07 Q43, 05 §6)", () => {
+  it("the OWNER moves a candidate across managers, to a manager's queue or to one of their BDEs; applications stay", async () => {
+    const m = await load(EMAIL.imran);
+    const { allApplications } = await import("./applications");
+    const apps = allApplications.filter((app) => app.candidateId === "cand_03").length;
+    expect(await m.candidates.reassign(FIRM, "cand_03", { managerId: "user_priya", bdeId: null, note: null })).toMatchObject({ managerId: "user_priya", bdeId: null });
+    expect(await m.candidates.reassign(FIRM, "cand_03", { managerId: "user_priya", bdeId: "user_vikram", note: "Over to you." })).toMatchObject({ bdeId: "user_vikram" });
+    expect(allApplications.filter((app) => app.candidateId === "cand_03")).toHaveLength(apps);
+    await expect(m.candidates.reassign(FIRM, "cand_03", { managerId: "user_priya", bdeId: "user_vikram", note: null })).rejects.toMatchObject({ status: 400 }); // no change
+    await expect(m.candidates.reassign(FIRM, "cand_03", { managerId: "user_priya", bdeId: "user_adnan", note: null })).rejects.toMatchObject({ status: 403 }); // not Priya's BDE
+  });
+
+  it("a MANAGER moves within their team only", async () => {
+    const m = await load("user_fatima");
+    expect(await m.candidates.reassign(FIRM, "cand_03", { managerId: "user_fatima", bdeId: "user_sneha", note: null })).toMatchObject({ bdeId: "user_sneha" });
+    await expect(m.candidates.reassign(FIRM, "cand_03", { managerId: "user_priya", bdeId: "user_vikram", note: null })).rejects.toMatchObject({ status: 403 });
+    const priyas = m.allCandidates.find((item) => item.managerId === "user_priya")!;
+    await expect(m.candidates.reassign(FIRM, priyas.id, { managerId: "user_fatima", bdeId: "user_adnan", note: null })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("a BDE can't reassign", async () => {
+    const m = await load(EMAIL.adnan);
+    await expect(m.candidates.reassign(FIRM, "cand_03", { managerId: "user_fatima", bdeId: "user_sneha", note: null })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("at the candidate limit, a queue candidate can't get a BDE; moving between BDEs still works (Q45)", async () => {
+    const m = await load(EMAIL.imran);
+    const { firms } = await import("./team-data");
+    const { candidateCapacity } = await import("@/lib/derive/tenancy");
+    const firm = firms.find((item) => item.id === FIRM)!;
+    firm.candidateLimit = candidateCapacity(firm, m.allCandidates).assignedCandidates;
+    await expect(m.candidates.reassign(FIRM, "cand_01", { managerId: "user_fatima", bdeId: "user_adnan", note: null })).rejects.toMatchObject({ status: 409 });
+    expect(await m.candidates.reassign(FIRM, "cand_03", { managerId: "user_fatima", bdeId: "user_sneha", note: null })).toMatchObject({ bdeId: "user_sneha" });
+    expect(await m.candidates.reassign(FIRM, "cand_01", { managerId: "user_priya", bdeId: null, note: null })).toMatchObject({ managerId: "user_priya" });
+  });
+});
+
 describe("Capture job", () => {
   it("captures one: first in the list, by id, provenance USER_SUBMITTED by the user, the known company reused, kept after a reload", async () => {
     const m = await load(EMAIL.adnan);
