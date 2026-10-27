@@ -4,7 +4,11 @@ import { isBde, isManager } from "@/lib/auth/roles";
 import { candidateBlockReason } from "@/lib/derive/platform";
 import { candidateCapacity } from "@/lib/derive/tenancy";
 import { CandidateSchema, CreateCandidateSchema, UpdateCandidateSchema, type Candidate, type CreateCandidate, type UpdateCandidate } from "@/lib/schemas/candidate";
+import type { z } from "zod";
+import type { BackendResumeParseResponseSchema } from "@/lib/api/dto/resume-parse";
+import { resumeFileProblem } from "@/lib/constants/candidate-intake";
 import candidatesSeed from "./data/candidates.json";
+import resumeParses from "./data/resume-parses.json";
 import { findInFirm, inFirm, mockResult, newId } from "./_shared";
 import { currentPrincipal } from "./auth";
 import { changed, table } from "./db";
@@ -90,4 +94,18 @@ export const candidatesMock = firmScoped("candidates", {
     changed("candidates");
     return mockResult(CandidateSchema.parse(candidate));
   },
-}, { create: "candidate.create", update: "candidate.edit" });
+
+  /**
+   * Stand-in for the backend's résumé parser (onboarding 06 §4): answers in Zuhair's format, saving nothing. A sample's
+   * file name gets that sample; any other file gets the first one, under its own name (the mock can't read a file).
+   */
+  parseResume: (_firmId: string, file: { fileName: string; sizeBytes: number; mimeType: string }): Promise<z.input<typeof BackendResumeParseResponseSchema>> => {
+    const problem = resumeFileProblem({ name: file.fileName, size: file.sizeBytes, type: file.mimeType });
+    if (problem) throw new ApiError(problem, problem.startsWith("PDF") ? "UNSUPPORTED_FILE" : "FILE_TOO_LARGE", problem.startsWith("PDF") ? 415 : 413);
+    const sample = resumeParses.find((item) => item.file_name === file.fileName) ?? resumeParses[0]!;
+    return mockResult({ parse_id: newId("parse"), file_name: file.fileName, parse: sample.parse });
+  },
+}, { create: "candidate.create", update: "candidate.edit", parseResume: "candidate.create" });
+
+/** The sample résumés the mock parser knows, for step 1's "Try a sample" (README assumption A1: mocks only). */
+export const SAMPLE_RESUME_NAMES: readonly string[] = resumeParses.map((item) => item.file_name);

@@ -15,7 +15,8 @@ export const WORK_AUTH_LABEL: Record<WorkAuth, string> = {
   OTHER: "Other",
 };
 
-const NEEDS_SPONSOR: WorkAuth[] = ["H1B", "OPT", "CPT", "H4_EAD", "TN"];
+/** Statuses that need an employer to sponsor (or transfer) the visa: the chip's blue, and the new-candidate flow's needsSponsorship. */
+export const NEEDS_SPONSOR: readonly WorkAuth[] = ["H1B", "OPT", "CPT", "H4_EAD", "TN"];
 
 /** WorkAuthChip — work authorization with an amber warning when expiring soon. */
 export function WorkAuthChip({

@@ -1,0 +1,166 @@
+[
+  {
+    "file_name": "Ravi_Teja_Java_FullStack.pdf",
+    "parse": {
+      "header": {
+        "name": "Ravi Teja Kommineni",
+        "title": "Senior Java Full Stack Developer",
+        "location": "Irving, TX",
+        "email": "ravi.kommineni@example.com",
+        "phone": "(469) 555-0182",
+        "work_authorization": "H1B",
+        "github": "https://github.com/ravi-kommineni",
+        "linkedin": "linkedin.com/in/ravi-kommineni"
+      },
+      "professional_summary": "Full stack developer with 9 years building payment and banking platforms on Java, Spring Boot and React. Led the move of a card-authorisation service to AWS with zero downtime.",
+      "technical_skills": [
+        { "category": "Languages", "skills": "Java, TypeScript, SQL" },
+        { "category": "Frameworks", "skills": "Spring Boot, React, Hibernate, spring boot" },
+        { "category": "Cloud", "skills": "AWS, Docker, Kubernetes" }
+      ],
+      "work_experience": [
+        {
+          "job_title": "Senior Java Developer",
+          "company": "Capital Payments Inc.",
+          "location": "Plano, TX",
+          "dates": "Mar 2021 – Present",
+          "start": "2021-03",
+          "end": "",
+          "current": true,
+          "bullets": [
+            "Built Spring Boot services that authorise card payments for regional banks.",
+            "Moved the authorisation service to AWS EKS with zero downtime."
+          ]
+        },
+        {
+          "job_title": "Java Developer",
+          "company": "Lakeview Bank",
+          "location": "Charlotte, NC",
+          "dates": "Jan 2017 – Apr 2021",
+          "start": "2017-01",
+          "end": "2021-04",
+          "current": false,
+          "bullets": ["Maintained the online banking back end in Java and Oracle."]
+        },
+        {
+          "job_title": "Software Engineer",
+          "company": "Nimbus Tech Services",
+          "location": "Hyderabad, Telangana",
+          "dates": "2015 – 2016",
+          "start": "2015",
+          "end": "2016",
+          "current": false,
+          "bullets": ["Wrote internal tools in Java Swing."]
+        }
+      ],
+      "projects": [],
+      "education": [
+        { "degree": "B.Tech, Computer Science", "institution": "JNTU Hyderabad", "graduation_date": "May 2014", "grade": "8.1 CGPA" }
+      ],
+      "certifications": ["AWS Certified Developer – Associate"]
+    }
+  },
+  {
+    "file_name": "Priyanka_Nair_Data_Engineer.docx",
+    "parse": {
+      "header": {
+        "name": "Priyanka Nair",
+        "title": "Data Engineer",
+        "location": "Charlotte, NC",
+        "email": "priyanka.nair@example.com",
+        "phone": "",
+        "work_authorization": "Green Card holder",
+        "github": "",
+        "linkedin": "https://www.linkedin.com/in/priyanka-nair-data"
+      },
+      "professional_summary": "Data engineer with 6 years on Spark and Snowflake pipelines for insurance and healthcare clients.",
+      "technical_skills": [
+        { "category": "Data", "skills": "Spark, Snowflake, Airflow, dbt" },
+        { "category": "Languages", "skills": "Python, SQL, Scala" }
+      ],
+      "work_experience": [
+        {
+          "job_title": "Data Engineer",
+          "company": "Harborline Insurance",
+          "location": "Charlotte, NC",
+          "dates": "Jun 2022 – Present",
+          "start": "2022-06",
+          "end": "",
+          "current": true,
+          "bullets": ["Built the claims data lake on Snowflake and Airflow."]
+        },
+        {
+          "job_title": "Data Engineer (contract)",
+          "company": "Medway Health",
+          "location": "Remote",
+          "dates": "Jan 2021 – Dec 2022",
+          "start": "2021-01",
+          "end": "2022-12",
+          "current": false,
+          "bullets": ["Ran Spark jobs that load claims for analytics, overlapping the Harborline role for six months."]
+        },
+        {
+          "job_title": "ETL Developer",
+          "company": "Quantis Analytics",
+          "location": "Pune, India",
+          "dates": "Aug 2019 – Dec 2020",
+          "start": "2019-08",
+          "end": "2020-12",
+          "current": false,
+          "bullets": ["Wrote Informatica mappings."]
+        },
+        {
+          "job_title": "Intern",
+          "company": "Quantis Analytics",
+          "location": "Pune, India",
+          "dates": "Summer 2019",
+          "start": "",
+          "end": "",
+          "current": false,
+          "bullets": []
+        }
+      ],
+      "projects": [
+        { "name": "Claims anomaly detector", "url": "", "dates": "2023", "technologies": "Python, Spark", "bullets": ["Flags duplicate claims."] }
+      ],
+      "education": [
+        { "degree": "M.S. Data Science", "institution": "UNC Charlotte", "graduation_date": "Dec 2018", "grade": "" }
+      ],
+      "certifications": ["SnowPro Core"]
+    }
+  },
+  {
+    "file_name": "Karthik_S_DevOps_Resume.pdf",
+    "parse": {
+      "header": {
+        "name": "Karthik S",
+        "title": "",
+        "location": "New Jersey",
+        "email": "karthik.s[at]example.com",
+        "phone": "+1 732 555 0144",
+        "work_authorization": "Authorized to work in the US",
+        "github": "",
+        "linkedin": ""
+      },
+      "professional_summary": "",
+      "technical_skills": [
+        { "category": "", "skills": "Terraform, Jenkins, AWS, , Ansible" }
+      ],
+      "work_experience": [
+        {
+          "job_title": "DevOps Engineer",
+          "company": "Northpoint Retail",
+          "location": "Edison, NJ",
+          "dates": "2020 – Present",
+          "start": "2020",
+          "end": "",
+          "current": true,
+          "bullets": ["Runs the Terraform and Jenkins platform for 40 services."]
+        }
+      ],
+      "projects": [],
+      "education": [],
+      "certifications": []
+    }
+  }
+]
