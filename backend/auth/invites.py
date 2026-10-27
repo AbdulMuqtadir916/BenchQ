@@ -138,12 +138,13 @@ def check_seat(db: DbSession, firm: Firm, role: str, now: datetime) -> None:
 # ── Sending ──────────────────────────────────────────────────────────────────
 
 def send_invite(db: DbSession, *, inviter: User | PlatformUser, firm: Firm | None, email: str, role: str,
-                invitee_name: str | None, summary: str, now: datetime) -> tuple[Invite, str]:
+                invitee_name: str | None, summary: str, now: datetime,
+                manager_id: uuid.UUID | None = None) -> tuple[Invite, str]:
     """Create a PENDING invite and log INVITE_SENT. Returns the invite and its token, which is shown once and
     never stored (07 Q38). The caller has checked the email and, for a firm invite, the seat."""
     token = new_token()
     invite = Invite(
-        firm_id=firm.id if firm else None, email=email, invitee_name=invitee_name, role=role,
+        firm_id=firm.id if firm else None, email=email, invitee_name=invitee_name, role=role, manager_id=manager_id,
         invited_by_user_id=inviter.id if isinstance(inviter, User) else None,
         invited_by_platform_user_id=inviter.id if isinstance(inviter, PlatformUser) else None,
         status="PENDING", token_hash=hash_token(token), expires_at=now + INVITE_LIFETIME,

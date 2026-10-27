@@ -104,13 +104,31 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.add(link)
     db.flush()
     db.add(TracerClickEvent(firm_id=firm.id, tracer_link_id=link.id))
+    # The hierarchy (07 Q40): a MANAGER and a BDE who reports to them.
+    from backend.models.tenancy import User
+    from backend.tests.auth_support import password_hash
+    manager = User(firm_id=firm.id, role="MANAGER", name=f"{tag} manager", email=f"manager@{tag.lower()}.test",
+                   password_hash=password_hash())
+    db.add(manager)
+    db.flush()
+    bde = User(firm_id=firm.id, role="BDE", name=f"{tag} bde", email=f"bde-user@{tag.lower()}.test",
+               manager_id=manager.id, password_hash=password_hash())
+    db.add(bde)
+    db.flush()
+    from backend.models.candidates import Candidate
+    candidate = Candidate(firm_id=firm.id, manager_id=manager.id, bde_id=bde.id, created_by_user_id=owner.id,
+                          full_name=f"{tag} candidate", primary_role=f"{tag} Java Developer", work_auth="H1B")
+    db.add(candidate)
+    db.flush()
     invite, _ = send_invite(db, inviter=owner, firm=firm, email=f"bde@{tag.lower()}.test", role="BDE",
-                            invitee_name=f"{tag} invitee", summary=f"Invited a BDE to {tag}", now=utcnow())
+                            invitee_name=f"{tag} invitee", summary=f"Invited a BDE to {tag}", now=utcnow(),
+                            manager_id=manager.id)
     ledger.record(db, actor=owner, action="UPDATE", entity_type="candidate", entity_id=uuid.uuid4(),
                   entity_label=f"{tag} candidate", summary=f"{tag} edited a candidate", firm_id=firm.id)
     db.flush()
     return {"firm": firm.id, "slug": firm.slug, "job": job.id, "app": app.id, "interview": interview.id,
-            "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id}
+            "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id,
+            "manager": manager.id, "bde_user": bde.id, "candidate": candidate.id}
 
 
 def make_world(db, accounts) -> World:
@@ -233,3 +251,12 @@ def offline(monkeypatch):
     if hasattr(routes_cover_letters, "_get_browser"):
         monkeypatch.setattr(routes_cover_letters, "_get_browser", browser)
     monkeypatch.setattr(routes_resumes, "parse_resume_pdf", parsed_pdf)
+    # The new-candidate parser (onboarding 06 PR 3): no text extraction, no model.
+    from backend.api import routes_candidates
+    from backend.candidates.parse import checked
+
+    async def read_resume(text, db):
+        return checked({"header": {"name": "Isolation Reader"}})
+
+    monkeypatch.setattr(routes_candidates, "extract_text", lambda kind, content: "isolation résumé text")
+    monkeypatch.setattr(routes_candidates, "read_resume", read_resume)

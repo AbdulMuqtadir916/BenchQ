@@ -114,7 +114,7 @@ def test_a_write_shows_up_in_the_ledger(anonymous_client, accounts, ledger, test
     firm's ledger shows it."""
     owner = _cookie(accounts.firm_token)
     resp = anonymous_client.post(f"/api/firms/{accounts.firm_id}/invites", headers=owner,
-                                 json={"email": "new@acme.test", "role": "BDE"})
+                                 json={"email": "new@acme.test", "role": "VIEWER"})   # a BDE would need a manager (07 Q40)
     assert resp.status_code == 201, resp.text
     invite_id = resp.json()["invite"]["id"]
     assert_logged(test_db, action="INVITE_SENT", entity_type="invite", entity_id=invite_id,

@@ -22,6 +22,29 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 > `CandidateSchema` in snake_case; skills JSONB and `summary_state`, which a CHECK keeps UNVERIFIED) and
 > `resume_parses`. The serializers send `manager_id`, `bde_capacity` and `note`. The demo seed fills managers and
 > capacity, including on rows seeded before. Both new tables are firm-owned in the scoping lint.
+>
+> **PR 2 built:** a BDE invite names an active MANAGER of the firm (400 if missing, 404 if not a manager, 409
+> "Invite a manager first…" when the firm has none), and accepting it keeps the manager.
+> `PATCH /api/firms/{id}/members/{user_id}/manager` (OWNER) moves a BDE and the candidates they work; it is also how a
+> manager-less BDE gets one. `PATCH /api/firms/{id}/settings {bde_capacity}` (OWNER). **The frontend's invite form must
+> send `manager_id` for BDEs (module 02) before this reaches users:** today's form doesn't, and the backend now refuses.
+>
+> **PR 3 built:** `POST /api/firms/{id}/candidates/parse-resume` (OWNER, MANAGER: `candidate.create`). PDF via
+> pdfplumber, `.docx` via python-docx (tables included), `.doc` refused; 413/415/422 with the frontend's wording. One
+> call to AI module `resume_parse` (primary model; prompt in setting `resume_parse_prompt`, an AI preset), logged to
+> `llm_call_log` as `resume_parse`. The answer is held to Zuhair's format (unknown keys dropped, missing ones "" or [])
+> and kept 60 minutes in `resume_parses`; expired unused parses are cleared on the firm's next read.
+>
+> **PR 4 built:** `GET/POST /api/firms/{id}/candidates`, `GET/PATCH …/candidates/{cid}`, `POST …/{cid}/assign`. Reads
+> are scoped (`team_scope` for a MANAGER, `own_scope` for a BDE; outside is 404). Create and assign check
+> `can_assign_to` (the Python mirror of the frontend's `canAssignTo`, in `backend/auth/policy.py`). Assigning a BDE to
+> a candidate that had none is blocked at the candidate limit, with the frontend's `assignBlockReason`. Create keeps
+> the résumé parse (once; expired or reused is 404) and writes `CREATE` and `ASSIGN` with the handoff note. Skills
+> and the summary are stored UNVERIFIED.
+>
+> **PR 5 built:** the demo seed loads `src/mocks/data/candidates.json` (same ids through `demo_id`; persona and answer
+> bank in snake_case; the frontend's `demo-ids.json` now maps candidates too). The F7 isolation matrix covers every new
+> route: each test firm has a MANAGER, a BDE under them and a candidate (cases added in PRs 2–4).
 
 ## 1. PRs, in order
 

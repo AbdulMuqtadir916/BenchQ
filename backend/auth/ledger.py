@@ -11,7 +11,8 @@ from backend.models.tenancy import LedgerEntry, PlatformUser, User
 
 
 def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_type: str, entity_id: uuid.UUID | str,
-           entity_label: str, summary: str, firm_id: uuid.UUID | None, at: datetime | None = None) -> LedgerEntry:
+           entity_label: str, summary: str, firm_id: uuid.UUID | None, at: datetime | None = None,
+           note: str | None = None) -> LedgerEntry:
     """`firm_id` is the firm the event belongs to, or None for a platform-only event (A13). `at` dates an event that
     happened before it was noticed (a support view's expiry); otherwise the database's now()."""
     entry = LedgerEntry(
@@ -24,6 +25,7 @@ def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_typ
         entity_label=entity_label,
         action=action,
         summary=summary,
+        note=note,                 # the handoff note on an ASSIGN entry (docs/02 §3.4)
     )
     if at is not None:
         entry.created_at = at

@@ -91,6 +91,7 @@ def accept(token: str, body: AcceptBody, request: Request, response: Response, d
     else:
         activates = invite.role == "OWNER" and firm.status == "ONBOARDING"
         account = User(firm_id=firm.id, role=invite.role, name=name, email=invite.email,
+                       manager_id=invite.manager_id,   # 07 Q40: a BDE joins under the manager the invite named
                        password_hash=password_hash)   # last_active_at stays empty: first run lands on /welcome
         if activates:
             firm.status = "ACTIVE"

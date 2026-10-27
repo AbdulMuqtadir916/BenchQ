@@ -31,7 +31,7 @@ class Case:
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate"}
 
 
 def _new(prefix: str) -> str:
@@ -46,7 +46,23 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/members": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/invites": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/invites": Case(body=lambda i: {"email": f"new-{uuid.uuid4().hex[:6]}@example.test",
-                                                              "role": "BDE"}),
+                                                              "role": "BDE", "manager_id": str(i["manager"])},
+                                              body_ids=True),
+    # The hierarchy (onboarding 06 PR 2): a BDE's manager, the firm's BDE capacity.
+    "PATCH /api/firms/{firm_id}/members/{user_id}/manager": Case(body=lambda i: {"manager_id": str(i["manager"])},
+                                                                 body_ids=True),
+    "PATCH /api/firms/{firm_id}/settings": Case(body=lambda i: {"bde_capacity": 7}),
+
+    # ── Candidates (onboarding 06): the firm is in the path ──────────────────
+    "POST /api/firms/{firm_id}/candidates/parse-resume": Case(upload=True),
+    "GET /api/firms/{firm_id}/candidates": Case(shows_rows=True),
+    "POST /api/firms/{firm_id}/candidates": Case(body=lambda i: {
+        "full_name": "New candidate", "primary_role": "Data Engineer", "email": "new@example.test", "work_auth": "GC",
+        "manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}": Case(),
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(body=lambda i: {"rate_target": 90}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": Case(
+        body=lambda i: {"manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": Case(),
 

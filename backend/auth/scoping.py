@@ -62,6 +62,14 @@ def own_scope(principal: Principal) -> uuid.UUID | None:
     return None
 
 
+def team_scope(principal: Principal) -> uuid.UUID | None:
+    """The MANAGER whose team alone a principal may read (07 Q47), or None: the candidates they manage and, through
+    those, their records. As the frontend's `scopeOf`. Pair it with `scoped()`, never instead of it."""
+    if principal.kind == "firm" and principal.role == "MANAGER":
+        return principal.user_id
+    return None
+
+
 def firm_job_ids(firm_id: uuid.UUID):
     """The ids of the jobs a firm sees: the ones `firm_jobs` links it to (07 Q37)."""
     from sqlalchemy import select
