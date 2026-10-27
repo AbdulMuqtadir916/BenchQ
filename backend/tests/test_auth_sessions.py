@@ -46,11 +46,12 @@ def test_the_session_matches_the_frontend_contract(anonymous_client, accounts):
     firm = _sign_in(anonymous_client, "owner@acme.test").json()
     assert set(map(_camel, firm)) == {"principal", "user", "firm"}
     assert set(map(_camel, firm["principal"])) == {"kind", "userId", "firmId", "role"}
-    assert set(map(_camel, firm["user"])) == {"id", "firmId", "name", "email", "role", "avatarUrl", "isActive",
-                                              "lastActiveAt"}
+    assert set(map(_camel, firm["user"])) == {"id", "firmId", "name", "email", "role", "managerId", "avatarUrl",
+                                              "isActive", "lastActiveAt"}
     assert set(map(_camel, firm["firm"])) == {
         "id", "name", "slug", "logoUrl", "primaryTimezone", "clientTimezone", "truthGuardMode",
-        "applicationExpiryDays", "status", "planId", "seatLimit", "candidateLimit", "contactPhone", "createdAt"}
+        "applicationExpiryDays", "status", "planId", "seatLimit", "candidateLimit", "contactPhone", "bdeCapacity",
+        "createdAt"}
     platform = _sign_in(anonymous_client, "admin@benchq.test").json()
     assert set(map(_camel, platform)) == {"principal", "platformUser", "firm"}
     assert set(map(_camel, platform["principal"])) == {"kind", "userId", "role", "support"}

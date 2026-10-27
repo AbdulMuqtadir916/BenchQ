@@ -86,7 +86,7 @@ def test_paging(api_client, accounts, ledger):
 def test_the_entry_has_the_frontends_shape(api_client, accounts, ledger):
     entry = api_client.get(_url(accounts.firm_id, "?limit=1")).json()[0]
     assert set(entry) == {"id", "firm_id", "actor_user_id", "actor_type", "actor_name", "entity_type", "entity_id",
-                          "entity_label", "action", "summary", "model_id", "prompt_version", "evidence_ids",
+                          "entity_label", "action", "summary", "note", "model_id", "prompt_version", "evidence_ids",
                           "claim_state", "created_at"}
     assert entry["firm_id"] == str(accounts.firm_id) and entry["evidence_ids"] == []
 

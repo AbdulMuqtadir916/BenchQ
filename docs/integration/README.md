@@ -180,7 +180,7 @@ dependencies are live; only switching the adapter to live waits.
 |---|---|---|---|---|
 | 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6). **The worked example: copy it** | F1–F4 | Abdul | Live behind flag (`session,ledger`) |
 | 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md) | F1–F7; shared-pool decision (07 §2) | Zuhair | Not started |
-| — | Candidates (D1), with the firm hierarchy and onboarding: [`docs/candidate-onboarding/06-backend.md`](../candidate-onboarding/06-backend.md) | F1–F7; D1 (option 1, Q50) | Zuhair | Planned 2026-10-26 (07 Q40–Q50) |
+| — | Candidates (D1), with the firm hierarchy and onboarding: [`docs/candidate-onboarding/06-backend.md`](../candidate-onboarding/06-backend.md) | F1–F7; D1 (option 1, Q50) | Abdul (from Zuhair, 2026-10-27) | In progress: PR 1 tables (migration 0006) |
 | — | Admin API (firms, plans, users, invites, platform team, audit) | F1–F7 | Uzair (after F7) | In progress: create firm, invites, read lists live behind flag (#36, #39, #40); firm edits, suspend, plans, limits, user deactivate, platform-team invites not started |
 | 03 | [Applications](./03-applications.md) (10 statuses, D3) | 02, Candidates, D3 | Samad | Not started |
 | 04 | [Resumes + claims + AI tailoring](./04-resumes-and-tailoring.md) (D4), then resume scoring (`cv_score`, `score-check`) | 02, Candidates, D4 | Zuhair | Not started |

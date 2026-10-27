@@ -19,14 +19,15 @@ def firm_json(firm: Firm) -> dict:
         "truth_guard_mode": firm.truth_guard_mode, "application_expiry_days": firm.application_expiry_days,
         "status": firm.status, "plan_id": str(firm.plan_id), "seat_limit": firm.seat_limit,
         "candidate_limit": firm.candidate_limit, "contact_phone": firm.contact_phone,
-        "created_at": _iso(firm.created_at),
+        "bde_capacity": firm.bde_capacity, "created_at": _iso(firm.created_at),
     }
 
 
 def user_json(user: User) -> dict:
     return {
         "id": str(user.id), "firm_id": str(user.firm_id), "name": user.name, "email": user.email,
-        "role": user.role, "avatar_url": user.avatar_url, "is_active": user.is_active,
+        "role": user.role, "manager_id": str(user.manager_id) if user.manager_id else None,
+        "avatar_url": user.avatar_url, "is_active": user.is_active,
         "last_active_at": _iso(user.last_active_at),
     }
 
@@ -51,7 +52,7 @@ def ledger_entry_json(entry: LedgerEntry) -> dict:
         "id": str(entry.id), "firm_id": str(entry.firm_id) if entry.firm_id else None,
         "actor_user_id": str(entry.actor_user_id) if entry.actor_user_id else None, "actor_type": entry.actor_type,
         "actor_name": entry.actor_name, "entity_type": entry.entity_type, "entity_id": entry.entity_id,
-        "entity_label": entry.entity_label, "action": entry.action, "summary": entry.summary,
+        "entity_label": entry.entity_label, "action": entry.action, "summary": entry.summary, "note": entry.note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
         "evidence_ids": list(entry.evidence_ids or []), "claim_state": entry.claim_state,
         "created_at": _iso(entry.created_at),

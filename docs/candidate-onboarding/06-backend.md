@@ -1,6 +1,6 @@
 # 06 — Backend: candidates, hierarchy, parser
 
-**Owner:** Zuhair · **Depends on:** 01's docs (the contracts in docs/02); foundation F1–F7 (done) ·
+**Owner:** Abdul (taken over from Zuhair on 2026-10-27; Zuhair's own parser prompt can replace ours later) · **Depends on:** 01's docs (the contracts in docs/02); foundation F1–F7 (done) ·
 **Branch:** one per PR below, e.g. `feat/candidates-1-tables`
 
 This is the backend **Candidates track** (`docs/integration/README.md` board; decision D1 option 1: a `candidates`
@@ -11,6 +11,17 @@ the frontend owner of module 07.
 Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the workflow and conventions),
 `docs/integration/07-auth-and-tenancy.md` (Q38 table conventions), `backend/models/tenancy.py`, `backend/auth/`
 (`policy.py`, `scoping.py`, `invites.py`, `ledger.py`), `backend/ai/config.py`, `backend/tests/test_isolation.py`.
+
+> **Decided 2026-10-27 (product owner):** Word résumés are read with **python-docx** (a new dependency; `.doc` is
+> refused with "Save it as .docx or PDF"). The file and the parse live in a **`resume_parses`** table: 60 minutes
+> unless a create keeps it. The parser is **built here** as AI module `resume_parse`, prompting for exactly Zuhair's
+> format, so his prompt can replace ours without changing the response.
+>
+> **PR 1 built** (migration 0006): `users.manager_id` and `invites.manager_id` with "only a BDE has a manager"
+> (Q51, no backfill), `firms.bde_capacity` 1–50, `ledger_entries.note` and `ASSIGN`, `candidates` (the frontend's
+> `CandidateSchema` in snake_case; skills JSONB and `summary_state`, which a CHECK keeps UNVERIFIED) and
+> `resume_parses`. The serializers send `manager_id`, `bde_capacity` and `note`. The demo seed fills managers and
+> capacity, including on rows seeded before. Both new tables are firm-owned in the scoping lint.
 
 ## 1. PRs, in order
 
