@@ -137,7 +137,7 @@ export function CreateFirm() {
               id="firm-plan"
               label="Plan"
               error={shown("planId")}
-              hint={plan ? `Copied onto the firm: ${plan.seatLimit} seats, ${plan.candidateLimit} active candidates.` : "No plan is offered to new firms. Show one on Plans first."}
+              hint={plan ? `Copied onto the firm: ${plan.seatLimit} BDE seats, ${plan.candidateLimit} active candidates.` : "No plan is offered to new firms. Show one on Plans first."}
             >
               <select {...fieldAria("firm-plan", shown("planId"), true)} value={planId} onChange={(event) => set("planId", event.target.value)} className="bq-input w-full">
                 {activePlans.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}

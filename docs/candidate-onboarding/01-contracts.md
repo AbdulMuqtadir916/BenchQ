@@ -3,7 +3,14 @@
 **Owner:** — · **Depends on:** nothing · **Branch:** `feat/onboarding-01-contracts` · **Size:** one PR, docs first
 
 Every later module builds on the shapes defined here. This module changes contracts and keeps the app working
-exactly as today: no new screens, no new behaviour. It is the only module that edits `src/lib/schemas/`.
+as today: no new screens. It is the only module that edits `src/lib/schemas/`.
+
+> **Built 2026-10-27, with one change of scope (decided with the product owner):** the BDE-only seat rule (Q44) moved
+> here from module 02 and 06 PR 2, frontend and backend, because the demo MANAGERs this module adds would otherwise
+> push the seat fixtures over their limits. Done here: `deriveFirmUsage` and `seats_used` count BDEs and BDE invites,
+> only BDE invites are blocked, the block message and every label say "BDE seats", and the seat fixtures were
+> re-tuned (two demo BDEs each in STL and CBW). `workSettings` reuses the existing `RemoteMode` enum instead of a new
+> `WorkSetting`. The live DTO mapper reads `manager_id`, `bde_capacity` and `note` as optional until 06 sends them.
 
 Read first: [README](./README.md) §2–§3, `docs/02-DATA-CONTRACTS.md` §3.1 and §4, `src/lib/schemas/candidate.ts`,
 `tenancy.ts`, `session.ts`, `analytics.ts`, `enums.ts`.
@@ -20,11 +27,11 @@ Zuhair fixes the production contract (Q50); keep the "provisional" note next to 
 | remove | `assignedUserIds`, `primaryUserId` | replaced by the two below |
 | add | `managerId: string` | the candidate's manager (a MANAGER of the same firm). Always set (Q41). |
 | add | `bdeId: string \| null` | the candidate's one BDE (Q42). When set, that BDE's `managerId` equals the candidate's `managerId`. null = "Needs a BDE". |
-| add, provisional | `workSettings: WorkSetting[]` | step 4, several allowed |
+| add, provisional | `workSettings: RemoteMode[]` | step 4, several allowed |
 | add, provisional | `preferredLocations: string[]` | step 4, "City, ST" strings |
 | add, provisional | `contactNotes: string \| null` | step 4 "Notes for the BDE" (how to reach them, interview windows) |
 
-New enum in `enums.ts` (docs/02 §2): `WorkSetting = z.enum(["REMOTE", "HYBRID", "ONSITE"])`.
+`workSettings` uses the existing `RemoteMode` enum (`ONSITE`, `HYBRID`, `REMOTE`, docs/02 §2); no new enum.
 
 `CreateCandidateSchema` becomes the wizard's payload (module 04/05 use it):
 
@@ -83,8 +90,9 @@ export const ResumeDraftSchema = z.object({
   manager, except a BDE from before the hierarchy, who may be `null` until the OWNER sets one (Q51); the UI shows
   "No manager". Add the refinement the same way `InviteSchema` does it (a base object plus `superRefine`), so
   `.pick`/`.extend` keep working.
-- `InviteBaseSchema` gains `managerId: string | null`, with the same rule in `InviteSchema`'s refinement: set if and
-  only if the role is `BDE`.
+- `InviteBaseSchema` gains `managerId: string | null`, with the same rule in `InviteSchema`'s refinement: only a BDE
+  invite has one. A **new** BDE invite must name one (checked when sent, module 02 / 06); a BDE invite from before the
+  hierarchy may be null, like its user (Q51).
 
 ### Firm (`session.ts`, docs/02 §3.1)
 
@@ -142,7 +150,8 @@ Mark that branch `// removed in onboarding module 04`.
 
 ## 5. Tests
 
-- `tenancy.test.ts`: `InviteSchema` rejects a BDE invite without `managerId` and a non-BDE invite with one; `UserSchema` rejects a non-BDE with one and accepts a BDE with `null` (Q51).
+- `tenancy.test.ts`: `InviteSchema` and `UserSchema` reject a non-BDE with a `managerId` and accept a BDE with one or
+  with `null` (Q51).
 - Candidate schema: `bdeId` null is valid; a fixture whose `bdeId`'s manager differs from `managerId` fails a new
   fixture test (`mocks/fixtures.test.ts`).
 - Ledger: an `ASSIGN` entry parses; every existing entry has `note: null`.

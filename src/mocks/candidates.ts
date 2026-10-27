@@ -1,9 +1,10 @@
 import { ApiError, arrayOf } from "@/lib/api/client";
 import { can } from "@/lib/auth/policy";
-import { isBde } from "@/lib/auth/roles";
+import { isBde, isManager } from "@/lib/auth/roles";
 import { candidateBlockReason } from "@/lib/derive/platform";
 import { candidateCapacity } from "@/lib/derive/tenancy";
 import { CandidateSchema, CreateCandidateSchema, UpdateCandidateSchema, type Candidate, type CreateCandidate, type UpdateCandidate } from "@/lib/schemas/candidate";
+import type { User } from "@/lib/schemas/session";
 import candidatesSeed from "./data/candidates.json";
 import { findInFirm, inFirm, mockResult, newId } from "./_shared";
 import { currentPrincipal, currentUser } from "./auth";
@@ -15,20 +16,28 @@ import { allUsers, firms } from "./team-data";
 export const allCandidates: Candidate[] = table("candidates", CandidateSchema, () => arrayOf(CandidateSchema).parse(candidatesSeed));
 
 /**
- * Who a new candidate is assigned to. With `candidate.assign` (OWNER, MANAGER, Q15) the form may name an
- * active BDE of the firm, or nobody; anyone else (a BDE) gets their own new candidate, so it is in their
- * scope, and may not name someone else.
+ * Who a new candidate is assigned to (docs/02 §3.4). With `candidate.assign` (OWNER, MANAGER, Q15) the request names
+ * an active MANAGER of the firm and, optionally, an active BDE of the firm; anyone else (a BDE) gets their own new
+ * candidate, under their own manager, so it is in their scope. A named BDE brings their own manager: the mock holds the
+ * hierarchy until the backend sends `manager_id` (onboarding 06 PR 1), so the client's guess at the manager is replaced.
+ * Who may be given which candidate (07 Q41, `canAssignTo`, with the strict manager check) arrives with module 03.
  */
-function assigneeFor(firmId: string, requested: string | null): string | null {
+function assignmentFor(firmId: string, requested: { managerId: string; bdeId: string | null }): { managerId: string; bdeId: string | null } {
   const actor = currentUser();
+  const member = (id: string, isRole: (user: User) => boolean) => allUsers.find((user) => user.id === id && user.firmId === firmId && user.isActive && isRole(user));
   if (!can(currentPrincipal(), "candidate.assign")) {
-    if (requested !== null && requested !== actor.id) throw new ApiError("Your role can't assign candidates.", "FORBIDDEN", 403);
-    return actor.id;
+    if (requested.bdeId !== null && requested.bdeId !== actor.id) throw new ApiError("Your role can't assign candidates.", "FORBIDDEN", 403);
+    if (actor.managerId === null) throw new ApiError("Your manager isn't set yet. Ask the owner to set it.", "INVALID", 400);
+    return { managerId: actor.managerId, bdeId: actor.id };
   }
-  if (requested === null) return null;
-  const assignee = allUsers.find((user) => user.id === requested && user.firmId === firmId && user.isActive && isBde(user));
-  if (!assignee) throw new ApiError("Choose an active BDE of this firm.", "INVALID", 400);
-  return assignee.id;
+  if (requested.bdeId === null) {
+    if (!member(requested.managerId, isManager)) throw new ApiError("Choose an active manager of this firm.", "INVALID", 400);
+    return { managerId: requested.managerId, bdeId: null };
+  }
+  const bde = member(requested.bdeId, isBde);
+  if (!bde) throw new ApiError("Choose an active BDE of this firm.", "INVALID", 400);
+  if (bde.managerId === null) throw new ApiError("That BDE has no manager yet. Ask the owner to set one.", "INVALID", 400);
+  return { managerId: bde.managerId, bdeId: bde.id };
 }
 
 export const candidatesMock = firmScoped("candidates", {
@@ -42,7 +51,7 @@ export const candidatesMock = firmScoped("candidates", {
     const firm = firms.find((item) => item.id === firmId)!;
     const capacity = candidateCapacity(firm, allCandidates);
     if (!capacity.canAddCandidate) throw new ApiError(candidateBlockReason(capacity), "CANDIDATE_LIMIT", 409);
-    const assigneeId = assigneeFor(firmId, input.assignedUserId);
+    const assignment = assignmentFor(firmId, input);
 
     const now = new Date();
     const candidate = CandidateSchema.parse({
@@ -51,27 +60,30 @@ export const candidatesMock = firmScoped("candidates", {
       fullName: input.fullName,
       email: input.email,
       phone: input.phone,
-      linkedinUrl: null,
-      city: null,
-      state: null,
+      linkedinUrl: input.linkedinUrl,
+      city: input.city,
+      state: input.state,
       country: "US",
-      willingToRelocate: false,
+      willingToRelocate: input.willingToRelocate,
       workAuth: input.workAuth,
-      workAuthExpiry: null,
+      workAuthExpiry: input.workAuthExpiry,
       needsSponsorship: input.needsSponsorship,
       needsTransfer: input.needsTransfer,
-      employmentTypes: [],
-      rateMin: null,
-      rateTarget: null,
+      employmentTypes: input.employmentTypes,
+      rateMin: input.rateMin,
+      rateTarget: input.rateTarget,
       status: "ON_BENCH",
       benchStartDate: now.toISOString(),
-      availableFrom: null,
-      noticePeriodDays: null,
-      yearsExperience: null,
+      availableFrom: input.availableFrom,
+      noticePeriodDays: input.noticePeriodDays,
+      yearsExperience: input.yearsExperience,
       primaryRole: input.primaryRole,
-      targetRoles: [input.primaryRole],
-      assignedUserIds: assigneeId ? [assigneeId] : [],
-      primaryUserId: assigneeId,
+      targetRoles: input.targetRoles.length > 0 ? input.targetRoles : [input.primaryRole],
+      managerId: assignment.managerId,
+      bdeId: assignment.bdeId,
+      workSettings: input.workSettings,
+      preferredLocations: input.preferredLocations,
+      contactNotes: input.contactNotes,
       persona: null,
       qaBank: [],
       createdAt: now.toISOString(),

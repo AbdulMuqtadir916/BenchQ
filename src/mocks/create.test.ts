@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CreateCandidate } from "@/lib/schemas/candidate";
 import type { CaptureJob } from "@/lib/schemas/job";
+import { createCandidateBody as candidate } from "./create-candidate-body";
 
 /**
  * Phase B fix PR 1 (audit B1, B2): New candidate and Capture job save for real. Both persist across a
@@ -29,10 +29,6 @@ async function load(email: string | null) {
   return { db, signInAs: signIn.signInAs, candidates: candidates.candidatesMock, allCandidates: candidates.allCandidates, jobs: jobs.jobsMock, DuplicateJobError: jobs.DuplicateJobError };
 }
 
-const candidate = (overrides: Partial<CreateCandidate> = {}): CreateCandidate => ({
-  fullName: "Nisha Verma", primaryRole: "Data Engineer", email: "nisha@example.com", phone: null, workAuth: "H1B", needsSponsorship: true, needsTransfer: true, assignedUserId: null, ...overrides,
-});
-
 const job = (overrides: Partial<CaptureJob> = {}): CaptureJob => ({
   sourceUrl: "https://careers.example.com/jobs/4021?utm_source=linkedin", title: "Senior Data Engineer", companyName: "JPMorgan Chase", location: "Dallas, TX",
   remoteMode: "HYBRID", employmentType: "C2C", payPeriod: "HOUR", payMin: 80, payMax: 95, sponsorsVisa: true, excludesC2C: false,
@@ -50,10 +46,10 @@ afterEach(() => {
 });
 
 describe("New candidate", () => {
-  it("an OWNER adds one: ON_BENCH, assigned to the BDE chosen, still there after a reload", async () => {
+  it("an OWNER adds one: ON_BENCH, with the manager and BDE chosen, still there after a reload", async () => {
     const m = await load(EMAIL.imran);
-    const created = await m.candidates.create(FIRM, candidate({ assignedUserId: "user_adnan" }));
-    expect(created).toMatchObject({ firmId: FIRM, fullName: "Nisha Verma", status: "ON_BENCH", workAuth: "H1B", assignedUserIds: ["user_adnan"], primaryUserId: "user_adnan", primaryRole: "Data Engineer" });
+    const created = await m.candidates.create(FIRM, candidate({ bdeId: "user_adnan" }));
+    expect(created).toMatchObject({ firmId: FIRM, fullName: "Nisha Verma", status: "ON_BENCH", workAuth: "H1B", managerId: "user_fatima", bdeId: "user_adnan", primaryRole: "Data Engineer" });
     expect((await m.candidates.list(FIRM))[0]?.id).toBe(created.id);
     m.db.flush();
 
@@ -61,18 +57,25 @@ describe("New candidate", () => {
     expect(await later.candidates.byId(FIRM, created.id)).toMatchObject({ fullName: "Nisha Verma" });
   });
 
-  it("an OWNER may leave it unassigned, and may only assign an active BDE of the firm", async () => {
+  it("an OWNER may hand it to a manager without a BDE, and may only name an active manager and a BDE under them", async () => {
     const m = await load(EMAIL.imran);
-    expect((await m.candidates.create(FIRM, candidate())).assignedUserIds).toEqual([]);
-    await expect(m.candidates.create(FIRM, candidate({ assignedUserId: "user_fatima" }))).rejects.toMatchObject({ status: 400 }); // a MANAGER
-    await expect(m.candidates.create(FIRM, candidate({ assignedUserId: "user_kiran" }))).rejects.toMatchObject({ status: 400 }); // another firm's BDE
+    expect(await m.candidates.create(FIRM, candidate())).toMatchObject({ managerId: "user_fatima", bdeId: null });
+    await expect(m.candidates.create(FIRM, candidate({ managerId: "user_adnan" }))).rejects.toMatchObject({ status: 400 }); // a BDE, not a manager
+    await expect(m.candidates.create(FIRM, candidate({ managerId: "user_arjun" }))).rejects.toMatchObject({ status: 400 }); // another firm's manager
+    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_fatima" }))).rejects.toMatchObject({ status: 400 }); // a MANAGER as the BDE
+    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_kiran" }))).rejects.toMatchObject({ status: 400 }); // another firm's BDE
+  });
+
+  it("a named BDE brings their own manager (the mock holds the hierarchy until the backend sends it)", async () => {
+    const m = await load(EMAIL.imran);
+    expect(await m.candidates.create(FIRM, candidate({ bdeId: "user_vikram" }))).toMatchObject({ managerId: "user_priya", bdeId: "user_vikram" });
   });
 
   it("a BDE's new candidate is their own (so it is in their scope); a BDE can't assign someone else", async () => {
     const m = await load(EMAIL.adnan);
     const created = await m.candidates.create(FIRM, candidate());
-    expect(created).toMatchObject({ assignedUserIds: ["user_adnan"], primaryUserId: "user_adnan" });
-    await expect(m.candidates.create(FIRM, candidate({ assignedUserId: "user_sneha" }))).rejects.toMatchObject({ status: 403 });
+    expect(created).toMatchObject({ managerId: "user_fatima", bdeId: "user_adnan" });
+    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_sneha" }))).rejects.toMatchObject({ status: 403 });
   });
 
   it("at the candidate limit it is refused with the reason, and nothing is added (A4)", async () => {

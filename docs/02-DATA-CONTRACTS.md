@@ -236,8 +236,8 @@ slug: z.string()
 
 | Value | Definition |
 |---|---|
-| `seatsUsed` | number of **active users** (OWNER, MANAGER, BDE and VIEWER all count) **+ pending invites** (A1). Per A9, an invite that is `PENDING` but past `expiresAt` is treated as `EXPIRED` and does not reserve a seat **(approved 2026-10-16)** |
-| `activeCandidates` | candidates whose status is `ON_BENCH`, `INTERVIEWING` or `OFFER`. `PLACED`, `PAUSED` and `INACTIVE` do not count (A2) |
+| `seatsUsed` | *(replaced by §3.4 / 07 Q44: active BDEs + pending BDE invites)* number of **active users** (OWNER, MANAGER, BDE and VIEWER all count) **+ pending invites** (A1). Per A9, an invite that is `PENDING` but past `expiresAt` is treated as `EXPIRED` and does not reserve a seat **(approved 2026-10-16)** |
+| `activeCandidates` | *(replaced by §3.4 / 07 Q45: a BDE is assigned and the status is working)* candidates whose status is `ON_BENCH`, `INTERVIEWING` or `OFFER`. `PLACED`, `PAUSED` and `INACTIVE` do not count (A2) |
 | `canAddSeat` / `canAddCandidate` | `seatsUsed < seatLimit` / `activeCandidates < candidateLimit`. **These drive the block** on new additions: at the limit you can't add one more |
 | `isOverSeatLimit` / `isOverCandidateLimit` | `seatsUsed > seatLimit` / `activeCandidates > candidateLimit`. Over, not at: a firm exactly at its limit is not flagged |
 | `isOverLimit` | either of the two above. Shown as a flag on the admin firms list (A4) |
@@ -349,6 +349,7 @@ platform-only events.
 'PLAN_CHANGED',        // a firm's plan or limits changed. `summary` states before and after
                        // (A14), e.g. "Starter → Growth, seats 5 → 10"
 'INVITE_SENT', 'INVITE_ACCEPTED', 'INVITE_REVOKED',
+'ASSIGN',              // a candidate's manager or BDE set or changed (§3.4, 07 Q43)
 // `actorType` already has 'PLATFORM_ADMIN'; `ADMIN_ACCESS` (support view started) and `LOGIN` already exist
 ```
 
@@ -596,6 +597,44 @@ followUpCadence: z.array(z.object({
    "shift" range on dashboards read it; nothing is blocked outside the window.)*
 4. **Ledger.** *(Proposed: editing either logs `UPDATE` with `entityType: "firm"`, as other firm edits do.)*
 
+### 3.4 Firm hierarchy — APPROVED 2026-10-26 (07 Q40–Q51)
+
+> **Status: approved by the product owner on 2026-10-26** (07 §0 Q40–Q50; Q51 on 2026-10-27). Plan and modules:
+> `docs/candidate-onboarding/`. **Schemas in onboarding module 01; the derivations (seats, limit, load) change in
+> module 02.** Fields marked *provisional* are on mocks only; Zuhair owns the production candidate contract (Q50).
+
+The firm's layers are fixed: **OWNER → MANAGER → BDE → candidate** (Q40).
+
+```ts
+// src/lib/schemas/session.ts — UserSchema (base) gains:
+managerId: z.string().nullable(),      // the MANAGER this BDE reports to. null for every non-BDE. A BDE has one,
+                                       // except a BDE from before the hierarchy, null until the OWNER sets one (Q51)
+
+// src/lib/schemas/tenancy.ts — InviteBaseSchema gains:
+managerId: z.string().nullable(),      // the BDE's manager-to-be (Q40). null for non-BDE invites. A new BDE invite
+                                       // always names one (checked when sent); an older one may be null (Q51)
+
+// src/lib/schemas/session.ts — FirmSchema gains:
+bdeCapacity: z.number().int().positive().default(10),   // comfortable load per BDE: a warning, never a block (Q46)
+```
+
+`UserSchema` and `InviteSchema` are refined like `InviteSchema` already is (a base object plus `superRefine`):
+only a BDE (user or invite) has a `managerId`. That a **new** BDE or BDE invite has one, and that it is an active
+MANAGER of the same firm, is a store/backend check: users and invites from before the hierarchy may lack one (Q51).
+
+**Derived, never stored** (replaces the seat and candidate rows of §3.1's table):
+
+| Value | Definition |
+|---|---|
+| `seatsUsed` | active users **with role BDE** + pending, unexpired invites **with role BDE** (Q44). OWNER, MANAGER and VIEWER are free and unlimited; `seatLimit` means BDE seats |
+| working statuses | `ON_BENCH`, `INTERVIEWING`, `OFFER` (Q45). One list in `src/lib/derive/tenancy.ts` |
+| assigned candidates | candidates with a BDE (`bdeId` not null) **and** a working status. What `candidateLimit` counts (Q45). Creating a candidate is never blocked; assigning a BDE is, at the limit |
+| BDE load | a BDE's candidates in a working status, against `Firm.bdeCapacity` (Q46) |
+
+Ledger: `ASSIGN` (`entityType: "candidate"`) whenever a candidate's manager or BDE is set or changed, summary
+"Assigned to {BDE} ({manager})" or "Handed to {manager}", with "(from {previous})" on a move; its `note` is the
+handoff note. Changing a BDE's manager logs `UPDATE` on the `user`.
+
 ---
 
 ## 4. Candidate
@@ -659,8 +698,13 @@ export const CandidateSchema = z.object({
   primaryRole: z.string().nullable(),
   targetRoles: z.array(z.string()),
 
-  assignedUserIds: z.array(z.string()),
-  primaryUserId: z.string().nullable(),
+  managerId: z.string(),                 // the candidate's MANAGER. Always set (07 Q41)
+  bdeId: z.string().nullable(),          // the one BDE (Q42); null = "Needs a BDE". When set, that BDE's
+                                         // managerId equals managerId
+
+  workSettings: z.array(RemoteMode),     // provisional (Q50): remote / hybrid / on-site, several allowed
+  preferredLocations: z.array(z.string()), // provisional: "City, ST"
+  contactNotes: z.string().nullable(),   // provisional: how to reach them, interview windows ("Notes for the BDE")
 
   persona: PersonaSchema.nullable(),
   qaBank: z.array(QaBankEntrySchema),
@@ -691,6 +735,51 @@ export const CandidateStatsSchema = z.object({
   workAuthExpiringSoon: z.boolean(),      // < 90 days
 });
 ```
+
+**Writing a candidate** (07 Q41–Q43, Q48–Q49). `CreateCandidateSchema` is what the new-candidate flow sends;
+`ReassignCandidateSchema` moves a candidate; `ResumeDraftSchema` is the parser's answer after the DTO mapper (it fills
+the form and is never saved).
+
+```ts
+export const CreateCandidateSchema = CandidateSchema.pick({
+  phone: true, linkedinUrl: true, city: true, state: true, yearsExperience: true,
+  workAuth: true, workAuthExpiry: true, needsSponsorship: true, needsTransfer: true,
+  employmentTypes: true, rateTarget: true, rateMin: true, availableFrom: true, noticePeriodDays: true,
+  targetRoles: true, willingToRelocate: true, workSettings: true, preferredLocations: true, contactNotes: true,
+}).extend({
+  fullName: z.string().trim().min(1),
+  primaryRole: z.string().trim().min(1),            // "Marketed as"
+  email: z.string().trim().email(),                 // required in the flow (Q48)
+  summary: z.string().trim().nullable(),
+  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable(), source: FieldSource })),
+  preferredIndustries: z.array(z.string()),
+  dealBreakers: z.array(z.string()),
+  resumeParseId: z.string().nullable(),             // the parse to keep; null = no résumé
+  managerId: z.string().min(1),
+  bdeId: z.string().nullable(),
+  handoffNote: z.string().trim().max(1000).nullable(),
+});
+
+export const ReassignCandidateSchema = z.object({
+  managerId: z.string().min(1),
+  bdeId: z.string().nullable(),
+  note: z.string().trim().max(1000).nullable(),
+});
+
+// src/lib/schemas/resume-draft.ts — every field null when the résumé didn't have it
+export const ResumeDraftSchema = z.object({
+  parseId: z.string(), fileName: z.string(),
+  fullName: z.string().nullable(), primaryRole: z.string().nullable(), email: z.string().nullable(),
+  phone: z.string().nullable(), linkedinUrl: z.string().nullable(), city: z.string().nullable(),
+  state: z.string().nullable(), yearsExperience: z.number().nullable(),
+  workAuth: WorkAuth.nullable(), workAuthText: z.string().nullable(),
+  summary: z.string().nullable(),
+  skills: z.array(z.object({ name: z.string(), family: z.string().nullable() })),
+});
+```
+
+Onboarding never produces a `VERIFIED` claim (Q49): skills and the summary land in the Record as `UNVERIFIED` with
+their `FieldSource`.
 
 ---
 
@@ -1337,8 +1426,10 @@ export const LedgerEntrySchema = z.object({
   action: z.enum([
     'CREATE','UPDATE','DELETE','STATE_CHANGE',
     'AI_GENERATE','AI_BLOCK','AI_OVERRIDE','EXPORT','LOGIN','ADMIN_ACCESS',
+    // + the tenancy actions of §3.1 and 'ASSIGN' (§3.4)
   ]),
   summary: z.string(),
+  note: z.string().nullable(),            // the handoff note on an ASSIGN entry; null on every other entry (§3.4)
   modelId: z.string().nullable(),
   promptVersion: z.string().nullable(),
   evidenceIds: z.array(z.string()),

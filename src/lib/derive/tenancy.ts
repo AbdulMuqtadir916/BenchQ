@@ -1,3 +1,4 @@
+import { isBde } from "@/lib/auth/roles";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { User } from "@/lib/schemas/session";
 import type { Invite, InviteStatus } from "@/lib/schemas/tenancy";
@@ -26,7 +27,7 @@ export function isSeatReservingInvite(invite: Pick<Invite, "status" | "expiresAt
 }
 
 export interface FirmUsage {
-  /** Active users of every role + pending, unexpired invites (A1). */
+  /** Active BDEs + pending, unexpired BDE invites (A1, 07 Q44). OWNER, MANAGER and VIEWER take no seat. */
   seatsUsed: number;
   seatLimit: number;
   /** Candidates in ON_BENCH, INTERVIEWING or OFFER (A2). */
@@ -44,11 +45,11 @@ export interface FirmUsage {
 export function deriveFirmUsage(
   /** A Firm (its effective limits, copied from the plan). */
   firm: { id: string; seatLimit: number; candidateLimit: number },
-  data: { users: readonly Pick<User, "firmId" | "isActive">[]; invites: readonly Invite[]; candidates: readonly Pick<Candidate, "firmId" | "status">[] },
+  data: { users: readonly Pick<User, "firmId" | "isActive" | "role">[]; invites: readonly Invite[]; candidates: readonly Pick<Candidate, "firmId" | "status">[] },
   now: Date,
 ): FirmUsage {
-  const activeUsers = data.users.filter((user) => user.firmId === firm.id && user.isActive).length;
-  const reserved = data.invites.filter((invite) => invite.firmId === firm.id && isSeatReservingInvite(invite, now)).length;
+  const activeUsers = data.users.filter((user) => user.firmId === firm.id && user.isActive && isBde(user)).length;
+  const reserved = data.invites.filter((invite) => invite.firmId === firm.id && isBde(invite) && isSeatReservingInvite(invite, now)).length;
   const seatsUsed = activeUsers + reserved;
   const { activeCandidates } = candidateCapacity(firm, data.candidates);
   const isOverSeatLimit = seatsUsed > firm.seatLimit;

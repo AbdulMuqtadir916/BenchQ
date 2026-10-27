@@ -9,6 +9,7 @@ import { documentsApi } from "@/lib/api/documents";
 import { inboxApi } from "@/lib/api/inbox";
 import { agentsApi } from "@/lib/api/agents";
 import { allCandidates, candidatesMock } from "./candidates";
+import { createCandidateBody } from "./create-candidate-body";
 import { allJobs, jobsMock } from "./jobs";
 import { allJobMarks, jobMarksMock } from "./job-marks";
 import { jobMarksApi } from "@/lib/api/job-marks";
@@ -52,7 +53,7 @@ type Ids = ReturnType<typeof idsOf>;
 const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) => Promise<unknown>, boolean]> = [
   ["candidates", "list", (f) => candidatesApi.list(f), false],
   ["candidates", "byId", (f, i) => candidatesApi.byId(f, i.candidate), false],
-  ["candidates", "create", (f) => candidatesApi.create(f, { fullName: "X", primaryRole: "Y", email: null, phone: null, workAuth: "H1B", needsSponsorship: false, needsTransfer: false, assignedUserId: null }), true],
+  ["candidates", "create", (f) => candidatesApi.create(f, createCandidateBody()), true],
   ["candidates", "update", (f, i) => candidatesApi.update(f, i.candidate, { noticePeriodDays: 99 } as never), true],
   ["jobs", "list", (f) => jobsApi.list(f), false],
   ["jobs", "byId", (f, i) => jobsApi.byId(f, i.job), false],

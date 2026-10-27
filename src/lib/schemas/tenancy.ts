@@ -58,13 +58,18 @@ export const InviteBaseSchema = z.object({
   role: z.union([FirmRole, PlatformRole]),
   /** A firm user, or a PlatformUser (the firm's one OWNER is invited by a Super Admin). */
   invitedByUserId: z.string(),
+  /**
+   * 07 Q40: the MANAGER a BDE will report to. null for every non-BDE invite. A new BDE invite always names one (checked
+   * when it is sent); a BDE invite from before the hierarchy may be null, like its user (07 Q51).
+   */
+  managerId: z.string().nullable(),
   status: InviteStatus,
   /** createdAt + 7 days (A9). Resend keeps the row, issues a new token and resets this. */
   expiresAt: z.string().datetime(),
   createdAt: z.string().datetime(),
 });
 
-/** A11: firmId is null if and only if the role is PLATFORM_ADMIN. */
+/** A11: firmId is null if and only if the role is PLATFORM_ADMIN. 07 Q40: only a BDE invite has a manager. */
 export const InviteSchema = InviteBaseSchema.superRefine((invite, ctx) => {
   if ((invite.firmId === null) !== PlatformRole.safeParse(invite.role).success) {
     ctx.addIssue({
@@ -72,6 +77,9 @@ export const InviteSchema = InviteBaseSchema.superRefine((invite, ctx) => {
       path: ["firmId"],
       message: "firmId must be null exactly when role is PLATFORM_ADMIN",
     });
+  }
+  if (invite.managerId !== null && invite.role !== "BDE") {
+    ctx.addIssue({ code: "custom", path: ["managerId"], message: "Only a BDE invite has a manager" });
   }
 });
 export type Invite = z.infer<typeof InviteSchema>;

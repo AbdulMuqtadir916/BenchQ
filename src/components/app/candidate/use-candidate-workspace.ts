@@ -88,7 +88,7 @@ export function useCandidateWorkspace(candidateId: string) {
     const names = new Map((teamQuery.data ?? []).map((u) => [u.id, u.name]));
     return (id: string | null) => (id ? (names.get(id) ?? null) : null);
   }, [teamQuery.data]);
-  const ownerName = teamName(candidate?.primaryUserId ?? candidate?.assignedUserIds[0] ?? null);
+  const ownerName = teamName(candidate?.bdeId ?? null);
 
   return {
     now,

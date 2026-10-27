@@ -62,11 +62,11 @@ function FirmPlan({ detail }: { detail: FirmDetail }) {
               {plan?.name ?? "Unknown plan"} {isCustom ? <CustomLimitsBadge /> : null}
             </h2>
             <p className="mt-1 text-sm text-[var(--color-text-2)]">
-              <span className="tabular">{firm.seatLimit}</span> seats · <span className="tabular">{firm.candidateLimit}</span> active candidates
-              {isCustom && plan ? <span className="text-[var(--color-text-3)]"> (plan: {plan.seatLimit} seats, {plan.candidateLimit} candidates)</span> : null}
+              <span className="tabular">{firm.seatLimit}</span> BDE seats · <span className="tabular">{firm.candidateLimit}</span> active candidates
+              {isCustom && plan ? <span className="text-[var(--color-text-3)]"> (plan: {plan.seatLimit} BDE seats, {plan.candidateLimit} candidates)</span> : null}
             </p>
             <p className="mt-1 text-caption text-[var(--color-text-3)]">
-              In use: {usage.seatsUsed} seats, {usage.activeCandidates} active candidates.
+              In use: {usage.seatsUsed} BDE seats, {usage.activeCandidates} active candidates.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -132,7 +132,7 @@ function ChangePlanDialog({ detail, onClose }: { detail: FirmDetail; onClose: ()
       error={errorMessage(change.error)}
       onConfirm={() => change.mutate(planId, { onSuccess: onClose })}
     >
-      <Field id="change-plan" label="Plan" hint={target ? `New limits: ${target.seatLimit} seats, ${target.candidateLimit} active candidates.` : undefined}>
+      <Field id="change-plan" label="Plan" hint={target ? `New limits: ${target.seatLimit} BDE seats, ${target.candidateLimit} active candidates.` : undefined}>
         <select {...fieldAria("change-plan", null, true)} value={planId} onChange={(event) => setPlanId(event.target.value)} className="bq-input w-full">
           {offered.map((plan) => (
             <option key={plan.id} value={plan.id}>{plan.name}{plan.id === firm.planId ? " (current)" : ""}</option>
@@ -170,7 +170,7 @@ function AdjustLimitsDialog({ detail, onClose }: { detail: FirmDetail; onClose: 
       onConfirm={() => adjust.mutate(limits, { onSuccess: onClose })}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field id="limit-seats" label="Seat limit" error={seatError}>
+        <Field id="limit-seats" label="BDE seat limit" error={seatError}>
           <Input {...fieldAria("limit-seats", seatError)} inputMode="numeric" value={seats} onChange={(event) => setSeats(event.target.value)} />
         </Field>
         <Field id="limit-candidates" label="Active candidate limit" error={candidateError}>

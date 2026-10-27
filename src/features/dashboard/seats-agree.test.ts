@@ -40,7 +40,7 @@ async function textAs(accountId: string, component: ComponentType): Promise<stri
   return tree().replace(/<!-- -->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 }
 
-const seatsUsed = (text: string) => text.match(/Seats used (\d+ \/ \d+)/)?.[1];
+const seatsUsed = (text: string) => text.match(/BDE seats used (\d+ \/ \d+)/)?.[1];
 
 beforeEach(() => stubBackendReads());
 afterEach(() => {

@@ -96,7 +96,7 @@ export default function CandidatesPage() {
       .filter((c) => statusFilter === "ALL" || c.status === statusFilter)
       .map((c) => {
         const stats = deriveCandidateStats(c, applications.filter((a) => a.candidateId === c.id));
-        const bde = team.find((u) => u.id === c.primaryUserId)?.name ?? "Unassigned";
+        const bde = team.find((u) => u.id === c.bdeId)?.name ?? "Unassigned";
         return {
           candidate: c,
           bde,

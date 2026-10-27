@@ -1,7 +1,8 @@
 import type { Access } from "./registry";
 
 export interface ScopedRecord {
-  assignedUserIds?: readonly string[];
+  /** The candidate's one BDE (docs/02 §3.4). */
+  bdeId?: string | null;
   ownerUserId?: string | null;
 }
 
@@ -12,7 +13,7 @@ export function isInScope(access: Access, userId: string, record: ScopedRecord):
     case "read":
       return true;
     case "assigned":
-      return record.assignedUserIds?.includes(userId) ?? false;
+      return record.bdeId === userId;
     case "own":
       return record.ownerUserId === userId;
     case "none":

@@ -75,8 +75,8 @@ export function AdminOverview() {
         )}
       </section>
 
-      <h2 className="bq-section-heading mb-3 text-h3 text-[var(--color-text)]">Seats</h2>
-      <section aria-label="Seats" className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <h2 className="bq-section-heading mb-3 text-h3 text-[var(--color-text)]">BDE seats</h2>
+      <section aria-label="BDE seats" className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {seats.status === "error" ? (
           <GroupRowError group={seats} />
         ) : seats.status === "pending" ? (
@@ -120,11 +120,11 @@ function SeatCards({ seatsUsed, seatLimit, activeUsers }: { seatsUsed: number; s
     <>
       <div className="bq-card p-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-label text-[var(--color-text-3)]">Seats used</span>
+          <span className="text-label text-[var(--color-text-3)]">BDE seats used</span>
           <Building2 size={14} aria-hidden className="text-[var(--color-text-3)]" />
         </div>
         <div className="tabular mt-1 text-h1 text-[var(--color-text)]">{seatsUsed} / {seatLimit}</div>
-        <div className="mt-1 text-caption text-[var(--color-text-3)]">active firms · users + pending invites</div>
+        <div className="mt-1 text-caption text-[var(--color-text-3)]">active firms · BDEs + pending BDE invites</div>
       </div>
       <div className="bq-card p-4">
         <div className="flex items-center justify-between gap-3">
@@ -141,7 +141,7 @@ function SeatCards({ seatsUsed, seatLimit, activeUsers }: { seatsUsed: number; s
 function attentionText(item: AttentionItem): { title: string; detail: string } {
   switch (item.kind) {
     case "over-limit":
-      return { title: `Over its ${item.limit === "seats" ? "seat" : "candidate"} limit`, detail: `${item.used} of ${item.allowed} ${item.limit}, ${item.used - item.allowed} over` };
+      return { title: `Over its ${item.limit === "seats" ? "BDE seat" : "candidate"} limit`, detail: `${item.used} of ${item.allowed} ${item.limit === "seats" ? "BDE seats" : item.limit}, ${item.used - item.allowed} over` };
     case "owner-invite-expired":
       return { title: "Owner invite expired", detail: `${item.email}: resend it so the firm can go active` };
     case "stalled-onboarding":

@@ -13,6 +13,9 @@ export const isOwner = (record: { role: Role }): boolean => record.role === "OWN
 /** A BDE: the people the per-BDE numbers are about. */
 export const isBde = (record: { role: Role }): boolean => record.role === "BDE";
 
+/** A MANAGER: the people BDEs report to and candidates belong to (07 Q40–Q41). */
+export const isManager = (record: { role: Role }): boolean => record.role === "MANAGER";
+
 /** A platform-team invite or account (firmId null ⇔ PLATFORM_ADMIN, A11). */
 export const isPlatformRole = (record: { role: Role }): boolean => record.role === "PLATFORM_ADMIN";
 

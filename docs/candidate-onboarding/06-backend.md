@@ -17,12 +17,13 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 | PR | What | Section |
 |---|---|---|
 | 1 | Tables and migration `0006`: `users.manager_id`, `firms.bde_capacity`, `ledger_entries.note` + `ASSIGN`, `candidates` | §2 |
-| 2 | Seats count BDEs only; BDE invites need a manager; change a BDE's manager; firm settings | §3 |
+| 2 | BDE invites need a manager; change a BDE's manager; firm settings. (*Seats count BDEs only* is already built, in frontend module 01) | §3 |
 | 3 | Résumé parse endpoint (your parser), no save | §4 |
 | 4 | Candidates: create, list, read, update, assign — with team scope | §5 |
 | 5 | Demo seed and isolation tests | §7 |
 
-PR 2's seat change should merge in the same week as frontend module 02 (live mode reads your numbers). PRs 2 and 4 use
+Frontend module 02's team screens (invite with a manager, change manager, capacity) call PR 2's endpoints, since the
+team, invites and ledger have no mock since F6. PRs 2 and 4 use
 the new policy actions, so they wait for frontend module 03's PR (it changes `backend/auth/policy.py` and the shared
 table).
 
@@ -49,9 +50,9 @@ table).
 
 ## 3. Hierarchy, seats, settings (PR 2)
 
-- `backend/auth/invites.py` `seats_used`: active **BDE** users + pending, unexpired **BDE** invites (Q44).
-  `check_seat` runs only for BDE invites. Message, word for word: "Your plan allows {n} BDE seat(s); {used} {is/are} in
-  use." (same as `seatBlockReason` in `src/lib/derive/platform.ts`).
+- ~~`seats_used` counts BDEs only~~ **Done in frontend module 01 (2026-10-27):** `backend/auth/invites.py` counts active
+  BDEs + pending, unexpired BDE invites; `check_seat(db, firm, role, now)` only blocks BDE invites; the message is "Your
+  plan allows {n} BDE seat(s); {used} {is/are} in use."; tests in `test_member_invites.py` and `test_admin_firms.py`.
 - `POST /api/firms/{firm_id}/team/invites`: `manager_id` required when `role` is `BDE` (400 otherwise), refused for other
   roles; it must be an active MANAGER of this firm (404 if not). No active MANAGER → 409 "Invite a manager first. Every
   BDE reports to a manager." Accepting copies `manager_id` onto the user.

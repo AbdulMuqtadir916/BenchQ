@@ -13,7 +13,7 @@ const later = (days: number) => new Date(NOW.getTime() + days * DAY);
 
 const entry = (over: Partial<LedgerEntry>): LedgerEntry => ({
   id: "e", firmId: "firm_stl", actorUserId: "padm_sana", actorType: "PLATFORM_ADMIN", actorName: "Sana Mirza", entityType: "firm", entityId: "firm_stl",
-  entityLabel: "STL", action: "PLAN_CHANGED", summary: "", modelId: null, promptVersion: null, evidenceIds: [], claimState: null, createdAt: NOW.toISOString(), ...over,
+  entityLabel: "STL", action: "PLAN_CHANGED", summary: "", note: null, modelId: null, promptVersion: null, evidenceIds: [], claimState: null, createdAt: NOW.toISOString(), ...over,
 });
 
 /** What the backend's ledger holds for a firm that was created, moved to a smaller plan and then suspended. */
@@ -29,8 +29,8 @@ describe("overview numbers (docs/04 §14.2), from the fixtures", () => {
     expect(firmsByStatus(firms)).toEqual({ ACTIVE: 2, ONBOARDING: 1, SUSPENDED: 1 });
   });
 
-  it("sums seats over ACTIVE firms only (HTS 7 of 10 + STL 4 of 4); active users over every firm", () => {
-    expect(seatTotals(data, NOW)).toEqual({ seatsUsed: 11, seatLimit: 14, activeUsers: allUsers.filter((user) => user.isActive).length });
+  it("sums BDE seats over ACTIVE firms only (HTS 4 of 10 + STL 4 of 4, 07 Q44); active users over every firm", () => {
+    expect(seatTotals(data, NOW)).toEqual({ seatsUsed: 8, seatLimit: 14, activeUsers: allUsers.filter((user) => user.isActive).length });
   });
 
   it("needs attention: CBW over its seat limit by 2; nothing for GSC until its onboarding is 7 days old", () => {
@@ -83,8 +83,8 @@ describe("firm rows (docs/04 §14.3, §14.5)", () => {
   });
 
   it("names the limit when a seat is blocked (A4)", () => {
-    expect(seatBlockReason({ seatsUsed: 4, seatLimit: 4 })).toBe("Your plan allows 4 seats; 4 are in use.");
-    expect(seatBlockReason({ seatsUsed: 1, seatLimit: 1 })).toBe("Your plan allows 1 seat; 1 is in use.");
+    expect(seatBlockReason({ seatsUsed: 4, seatLimit: 4 })).toBe("Your plan allows 4 BDE seats; 4 are in use.");
+    expect(seatBlockReason({ seatsUsed: 1, seatLimit: 1 })).toBe("Your plan allows 1 BDE seat; 1 is in use.");
   });
 });
 

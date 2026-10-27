@@ -16,32 +16,32 @@ const usageOf = (firmId: string) => {
 };
 
 describe("deriveFirmUsage on the fixture firms (A1–A4)", () => {
-  it("firm A (ACTIVE, Growth): 6 users (every role) + 1 pending invite; the expired invite frees its seat", () => {
-    expect(usageOf("firm_hts")).toMatchObject({ seatsUsed: 7, seatLimit: 10, activeCandidates: 21, candidateLimit: 100, canAddSeat: true, canAddCandidate: true, isOverLimit: false });
+  it("firm A (ACTIVE, Growth): 3 BDEs + 1 pending BDE invite (07 Q44); the expired VIEWER invite and the OWNER, MANAGERs and VIEWER take no seat", () => {
+    expect(usageOf("firm_hts")).toMatchObject({ seatsUsed: 4, seatLimit: 10, activeCandidates: 21, candidateLimit: 100, canAddSeat: true, canAddCandidate: true, isOverLimit: false });
   });
 
   it("second firm (ACTIVE, Starter): exactly at the seat limit, so it can't add a seat but is not over", () => {
     expect(usageOf("firm_stl")).toMatchObject({ seatsUsed: 4, seatLimit: 4, canAddSeat: false, isOverSeatLimit: false, activeCandidates: 3, canAddCandidate: true });
   });
 
-  it("suspended firm, downgraded to Starter: 5 users + 1 pending invite = 6 of 4 seats, so it is over the limit", () => {
+  it("suspended firm, downgraded to Starter: 5 BDEs + 1 pending BDE invite = 6 of 4 seats, so it is over the limit", () => {
     expect(usageOf("firm_cbw")).toMatchObject({ seatsUsed: 6, seatLimit: 4, canAddSeat: false, isOverSeatLimit: true, isOverLimit: true, activeCandidates: 1, canAddCandidate: true, isOverCandidateLimit: false });
   });
 
-  it("suspended firm is over its seat limit on active users alone, whatever Phase S decides about its pending invites", () => {
+  it("suspended firm is over its seat limit on active BDEs alone, whatever Phase S decides about its pending invites", () => {
     const cbw = firms.find((item) => item.id === "firm_cbw")!;
     const withoutInvites = deriveFirmUsage(cbw, { users: allUsers, invites: [], candidates: allCandidates }, NOW);
     expect(withoutInvites).toMatchObject({ seatsUsed: 5, seatLimit: 4, isOverSeatLimit: true, isOverLimit: true });
   });
 
-  it("onboarding firm: no users, the owner's pending invite reserves one seat", () => {
-    expect(usageOf("firm_gsc")).toMatchObject({ seatsUsed: 1, activeCandidates: 0, canAddSeat: true, isOverLimit: false });
+  it("onboarding firm: no users, and the owner's pending invite takes no seat (07 Q44)", () => {
+    expect(usageOf("firm_gsc")).toMatchObject({ seatsUsed: 0, activeCandidates: 0, canAddSeat: true, isOverLimit: false });
   });
 });
 
 describe("deriveFirmUsage edges", () => {
   const firm = (seatLimit: number, candidateLimit: number) => ({ id: "f", seatLimit, candidateLimit });
-  const user = (id: string, isActive = true) => ({ id, firmId: "f", isActive }) as User;
+  const user = (id: string, isActive = true, role: User["role"] = "BDE") => ({ id, firmId: "f", isActive, role }) as User;
   const candidate = (status: Candidate["status"]) => ({ firmId: "f", status }) as Candidate;
 
   it("separates 'can add' (usage < limit) from 'over' (usage > limit)", () => {
@@ -53,9 +53,11 @@ describe("deriveFirmUsage edges", () => {
     expect([over.canAddSeat, over.isOverSeatLimit, over.isOverLimit]).toEqual([false, true, true]);
   });
 
-  it("counts every active role, skips inactive users, and ignores other firms", () => {
+  it("counts active BDEs only (07 Q44), skips inactive users, and ignores other firms", () => {
     const usage = deriveFirmUsage(firm(10, 10), { users: [user("a"), user("b", false), { ...user("c"), firmId: "other" }], invites: [], candidates: [] }, NOW);
     expect(usage.seatsUsed).toBe(1);
+    const others = (["OWNER", "MANAGER", "VIEWER"] as const).map((role) => user(role, true, role));
+    expect(deriveFirmUsage(firm(10, 10), { users: others, invites: [], candidates: [] }, NOW).seatsUsed).toBe(0);
   });
 
   it("counts only ON_BENCH, INTERVIEWING and OFFER candidates (A2)", () => {
@@ -66,7 +68,7 @@ describe("deriveFirmUsage edges", () => {
   });
 
   it("treats a PENDING invite past expiresAt as EXPIRED, and only PENDING ones reserve seats (A9)", () => {
-    const invite = (status: Invite["status"], expiresAt: string) => ({ status, expiresAt });
+    const invite = (status: Invite["status"], expiresAt: string, role: Invite["role"] = "BDE") => ({ status, expiresAt, role });
     expect(effectiveInviteStatus(invite("PENDING", "2026-10-19T00:00:00.000Z"), NOW)).toBe("PENDING");
     expect(effectiveInviteStatus(invite("PENDING", "2026-10-18T12:00:00.000Z"), NOW)).toBe("EXPIRED");
     expect(effectiveInviteStatus(invite("ACCEPTED", "2026-01-01T00:00:00.000Z"), NOW)).toBe("ACCEPTED");
@@ -76,6 +78,9 @@ describe("deriveFirmUsage edges", () => {
     expect(seats("PENDING", "2026-10-01T00:00:00.000Z")).toBe(0);
     expect(seats("REVOKED", "2026-10-25T00:00:00.000Z")).toBe(0);
     expect(seats("ACCEPTED", "2026-10-25T00:00:00.000Z")).toBe(0);
+    const pendingAs = (role: Invite["role"]) =>
+      deriveFirmUsage(firm(10, 10), { users: [], invites: [{ ...invite("PENDING", "2026-10-25T00:00:00.000Z", role), firmId: "f" } as Invite], candidates: [] }, NOW).seatsUsed;
+    expect([pendingAs("BDE"), pendingAs("MANAGER"), pendingAs("VIEWER"), pendingAs("OWNER")]).toEqual([1, 0, 0, 0]);
   });
 });
 

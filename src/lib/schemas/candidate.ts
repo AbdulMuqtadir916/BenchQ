@@ -3,6 +3,8 @@ import {
   CandidateStatus,
   ClaimState,
   EmploymentType,
+  FieldSource,
+  RemoteMode,
   WorkAuth,
 } from "./enums";
 
@@ -61,8 +63,16 @@ export const CandidateSchema = z.object({
   yearsExperience: z.number().nullable(),
   primaryRole: z.string().nullable(),
   targetRoles: z.array(z.string()),
-  assignedUserIds: z.array(z.string()),
-  primaryUserId: z.string().nullable(),
+  /** The candidate's MANAGER. Always set (docs/02 §3.4, 07 Q41). */
+  managerId: z.string(),
+  /** The one BDE (Q42). null = "Needs a BDE". When set, that BDE's managerId equals `managerId`. */
+  bdeId: z.string().nullable(),
+  /** Provisional (Q50): remote / hybrid / on-site, several allowed. */
+  workSettings: z.array(RemoteMode),
+  /** Provisional (Q50): "City, ST". */
+  preferredLocations: z.array(z.string()),
+  /** Provisional (Q50): how to reach them, interview windows — "Notes for the BDE". */
+  contactNotes: z.string().nullable(),
   persona: PersonaSchema.nullable(),
   qaBank: z.array(QaBankEntrySchema),
   createdAt: z.string().datetime(),
@@ -104,19 +114,49 @@ export const UpdateCandidateSchema = CandidateSchema.pick({
 export type UpdateCandidate = z.infer<typeof UpdateCandidateSchema>;
 
 /**
- * New candidate (docs/04 §4.2, `POST /api/candidates`): what the intake form sends. `assignedUserId` is
- * the BDE to assign — only a principal with `candidate.assign` may name one; a BDE's new candidate is
- * always assigned to themself, so it lands in their own scope.
+ * New candidate (docs/02 §4, 07 Q41 and Q48): what the new-candidate flow sends. The OWNER names a MANAGER and
+ * optionally one of their BDEs; a MANAGER names themself and one of their BDEs (`canAssignTo`, onboarding module 03).
  */
 export const CreateCandidateSchema = CandidateSchema.pick({
-  email: true,
   phone: true,
+  linkedinUrl: true,
+  city: true,
+  state: true,
+  yearsExperience: true,
   workAuth: true,
+  workAuthExpiry: true,
   needsSponsorship: true,
   needsTransfer: true,
+  employmentTypes: true,
+  rateTarget: true,
+  rateMin: true,
+  availableFrom: true,
+  noticePeriodDays: true,
+  targetRoles: true,
+  willingToRelocate: true,
+  workSettings: true,
+  preferredLocations: true,
+  contactNotes: true,
 }).extend({
   fullName: z.string().trim().min(1, "Enter the candidate's name."),
-  primaryRole: z.string().trim().min(1, "Enter the target role."),
-  assignedUserId: z.string().nullable(),
+  primaryRole: z.string().trim().min(1, "Enter the title they're marketed as."),
+  email: z.string().trim().email("Enter a valid email."),
+  summary: z.string().trim().nullable(),
+  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable(), source: FieldSource })),
+  preferredIndustries: z.array(z.string()),
+  dealBreakers: z.array(z.string()),
+  /** The parse to keep: the backend holds the file until create (onboarding module 06). null = no résumé. */
+  resumeParseId: z.string().nullable(),
+  managerId: z.string().min(1, "Choose a manager."),
+  bdeId: z.string().nullable(),
+  handoffNote: z.string().trim().max(1000).nullable(),
 });
 export type CreateCandidate = z.infer<typeof CreateCandidateSchema>;
+
+/** Move a candidate to another manager and/or BDE (07 Q43). One ASSIGN ledger entry per move. */
+export const ReassignCandidateSchema = z.object({
+  managerId: z.string().min(1, "Choose a manager."),
+  bdeId: z.string().nullable(),
+  note: z.string().trim().max(1000).nullable(),
+});
+export type ReassignCandidate = z.infer<typeof ReassignCandidateSchema>;

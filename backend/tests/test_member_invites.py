@@ -92,7 +92,7 @@ def test_one_email_one_account(anonymous_client, accounts, owner):
     assert _invite(anonymous_client, accounts, owner, email="BEA@acme.test").status_code == 409
 
 
-# ── Seats (A1, A4) ───────────────────────────────────────────────────────────
+# ── Seats (A1, A4; 07 Q44: only BDEs and BDE invites take a seat) ─────────────
 
 def _set_seats(test_db, accounts, limit):
     from backend.models.tenancy import Firm
@@ -100,17 +100,24 @@ def _set_seats(test_db, accounts, limit):
     test_db.commit()
 
 
-def test_an_invite_is_blocked_at_the_seat_limit(anonymous_client, accounts, owner, test_db):
-    _set_seats(test_db, accounts, 2)                     # the owner holds one seat
+def test_a_bde_invite_is_blocked_at_the_seat_limit(anonymous_client, accounts, owner, test_db):
+    _set_seats(test_db, accounts, 1)                     # the owner holds no seat (Q44)
     assert _invite(anonymous_client, accounts, owner).status_code == 201
     r = _invite(anonymous_client, accounts, owner, email="cal@acme.test")
     assert r.status_code == 409
-    assert r.json() == {"detail": "Your plan allows 2 seats; 2 are in use."}
+    assert r.json() == {"detail": "Your plan allows 1 BDE seat; 1 is in use."}
+
+
+@pytest.mark.parametrize("role", ["MANAGER", "VIEWER"])
+def test_managers_and_viewers_take_no_seat(anonymous_client, accounts, owner, team, role, test_db):
+    _set_seats(test_db, accounts, 1)                     # the team's one BDE fills it
+    assert _invite(anonymous_client, accounts, owner).status_code == 409
+    assert _invite(anonymous_client, accounts, owner, email="cal@acme.test", role=role).status_code == 201
 
 
 def test_a_revoked_or_expired_invite_frees_its_seat(anonymous_client, accounts, owner, test_db):
     from backend.models.tenancy import Invite
-    _set_seats(test_db, accounts, 2)
+    _set_seats(test_db, accounts, 1)
     invite_id = _invite(anonymous_client, accounts, owner).json()["invite"]["id"]
     anonymous_client.post(f"{_invites(accounts)}/{invite_id}/revoke", headers=owner)
     second = _invite(anonymous_client, accounts, owner, email="cal@acme.test").json()["invite"]["id"]
@@ -120,11 +127,11 @@ def test_a_revoked_or_expired_invite_frees_its_seat(anonymous_client, accounts, 
     assert _invite(anonymous_client, accounts, owner, email="dee@acme.test").status_code == 201
 
 
-def test_a_deactivated_member_frees_their_seat(anonymous_client, accounts, owner, team, test_db):
+def test_a_deactivated_bde_frees_their_seat(anonymous_client, accounts, owner, team, test_db):
     from backend.models.tenancy import User
-    _set_seats(test_db, accounts, 4)                     # owner + three members
+    _set_seats(test_db, accounts, 1)                     # the team's one BDE
     assert _invite(anonymous_client, accounts, owner).status_code == 409
-    test_db.query(User).filter(User.email == "viewer@acme.test").one().is_active = False
+    test_db.query(User).filter(User.email == "bde@acme.test").one().is_active = False
     test_db.commit()
     assert _invite(anonymous_client, accounts, owner).status_code == 201
 

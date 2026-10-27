@@ -16,6 +16,11 @@ const id = z.string();
 const nullableId = z.string().nullable();
 const mapId = (value: string) => fromBackendId(value);
 const mapNullableId = (value: string | null) => (value === null ? null : fromBackendId(value));
+/**
+ * Fields the backend adds in the candidate-onboarding track (docs/candidate-onboarding/06-backend.md PRs 1–2). Optional
+ * until it sends them: a missing manager is null, which 07 Q51 allows for users and invites from before the hierarchy.
+ */
+const pendingNullableId = nullableId.optional();
 
 export const FirmDto = z.object({
   id,
@@ -31,6 +36,7 @@ export const FirmDto = z.object({
   seat_limit: z.number(),
   candidate_limit: z.number(),
   contact_phone: z.string().nullable(),
+  bde_capacity: z.number().optional(),
   created_at: z.string(),
 });
 
@@ -40,6 +46,7 @@ export const UserDto = z.object({
   name: z.string(),
   email: z.string(),
   role: z.string(),
+  manager_id: pendingNullableId,
   avatar_url: z.string().nullable(),
   is_active: z.boolean(),
   last_active_at: z.string().nullable(),
@@ -76,6 +83,7 @@ export const InviteDto = z.object({
   invitee_name: z.string().nullable(),
   role: z.string(),
   invited_by_user_id: id,
+  manager_id: pendingNullableId,
   status: z.string(),
   expires_at: z.string(),
   created_at: z.string(),
@@ -101,6 +109,7 @@ export const LedgerEntryDto = z.object({
   entity_label: z.string(),
   action: z.string(),
   summary: z.string(),
+  note: z.string().nullable().optional(),
   model_id: z.string().nullable(),
   prompt_version: z.string().nullable(),
   evidence_ids: z.array(z.string()),
@@ -147,6 +156,7 @@ export function toFirm(dto: z.infer<typeof FirmDto>): Firm {
     seatLimit: dto.seat_limit,
     candidateLimit: dto.candidate_limit,
     contactPhone: dto.contact_phone,
+    bdeCapacity: dto.bde_capacity,
     createdAt: toIso(dto.created_at),
   });
 }
@@ -158,6 +168,7 @@ export function toUser(dto: z.infer<typeof UserDto>): User {
     name: dto.name,
     email: dto.email,
     role: dto.role,
+    managerId: mapNullableId(dto.manager_id ?? null),
     avatarUrl: dto.avatar_url,
     isActive: dto.is_active,
     lastActiveAt: toIsoOrNull(dto.last_active_at),
@@ -214,6 +225,7 @@ export function toInvite(dto: z.infer<typeof InviteDto>): Invite {
     inviteeName: dto.invitee_name,
     role: dto.role,
     invitedByUserId: mapId(dto.invited_by_user_id),
+    managerId: mapNullableId(dto.manager_id ?? null),
     status: dto.status,
     expiresAt: toIso(dto.expires_at),
     createdAt: toIso(dto.created_at),
@@ -243,6 +255,7 @@ export function toLedgerEntry(dto: z.infer<typeof LedgerEntryDto>): LedgerEntry 
     entityLabel: dto.entity_label,
     action: dto.action,
     summary: dto.summary,
+    note: dto.note ?? null,
     modelId: dto.model_id,
     promptVersion: dto.prompt_version,
     evidenceIds: dto.evidence_ids,

@@ -72,7 +72,8 @@ def list_invites(firm_id: uuid.UUID, principal: Principal = Depends(require("tea
 @router.post("/invites", status_code=201, summary="Invite a member")
 def invite_member(firm_id: uuid.UUID, body: InviteMemberBody, principal: Principal = Depends(require("member.invite")),
                   db: DbSession = Depends(get_db)):
-    """Blocked at the seat limit (A4). Returns the invite link's token once; only its hash is stored."""
+    """A BDE invite is blocked at the seat limit (A4, 07 Q44). Returns the invite link's token once; only its hash is
+    stored."""
     _member_of(firm_id, principal)
     if body.role not in MEMBER_ROLES:
         raise bad_request("Choose Manager, BDE or Viewer.")
@@ -81,7 +82,7 @@ def invite_member(firm_id: uuid.UUID, body: InviteMemberBody, principal: Princip
     name = (body.invitee_name or "").strip() or None
     firm = lock_firm(db, firm_id)
     check_email_free(db, email, now)
-    check_seat(db, firm, now)
+    check_seat(db, firm, body.role, now)
     who = f"{name} ({email})" if name else email
     invite, token = send_invite(db, inviter=db.get(User, principal.user_id), firm=firm, email=email, role=body.role,
                                 invitee_name=name, summary=f"Invited {who} as {body.role}", now=now)
@@ -96,7 +97,7 @@ def invite_member(firm_id: uuid.UUID, body: InviteMemberBody, principal: Princip
 @router.post("/invites/{invite_id}/resend", summary="Resend an invite: a new link, 7 more days")
 def resend(firm_id: uuid.UUID, invite_id: uuid.UUID, principal: Principal = Depends(require("member.invite")),
            db: DbSession = Depends(get_db)):
-    """Also the way to copy a pending invite's link again (07 Q38). An expired one needs a free seat."""
+    """Also the way to copy a pending invite's link again (07 Q38). An expired BDE invite needs a free seat."""
     _member_of(firm_id, principal)
     now = utcnow()
     invite = _firm_invite(db, firm_id, invite_id)

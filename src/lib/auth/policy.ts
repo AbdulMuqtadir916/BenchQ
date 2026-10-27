@@ -97,8 +97,8 @@ const isOwnScope = (principal: Principal): principal is Extract<Principal, { kin
 /** True when the page shows only the principal's own work (a BDE), e.g. to word a subtitle "Your assigned bench". */
 export const hasOwnScope = (principal: Principal): boolean => isOwnScope(principal);
 
-export function scopeCandidates<T extends { assignedUserIds: readonly string[] }>(principal: Principal, candidates: readonly T[]): T[] {
-  return isOwnScope(principal) ? candidates.filter((candidate) => candidate.assignedUserIds.includes(principal.userId)) : [...candidates];
+export function scopeCandidates<T extends { bdeId: string | null }>(principal: Principal, candidates: readonly T[]): T[] {
+  return isOwnScope(principal) ? candidates.filter((candidate) => candidate.bdeId === principal.userId) : [...candidates];
 }
 
 export function scopeApplications<T extends { submittedByUserId: string }>(principal: Principal, applications: readonly T[]): T[] {

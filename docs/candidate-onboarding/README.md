@@ -71,7 +71,7 @@ filled in; its "Owner" row becomes **"Assigned BDE"** (Q48).
 | # | Module | Owner | Depends on | Can run alongside |
 |---|---|---|---|---|
 | 01 | [Contracts, schemas and mock data](./01-contracts.md) | — | — | 06 can start from its docs PR |
-| 02 | [Hierarchy and seats](./02-hierarchy-and-seats.md) | — | 01 (its steps 5–6 wait for 03) | 03, 04, 06 |
+| 02 | [Hierarchy and seats](./02-hierarchy-and-seats.md) | — | 01; its team screens (§4–§6) wait for 03 and 06 PR 2 | 03, 04, 06 |
 | 03 | [Scope and permissions](./03-scope-and-permissions.md) | — | 01 | 02, 04, 06 |
 | 04 | [Wizard, steps 1–4](./04-wizard-steps.md) | — | 01 | 02, 03, 06 |
 | 05 | [Assign, done screen and reassigning](./05-assign-and-reassign.md) | — | 02, 03, 04 | 06 |
@@ -85,7 +85,9 @@ filled in; its "Owner" row becomes **"Assigned BDE"** (Q48).
      └── 06 ───────────┘
 ```
 
-Frontend modules 01–05 run on mocks and can start now. 06 is the backend Candidates track (decision D1 option 1, the
+Frontend modules 01–05 run the **candidates** on mocks. The team, invites, ledger and session have no mock since F6
+(`src/lib/api/config.ts`), so the parts of 02 and 05 that write them wait for 06's endpoints (noted in each file).
+Module 01 also built the BDE-only seat rule, frontend and backend (2026-10-27). 06 is the backend Candidates track (decision D1 option 1, the
 `candidates` table); its foundation (F1–F7) is done. 07 switches the frontend to it.
 
 **File ownership** (two modules never edit the same file at once): 02 owns `src/lib/derive/tenancy.ts`,

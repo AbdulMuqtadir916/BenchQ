@@ -6,6 +6,7 @@
     "inviteeName": "Nikhil Rao",
     "role": "BDE",
     "invitedByUserId": "user_imran",
+    "managerId": "user_fatima",
     "status": "PENDING",
     "expiresAt": "2026-10-23T12:00:00.000Z",
     "createdAt": "2026-10-16T12:00:00.000Z"
@@ -17,6 +18,7 @@
     "inviteeName": null,
     "role": "VIEWER",
     "invitedByUserId": "user_imran",
+    "managerId": null,
     "status": "PENDING",
     "expiresAt": "2026-10-16T12:00:00.000Z",
     "createdAt": "2026-10-09T12:00:00.000Z"
@@ -28,6 +30,7 @@
     "inviteeName": "Vikram Desai",
     "role": "BDE",
     "invitedByUserId": "user_imran",
+    "managerId": "user_priya",
     "status": "ACCEPTED",
     "expiresAt": "2026-06-17T12:00:00.000Z",
     "createdAt": "2026-06-10T12:00:00.000Z"
@@ -39,6 +42,7 @@
     "inviteeName": null,
     "role": "BDE",
     "invitedByUserId": "user_imran",
+    "managerId": "user_fatima",
     "status": "REVOKED",
     "expiresAt": "2026-08-08T12:00:00.000Z",
     "createdAt": "2026-08-01T12:00:00.000Z"
@@ -50,6 +54,7 @@
     "inviteeName": "Lakshmi Iyer",
     "role": "OWNER",
     "invitedByUserId": "padm_sana",
+    "managerId": null,
     "status": "ACCEPTED",
     "expiresAt": "2026-08-19T06:30:00.000Z",
     "createdAt": "2026-08-12T06:30:00.000Z"
@@ -61,6 +66,7 @@
     "inviteeName": "Ravi Teja",
     "role": "BDE",
     "invitedByUserId": "user_lakshmi",
+    "managerId": "user_arjun",
     "status": "PENDING",
     "expiresAt": "2026-10-23T12:00:00.000Z",
     "createdAt": "2026-10-16T12:00:00.000Z"
@@ -72,6 +78,7 @@
     "inviteeName": "Naveen Reddy",
     "role": "OWNER",
     "invitedByUserId": "padm_sana",
+    "managerId": null,
     "status": "ACCEPTED",
     "expiresAt": "2026-07-27T07:00:00.000Z",
     "createdAt": "2026-07-20T07:00:00.000Z"
@@ -83,6 +90,7 @@
     "inviteeName": null,
     "role": "BDE",
     "invitedByUserId": "user_naveen",
+    "managerId": "user_salma",
     "status": "PENDING",
     "expiresAt": "2026-10-22T12:00:00.000Z",
     "createdAt": "2026-10-15T12:00:00.000Z"
@@ -94,6 +102,7 @@
     "inviteeName": "Sunita Rao",
     "role": "OWNER",
     "invitedByUserId": "padm_sana",
+    "managerId": null,
     "status": "PENDING",
     "expiresAt": "2026-10-22T10:00:00.000Z",
     "createdAt": "2026-10-15T10:00:00.000Z"
@@ -105,6 +114,7 @@
     "inviteeName": "Omar Siddiqui",
     "role": "PLATFORM_ADMIN",
     "invitedByUserId": "padm_sana",
+    "managerId": null,
     "status": "PENDING",
     "expiresAt": "2026-10-23T12:00:00.000Z",
     "createdAt": "2026-10-16T12:00:00.000Z"

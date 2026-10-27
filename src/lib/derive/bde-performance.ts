@@ -17,7 +17,7 @@ export function deriveBdePerformance(
   return users
     .filter(isBde)
     .map((user) => {
-      const assigned = candidates.filter((c) => c.assignedUserIds.includes(user.id));
+      const assigned = candidates.filter((c) => c.bdeId === user.id);
       const assignedIds = new Set(assigned.map((c) => c.id));
       const apps = applications.filter(
         (a) => assignedIds.has(a.candidateId) && a.status !== "SAVED",
