@@ -57,10 +57,10 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     { id: "a3", submittedByUserId: "b2", candidateId: "c1" }, // c1 moved from b2's team: its history moves with it (Q43)
   ];
   const ledger = [
-    { id: "l1", actorUserId: "u_BDE", entityType: "application", entityId: "a1" },
-    { id: "l2", actorUserId: "b2", entityType: "application", entityId: "a2" },
-    { id: "l3", actorUserId: null, entityType: "firm", entityId: "f" },
-    { id: "l4", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c3" },
+    { id: "l1", actorUserId: "u_BDE", entityType: "application", entityId: "a1", action: "UPDATE" },
+    { id: "l2", actorUserId: "b2", entityType: "application", entityId: "a2", action: "UPDATE" },
+    { id: "l3", actorUserId: null, entityType: "firm", entityId: "f", action: "UPDATE" },
+    { id: "l4", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c3", action: "UPDATE" },
   ];
   const followups = [{ id: "f1", assignedToUserId: "u_BDE" }, { id: "f2", assignedToUserId: "b2" }];
   const ids = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
@@ -71,6 +71,13 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     expect(ids(scopeCandidates(bde, candidates))).toEqual(["c1"]);
     expect(ids(scopeApplications(bde, applications, candidates))).toEqual(["a1"]);
     expect(ids(scopeLedger(bde, ledger, context))).toEqual(["l1"]);
+    // 07 Q52: plus who assigned them the candidates they work now; not other entries about them, nor others' candidates.
+    const assigns = [
+      { id: "l5", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c1", action: "ASSIGN" },
+      { id: "l6", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c1", action: "UPDATE" },
+      { id: "l7", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c2", action: "ASSIGN" },
+    ];
+    expect(ids(scopeLedger(bde, [...ledger, ...assigns], context))).toEqual(["l1", "l5"]);
     expect(ids(scopeFollowups(bde, followups, context))).toEqual(["f1"]);
     expect(scopeFollowupsUserId(bde)).toBe("u_BDE");
     expect(hasOwnScope(bde)).toBe(true);

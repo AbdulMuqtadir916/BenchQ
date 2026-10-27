@@ -23,7 +23,8 @@ Read first: `docs/integration/README.md`, `src/lib/api/http.ts`, `src/lib/api/dt
 - Multipart: `http.ts` is the only `fetch`; add a `postForm` there if it has none, not a second `fetch`.
 - The parse adapter in live mode: hide "Try a sample" (README A1).
 - Query keys stay firm-first (`[firmId, "candidates", …]`).
-- **Ledger, two backend gaps found in 05b** (a backend change, so agree it with the backend owner first):
+- **Ledger, two backend gaps found in 05b. Done in 07a (Q52):** both below are built (`routes_ledger.py`,
+  `ledgerApi`'s `LedgerQuery`), and the handoff note and "New assignments" use the filters.
   1. `GET /ledger` gives a BDE only the entries they wrote (`own_scope`). "New assignments" and the handoff note need
      the ASSIGN entries about the BDE's own candidates too, which a manager or the OWNER wrote.
   2. There's no filter by entity: the candidate page and the dashboard card read the first 500 entries and filter in

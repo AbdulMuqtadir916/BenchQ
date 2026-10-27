@@ -9,6 +9,7 @@ import demoIds from "./dto/demo-ids.json";
  */
 
 const { ledgerApi } = await import("./analytics");
+const { toBackendId } = await import("./dto/demo-ids");
 
 const HTS = demoIds.firm_hts;
 const entryDto = (over: Record<string, unknown> = {}) => ({
@@ -35,6 +36,11 @@ describe("the ledger on the live backend", () => {
   it("asks for the firm's ledger by its backend id, with the page", async () => {
     await ledgerApi.list("firm_hts", { limit: 100, offset: 0 });
     expect(urls).toEqual([`/api/firms/${HTS}/ledger?limit=100&offset=0`]);
+  });
+
+  it("filters by record and action, naming a seeded record by its backend id (07 Q52)", async () => {
+    await ledgerApi.list("firm_hts", { entityType: "candidate", entityId: "cand_01", action: "ASSIGN", limit: 1 });
+    expect(urls).toEqual([`/api/firms/${HTS}/ledger?limit=1&entity_type=candidate&entity_id=${toBackendId("cand_01")}&action=ASSIGN`]);
   });
 
   it("maps each entry to LedgerEntry, translating seeded ids back to fixture ids", async () => {

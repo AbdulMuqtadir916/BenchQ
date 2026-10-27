@@ -121,3 +121,72 @@ def test_a_write_shows_up_in_the_ledger(anonymous_client, accounts, ledger, test
                   firm_id=accounts.firm_id, actor_user_id=accounts.user_id)
     newest = anonymous_client.get(_url(accounts.firm_id, "?limit=1"), headers=owner).json()[0]
     assert newest["action"] == "INVITE_SENT" and newest["entity_id"] == invite_id
+
+
+# 07 Q52: a BDE also reads the ASSIGN entries about the candidates they work now; and every reader can filter.
+
+def _candidate(test_db, firm, manager, bde, name):
+    from backend.models.candidates import Candidate
+    candidate = Candidate(firm_id=firm.id, manager_id=manager.id, bde_id=bde.id if bde else None,
+                          created_by_user_id=manager.id, full_name=name, work_auth="H1B")
+    test_db.add(candidate)
+    test_db.flush()
+    return candidate
+
+
+def _assign(firm_id, actor, candidate, summary, minutes_ago, note=None):
+    entry = _entry(firm_id, actor, summary, minutes_ago, action="ASSIGN")
+    entry.entity_id, entry.entity_label, entry.note = str(candidate.id), candidate.full_name, note
+    return entry
+
+
+@pytest.fixture
+def assignments(test_db, accounts, ledger):
+    """Bea works Asha (assigned by a manager); Ben works Ravi; Kiran is in the manager's queue. Plus a manager's
+    UPDATE on Asha, which Bea must not see (only ASSIGN entries widen her view)."""
+    from backend.models.tenancy import User
+    acme = test_db.get(Firm, accounts.firm_id)
+    manager = make_user(test_db, acme, email="mgr@acme.test", role="MANAGER", name="Mira")
+    bea = ledger["bde_user"]
+    ben = test_db.query(User).filter(User.email == "bde2@acme.test").one()
+    asha = _candidate(test_db, acme, manager, bea, "Asha")
+    ravi = _candidate(test_db, acme, manager, ben, "Ravi")
+    kiran = _candidate(test_db, acme, manager, None, "Kiran")
+    update = _entry(acme.id, manager, "Mira edited Asha", 4)
+    update.entity_id = str(asha.id)
+    test_db.add_all([
+        _assign(acme.id, manager, asha, "Assigned Asha to Bea", 6, note="Push banking."),
+        _assign(acme.id, manager, ravi, "Assigned Ravi to Ben", 5),
+        _assign(acme.id, manager, kiran, "Kiran to Mira's queue", 7),
+        update,
+    ])
+    test_db.commit()
+    return {"asha": asha, "ravi": ravi}
+
+
+def test_a_bde_also_sees_who_assigned_them_their_candidates(anonymous_client, accounts, ledger, assignments):
+    resp = anonymous_client.get(_url(accounts.firm_id), headers=ledger["bde"])
+    assert _summaries(resp) == ["Bea edit", "Assigned Asha to Bea"]
+    assert resp.json()[1]["note"] == "Push banking."
+
+
+def test_a_candidate_moved_away_takes_its_assignments_with_it(anonymous_client, accounts, ledger, assignments, test_db):
+    from backend.models.tenancy import User
+    assignments["asha"].bde_id = test_db.query(User).filter(User.email == "bde2@acme.test").one().id
+    test_db.commit()
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=ledger["bde"])) == ["Bea edit"]
+
+
+def test_filters_by_entity_and_action(api_client, accounts, ledger, assignments):
+    asha = str(assignments["asha"].id)
+    assert _summaries(api_client.get(_url(accounts.firm_id, f"?entity_type=candidate&entity_id={asha}"))) == \
+        ["Mira edited Asha", "Assigned Asha to Bea"]
+    assert _summaries(api_client.get(_url(accounts.firm_id, f"?entity_id={asha}&action=ASSIGN"))) == ["Assigned Asha to Bea"]
+    assert _summaries(api_client.get(_url(accounts.firm_id, "?action=ASSIGN"))) == \
+        ["Assigned Ravi to Ben", "Assigned Asha to Bea", "Kiran to Mira's queue"]
+    assert _summaries(api_client.get(_url(accounts.firm_id, "?entity_type=invite"))) == []
+
+
+def test_a_bde_filtering_stays_inside_their_scope(anonymous_client, accounts, ledger, assignments):
+    ravi = str(assignments["ravi"].id)
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id, f"?entity_id={ravi}"), headers=ledger["bde"])) == []

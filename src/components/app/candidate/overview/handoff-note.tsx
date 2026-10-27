@@ -6,16 +6,14 @@ import { latestHandoff } from "@/lib/derive/assignment";
 import { formatRelative } from "@/lib/format/timezone";
 import { useLedger } from "@/lib/hooks/use-ledger";
 
-/** How far back the overview looks for the note: the ledger has no per-candidate filter yet (module 07). */
-const LEDGER_WINDOW = 500;
-
 /**
  * The latest handoff note (docs/candidate-onboarding/05 §6): "Note from {actor}, {when}", from the candidate's latest
  * ASSIGN entry. An annotation, not a list: nothing shows while the ledger loads, if it fails, or when the last move had
- * no note. ASSIGN entries come from the backend's candidates, so on mock candidates this stays hidden until module 07.
+ * no note. ASSIGN entries come from the backend's candidates, so on mock candidates it stays hidden.
  */
 export function HandoffNote({ candidateId }: { candidateId: string }) {
-  const ledger = useLedger({ limit: LEDGER_WINDOW });
+  // The candidate's latest assignment only: the note shows when that move had one (07 Q52 filters).
+  const ledger = useLedger({ entityType: "candidate", entityId: candidateId, action: "ASSIGN", limit: 1 });
   const entry = ledger.data ? latestHandoff(candidateId, ledger.data) : null;
   if (!entry) return null;
   return (

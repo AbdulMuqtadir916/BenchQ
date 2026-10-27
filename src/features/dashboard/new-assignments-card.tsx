@@ -15,19 +15,20 @@ import { queryGroup } from "@/lib/query/query-group";
 import { useHref } from "@/lib/routes/use-href";
 
 const EMPTY: never[] = [];
-/** How far back the card reads the ledger: it has no per-BDE filter yet (module 07). */
-const LEDGER_WINDOW = 500;
+/** The newest ASSIGN entries the card reads: far more than a week of assignments for one firm. */
+const ASSIGN_WINDOW = 500;
 
 /**
  * "New assignments" on the BDE's dashboard (A5, Q50; no notifications): their candidates assigned in the last 7 days,
  * newest first, with who assigned them and the note. Derived from the ledger's ASSIGN entries, which only the backend
- * writes, so on mock candidates it shows its empty state until module 07.
+ * writes, so on mock candidates it shows its empty state.
  */
 export function NewAssignmentsCard({ userId }: { userId: string }) {
   const toHref = useHref();
   const now = useNow();
   const candidatesQuery = useCandidates();
-  const ledgerQuery = useLedger({ limit: LEDGER_WINDOW });
+  // The backend gives a BDE the ASSIGN entries about the candidates they work now (07 Q52).
+  const ledgerQuery = useLedger({ action: "ASSIGN", limit: ASSIGN_WINDOW });
   const group = queryGroup(candidatesQuery, ledgerQuery);
   const items = useMemo(
     () => deriveNewAssignments(userId, candidatesQuery.data ?? EMPTY, ledgerQuery.data ?? EMPTY, now),
