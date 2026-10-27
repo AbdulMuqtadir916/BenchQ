@@ -8,6 +8,6 @@ export const candidateUsageMock = {
   usage: () => {
     currentPlatformUser();
     injectedFailure("platform.candidates.usage");
-    return mockResult(allCandidates.map((candidate) => ({ firmId: candidate.firmId, status: candidate.status })));
+    return mockResult(allCandidates.map((candidate) => ({ firmId: candidate.firmId, status: candidate.status, bdeId: candidate.bdeId })));
   },
 };

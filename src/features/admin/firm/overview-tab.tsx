@@ -76,7 +76,7 @@ function Overview({ detail }: { detail: FirmDetail }) {
           <Row label="Plan">{plan?.name ?? "Unknown plan"}{detail.isCustom ? " · custom limits" : ""}</Row>
         </dl>
         <Usage label="BDE seats used" used={usage.seatsUsed} limit={usage.seatLimit} isOver={usage.isOverSeatLimit} detail={`${activeBdes} active BDE${activeBdes === 1 ? "" : "s"} + ${pendingInvites} pending BDE invite${pendingInvites === 1 ? "" : "s"}`} />
-        <Usage label="Active candidates" used={usage.activeCandidates} limit={usage.candidateLimit} isOver={usage.isOverCandidateLimit} detail="On bench, interviewing or offer" />
+        <Usage label="Assigned candidates" used={usage.assignedCandidates} limit={usage.candidateLimit} isOver={usage.isOverCandidateLimit} detail="With a BDE, and on bench, interviewing or at offer" />
         {usage.isOverLimit ? (
           <p className="mt-2 text-sm text-[var(--color-danger-fg)]">New additions are blocked. Existing users keep working.</p>
         ) : null}

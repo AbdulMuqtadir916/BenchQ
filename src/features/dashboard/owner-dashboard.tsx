@@ -82,7 +82,7 @@ export function OwnerDashboard() {
             <StatCard label="Placements" value={`${placedThisQuarter}`} delta="this quarter" trend="up" window="closed won" />
             <StatCard label="Time to place" value={`${avgTimeToPlace}d`} trend="neutral" window="apply → placed avg" />
             <StatCard label="BDE seats used" value={`${usage.seatsUsed} / ${usage.seatLimit}`} window={seatDetail} />
-            <StatCard label="Active candidates" value={`${usage.activeCandidates} / ${usage.candidateLimit}`} window="of plan" />
+            <StatCard label="Assigned candidates" value={`${usage.assignedCandidates} / ${usage.candidateLimit}`} window="of plan" />
           </>
         )}
       </section>

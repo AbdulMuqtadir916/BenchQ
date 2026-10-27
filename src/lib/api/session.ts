@@ -35,6 +35,8 @@ const live = {
     return null;
   },
   firmBySlug: async (slug: string): Promise<Firm> => toFirm(await http.get(`/api/firms/by-slug/${encodeURIComponent(slug)}`, FirmDto)),
+  updateFirmSettings: async (firmId: string, settings: { bdeCapacity: number }): Promise<Firm> =>
+    toFirm(await http.patch(`/api/firms/${toBackendId(firmId)}/settings`, FirmDto, { body: { bde_capacity: settings.bdeCapacity } })),
   finishFirstRun: async (): Promise<FirmSession> => {
     const session = toSession(await http.post("/api/auth/first-run-done", SessionDto));
     rememberLiveSession(session, { broadcast: false });
@@ -88,6 +90,9 @@ export const sessionApi = {
    * unknown slug. 401 when signed out.
    */
   firmBySlug: live.firmBySlug,
+
+  /** The OWNER's firm settings (`firmSettings.edit`, 07 Q46): today the BDE capacity, a warning when assigning. */
+  updateFirmSettings: live.updateFirmSettings,
 
   /** The signed-in user finished or skipped /welcome: from now on they land on the dashboard (docs/07 T7). */
   finishFirstRun: live.finishFirstRun,

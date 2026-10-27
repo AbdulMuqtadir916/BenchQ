@@ -34,7 +34,7 @@ export function FirmPlanTab() {
 function overWarnings(usage: FirmUsage, limits: { seatLimit: number; candidateLimit: number }): string[] {
   const warnings: string[] = [];
   if (usage.seatsUsed > limits.seatLimit) warnings.push(`This firm will be over its seat limit (${usage.seatsUsed} / ${limits.seatLimit}).`);
-  if (usage.activeCandidates > limits.candidateLimit) warnings.push(`This firm will be over its candidate limit (${usage.activeCandidates} / ${limits.candidateLimit}).`);
+  if (usage.assignedCandidates > limits.candidateLimit) warnings.push(`This firm will be over its candidate limit (${usage.assignedCandidates} / ${limits.candidateLimit}).`);
   return warnings;
 }
 
@@ -66,7 +66,7 @@ function FirmPlan({ detail }: { detail: FirmDetail }) {
               {isCustom && plan ? <span className="text-[var(--color-text-3)]"> (plan: {plan.seatLimit} BDE seats, {plan.candidateLimit} candidates)</span> : null}
             </p>
             <p className="mt-1 text-caption text-[var(--color-text-3)]">
-              In use: {usage.seatsUsed} BDE seats, {usage.activeCandidates} active candidates.
+              In use: {usage.seatsUsed} BDE seats, {usage.assignedCandidates} assigned candidates.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -132,7 +132,7 @@ function ChangePlanDialog({ detail, onClose }: { detail: FirmDetail; onClose: ()
       error={errorMessage(change.error)}
       onConfirm={() => change.mutate(planId, { onSuccess: onClose })}
     >
-      <Field id="change-plan" label="Plan" hint={target ? `New limits: ${target.seatLimit} BDE seats, ${target.candidateLimit} active candidates.` : undefined}>
+      <Field id="change-plan" label="Plan" hint={target ? `New limits: ${target.seatLimit} BDE seats, ${target.candidateLimit} assigned candidates.` : undefined}>
         <select {...fieldAria("change-plan", null, true)} value={planId} onChange={(event) => setPlanId(event.target.value)} className="bq-input w-full">
           {offered.map((plan) => (
             <option key={plan.id} value={plan.id}>{plan.name}{plan.id === firm.planId ? " (current)" : ""}</option>

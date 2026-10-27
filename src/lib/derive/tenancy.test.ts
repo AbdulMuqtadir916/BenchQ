@@ -5,7 +5,7 @@ import { FIXTURE_NOW, invitesAt } from "@/mocks/tenancy";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { User } from "@/lib/schemas/session";
 import type { Invite } from "@/lib/schemas/tenancy";
-import { deriveFirmUsage, effectiveInviteStatus, isActiveCandidate } from "./tenancy";
+import { countsTowardLimit, deriveBdeLoad, deriveFirmUsage, effectiveInviteStatus, isWorkingCandidate } from "./tenancy";
 
 /** Tests use a fixed clock: the instant the fixture invite dates were written against. */
 const NOW = FIXTURE_NOW;
@@ -17,15 +17,15 @@ const usageOf = (firmId: string) => {
 
 describe("deriveFirmUsage on the fixture firms (A1–A4)", () => {
   it("firm A (ACTIVE, Growth): 3 BDEs + 1 pending BDE invite (07 Q44); the expired VIEWER invite and the OWNER, MANAGERs and VIEWER take no seat", () => {
-    expect(usageOf("firm_hts")).toMatchObject({ seatsUsed: 4, seatLimit: 10, activeCandidates: 21, candidateLimit: 100, canAddSeat: true, canAddCandidate: true, isOverLimit: false });
+    expect(usageOf("firm_hts")).toMatchObject({ seatsUsed: 4, seatLimit: 10, assignedCandidates: 19, candidateLimit: 100, canAddSeat: true, canAssignCandidate: true, isOverLimit: false });
   });
 
   it("second firm (ACTIVE, Starter): exactly at the seat limit, so it can't add a seat but is not over", () => {
-    expect(usageOf("firm_stl")).toMatchObject({ seatsUsed: 4, seatLimit: 4, canAddSeat: false, isOverSeatLimit: false, activeCandidates: 3, canAddCandidate: true });
+    expect(usageOf("firm_stl")).toMatchObject({ seatsUsed: 4, seatLimit: 4, canAddSeat: false, isOverSeatLimit: false, assignedCandidates: 2, canAssignCandidate: true });
   });
 
   it("suspended firm, downgraded to Starter: 5 BDEs + 1 pending BDE invite = 6 of 4 seats, so it is over the limit", () => {
-    expect(usageOf("firm_cbw")).toMatchObject({ seatsUsed: 6, seatLimit: 4, canAddSeat: false, isOverSeatLimit: true, isOverLimit: true, activeCandidates: 1, canAddCandidate: true, isOverCandidateLimit: false });
+    expect(usageOf("firm_cbw")).toMatchObject({ seatsUsed: 6, seatLimit: 4, canAddSeat: false, isOverSeatLimit: true, isOverLimit: true, assignedCandidates: 1, canAssignCandidate: true, isOverCandidateLimit: false });
   });
 
   it("suspended firm is over its seat limit on active BDEs alone, whatever Phase S decides about its pending invites", () => {
@@ -35,7 +35,7 @@ describe("deriveFirmUsage on the fixture firms (A1–A4)", () => {
   });
 
   it("onboarding firm: no users, and the owner's pending invite takes no seat (07 Q44)", () => {
-    expect(usageOf("firm_gsc")).toMatchObject({ seatsUsed: 0, activeCandidates: 0, canAddSeat: true, isOverLimit: false });
+    expect(usageOf("firm_gsc")).toMatchObject({ seatsUsed: 0, assignedCandidates: 0, canAddSeat: true, isOverLimit: false });
   });
 });
 
@@ -60,11 +60,22 @@ describe("deriveFirmUsage edges", () => {
     expect(deriveFirmUsage(firm(10, 10), { users: others, invites: [], candidates: [] }, NOW).seatsUsed).toBe(0);
   });
 
-  it("counts only ON_BENCH, INTERVIEWING and OFFER candidates (A2)", () => {
+  it("counts candidates with a BDE and a working status (07 Q45): a queue and PAUSED don't count", () => {
     const statuses: Candidate["status"][] = ["ON_BENCH", "INTERVIEWING", "OFFER", "PLACED", "PAUSED", "INACTIVE"];
-    expect(statuses.filter((status) => isActiveCandidate({ status }))).toEqual(["ON_BENCH", "INTERVIEWING", "OFFER"]);
-    const usage = deriveFirmUsage(firm(10, 3), { users: [], invites: [], candidates: statuses.map(candidate) }, NOW);
-    expect([usage.activeCandidates, usage.canAddCandidate, usage.isOverCandidateLimit]).toEqual([3, false, false]);
+    expect(statuses.filter((status) => isWorkingCandidate({ status }))).toEqual(["ON_BENCH", "INTERVIEWING", "OFFER"]);
+    const assigned = statuses.map((status) => ({ ...candidate(status), bdeId: "bde" }));
+    const queued = statuses.map((status) => ({ ...candidate(status), bdeId: null }));
+    const usage = deriveFirmUsage(firm(10, 3), { users: [], invites: [], candidates: [...assigned, ...queued] }, NOW);
+    expect([usage.assignedCandidates, usage.canAssignCandidate, usage.isOverCandidateLimit]).toEqual([3, false, false]);
+    expect(countsTowardLimit({ status: "ON_BENCH", bdeId: null })).toBe(false);
+    expect(countsTowardLimit({ status: "PAUSED", bdeId: "bde" })).toBe(false);
+  });
+
+  it("a BDE's load is their working candidates against the capacity: at it is a warning (07 Q46)", () => {
+    const of = (status: Candidate["status"], bdeId: string | null) => ({ status, bdeId });
+    const rows = [of("ON_BENCH", "b"), of("OFFER", "b"), of("PLACED", "b"), of("ON_BENCH", "other"), of("ON_BENCH", null)];
+    expect(deriveBdeLoad("b", rows, 3)).toEqual({ load: 2, capacity: 3, isAtCapacity: false });
+    expect(deriveBdeLoad("b", rows, 2)).toEqual({ load: 2, capacity: 2, isAtCapacity: true });
   });
 
   it("treats a PENDING invite past expiresAt as EXPIRED, and only PENDING ones reserve seats (A9)", () => {

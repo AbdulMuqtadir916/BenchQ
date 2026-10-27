@@ -11,4 +11,7 @@ export const candidatesApi = {
   create: async (firmId: string, body: CreateCandidate): Promise<Candidate> => (await mock()).create(firmId, body),
 
   update: async (firmId: string, id: string, body: UpdateCandidate): Promise<Candidate> => (await mock()).update(firmId, id, body),
+
+  /** After a BDE's manager changes, their candidates follow (07 Q43). Mock-only: the live backend moves them itself. */
+  followBde: async (firmId: string, bdeId: string, managerId: string): Promise<number> => (await mock()).followBde(firmId, bdeId, managerId),
 };

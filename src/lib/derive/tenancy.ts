@@ -8,11 +8,19 @@ import type { Invite, InviteStatus } from "@/lib/schemas/tenancy";
  * records, never stored. `now` is a parameter so results are stable in tests and fixtures.
  */
 
-/** A2: only these statuses count against `candidateLimit`. */
-export const ACTIVE_CANDIDATE_STATUSES: readonly Candidate["status"][] = ["ON_BENCH", "INTERVIEWING", "OFFER"];
+/**
+ * 07 Q45: the working statuses: what counts toward the candidate limit and a BDE's load. Change it here only, with a
+ * decision entry (the backend's WORKING_STATUSES in backend/models/candidates.py says the same).
+ */
+export const WORKING_STATUSES: readonly Candidate["status"][] = ["ON_BENCH", "INTERVIEWING", "OFFER"];
 
-export function isActiveCandidate(candidate: Pick<Candidate, "status">): boolean {
-  return ACTIVE_CANDIDATE_STATUSES.includes(candidate.status);
+export function isWorkingCandidate(candidate: Pick<Candidate, "status">): boolean {
+  return WORKING_STATUSES.includes(candidate.status);
+}
+
+/** 07 Q45: a candidate counts toward the limit once a BDE is assigned and its status is working. */
+export function countsTowardLimit(candidate: Pick<Candidate, "status" | "bdeId">): boolean {
+  return candidate.bdeId !== null && isWorkingCandidate(candidate);
 }
 
 /** A9: a PENDING invite past its `expiresAt` is treated as EXPIRED. */
@@ -30,12 +38,12 @@ export interface FirmUsage {
   /** Active BDEs + pending, unexpired BDE invites (A1, 07 Q44). OWNER, MANAGER and VIEWER take no seat. */
   seatsUsed: number;
   seatLimit: number;
-  /** Candidates in ON_BENCH, INTERVIEWING or OFFER (A2). */
-  activeCandidates: number;
+  /** Candidates with a BDE and a working status (07 Q45): what `candidateLimit` counts. */
+  assignedCandidates: number;
   candidateLimit: number;
-  /** usage < limit: the firm may add one more. These drive the block on new additions (A4). */
+  /** usage < limit: the firm may add one more. These drive the block (A4): a seat on a BDE invite, a candidate on assigning a BDE. */
   canAddSeat: boolean;
-  canAddCandidate: boolean;
+  canAssignCandidate: boolean;
   /** usage > limit: shown as the "over limit" flag (e.g. after a downgrade). At the limit is not over. */
   isOverSeatLimit: boolean;
   isOverCandidateLimit: boolean;
@@ -45,22 +53,22 @@ export interface FirmUsage {
 export function deriveFirmUsage(
   /** A Firm (its effective limits, copied from the plan). */
   firm: { id: string; seatLimit: number; candidateLimit: number },
-  data: { users: readonly Pick<User, "firmId" | "isActive" | "role">[]; invites: readonly Invite[]; candidates: readonly Pick<Candidate, "firmId" | "status">[] },
+  data: { users: readonly Pick<User, "firmId" | "isActive" | "role">[]; invites: readonly Invite[]; candidates: readonly Pick<Candidate, "firmId" | "status" | "bdeId">[] },
   now: Date,
 ): FirmUsage {
   const activeUsers = data.users.filter((user) => user.firmId === firm.id && user.isActive && isBde(user)).length;
   const reserved = data.invites.filter((invite) => invite.firmId === firm.id && isBde(invite) && isSeatReservingInvite(invite, now)).length;
   const seatsUsed = activeUsers + reserved;
-  const { activeCandidates } = candidateCapacity(firm, data.candidates);
+  const { assignedCandidates } = candidateCapacity(firm, data.candidates);
   const isOverSeatLimit = seatsUsed > firm.seatLimit;
-  const isOverCandidateLimit = activeCandidates > firm.candidateLimit;
+  const isOverCandidateLimit = assignedCandidates > firm.candidateLimit;
   return {
     seatsUsed,
     seatLimit: firm.seatLimit,
-    activeCandidates,
+    assignedCandidates,
     candidateLimit: firm.candidateLimit,
     canAddSeat: seatsUsed < firm.seatLimit,
-    canAddCandidate: activeCandidates < firm.candidateLimit,
+    canAssignCandidate: assignedCandidates < firm.candidateLimit,
     isOverSeatLimit,
     isOverCandidateLimit,
     isOverLimit: isOverSeatLimit || isOverCandidateLimit,
@@ -68,13 +76,19 @@ export function deriveFirmUsage(
 }
 
 /**
- * Room for one more active candidate (A2, A4), from the firm's candidates alone — what firm pages can
- * read. The same numbers as `deriveFirmUsage`'s candidate half.
+ * Room to assign a BDE to one more candidate (07 Q45, A4), from the firm's candidates alone — what firm pages can read.
+ * The same numbers as `deriveFirmUsage`'s candidate half.
  */
 export function candidateCapacity(
   firm: { id: string; candidateLimit: number },
-  candidates: readonly Pick<Candidate, "firmId" | "status">[],
-): Pick<FirmUsage, "activeCandidates" | "candidateLimit" | "canAddCandidate"> {
-  const activeCandidates = candidates.filter((candidate) => candidate.firmId === firm.id && isActiveCandidate(candidate)).length;
-  return { activeCandidates, candidateLimit: firm.candidateLimit, canAddCandidate: activeCandidates < firm.candidateLimit };
+  candidates: readonly Pick<Candidate, "firmId" | "status" | "bdeId">[],
+): Pick<FirmUsage, "assignedCandidates" | "candidateLimit" | "canAssignCandidate"> {
+  const assignedCandidates = candidates.filter((candidate) => candidate.firmId === firm.id && countsTowardLimit(candidate)).length;
+  return { assignedCandidates, candidateLimit: firm.candidateLimit, canAssignCandidate: assignedCandidates < firm.candidateLimit };
+}
+
+/** A BDE's load against the firm's capacity (07 Q46): their candidates in a working status. At capacity is a warning, never a block. */
+export function deriveBdeLoad(bdeId: string, candidates: readonly Pick<Candidate, "status" | "bdeId">[], bdeCapacity: number): { load: number; capacity: number; isAtCapacity: boolean } {
+  const load = candidates.filter((candidate) => candidate.bdeId === bdeId && isWorkingCandidate(candidate)).length;
+  return { load, capacity: bdeCapacity, isAtCapacity: load >= bdeCapacity };
 }

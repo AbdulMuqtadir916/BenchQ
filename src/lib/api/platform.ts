@@ -26,7 +26,8 @@ export interface CreateFirmInput {
 export type FirmProfileInput = Pick<Firm, "name" | "contactPhone" | "primaryTimezone" | "clientTimezone">;
 export type LimitsInput = Pick<Firm, "seatLimit" | "candidateLimit">;
 export type PlanInput = Pick<Plan, "name" | "seatLimit" | "candidateLimit" | "features">;
-export type CandidateUsageRow = Pick<Candidate, "firmId" | "status">;
+/** What the limit counts (07 Q45): the firm, the status and whether a BDE is assigned. */
+export type CandidateUsageRow = Pick<Candidate, "firmId" | "status" | "bdeId">;
 
 /**
  * The Super Admin endpoints the backend has (backend/api/routes_admin.py, 07 Q38), behind the session switch.
@@ -122,7 +123,7 @@ export const platformApi = {
     deactivate: unavailable<[string], PlatformUser>(),
   },
   candidates: {
-    /** Firm and status of every candidate, for usage counts (A2). Candidates are still mocks, read under the real signed-in principal. */
+    /** Firm, status and BDE of every candidate, for usage counts (07 Q45). Candidates are still mocks, read under the real signed-in principal. */
     usage: async (): Promise<CandidateUsageRow[]> => (await usageMock()).usage(),
   },
 };

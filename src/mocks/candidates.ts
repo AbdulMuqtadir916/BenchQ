@@ -1,7 +1,7 @@
 import { ApiError, arrayOf } from "@/lib/api/client";
 import { canAssignTo } from "@/lib/auth/policy";
 import { isBde, isManager } from "@/lib/auth/roles";
-import { candidateBlockReason } from "@/lib/derive/platform";
+import { assignBlockReason } from "@/lib/derive/platform";
 import { candidateCapacity } from "@/lib/derive/tenancy";
 import { CandidateSchema, CreateCandidateSchema, UpdateCandidateSchema, type Candidate, type CreateCandidate, type UpdateCandidate } from "@/lib/schemas/candidate";
 import type { z } from "zod";
@@ -39,13 +39,14 @@ export const candidatesMock = firmScoped("candidates", {
 
   byId: (firmId: string, id: string): Promise<Candidate> => mockResult(findInFirm(allCandidates, firmId, id, "Candidate")),
 
-  /** A new candidate starts ON_BENCH, so it counts against the plan: at the limit it is refused (A4). */
+  /** A new candidate starts ON_BENCH. Given a BDE, it counts toward the plan, so at the limit it is refused (07 Q45, A4). */
   create: (firmId: string, body: CreateCandidate): Promise<Candidate> => {
     const input = CreateCandidateSchema.parse(body);
     const firm = firms.find((item) => item.id === firmId)!;
-    const capacity = candidateCapacity(firm, allCandidates);
-    if (!capacity.canAddCandidate) throw new ApiError(candidateBlockReason(capacity), "CANDIDATE_LIMIT", 409);
     const assignment = assignmentFor(firmId, input);
+    // 07 Q45: only assigning a BDE counts toward the limit; a manager's queue is never blocked.
+    const capacity = candidateCapacity(firm, allCandidates);
+    if (assignment.bdeId !== null && !capacity.canAssignCandidate) throw new ApiError(assignBlockReason(capacity), "CANDIDATE_LIMIT", 409);
 
     const now = new Date();
     const candidate = CandidateSchema.parse({
@@ -105,7 +106,18 @@ export const candidatesMock = firmScoped("candidates", {
     const sample = resumeParses.find((item) => item.file_name === file.fileName) ?? resumeParses[0]!;
     return mockResult({ parse_id: newId("parse"), file_name: file.fileName, parse: sample.parse });
   },
-}, { create: "candidate.create", update: "candidate.edit", parseResume: "candidate.create" });
+
+  /**
+   * A BDE moved to another manager (07 Q43): every candidate they work follows. The backend does this itself
+   * (PATCH …/members/{id}/manager); the mock's candidates follow here until candidates go live (onboarding 07).
+   */
+  followBde: (firmId: string, bdeId: string, managerId: string): Promise<number> => {
+    const moved = inFirm(allCandidates, firmId).filter((candidate) => candidate.bdeId === bdeId);
+    for (const candidate of moved) Object.assign(candidate, { managerId, updatedAt: new Date().toISOString() });
+    if (moved.length > 0) changed("candidates");
+    return mockResult(moved.length);
+  },
+}, { create: "candidate.create", update: "candidate.edit", parseResume: "candidate.create", followBde: "member.changeManager" });
 
 /** The sample résumés the mock parser knows, for step 1's "Try a sample" (README assumption A1: mocks only). */
 export const SAMPLE_RESUME_NAMES: readonly string[] = resumeParses.map((item) => item.file_name);
