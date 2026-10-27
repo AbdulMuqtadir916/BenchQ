@@ -9,7 +9,7 @@ import type { WizardValues } from "./model";
 
 /**
  * The candidate as they are being filled in (the right-hand card on every step). "Assigned BDE" is the screens'
- * "Owner" row, renamed (07 Q48): OWNER is the firm's owner. It shows a dash until the assign step (module 05).
+ * "Owner" row, renamed (07 Q48): OWNER is the firm's owner. Filled from step 5: the BDE, or "{manager} picks".
  */
 export function SummaryCard({ values, assignedBdeName = null }: { values: WizardValues; assignedBdeName?: string | null }) {
   const name = values.fullName.trim() || "New candidate";

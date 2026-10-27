@@ -5,6 +5,22 @@
 Finishes the flow: step 5, creating the candidate, the done screen, the "Needs a BDE" queue, reassigning, and the BDE's
 "New assignments". Then it switches `/candidates/new` over to the wizard for good.
 
+> **05a built 2026-10-27** (§1–§4, part of §8): step 5, create, the done screen, the route switched over. Notes:
+> - **Step 5 is in `step-assign.tsx` and `bde-option.tsx`** (`AssignOption`, one radio row for a manager or a BDE, and
+>   `onRadioJK` for J/K). Who sees which part comes from the scope (`hasTeamScope`), not the role: a MANAGER is always
+>   the manager (set on entry) and must name a BDE (`validateStep("assign", …, { requiresBde })`).
+> - **The assignment is part of `WizardValues`** (`managerId`, `bdeId`, `handoffNote`); `toCreateCandidate(values)`
+>   takes no second argument. Picking an assignment alone doesn't make the flow dirty.
+> - **An empty flow starts on step 1** (`firstOpenStep`): a reload, or just after creating one, lands on the résumé.
+> - **The mock create writes the Record and the résumé document** (records are now a persisted mock table). The file
+>   name comes from the tab's parse; after a reload the mock can't know it and names the document `resume.pdf`.
+> - **The page is in `(studio)`** (no sidebar, registry `shell: "studio"`). There's no `n` shortcut in the app, so the
+>   entry points are the candidates page button and ⌘K.
+> - **Not run:** `axe` (not installed in the repo). Checked by hand: radios are native, every row has a label, the
+>   error is text, the done screen's check icon has a text label.
+>
+> **05b** (§5–§7) is next: the "Needs a BDE" queue, reassigning, and "New assignments".
+
 Read first: [README](./README.md) §2 (Q41–Q46, Q48, Q50), §7 (A4–A6), [03 §1](./03-scope-and-permissions.md) (`canAssignTo`),
 [02 §1–§2](./02-hierarchy-and-seats.md) (load, limit, messages), `src/components/app/candidate-wizard/` (04).
 

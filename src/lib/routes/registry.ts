@@ -82,7 +82,7 @@ const ROUTE_DEFS = [
   // Workspace
   { id: "dashboard", path: "/[firm]/dashboard", title: "Dashboard", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 1, icon: LayoutDashboard }, shortcut: "d", palette: true },
   { id: "candidates", path: "/[firm]/candidates", title: "Candidates", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 2, icon: Users }, shortcut: "c", palette: true },
-  { id: "candidates.new", path: "/[firm]/candidates/new", title: "New candidate", area: "firm", shell: "app", access: firm(roles("full", "full", "none", "none"), "none") },
+  { id: "candidates.new", path: "/[firm]/candidates/new", title: "New candidate", area: "firm", shell: "studio", access: firm(roles("full", "full", "none", "none"), "none") },
   { id: "candidates.detail", path: "/[firm]/candidates/[id]", title: "Candidate", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")) },
   { id: "jobs", path: "/[firm]/jobs", title: "Jobs", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 3, icon: Briefcase }, shortcut: "j", palette: true },
   { id: "jobs.capture", path: "/[firm]/jobs/capture", title: "Capture job", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "none"), "none") },
