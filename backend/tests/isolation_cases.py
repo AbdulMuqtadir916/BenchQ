@@ -31,7 +31,7 @@ class Case:
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate"}
 
 
 def _new(prefix: str) -> str:
@@ -55,6 +55,14 @@ CASES: dict[str, Case] = {
 
     # ── Candidates (onboarding 06): the firm is in the path ──────────────────
     "POST /api/firms/{firm_id}/candidates/parse-resume": Case(upload=True),
+    "GET /api/firms/{firm_id}/candidates": Case(shows_rows=True),
+    "POST /api/firms/{firm_id}/candidates": Case(body=lambda i: {
+        "full_name": "New candidate", "primary_role": "Data Engineer", "email": "new@example.test", "work_auth": "GC",
+        "manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}": Case(),
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(body=lambda i: {"rate_target": 90}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": Case(
+        body=lambda i: {"manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": Case(),
 

@@ -77,3 +77,25 @@ def require(action: str):
         return principal
 
     return _check
+
+
+def can_assign_to(principal: Principal, candidate_manager_id, target_manager, target_bde) -> bool:
+    """Who may give a candidate this manager and BDE (07 Q41, Q43): the Python mirror of `canAssignTo` in
+    src/lib/auth/policy.ts. `candidate_manager_id` is the candidate's current manager, None for a new candidate;
+    `target_manager` / `target_bde` are the users named (or None), already known to be of this firm.
+
+    Everyone: the manager is an active MANAGER, the BDE (if any) an active BDE who reports to that manager. The OWNER
+    may pick any such target; a MANAGER only themself as the manager, a BDE when creating, and only candidates they
+    already manage. A BDE, a VIEWER and a support view never."""
+    if not can(principal, "candidate.assign") or principal.kind != "firm":
+        return False
+    if target_manager is None or target_manager.role != "MANAGER" or not target_manager.is_active:
+        return False
+    if target_bde is not None and (target_bde.role != "BDE" or not target_bde.is_active
+                                   or target_bde.manager_id != target_manager.id):
+        return False
+    if principal.role == "OWNER":
+        return True
+    if target_manager.id != principal.user_id:
+        return False
+    return target_bde is not None if candidate_manager_id is None else candidate_manager_id == principal.user_id
