@@ -6,8 +6,8 @@ import { STEPS, type StepId } from "./model";
 
 /**
  * The five steps. Steps before the current one are done (a check) and are buttons back to them; later steps are plain
- * text, not clickable. `horizontal` is the header; `vertical` the list under the summary card. Below the `md`
- * breakpoint the header shows "Step 2 of 5 · Basic details" instead of all five.
+ * text, not clickable. `horizontal` is the header; `vertical` the list under the summary card. Below the `xl`
+ * breakpoint the header shows "Step 2 of 5 · Basic details" instead of all five (the list under the card has them).
  */
 export function Stepper({ current, onGo, orientation }: { current: StepId; onGo: (step: StepId) => void; orientation: "horizontal" | "vertical" }) {
   const currentIndex = STEPS.findIndex((step) => step.id === current);
@@ -16,11 +16,11 @@ export function Stepper({ current, onGo, orientation }: { current: StepId; onGo:
   return (
     <nav aria-label={isVertical ? "Steps, summary" : "Steps"}>
       {!isVertical ? (
-        <p className="text-sm text-[var(--color-text-2)] md:hidden">
+        <p className="text-sm text-[var(--color-text-2)] xl:hidden">
           Step {currentIndex + 1} of {STEPS.length} · <span className="text-body-strong text-[var(--color-text)]">{STEPS[currentIndex]!.label}</span>
         </p>
       ) : null}
-      <ol className={cn(isVertical ? "space-y-1" : "hidden items-center gap-2 md:flex")}>
+      <ol className={cn(isVertical ? "space-y-1" : "hidden items-center gap-2 xl:flex")}>
         {STEPS.map((step, index) => {
           const state = index < currentIndex ? "done" : index === currentIndex ? "current" : "todo";
           const marker = (
@@ -37,7 +37,7 @@ export function Stepper({ current, onGo, orientation }: { current: StepId; onGo:
             </span>
           );
           const label = (
-            <span className={cn("text-sm", state === "current" ? "text-[var(--color-primary-subtle-fg)]" : state === "done" ? "text-[var(--color-text)]" : "text-[var(--color-text-3)]")}>
+            <span className={cn("whitespace-nowrap text-sm", state === "current" ? "text-[var(--color-primary-subtle-fg)]" : state === "done" ? "text-[var(--color-text)]" : "text-[var(--color-text-3)]")}>
               {step.label}
               <span className="sr-only">{state === "done" ? " (done)" : state === "current" ? " (current step)" : ""}</span>
             </span>

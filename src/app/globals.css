@@ -262,6 +262,8 @@ button:disabled { cursor: not-allowed; }
 .tabular { font-variant-numeric: tabular-nums; }
 :root[data-theme="dark"] .logo-wordmark { filter: brightness(0) invert(1); }
 :where(a, button, summary, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
+/* A heading that receives focus only programmatically (to announce a new step): no ring, it is not a control. */
+.bq-focus-target:focus-visible { outline: none; }
 .text-display { font-size: 28px; line-height: 34px; font-weight: 600; letter-spacing: -0.035em; }
 .text-h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.03em; }
 .text-h2 { font-size: 17px; line-height: 24px; font-weight: 600; letter-spacing: -0.02em; }

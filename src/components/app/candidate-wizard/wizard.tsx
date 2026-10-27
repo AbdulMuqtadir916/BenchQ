@@ -74,6 +74,8 @@ export function CandidateWizard() {
         event.preventDefault();
         goNext();
       } else if (event.key === "Escape") {
+        // Without this, the browser's own Escape handling runs after us and closes the dialog we just opened.
+        event.preventDefault();
         requestClose();
       }
     }
@@ -91,7 +93,7 @@ export function CandidateWizard() {
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-subtle-fg)]"><UserPlus size={16} aria-hidden /></span>
           <h1 className="text-h3 text-[var(--color-text)]">New candidate</h1>
         </div>
-        <div className="order-3 w-full md:order-none md:w-auto md:flex-1 md:justify-center lg:flex">
+        <div className="order-3 w-full sm:order-none sm:w-auto sm:flex-1 xl:flex xl:justify-center">
           <Stepper current={step} onGo={wizard.goTo} orientation="horizontal" />
         </div>
         <Button variant="ghost" size="icon" className="ml-auto" onClick={requestClose} aria-label="Close new candidate"><X size={16} aria-hidden /></Button>
@@ -99,7 +101,7 @@ export function CandidateWizard() {
 
       <div className="grid flex-1 lg:grid-cols-[minmax(0,1fr)_--spacing(80)]">
         <section ref={mainRef} className="mx-auto w-full max-w-3xl px-4 py-6 md:px-8 md:py-8" aria-labelledby="cw-step-heading">
-          <h2 id="cw-step-heading" ref={headingRef} tabIndex={-1} className="text-h2 text-[var(--color-text)] outline-none">{copy.title}</h2>
+          <h2 id="cw-step-heading" ref={headingRef} tabIndex={-1} className="bq-focus-target text-h2 text-[var(--color-text)]">{copy.title}</h2>
           <p className="mt-1 mb-6 text-body text-[var(--color-text-2)]">{copy.description}</p>
           {step === "resume" ? <StepResume wizard={wizard} /> : null}
           {step === "basic" ? <StepBasic wizard={wizard} errors={errors} /> : null}

@@ -2,6 +2,19 @@
 
 **Owner:** — · **Depends on:** 01 · **Branch:** `feat/onboarding-04-wizard`
 
+> **Built 2026-10-27** behind `NEXT_PUBLIC_CANDIDATE_WIZARD`, with these notes for module 05:
+> - **The step is changed with `history.replaceState`, not `router.replace`.** Next keys a page by its search params,
+>   so a router navigation remounts the page and loses everything entered (found in the browser check).
+> - **The parser call is `candidatesMock.parseResume`** (a write that needs `candidate.create`), so the existing
+>   write-authorization and isolation tests cover it. The adapter is `src/lib/api/resume-parse.ts`.
+> - **The pure logic is in `model.ts`:** values, `applyDraft`, `validateStep`, `firstOpenStep` and
+>   `toCreateCandidate`, which module 05's create calls with the assignment. A3 uses `NEEDS_SPONSOR` from
+>   `work-auth-chip.tsx`.
+> - **Step 5 is a placeholder.** Until module 05, the pop-up version of `/candidates/new` reloads into the full page
+>   when the flag is on.
+> - **New classes in `globals.css`, built from tokens:** `.bq-choice`, `.bq-dropzone`, `.bq-focus-target`, and focus
+>   rings for compound inputs.
+
 The new "New candidate" flow up to the assign step: the frame (stepper, summary card, footer), the résumé step with the
 parser, and steps 2–4. Module 05 adds step 5, the done screen, and swaps the route over. Until then the wizard is
 behind a flag, so `main` never ships a half flow.

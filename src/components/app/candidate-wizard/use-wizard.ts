@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { ResumeDraft } from "@/lib/schemas/resume-draft";
 import { applyDraft, DRAFTABLE, EMPTY_VALUES, firstOpenStep, isDirty, STEPS, StepIdSchema, type DraftableField, type StepId, type WizardValues } from "./model";
 
@@ -47,15 +47,16 @@ function reducer(state: State, action: Action): State {
 
 export function useWizard() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
-  const router = useRouter();
   const pathname = usePathname();
   const requested = StepIdSchema.catch("resume").parse(useSearchParams().get("step") ?? "resume");
   // A reload starts empty, so a step past an unfinished one opens that one instead.
   const step = firstOpenStep(requested, state.values);
 
+  // The native history API, not router.replace: Next keys a page by its search params, so a router navigation would
+  // remount the page and lose everything entered. Next keeps useSearchParams in step with replaceState.
   const goTo = useCallback((next: StepId) => {
-    router.replace(next === "resume" ? pathname : `${pathname}?step=${next}`, { scroll: false });
-  }, [router, pathname]);
+    window.history.replaceState(null, "", next === "resume" ? pathname : `${pathname}?step=${next}`);
+  }, [pathname]);
 
   useEffect(() => {
     if (step !== requested) goTo(step);
