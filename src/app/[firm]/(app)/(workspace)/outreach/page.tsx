@@ -43,9 +43,9 @@ export default function OutreachPage() {
 
   const threads = useMemo(() => {
     let apps = applicationsQuery.data ?? [];
-    apps = scopeApplications(principal, apps);
+    apps = scopeApplications(principal, apps, candidatesQuery.data ?? []);
     return apps.filter((a) => ["APPLIED", "RESPONSE", "SCREENING"].includes(a.status)).slice(0, 20);
-  }, [applicationsQuery.data, principal]);
+  }, [applicationsQuery.data, candidatesQuery.data, principal]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState(TEMPLATES[0]!.id);

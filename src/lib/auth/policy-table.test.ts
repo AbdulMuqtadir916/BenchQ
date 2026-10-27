@@ -20,7 +20,7 @@ const PRINCIPALS: Record<string, Principal> = {
 //                                   OWNER MANAGER BDE VIEWER ADMIN SUPPORT
 const TABLE: ReadonlyArray<readonly [Action, string]> = [
   // firm work
-  ["candidate.create", "Y Y Y - - -"],
+  ["candidate.create", "Y Y - - - -"],   // 07 Q41: a BDE no longer adds candidates
   ["candidate.edit", "Y Y Y - - -"],
   ["job.capture", "Y Y Y - - -"],
   ["job.apply", "Y Y Y - - -"],
@@ -33,7 +33,9 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["member.remove", "Y - - - - -"],
   ["member.changeRole", "Y - - - - -"],
   ["member.deactivate", "Y - - - - -"],
+  ["member.changeManager", "Y - - - - -"],   // 07 Q40
   ["candidate.assign", "Y Y - - - -"],
+  ["firmSettings.edit", "Y - - - - -"],      // 07 Q46
   ["team.view", "Y Y - - - Y"],
   // platform (07 §2.3)
   ["firm.create", "- - - - Y Y"],

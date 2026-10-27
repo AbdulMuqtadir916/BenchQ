@@ -26,7 +26,11 @@ import type { Principal } from "@/lib/schemas/tenancy";
  * read from here. Adding a page means adding it here — registry.test.ts fails otherwise.
  */
 
-export type Access = "full" | "assigned" | "own" | "read" | "none";
+/**
+ * `team` (07 Q47): a MANAGER opens the page and sees their team's records only — the candidates they manage and their
+ * BDEs' work; a record outside it renders as not-found.
+ */
+export type Access = "full" | "team" | "assigned" | "own" | "read" | "none";
 export type RoleAccess = Record<FirmRole, Access>;
 
 /**
@@ -77,31 +81,29 @@ const ROUTE_DEFS = [
 
   // Workspace
   { id: "dashboard", path: "/[firm]/dashboard", title: "Dashboard", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 1, icon: LayoutDashboard }, shortcut: "d", palette: true },
-  { id: "candidates", path: "/[firm]/candidates", title: "Candidates", area: "firm", shell: "app", access: firm(roles("full", "full", "assigned", "read")), nav: { section: "workspace", order: 2, icon: Users }, shortcut: "c", palette: true },
-  { id: "candidates.new", path: "/[firm]/candidates/new", title: "New candidate", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "none"), "none") },
-  { id: "candidates.detail", path: "/[firm]/candidates/[id]", title: "Candidate", area: "firm", shell: "app", access: firm(roles("full", "full", "assigned", "read")) },
+  { id: "candidates", path: "/[firm]/candidates", title: "Candidates", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 2, icon: Users }, shortcut: "c", palette: true },
+  { id: "candidates.new", path: "/[firm]/candidates/new", title: "New candidate", area: "firm", shell: "app", access: firm(roles("full", "full", "none", "none"), "none") },
+  { id: "candidates.detail", path: "/[firm]/candidates/[id]", title: "Candidate", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")) },
   { id: "jobs", path: "/[firm]/jobs", title: "Jobs", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 3, icon: Briefcase }, shortcut: "j", palette: true },
   { id: "jobs.capture", path: "/[firm]/jobs/capture", title: "Capture job", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "none"), "none") },
   { id: "jobs.detail", path: "/[firm]/jobs/[id]", title: "Job", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")) },
-  { id: "applications", path: "/[firm]/applications", title: "Applications", area: "firm", shell: "app", access: firm(roles("full", "full", "own", "read")), nav: { section: "workspace", order: 4, icon: Send }, shortcut: "a", palette: true },
-  { id: "applications.detail", path: "/[firm]/applications/[id]", title: "Application", area: "firm", shell: "app", access: firm(roles("full", "full", "own", "read")) },
-  { id: "resumes", path: "/[firm]/resumes", title: "Resume Builder", area: "firm", shell: "app", access: firm(roles("full", "full", "assigned", "read")), nav: { section: "workspace", order: 5, icon: FileText }, palette: true },
-  { id: "resumes.studio", path: "/[firm]/resumes/[id]", title: "Resume", area: "firm", shell: "studio", access: firm(roles("full", "full", "assigned", "read")) },
-  { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "full", "own", "read")), nav: { section: "workspace", order: 6, icon: Mail }, palette: true },
-  { id: "followups", path: "/[firm]/followups", title: "Follow-ups", area: "firm", shell: "app", access: firm(roles("full", "full", "own", "none")), nav: { section: "workspace", order: 7, icon: Bell }, shortcut: "f", palette: true },
-  { id: "analytics", path: "/[firm]/analytics", title: "Analytics", area: "firm", shell: "app", access: firm(roles("full", "full", "none", "read")), nav: { section: "workspace", order: 8, icon: BarChart3 }, palette: true },
-  { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "full", "own", "read")), nav: { section: "workspace", order: 9, icon: ScrollText }, palette: true },
+  { id: "applications", path: "/[firm]/applications", title: "Applications", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 4, icon: Send }, shortcut: "a", palette: true },
+  { id: "applications.detail", path: "/[firm]/applications/[id]", title: "Application", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")) },
+  { id: "resumes", path: "/[firm]/resumes", title: "Resume Builder", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 5, icon: FileText }, palette: true },
+  { id: "resumes.studio", path: "/[firm]/resumes/[id]", title: "Resume", area: "firm", shell: "studio", access: firm(roles("full", "team", "assigned", "read")) },
+  { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 6, icon: Mail }, palette: true },
+  { id: "followups", path: "/[firm]/followups", title: "Follow-ups", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "none")), nav: { section: "workspace", order: 7, icon: Bell }, shortcut: "f", palette: true },
+  { id: "analytics", path: "/[firm]/analytics", title: "Analytics", area: "firm", shell: "app", access: firm(roles("full", "team", "none", "read")), nav: { section: "workspace", order: 8, icon: BarChart3 }, palette: true },
+  { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 9, icon: ScrollText }, palette: true },
   { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", access: firm(roles("full", "full", "full", "none"), "none") },
 
   // Preferences
   { id: "design-system", path: "/dev/design-system", title: "Design system", area: "dev", shell: "app", access: PUBLIC, nav: { section: "preferences", order: 1, icon: SwatchBook }, devOnly: true },
   { id: "settings", path: "/[firm]/settings", title: "Settings", area: "firm", shell: "app", access: firm(everyone("full")), nav: { section: "preferences", order: 2, icon: Settings }, palette: true },
   { id: "settings.firm", path: "/[firm]/settings/firm", title: "Firm", area: "firm", shell: "app", access: firm(roles("full", "none", "none", "none")), nav: { section: "settings", order: 1, icon: Building2 }, palette: true },
-  // TODO(Phase C, docs/07 Q15): OWNER manages the team (invite / remove / deactivate / change role); MANAGER may open this
-  // page but it is read-only for them, plus assigning candidates to BDEs. `full` here only means "openable": the per-control
-  // rules belong in can() (member.invite, member.remove, member.changeRole, member.deactivate, candidate.assign, team.view).
-  // The page has no management controls today, so there is nothing to hide yet.
-  { id: "settings.team", path: "/[firm]/settings/team", title: "Team", area: "firm", shell: "app", access: firm(roles("full", "full", "none", "none")), nav: { section: "settings", order: 2, icon: Users }, palette: true },
+  // docs/07 Q15, Q47: OWNER manages the team; a MANAGER opens the page read-only and sees their own team (`team`), plus
+  // assigning candidates to BDEs. The per-control rules are in can() (member.*, candidate.assign, team.view).
+  { id: "settings.team", path: "/[firm]/settings/team", title: "Team", area: "firm", shell: "app", access: firm(roles("full", "team", "none", "none")), nav: { section: "settings", order: 2, icon: Users }, palette: true },
   { id: "settings.templates", path: "/[firm]/settings/templates", title: "Templates", area: "firm", shell: "app", access: firm(roles("full", "full", "none", "none")), nav: { section: "settings", order: 3, icon: FileText }, palette: true },
   { id: "settings.preferences", path: "/[firm]/settings/preferences", title: "Preferences", area: "firm", shell: "app", access: firm(everyone("full"), "none"), nav: { section: "settings", order: 4, icon: SlidersHorizontal }, palette: true },
 

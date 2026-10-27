@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { useLedger } from "@/lib/hooks/use-ledger";
-import { hasOwnScope, scopeLedger } from "@/lib/auth/permissions";
+import { useCandidates } from "@/lib/hooks/use-candidates";
+import { useTeam } from "@/lib/hooks/use-team";
+import { hasOwnScope, hasTeamScope, scopeLedger } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { PageHeader } from "@/components/app/page-header";
 import { DataTable } from "@/components/app/data-table";
@@ -15,13 +17,20 @@ import { ClaimChip } from "@/components/app/claim-chip";
 export default function LedgerPage() {
   const principal = useSignedInPrincipal();
   const ledgerQuery = useLedger({ limit: 100 });
+  // A MANAGER's ledger is their team's (07 Q47): who is on it comes from the team and the candidates they manage.
+  const isTeamScope = hasTeamScope(principal);
+  const teamQuery = useTeam();
+  const candidatesQuery = useCandidates();
   const [actorFilter, setActorFilter] = useState<"ALL" | LedgerEntry["actorType"]>("ALL");
 
   const rows = useMemo(() => {
     // The backend already scopes a BDE's ledger to their own entries (07 §2.2); the page applies the same rule.
-    const entries = scopeLedger(principal, ledgerQuery.data ?? []);
+    const entries = scopeLedger(principal, ledgerQuery.data ?? [], { users: teamQuery.data ?? [], candidates: candidatesQuery.data ?? [] });
     return entries.filter((e) => actorFilter === "ALL" || e.actorType === actorFilter);
-  }, [ledgerQuery.data, actorFilter, principal]);
+  }, [ledgerQuery.data, teamQuery.data, candidatesQuery.data, actorFilter, principal]);
+  const contextQueries = isTeamScope ? [teamQuery, candidatesQuery] : [];
+  const isLoading = ledgerQuery.isLoading || contextQueries.some((query) => query.isLoading);
+  const loadError = (ledgerQuery.error ?? contextQueries.find((query) => query.error)?.error ?? null) as Error | null;
 
   const columns = useMemo<ColumnDef<LedgerEntry, unknown>[]>(
     () => [
@@ -73,16 +82,16 @@ export default function LedgerPage() {
 
   return (
     <div className="bq-page">
-      <PageHeader title="Ledger" subtitle={hasOwnScope(principal) ? "Your actions in the audit trail. Append-only, immutable." : "Append-only audit trail. Every AI action, every state change, immutable."} />
+      <PageHeader title="Ledger" subtitle={hasOwnScope(principal) ? "Your actions in the audit trail. Append-only, immutable." : isTeamScope ? "Your team's actions and candidates in the audit trail. Append-only, immutable." : "Append-only audit trail. Every AI action, every state change, immutable."} />
 
       <div className="mt-4">
         <DataTable
           columns={columns}
           data={rows}
           getRowId={(e) => e.id}
-          isLoading={ledgerQuery.isLoading}
-          error={ledgerQuery.error as Error | null}
-          onRetry={() => void ledgerQuery.refetch()}
+          isLoading={isLoading}
+          error={loadError}
+          onRetry={() => { void ledgerQuery.refetch(); for (const query of contextQueries) void query.refetch(); }}
           isRowSelectable={false}
           searchPlaceholder="Search the ledger…"
           storageKey="ledger-list"
