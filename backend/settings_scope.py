@@ -77,6 +77,7 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "cover_letter_llm_api_key": (AI, "AI presets"),
     "cover_letter_llm_effort": (AI, "AI presets"),
     "cover_letter_prompt": (AI, "AI presets"),
+    "resume_parse_prompt": (AI, "AI presets"),
     "cover_letter_voice_presets": (AI, "AI presets"),
     "email_llm_enabled": (AI, "AI presets"),
     "email_llm_provider": (AI, "AI presets"),
