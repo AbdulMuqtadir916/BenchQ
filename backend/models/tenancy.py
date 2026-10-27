@@ -32,6 +32,7 @@ LEDGER_ACTIONS = (
     "CREATE", "UPDATE", "DELETE", "STATE_CHANGE", "AI_GENERATE", "AI_BLOCK", "AI_OVERRIDE", "EXPORT", "LOGIN",
     "ADMIN_ACCESS", "ADMIN_ACCESS_END", "FIRM_CREATED", "FIRM_SUSPENDED", "FIRM_REACTIVATED", "PLAN_CHANGED",
     "INVITE_SENT", "INVITE_ACCEPTED", "INVITE_REVOKED",
+    "ASSIGN",   # a candidate's manager or BDE set or changed (docs/02 §3.4, 07 Q43)
 )
 CLAIM_STATES = ("VERIFIED", "UNVERIFIED", "CONTRADICTED")
 FIRM_JOB_ORIGINS = ("SCRAPED", "CAPTURED")
@@ -105,11 +106,14 @@ class Firm(Base):
     client_timezone = Column(String, nullable=False, server_default=text("'America/New_York'"))
     truth_guard_mode = Column(String, nullable=False, server_default=text("'BALANCED'"))
     application_expiry_days = Column(Integer, nullable=False, server_default=text("30"))
+    # 07 Q46: a BDE's comfortable load. A warning when assigning, never a block; the OWNER edits it.
+    bde_capacity = Column(Integer, nullable=False, server_default=text("10"))
     created_at = _created_at()
     updated_at = _updated_at()
 
     __table_args__ = (
         CheckConstraint(f"slug ~ '{SLUG_PATTERN}'", name="ck_firms_slug_format"),
+        CheckConstraint("bde_capacity BETWEEN 1 AND 50", name="ck_firms_bde_capacity_range"),
         CheckConstraint(_in("status", FIRM_STATUSES), name="ck_firms_status"),
         CheckConstraint(_in("truth_guard_mode", TRUTH_GUARD_MODES), name="ck_firms_truth_guard_mode"),
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_firms_limits_not_negative"),
@@ -124,6 +128,9 @@ class User(Base):
     id = _pk()
     firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
     role = Column(String, nullable=False)
+    # 07 Q40: the MANAGER this BDE reports to. Only a BDE has one; a BDE from before the hierarchy may have none
+    # until the OWNER sets it (Q51), so "a BDE has a manager" is enforced in code, not here.
+    manager_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True, index=True)
     name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     password_hash = Column(String, nullable=False)       # Argon2id (Q37)
@@ -136,6 +143,7 @@ class User(Base):
     __table_args__ = (
         CheckConstraint(_in("role", FIRM_ROLES), name="ck_users_role"),
         CheckConstraint("email = lower(email)", name="ck_users_email_lowercase"),
+        CheckConstraint("role = 'BDE' OR manager_id IS NULL", name="ck_users_only_bde_has_manager"),
         # At most one active OWNER per firm (A10); an ONBOARDING firm has none until its owner accepts.
         Index("uq_users_one_active_owner_per_firm", "firm_id", unique=True,
               postgresql_where=text("role = 'OWNER' AND is_active")),
@@ -169,6 +177,7 @@ class Invite(Base):
     email = Column(String, nullable=False)
     invitee_name = Column(String, nullable=True)          # 07 Q31
     role = Column(String, nullable=False)
+    manager_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True)   # 07 Q40: a BDE invite's manager
     invited_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True)
     invited_by_platform_user_id = Column(UUID(as_uuid=True), _restrict("platform_users.id"), nullable=True)
     status = Column(String, nullable=False, server_default=text("'PENDING'"))
@@ -183,6 +192,7 @@ class Invite(Base):
         CheckConstraint(_in("role", INVITE_ROLES), name="ck_invites_role"),
         CheckConstraint(_in("status", INVITE_STATUSES), name="ck_invites_status"),
         CheckConstraint("email = lower(email)", name="ck_invites_email_lowercase"),
+        CheckConstraint("role = 'BDE' OR manager_id IS NULL", name="ck_invites_only_bde_has_manager"),
         CheckConstraint(f"token_hash ~ '{SHA256_HEX}'", name="ck_invites_token_hash_sha256"),
         # A11: firm_id is null exactly when the role is PLATFORM_ADMIN.
         CheckConstraint("(firm_id IS NULL) = (role = 'PLATFORM_ADMIN')", name="ck_invites_platform_iff_no_firm"),
@@ -265,6 +275,7 @@ class LedgerEntry(Base):
     entity_label = Column(String, nullable=False)
     action = Column(String, nullable=False)
     summary = Column(Text, nullable=False)
+    note = Column(Text, nullable=True)                    # the handoff note on an ASSIGN entry (docs/02 §3.4)
     model_id = Column(String, nullable=True)
     prompt_version = Column(String, nullable=True)
     evidence_ids = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))

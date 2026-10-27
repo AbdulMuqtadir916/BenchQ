@@ -194,6 +194,7 @@ def invite_json(invite: Invite, now: datetime | None = None) -> dict:
     return {
         "id": str(invite.id), "firm_id": str(invite.firm_id) if invite.firm_id else None, "email": invite.email,
         "invitee_name": invite.invitee_name, "role": invite.role,
+        "manager_id": str(invite.manager_id) if invite.manager_id else None,
         "invited_by_user_id": str(invite.invited_by_user_id or invite.invited_by_platform_user_id),
         "status": effective_status(invite, now or utcnow()), "expires_at": invite.expires_at.isoformat(),
         "created_at": invite.created_at.isoformat(),

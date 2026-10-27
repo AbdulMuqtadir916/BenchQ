@@ -75,7 +75,7 @@ filled in; its "Owner" row becomes **"Assigned BDE"** (Q48).
 | 03 | [Scope and permissions](./03-scope-and-permissions.md) | — | 01 | 02, 04, 06 |
 | 04 | [Wizard, steps 1–4](./04-wizard-steps.md) | — | 01 | 02, 03, 06 |
 | 05 | [Assign, done screen and reassigning](./05-assign-and-reassign.md) | — | 02, 03, 04 | 06 |
-| 06 | [Backend: candidates, hierarchy, parser](./06-backend.md) | Zuhair | 01 (docs part); PRs 2 and 4 wait for 03 | 02–05 |
+| 06 | [Backend: candidates, hierarchy, parser](./06-backend.md) | Abdul (from Zuhair, 2026-10-27) | 01 (docs part); PRs 2 and 4 wait for 03 | 02–05 |
 | 07 | [Go live: adapters and mappers](./07-go-live.md) | — | 05, 06 | — |
 
 ```

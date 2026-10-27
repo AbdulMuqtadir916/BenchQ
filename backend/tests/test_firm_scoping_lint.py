@@ -46,7 +46,8 @@ def _firm_owned_models() -> set[str]:
     for mapper in Base.registry.mappers:
         column = mapper.columns.get("firm_id")
         if column is not None and not column.nullable and mapper.class_.__module__ in (
-                "backend.models.db", "backend.models.tenancy") and mapper.class_.__tablename__ in _F2B_TABLES:
+                "backend.models.db", "backend.models.tenancy", "backend.models.candidates") \
+                and mapper.class_.__tablename__ in _F2B_TABLES:
             names.add(mapper.class_.__name__)
     return names
 
@@ -54,7 +55,9 @@ def _firm_owned_models() -> set[str]:
 # The firm-owned tables F2b created or filled (migration 0005). The tenancy tables (users, invites, ...) carry a
 # firm_id too, but their routes check membership themselves (routes_firms, routes_team).
 _F2B_TABLES = {"searches", "applications", "interviews", "resumes", "cover_letters", "tracer_links",
-               "tracer_click_events", "firm_jobs"}
+               "tracer_click_events", "firm_jobs",
+               # The Candidates track (docs/candidate-onboarding/06-backend.md, migration 0006).
+               "candidates", "resume_parses"}
 # Firm-owned although `firm_id` may be null: a ledger entry with no firm is a platform-only event (A13), and a
 # firm route must still read only its own firm's entries.
 _NULLABLE_FIRM_OWNED = {"LedgerEntry"}
@@ -93,7 +96,7 @@ def _violations(path: Path, models: set[str], allowed: dict = ALLOWED) -> list[s
 
 def test_the_firm_owned_models_are_known():
     assert _firm_owned_models() == {"Search", "Application", "Interview", "Resume", "CoverLetter", "TracerLink",
-                                    "TracerClickEvent", "FirmJob", "LedgerEntry"}
+                                    "TracerClickEvent", "FirmJob", "LedgerEntry", "Candidate", "ResumeParse"}
 
 
 def test_routes_read_firm_rows_only_through_scoped():

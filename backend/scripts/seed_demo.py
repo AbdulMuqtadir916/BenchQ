@@ -27,6 +27,7 @@ from backend.auth.passwords import hash_password
 from backend.auth.tokens import hash_token, new_token
 from backend.config import IS_PRODUCTION
 from backend.models.db import SessionLocal, utcnow
+from backend.models.candidates import Candidate, ResumeParse
 from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, Session, User
 
 DEMO_PASSWORD = "benchq-demo-2026"                                     # docs/03 §3.2
@@ -74,12 +75,34 @@ def reset(db) -> None:
         .delete(synchronize_session=False)
     db.query(LedgerEntry).filter(or_(LedgerEntry.firm_id.in_(firm_ids), LedgerEntry.actor_user_id.in_(user_ids))) \
         .delete(synchronize_session=False)
+    db.query(ResumeParse).filter(ResumeParse.firm_id.in_(firm_ids)).delete(synchronize_session=False)
+    db.query(Candidate).filter(Candidate.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Invite).filter(or_(Invite.id.in_(fixture_ids["invites"]), Invite.firm_id.in_(firm_ids))) \
         .delete(synchronize_session=False)
+    # A BDE points at their manager (ON DELETE RESTRICT, checked row by row), so the links go before the users.
+    db.query(User).filter(User.firm_id.in_(firm_ids)).update({User.manager_id: None}, synchronize_session=False)
     db.query(User).filter(User.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(PlatformUser).filter(PlatformUser.id.in_(fixture_ids["platform_users"])).delete(synchronize_session=False)
     db.query(Firm).filter(Firm.id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Plan).filter(Plan.id.in_(fixture_ids["plans"])).delete(synchronize_session=False)
+    db.flush()
+
+
+def _sync_hierarchy(db, firm_data: dict) -> None:
+    """Demo rows seeded before the hierarchy (07 Q40) get the fixtures' managers and BDE capacity. Only empty or
+    default values are filled, so a manager changed in the app since stays as it is."""
+    for f in firm_data["firms"]:
+        firm = db.get(Firm, demo_id(f["id"]))
+        if firm is not None and firm.bde_capacity == 10 and f.get("bdeCapacity", 10) != 10:
+            firm.bde_capacity = f["bdeCapacity"]
+    for u in firm_data["users"]:
+        user = db.get(User, demo_id(u["id"]))
+        if user is not None and user.manager_id is None and u.get("managerId"):
+            user.manager_id = demo_id(u["managerId"])
+    for i in _load("invites.json"):
+        invite = db.get(Invite, demo_id(i["id"]))
+        if invite is not None and invite.manager_id is None and i.get("managerId"):
+            invite.manager_id = demo_id(i["managerId"])
     db.flush()
 
 
@@ -111,12 +134,16 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             plan_id=demo_id(f["planId"]), seat_limit=f["seatLimit"], candidate_limit=f["candidateLimit"],
             contact_phone=f["contactPhone"], logo_url=f["logoUrl"], primary_timezone=f["primaryTimezone"],
             client_timezone=f["clientTimezone"], truth_guard_mode=f["truthGuardMode"],
-            application_expiry_days=f["applicationExpiryDays"], created_at=_when(f["createdAt"]))
-    for u in firm_data["users"]:
+            application_expiry_days=f["applicationExpiryDays"], bde_capacity=f.get("bdeCapacity", 10),
+            created_at=_when(f["createdAt"]))
+    # Managers before the BDEs who point at them (07 Q40).
+    for u in sorted(firm_data["users"], key=lambda user: user.get("managerId") is not None):
         added["users"] += _add_missing(
             db, User, demo_id(u["id"]), firm_id=demo_id(u["firmId"]), role=u["role"], name=u["name"],
+            manager_id=demo_id(u["managerId"]) if u.get("managerId") else None,
             email=u["email"].lower(), password_hash=password_hash, avatar_url=u["avatarUrl"], is_active=u["isActive"],
             last_active_at=_when(u["lastActiveAt"]))
+    _sync_hierarchy(db, firm_data)
     for a in _load("platform-users.json"):
         added["platform_users"] += _add_missing(
             db, PlatformUser, demo_id(a["id"]), name=a["name"], email=a["email"].lower(),
@@ -131,6 +158,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             email=i["email"].lower(), invitee_name=i["inviteeName"], role=i["role"], status=i["status"],
             invited_by_user_id=None if by_platform else demo_id(i["invitedByUserId"]),
             invited_by_platform_user_id=demo_id(i["invitedByUserId"]) if by_platform else None,
+            manager_id=demo_id(i["managerId"]) if i.get("managerId") else None,
             token_hash=hash_token(new_token()), expires_at=_shift(i["expiresAt"], now), created_at=created,
             accepted_at=created + timedelta(hours=1) if i["status"] == "ACCEPTED" else None,
             revoked_at=created + timedelta(hours=1) if i["status"] == "REVOKED" else None)
