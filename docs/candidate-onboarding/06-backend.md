@@ -41,6 +41,10 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 > a candidate that had none is blocked at the candidate limit, with the frontend's `assignBlockReason`. Create keeps
 > the résumé parse (once; expired or reused is 404) and writes `CREATE` and `ASSIGN` with the handoff note. Skills
 > and the summary are stored UNVERIFIED.
+>
+> **PR 5 built:** the demo seed loads `src/mocks/data/candidates.json` (same ids through `demo_id`; persona and answer
+> bank in snake_case; the frontend's `demo-ids.json` now maps candidates too). The F7 isolation matrix covers every new
+> route: each test firm has a MANAGER, a BDE under them and a candidate (cases added in PRs 2–4).
 
 ## 1. PRs, in order
 
