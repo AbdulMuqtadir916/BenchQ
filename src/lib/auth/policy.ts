@@ -204,16 +204,20 @@ export interface TeamContext {
 }
 
 /**
- * The ledger a principal sees (07 §2.2 `ledger`): a BDE, only the entries they made; a MANAGER, the entries their
- * team made and every entry about a candidate they manage; everyone else the firm's.
+ * The ledger a principal sees (07 §2.2 `ledger`): a BDE, the entries they made and the ASSIGN entries about the
+ * candidates they work now (07 Q52: who assigned them, and the note); a MANAGER, the entries their team made and every
+ * entry about a candidate they manage; everyone else the firm's. The backend enforces the same (routes_ledger.py).
  */
-export function scopeLedger<T extends { actorUserId: string | null; entityType: string; entityId: string }>(
+export function scopeLedger<T extends { actorUserId: string | null; entityType: string; entityId: string; action: string }>(
   principal: Principal,
   entries: readonly T[],
   context: TeamContext,
 ): T[] {
   const scope = scopeOf(principal);
-  if (scope.kind === "own") return entries.filter((entry) => entry.actorUserId === scope.userId);
+  if (scope.kind === "own") {
+    const theirs = new Set(context.candidates.filter((candidate) => candidate.bdeId === scope.userId).map((candidate) => candidate.id));
+    return entries.filter((entry) => entry.actorUserId === scope.userId || (entry.action === "ASSIGN" && entry.entityType === "candidate" && theirs.has(entry.entityId)));
+  }
   if (scope.kind === "team") {
     const team = teamMemberIds(scope.managerId, context.users, context.candidates);
     const managed = new Set(scopeCandidates(principal, context.candidates).map((candidate) => candidate.id));
