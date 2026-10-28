@@ -65,7 +65,10 @@ describe("validateStep", () => {
 
 describe("the flow", () => {
   it("a reload lands on the first step that can't be passed yet", () => {
-    expect(firstOpenStep("preferences", EMPTY_VALUES)).toBe("resume");
+    expect(firstOpenStep("preferences", EMPTY_VALUES, false)).toBe("resume");
+    // "Skip, enter manually": started, still empty, so the first step that can't be passed.
+    expect(firstOpenStep("basic", EMPTY_VALUES, true)).toBe("basic");
+    expect(firstOpenStep("preferences", EMPTY_VALUES)).toBe("basic");
     expect(firstOpenStep("preferences", { ...EMPTY_VALUES, city: "Irving" })).toBe("basic");
     expect(firstOpenStep("preferences", { ...valid, workAuth: null })).toBe("work");
     expect(firstOpenStep("preferences", valid)).toBe("preferences");

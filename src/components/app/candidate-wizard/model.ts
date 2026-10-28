@@ -143,10 +143,12 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
   return errors;
 }
 
-/** The first step that can't be passed yet, at or before `requested` (a reload starts empty: no drafts, Q48). */
-export function firstOpenStep(requested: StepId, values: WizardValues): StepId {
-  // Nothing entered (a reload, or just after creating one): start where the flow starts.
-  if (!isDirty(values)) return "resume";
+/**
+ * The first step that can't be passed yet, at or before `requested` (a reload starts empty: no drafts, Q48). A flow
+ * not yet started (a reload, or just after creating one) starts on the résumé; "Skip, enter manually" starts it empty.
+ */
+export function firstOpenStep(requested: StepId, values: WizardValues, hasStarted = true): StepId {
+  if (!hasStarted && !isDirty(values)) return "resume";
   for (const step of STEPS) {
     if (step.id === requested) return requested;
     if (Object.keys(validateStep(step.id, values)).length > 0) return step.id;

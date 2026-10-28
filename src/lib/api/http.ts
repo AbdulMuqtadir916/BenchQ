@@ -67,16 +67,18 @@ async function toApiError(response: Response): Promise<ApiError> {
 
 async function request<T>(target: HttpTarget, method: string, path: string, schema: ZodType<T>, options: RequestOptions = {}): Promise<T> {
   const hasBody = options.body !== undefined;
+  // A form (a file upload) sets its own multipart Content-Type, boundary included.
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
   let response: Response;
   try {
-    const headers = { ...(hasBody ? { "Content-Type": "application/json" } : {}), ...target.headers };
+    const headers = { ...(hasBody && !isForm ? { "Content-Type": "application/json" } : {}), ...target.headers };
     response = await fetch(`${target.baseUrl ?? ""}${buildUrl(path, options.query)}`, {
       method,
       credentials: "include",
       // A server read is never cached: it is somebody's session.
       cache: target.baseUrl ? "no-store" : undefined,
       headers: Object.keys(headers).length ? headers : undefined,
-      body: hasBody ? JSON.stringify(options.body) : undefined,
+      body: isForm ? (options.body as FormData) : hasBody ? JSON.stringify(options.body) : undefined,
       signal: options.signal,
     });
   } catch (error) {
@@ -101,6 +103,8 @@ export function createHttp(target: HttpTarget = {}) {
   return {
     get: <T>(path: string, schema: ZodType<T>, options?: Omit<RequestOptions, "body">) => request(target, "GET", path, schema, options),
     post: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => request(target, "POST", path, schema, options),
+    /** multipart/form-data, for file uploads (the résumé parser). */
+    postForm: <T>(path: string, schema: ZodType<T>, form: FormData, options?: Omit<RequestOptions, "body">) => request(target, "POST", path, schema, { ...options, body: form }),
     patch: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => request(target, "PATCH", path, schema, options),
     delete: <T>(path: string, schema: ZodType<T>, options?: Omit<RequestOptions, "body">) => request(target, "DELETE", path, schema, options),
   };
