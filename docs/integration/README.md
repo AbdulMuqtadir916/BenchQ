@@ -179,15 +179,16 @@ dependencies are live; only switching the adapter to live waits.
 | Track | Module | Depends on | Owner | Status |
 |---|---|---|---|---|
 | 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6). **The worked example: copy it** | F1–F4 | Abdul | Live behind flag (`session,ledger`) |
-| 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md) | F1–F7; shared-pool decision (07 §2) | Zuhair | Not started |
+| 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md); searches and jobs per candidate (Q53b) | F1–F7; 0007 | Zuhair (2nd) | Not started |
 | — | Candidates (D1), with the firm hierarchy and onboarding: [`docs/candidate-onboarding/06-backend.md`](../candidate-onboarding/06-backend.md) | F1–F7; D1 (option 1, Q50) | Abdul (from Zuhair, 2026-10-27) | Built (PRs 1–5, 2026-10-27). Frontend live behind flag (`session,ledger,candidates`, onboarding 07b, 2026-10-28); the mock stays until Tracks 03/04 |
 | — | Admin API (firms, plans, users, invites, platform team, audit) | F1–F7 | Uzair (after F7) | In progress: create firm, invites, read lists live behind flag (#36, #39, #40); firm edits, suspend, plans, limits, user deactivate, platform-team invites not started |
-| 03 | [Applications](./03-applications.md) (10 statuses, D3) | 02, Candidates, D3 | Samad | Not started |
-| 04 | [Resumes + claims + AI tailoring](./04-resumes-and-tailoring.md) (D4), then resume scoring (`cv_score`, `score-check`) | 02, Candidates, D4 | Zuhair | Not started |
+| 03 | [Applications](./03-applications.md) (10 statuses, D3) | Candidates, D3, 0007 | Samad (2nd, after the inbox) | Not started |
+| 04 | [Resumes + claims + AI tailoring](./04-resumes-and-tailoring.md) (D4), then resume scoring (`cv_score`, `score-check`) | 02, Candidates, D4, 0007 | Zuhair (3rd; the Record from the parse is his 1st) | Not started |
 | 05 | [Analytics](./05-analytics.md) | 03 | First free owner, after 03 | Not started |
 | — | Job extension: capture and autofill, per-user access tokens (07 §2). Not in this repo yet (`backend/UPSTREAM.md`) | 02; a proposal signed off by the product owner | Samad | Proposal first |
-| — | Gmail inbox per candidate (D8): OAuth, token storage, status updates on applications | Candidates, 03; a design signed off by the product owner | Samad | Design first |
-| — | Production readiness: prod Docker config, the scheduler out of the API process (one worker until then), logging, a security pass; CI and test health | F7 | Uzair | Not started |
+| — | Gmail inbox per candidate (D8): OAuth, token storage, status updates on applications | Candidates, 0007; a design signed off by the product owner | Samad (1st) | Design first |
+| — | Production layer (rate limits, timeouts, the scheduler out of the API process, logging), then production testing | F7 | Uzair | Not started (`docs/team/uzair.md`) |
+| — | Candidate core tables (migration 0007, `docs/team/00-candidate-core.md`), then billing, deployment, clean-up | Candidates | Abdul | 0007 first |
 | — | [AI presets](./08-ai-presets.md): per-module presets (model + prompts) a Super Admin creates and switches. Every AI track reads its setup through `ai_config()` now | Zuhair's AI tracks | Abdul | Decided, not built (`ai_config` seam only) |
 | 06 | [Open decisions](./06-open-decisions.md) | Product decision | Product owner | D1–D4 recommended in 07 §2 |
 
@@ -198,13 +199,14 @@ Abdul Muqtadir is the product owner, the only code owner and the reviewer of eve
 - **Wave 1:** each owner rewrites their own module file for tenancy (`firm_id`, scoping, the ledger, Q37's
   D1–D4) against [`07-auth-and-tenancy.md`](./07-auth-and-tenancy.md), as their first PR. Abdul approves it
   before any code. Samad's wave-1 PR is the job-extension proposal and the Gmail (D8) design.
-- **Abdul:** F2b (`firm_id` on the existing tables, `firm_jobs`), the firm-scoping helper, Ledger as the worked
-  example, then F2c, the support-view endpoints and the rest of F6.
-- **Zuhair:** Candidates, then job scraping (live once `firm_jobs` lands), then resume tailoring and claims,
-  then resume scoring.
-- **Samad:** the extension and Gmail designs, then the extension after Jobs, then Applications with the Gmail
-  inbox after Candidates.
-- **Uzair:** F7, CI and test health, production readiness, then the rest of the Admin API.
+Who does what, in order (since 2026-10-29, `docs/team/`, Q53):
+
+- **Abdul:** the candidate core tables (0007, before everyone), then billing, deployment, cleaning the project.
+- **Samad:** the Gmail inbox per candidate, then Applications, then the extension (favorite jobs).
+- **Zuhair:** candidate table improvement (the profile and Record from the résumé), then job scraping per
+  candidate, then résumé tailoring and the ATS score.
+- **Uzair:** the production layer (rate limits, timeouts, the scheduler out of the API, logging), then production
+  testing; the rest of the Admin API after.
 
 Status values: `Not started` → `In progress` → `Live behind flag` → `Done (mock deleted)`.
 
