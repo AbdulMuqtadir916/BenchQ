@@ -69,6 +69,10 @@ class Search(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = firm_id_column()   # searches are firm-owned (07 Q37)
+    # The candidate this search runs for (07 Q53b). Null only on firm-wide searches from before 0007 and the
+    # platform's own (the extension search). Owner: Zuhair.
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=True,
+                          index=True)
     name = Column(String, nullable=False)
     active = Column(Boolean, default=True)
     sources = Column(JSON, default=["linkedin", "indeed", "zip_recruiter", "google", "direct"])
@@ -313,6 +317,12 @@ class Application(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = firm_id_column()
     job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=False)
+    # The candidate core (07 Q53d, migration 0007): whose application, the tailored résumé sent, who sent it. Null
+    # only on rows from before 0007; the routes require the candidate. One per candidate per job. Owner: Samad.
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=True,
+                          index=True)
+    resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
+    submitted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
     status = Column(String, default="applied")
     # applied|interview|offer|rejected. Retired screening/phone_screen/final_round
     # values were backfilled before the baseline (0001); status_transitions is left unchanged.
@@ -325,6 +335,11 @@ class Application(Base):
     last_email_snippet = Column(Text, nullable=True)
     status_transitions = Column(JSON, default=[])  # [{from, to, at, source}]
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        Index("uq_applications_candidate_job", "candidate_id", "job_id", unique=True,
+              postgresql_where=text("candidate_id IS NOT NULL")),
+    )
 
     job = relationship("Job", back_populates="applications")
     interviews = relationship("Interview", back_populates="application",
@@ -484,12 +499,23 @@ class Resume(Base):
     name = Column(String, nullable=False)
     is_base = Column(Boolean, default=True)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
+    # The candidate core (07 Q53e, migration 0007): one base résumé per candidate (made from the kept parse), many
+    # tailored ones (parent_id → the base, job_id → the job). Null candidate only on rows from before 0007.
+    # Owner: Zuhair.
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=True,
+                          index=True)
+    resume_parse_id = Column(UUID(as_uuid=True), ForeignKey("resume_parses.id", ondelete="RESTRICT"), nullable=True)
     job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
     template = Column(String, default=lambda: first_template("resume_templates"))
     page_format = Column(String, default="letter")
     json_data = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        Index("uq_resumes_one_base_per_candidate", "candidate_id", unique=True,
+              postgresql_where=text("is_base AND candidate_id IS NOT NULL")),
+    )
 
     parent = relationship("Resume", remote_side=[id], backref="tailored_versions")
     job = relationship("Job", backref="resumes")

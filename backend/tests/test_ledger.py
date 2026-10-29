@@ -137,6 +137,7 @@ def _candidate(test_db, firm, manager, bde, name):
 def _assign(firm_id, actor, candidate, summary, minutes_ago, note=None):
     entry = _entry(firm_id, actor, summary, minutes_ago, action="ASSIGN")
     entry.entity_id, entry.entity_label, entry.note = str(candidate.id), candidate.full_name, note
+    entry.candidate_id = candidate.id          # as ledger.record sets it for an entry about a candidate (Q53h)
     return entry
 
 
@@ -153,7 +154,7 @@ def assignments(test_db, accounts, ledger):
     ravi = _candidate(test_db, acme, manager, ben, "Ravi")
     kiran = _candidate(test_db, acme, manager, None, "Kiran")
     update = _entry(acme.id, manager, "Mira edited Asha", 4)
-    update.entity_id = str(asha.id)
+    update.entity_id, update.candidate_id = str(asha.id), asha.id
     test_db.add_all([
         _assign(acme.id, manager, asha, "Assigned Asha to Bea", 6, note="Push banking."),
         _assign(acme.id, manager, ravi, "Assigned Ravi to Ben", 5),
@@ -190,3 +191,16 @@ def test_filters_by_entity_and_action(api_client, accounts, ledger, assignments)
 def test_a_bde_filtering_stays_inside_their_scope(anonymous_client, accounts, ledger, assignments):
     ravi = str(assignments["ravi"].id)
     assert _summaries(anonymous_client.get(_url(accounts.firm_id, f"?entity_id={ravi}"), headers=ledger["bde"])) == []
+
+
+def test_filters_by_candidate_their_whole_activity(api_client, accounts, ledger, assignments, test_db):
+    """07 Q53h: everything about a candidate, whatever the entry's entity (an application here)."""
+    from backend.auth import ledger as ledger_log
+    from backend.models.tenancy import User
+    owner = test_db.get(User, accounts.user_id)
+    asha = assignments["asha"]
+    ledger_log.record(test_db, actor=owner, action="CREATE", entity_type="application", entity_id=asha.id,
+                      entity_label="Acme", summary="Applied for Asha", firm_id=accounts.firm_id, candidate_id=asha.id)
+    test_db.commit()
+    assert _summaries(api_client.get(_url(accounts.firm_id, f"?candidate_id={asha.id}"))) == \
+        ["Applied for Asha", "Mira edited Asha", "Assigned Asha to Bea"]
