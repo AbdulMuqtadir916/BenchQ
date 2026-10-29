@@ -12,7 +12,8 @@ Conventions as backend/models/tenancy.py (Q38): UUID keys, timestamps with time 
 foreign keys ON DELETE RESTRICT.
 """
 from sqlalchemy import (
-    ARRAY, Boolean, CheckConstraint, Column, DateTime, Index, Integer, LargeBinary, Numeric, String, Text, text,
+    ARRAY, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, LargeBinary, Numeric, String, Text,
+    UniqueConstraint, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
@@ -129,4 +130,142 @@ class ResumeParse(Base):
         CheckConstraint("size_bytes BETWEEN 1 AND 10485760", name="ck_resume_parses_size"),   # 10 MB
         # Either still waiting for a create (and expiring), or kept with its candidate.
         CheckConstraint("(candidate_id IS NULL) = (expires_at IS NOT NULL)", name="ck_resume_parses_kept_or_expiring"),
+    )
+
+
+# ── The candidate core (docs/team/00-candidate-core.md, migration 0007, 07 Q53) ────────────────────────────────────
+# Everything a candidate has, fixed before the team splits up. Owners in docs/team/README.md §3: add columns to your
+# own tables only; renaming or removing one needs Abdul.
+
+FIELD_SOURCES = ("MANUAL", "RESUME_UPLOAD", "LINKEDIN_EXPORT", "INTAKE_CALL", "AI_EXTRACTED")   # FieldSource (enums.ts)
+CLAIM_STATES = ("VERIFIED", "UNVERIFIED", "CONTRADICTED")
+CLAIM_ENTITY_TYPES = ("summary", "experience", "skill", "project", "certificate", "education")
+MAILBOX_PROVIDERS = ("GOOGLE",)
+MAILBOX_STATUSES = ("CONNECTED", "DISCONNECTED", "ERROR")
+
+
+class CandidateJob(Base):
+    """A job found for a candidate (Q53b). The job row stays in the shared pool (`jobs`, 07 Q37). Owner: Zuhair."""
+    __tablename__ = "candidate_jobs"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False)
+    job_id = Column(UUID(as_uuid=True), _restrict("jobs.id"), nullable=False, index=True)
+    search_id = Column(UUID(as_uuid=True), ForeignKey("searches.id", ondelete="SET NULL"), nullable=True)
+    match_score = Column(Integer, nullable=True)
+    found_at = _created_at()
+
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "job_id", name="uq_candidate_jobs_candidate_job"),
+        CheckConstraint("match_score IS NULL OR match_score BETWEEN 0 AND 100", name="ck_candidate_jobs_match_score"),
+    )
+
+
+class FavoriteJob(Base):
+    """A job a BDE marked for a candidate (Q53c); the extension applies from these. Owner: Samad."""
+    __tablename__ = "favorite_jobs"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False)
+    job_id = Column(UUID(as_uuid=True), _restrict("jobs.id"), nullable=False, index=True)
+    marked_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
+    created_at = _created_at()
+
+    __table_args__ = (UniqueConstraint("candidate_id", "job_id", name="uq_favorite_jobs_candidate_job"),)
+
+
+class CandidateMailbox(Base):
+    """The candidate's own connected email account (Q53f), one per candidate. Token columns are Samad's (D8)."""
+    __tablename__ = "candidate_mailboxes"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False, unique=True)
+    provider = Column(String, nullable=False, server_default=text("'GOOGLE'"))
+    address = Column(String, nullable=False)
+    status = Column(String, nullable=False, server_default=text("'CONNECTED'"))
+    connected_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
+    connected_at = _created_at()
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = _created_at()
+    updated_at = _updated_at()
+
+    __table_args__ = (
+        CheckConstraint(_in("provider", MAILBOX_PROVIDERS), name="ck_candidate_mailboxes_provider"),
+        CheckConstraint(_in("status", MAILBOX_STATUSES), name="ck_candidate_mailboxes_status"),
+    )
+
+
+class InboxMessage(Base):
+    """An email in the candidate's mailbox; `application_id` links it to the application it is about (Q53f), so an
+    application has many. Owner: Samad."""
+    __tablename__ = "inbox_messages"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False)
+    mailbox_id = Column(UUID(as_uuid=True), _restrict("candidate_mailboxes.id"), nullable=False)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="SET NULL"), nullable=True,
+                            index=True)
+    provider_message_id = Column(String, nullable=False)
+    thread_id = Column(String, nullable=True)
+    from_name = Column(String, nullable=False)
+    from_email = Column(String, nullable=False)
+    subject = Column(String, nullable=False)
+    snippet = Column(Text, nullable=False)
+    body = Column(Text, nullable=True)
+    received_at = Column(DateTime(timezone=True), nullable=False)
+    is_read = Column(Boolean, nullable=False, server_default=text("false"))
+    created_at = _created_at()
+
+    __table_args__ = (
+        UniqueConstraint("mailbox_id", "provider_message_id", name="uq_inbox_messages_mailbox_message"),
+        Index("ix_inbox_messages_candidate_received", "firm_id", "candidate_id", "received_at"),
+    )
+
+
+class Evidence(Base):
+    """What substantiates a claim (D4, Q53g). Owner: Zuhair."""
+    __tablename__ = "evidence"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False, index=True)
+    resume_parse_id = Column(UUID(as_uuid=True), _restrict("resume_parses.id"), nullable=True)
+    document_url = Column(String, nullable=True)
+    excerpt = Column(Text, nullable=True)
+    page_number = Column(Integer, nullable=True)
+    source = Column(String, nullable=False)
+    confirmed_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = _created_at()
+
+    __table_args__ = (CheckConstraint(_in("source", FIELD_SOURCES), name="ck_evidence_source"),)
+
+
+class Claim(Base):
+    """A statement about the candidate (Q53g). The database refuses a VERIFIED claim without evidence (Truth Guard,
+    D4): never relax `ck_claims_verified_has_evidence`. Owner: Zuhair."""
+    __tablename__ = "claims"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False, index=True)
+    entity_type = Column(String, nullable=False)
+    entity_ref = Column(String, nullable=True)
+    # Before `text` below, which shadows sqlalchemy's text() in this class body.
+    state = Column(String, nullable=False, server_default=text("'UNVERIFIED'"))
+    text = Column(Text, nullable=False)
+    evidence_id = Column(UUID(as_uuid=True), _restrict("evidence.id"), nullable=True)
+    source = Column(String, nullable=False)
+    created_at = _created_at()
+    updated_at = _updated_at()
+
+    __table_args__ = (
+        CheckConstraint(_in("entity_type", CLAIM_ENTITY_TYPES), name="ck_claims_entity_type"),
+        CheckConstraint(_in("state", CLAIM_STATES), name="ck_claims_state"),
+        CheckConstraint(_in("source", FIELD_SOURCES), name="ck_claims_source"),
+        CheckConstraint("state <> 'VERIFIED' OR evidence_id IS NOT NULL", name="ck_claims_verified_has_evidence"),
     )

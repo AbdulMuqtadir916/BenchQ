@@ -280,6 +280,9 @@ class LedgerEntry(Base):
     prompt_version = Column(String, nullable=True)
     evidence_ids = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
     claim_state = Column(String, nullable=True)
+    # The candidate the entry is about, if any (07 Q53h): the candidate's activity is one query. No foreign key: the
+    # ledger outlives what it describes. Every write about a candidate passes it (ledger.record).
+    candidate_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = _created_at()
 
     __table_args__ = (
@@ -288,6 +291,7 @@ class LedgerEntry(Base):
         CheckConstraint(f"claim_state IS NULL OR {_in('claim_state', CLAIM_STATES)}",
                         name="ck_ledger_entries_claim_state"),
         Index("ix_ledger_entries_firm_created", "firm_id", "created_at"),
+        Index("ix_ledger_entries_firm_candidate_created", "firm_id", "candidate_id", "created_at"),
         Index("ix_ledger_entries_created", "created_at"),
     )
 

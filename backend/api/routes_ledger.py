@@ -7,7 +7,7 @@ is 404, the same as a missing firm (principle 4). Platform-only events (`firm_id
 `/api/admin/audit`.
 
 Filters (all optional, combined with AND): `entity_type`, `entity_id` (one record's history, e.g. a candidate's
-handoff note) and `action` (e.g. ASSIGN).
+handoff note), `action` (e.g. ASSIGN) and `candidate_id` (everything about a candidate: its activity, 07 Q53h).
 """
 import uuid
 
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/firms/{firm_id}", tags=["ledger"])
 @router.get("/ledger", summary="The firm's ledger, newest first; a BDE's own entries and their candidates' assignments")
 def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
                 entity_type: str | None = Query(None, max_length=64), entity_id: str | None = Query(None, max_length=128),
-                action: str | None = Query(None, max_length=32),
+                action: str | None = Query(None, max_length=32), candidate_id: uuid.UUID | None = None,
                 principal: Principal = Depends(current_principal), my_firm: uuid.UUID = Depends(reader_firm_id),
                 db: DbSession = Depends(get_db)):
     if firm_id != my_firm:
@@ -51,5 +51,7 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
         entries = entries.filter(LedgerEntry.entity_id == entity_id)
     if action is not None:
         entries = entries.filter(LedgerEntry.action == action)
+    if candidate_id is not None:     # the candidate's activity (07 Q53h)
+        entries = entries.filter(LedgerEntry.candidate_id == candidate_id)
     entries = entries.order_by(LedgerEntry.created_at.desc(), LedgerEntry.id).offset(offset).limit(limit)
     return [ledger_entry_json(e) for e in entries]
