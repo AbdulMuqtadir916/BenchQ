@@ -87,5 +87,5 @@ it. Everyone else reads it.
 
 | # | Owner | What | Status |
 |---|---|---|---|
-| 0007 | Abdul | Candidate core tables | In progress |
+| 0007 | Abdul | Candidate core tables | PR #91 |
 | 0008+ | — | Claim the next number here in your PR | — |

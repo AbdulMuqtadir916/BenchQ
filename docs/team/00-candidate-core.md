@@ -65,7 +65,8 @@ now on) + `resume_parse_id` (UUID → `resume_parses`, nullable).
 - **Base résumé** (`is_base = true`, `parent_id` null): uploaded or generated when the profile is created; made from
   the kept résumé parse (`resume_parse_id`). **One per candidate** (a partial unique index).
 - **Tailored résumé** (`is_base = false`): made from the base for one job: `parent_id` → the base, `job_id` → the job.
-  A candidate has many. Enforced for new rows (`CHECK … NOT VALID`, so old rows are left alone).
+  A candidate has many. The routes enforce "a tailored résumé has a base and a job" (Zuhair), not a database CHECK:
+  jobs and base résumés can be deleted, and their `ON DELETE SET NULL` would then break such a check.
 - Applying picks a tailored résumé (`applications.resume_id`). Once an application points at it, its content is what
   was sent: the tailoring routes must not change it afterwards (Zuhair).
 
@@ -142,8 +143,8 @@ evidence. Never relax it.
 
 **`ledger_entries`** + `candidate_id` (UUID, nullable, no foreign key: the ledger outlives what it describes) and an
 index (`firm_id`, `candidate_id`, `created_at`). Backfilled from entries whose `entity_type` is `candidate`.
-`ledger.record(..., candidate_id=)` sets it, and **every write about a candidate passes it** (an application, a
-résumé, an email, an assignment). `GET /ledger?candidate_id=` is the candidate's activity. The old `activity_log_v2`
+`ledger.record` sets it itself for an entry whose entity is a candidate; **every other write about a candidate passes
+`candidate_id=`** (an application, a résumé, an email). `GET /ledger?candidate_id=` is the candidate's activity. The old `activity_log_v2`
 is removed in Abdul's clean-up.
 
 ## 3. Not in 0007, on purpose
@@ -166,6 +167,6 @@ is removed in Abdul's clean-up.
 
 ## 5. Done when
 
-- [ ] The PR is merged and the local database is on 0007
+- [ ] The PR (#91) is merged and the local database is on 0007
 - [ ] Every table in §2 exists with every column, and the constraints are tested
 - [ ] Owners in the team README §3 agreed; this file is the contract
