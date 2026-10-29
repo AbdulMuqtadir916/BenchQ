@@ -1,7 +1,7 @@
 # Team plan — who builds what, in which order, without stepping on each other
 
-**Set by Abdul Muqtadir, 2026-10-29.** Read this file, then [00-candidate-core.md](./00-candidate-core.md), then your
-own file. Anything this plan doesn't settle: ask Abdul before you build it.
+**Set by Abdul Muqtadir, 2026-10-29.** Read this file, then [FLOWS.md](./FLOWS.md) (the user flow and the
+architecture, as diagrams), then [00-candidate-core.md](./00-candidate-core.md), then your own file. Anything this plan doesn't settle: ask Abdul before you build it.
 
 ## 1. The shape of the product
 
@@ -75,6 +75,7 @@ it. Everyone else reads it.
 
 | Area | Doc |
 |---|---|
+| The user flow and the architecture (diagrams, who builds each step) | [FLOWS.md](./FLOWS.md) |
 | The fixed tables | [00-candidate-core.md](./00-candidate-core.md) |
 | Inbox design (D8) | `docs/integration/06-open-decisions.md` D8, Samad's plan |
 | Applications (D3, 10 statuses) | `docs/integration/03-applications.md` |
