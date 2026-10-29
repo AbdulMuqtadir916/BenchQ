@@ -98,6 +98,7 @@ Details and the full route map: `docs/07-ROUTES-AND-RBAC.md`.
    | Original UI build phases (complete) | `docs/06-IMPLEMENTATION-PLAN.md` |
    | Connecting a module to the backend | `docs/integration/` |
    | Candidate onboarding and the firm hierarchy (07 Q40–Q50) | `docs/candidate-onboarding/` |
+   | **Who builds what, the candidate core tables, table owners (Q53)** | `docs/team/` |
    | Setup, and what to do when it fails | `README.md` Quick start, `docs/troubleshooting.md` |
    | Colour, type, spacing, motion | `design.md` |
 
@@ -251,12 +252,15 @@ A stopped task with a clear question beats a confident wrong implementation.
 backend. Every other module runs on mock data under the real signed-in user. Phase B fix PRs 3–14 and Phase S
 stay paused.
 
-**Next:** the module tracks. Owners, order and dependencies: the board in `docs/integration/README.md`.
+**Next (2026-10-29): the team plan in `docs/team/`.** Abdul builds the candidate core tables (migration 0007) first;
+then, in parallel: Samad inbox → applications → extension; Zuhair candidate table improvement → job scraping →
+tailoring (+ ATS); Uzair production layer → testing; Abdul billing → deployment → clean-up. Only change tables you
+own (`docs/team/README.md` §3); `candidates` changes are confirmed with Abdul.
 
 **Planned 2026-10-26: candidate onboarding and the firm hierarchy** (Q40–Q50: OWNER → MANAGER → BDE, BDE-only seats,
 a five-step new-candidate flow). Modules 01–07 in `docs/candidate-onboarding/`; frontend 01–05 run on mocks, 06 is the
 backend Candidates track (Zuhair).
 
-**Decisions** (Q1–Q52: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
+**Decisions** (Q1–Q53: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
 rules, the firm hierarchy) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
 The system contracts in `docs/02` §3.2 are approved and not built.
