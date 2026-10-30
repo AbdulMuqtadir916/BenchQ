@@ -85,8 +85,13 @@ I'd add a condition.
     from the app's own origin).
   - **The support view lives on the session row** (`support_view_id`), so the principal is always rebuilt
     on the server, and a view ends with its session.
-  - Throttle sign-in per IP **and** per email (the current throttle is per IP, in memory, per process).
-    Shared state in Postgres or Redis comes when there's more than one worker.
+  - Throttle sign-in per IP **and** per email, and invite acceptance per IP (`backend/auth/throttle.py`, in
+    memory, per process). Shared state in Postgres or Redis comes when there's more than one worker (decided
+    2026-10-30, Uzair's production layer).
+  - The client IP is read from the right of `X-Forwarded-For`: the last `TRUSTED_PROXY_HOPS` entries (default 1)
+    were appended by our own proxies, and anything to their left can be forged. Next's proxy keeps a header the
+    client sent, so **production needs a load balancer in front of Next that appends the client's address**
+    (Abdul's deployment).
 
 ### Password hashing
 
@@ -514,5 +519,5 @@ tests can be written before its dependencies are live; only "switch the adapter 
    triggers). That list is a product call; F4's PR proposes it for your review.
 10. **Upstream sync ends here.** `backend/UPSTREAM.md` says to diff and apply upstream fixes. After F2 the
     backend is a fork in practice; record that in `UPSTREAM.md` so nobody tries.
-11. **The auth throttle is in memory, per process** (`main.py:205`). Fine for one worker; the new sign-in
-    throttle should use the database (or Redis) from the start.
+11. **The auth throttle is in memory, per process** (`backend/auth/throttle.py`). Fine for one worker; it moves to
+    the database (or Redis) with the scheduler split that allows a second worker (`docs/team/uzair.md` §1.3).

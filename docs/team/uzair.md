@@ -10,8 +10,9 @@ config, logging. Changing a route's behaviour for its owner (Samad, Zuhair, Abdu
 
 ## 1. The production layer (first)
 
-What exists today: no API rate limiting; per-scraper throttles only (`backend/scraper/sources/*`); one uvicorn worker
-with the scheduler inside it.
+What exists today: a sign-in throttle and an invite-acceptance limit, per IP and per email, in memory
+(`backend/auth/throttle.py`); no other API rate limiting; per-scraper throttles (`backend/scraper/sources/*`); one
+uvicorn worker with the scheduler inside it.
 
 1. **Requests per second:** rate limits per IP for sign-in and invite acceptance (brute force), per user for the API,
    per firm for the AI routes (parse, tailor, score: they cost money). 429 with `Retry-After`; the frontend's
