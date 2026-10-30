@@ -205,6 +205,41 @@ def test_with_no_trusted_proxy_the_header_is_ignored(anonymous_client, accounts,
     assert _sign_in(anonymous_client, "owner@acme.test", headers={"X-Forwarded-For": "10.0.2.99"}).status_code == 429
 
 
+def _ip_of(forwarded_for, peer="10.9.9.9"):
+    """client_ip() for a request from `peer` carrying `forwarded_for` (None = no header)."""
+    from starlette.requests import Request
+    from backend.auth.throttle import client_ip
+    headers = [] if forwarded_for is None else [(b"x-forwarded-for", forwarded_for.encode())]
+    return client_ip(Request({"type": "http", "headers": headers, "client": (peer, 1234)}))
+
+
+@pytest.mark.parametrize("hops, forwarded_for, expected", [
+    (1, "198.51.100.7", "198.51.100.7"),                         # one load balancer appended the client
+    (2, "198.51.100.7, 10.0.0.2", "198.51.100.7"),               # a normal chain: client, proxy
+    (1, "6.6.6.6, 198.51.100.7", "198.51.100.7"),                # a forged entry to the left is skipped
+    (2, "6.6.6.6, 198.51.100.7, 10.0.0.2", "198.51.100.7"),      # ... behind two proxies too
+    (2, "198.51.100.7", "198.51.100.7"),                         # fewer entries than hops: the leftmost there is
+    (1, None, "10.9.9.9"),                                       # no header: the connecting address
+])
+def test_client_ip_reads_the_trusted_hops_from_the_right(monkeypatch, hops, forwarded_for, expected):
+    import backend.auth.throttle as throttle_mod
+    monkeypatch.setattr(throttle_mod, "TRUSTED_PROXY_HOPS", hops)
+    assert _ip_of(forwarded_for) == expected
+
+
+def test_client_ip_with_no_trusted_proxy_ignores_a_forged_header(monkeypatch):
+    import backend.auth.throttle as throttle_mod
+    monkeypatch.setattr(throttle_mod, "TRUSTED_PROXY_HOPS", 0)
+    assert _ip_of("6.6.6.6") == "10.9.9.9"
+    assert _ip_of("6.6.6.6, 198.51.100.7") == "10.9.9.9"
+
+
+def test_client_ip_rotating_forged_entries_share_one_bucket(monkeypatch):
+    import backend.auth.throttle as throttle_mod
+    monkeypatch.setattr(throttle_mod, "TRUSTED_PROXY_HOPS", 1)
+    assert {_ip_of(f"203.0.113.{i}, 198.51.100.7") for i in range(50)} == {"198.51.100.7"}
+
+
 def test_a_success_clears_the_count(anonymous_client, accounts):
     for _ in range(4):
         _sign_in(anonymous_client, "owner@acme.test", "wrong-password")
