@@ -112,6 +112,31 @@ def test_accept_of_an_unknown_link_is_410(anonymous_client, accounts):
     assert r.json() == {"detail": "This invite link isn't valid."}
 
 
+def test_too_many_accepts_from_one_address_are_429(anonymous_client, owner_invite):
+    from backend.auth.throttle import INVITE_ACCEPT_LIMIT
+    _, _, token = owner_invite
+    ip = {"X-Forwarded-For": "10.0.3.1"}
+    for _ in range(INVITE_ACCEPT_LIMIT[0]):
+        assert anonymous_client.post("/api/invites/not-a-token/accept", json=GOOD, headers=ip).status_code == 410
+    r = anonymous_client.post(f"/api/invites/{token}/accept", json=GOOD, headers=ip)
+    assert r.status_code == 429
+    assert int(r.headers["Retry-After"]) >= 1
+    assert r.json() == {"detail": "Too many attempts. Try again in a few minutes."}
+    # Another address is unaffected, and the invite is still there to accept.
+    assert anonymous_client.post(f"/api/invites/{token}/accept", json=GOOD,
+                                 headers={"X-Forwarded-For": "10.0.3.2"}).status_code == 200
+
+
+def test_the_accept_lock_expires(anonymous_client, accounts, monkeypatch):
+    import backend.auth.throttle as throttle_mod
+    for _ in range(throttle_mod.INVITE_ACCEPT_LIMIT[0]):
+        _accept(anonymous_client, "not-a-token")
+    assert _accept(anonymous_client, "not-a-token").status_code == 429
+    real = throttle_mod.time.monotonic
+    monkeypatch.setattr(throttle_mod.time, "monotonic", lambda: real() + throttle_mod.INVITE_ACCEPT_LIMIT[1] + 1)
+    assert _accept(anonymous_client, "not-a-token").status_code == 410
+
+
 def test_accept_of_a_revoked_or_expired_link_is_410(api_client, anonymous_client, owner_invite, test_db):
     from backend.models.tenancy import Invite
     _, invite_id, token = owner_invite

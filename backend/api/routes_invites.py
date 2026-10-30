@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
-from backend.auth import ledger
+from backend.auth import ledger, throttle
 from backend.auth.invites import account_exists, effective_status, lock_firm
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password
 from backend.auth.serialize import session_json
@@ -64,7 +64,8 @@ def accept(token: str, body: AcceptBody, request: Request, response: Response, d
     """Creates the firm user (or, for a platform-team invite, the Super Admin), marks the invite ACCEPTED,
     activates an ONBOARDING firm when its OWNER accepts, logs INVITE_ACCEPTED, and signs the new account in
     (replacing any session this browser had). 410 for a dead link, 403 for a suspended firm, 409 when the
-    email already has an account."""
+    email already has an account. 429 when this address has tried too often (backend/auth/throttle.py)."""
+    throttle.check_invite_accept(request)
     now = utcnow()
     invite = _invite_for(db, token, lock=True)   # the row lock stops a double-click accepting twice
     if invite is None:

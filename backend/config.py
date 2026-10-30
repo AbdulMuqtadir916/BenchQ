@@ -18,3 +18,6 @@ SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "true" if IS_PRODUCTI
 # The app's own origins: CORS, and the Origin check on unsafe requests (07 Q37).
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv(
     "ALLOWED_ORIGINS", "http://localhost,http://localhost:3000,http://localhost:80").split(",") if o.strip()]
+# How many proxies in front of the backend append to X-Forwarded-For (the load balancer: 1). The client's address
+# is that many entries from the right; anything further left was sent by the client and can be forged.
+TRUSTED_PROXY_HOPS = max(0, int(os.getenv("TRUSTED_PROXY_HOPS", "1")))

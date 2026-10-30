@@ -188,6 +188,23 @@ def test_ten_failures_lock_the_ip(anonymous_client, accounts):
     assert _sign_in(anonymous_client, "owner@acme.test", headers={"X-Forwarded-For": "10.0.0.10"}).status_code == 200
 
 
+def test_a_forged_forwarded_address_does_not_dodge_the_ip_lock(anonymous_client, accounts):
+    # The proxy appends the real address; whatever the client sent sits to its left and changes every time.
+    for i in range(10):
+        assert _sign_in(anonymous_client, f"nobody{i}@acme.test", "wrong-password",
+                        headers={"X-Forwarded-For": f"203.0.113.{i}, 10.0.0.9"}).status_code == 401
+    r = _sign_in(anonymous_client, "owner@acme.test", headers={"X-Forwarded-For": "203.0.113.99, 10.0.0.9"})
+    assert r.status_code == 429
+
+
+def test_with_no_trusted_proxy_the_header_is_ignored(anonymous_client, accounts, monkeypatch):
+    import backend.auth.throttle as throttle_mod
+    monkeypatch.setattr(throttle_mod, "TRUSTED_PROXY_HOPS", 0)
+    for i in range(10):
+        _sign_in(anonymous_client, f"nobody{i}@acme.test", "wrong-password", headers={"X-Forwarded-For": f"10.0.2.{i}"})
+    assert _sign_in(anonymous_client, "owner@acme.test", headers={"X-Forwarded-For": "10.0.2.99"}).status_code == 429
+
+
 def test_a_success_clears_the_count(anonymous_client, accounts):
     for _ in range(4):
         _sign_in(anonymous_client, "owner@acme.test", "wrong-password")

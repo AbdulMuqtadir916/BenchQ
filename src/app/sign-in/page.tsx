@@ -44,6 +44,14 @@ function SignedOutOnly() {
 
 /** Any failed sign-in reads the same, so the page never reveals which emails have an account (docs/07 L1). */
 const INVALID = "Email or password is incorrect.";
+/** Locked out by the backend's throttle (429): trying again at once only keeps the lock, so say to wait. */
+const RATE_LIMITED = "Too many sign-in attempts. Wait a few minutes, then try again.";
+
+function signInError(error: Error): string {
+  if (!(error instanceof ApiError) || error.status === 401) return INVALID;
+  if (error.code === "RATE_LIMITED") return RATE_LIMITED;
+  return "Couldn't sign in right now. Try again.";
+}
 
 /**
  * /sign-in (docs/07 §2.1, Phase L): email + password against the seeded accounts (docs/03 §3.2; mock
@@ -64,12 +72,8 @@ function SignInForm() {
   };
 
   // The generic credential error for a refused sign-in; a different message only when the service
-  // itself failed, which says nothing about the account.
-  const error = signIn.isError
-    ? signIn.error instanceof ApiError && signIn.error.status !== 401
-      ? "Couldn't sign in right now. Try again."
-      : INVALID
-    : null;
+  // itself failed or throttled, which says nothing about the account.
+  const error = signIn.isError ? signInError(signIn.error) : null;
   const isBusy = signIn.isPending || signIn.isSuccess;
 
   return (
