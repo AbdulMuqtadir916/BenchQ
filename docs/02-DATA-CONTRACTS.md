@@ -1032,6 +1032,11 @@ export const JobMarkSchema = z.object({
 - Endpoints: `GET /api/job-marks` (the signed-in user's), `PUT /api/job-marks/:jobId/:kind`,
   `DELETE /api/job-marks/:jobId/:kind`.
 
+**Candidate workspace exception (approved 2026-10-30):** the heart on a candidate's Jobs tab is not this personal
+`JobMark`. It identifies the candidate in the page context and writes `favorite_jobs` plus an `Application` in
+`SAVED` in one backend transaction. The job remains in the feed. The general Jobs page's personal Save/Hide marks
+remain a separate workflow until that module is revised.
+
 ## 7. Matching & scoring
 
 ```ts
@@ -1241,7 +1246,8 @@ export const ApplicationSchema = z.object({
   candidateId: z.string(),
   jobId: z.string(),
   resumeVersionId: z.string().nullable(),
-  submittedByUserId: z.string(),
+  // Null for SAVED: hearting queues a job, but does not mean an application was submitted.
+  submittedByUserId: z.string().nullable(),
 
   status: ApplicationStatus,
 
@@ -1311,17 +1317,18 @@ export const FollowUpTaskSchema = z.object({
 
 ### 9.x Candidate inbox (`src/lib/schemas/inbox.ts`)
 
-The candidate's Google mailbox, connected by the BDE. Frontend-only today — the mock adapter
-simulates the consent hand-off and sync (`POST /api/candidates/:id/inbox/connect`).
+The Google mailbox connected for a candidate. **Decision (2026-10-31):** a BDE initiates OAuth from that candidate's page;
+the Google account owner (or someone authorized to access that account) signs in on Google's page and grants Gmail read-only
+consent. The selected Google address does not need to match the candidate profile email, which may be placeholder data; store and display the verified Google address for that candidate's mailbox. Import the last 3 days; on disconnect, remove credentials and
+stop syncing but retain imported messages. Module 2 connects and displays raw messages; Module 3 performs
+classification and application status updates. The current adapter and consent screen are still mock-backed.
 
 - `MailboxConnection` — `provider: "GOOGLE"`, `address`, `connectedAt`, `lastSyncedAt`.
-- `InboxMessage` — sender, subject, body, `receivedAt`, the `applicationId` it matched (nullable),
-  a `signal` (`SHORTLISTED | CALL_REQUEST | INTERVIEW_SCHEDULED | ASSESSMENT | OFFER | REJECTED |
-  CONFIRMATION`), the `impliedStatus` that signal means for the pipeline, and `scheduledFor` for a
-  proposed call or interview.
+- `InboxMessage` — sender, subject, body, `receivedAt`, the `applicationId` it matched (nullable). Legacy mock-only
+  signals are not evidence for live mail. Until Module 3 classification is connected, live mail must display without
+  a signal, implied status or scheduled interview time, and must not change application status.
 - `CandidateInbox` — `{ connection | null, messages[] }`.
-- A **suggested status update is derived, never stored**: it exists while the application's stage
-  is behind the email's `impliedStatus`.
+- Module 3 will add versioned classification and review state; live classification is not part of this Inbox contract.
 
 Status changes go through `PATCH /api/applications/:id/status` (`{ status, note }`), which appends
 an `ApplicationEvent` — the same write the kanban makes.
@@ -1465,3 +1472,26 @@ export const TimelineEventSchema = z.object({
    history survives upstream edits.
 5. **`ClaimState` appears on Record fields, resume claims and Q&A answers.** That's intentional:
    anything asserted on a candidate's behalf is a claim, wherever it lives.
+
+
+## Application category statuses — user-authorized 2026-10-31
+
+Saved plus the ten category statuses are manually selectable in Module 1. New frontend values: SCREENING_CALL, INTERVIEW_SCHEDULE_REQUEST, INTERVIEW_SCHEDULED, SHORTLISTED, MOVE_ON (rejected), INCOMPLETE_APPLICATION, ASSESSMENT, OTHER; APPLIED and OFFER retain their meanings. Backend values are lowercase. Legacy statuses remain readable without data migration or invented historical mappings. These categories do not imply a mandatory linear sequence. BDE review remains a separate review workflow.
+
+BDE review placement confirmed 2026-10-31: Applications has a review column. Pending cards retain their confirmed status; no classifier category is applied during review. BDE reads the email and selects/confirms a status in Inbox. Board review membership is separate from ApplicationStatus.
+
+BDE review navigation — user-confirmed 2026-10-31: clicking a pending application or unmatched email in the Applications review column opens the exact candidate email using the registered candidate route with `tab=inbox&message=<messageId>`. Linked pending reviews also appear as clickable BDE review status labels in the table/list. The candidate Inbox selection lives in the URL. Its existing GET accepts optional `message_id` and includes that scoped email even outside the latest page; missing or out-of-candidate messages return the same 404. `GET /api/firms/{firm_id}/inbox/unmatched-reviews` returns `{total, messages}` using the existing InboxMessage DTO, body omitted as an empty string. It lists only DONE, unlinked, non-Other UNMATCHED messages within the principal's firm and candidate assignment scope, with limit/offset pagination. The frontend fetches every page for the review column. An unmatched email is an email card, never a fabricated application. Review confirmation invalidates both Applications and the unmatched queue. No schema or status enum changes.
+
+Module 1 persistence design (2026-10-31): applications adds status_revision, status_effective_at, last_manual_change_at. New application_status_events preserves original transition payloads and records revision, actor, source, note and optional command/review references. New application_reviews links firm/candidate/application/inbox_message, pending/resolved state, reason, application revision, review revision and human resolution. Multiple unresolved email reviews retain review membership until all have been resolved. No historical status relabeling. These additions implement the user's authorized tracker/review behavior; Abdul code-owner review remains required before merge.
+
+Email identity matching — user-confirmed 2026-10-31: resolve company and complete job title before status classification, within the mailbox's firm and candidate. Only applications with durable submission evidence (`applied_at` on a non-Saved application, or `submitted_by_user_id`) are eligible for automatic matching; later stages remain eligible and never-submitted Saved drafts do not. Reuse a single scoped submitted-application thread link first. Otherwise require complete canonicalized company (including registered aliases) and role names in subject/body, with exactly one eligible application. Normalize case, Unicode, whitespace and modest punctuation; preserve technology names, seniority and level. The existing `[QA-nn] … (Synthetic)` fixture wrapper is optional metadata, not part of the role. Never select a first row from ambiguous matches or infer identity from category words. The current backend derives frontend `companyNameAtApply`/`jobTitleAtApply` from `Job`; this change adds no historical snapshot columns or invented snapshots.
+
+Persist a unique match in `InboxMessage.application_id` with its immutable `EmailClassification.application_id` result. Recheck the match after inference and preserve concurrent human links/decisions. Classification remains independent: job-related unmatched/ambiguous mail has `outcome=UNMATCHED`, no application link and no status mutation; the existing Inbox derives its BDE review queue and manual confirmation from those fields. Unmatched `other` stays outside application review. Existing confidence (<0.6 review), flags, freshness/manual-change precedence, revision, event and deduplication safeguards still apply. No new API or schema fields are required.
+
+Immediate processing — user-confirmed 2026-10-31: every newly imported message starts the existing match-then-classify workflow as soon as its import transaction commits. Manual Sync now and OAuth/reconnect imports dispatch background work after the HTTP response; scheduled imports process each mailbox's committed new messages directly. The sync collector includes only IDs actually inserted, never duplicate Gmail records. Immediate work rechecks firm/candidate/mailbox scope and processes imported IDs in batches of 50 using existing leases, confidence gates, immutable results and status safeguards. Explicit classification retries also dispatch immediately after commit. Provider failures do not roll back Gmail imports or become Gmail-sync errors. A scheduled recovery sweep remains for pending retries and expired leases; it excludes the current tick's new imports so a transient failure does not get two attempts in the same tick. No API response shapes, schema fields or Gmail scopes change. “Immediate” means processing starts without waiting for another poll; provider latency still applies. Gmail fetching retains the configured polling cadence and does not use Gmail push delivery. Inbox refresh behavior is described below.
+
+Direct status updates and BDE review — user-confirmed 2026-10-31: a fresh uniquely matched classification at confidence >=0.6 moves directly to its corresponding status under the enabled backend policy. `AUTO_APPLIED` and `NO_CHANGE` results must not leave a suggested move or confirmation form, including when the frontend application cache is older or the email predates a later status. Low-confidence, actionable unmatched/ambiguous and stale/policy-blocked messages go directly to Needs BDE review. Linked review controls require the message's actual pending backend review; they disappear after human resolution without altering the immutable classification. Unrelated unmatched Other stays excluded; a linked Other with a genuine pending review remains accessible. Remove the separate Needs update/Update suggested flow and stage-order inference. While stored messages are PENDING/PROCESSING, the Inbox refreshes their state; when a linked classification decision is observed, invalidate the firm's application and candidate-job queries so persisted automatic statuses and review membership are displayed.
+
+### Inbox retained-account namespace — correction M2 (2026-10-31)
+
+The user-authorized correction plan preserves imported mail when a candidate disconnects and later connects another verified account. `InboxMessage.source_address` records the normalized, verified mailbox address at import. Deduplication is `(mailbox_id, source_address, provider_message_id)`; thread reuse additionally checks this account namespace. Existing messages are backfilled from their current mailbox address. A blank namespace is reserved for historical/test inserts and is attributed to the current account before reconnect/disconnect. Raw provider IDs remain unchanged. No subjects, bodies, credentials or application statuses are rewritten. This internal persistence field does not change the frontend Inbox DTO. New revision 0011 follows 0010; downgrade refuses to erase provenance that cannot be reconstructed from the current mailbox, or to collapse cross-account duplicate provider IDs. Auth/schema changes retain required code-owner review before merge.

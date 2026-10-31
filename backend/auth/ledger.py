@@ -36,3 +36,19 @@ def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_typ
         entry.created_at = at
     db.add(entry)
     return entry
+
+
+def record_automated(db: DbSession, *, actor_type: str, actor_name: str, action: str,
+                     entity_type: str, entity_id: uuid.UUID | str, entity_label: str,
+                     summary: str, firm_id: uuid.UUID, candidate_id: uuid.UUID,
+                     at: datetime | None = None) -> LedgerEntry:
+    """Internal worker audit; automated decisions never borrow a human identity."""
+    if actor_type not in {"SYSTEM", "AGENT"}:
+        raise ValueError("Automated ledger actor must be SYSTEM or AGENT.")
+    entry = LedgerEntry(firm_id=firm_id, candidate_id=candidate_id, actor_type=actor_type,
+        actor_user_id=None, actor_name=actor_name, action=action, entity_type=entity_type,
+        entity_id=str(entity_id), entity_label=entity_label, summary=summary)
+    if at is not None:
+        entry.created_at = at
+    db.add(entry)
+    return entry

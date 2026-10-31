@@ -25,7 +25,11 @@ const resource = <R extends string>(name: R) => ({
 export const queryKeys = {
   candidates: resource("candidates"),
   jobs: resource("jobs"),
-  applications: resource("applications"),
+  applications: {
+    ...resource("applications"),
+    byCandidate: (firmId: string, candidateId: string) => [firmId, "applications", "byCandidate", candidateId] as const,
+  },
+  candidateJobs: (firmId: string, candidateId: string) => [firmId, "jobs", "candidate", candidateId] as const,
   followups: resource("followups"),
   resumes: {
     ...resource("resumes"),
@@ -33,7 +37,11 @@ export const queryKeys = {
   },
   records: { byCandidate: (firmId: string, candidateId: string) => [firmId, "records", "byCandidate", candidateId] as const },
   documents: { byCandidate: (firmId: string, candidateId: string) => [firmId, "documents", "byCandidate", candidateId] as const },
-  inbox: { byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const },
+  inbox: {
+    byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const,
+    message: (firmId: string, candidateId: string, messageId: string) => [firmId, "inbox", "byCandidate", candidateId, "message", messageId] as const,
+    unmatchedReviews: (firmId: string) => [firmId, "inbox", "unmatchedReviews"] as const,
+  },
   ledger: { all: (firmId: string) => [firmId, "ledger"] as const, list: (firmId: string, params?: Params) => [firmId, "ledger", "list", params ?? {}] as const },
   team: {
     all: (firmId: string) => [firmId, "team"] as const,

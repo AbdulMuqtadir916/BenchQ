@@ -10,6 +10,8 @@ import { injectedFailure } from "./membership";
 import { firmBySlugForTest } from "./sign-in-as";
 import { allUsers, firms } from "./team-data";
 import { invites, plans } from "./tenancy";
+import { applicationsApi } from "@/lib/api/applications";
+import { applicationsMock } from "./applications";
 
 /**
  * TESTS ONLY: answer the reads that moved to the backend (the session, the team, invites, the ledger and the platform tier) from the
@@ -22,6 +24,16 @@ export function stubBackendReads(): void {
   vi.spyOn(sessionApi, "current").mockImplementation(async () => liveSession());
   vi.spyOn(sessionApi, "firmBySlug").mockImplementation(firmBySlugForTest);
   vi.spyOn(ledgerApi, "list").mockImplementation(() => mockResult([]));
+  // Dashboard rendering tests exercise the API-backed hooks without a running backend. Their fixture
+  // provider must stub Applications explicitly now that the production adapter is live-only.
+  vi.spyOn(applicationsApi, "list").mockImplementation(async (firmId, params) => {
+    injectedFailure("applications.list");
+    return applicationsMock.list(firmId, params);
+  });
+  vi.spyOn(applicationsApi, "listForCandidate").mockImplementation(async (firmId, candidateId) => {
+    injectedFailure("applications.list");
+    return applicationsMock.list(firmId, { candidateId });
+  });
   vi.spyOn(teamApi, "list").mockImplementation((firmId) => {
     injectedFailure("team.list");
     return mockResult(inFirm(allUsers, firmId));

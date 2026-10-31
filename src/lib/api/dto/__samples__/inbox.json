@@ -1,0 +1,30 @@
+{
+  "firm_id": "firm",
+  "candidate_id": "candidate",
+  "connection": {
+    "firm_id": "firm",
+    "candidate_id": "candidate",
+    "provider": "GOOGLE",
+    "address": "candidate@example.test",
+    "connected_at": "2026-10-31T10:00:00+00:00",
+    "last_synced_at": "2026-10-31T10:05:00+00:00",
+    "status": "CONNECTED",
+    "last_sync_error": null
+  },
+  "messages": [
+    {
+      "id": "email-1",
+      "firm_id": "firm",
+      "candidate_id": "candidate",
+      "application_id": null,
+      "from_name": "Recruiter",
+      "from_email": "recruiter@example.test",
+      "subject": "Application update",
+      "snippet": "We received your application.",
+      "body": "We received your application.",
+      "received_at": "2026-10-31T10:02:00+00:00",
+      "is_read": false,
+      "thread_id": "thread-1"
+    }
+  ]
+}

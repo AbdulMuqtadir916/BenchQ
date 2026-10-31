@@ -1,8 +1,7 @@
 import { arrayOf } from "@/lib/api/client";
-import { ApplicationSchema, FollowUpTaskSchema, type Application, type FollowUpTask } from "@/lib/schemas/application";
+import { ApplicationSchema, type Application } from "@/lib/schemas/application";
 import { UpdateApplicationStatusSchema, type UpdateApplicationStatus } from "@/lib/schemas/inbox";
 import applicationsSeed from "./data/applications.json";
-import followupsSeed from "./data/followups.json";
 import { scopeApplications } from "@/lib/auth/policy";
 import { currentPrincipal, currentUser } from "./auth";
 import { allCandidates } from "./candidates";
@@ -11,7 +10,7 @@ import { firmScoped } from "./membership";
 import { changed, table } from "./db";
 
 export const allApplications: Application[] = table("applications", ApplicationSchema, () => arrayOf(ApplicationSchema).parse(applicationsSeed));
-export const allFollowups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
+export { allFollowups, followupsMock } from "./followups";
 
 const CLOSED_STATUSES = ["PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
 
@@ -53,10 +52,3 @@ export const applicationsMock = firmScoped("applications", {
     return mockResult(ApplicationSchema.parse(application));
   },
 }, { updateStatus: "application.move" });
-
-export const followupsMock = firmScoped("followups", {
-  list: (firmId: string, params?: { userId?: string }): Promise<FollowUpTask[]> => {
-    const followups = inFirm(allFollowups, firmId);
-    return mockResult(params?.userId ? followups.filter((followup) => followup.assignedToUserId === params.userId) : followups);
-  },
-});

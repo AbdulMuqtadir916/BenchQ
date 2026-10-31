@@ -172,7 +172,7 @@ export function scopeCandidates<T extends { managerId: string; bdeId: string | n
  * Applications in scope: a MANAGER's are the ones for the candidates they manage, so a candidate's history moves with
  * it (Q43); a BDE's are the ones they submitted. `candidates` is the firm's (only read for a MANAGER).
  */
-export function scopeApplications<T extends { submittedByUserId: string; candidateId: string }>(
+export function scopeApplications<T extends { submittedByUserId: string | null; candidateId: string }>(
   principal: Principal,
   applications: readonly T[],
   candidates: readonly { id: string; managerId: string; bdeId: string | null }[],
@@ -182,7 +182,10 @@ export function scopeApplications<T extends { submittedByUserId: string; candida
     const mine = new Set(scopeCandidates(principal, candidates).map((candidate) => candidate.id));
     return applications.filter((application) => mine.has(application.candidateId));
   }
-  if (scope.kind === "own") return applications.filter((application) => application.submittedByUserId === scope.userId);
+  if (scope.kind === "own") {
+    const mine = new Set(scopeCandidates(principal, candidates).map((candidate) => candidate.id));
+    return applications.filter((application) => mine.has(application.candidateId));
+  }
   return [...applications];
 }
 

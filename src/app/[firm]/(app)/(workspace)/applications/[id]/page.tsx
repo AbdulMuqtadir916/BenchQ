@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useMemo } from "react";
-import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { useApplication, useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { useCandidate } from "@/lib/hooks/use-candidates";
 import { useJob } from "@/lib/hooks/use-jobs";
@@ -14,7 +14,6 @@ import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { deriveMatchScore } from "@/lib/derive";
 import { formatRelative } from "@/lib/format/timezone";
 import { PageHeader } from "@/components/app/page-header";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
@@ -28,7 +27,7 @@ import { SkeletonCard } from "@/components/app/skeleton-card";
 import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
 import { ResumeSent } from "@/components/app/applications/resume-sent";
 import { StatusTimeline } from "@/components/app/applications/status-timeline";
-import { NEXT_STATUS, STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
+import { TRACKER_STATUSES, STATUS_LABEL, STATUS_TONE, visibleApplicationStatuses } from "@/components/app/applications/status-meta";
 import { useHref } from "@/lib/routes/use-href";
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
@@ -61,7 +60,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
   }, [teamQuery.data]);
 
   // A MANAGER's access is their team's (07 Q47): the application's candidate must be one they manage.
-  if (appQuery.isLoading || (access === "team" && candidateQuery.isLoading)) return <div className="bq-page space-y-4"><SkeletonCard /><SkeletonCard /></div>;
+  if (appQuery.isLoading || candidateQuery.isLoading) return <div className="bq-page space-y-4"><SkeletonCard /><SkeletonCard /></div>;
   // A missing record and a record outside the user's scope look the same: not-found (07 Q6).
   const notFoundState = <NotFoundState title="Application not found" description="This application doesn't exist or isn't available to you." backHref={toHref("applications")} backLabel="Back to applications" />;
   if (isNotFoundError(appQuery.error)) return notFoundState;
@@ -73,11 +72,11 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
       </div>
     );
   }
-  if (!isInScope(access, principal.userId, { ownerUserId: app.submittedByUserId, managerId: candidateQuery.data?.managerId ?? null })) return notFoundState;
+  if (!isInScope(access, principal.userId, { ownerUserId: candidateQuery.data?.bdeId ?? null, managerId: candidateQuery.data?.managerId ?? null })) return notFoundState;
 
   const candidate = candidateQuery.data;
   const job = jobQuery.data;
-  const next = NEXT_STATUS[app.status];
+
   const emails = (inboxQuery.data?.messages ?? []).filter((m) => m.applicationId === app.id);
 
   return (
@@ -91,15 +90,22 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
         actions={
           <>
             <Tag tone={STATUS_TONE[app.status]}>{STATUS_LABEL[app.status]}</Tag>
-            {can(principal, "application.move") && next ? (
-              <Button size="sm" variant="secondary" disabled={updateStatus.isPending} onClick={() => updateStatus.mutate({ id: app.id, status: next, note: null })}>
-                Move to {STATUS_LABEL[next]} <ArrowRight size={13} aria-hidden />
-              </Button>
+            {can(principal, "application.move") && app.pendingReviews.length === 0 ? (
+              <label className="text-sm">Change status
+                <select aria-label="Change application status" value={app.status} disabled={updateStatus.isPending}
+                  onChange={(event) => updateStatus.mutate({ id: app.id, status: event.target.value as typeof app.status, note: null,
+                    expectedRevision: app.statusRevision, commandId: crypto.randomUUID() })} className="bq-input ml-2">
+                  {!TRACKER_STATUSES.includes(app.status) ? <option value={app.status}>{STATUS_LABEL[app.status]}</option> : null}
+                  {visibleApplicationStatuses(app, emails).map((status) => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
+                </select>
+              </label>
             ) : null}
           </>
         }
       />
 
+      {updateStatus.error ? <ErrorState error={updateStatus.error} onRetry={() => { updateStatus.reset(); void appQuery.refetch(); }} /> : null}
+      {app.pendingReviews.length ? <p className="mb-4 text-sm">BDE review pending. Read the email and confirm its status in <Link className="underline" href={toHref("candidates.detail", { id: app.candidateId }, { tab: "inbox", message: app.pendingReviews[0]!.messageId })}>Inbox</Link>. Last confirmed: {STATUS_LABEL[app.status]}.</p> : null}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-5">
           <Card>
@@ -128,7 +134,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                       <p className="line-clamp-2 text-sm text-[var(--color-text-2)]">{m.snippet}</p>
                       <p className="mt-0.5 text-caption text-[var(--color-text-3)]">{m.fromName} · {formatRelative(m.receivedAt)}</p>
                     </div>
-                    <Tag tone={SIGNAL_META[m.signal].tone} className="shrink-0">{SIGNAL_META[m.signal].label}</Tag>
+                    <Tag tone={m.signal ? SIGNAL_META[m.signal].tone : "neutral"} className="shrink-0">{m.signal ? SIGNAL_META[m.signal].label : "Unclassified"}</Tag>
                   </li>
                 ))}
               </ul>

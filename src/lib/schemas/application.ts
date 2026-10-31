@@ -19,9 +19,14 @@ export const ApplicationSchema = z.object({
   candidateId: z.string(),
   jobId: z.string(),
   resumeVersionId: z.string().nullable(),
-  submittedByUserId: z.string(),
+  /** Null for a Saved draft: saving a job is not evidence that anyone submitted an application. */
+  submittedByUserId: z.string().nullable(),
 
   status: ApplicationStatus,
+  statusRevision: z.number().int().nonnegative().default(0),
+  pendingReviews: z.array(z.object({
+    id: z.string(), messageId: z.string(), revision: z.number().int(), reason: z.string(),
+  })).default([]),
 
   companyNameAtApply: z.string(),
   jobTitleAtApply: z.string(),

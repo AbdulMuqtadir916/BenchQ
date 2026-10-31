@@ -6,6 +6,8 @@
 Every route, its layout, its states, its permissions and its keyboard map. If a screen isn't in
 here, it doesn't get built — propose it first.
 
+Inbox status handling (user-confirmed 2026-10-31): fresh uniquely matched classifications at confidence >=0.6 update the application directly under backend policy. Completed automatic results show no suggestion or Confirm status control. Low-confidence, job-related unmatched/ambiguous and stale/policy-blocked results go directly to Needs BDE review. Remove the separate Needs update filter and Update suggested badges. Review forms require a genuine pending linked review or actionable unmatched result, and disappear after resolution. The Inbox refreshes queued processing and the application cache after persisted decisions; it never derives a proposed move from an assumed stage order.
+
 ---
 
 ## 0. Rules that apply to every screen
@@ -322,29 +324,30 @@ exceed the target), **Resume readiness** (verified share of the master resume's 
 unverified claims* → `/resumes/[id]?review=1`), **Best new matches**.
 
 #### Applications
-Toolbar: *Active / All* and *Board / List*, plus a one-line summary. When emails suggest updates, a
-violet strip lists them as one-click chips. **Board** — the shared `ApplicationBoard`: one column
-per stage, drag one stage forward (anything else snaps back with the reason), a read-only *Closed*
-column under *All*. Cards show role, company, the latest recruiter email as a chip, days in stage
-(amber at 3, red at 7) and the next follow-up. **List** — role, company, status, six-dot stage
-progress, latest email, applied date. Enter or click opens the **application drawer**: stage
-progress with dates, the suggested update, *Move to next stage* / *Mark not selected*, the
-**resume sent** (the exact version the client received — master or tailored, template, ATS, with a
-warning when the resume has been edited since), every matched email, and a link to
-`/applications/[id]`.
+Toolbar: *Active / All* and *Board / List*, plus derived active, closed and BDE review counts.
+**Board** — the shared `ApplicationBoard`: canonical status columns and a BDE review column after
+Applied. Pending applications appear only in review and retain their last confirmed status;
+actionable unmatched emails appear there as email cards, including when there are no applications.
+Click or Enter on a review card opens that exact candidate email in Inbox for review, linking and
+status confirmation. Review cards cannot be dragged. Other cards can move directly between
+canonical statuses. A read-only *Closed* column is available under *All*. **List** — role,
+company, status, latest email and applied date; BDE review rows open their pending email.
+Other rows open the **application drawer**, showing current status, controls and optional notes.
+It does not show status history.
 
 #### Inbox
 The candidate's Google account, connected by the BDE (candidates apply from their own address).
-Not connected → a connect card: what it does, a read-only consent step, then a staged first sync
-("Connecting → Reading → Matching to N applications → Found N updates"). Connected → address, last
-sync, *Sync now*, *Disconnect*; filter chips with counts (All, Needs update, Interviews,
-Shortlisted, Calls, Offers, Not selected); list + reader. The reader shows the proposed call or
-interview time (IST, relative), the matched application with its progress, and either *Move to …*
-or "pipeline is up to date". Nothing changes on its own — every update is confirmed.
-
-Signals detected per email: `SHORTLISTED`, `CALL_REQUEST`, `INTERVIEW_SCHEDULED`, `ASSESSMENT`,
-`OFFER`, `REJECTED`, `CONFIRMATION`. A suggestion is **derived**: it exists only while the
-application's stage is behind the stage the email implies.
+Not connected → a connect card explaining Google-hosted read-only consent and the initial three-day
+import. Connected → address, last sync, *Sync now*, *Disconnect*; filter chips with counts (All,
+Needs BDE review, Interviews, Shortlisted, Calls, Offers, Not selected); list + reader. The reader
+shows the matched application and its confirmed status. A fresh uniquely matched classification
+at confidence >=0.6 updates that status automatically under backend policy, with no suggested move
+or confirmation form. Low-confidence, actionable unmatched/ambiguous and stale/policy-blocked
+messages go directly to BDE review; only these show application/status confirmation controls.
+Resolved reviews stop showing controls. The backend's persisted decision owns review membership,
+with no inferred stage order. Other/unrelated unmatched mail stays hidden; a linked Other message
+with a genuine pending review remains reviewable. The Inbox refreshes pending processing and
+application data after classification so the UI shows the persisted status.
 
 #### Jobs
 The profile-locked job explorer. `Find jobs` plays the matching sequence (read profile → filter by
@@ -482,7 +485,10 @@ Three views over one dataset, toggled in the toolbar, selection preserved across
 Columns per `ApplicationStatus`. Cards: candidate, job, company, days in stage, next follow-up,
 owning BDE. Drag between columns transitions status optimistically and writes a ledger event; an
 invalid transition snaps back with a toast naming why. Column headers carry derived counts and
-column WIP is visible at a glance.
+column WIP is visible at a glance. BDE review contains pending application reviews and actionable
+unmatched email cards. Click or Enter opens the exact email in the candidate's Inbox; confirmed
+status stays unchanged until review. Counts include both kinds of review card. The review queue
+obeys firm and candidate visibility and never creates an application for unmatched mail.
 
 ### 7.2 Table
 TanStack Table, virtualised, grouping by candidate / BDE / company / status, column visibility and

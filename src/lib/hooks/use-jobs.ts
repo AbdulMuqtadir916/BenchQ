@@ -14,6 +14,16 @@ export function useJobs(params?: { limit?: number; offset?: number }) {
   });
 }
 
+/** Candidate-scoped live Jobs feed. It is separate from generic firm Jobs so this slice has no mock fallback. */
+export function useCandidateJobs(candidateId: string) {
+  const firmId = useFirmId();
+  return useQuery({
+    queryKey: queryKeys.candidateJobs(firmId, candidateId),
+    queryFn: () => jobsApi.listForCandidate(firmId, candidateId),
+    enabled: !!candidateId,
+  });
+}
+
 export function useJob(id: string) {
   const firmId = useFirmId();
   return useQuery({

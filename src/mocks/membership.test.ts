@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { candidatesApi } from "@/lib/api/candidates";
 import { jobsApi } from "@/lib/api/jobs";
-import { applicationsApi, followupsApi } from "@/lib/api/applications";
+import { applicationsMock as applicationsApi } from "./applications";
+import { followupsApi } from "@/lib/api/applications";
 import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
-import { inboxApi } from "@/lib/api/inbox";
 import { agentsApi } from "@/lib/api/agents";
 import { allCandidates, candidatesMock } from "./candidates";
 import { createCandidateBody } from "./create-candidate-body";
@@ -72,10 +72,10 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["documents", "byCandidate", (f, i) => documentsApi.byCandidate(f, i.candidate), false],
   ["documents", "upload", (f, i) => documentsApi.upload(f, i.candidate, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null } as never), true],
   ["documents", "remove", (f, i) => documentsApi.remove(f, i.document), true],
-  ["inbox", "byCandidate", (f, i) => inboxApi.byCandidate(f, i.candidate), false],
-  ["inbox", "connect", (f, i) => inboxApi.connect(f, i.candidate), true],
-  ["inbox", "disconnect", (f, i) => inboxApi.disconnect(f, i.candidate), true],
-  ["inbox", "markRead", (f, i) => inboxApi.markRead(f, i.message), true],
+  ["inbox", "byCandidate", (f, i) => inboxMock.byCandidate(f, i.candidate), false],
+  ["inbox", "connect", (f, i) => inboxMock.connect(f, i.candidate), true],
+  ["inbox", "disconnect", (f, i) => inboxMock.disconnect(f, i.candidate), true],
+  ["inbox", "markRead", (f, i) => inboxMock.markRead(f, i.message), true],
   ["jobMarks", "list", (f) => jobMarksApi.list(f), false],
   ["jobMarks", "mark", (f, i) => jobMarksApi.mark(f, i.job, "SAVED"), true],
   ["jobMarks", "unmark", (f, i) => jobMarksApi.unmark(f, i.job, "SAVED"), true],

@@ -22,7 +22,7 @@ jobs to `GET /api/companies` to build that object.
 
 | Call | Endpoint | Source | Response |
 |---|---|---|---|
-| list | `GET /api/jobs?limit=<0..200>&offset=<n>&sort_by=date` (+ many filters) | `list_jobs` in `backend/api/routes_jobs.py` | `{ "total": n, "jobs": [Job] }` |
+| list | `GET /api/jobs?limit=<0..200>&offset=<n>&sort_by=date` (+ many filters); candidate workspace adds `candidate_id=<uuid>` | `list_jobs` in `backend/api/routes_jobs.py` | `{ "total": n, "jobs": [Job] }`; with `candidate_id`: also `candidate_id` and `favorite_job_ids` |
 | detail | `GET /api/jobs/{job_id}` | `get_job`, same file | `Job` |
 | companies | `GET /api/companies?active=<bool>&tier=<int>` | `list_companies` in `backend/api/routes_companies.py` | `[Company]` (bare array) |
 
@@ -111,6 +111,8 @@ name `"Unknown company"`.
 - [ ] Delete mocks/JSON for both; remove `isLive` branches
 
 ## Gaps (write new ones here)
+
+- **Candidate workspace scope:** `GET /api/jobs?candidate_id=...` now intersects `candidate_jobs` with the signed-in principal's visible candidate and the firm's `firm_jobs` set. Its response includes all favorite job IDs for that candidate; favorites still require the candidate Favorites/Application write flow.
 
 - **No requirements or work-authorization rules.** Match scoring and the job-detail requirement
   matrix depend on `requirements` and `allowedWorkAuth`; with both empty, every candidate matches

@@ -1,4 +1,7 @@
 "use client";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useHref } from "@/lib/routes/use-href";
 
 import { useMemo, useState } from "react";
 import { Columns3, Calendar, Table2, type LucideIcon } from "lucide-react";
@@ -9,6 +12,7 @@ import { useApplications, useUpdateApplicationStatus } from "@/lib/hooks/use-app
 import { can, scopeApplications } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useCandidates } from "@/lib/hooks/use-candidates";
+import { useUnmatchedInboxReviews } from "@/lib/hooks/use-inbox";
 import { PageHeader } from "@/components/app/page-header";
 import { DataTable } from "@/components/app/data-table";
 import { Card } from "@/components/ui/card";
@@ -28,14 +32,18 @@ const VIEWS: Array<{ id: View; label: string; Icon: LucideIcon }> = [
 type View = "kanban" | "table" | "calendar";
 
 export default function ApplicationsPage() {
+  const router = useRouter();
+  const toHref = useHref();
   const principal = useSignedInPrincipal();
   const applicationsQuery = useApplications();
   const candidatesQuery = useCandidates();
+  const reviewsQuery = useUnmatchedInboxReviews();
   // An error must never read as an empty board (CLAUDE.md: three states, always).
-  const loadError = (applicationsQuery.error ?? candidatesQuery.error) as Error | null;
+  const loadError = (applicationsQuery.error ?? candidatesQuery.error ?? reviewsQuery.error) as Error | null;
   const retry = () => {
     void applicationsQuery.refetch();
     void candidatesQuery.refetch();
+    void reviewsQuery.refetch();
   };
   const [view, setView] = useState<View>("kanban");
   // A move on the board is a real status change (it persists, docs/03 §3.3), shown at once (optimistic).
@@ -53,12 +61,14 @@ export default function ApplicationsPage() {
   }, [applicationsQuery.data, candidatesQuery.data, principal]);
 
   function moveTo(id: string, to: ApplicationStatus) {
-    updateStatus.mutate({ id, status: to, note: null });
+    const app = apps.find((item) => item.id === id);
+    if (!app) return;
+    updateStatus.mutate({ id, status: to, note: null, expectedRevision: app.statusRevision, commandId: crypto.randomUUID() });
   }
 
   return (
     <div className="bq-page bq-page-wide">
-      <PageHeader title="Applications" subtitle={can(principal, "application.move") ? "Drag a card into the next stage." : "Every application, by stage."} />
+      <PageHeader title="Applications" subtitle={can(principal, "application.move") ? "Move a card to its current status." : "Every application, by stage."} />
       <div className="mb-4 flex flex-wrap items-center gap-1" role="tablist" aria-label="View">
         {VIEWS.map(({ id, label, Icon }) => (
           <button key={id} type="button" role="tab" aria-selected={view === id} className="bq-view-tab" onClick={() => setView(id)}>
@@ -68,8 +78,9 @@ export default function ApplicationsPage() {
         ))}
       </div>
 
-      {loadError ? <ErrorState error={loadError} onRetry={retry} /> : applicationsQuery.isLoading ? <SkeletonCard /> : view === "kanban" ? (
-        <ApplicationBoard apps={apps} candidateName={candidateName} onMove={moveTo} canAct={can(principal, "application.move")} />
+      {updateStatus.error ? <ErrorState error={updateStatus.error} onRetry={() => { updateStatus.reset(); void applicationsQuery.refetch(); }} /> : null}
+      {loadError ? <ErrorState error={loadError} onRetry={retry} /> : applicationsQuery.isLoading || candidatesQuery.isLoading || reviewsQuery.isLoading ? <SkeletonCard /> : view === "kanban" ? (
+        <ApplicationBoard apps={apps} unmatchedReviewMessages={reviewsQuery.data} candidateName={candidateName} onMove={moveTo} onOpen={(id) => router.push(toHref("applications.detail", { id }))} canAct={can(principal, "application.move")} />
       ) : view === "table" ? (
         <TableView apps={apps} candidateName={candidateName} />
       ) : (
@@ -80,11 +91,17 @@ export default function ApplicationsPage() {
 }
 
 function TableView({ apps, candidateName }: { apps: Application[]; candidateName: (id: string) => string }) {
+  const toHref = useHref();
   const columns: ColumnDef<Application, unknown>[] = [
     { id: "candidate", accessorFn: (a) => candidateName(a.candidateId), header: "Candidate", cell: ({ row }) => <span className="text-body-strong">{candidateName(row.original.candidateId)}</span> },
     { id: "job", accessorFn: (a) => a.jobTitleAtApply, header: "Role", cell: ({ row }) => <span className="text-[var(--color-text-2)]">{row.original.jobTitleAtApply}</span> },
     { id: "company", accessorFn: (a) => a.companyNameAtApply, header: "Company" },
-    { id: "status", accessorFn: (a) => a.status, header: "Status", cell: ({ row }) => <Tag tone={STATUS_TONE[row.original.status]}>{STATUS_LABEL[row.original.status]}</Tag> },
+    { id: "status", accessorFn: (a) => a.pendingReviews.length ? "BDE review" : a.status, header: "Status", cell: ({ row }) => {
+      const app = row.original;
+      const review = app.pendingReviews[0];
+      return review ? <Link className="underline" href={toHref("candidates.detail", { id: app.candidateId }, { tab: "inbox", message: review.messageId })}><Tag tone="amber">BDE review</Tag></Link>
+        : <Tag tone={STATUS_TONE[app.status]}>{STATUS_LABEL[app.status]}</Tag>;
+    } },
     { id: "applied", accessorFn: (a) => a.appliedAt ?? "", header: "Applied", cell: ({ row }) => row.original.appliedAt ? <DualTimestamp iso={row.original.appliedAt} format="relative" className="text-[var(--color-text-3)]" /> : <span className="text-[var(--color-text-3)]">—</span> },
   ];
   return <DataTable columns={columns} data={apps} getRowId={(a) => a.id} isRowSelectable={false} searchPlaceholder="Search applications…" storageKey="applications-table" pagination pageSize={15} />;

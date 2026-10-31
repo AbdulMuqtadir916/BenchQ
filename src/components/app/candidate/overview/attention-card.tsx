@@ -67,16 +67,16 @@ export function AttentionCard({ ws, actions, canAct }: { ws: CandidateWorkspace;
     }),
     ...ws.suggestions.map((s): Item => {
       const app = appById.get(s.applicationId);
-      const meta = SIGNAL_META[s.message.signal];
+      const meta = s.message.signal ? SIGNAL_META[s.message.signal] : { label: "Unclassified email", Icon: Mail, tone: "neutral" as const };
       return {
         key: `sg_${s.message.id}`,
         Icon: meta.Icon,
         tone: meta.tone,
         title: `${app?.companyNameAtApply ?? s.message.fromName}: ${meta.label.toLowerCase()}`,
-        detail: `${app?.jobTitleAtApply ?? ""} · still marked ${STATUS_LABEL[app?.status ?? "APPLIED"].toLowerCase()}`,
+        detail: `${app?.jobTitleAtApply ?? ""} · needs BDE review · current status ${STATUS_LABEL[app?.status ?? "APPLIED"].toLowerCase()}`,
         when: formatRelative(s.message.receivedAt),
         ...(canAct
-          ? { primary: { label: `Move to ${STATUS_LABEL[s.to]}`, onClick: () => actions.applySuggestion(s) }, secondary: { label: "Email", onClick: () => actions.openMessage(s.message.id) } }
+          ? { primary: { label: "Review email", onClick: () => actions.applySuggestion(s) }, secondary: { label: "Email", onClick: () => actions.openMessage(s.message.id) } }
           : { primary: { label: "Email", onClick: () => actions.openMessage(s.message.id) } }),
       };
     }),

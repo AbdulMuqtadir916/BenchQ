@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { applicationsApi } from "@/lib/api/applications";
+import { applicationsMock as applicationsApi } from "./applications";
 import { signInAs, signOutForTest } from "./sign-in-as";
 import { allApplications } from "./applications";
+import { allCandidates } from "./candidates";
 
 /**
  * Moving an application is a real write (docs/07 §2.2, applications.detail): the mock backend refuses
@@ -33,7 +34,7 @@ describe("who may move an application (mock backend)", () => {
 
   it("answers a BDE moving someone else's application exactly like a missing one (404), and changes nothing", async () => {
     await signInAs("user_adnan");
-    const sneha = allApplications.find((app) => app.firmId === "firm_hts" && app.submittedByUserId === "user_sneha")!;
+    const sneha = allApplications.find((app) => app.firmId === "firm_hts" && allCandidates.some((c) => c.id === app.candidateId && c.bdeId !== "user_adnan"))!;
     const before = sneha.status;
     const others = await failure(move(sneha.id));
     const missing = await failure(move("app_does_not_exist"));
@@ -43,8 +44,8 @@ describe("who may move an application (mock backend)", () => {
   });
 
   it("lets a BDE move their own, and a MANAGER or OWNER move anyone's", async () => {
-    const adnans = allApplications.filter((app) => app.firmId === "firm_hts" && app.submittedByUserId === "user_adnan" && app.status === "APPLIED");
-    const snehas = allApplications.filter((app) => app.firmId === "firm_hts" && app.submittedByUserId === "user_sneha" && app.status === "APPLIED");
+    const adnans = allApplications.filter((app) => app.firmId === "firm_hts" && allCandidates.some((c) => c.id === app.candidateId && c.bdeId === "user_adnan") && app.status === "APPLIED");
+    const snehas = allApplications.filter((app) => app.firmId === "firm_hts" && allCandidates.some((c) => c.id === app.candidateId && c.managerId === "user_fatima") && app.status === "APPLIED");
     await signInAs("user_adnan");
     expect(await failure(move(adnans[0]!.id))).toBe("allowed");
     await signInAs("user_fatima");

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
+import { useState } from "react";
 import { ArrowRight, CalendarClock, CheckCircle2, MailOpen } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
 import type { InboxMessage } from "@/lib/schemas/inbox";
@@ -10,25 +11,38 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { EmptyState } from "@/components/app/empty-state";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { needsBdeReview, SIGNAL_META } from "@/components/app/inbox/signal-meta";
 import { STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
 import { StageDots } from "../applications/application-list";
+import { TRACKER_STATUSES, visibleApplicationStatuses } from "@/components/app/applications/status-meta";
+import type { ApplicationStatus } from "@/lib/schemas/enums";
 import type { Suggestion } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 
 interface ReaderProps {
   message: InboxMessage | null;
   application: Application | undefined;
+  applications: Application[];
   suggestion: Suggestion | undefined;
   canAct: boolean;
   actions: CandidateActions;
 }
 
 /** One email, what it means, and the application it belongs to. */
-export function InboxReader({ message, application, suggestion, canAct, actions }: ReaderProps) {
+export function InboxReader({ message, application, applications, suggestion, canAct, actions }: ReaderProps) {
   const reduce = useReducedMotion() ?? false;
+  const [selection, setSelection] = useState<{ messageId: string; applicationId: string; status: ApplicationStatus } | null>(null);
   if (!message) return <EmptyState icon={MailOpen} title="Pick an email" description="Select an email on the left to read it here." />;
-  const meta = SIGNAL_META[message.signal];
+  const meta = message.signal ? SIGNAL_META[message.signal] : { label: "Unclassified email", Icon: MailOpen, tone: "neutral" as const };
+  const applicationId = selection?.messageId === message.id ? selection.applicationId : message.applicationId ?? "";
+  const status = selection?.messageId === message.id ? selection.status : suggestion?.to ?? message.impliedStatus ?? application?.status ?? "APPLIED";
+  const setApplication = (next: string) => setSelection({ messageId: message.id, applicationId: next, status });
+  const setConfirmedStatus = (next: ApplicationStatus) => setSelection({ messageId: message.id, applicationId, status: next });
+  const selectedApplication = applications.find((item) => item.id === applicationId);
+  const activeApplication = application ?? selectedApplication;
+  const pendingReview = application?.pendingReviews.find((review) => review.messageId === message.id);
+  const needsReview = needsBdeReview(message, !!pendingReview);
+  const isReviewableUnmatched = needsReview && !message.applicationId;
 
   return (
     <motion.article key={message.id} initial={reduce ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="flex h-full flex-col">
@@ -42,6 +56,20 @@ export function InboxReader({ message, application, suggestion, canAct, actions 
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-5">
+        {message.classificationState === "ERROR" && canAct ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3">
+            <p className="text-sm text-[var(--color-warning-fg)]">{message.classificationError ?? "Email classification failed after retries."}</p>
+            <Button size="sm" variant="secondary" onClick={() => actions.retryInboxClassification(message.id)}>Retry classification</Button>
+          </div>
+        ) : null}
+        {isReviewableUnmatched ? (
+          <div className="rounded-[var(--radius-lg)] border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3">
+            <p className="text-sm font-[550] text-[var(--color-warning-fg)]">Needs BDE review · No unique application matched</p>
+            <p className="mt-1 text-sm text-[var(--color-warning-fg)]">
+              Decider confidence {message.classificationConfidence === null ? "unavailable" : `${(message.classificationConfidence * 100).toFixed(0)}%`}. Link this email to the correct application and confirm its status; the classification has not changed an application.
+            </p>
+          </div>
+        ) : null}
         {message.scheduledFor ? (
           <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-warning-bg)] px-3 py-2.5 text-sm text-[var(--color-warning-fg)]">
             <CalendarClock size={16} aria-hidden className="shrink-0" />
@@ -63,20 +91,59 @@ export function InboxReader({ message, application, suggestion, canAct, actions 
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--color-border)] pt-3">
-              {suggestion && canAct ? (
-                <>
-                  <span className="flex-1 text-sm text-[var(--color-violet-fg)]">This email means <span className="font-[550]">{STATUS_LABEL[suggestion.to].toLowerCase()}</span> — the pipeline still says {STATUS_LABEL[application.status].toLowerCase()}.</span>
-                  <Button size="sm" onClick={() => actions.applySuggestion(suggestion)}>Move to {STATUS_LABEL[suggestion.to]}</Button>
-                </>
-              ) : (
-                <span className="flex flex-1 items-center gap-1.5 text-sm text-[var(--color-success-fg)]"><CheckCircle2 size={14} aria-hidden />Pipeline is up to date with this email.</span>
-              )}
+              {needsReview ? <span className="flex-1 text-sm text-[var(--color-warning-fg)]">Needs BDE review · current status is retained until confirmed.</span>
+                : message.classificationOutcome === "AUTO_APPLIED" || message.classificationOutcome === "NO_CHANGE" ? (
+                  <span className="flex flex-1 items-center gap-1.5 text-sm text-[var(--color-success-fg)]"><CheckCircle2 size={14} aria-hidden />{message.classificationOutcome === "AUTO_APPLIED" ? "Status updated automatically." : "No status change was needed."}</span>
+                ) : <span className="flex-1 text-sm text-[var(--color-text-3)]">{message.classificationOutcome === "REVIEW" ? "Review completed." : message.classificationState === "ERROR" ? "Classification needs retry." : "Matching and classifying…"}</span>}
               <Button size="sm" variant="ghost" onClick={() => actions.openApplication(application.id)}>Open <ArrowRight size={13} aria-hidden /></Button>
             </div>
           </div>
         ) : (
           <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] px-3 py-2.5 text-sm text-[var(--color-text-3)]">Couldn&apos;t match this email to an application.</p>
         )}
+
+        {canAct && needsReview ? (
+          <section className="space-y-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3" aria-label="Confirm application status from email">
+            <div>
+              <p className="text-sm font-[550] text-[var(--color-text)]">Review application status</p>
+              <p className="mt-1 text-caption text-[var(--color-text-3)]">
+                {pendingReview?.reason === "STATUS_REVIEW"
+                  ? "This email is older than newer application activity. Review it before confirming a status."
+                  : pendingReview?.reason === "AUTO_STATUS_DISABLED"
+                    ? "Automatic status updates are disabled. Review this email and confirm the status."
+                    : message.classificationOutcome === "REVIEW" && message.classificationConfidence !== null
+                      ? `Decider confidence ${(message.classificationConfidence * 100).toFixed(0)}% — confirm the status yourself.`
+                      : "Choose the status you want to record after reading this email."}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {!application ? (
+                <label className="min-w-48 flex-1 text-caption text-[var(--color-text-3)]">
+                  Application
+                  <select value={applicationId} onChange={(event) => setApplication(event.target.value)} className="mt-1 h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text)]">
+                    <option value="">Select application…</option>
+                    {applications.map((item) => <option key={item.id} value={item.id}>{item.jobTitleAtApply} · {item.companyNameAtApply}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              <label className="min-w-48 flex-1 text-caption text-[var(--color-text-3)]">
+                Confirmed status
+                <select value={status} onChange={(event) => setConfirmedStatus(event.target.value as ApplicationStatus)} className="mt-1 h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text)]">
+                  {(activeApplication ? TRACKER_STATUSES.filter((value) => visibleApplicationStatuses(activeApplication, [message]).includes(value) || (value === "INCOMPLETE_APPLICATION" && message.signal === "INCOMPLETE_APPLICATION")) : TRACKER_STATUSES.filter((value) => value !== "INCOMPLETE_APPLICATION" || message.signal === "INCOMPLETE_APPLICATION")).map((value) => <option key={value} value={value}>{STATUS_LABEL[value]}</option>)}
+                </select>
+              </label>
+              <Button size="sm" className="self-end" disabled={!selectedApplication} onClick={() => {
+                if (!activeApplication) return;
+                actions.reviewInboxMessage({
+                  messageId: message.id, applicationId: activeApplication.id, status,
+                  expectedRevision: activeApplication.statusRevision,
+                  reviewId: pendingReview?.id,
+                  expectedReviewRevision: pendingReview?.revision,
+                });
+              }}>Confirm status</Button>
+            </div>
+          </section>
+        ) : null}
 
         <div className="whitespace-pre-line text-body leading-relaxed text-[var(--color-text)]">{message.body}</div>
       </div>

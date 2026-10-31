@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, R
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, text, func
-from backend.models.db import get_db, Job, find_company_by_name
+from backend.models.db import get_db, Job, Application, find_company_by_name
 from backend.models.tenancy import link_job_to_firm
 from backend.api.routes_auth import current_principal
 from backend.auth.policy import is_support_view
@@ -106,6 +106,7 @@ def list_jobs(
     min_score: Optional[int] = None,
     max_score: Optional[int] = None,
     search_id: Optional[str] = None,
+    candidate_id: Optional[str] = None,
     h1b_verdict: Optional[str] = None,
     remote: Optional[bool] = None,
     location: Optional[str] = None,
@@ -124,9 +125,36 @@ def list_jobs(
     # pickers that only need title/company/scores; 200 full rows are several MB.
     brief: bool = False,
     db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+    principal: Principal = Depends(current_principal),
 ):
     search_id = uuid_filter(search_id, "search_id")
     q = scoped_jobs(db, firm_id)
+
+    candidate_uuid = uuid_filter(candidate_id, "candidate_id")
+    candidate_favorite_ids = None
+    if candidate_uuid is not None:
+        # Candidate visibility uses the same manager/BDE scope as the candidate
+        # page. The candidate_jobs link narrows the firm's shared jobs pool.
+        from backend.api.routes_candidates import _candidate
+        from backend.models.candidates import CandidateJob, FavoriteJob
+
+        candidate = _candidate(db, firm_id, principal, candidate_uuid)
+        candidate_job_ids = scoped(db, CandidateJob, firm_id, CandidateJob.job_id).filter(
+            CandidateJob.candidate_id == candidate.id
+        )
+        q = q.filter(Job.id.in_(candidate_job_ids))
+        candidate_application_rows = scoped(db, Application, firm_id, Application.job_id).filter(
+            Application.candidate_id == candidate.id,
+            Application.status != "saved",
+        )
+        q = q.filter(~Job.id.in_(candidate_application_rows))
+        candidate_favorite_ids = {
+            str(job_id)
+            for (job_id,) in scoped(db, FavoriteJob, firm_id, FavoriteJob.job_id)
+            .filter(FavoriteJob.candidate_id == candidate.id)
+            .filter(~FavoriteJob.job_id.in_(candidate_application_rows))
+            .all()
+        }
 
     if status:
         vals = [s.strip() for s in status.split(",") if s.strip()]
@@ -214,7 +242,11 @@ def list_jobs(
         for r in rows:
             for k in _BRIEF_DROPPED:
                 r.pop(k, None)
-    return {"total": total, "jobs": rows}
+    result = {"total": total, "jobs": rows}
+    if candidate_uuid is not None:
+        result["candidate_id"] = str(candidate_uuid)
+        result["favorite_job_ids"] = sorted(candidate_favorite_ids or set())
+    return result
 
 
 # The long text fields a `brief=1` listing leaves out.

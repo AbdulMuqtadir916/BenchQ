@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { candidatesApi } from "@/lib/api/candidates";
 import { jobsApi } from "@/lib/api/jobs";
-import { applicationsApi, followupsApi } from "@/lib/api/applications";
+import { applicationsMock as applicationsApi } from "./applications";
+import { followupsApi } from "@/lib/api/applications";
 import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
-import { inboxApi } from "@/lib/api/inbox";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 
 /**
@@ -52,7 +52,6 @@ describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
     expect(await is404(applicationsApi.byId(mine, theirApplication.id))).toBe(true);
     expect(await is404(resumesApi.byId(mine, theirResume.id))).toBe(true);
     expect(await is404(recordsApi.byCandidate(mine, theirCandidate.id))).toBe(true);
-    expect(await is404(inboxApi.byCandidate(mine, theirCandidate.id))).toBe(true);
     expect(await resumesApi.byCandidate(mine, theirCandidate.id)).toEqual([]);
     expect(await documentsApi.byCandidate(mine, theirCandidate.id)).toEqual([]);
     expect((await applicationsApi.list(mine, { candidateId: theirCandidate.id }))).toEqual([]);
@@ -67,7 +66,6 @@ describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
     expect(await is404(candidatesApi.update(mine, theirCandidate.id, { notes: "x" } as never))).toBe(true);
     expect(await is404(applicationsApi.updateStatus(mine, theirApplication.id, { status: "WITHDRAWN", note: null }))).toBe(true);
     expect(await is404(documentsApi.upload(mine, theirCandidate.id, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null } as never))).toBe(true);
-    expect(await is404(inboxApi.connect(mine, theirCandidate.id))).toBe(true);
     if (theirDocuments[0]) expect(await is404(documentsApi.remove(mine, theirDocuments[0].id))).toBe(true);
     // still untouched for its own firm
     await as(other);

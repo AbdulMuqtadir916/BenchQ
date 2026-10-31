@@ -31,7 +31,7 @@ export function ResumeSent({ application, resumes, isLoading = false, className 
   if (!application.resumeVersionId) {
     return (
       <p className={cn("rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] px-3 py-3 text-sm text-[var(--color-text-3)]", className)}>
-        Not submitted yet — the resume is picked when you apply.
+        {application.status === "SAVED" ? "No resume attached to this saved application." : "No resume recorded for this application."}
       </p>
     );
   }

@@ -89,4 +89,7 @@ it. Everyone else reads it.
 | # | Owner | What | Status |
 |---|---|---|---|
 | 0007 | Abdul | Candidate core tables | PR #91 |
-| 0008+ | — | Claim the next number here in your PR | — |
+| 0008 | Samad | Applications revisions, status events and BDE review foundation | Implemented/applied locally (2026-10-31; based on verified 0007); review pending |
+| 0009 | Samad | Candidate Gmail OAuth state, encrypted refresh token and sync checkpoint | Implementing in combined Applications/Inbox/Decider change set (2026-10-31) |
+| 0010 | Samad | Inbox email classification results and review linkage | Implementing in same combined change set; follows 0009 |
+| 0011 | Samad | Retained Inbox account provenance and account-scoped deduplication | Implemented/tested/applied locally 2026-11-01; follows 0010; combined-PR packaging and code-owner review required before merge |

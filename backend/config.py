@@ -8,6 +8,13 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID", "")
 GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET", "")
 GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN", "")
+CANDIDATE_GMAIL_CLIENT_ID = os.getenv("CANDIDATE_GMAIL_CLIENT_ID", "")
+CANDIDATE_GMAIL_CLIENT_SECRET = os.getenv("CANDIDATE_GMAIL_CLIENT_SECRET", "")
+CANDIDATE_GMAIL_REDIRECT_URI = os.getenv("CANDIDATE_GMAIL_REDIRECT_URI", "")
+CANDIDATE_GMAIL_ENCRYPTION_KEY = os.getenv("CANDIDATE_GMAIL_ENCRYPTION_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+CANDIDATE_EMAIL_CLASSIFICATION_ENABLED = os.getenv("CANDIDATE_EMAIL_CLASSIFICATION_ENABLED", "true").strip().lower() == "true"
+CANDIDATE_EMAIL_AUTO_STATUS_ENABLED = os.getenv("CANDIDATE_EMAIL_AUTO_STATUS_ENABLED", "true").strip().lower() == "true"
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://jobnavigator:password@db:5432/jobnavigator")
 # "production" unless told otherwise, so a forgotten setting fails safe: Secure cookies, no API docs, no demo
 # seed. docker-compose sets BENCHQ_ENV=development for local work.

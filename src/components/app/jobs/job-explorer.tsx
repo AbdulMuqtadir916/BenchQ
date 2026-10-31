@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -38,6 +38,7 @@ import { PORTALS, PortalLogo, portalForJob, type PortalKey } from "@/components/
 import { useCan } from "@/lib/auth/permissions";
 import { useHref } from "@/lib/routes/use-href";
 import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
+import { useToggleCandidateFavorite } from "@/lib/hooks/use-candidate-favorite";
 
 const REMOTE_OPTIONS: SelectOption[] = [
   { value: "ALL", label: "Any work mode" },
@@ -72,6 +73,7 @@ export function JobExplorer({
   jobs,
   candidates = [],
   applications,
+  candidateFavoriteIds,
   loading = false,
   lockedCandidate,
   initialCandidateId,
@@ -83,6 +85,8 @@ export function JobExplorer({
   jobs: Job[];
   candidates?: Candidate[];
   applications: Application[];
+  /** Candidate-scoped backend favorites. Omitted outside a candidate's Jobs tab. */
+  candidateFavoriteIds?: string[];
   loading?: boolean;
   lockedCandidate?: Candidate;
   /** Preselect a candidate context (e.g. arriving from "Find jobs" on a profile). */
@@ -93,6 +97,7 @@ export function JobExplorer({
   toolbarBordered?: boolean;
   className?: string;
 }) {
+  const toHref = useHref();
   const reduceMotion = useReducedMotion() ?? false;
   const startingCandidateId = lockedCandidate?.id ?? initialCandidateId ?? "";
   const [candidateId, setCandidateId] = useState(startingCandidateId);
@@ -101,20 +106,23 @@ export function JobExplorer({
   const deferredQuery = useDeferredValue(query);
   const [portal, setPortal] = useState("ALL");
   const [remote, setRemote] = useState("ALL");
-  const [scoreFloor, setScoreFloor] = useState(startingCandidateId ? "70" : "0");
+  const [scoreFloor, setScoreFloor] = useState(lockedCandidate ? "0" : startingCandidateId ? "70" : "0");
   const [sort, setSort] = useState(startingCandidateId ? "MATCH" : "NEWEST");
   const [selectedId, setSelectedId] = useState("");
   // Save / Hide are the person's own (docs/02 §6.x), kept by the server; only the acting roles get them.
   const canMark = useCan("job.apply");
-  const { savedIds, hiddenIds } = useJobMarks();
+  const { savedIds: personalSavedIds, hiddenIds } = useJobMarks();
+  const candidateFavoriteMode = Boolean(lockedCandidate && candidateFavoriteIds !== undefined);
+  const savedIds = candidateFavoriteMode ? new Set(candidateFavoriteIds) : personalSavedIds;
   const toggleMark = useToggleJobMark();
+  const toggleCandidateFavorite = useToggleCandidateFavorite(lockedCandidate?.id ?? "");
   const [showHidden, setShowHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const context = lockedCandidate ?? candidates.find((candidate) => candidate.id === candidateId) ?? null;
   const appliedIds = useMemo(
-    () => new Set(context ? applications.filter((application) => application.candidateId === context.id).map((application) => application.jobId) : []),
+    () => new Set(context ? applications.filter((application) => application.candidateId === context.id && application.status !== "SAVED").map((application) => application.jobId) : []),
     [applications, context],
   );
 
@@ -123,7 +131,7 @@ export function JobExplorer({
     const minimum = Number(scoreFloor);
     const list = jobs
       .filter((job) => job.isActive && job.dedupe.duplicateOfJobId === null && (showHidden || !hiddenIds.has(job.id)))
-      .filter((job) => !context || (job.allowedWorkAuth.includes(context.workAuth) && !appliedIds.has(job.id)))
+      .filter((job) => !context || ((!job.allowedWorkAuth.length || job.allowedWorkAuth.includes(context.workAuth)) && !appliedIds.has(job.id)))
       .map((job) => ({ job, score: context ? deriveMatchScore(context, job) : null, portal: portalForJob(job) }))
       .filter(({ job, score, portal: rowPortal }) => {
         if (normalizedQuery && !`${job.title} ${job.company.name} ${job.city ?? ""} ${job.state ?? ""}`.toLowerCase().includes(normalizedQuery)) return false;
@@ -145,8 +153,40 @@ export function JobExplorer({
   const arrivedToday = rows.filter(({ job }) => job.postedAt && renderedAt - new Date(job.postedAt).getTime() < 86_400_000).length;
   const activeFilterCount = [portal !== "ALL", remote !== "ALL", Number(scoreFloor) > 0, Boolean(query)].filter(Boolean).length;
 
-  function toggleSaved(id: string) {
-    toggleMark.mutate({ jobId: id, kind: "SAVED", on: !savedIds.has(id) });
+  function toggleSaved(job: Job) {
+    const on = !savedIds.has(job.id);
+    if (candidateFavoriteMode && lockedCandidate) {
+      const application = applications.find((item) => item.candidateId === lockedCandidate.id && item.jobId === job.id);
+      toggleCandidateFavorite.mutate({ job, on, applicationId: application?.id });
+    } else {
+      toggleMark.mutate({ jobId: job.id, kind: "SAVED", on });
+    }
+  }
+
+  /** Save a candidate job before opening its external application page. */
+  function openJobUrl(job: Job, url: string) {
+    if (!candidateFavoriteMode || !canMark || savedIds.has(job.id)) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (toggleCandidateFavorite.isPending) return;
+
+    // Open a window during the click gesture so popup blockers do not discard it
+    // while the candidate-scoped save request completes.
+    const popup = window.open("about:blank", "_blank");
+    if (popup) popup.opener = null;
+    void toggleCandidateFavorite.mutateAsync({ job, on: true })
+      .then(() => {
+        if (popup) popup.location.assign(url);
+        else window.location.assign(url);
+      })
+      .catch(() => popup?.close());
+  }
+
+  function interceptJobUrl(event: ReactMouseEvent<HTMLAnchorElement>, job: Job, url: string) {
+    if (!candidateFavoriteMode || !canMark) return;
+    event.preventDefault();
+    openJobUrl(job, url);
   }
 
   /** Hide a job from your own feed, or bring it back while hidden jobs are shown. */
@@ -173,6 +213,7 @@ export function JobExplorer({
 
   return (
     <section className={cn("space-y-3", className)} aria-label={lockedCandidate ? `Jobs matched to ${lockedCandidate.fullName}` : "Job explorer"}>
+      {candidateFavoriteMode && toggleCandidateFavorite.error ? <p role="alert" className="rounded-[var(--radius-md)] bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger-fg)]">Could not update the saved job: {toggleCandidateFavorite.error.message}</p> : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-body-strong text-[var(--color-text)]">
@@ -267,7 +308,7 @@ export function JobExplorer({
                       </button>
                       {canMark ? (
                         <div className="flex flex-col border-l border-[var(--color-border)]">
-                          <button type="button" aria-label={savedIds.has(job.id) ? "Unsave job" : "Save job"} aria-pressed={savedIds.has(job.id)} onClick={() => toggleSaved(job.id)} className="flex flex-1 items-center justify-center text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-danger-fg)]">
+                          <button type="button" disabled={candidateFavoriteMode && toggleCandidateFavorite.isPending} aria-label={savedIds.has(job.id) ? "Unsave job" : "Save job"} aria-pressed={savedIds.has(job.id)} onClick={() => toggleSaved(job)} className="flex flex-1 items-center justify-center text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-danger-fg)] disabled:cursor-wait disabled:opacity-60">
                             <Heart size={14} fill={savedIds.has(job.id) ? "currentColor" : "none"} />
                           </button>
                           <button type="button" aria-label={hiddenIds.has(job.id) ? "Unhide job" : "Hide job"} onClick={() => toggleHidden(job.id)} className="flex flex-1 items-center justify-center border-t border-[var(--color-border)] text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]">
@@ -295,10 +336,12 @@ export function JobExplorer({
                 copied={copied}
                 onMenuToggle={() => setMenuOpen((open) => !open)}
                 onCopy={() => copyJobLink(selected.job)}
+                onOpenSource={(url) => openJobUrl(selected.job, url)}
+                onApply={() => openJobUrl(selected.job, selected.job.applyUrl ?? selected.job.provenance.sourceUrl ?? toHref("jobs.detail", { id: selected.job.id }))}
                 isHidden={hiddenIds.has(selected.job.id)}
                 onHide={canMark ? () => toggleHidden(selected.job.id) : null}
               />
-              <SourcePreview job={selected.job} portal={selected.portal} />
+              <SourcePreview job={selected.job} portal={selected.portal} onOpenSource={(event, url) => interceptJobUrl(event, selected.job, url)} />
             </motion.div>
           ) : (
             <div className="flex h-full min-h-[520px] items-center justify-center p-8 text-center">
@@ -324,6 +367,8 @@ function JobDetailHeader({
   copied,
   onMenuToggle,
   onCopy,
+  onOpenSource,
+  onApply,
   isHidden,
   onHide,
 }: {
@@ -335,6 +380,8 @@ function JobDetailHeader({
   copied: boolean;
   onMenuToggle: () => void;
   onCopy: () => void;
+  onOpenSource: (url: string) => void;
+  onApply: () => void;
   isHidden: boolean;
   /** Null for a read-only viewer: no Hide in the menu. */
   onHide: (() => void) | null;
@@ -359,8 +406,8 @@ function JobDetailHeader({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer">Open source<ExternalLink size={13} /></a></Button>
-          {context && canApply ? <Button size="sm"><Sparkles size={13} />Tailor & apply</Button> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
+          <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => { if (context && canApply) { event.preventDefault(); onOpenSource(sourceUrl); } }}>Open source<ExternalLink size={13} /></a></Button>
+          {context && canApply ? <Button size="sm" onClick={onApply}><Sparkles size={13} />Tailor & apply</Button> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
           <Button variant="secondary" size="icon" aria-label="More job actions" aria-expanded={menuOpen} onClick={onMenuToggle}><MoreHorizontal size={15} /></Button>
         </div>
       </div>
@@ -376,7 +423,7 @@ function JobDetailHeader({
         {menuOpen ? (
           <motion.div initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.985 }} transition={POPOVER_TRANSITION} className="absolute right-5 top-16 z-30 w-56 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-md)]">
             <button type="button" onClick={onCopy} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]">{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? "Link copied" : "Copy job link"}</button>
-            <a href={sourceUrl} target="_blank" rel="noreferrer" className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"><ExternalLink size={14} />Open in new tab</a>
+            <a href={sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => { if (context && canApply) { event.preventDefault(); onOpenSource(sourceUrl); } }} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"><ExternalLink size={14} />Open in new tab</a>
             {onHide ? (
               <button type="button" onClick={onHide} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-danger-fg)] hover:bg-[var(--color-danger-bg)]">{isHidden ? <><Eye size={14} />Unhide this job</> : <><EyeOff size={14} />Hide this job</>}</button>
             ) : null}
@@ -387,7 +434,7 @@ function JobDetailHeader({
   );
 }
 
-function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) {
+function SourcePreview({ job, portal, onOpenSource }: { job: Job; portal: PortalKey; onOpenSource: (event: ReactMouseEvent<HTMLAnchorElement>, url: string) => void }) {
   const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl;
   const lines = job.description.split("\n").filter(Boolean);
   return (
@@ -398,7 +445,7 @@ function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) {
             <PortalLogo portal={portal} domain={job.company.domain} size={32} />
             <div className="min-w-0"><div className="text-body-strong text-[var(--color-text)]">{PORTALS[portal].label} source preview</div><div className="truncate text-caption text-[var(--color-text-3)]">{sourceUrl ?? job.company.websiteUrl ?? "Source URL unavailable"}</div></div>
           </div>
-          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">Open original<ArrowUpRight size={13} /></a> : null}
+          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => onOpenSource(event, sourceUrl)} className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">Open original<ArrowUpRight size={13} /></a> : null}
         </header>
         <div className="p-5">
           <div className="mb-5 flex items-start gap-3">

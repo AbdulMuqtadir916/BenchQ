@@ -27,6 +27,7 @@ from backend.api.routes_cover_letters import router as cover_letters_router
 from backend.api.routes_linkedin import router as linkedin_router
 from backend.api.routes_autofill import router as autofill_router
 from backend.api.routes_llm import router as llm_router
+from backend.api.routes_inbox import router as inbox_router
 from backend.api.routes_auth import router as auth_router
 from backend.api.routes_admin import router as admin_router
 from backend.api.routes_firms import router as firms_router
@@ -170,6 +171,7 @@ app.include_router(cover_letters_router, prefix="/api")
 app.include_router(linkedin_router, prefix="/api")
 app.include_router(autofill_router, prefix="/api")
 app.include_router(llm_router, prefix="/api")
+app.include_router(inbox_router, prefix="/api")
 
 
 # A malformed UUID in a path (/api/jobs/abc) makes Postgres raise DataError deep in
