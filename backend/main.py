@@ -11,6 +11,7 @@ from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun
 from backend.seed import run_seeds
 from backend.auth.access import enforce as enforce_access
+from backend.auth import throttle
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
@@ -128,6 +129,20 @@ def _pool_busy_response() -> JSONResponse:
         content={"detail": "Database is busy, retry shortly"},
         headers={"Retry-After": "5"},
     )
+
+
+# ── Per-user rate limit (docs/team/uzair.md §1) ──────────────────────────────
+# Registered before enforce_access so it runs inside it (the middleware added first runs innermost): by then
+# request.state.principal is set for a signed-in request. Signed-out requests have no principal and pass through.
+@app.middleware("http")
+async def limit_per_user(request: Request, call_next):
+    principal = getattr(request.state, "principal", None)
+    if principal is not None:
+        try:
+            throttle.check_user(principal)
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
+    return await call_next(request)
 
 
 # ── Sessions and access (07 Q37, Q38) ────────────────────────────────────────
