@@ -1,5 +1,5 @@
-"""Rate limits on the public auth routes (07-auth §2), in memory: sign-in failures per client IP and per email, and
-invite acceptance attempts per client IP.
+"""Rate limits (07-auth §2, docs/team/uzair.md §1), in memory: sign-in failures per client IP and per email, invite
+acceptance attempts per client IP, and every request per signed-in user.
 
 In-memory is right for the one backend worker the deployment runs (docs/integration/07); shared state in
 Postgres or Redis comes with a second worker. A restart forgives everything, which is fine.
@@ -20,6 +20,9 @@ EMAIL_LIMIT = (5, 15 * 60.0)
 # Every accept attempt counts, not just failures. An invite's token can't be guessed, so this only stops a
 # client hammering the route; it is loose enough for an office of new BDEs accepting from one address.
 INVITE_ACCEPT_LIMIT = (20, 15 * 60.0)
+# Every request a signed-in firm user makes. A BDE clicking job by job stays far below this; it stops a broken script
+# or a screen stuck in a loop. In production a proxy in front of Next also limits per IP (uzair.md §1).
+USER_LIMIT = (300, 60.0)
 
 TOO_MANY = "Too many attempts. Try again in a few minutes."
 
@@ -83,6 +86,17 @@ def check_invite_accept(request: Request) -> None:
     now = time.monotonic()
     key = f"invite-ip:{client_ip(request)}"
     _refuse_if_over(key, INVITE_ACCEPT_LIMIT, now)
+    _hits.setdefault(key, []).append(now)
+
+
+def check_user(principal) -> None:
+    """Any signed-in request: count it, or raise 429 with Retry-After when the user is over their budget. A Super
+    Admin (in or out of a support view) is never limited. A refused request isn't counted."""
+    if principal.is_platform:
+        return
+    now = time.monotonic()
+    key = f"user:{principal.user_id}"
+    _refuse_if_over(key, USER_LIMIT, now)
     _hits.setdefault(key, []).append(now)
 
 

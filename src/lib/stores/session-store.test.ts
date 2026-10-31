@@ -1,12 +1,15 @@
 import { liveSession } from "@/lib/api/live-session";
-import { afterEach, describe, expect, it } from "vitest";
-import { applySession } from "@/lib/hooks/use-session";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api/client";
+import { http } from "@/lib/api/http";
+import { applySession, checkSession } from "@/lib/hooks/use-session";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "./session-store";
 
 /** The client session store (docs/07 §3, Phase L): who is signed in, never which firm a page shows. */
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   useSession.getState().reset();
   signOutForTest();
 });
@@ -73,5 +76,42 @@ describe("applySession: start-up and other tabs (docs/07 L4, Q27)", () => {
     applySession(liveSession()); // the same principal again: no change
     stop();
     expect(commits).toEqual(["padm_sana"]);
+  });
+});
+
+describe("checkSession: the refresh on start-up, another tab's change and a demo-data change (useSessionSync, useDemoDataSync)", () => {
+  /** /api/auth/me answers with this failure, through the real session adapter. */
+  const meFails = (error: Error) => vi.spyOn(http, "get").mockRejectedValue(error);
+
+  it.each([
+    ["a 429 from the rate limit", new ApiError("Too many attempts. Try again in a few minutes.", "RATE_LIMITED", 429)],
+    ["a 503 from a busy database", new ApiError("Database is busy, retry shortly", "UNAVAILABLE", 503)],
+    ["the network", new ApiError("Can't reach the BenchQ backend. Check that it is running.", "NETWORK", 0)],
+  ])("keeps the signed-in user through %s: it says nothing about the session", async (_, error) => {
+    state().setSession(await signInAs("user_adnan"));
+    meFails(error);
+    await checkSession();
+    expect([state().principal?.userId, state().bootstrapping]).toEqual(["user_adnan", false]);
+  });
+
+  it("still signs this tab out on a 401: the session is gone", async () => {
+    state().setSession(await signInAs("user_adnan"));
+    meFails(new ApiError("Sign in to continue.", "UNAUTHENTICATED", 401));
+    await checkSession();
+    expect(state().principal).toBeNull();
+  });
+
+  it("finishes start-up on a failed check rather than waiting forever", async () => {
+    useSession.setState({ bootstrapping: true });
+    meFails(new ApiError("Too many attempts. Try again in a few minutes.", "RATE_LIMITED", 429));
+    await checkSession();
+    expect(state().bootstrapping).toBe(false);
+  });
+
+  it("drops a late answer once its caller is gone", async () => {
+    state().setSession(await signInAs("user_adnan"));
+    meFails(new ApiError("Sign in to continue.", "UNAUTHENTICATED", 401));
+    await checkSession(() => false);
+    expect(state().principal?.userId).toBe("user_adnan");
   });
 });
