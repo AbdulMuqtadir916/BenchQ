@@ -106,6 +106,23 @@ export function applySession(session: Session | null): void {
 }
 
 /**
+ * Ask the session layer who is signed in, and apply the answer. Only "signed out" signs this tab out: `current()`
+ * answers null for a 401. Any other failure (a 429 from the rate limit, a 503, the network) says nothing about the
+ * session, so who is signed in stays as it is and the next check asks again. `isAlive` lets an unmounted caller drop
+ * a late answer.
+ */
+export function checkSession(isAlive: () => boolean = () => true): Promise<void> {
+  return sessionApi.current().then(
+    (session) => {
+      if (isAlive()) applySession(session);
+    },
+    () => {
+      if (isAlive()) useSession.getState().setBootstrapped();
+    },
+  );
+}
+
+/**
  * Mounted once, above the per-principal remount (query provider): asks the session layer who is
  * signed in on start-up, then follows other tabs. Until the first answer the store is bootstrapping
  * and every gate shows its skeleton.
@@ -113,11 +130,7 @@ export function applySession(session: Session | null): void {
 export function useSessionSync() {
   useEffect(() => {
     let alive = true;
-    const refresh = () =>
-      sessionApi.current().then(
-        (session) => alive && applySession(session),
-        () => alive && applySession(null),
-      );
+    const refresh = () => checkSession(() => alive);
     void refresh();
     const stop = sessionApi.watch(() => void refresh());
     return () => {

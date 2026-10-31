@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { demoDataApi } from "@/lib/api/demo-data";
-import { sessionApi } from "@/lib/api/session";
-import { applySession } from "@/lib/hooks/use-session";
+import { checkSession } from "@/lib/hooks/use-session";
 
 /** After the data changed underneath: refetch everything, and re-check who is signed in (a reset can remove an account). */
 async function afterDataChange(queryClient: QueryClient): Promise<void> {
-  applySession(await sessionApi.current().catch(() => null));
+  await checkSession();
   await queryClient.invalidateQueries();
 }
 
