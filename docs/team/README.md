@@ -10,7 +10,7 @@ Firm ─ Owner ─ Manager ─ BDE ─ Candidate
                                   │  (a set of info + its own status: ON_BENCH, INTERVIEWING, …)
                                   ├─ Searches + jobs found for them   (job scraping)
                                   ├─ Favorite jobs                    (marked by the BDE, used by the extension)
-                                  ├─ Résumés: one base, many tailored
+                                  ├─ Résumés: bases (one active), tailored, every edit a version
                                   ├─ Applications                     (job + tailored résumé + status)
                                   ├─ Mailbox + emails                 (the candidate's own inbox, linked to applications)
                                   ├─ Record: claims + evidence        (Truth Guard: nothing VERIFIED without evidence)
@@ -44,6 +44,7 @@ it. Everyone else reads it.
 | `searches` (candidate columns), `candidate_jobs`, `jobs`, `companies`, `job_locations`, `firm_jobs` | Zuhair | `jobs` is the shared pool (07 Q37) |
 | `favorite_jobs` | Samad | Written by the BDE in the app and read by the extension |
 | `resumes`, `cover_letters`, `tracer_links`, `tracer_click_events` | Zuhair | |
+| `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
 | `claims`, `evidence` | Zuhair | Truth Guard is enforced in the database; never relax it |
 | `applications`, `interviews` | Samad | |
 | `candidate_mailboxes`, `inbox_messages` | Samad | |

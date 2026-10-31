@@ -57,18 +57,27 @@ Unique (`candidate_id`, `job_id`).
 
 Unique (`candidate_id`, `job_id`). Reassigning the candidate keeps their favorites.
 
-### Résumés: one base, many tailored (Q53e)
+### Résumés: bases and tailored résumés, versioned (Q53e)
 
-**`resumes`** + `candidate_id` (UUID → `candidates`, nullable for rows from before 0007; the routes require it from
-now on) + `resume_parse_id` (UUID → `resume_parses`, nullable).
+**0007 added** to `resumes`: `candidate_id` (UUID → `candidates`, nullable for rows from before 0007; the routes
+require it from now on) and `resume_parse_id` (UUID → `resume_parses`, nullable).
 
-- **Base résumé** (`is_base = true`, `parent_id` null): uploaded or generated when the profile is created; made from
-  the kept résumé parse (`resume_parse_id`). **One per candidate** (a partial unique index).
-- **Tailored résumé** (`is_base = false`): made from the base for one job: `parent_id` → the base, `job_id` → the job.
-  A candidate has many. The routes enforce "a tailored résumé has a base and a job" (Zuhair), not a database CHECK:
-  jobs and base résumés can be deleted, and their `ON DELETE SET NULL` would then break such a check.
-- Applying picks a tailored résumé (`applications.resume_id`). Once an application points at it, its content is what
-  was sent: the tailoring routes must not change it afterwards (Zuhair).
+**Résumé versioning replaces the "one base" rule** (agreed with Abdul 2026-10-31; full spec, migrations 0008 and 0009:
+[resume-versioning.md](./resume-versioning.md)):
+
+- **Bases:** a candidate has many bases in a new table, `base_resumes` (`source` `UPLOAD` / `PROMOTED`,
+  `resume_parse_id` for an upload), and **exactly one is active** (a partial unique index). The first is made from
+  the kept résumé parse at candidate create.
+- **`resumes` holds every version of every résumé:** `base_resume_id` → its base, `category` (`BASE` / `TAILORED`)
+  instead of `is_base`, `job_id` for a tailored one, and `version` (1, 2, 3…). One résumé is one
+  `(base_resume_id, category, job_id)`; an edit inserts the next version, and a row's content never changes.
+- **Tailored résumé:** made from the active base's version 1 for one job. A candidate has many. Whether "a tailored
+  résumé has a job" is a database CHECK or a route rule is decided in 0008: `jobs` can be deleted, and
+  `resumes.job_id`'s `ON DELETE SET NULL` would then break such a check.
+- **Dropped in 0009** (approved by Abdul): `resumes.is_base`, `parent_id`, `json_data`, `resume_parse_id` (moved to
+  `base_resumes`), `updated_at`, and the one-base index `uq_resumes_one_base_per_candidate`.
+- Applying picks a tailored résumé version (`applications.resume_id`). Rows never change, so what was sent stays
+  exactly as it was.
 
 ### Applications (Q53d)
 
