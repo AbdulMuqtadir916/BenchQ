@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, Text, DateTime, Date,
-    ForeignKey, JSON, Index, UniqueConstraint, create_engine, text
+    ForeignKey, JSON, Index, UniqueConstraint, create_engine, text, CheckConstraint, ForeignKeyConstraint
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import backref, column_property, declarative_base, deferred, relationship, sessionmaker
 
 from backend.config import DATABASE_URL
@@ -505,20 +505,61 @@ class Resume(Base):
     candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=True,
                           index=True)
     resume_parse_id = Column(UUID(as_uuid=True), ForeignKey("resume_parses.id", ondelete="RESTRICT"), nullable=True)
-    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
+    # Deleting a job deletes the résumés tailored for it (Abdul, 2026-11-01): a tailored résumé always has its job.
+    # An application still blocks deleting a job it names, so a résumé that was sent stays.
+    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=True)
     template = Column(String, default=lambda: first_template("resume_templates"))
     page_format = Column(String, default="letter")
     json_data = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
+    # Versioning (docs/team/resume-versioning.md §3.3, migration 0008). One résumé is one (base_resume_id, category,
+    # job_id); each saved edit is its next `version`, and a row's content is never updated. Rows from before 0008 have
+    # no base (PR 6 converts them), so the version rules below hold for rows with a base only.
+    base_resume_id = Column(UUID(as_uuid=True), nullable=True)            # composite FK below: same candidate
+    category = Column(String, nullable=False, default="BASE", server_default=text("'BASE'"))
+    version = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
+    # The content, one column per section of the parser's format (§2); ids on every item (§3.4). Empty is [], never NULL.
+    full_name = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    state = Column(String, nullable=True)
+    country = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    work_authorization = Column(String, nullable=True)
+    github = Column(String, nullable=True)
+    linkedin = Column(String, nullable=True)
+    summary = Column(Text, nullable=True)
+    skills = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    experiences = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    projects = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    educations = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    certifications = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    awards = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    languages = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+
     __table_args__ = (
+        # 0007's one-base rule, for rows from before versioning only (0008): a versioned candidate has many bases and
+        # many base versions. Abdul approved dropping it; PR 6 does, once the old rows are converted.
         Index("uq_resumes_one_base_per_candidate", "candidate_id", unique=True,
-              postgresql_where=text("is_base AND candidate_id IS NOT NULL")),
+              postgresql_where=text("is_base AND candidate_id IS NOT NULL AND base_resume_id IS NULL")),
+        CheckConstraint("category IN ('BASE', 'TAILORED')", name="ck_resumes_category_values"),
+        CheckConstraint("base_resume_id IS NULL OR (category = 'BASE' AND job_id IS NULL) "
+                        "OR (category = 'TAILORED' AND job_id IS NOT NULL)", name="ck_resumes_category_job"),
+        # A composite foreign key isn't checked while one of its columns is null, so a versioned row names its candidate.
+        CheckConstraint("base_resume_id IS NULL OR candidate_id IS NOT NULL", name="ck_resumes_base_has_candidate"),
+        ForeignKeyConstraint(["base_resume_id", "candidate_id"], ["base_resumes.id", "base_resumes.candidate_id"],
+                             name="fk_resumes_base_candidate", ondelete="RESTRICT"),
+        Index("uq_resumes_version", "base_resume_id", "category", "job_id", "version", unique=True,
+              postgresql_nulls_not_distinct=True, postgresql_where=text("base_resume_id IS NOT NULL")),
     )
 
     parent = relationship("Resume", remote_side=[id], backref="tailored_versions")
-    job = relationship("Job", backref="resumes")
+    # passive_deletes: let the database cascade; otherwise the ORM would null job_id on the children first.
+    job = relationship("Job", backref=backref("resumes", passive_deletes=True))
 
 
 # ── Cover Letter ──────────────────────────────────────────────────────────────

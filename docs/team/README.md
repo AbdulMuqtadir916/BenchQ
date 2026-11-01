@@ -90,4 +90,5 @@ it. Everyone else reads it.
 | # | Owner | What | Status |
 |---|---|---|---|
 | 0007 | Abdul | Candidate core tables | PR #91 |
-| 0008+ | — | Claim the next number here in your PR | — |
+| 0008 | Zuhair | Résumé versioning: `base_resumes`, the new `resumes` columns, `award` claims (additive) | `feat/base-resumes-schema` |
+| 0009+ | — | Claim the next number here in your PR | — |

@@ -133,13 +133,42 @@ class ResumeParse(Base):
     )
 
 
+BASE_RESUME_SOURCES = ("UPLOAD", "PROMOTED")
+
+
+class BaseResume(Base):
+    """One of a candidate's base résumés (docs/team/resume-versioning.md §3.2, migration 0008): an entry on their shelf
+    of bases, holding no content. Its content is its `resumes` versions (category BASE); the active one is what
+    tailoring and job search use. Made from an upload (with the parse it came from) or promoted by a person from a
+    version. Owner: Zuhair."""
+    __tablename__ = "base_resumes"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False)
+    source = Column(String, nullable=False)
+    resume_parse_id = Column(UUID(as_uuid=True), _restrict("resume_parses.id"), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    created_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
+    created_at = _created_at()
+
+    __table_args__ = (
+        CheckConstraint(_in("source", BASE_RESUME_SOURCES), name="ck_base_resumes_source_values"),
+        CheckConstraint("source = 'PROMOTED' OR resume_parse_id IS NOT NULL", name="ck_base_resumes_source"),
+        # For the composite foreign key from resumes: a version's base belongs to the same candidate.
+        UniqueConstraint("id", "candidate_id", name="uq_base_resumes_id_candidate"),
+        Index("uq_base_resumes_one_active", "candidate_id", unique=True, postgresql_where=text("is_active")),
+        Index("ix_base_resumes_firm_candidate", "firm_id", "candidate_id"),
+    )
+
+
 # ── The candidate core (docs/team/00-candidate-core.md, migration 0007, 07 Q53) ────────────────────────────────────
 # Everything a candidate has, fixed before the team splits up. Owners in docs/team/README.md §3: add columns to your
 # own tables only; renaming or removing one needs Abdul.
 
 FIELD_SOURCES = ("MANUAL", "RESUME_UPLOAD", "LINKEDIN_EXPORT", "INTAKE_CALL", "AI_EXTRACTED")   # FieldSource (enums.ts)
 CLAIM_STATES = ("VERIFIED", "UNVERIFIED", "CONTRADICTED")
-CLAIM_ENTITY_TYPES = ("summary", "experience", "skill", "project", "certificate", "education")
+CLAIM_ENTITY_TYPES = ("summary", "experience", "skill", "project", "certificate", "education", "award")   # award: 0008
 MAILBOX_PROVIDERS = ("GOOGLE",)
 MAILBOX_STATUSES = ("CONNECTED", "DISCONNECTED", "ERROR")
 
