@@ -8,7 +8,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.db_schema import check_schema_at_head
-from backend.models.db import SessionLocal, Setting, JobRun
+from backend.models.db import SessionLocal, Setting, JobRun, engine
+from backend import statement_timeout
 from backend.seed import run_seeds
 from backend.auth.access import enforce as enforce_access
 from backend.auth import throttle
@@ -117,19 +118,14 @@ app.add_middleware(
 )
 
 
-# ── DB pool saturation → 503, fast ───────────────────────────────────────────
+# ── DB pool saturation and slow queries → 503, fast ──────────────────────────
 # The engine's pool_timeout is short (5 s) so a drained pool fails instead of
-# hanging. Both surfaces of that failure answer the same way: a 503 with
-# Retry-After, never a 30 s stall or a stack trace.
-from sqlalchemy.exc import TimeoutError as _PoolTimeout
+# hanging, and a query past its statement timeout is cancelled by Postgres
+# (backend/statement_timeout.py). Both answer the same way: a 503 with
+# Retry-After, never a long stall or a stack trace.
+from sqlalchemy.exc import OperationalError as _OperationalError, TimeoutError as _PoolTimeout
 
-
-def _pool_busy_response() -> JSONResponse:
-    return JSONResponse(
-        status_code=503,
-        content={"detail": "Database is busy, retry shortly"},
-        headers={"Retry-After": "5"},
-    )
+statement_timeout.install(engine)
 
 
 # ── Per-user rate limit (docs/team/uzair.md §1) ──────────────────────────────
@@ -152,8 +148,14 @@ app.middleware("http")(enforce_access)
 
 
 # ── Request body size (docs/team/uzair.md §1) ────────────────────────────────
-# Added last, so it runs first: an oversized request is refused (413) before the session is looked up.
+# Added after enforce_access, so it runs before it: an oversized request is refused (413) before the session is
+# looked up.
 app.add_middleware(BodySizeLimit)
+
+
+# ── Statement timeout for web requests (docs/team/uzair.md §1) ───────────────
+# Added last, so it runs first: every query of the request, the session lookup included, gets the web limit.
+app.add_middleware(statement_timeout.WebRequestMarker)
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -195,7 +197,16 @@ async def _bad_uuid_to_404(request: Request, exc: _SADataError):
 async def _pool_timeout_to_503(request: Request, exc: _PoolTimeout):
     """A handler that could not get a connection answers 503, not 500."""
     logger.warning("DB pool exhausted on %s %s", request.method, request.url.path)
-    return _pool_busy_response()
+    return statement_timeout.busy_response()
+
+
+@app.exception_handler(_OperationalError)
+async def _statement_timeout_to_503(request: Request, exc: _OperationalError):
+    """A query cancelled at its statement timeout answers 503; any other OperationalError stays a 500."""
+    if not statement_timeout.is_statement_timeout(exc):
+        raise exc
+    logger.warning("Query timed out on %s %s: %s", request.method, request.url.path, exc.statement)
+    return statement_timeout.busy_response()
 
 
 @app.get("/health", tags=["system"], summary="Health check")
