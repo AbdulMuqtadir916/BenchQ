@@ -19,9 +19,12 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
    résumés (anonymised fixtures).
 3. **The Record from the parse:** on create, turn the kept parse into **claims** (experience bullets, skills,
    education, certificates, summary), all `UNVERIFIED`, with `source`, and **evidence** pointing at the parse
-   (`evidence.resume_parse_id`, the excerpt). Move `candidates.skills` into `claims` (then drop the column, with
-   Abdul). Never VERIFIED here: the database refuses it without evidence, and verification is a person's act.
-4. **The base résumé:** made from the parse (`resumes` with `is_base`, `resume_parse_id`, one per candidate).
+   (`evidence.resume_parse_id`, the excerpt). The excerpt quotes the original file (`resume_parses.content`), never
+   `parse`: the parser rewrites for ATS, so `parse` is the AI's wording, not proof. Move `candidates.skills` into
+   `claims` (then drop the column, with Abdul). Never VERIFIED here: the database refuses it without evidence, and
+   verification is a person's act.
+4. **The base résumé:** made from the parse at candidate create, as the first of the candidate's bases
+   (`base_resumes`, one active) and its version 1 in `resumes`. Spec and PR plan: [resume-versioning.md](./resume-versioning.md).
 5. **Frontend live:** the Record (`src/lib/api/records.ts`) behind `records`, with a DTO mapper and a real sample.
 
 ## 2. Job scraping — per candidate (Q53b)
@@ -38,10 +41,10 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
 ## 3. Résumé tailoring (+ ATS score) (Track 04, `docs/integration/04-resumes-and-tailoring.md`)
 
 1. Its Phase 0 design review first (no code).
-2. **Tailored résumés** from the base for one job (`is_base = false`, `parent_id` → base, `job_id`), many per
-   candidate. The claims a tailored résumé uses keep their state; an UNVERIFIED claim blocks export (CLAUDE.md).
-3. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is not changed by tailoring
-   again; tailor a new one.
+2. **Tailored résumés** from the active base's version 1 for one job (`category = 'TAILORED'`, `base_resume_id`,
+   `job_id`; [resume-versioning.md](./resume-versioning.md) §4), many per candidate. The claims a tailored résumé uses keep their state; an UNVERIFIED claim blocks export (CLAUDE.md).
+3. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
+   or re-tailoring inserts the next version.
 4. **ATS score** for a tailored résumé against its job (`cv_score` / `score-check` today).
 5. Frontend live behind `resumes`.
 

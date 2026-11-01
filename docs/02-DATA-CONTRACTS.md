@@ -779,7 +779,7 @@ export const ResumeDraftSchema = z.object({
 ```
 
 Onboarding never produces a `VERIFIED` claim (Q49): skills and the summary land in the Record as `UNVERIFIED` with
-their `FieldSource`.
+their `FieldSource`. `ResumeDraftSchema` gains `country` with the new parser (§8.1).
 
 ---
 
@@ -1217,6 +1217,50 @@ export const ExportGateSchema = z.object({
   message: z.string().nullable(),
 });
 ```
+
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul), NOT BUILT
+
+Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
+every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
+
+**How a `Resume` maps to the backend:** one `Resume` is one `(base_resume_id, category, job_id)` group of `resumes`
+rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateId` ← `template`, `name` ← `name`,
+`versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
+`ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
+
+```ts
+// src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker
+export const BaseResumeSchema = z.object({
+  id: z.string(),
+  firmId: z.string(),
+  candidateId: z.string(),
+  source: z.enum(['UPLOAD', 'PROMOTED']),   // from an upload, or a version a person chose as the base
+  isActive: z.boolean(),                    // exactly one per candidate
+  createdByUserId: z.string(),
+  createdAt: z.string().datetime(),
+});
+
+// ResumeSchema gains:
+  baseResumeId: z.string().nullable(),      // null only for résumés from before versioning
+
+// src/lib/schemas/resume-draft.ts — ResumeDraftSchema gains:
+  country: z.string().nullable(),           // header.country as printed; null when not printed (never guessed)
+
+// src/lib/schemas/resume-document.ts — the studio's content gains:
+export const AwardEntrySchema = z.object({
+  id: z.string(), name: z.string(), issuer: z.string(), date: z.string(), detail: z.string(),
+});
+// ResumeDocumentSchema: awards: z.array(AwardEntrySchema), languages: z.array(z.string()) (kept, never printed);
+// ResumeSectionKey: + 'awards'
+
+// src/lib/schemas/record.ts — RecordEvidenceSchema.entityType becomes, matching the backend's claims.entity_type:
+  entityType: z.enum(['experience', 'skill', 'project', 'certificate', 'summary', 'education', 'award']),
+```
+
+- `ResumeDraftSchema.city` and `.state` are read straight from the parser's `header.city` / `header.state`
+  (the parser splits the location; `splitLocation` is no longer used for the draft).
+- Change `src/lib/schemas/` to match this only in the PR that builds it (versioning PR 2 for `country`, PR 7 for
+  the rest).
 
 ---
 
