@@ -1,6 +1,7 @@
 # Résumé versioning — `resume_parses`, `base_resumes`, `resumes` (Zuhair)
 
-Design agreed 2026-10-31 by Zuhair, with the approvals in §1 from Abdul. **Nothing here is built yet.** This file is
+Design agreed 2026-10-31 by Zuhair, with the approvals in §1 from Abdul. **Built so far: the parser (§2–§2.2, PR 2).**
+The tables, the workflow and the screens (PRs 3–7) are not built yet. This file is
 the single reference for building it: the tables (§3), the workflow (§4), the frontend contract (§5), permissions
 (§6) and the PR plan (§7). Owner of all three tables: Zuhair (`docs/team/README.md` §3).
 
@@ -36,7 +37,7 @@ properties). It replaces the current format in `src/lib/api/dto/resume-parse.ts`
 | `work_experience` | `[{job_title, company, location, dates, start, end, current, bullets[]}]` | — |
 | `projects` | `[{name, url, dates, technologies, bullets[]}]` | — |
 | `education` | `[{degree, institution, graduation_date, grade}]` | — |
-| `certifications` | `[string]` | — |
+| `certifications` | `[{name, issuer, date, detail}]` | **was `[string]`** (2026-11-01): with one string, the model glued a certification's description to its name |
 | `awards` | `[{name, issuer, date, detail}]` | **new** |
 | `languages` | `[string]` | **new** |
 
@@ -174,7 +175,7 @@ All reads, edits, tailoring, previews and downloads go through this table.
 | `experiences` | jsonb | | `[{id, job_title, company, location, dates, start, end, current, bullets: [{id, text}]}]` | **new** |
 | `projects` | jsonb | | `[{id, name, url, dates, technologies, bullets: [{id, text}]}]` | **new** |
 | `educations` | jsonb | | `[{id, degree, institution, graduation_date, grade}]` | **new** |
-| `certifications` | jsonb | | `[{id, name}]` | **new** |
+| `certifications` | jsonb | | `[{id, name, issuer, date, detail}]` | **new** |
 | `awards` | jsonb | | `[{id, name, issuer, date, detail}]` | **new** |
 | `languages` | jsonb | | `[{id, name}]` | **new** |
 | `created_by_user_id` | uuid | FK → users | Who saved this version | **new** |
@@ -367,7 +368,7 @@ and contracts.
 | # | Branch | What | Migration |
 |---|---|---|---|
 | 1 | `docs/resume-versioning` | This file; the docs/02 §8.1 addition (§5); the 00-candidate-core résumé rewrite; `zuhair.md` 1.3, 1.4, 3.2 and 3.3 updated; `base_resumes` in `docs/team/README.md` §3. No code. | — |
-| 2 | `feat/parser-format-v2` | The new parser (§2–§2.2, from the parser handoff): prompts, strict format, `clean_reply`, link addresses for PDF and DOCX, the `call_llm` options, the settings rows and save check. Frontend: `BackendResumeParseSchema`, `toResumeDraft`, `splitSkills` (bracket depth 0), `ResumeDraftSchema.country`, the mock fixture. The wizard and `applyDraft` are unchanged. Tests, including anonymised real-résumé fixtures. | — |
+| 2 | `feat/parser-format-v2` (**built**) | The new parser (§2–§2.2, from the parser handoff): prompts, strict format, `clean_reply`, link addresses for PDF and DOCX, the `call_llm` options, the settings rows and save check. Frontend: `BackendResumeParseSchema`, `toResumeDraft`, `splitSkills` (bracket depth 0), `ResumeDraftSchema.country`, the mock fixture. The wizard and `applyDraft` are unchanged. Tests; the real-résumé tests run on the team's test résumés, which are shared separately and kept out of the repo. | — |
 | 3 | `feat/base-resumes-schema` | **Additive only**: `base_resumes`, the new `resumes` columns, CHECKs, indexes, composite FK; `award` in `ck_claims_entity_type`; SQLAlchemy models; constraint tests; claim **0008** in `docs/team/README.md` §6. No behaviour change. | **0008** |
 | 4 | `feat/base-resume-from-parse` | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
 | 5 | `feat/resume-versions` | Routes: save an edit as the next version; "use as base"; list bases + versions; pick a base (v1 flips, v2+ promotes); tailor from the active base's v1 (also sets `candidate_id`, which the tailor route doesn't today). `resume.edit`, `access.py`, `isolation_cases.py`. | — |

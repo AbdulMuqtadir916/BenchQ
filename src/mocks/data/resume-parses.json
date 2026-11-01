@@ -5,7 +5,9 @@
       "header": {
         "name": "Ravi Teja Kommineni",
         "title": "Senior Java Full Stack Developer",
-        "location": "Irving, TX",
+        "city": "Irving",
+        "state": "TX",
+        "country": "",
         "email": "ravi.kommineni@example.com",
         "phone": "(469) 555-0182",
         "work_authorization": "H1B",
@@ -57,7 +59,9 @@
       "education": [
         { "degree": "B.Tech, Computer Science", "institution": "JNTU Hyderabad", "graduation_date": "May 2014", "grade": "8.1 CGPA" }
       ],
-      "certifications": ["AWS Certified Developer – Associate"]
+      "certifications": [{ "name": "AWS Certified Developer – Associate", "issuer": "Amazon Web Services", "date": "2022", "detail": "" }],
+      "awards": [{ "name": "Star Performer", "issuer": "Capital Payments Inc.", "date": "2023", "detail": "" }],
+      "languages": ["English", "Telugu"]
     }
   },
   {
@@ -66,7 +70,9 @@
       "header": {
         "name": "Priyanka Nair",
         "title": "Data Engineer",
-        "location": "Charlotte, NC",
+        "city": "Charlotte",
+        "state": "NC",
+        "country": "USA",
         "email": "priyanka.nair@example.com",
         "phone": "",
         "work_authorization": "Green Card holder",
@@ -126,7 +132,9 @@
       "education": [
         { "degree": "M.S. Data Science", "institution": "UNC Charlotte", "graduation_date": "Dec 2018", "grade": "" }
       ],
-      "certifications": ["SnowPro Core"]
+      "certifications": [{ "name": "SnowPro Core", "issuer": "Snowflake", "date": "", "detail": "" }],
+      "awards": [],
+      "languages": []
     }
   },
   {
@@ -135,7 +143,9 @@
       "header": {
         "name": "Karthik S",
         "title": "",
-        "location": "New Jersey",
+        "city": "",
+        "state": "New Jersey",
+        "country": "",
         "email": "karthik.s[at]example.com",
         "phone": "+1 732 555 0144",
         "work_authorization": "Authorized to work in the US",
@@ -160,7 +170,9 @@
       ],
       "projects": [],
       "education": [],
-      "certifications": []
+      "certifications": [],
+      "awards": [],
+      "languages": []
     }
   }
 ]

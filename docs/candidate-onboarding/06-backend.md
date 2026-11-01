@@ -31,9 +31,11 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 >
 > **PR 3 built:** `POST /api/firms/{id}/candidates/parse-resume` (OWNER, MANAGER: `candidate.create`). PDF via
 > pdfplumber, `.docx` via python-docx (tables included), `.doc` refused; 413/415/422 with the frontend's wording. One
-> call to AI module `resume_parse` (primary model; prompt in setting `resume_parse_prompt`, an AI preset), logged to
-> `llm_call_log` as `resume_parse`. The answer is held to Zuhair's format (unknown keys dropped, missing ones "" or [])
-> and kept 60 minutes in `resume_parses`; expired unused parses are cleared on the firm's next read.
+> call to AI module `resume_parse`, logged to `llm_call_log` as `resume_parse`, and kept 60 minutes in `resume_parses`;
+> expired unused parses are cleared on the firm's next read. **Since versioning PR 2** the call is the base-résumé
+> parser ([resume-versioning.md](../team/resume-versioning.md) §2): its own model (`resume_parse_llm_*`, OpenRouter,
+> never the primary's), a strict response format, and `clean_reply` (`backend/candidates/base_resume.py`) storing the
+> format's own keys.
 >
 > **PR 4 built:** `GET/POST /api/firms/{id}/candidates`, `GET/PATCH …/candidates/{cid}`, `POST …/{cid}/assign`. Reads
 > are scoped (`team_scope` for a MANAGER, `own_scope` for a BDE; outside is 404). Create and assign check
@@ -111,18 +113,20 @@ table).
 
 ### Parser response
 
-As shared by Zuhair (`Copy of Response Formats For Parser And Tailoring Resume`). The frontend maps it in
-`src/lib/api/dto/resume-parse.ts` ([04 §5](./04-wizard-steps.md#5-parser-to-form-mapping)).
+The base-résumé parser's format (resume-versioning.md §2; it replaced the first format in versioning PR 2). The
+frontend maps it in `src/lib/api/dto/resume-parse.ts` ([04 §5](./04-wizard-steps.md#5-parser-to-form-mapping)).
 
 | Field | Type |
 |---|---|
-| `header` `{ name, title, location, email, phone, work_authorization, github, linkedin }` | strings |
+| `header` `{ name, title, city, state, country, email, phone, work_authorization, github, linkedin }` | strings; city, state and country as printed, empty when not |
 | `professional_summary` | string |
 | `technical_skills[]` `{ category, skills }` | `skills` is one comma-separated string |
 | `work_experience[]` `{ job_title, company, location, dates, start, end, current, bullets[] }` | `start`/`end` "YYYY-MM" or "YYYY"; empty when not printed or ongoing |
 | `projects[]` `{ name, url, dates, technologies, bullets[] }` | |
 | `education[]` `{ degree, institution, graduation_date, grade }` | `graduation_date` as printed |
-| `certifications[]` | strings |
+| `certifications[]` `{ name, issuer, date, detail }` | as printed; `detail` only when stated |
+| `awards[]` `{ name, issuer, date, detail }` | as printed; `detail` only when stated |
+| `languages[]` | strings; stored, never printed |
 
 ## 5. Candidates (PR 4)
 
@@ -165,7 +169,7 @@ Found while mapping the format to the form (04 §5). None blocks onboarding; eac
 | G5 | `header.work_authorization` is free text | return one of the nine statuses (or null) plus the printed text, so matching isn't redone in the frontend |
 | G6 | Total years of experience are inside `professional_summary` text | return `years_experience` as a number |
 | G7 | `technical_skills[].skills` is one comma-separated string | return an array |
-| G8 | `header.location` is one string | return `city` and `state` |
+| G8 | ~~`header.location` is one string~~ | **Done** (versioning PR 2): the parser returns `city`, `state` and `country` |
 
 ## 7. Seed and tests (PR 5)
 

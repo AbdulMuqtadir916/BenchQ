@@ -65,8 +65,21 @@ def resolve_llm_config(feature: str = "", db=None) -> dict:
 async def call_llm(prompt: str, system: str, max_tokens: int = 1200,
                    cached_prefix: str | None = None,
                    provider: str | None = None, model: str | None = None,
-                   api_key: str | None = None, effort: str | None = None) -> dict:
-    """Route to the configured LLM provider with retry + automatic fallback; provider/model/api_key/effort override the Primary for this call when given, else fall back to the llm_* settings."""
+                   api_key: str | None = None, effort: str | None = None,
+                   response_format: dict | None = None, reasoning_off: bool = False,
+                   use_fallback: bool = True, retry_cut_off: bool = False,
+                   attempt_timeout: float | None = None) -> dict:
+    """Route to the configured LLM provider with retry + automatic fallback; provider/model/api_key/effort override the Primary for this call when given, else fall back to the llm_* settings.
+
+    The rest are off by default, so every other caller behaves as before (the résumé parser turns them on,
+    docs/team/resume-versioning.md §2.1):
+    - `response_format`: a strict `json_schema` format, sent with `provider.require_parameters` so OpenRouter
+      only routes to a host that honours it. OpenRouter only; another provider refuses the call.
+    - `reasoning_off`: `reasoning: {enabled: false}` in place of any effort. OpenRouter only.
+    - `use_fallback=False`: the llm_fallback_* model is never called (it wouldn't carry the strict format).
+    - `retry_cut_off`: a reply cut off at the output cap is a failed attempt, retried.
+    - `attempt_timeout`: seconds per attempt; running out raises LLMDeadlineError, with no further attempts.
+    """
     MAX_ATTEMPTS = 4
     BACKOFF_BASE = 2  # seconds: 2, 4, 8
 
@@ -91,14 +104,24 @@ async def call_llm(prompt: str, system: str, max_tokens: int = 1200,
     # Only claude_api supports explicit prompt caching — other providers get the
     # prefix concatenated into the prompt (no cache discount).
     caching = bool(cached_prefix) and provider == "claude_api"
+    # Passed on only when set, so a call without them is dispatched exactly as before.
+    options = {k: v for k, v in (("response_format", response_format), ("reasoning_off", reasoning_off),
+                                 ("retry_cut_off", retry_cut_off)) if v}
 
     # Try primary with retries
     last_primary_err = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             logger.info(f"LLM call: provider={provider}, model={model}, attempt={attempt}/{MAX_ATTEMPTS}, caching={'on' if caching else 'off'}")
-            res = await _dispatch(provider, model, api_key, prompt, system, max_tokens,
-                                  cached_prefix=cached_prefix, effort=effort)
+            sent = _dispatch(provider, model, api_key, prompt, system, max_tokens,
+                             cached_prefix=cached_prefix, effort=effort, **options)
+            if attempt_timeout is None:
+                res = await sent
+            else:
+                try:
+                    res = await asyncio.wait_for(sent, attempt_timeout)
+                except asyncio.TimeoutError:
+                    raise LLMDeadlineError(f"{model} gave no answer within {attempt_timeout:g}s")
             return {**res, "provider": provider, "model": model}
         except Exception as e:
             last_primary_err = e
@@ -113,7 +136,7 @@ async def call_llm(prompt: str, system: str, max_tokens: int = 1200,
                 logger.warning(f"LLM primary exhausted {MAX_ATTEMPTS} attempts: {e}")
 
     # Try fallback with retries
-    if fallback_provider and fallback_model:
+    if use_fallback and fallback_provider and fallback_model:
         fb_caching = bool(cached_prefix) and fallback_provider == "claude_api"
         last_fallback_err = None
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -301,8 +324,15 @@ async def _stream_openai(prompt, system, model, api_key, max_tokens, base_url=No
 
 async def _dispatch(provider: str, model: str, api_key: str,
                     prompt: str, system: str, max_tokens: int,
-                    cached_prefix: str | None = None, effort: str = "") -> dict:
-    """Route to the correct provider; only `claude_api` supports prompt caching, others get cached_prefix concatenated into the prompt (no cache discount). `effort` reaches only the providers in REASONING_EFFORTS."""
+                    cached_prefix: str | None = None, effort: str = "",
+                    response_format: dict | None = None, reasoning_off: bool = False,
+                    retry_cut_off: bool = False) -> dict:
+    """Route to the correct provider; only `claude_api` supports prompt caching, others get cached_prefix concatenated into the prompt (no cache discount). `effort` reaches only the providers in REASONING_EFFORTS. The strict format and reasoning-off are OpenRouter's (see call_llm)."""
+    if response_format is not None or reasoning_off:
+        if provider != "openrouter":
+            # Dropping either quietly would send an unenforced, reasoning call; refuse instead.
+            raise NonRetryableLLMError(f"a strict response format and reasoning off need openrouter, not {provider}")
+        effort = ""                  # reasoning off replaces any effort, and adds no reasoning headroom
     effort = _supported_effort(provider, effort)
     max_tokens = _output_cap(provider, max_tokens, effort)
     if provider == "claude_api":
@@ -320,8 +350,14 @@ async def _dispatch(provider: str, model: str, api_key: str,
     elif provider == "openrouter":
         # OpenRouter is OpenAI-API-compatible — same client, different base URL.
         # One key reaches every vendor's models (model slug is vendor-prefixed).
+        extra = {}
+        if response_format is not None:
+            extra["provider"] = {"require_parameters": True}
+        if reasoning_off:
+            extra["reasoning"] = {"enabled": False}
         return await _call_openai(combined, system, model, api_key, max_tokens,
-                                  base_url=OPENROUTER_BASE_URL, effort=effort)
+                                  base_url=OPENROUTER_BASE_URL, extra_body=extra or None, effort=effort,
+                                  response_format=response_format, retry_cut_off=retry_cut_off)
     elif provider == "lmstudio":
         # LM Studio serves an OpenAI-compatible API on :1234; no key (client wants a non-empty string).
         # Override with LMSTUDIO_BASE_URL when the backend is containerized (e.g. http://host.docker.internal:1234/v1).
@@ -440,6 +476,10 @@ class CLITimeoutError(RuntimeError):
 
 class NonRetryableLLMError(RuntimeError):
     """A failure a retry cannot fix (not logged in, usage limit); call_llm goes straight to the fallback."""
+
+
+class LLMDeadlineError(NonRetryableLLMError):
+    """An attempt ran past call_llm's `attempt_timeout`: someone is waiting, so no further attempts."""
 
 
 CLI_TIMEOUT = 300   # seconds one subscription-CLI completion may take before it is killed
@@ -716,12 +756,15 @@ async def _call_antigravity_cli(prompt: str, system: str, model: str, max_tokens
 
 
 async def _call_openai(prompt: str, system: str, model: str, api_key: str, max_tokens: int,
-                       base_url: str | None = None, extra_body: dict | None = None, effort: str = "") -> dict:
+                       base_url: str | None = None, extra_body: dict | None = None, effort: str = "",
+                       response_format: dict | None = None, retry_cut_off: bool = False) -> dict:
     """Call the OpenAI API, or any OpenAI-compatible endpoint via base_url."""
     client = _openai_client(api_key, base_url)  # base_url=None → OpenAI default
     kwargs = _openai_kwargs(max_tokens, effort, base_url)
     if extra_body:
         kwargs["extra_body"] = {**kwargs.get("extra_body", {}), **extra_body}
+    if response_format is not None:
+        kwargs["response_format"] = response_format
     response = await client.chat.completions.create(
         model=model,
         messages=[
@@ -732,6 +775,9 @@ async def _call_openai(prompt: str, system: str, model: str, api_key: str, max_t
     )
     choice = response.choices[0]
     text = (choice.message.content or "").strip()
+    if retry_cut_off and choice.finish_reason == "length":
+        # A reply cut off at the cap is unusable (a strict JSON object missing its end); another attempt may fit.
+        raise RuntimeError(f"{model} reply was cut off at the {max_tokens}-token output cap")
     if not text and choice.finish_reason == "length":
         raise NonRetryableLLMError(
             f"{model} used the whole output cap on reasoning and returned no text; lower the reasoning effort")

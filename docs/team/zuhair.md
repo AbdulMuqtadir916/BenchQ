@@ -16,7 +16,8 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
    preferred locations, contact notes; anything else). Write the list with types and why, **confirm it with Abdul**,
    then migrate (claim the number in the team README §6) and update `docs/02-DATA-CONTRACTS.md` §4.
 2. **Parser quality:** the prompt (`resume_parse` AI module, `DEFAULT_PROMPT`), the fields it misses, tests on real
-   résumés (anonymised fixtures).
+   résumés (anonymised fixtures). **Done in résumé versioning PR 2** ([resume-versioning.md](./resume-versioning.md)
+   §2): the base-résumé parser on its own model, with the team's 14 test résumés and their recorded replies as fixtures.
 3. **The Record from the parse:** on create, turn the kept parse into **claims** (experience bullets, skills,
    education, certificates, summary), all `UNVERIFIED`, with `source`, and **evidence** pointing at the parse
    (`evidence.resume_parse_id`, the excerpt). The excerpt quotes the original file (`resume_parses.content`), never

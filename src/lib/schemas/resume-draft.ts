@@ -17,6 +17,8 @@ export const ResumeDraftSchema = z.object({
   linkedinUrl: z.string().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
+  /** The country as the header prints it ("India", "USA"); null when it prints none, never guessed (docs/02 §8.1). */
+  country: z.string().nullable(),
   /** Derived from the work history's dates by the mapper. */
   yearsExperience: z.number().nullable(),
   /** Matched from the printed work authorization; null when it didn't match. */

@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react"],
     // forbidden() and forbidden.tsx: a real 403 for a route the principal may not open (docs/07 Phase D).
     authInterrupts: true,
+    // How long the /api rewrite below waits for the backend (Next's default is 30 s). The résumé parse may take 80 s
+    // an attempt and 4 attempts (docs/team/resume-versioning.md §2.1), about 5.5 minutes at worst, so 6 minutes.
+    // Changed in Uzair's area (docs/team/cross-area-changes.md).
+    proxyTimeout: 360_000,
   },
   // Proxy the FastAPI backend so browser requests stay same-origin (no CORS,
   // and the backend's HTTP-only session cookie is sent automatically).
