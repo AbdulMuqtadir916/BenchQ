@@ -323,6 +323,9 @@ class Application(Base):
                           index=True)
     resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
     submitted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
+    status_revision = Column(Integer, nullable=False, server_default=text("0"), default=0)
+    status_effective_at = Column(DateTime(timezone=True), nullable=True)
+    last_manual_change_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String, default="applied")
     # applied|interview|offer|rejected. Retired screening/phone_screen/final_round
     # values were backfilled before the baseline (0001); status_transitions is left unchanged.
@@ -341,9 +344,56 @@ class Application(Base):
               postgresql_where=text("candidate_id IS NOT NULL")),
     )
 
+    reviews = relationship("ApplicationReview", order_by="ApplicationReview.created_at")
+    status_events = relationship("ApplicationStatusEvent", order_by="ApplicationStatusEvent.occurred_at")
     job = relationship("Job", back_populates="applications")
     interviews = relationship("Interview", back_populates="application",
                               cascade="all, delete-orphan", order_by="Interview.created_at")
+
+
+class ApplicationReview(Base):
+    __tablename__ = "application_reviews"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=False)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="RESTRICT"), nullable=False)
+    inbox_message_id = Column(UUID(as_uuid=True), ForeignKey("inbox_messages.id", ondelete="RESTRICT"), nullable=False)
+    state = Column(String, nullable=False, default="PENDING", server_default=text("'PENDING'"))
+    reason = Column(Text, nullable=False)
+    application_revision = Column(Integer, nullable=False)
+    revision = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, server_default=text("now()"))
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
+    resolved_status = Column(String, nullable=True)
+    note = Column(Text, nullable=True)
+    __table_args__ = (
+        UniqueConstraint("application_id", "inbox_message_id", name="uq_application_reviews_email"),
+        CheckConstraint("state IN ('PENDING', 'RESOLVED')", name="ck_application_reviews_state"),
+        Index("ix_application_reviews_candidate_state", "firm_id", "candidate_id", "state"),
+    )
+
+
+class ApplicationStatusEvent(Base):
+    __tablename__ = "application_status_events"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=True)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="RESTRICT"), nullable=False)
+    from_status = Column(String, nullable=True)
+    to_status = Column(String, nullable=False)
+    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
+    source = Column(String, nullable=False)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    revision = Column(Integer, nullable=False)
+    command_id = Column(UUID(as_uuid=True), nullable=True)
+    review_id = Column(UUID(as_uuid=True), ForeignKey("application_reviews.id", ondelete="RESTRICT"), nullable=True)
+    note = Column(Text, nullable=True)
+    original_payload = Column(JSON, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("application_id", "command_id", name="uq_application_status_event_command"),
+        Index("ix_application_status_events_application", "firm_id", "application_id", "occurred_at"),
+    )
 
 
 class Interview(Base):

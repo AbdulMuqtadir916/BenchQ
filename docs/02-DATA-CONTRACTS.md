@@ -1266,6 +1266,38 @@ export const AwardEntrySchema = z.object({
 
 ## 9. Application, outreach, follow-up
 
+### Applications backend foundation — PR 1 (2026-11-01)
+
+This backend-only slice implements the user's agreed candidate status/history and BDE-review foundation.
+Code-owner contract/schema approval is required before merge. The existing frontend schemas below remain
+unchanged in this PR; their live DTO integration and display changes belong to later PRs.
+
+- Candidate statuses are `saved`, `applied`, `screening_call`, `shortlisted`, `interview_schedule_request`,
+  `interview_scheduled`, `assessment`, `offer`, `move_on`, `incomplete_application`, and `other`.
+  Legacy applications retain their existing four-status API. Statuses remain text; migration 0009 does not
+  rewrite existing status values or invent a status enum.
+- Application responses add nullable `candidate_id` / `submitted_by_user_id`, integer `status_revision`, nullable
+  `status_effective_at` / `last_manual_change_at`, and `pending_reviews` containing
+  `{id, message_id, revision, reason}` for each pending persisted review.
+- `GET /api/applications` accepts `candidate_id` and `tracked_only`. Candidate visibility applies to list, detail,
+  edits, interviews and preparation; legacy rows are visible to firm-wide readers only.
+- `PATCH /api/applications/{id}/candidate-status` accepts
+  `{status, expected_revision, command_id?, note?}`. A changed revision returns 409. A matching command replay
+  creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+- `PATCH /api/applications/{id}/review` also requires `review_id` and `expected_review_revision`. Only a pending
+  persisted review for this application can be confirmed; another route cannot bypass it with a normal status move.
+  Review resolution and status/event/ledger writes commit together. Model classification and review queue creation
+  from imported mail are deferred; tests seed messages using the existing 0007 tables.
+- `application_status_events` stores firm/candidate/application, from/to status, actor, source, timestamp, revision,
+  optional command/review/note and original payload. SQL update/delete is blocked by an append-only trigger.
+  `application_reviews` stores the source email, reason, application/review revision and resolution metadata.
+- Saved drafts have no submission timestamp or submitter. Status changes maintain candidate favorites. Removing
+  an untouched draft can remove its application; retained history, notes or reviews preserve it. Protected legacy
+  application deletion returns 409, including atomic validation of bulk deletion.
+- Human changes use the existing permission policy and candidate ledger. Transition notes never replace the
+  application's notes. The legacy email monitor and auto-reject scheduler leave candidate applications untouched.
+
+
 ```ts
 // src/lib/schemas/application.ts
 

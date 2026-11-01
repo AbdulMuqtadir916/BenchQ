@@ -6,6 +6,35 @@ Read first: [team README](./README.md), [00-candidate-core.md](./00-candidate-co
 
 **Starts after** the candidate core PR (0007) is merged. One branch and one PR per numbered step below, from `main`.
 
+## PR raise rules
+
+Agreed with Samad on 2026-11-01 for separating the existing combined Inbox/Applications work:
+
+1. **Check the latest `main` before every PR.** Fetch `origin/main`, start each PR branch from it, and merge or
+   rebase any newer `main` changes into the branch before publication. Resolve conflicts and run the required checks
+   against that updated branch.
+2. **One concern per PR, raised step by step.** Each PR targets `main`. Wait for the preceding dependency to be
+   approved and merged, then prepare the next branch from the updated `main`; do not stack PRs on open branches.
+3. **Split the existing work in this order:**
+   - PR 1: Applications foundation — statuses, status history, BDE review records, and migration `0009` (follows main’s résumé migration `0008`).
+   - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection and sync, and its next available migration.
+   - PR 3: Email classification — application matching, confidence rules, automatic status updates and BDE review
+     routing, and its next available migration.
+   - PR 4: Mailbox history protection — account provenance, account-scoped deduplication, and its next available migration.
+   - PR 5: Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
+   Main owns résumé migration `0008`; Applications claims `0009` in this PR. Claim later migration numbers
+   individually after checking the latest Alembic head on `main`; do not reserve numbers from the old combined branch.
+   Include dependencies needed for each PR to work independently and explain any necessary scope adjustment.
+4. **Include a Markdown change document in every PR.** Use `docs/team/pr-changes/<branch-name>.md` (replace `/`
+   in the branch name with `-`). List every added, modified, deleted, or renamed file, explain what changed in each
+   file and why, and record the PR's scope, dependencies, migration impact, validation results, and remaining limits.
+5. **Preserve existing work while splitting.** Keep the combined implementation and local UI changes available;
+   move only the relevant changes into each PR. Each PR includes its own relevant tests and documentation, with no
+   dependency on changes left only in a later branch.
+6. **Follow the repository merge gates.** Fill in the PR template, include at most one migration with a real
+   downgrade, pass the required CI checks, and obtain Abdul's code-owner approval where required. Merge using a
+   merge commit. Supersede PR #95 with links to the replacement PRs when the replacement sequence is established.
+
 ## 1. Inbox — each candidate's own Gmail, linked to their applications (D8)
 
 The candidate page already has an Inbox tab and an "Inbox" preview on its Overview, on mocks

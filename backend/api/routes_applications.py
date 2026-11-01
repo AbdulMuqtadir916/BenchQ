@@ -9,6 +9,7 @@ from sqlalchemy import desc
 from backend.models.db import get_db, Application, Job, Company, Setting, utcnow, SessionLocal
 from backend.models.tenancy import link_job_to_firm
 from backend.api.routes_auth import current_principal
+from backend.api._input import uuid_filter
 from backend.auth.scoping import reader_firm_id, scoped, writer_firm_id
 from backend.auth.sessions import Principal
 from backend.scraper._shared.bot_wall import is_bot_wall
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 
 
 VALID_STATUSES = {"applied", "interview", "offer", "rejected"}
+from backend.applications.tracking import STATUSES as CANDIDATE_STATUSES
 
 
 def _parse_dt(value):
@@ -46,6 +48,10 @@ class ApplicationCreate(BaseModel):
     title: str
     company: str
     url: str
+    # Candidate-scoped Saved jobs are created from an existing canonical job; the
+    # title/company/url above remain required for the legacy manual-application path.
+    candidate_id: Optional[uuid.UUID] = None
+    job_id: Optional[uuid.UUID] = None
     cv_version_used: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None          # applied|interview|offer (Log-application modal)
@@ -305,6 +311,83 @@ def create_application(
     principal: Principal = Depends(current_principal),
 ):
     """Create application (used by Chrome extension). Also creates job record if needed."""
+    if data.candidate_id is not None or data.job_id is not None or (data.status or "").lower() == "saved":
+        from backend.api.routes_candidates import _candidate
+        from backend.auth.ledger import record as record_ledger
+        from backend.auth.policy import can
+        from backend.auth.scoping import scoped_jobs
+        from backend.models.candidates import CandidateJob, FavoriteJob
+        from backend.models.tenancy import User
+
+        if not can(principal, "job.apply"):
+            raise HTTPException(status_code=403, detail="You don't have permission to save jobs.")
+        if data.candidate_id is None or data.job_id is None or (data.status or "").lower() != "saved":
+            raise HTTPException(status_code=400, detail="Saving requires candidate_id, job_id, and status='saved'.")
+
+        candidate = _candidate(db, firm_id, principal, data.candidate_id, lock=True)
+        job = scoped_jobs(db, firm_id).filter(Job.id == data.job_id).first()
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found.")
+        candidate_job = scoped(db, CandidateJob, firm_id).filter(
+            CandidateJob.candidate_id == candidate.id, CandidateJob.job_id == job.id
+        ).first()
+        if candidate_job is None:
+            raise HTTPException(status_code=404, detail="Job not found for this candidate.")
+
+        actor = db.get(User, principal.user_id)
+        favorite = scoped(db, FavoriteJob, firm_id).filter(
+            FavoriteJob.candidate_id == candidate.id, FavoriteJob.job_id == job.id
+        ).first()
+        if favorite is None:
+            favorite = FavoriteJob(
+                firm_id=firm_id,
+                candidate_id=candidate.id,
+                job_id=job.id,
+                marked_by_user_id=principal.user_id,
+            )
+            db.add(favorite)
+            db.flush()
+            record_ledger(
+                db, actor=actor, action="CREATE", entity_type="favorite_job", entity_id=favorite.id,
+                entity_label=job.title or "Saved job", summary=f"Saved {job.title or 'a job'} for {candidate.full_name}.",
+                firm_id=firm_id, candidate_id=candidate.id,
+            )
+
+        application = scoped(db, Application, firm_id).filter(
+            Application.candidate_id == candidate.id, Application.job_id == job.id
+        ).first()
+        if application is None:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            application = Application(
+                firm_id=firm_id,
+                candidate_id=candidate.id,
+                job_id=job.id,
+                resume_id=None,
+                submitted_by_user_id=None,
+                status="saved",
+                applied_at=None,
+                status_transitions=[{"from": None, "to": "saved", "at": now.isoformat(), "source": "ui"}],
+            )
+            db.add(application)
+            db.flush()
+            # SQLAlchemy supplies applied_at by default; a Saved draft is not a submission.
+            application.applied_at = None
+            record_ledger(
+                db, actor=actor, action="CREATE", entity_type="application", entity_id=application.id,
+                entity_label=job.title or "Saved job", summary=f"Added {job.title or 'a job'} to Saved for {candidate.full_name}.",
+                firm_id=firm_id, candidate_id=candidate.id,
+            )
+
+        db.commit()
+        return {
+            "id": str(application.id),
+            "job_id": str(job.id),
+            "candidate_id": str(candidate.id),
+            "status": application.status,
+            "favorite": True,
+        }
+
     # Generate external_id for dedup (use same normalization as scrapers)
     from backend.scraper._shared.dedup import make_external_id
     external_id = make_external_id(data.company, data.title, data.url)
@@ -413,17 +496,32 @@ def create_application(
 @router.get("")
 def list_applications(
     status: Optional[str] = None,
+    candidate_id: Optional[str] = None,
+    tracked_only: bool = False,
     limit: Annotated[int, Query(ge=0, le=2000)] = 200,
     offset: Annotated[int, Query(ge=0)] = 0,
     db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+    principal: Principal = Depends(current_principal),
 ):
     from sqlalchemy.orm import selectinload
-    q = scoped(db, Application, firm_id).options(selectinload(Application.interviews))
+    from backend.api.routes_candidates import _candidate
+
+    q = scoped(db, Application, firm_id).options(selectinload(Application.interviews), selectinload(Application.reviews))
+    from backend.api.routes_candidates import _visible
+    from backend.models.candidates import Candidate
+    from backend.auth.scoping import own_scope, team_scope
+    visible_candidates = _visible(db, firm_id, principal).with_entities(Candidate.id)
+    if tracked_only or own_scope(principal) is not None or team_scope(principal) is not None:
+        q = q.filter(Application.candidate_id.in_(visible_candidates))
     if status:
         q = q.filter(Application.status == status)
+    candidate_uuid = uuid_filter(candidate_id, "candidate_id")
+    if candidate_uuid is not None:
+        candidate = _candidate(db, firm_id, principal, candidate_uuid)
+        q = q.filter(Application.candidate_id == candidate.id)
 
     total = q.count()
-    apps = q.order_by(desc(Application.updated_at)).offset(offset).limit(limit).all()
+    apps = q.order_by(desc(Application.updated_at), Application.id).offset(offset).limit(limit).all()
 
     from backend.models.db import build_company_lookup, Resume, CoverLetter
     lookup = build_company_lookup(db)
@@ -434,22 +532,180 @@ def list_applications(
                        .filter(CoverLetter.job_id.in_(job_ids)).distinct().all()}
     tailored = {}
     if job_ids:
+        resume_candidate_scope = Resume.candidate_id.in_([a.candidate_id for a in apps if a.candidate_id])
+        if any(a.candidate_id is None for a in apps):
+            resume_candidate_scope = resume_candidate_scope | Resume.candidate_id.is_(None)
         for r in (scoped(db, Resume, firm_id)
-                  .filter(Resume.job_id.in_(job_ids), Resume.is_base == False)  # noqa: E712
-                  .order_by(Resume.updated_at.asc()).all()):
-            tailored[str(r.job_id)] = r      # asc → last write wins = most recent
+                  .filter(Resume.job_id.in_(job_ids), resume_candidate_scope,
+                          Resume.is_base == False)  # noqa: E712
+                  .order_by(Resume.updated_at.desc(), Resume.created_at.desc()).all()):
+            key = (str(r.candidate_id), str(r.job_id))
+            tailored.setdefault(key, r)
     return {
         "total": total,
-        "applications": [_app_to_dict(a, lookup, tailored.get(str(a.job_id)),
+        "applications": [_app_to_dict(a, lookup, tailored.get((str(a.candidate_id), str(a.job_id))),
                                       str(a.job_id) in with_letter) for a in apps],
     }
 
 
+@router.get("/{app_id}")
+def get_application(app_id: str, principal: Principal = Depends(current_principal),
+                    db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    from backend.models.db import build_company_lookup
+    app = _scoped_application(db, firm_id, principal, app_id)
+    return _app_to_dict(app, build_company_lookup(db))
+
+
+@router.patch("/{app_id}/candidate-status")
+def move_candidate_application_status(app_id: str, updates: dict,
+                                      principal: Principal = Depends(current_principal),
+                                      db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    from backend.applications.tracking import accessible_application, move
+    from backend.models.db import build_company_lookup
+    try:
+        app = accessible_application(db, firm_id, principal, app_id, lock=True)
+        if set(updates) - {"status", "expected_revision", "note", "command_id"}:
+            raise HTTPException(400, "Unexpected status command fields.")
+        move(db, app, principal, status=updates.get("status"),
+             expected_revision=updates.get("expected_revision"), note=updates.get("note"),
+             command_id=updates.get("command_id"))
+        db.commit()
+        return _app_to_dict(app, build_company_lookup(db))
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.patch("/{app_id}/review")
+def resolve_application_review(app_id: str, updates: dict,
+                                principal: Principal = Depends(current_principal),
+                                db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    from backend.applications.tracking import accessible_application, move
+    from backend.models.db import ApplicationReview, build_company_lookup
+    try:
+        app = accessible_application(db, firm_id, principal, app_id, lock=True)
+        if set(updates) - {"review_id", "status", "expected_revision", "expected_review_revision", "note", "command_id"}:
+            raise HTTPException(400, "Unexpected review fields.")
+        review_id = uuid_filter(updates.get("review_id"), "review_id")
+        review = scoped(db, ApplicationReview, firm_id).filter_by(
+            id=review_id, application_id=app.id, candidate_id=app.candidate_id).with_for_update().first()
+        if review is None:
+            raise HTTPException(404, "Review not found")
+        if review.state != "PENDING":
+            # The shared command service validates any replay before checking revisions.
+            if not updates.get("command_id"):
+                raise HTTPException(409, "Review was already resolved.")
+            from backend.models.db import ApplicationStatusEvent
+            command = uuid_filter(updates['command_id'], 'command_id')
+            previous = scoped(db, ApplicationStatusEvent, firm_id).filter_by(
+                application_id=app.id, command_id=command, review_id=review.id).first()
+            if previous is None:
+                raise HTTPException(409, "Review was already resolved.")
+        elif (type(updates.get("expected_review_revision")) is not int
+              or updates["expected_review_revision"] != review.revision):
+            raise HTTPException(409, "Review changed. Reload before confirming.")
+        move(db, app, principal, status=updates.get("status"),
+             expected_revision=updates.get("expected_revision"), note=updates.get("note"),
+             command_id=updates.get("command_id"), review=review)
+        db.commit()
+        return _app_to_dict(app, build_company_lookup(db))
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.patch("/{app_id}")
-def update_application(app_id: str, updates: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
-    app = scoped(db, Application, firm_id).filter(Application.id == app_id).first()
+def update_application(app_id: str, updates: dict, principal: Principal = Depends(current_principal),
+                       db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    app = scoped(db, Application, firm_id).filter(Application.id == app_id).with_for_update().first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
+
+    if "unfavorite" in updates:
+        from backend.api.routes_candidates import _candidate
+        from backend.auth.ledger import record as record_ledger
+        from backend.auth.policy import can
+        from backend.models.candidates import FavoriteJob
+        from backend.models.tenancy import User
+
+        unfavorite = updates.pop("unfavorite")
+        if unfavorite is not True or updates:
+            raise HTTPException(status_code=400, detail="Send only {unfavorite: true} to remove a favorite.")
+        if not can(principal, "job.apply"):
+            raise HTTPException(status_code=403, detail="You don't have permission to remove saved jobs.")
+        if app.candidate_id is None:
+            raise HTTPException(status_code=404, detail="Application not found")
+        candidate = _candidate(db, firm_id, principal, app.candidate_id, lock=True)
+        actor = db.get(User, principal.user_id)
+        favorite = scoped(db, FavoriteJob, firm_id).filter(
+            FavoriteJob.candidate_id == candidate.id, FavoriteJob.job_id == app.job_id
+        ).first()
+        if favorite is not None:
+            record_ledger(
+                db, actor=actor, action="DELETE", entity_type="favorite_job", entity_id=favorite.id,
+                entity_label=app.job.title or "Saved job", summary=f"Removed {app.job.title or 'a job'} from favorites for {candidate.full_name}.",
+                firm_id=firm_id, candidate_id=candidate.id,
+            )
+            db.delete(favorite)
+
+        transitions = app.status_transitions or []
+        untouched = (
+            app.status == "saved"
+            and not app.notes
+            and app.resume_id is None
+            and not app.cv_version_used
+            and not app.next_action
+            and app.next_action_date is None
+            and app.last_email_received is None
+            and not app.last_email_snippet
+            and not app.interviews
+            and not app.reviews
+            and not app.status_events
+            and len(transitions) <= 1
+        )
+        application_id = str(app.id)
+        application_status = app.status
+        if untouched:
+            record_ledger(
+                db, actor=actor, action="DELETE", entity_type="application", entity_id=app.id,
+                entity_label=app.job.title or "Saved job", summary=f"Removed untouched Saved draft for {candidate.full_name}.",
+                firm_id=firm_id, candidate_id=candidate.id,
+            )
+            db.delete(app)
+        db.commit()
+        return {
+            "favorite": False,
+            "application_id": application_id,
+            "application_preserved": not untouched,
+            "status": application_status if not untouched else None,
+        }
+
+    app = _scoped_application(db, firm_id, principal, app.id, write=True)
+    if app.candidate_id is not None:
+        from backend.applications.tracking import accessible_application, move
+        from backend.auth.policy import can
+        app = accessible_application(db, firm_id, principal, app_id, lock=True)
+        if not can(principal, "application.move"):
+            raise HTTPException(403, "You don't have permission to update applications.")
+        if set(updates) - {"status", "expected_revision", "command_id", "note", "notes"}:
+            raise HTTPException(400, "Use the candidate status command; unsupported application fields.")
+        try:
+            if "status" in updates:
+                move(db, app, principal, status=updates['status'], expected_revision=updates.get('expected_revision'),
+                     note=updates.get('note'), command_id=updates.get('command_id'))
+            if "notes" in updates:
+                if updates['notes'] is not None and not isinstance(updates['notes'], str):
+                    raise HTTPException(400, "Notes must be text.")
+                if app.notes != updates['notes']:
+                    app.notes = updates['notes']
+                    app.updated_at = utcnow()
+                    _audit_application_edit(db, app, principal, 'Updated application notes.')
+            db.commit()
+            from backend.models.db import build_company_lookup
+            return _app_to_dict(app, build_company_lookup(db))
+        except Exception:
+            db.rollback()
+            raise
 
     allowed = {"status", "notes", "next_action", "next_action_date", "cv_version_used", "applied_at"}
     if "status" in updates and updates["status"] not in VALID_STATUSES:
@@ -474,17 +730,42 @@ def update_application(app_id: str, updates: dict, db: Session = Depends(get_db)
             changed = True
     if changed:
         app.updated_at = utcnow()
+        _audit_application_edit(db, app, principal, "Updated application details.")
     db.commit()
     from backend.models.db import build_company_lookup
     lookup = build_company_lookup(db)
     return _app_to_dict(app, lookup)
 
 
+def _audit_application_edit(db, app, principal, summary):
+    from backend.auth.ledger import record
+    from backend.models.tenancy import User
+    actor = scoped(db, User, app.firm_id).filter_by(id=principal.user_id).one()
+    record(db, actor=actor, action="UPDATE", entity_type="application", entity_id=app.id,
+           entity_label=app.job.title or "Application", summary=summary,
+           firm_id=app.firm_id, candidate_id=app.candidate_id)
+
+
+def _guard_application_history(db, firm_id, app_id):
+    from backend.models.db import ApplicationStatusEvent, ApplicationReview
+    from backend.models.candidates import InboxMessage
+    for model in (ApplicationStatusEvent, ApplicationReview, InboxMessage):
+        if scoped(db, model, firm_id).filter(model.application_id == app_id).first() is not None:
+            raise HTTPException(409, "Application has retained history or email. Change its status instead of deleting it.")
+
+
 @router.delete("/{app_id}")
-def delete_application(app_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
-    app = scoped(db, Application, firm_id).filter(Application.id == app_id).first()
-    if not app:
-        raise HTTPException(status_code=404, detail="Application not found")
+def delete_application(app_id: str, principal: Principal = Depends(current_principal),
+                       db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    app = _scoped_application(db, firm_id, principal, app_id, write=True)
+    from backend.auth.policy import can
+    if not can(principal, "application.move"):
+        raise HTTPException(403, "You don't have permission to delete applications.")
+    if app.candidate_id is not None:
+        from backend.api.routes_candidates import _candidate
+        _candidate(db, firm_id, principal, app.candidate_id)
+        raise HTTPException(409, "Candidate applications are removed through Saved/favorite actions; move their status instead.")
+    _guard_application_history(db, firm_id, app.id)
     # Deleting the application must also release the job, otherwise it stays
     # status='applied' forever and keeps counting in the Companies "Apps" column.
     job = app.job
@@ -519,7 +800,8 @@ def _parse_app_id(raw):
 
 
 @router.post("/bulk-update")
-def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                             principal: Principal = Depends(current_principal)):
     """Move several applications to one status.
 
     Each row goes through the same path as PATCH /{app_id}: record_transition()
@@ -529,11 +811,14 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=
     """
     from backend.api._input import str_field
     from backend.models.db import record_transition, revert_transition
+    from backend.auth.policy import can
+    if not can(principal, "application.move"):
+        raise HTTPException(403, "You don't have permission to update applications.")
 
     ids = _bulk_ids(body)
     status = str_field(body, "status", required=True)
     undo = bool((body or {}).get("undo", False))   # the bulk toast's Undo, see PATCH
-    if status not in VALID_STATUSES:
+    if status not in VALID_STATUSES | CANDIDATE_STATUSES:
         raise HTTPException(status_code=400,
                             detail=f"status must be one of {sorted(VALID_STATUSES)}")
 
@@ -549,6 +834,18 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=
         if app is None:
             not_found.append(str(raw))
             continue
+        app = _scoped_application(db, firm_id, principal, app.id, write=True)
+        if app.candidate_id is not None:
+            from backend.applications.tracking import accessible_application, move
+            app = accessible_application(db, firm_id, principal, app.id, lock=True)
+            revisions = body.get("expected_revisions", {})
+            if not isinstance(revisions, dict):
+                raise HTTPException(400, "expected_revisions must be an object keyed by application ID.")
+            move(db, app, principal, status=status, expected_revision=revisions.get(str(app.id)))
+            updated += 1
+            continue
+        if status not in VALID_STATUSES:
+            raise HTTPException(400, "Legacy application does not support this status.")
         if app.status == status:
             skipped += 1
             continue
@@ -557,21 +854,27 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=
         else:
             record_transition(app, status, "ui")
         app.updated_at = utcnow()
+        _audit_application_edit(db, app, principal, "Updated application status.")
         updated += 1
     db.commit()
     return {"updated": updated, "skipped": skipped, "not_found": not_found}
 
 
 @router.post("/bulk-delete")
-def bulk_delete_applications(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+def bulk_delete_applications(body: dict, principal: Principal = Depends(current_principal),
+                             db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Delete several applications, exactly as DELETE /{app_id} deletes one.
 
     The job each row points at is released back to 'saved' so it stops counting
     as applied, and the row's interviews go with it (delete-orphan cascade).
     """
     ids = _bulk_ids(body)
+    from backend.auth.policy import can
+    if not can(principal, "application.move"):
+        raise HTTPException(403, "You don't have permission to delete applications.")
     deleted = 0
     not_found: list[str] = []
+    applications = {}
     for raw in ids:
         parsed = _parse_app_id(raw)
         if parsed is None:
@@ -581,6 +884,15 @@ def bulk_delete_applications(body: dict, db: Session = Depends(get_db), firm_id=
         if app is None:
             not_found.append(str(raw))
             continue
+        if app.candidate_id is not None:
+            from backend.api.routes_candidates import _candidate
+            _candidate(db, firm_id, principal, app.candidate_id)
+            raise HTTPException(409, "Candidate applications are removed through Saved/favorite actions; move their status instead.")
+        app = _scoped_application(db, firm_id, principal, app.id, write=True)
+        _guard_application_history(db, firm_id, app.id)
+        applications[app.id] = app
+    # Validate the complete batch before the first mutation.
+    for app in applications.values():
         job = app.job
         if job is not None and job.status == "applied":
             job.status = "saved"
@@ -806,12 +1118,29 @@ async def extract_posting(payload: ExtractRequest):
             "blocked": blocked}
 
 
-@router.post("/{app_id}/interviews", status_code=201)
-def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
-    from backend.models.db import Interview
+def _scoped_application(db, firm_id, principal, app_id, *, write=False):
+    """Use candidate visibility for tracked rows; legacy rows have no own/team scope."""
+    from backend.auth.policy import can
+    from backend.auth.scoping import own_scope, team_scope
+    from backend.api.routes_candidates import _candidate
+    if write and not can(principal, "application.move"):
+        raise HTTPException(403, "You don't have permission to edit interviews.")
+    app_id = uuid_filter(str(app_id), "app_id")
     app = scoped(db, Application, firm_id).filter(Application.id == app_id).first()
-    if not app:
-        raise HTTPException(status_code=404, detail="Application not found")
+    if app is None:
+        raise HTTPException(404, "Application not found")
+    if app.candidate_id is not None:
+        _candidate(db, firm_id, principal, app.candidate_id)
+    elif own_scope(principal) is not None or team_scope(principal) is not None:
+        raise HTTPException(404, "Application not found")
+    return app
+
+
+@router.post("/{app_id}/interviews", status_code=201)
+def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                  principal: Principal = Depends(current_principal)):
+    from backend.models.db import Interview
+    app = _scoped_application(db, firm_id, principal, app_id, write=True)
     iv = Interview(firm_id=app.firm_id, application_id=app.id, what=data.what, where_text=data.where_text,
                    when_at=_parse_dt(data.when_at), status=data.status or "scheduled", prep=data.prep)
     db.add(iv)
@@ -821,11 +1150,13 @@ def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_
 
 
 @router.patch("/interviews/{interview_id}")
-def update_interview(interview_id: str, updates: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+def update_interview(interview_id: str, updates: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                     principal: Principal = Depends(current_principal)):
     from backend.models.db import Interview
     iv = scoped(db, Interview, firm_id).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
+    _scoped_application(db, firm_id, principal, iv.application_id, write=True)
     for key in ("what", "where_text", "status", "prep"):
         if key in updates:
             setattr(iv, key, updates[key])
@@ -836,23 +1167,24 @@ def update_interview(interview_id: str, updates: dict, db: Session = Depends(get
 
 
 @router.delete("/interviews/{interview_id}")
-def delete_interview(interview_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+def delete_interview(interview_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                     principal: Principal = Depends(current_principal)):
     from backend.models.db import Interview
     iv = scoped(db, Interview, firm_id).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
+    _scoped_application(db, firm_id, principal, iv.application_id, write=True)
     db.delete(iv)
     db.commit()
     return {"deleted": True}
 
 
 @router.get("/{app_id}/prep")
-def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                 principal: Principal = Depends(current_principal)):
     """Assemble the interview prep handover (role, résumé, posting, and the editable `prep_ask` closing question) as plain context for an external model; no LLM call happens here."""
     from backend.models.db import Resume
-    app = scoped(db, Application, firm_id).filter(Application.id == app_id).first()
-    if not app:
-        raise HTTPException(status_code=404, detail="Application not found")
+    app = _scoped_application(db, firm_id, principal, app_id)
     job = app.job
 
     def money(lo, hi):
@@ -902,12 +1234,14 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     tailored = None
     if app.job_id:
         tailored = (scoped(db, Resume, firm_id)
-                    .filter(Resume.job_id == app.job_id, Resume.is_base == False)  # noqa: E712
+                    .filter(Resume.job_id == app.job_id, Resume.is_base == False,  # noqa: E712
+                            Resume.candidate_id == app.candidate_id)
                     .order_by(Resume.updated_at.desc()).first())
     cv_name = (tailored.name if tailored else None) or app.cv_version_used or (job.best_cv if job else None)
     src = tailored
     if not src and cv_name:
-        src = scoped(db, Resume, firm_id).filter(Resume.name == cv_name).first()
+        src = scoped(db, Resume, firm_id).filter(Resume.name == cv_name,
+                                                Resume.candidate_id == app.candidate_id).first()
     resume_text = ""
     if src and src.json_data:
         try:
@@ -946,7 +1280,15 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
     return {
         "id": str(a.id),
         "job_id": str(a.job_id),
+        "candidate_id": str(a.candidate_id) if a.candidate_id else None,
+        "submitted_by_user_id": str(a.submitted_by_user_id) if a.submitted_by_user_id else None,
         "status": a.status,
+        "status_revision": a.status_revision,
+        "status_effective_at": a.status_effective_at.isoformat() if a.status_effective_at else None,
+        "last_manual_change_at": a.last_manual_change_at.isoformat() if a.last_manual_change_at else None,
+        "pending_reviews": [{"id": str(r.id), "message_id": str(r.inbox_message_id),
+                             "revision": r.revision, "reason": r.reason}
+                            for r in a.reviews if r.state == "PENDING"],
         "applied_at": a.applied_at.isoformat() if a.applied_at else None,
         "cv_version_used": a.cv_version_used,
         "notes": a.notes,

@@ -6,6 +6,7 @@ def _make_app(status="applied"):
     """Stub Application with attributes the function reads/writes."""
     app = MagicMock()
     app.id = "app-1"
+    app.candidate_id = None
     app.status = status
     app.status_transitions = []
     return app
