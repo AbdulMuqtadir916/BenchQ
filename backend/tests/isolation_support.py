@@ -83,7 +83,8 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.flush()
     link_job_to_firm(db, firm.id, job.id, "CAPTURED", captured_by_user_id=owner.id)
     app = Application(firm_id=firm.id, job_id=job.id, status="applied", notes=f"{tag} application notes")
-    db.add(app)
+    legacy_app = Application(firm_id=firm.id, job_id=job.id, status="applied", notes=f"{tag} legacy application")
+    db.add_all([app, legacy_app])
     db.flush()
     interview = Interview(firm_id=firm.id, application_id=app.id, what=f"{tag} phone screen")
     resume = Resume(firm_id=firm.id, name=f"{tag} base résumé", is_base=True,
@@ -129,10 +130,11 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     evidence = Evidence(firm_id=firm.id, candidate_id=candidate.id, excerpt=f"{tag} evidence excerpt", source="MANUAL")
     db.add_all([mailbox, evidence])
     db.flush()
-    db.add_all([InboxMessage(firm_id=firm.id, candidate_id=candidate.id, mailbox_id=mailbox.id, application_id=app.id,
+    candidate_message = InboxMessage(firm_id=firm.id, candidate_id=candidate.id, mailbox_id=mailbox.id, application_id=app.id,
                              provider_message_id=f"{tag}-msg-1", from_name=f"{tag} recruiter",
                              from_email=f"recruiter@{tag.lower()}.test", subject=f"{tag} interview",
-                             snippet=f"{tag} snippet", received_at=utcnow()),
+                             snippet=f"{tag} snippet", received_at=utcnow())
+    db.add_all([candidate_message,
                 Claim(firm_id=firm.id, candidate_id=candidate.id, entity_type="skill", text=f"{tag} Java",
                       state="VERIFIED", evidence_id=evidence.id, source="MANUAL")])
     app.candidate_id, resume.candidate_id, tailored.candidate_id = candidate.id, candidate.id, candidate.id
@@ -142,8 +144,26 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                             manager_id=manager.id)
     ledger.record(db, actor=owner, action="UPDATE", entity_type="candidate", entity_id=uuid.uuid4(),
                   entity_label=f"{tag} candidate", summary=f"{tag} edited a candidate", firm_id=firm.id)
+    # A dedicated pending-review application exercises the review command independently.
+    from backend.models.db import ApplicationReview
+    review_job = Job(external_id=f"{tag}-review", title=f"{tag} review role", company=f"{tag} Corp", source="manual")
+    db.add(review_job)
     db.flush()
-    return {"firm": firm.id, "slug": firm.slug, "job": job.id, "app": app.id, "interview": interview.id,
+    review_app = Application(firm_id=firm.id, candidate_id=candidate.id, job_id=review_job.id, status="applied")
+    db.add(review_app)
+    db.flush()
+    review_message = InboxMessage(firm_id=firm.id, candidate_id=candidate.id, mailbox_id=mailbox.id,
+        application_id=review_app.id, provider_message_id=f"{tag}-review-email", from_name="Recruiter",
+        from_email="recruiter@example.test", subject=f"{tag} assessment", snippet="Assessment", received_at=utcnow())
+    db.add(review_message)
+    db.flush()
+    review = ApplicationReview(firm_id=firm.id, candidate_id=candidate.id, application_id=review_app.id,
+        inbox_message_id=review_message.id, reason="LOW_CONFIDENCE", application_revision=0)
+    db.add(review)
+    db.flush()
+    return {"review_app": review_app.id, "review": review.id, "review_message": review_message.id,
+            "firm": firm.id, "slug": firm.slug, "job": job.id,
+            "app": app.id, "legacy_app": legacy_app.id, "inbox_message": candidate_message.id, "interview": interview.id,
             "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id,
             "manager": manager.id, "bde_user": bde.id, "candidate": candidate.id}
 

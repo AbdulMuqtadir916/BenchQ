@@ -498,6 +498,7 @@ async def trigger_auto_reject():
             cutoff = dt.now(tz.utc) - timedelta(days=days)
             keep = ["rejected", "offer"]
             stale = db.query(Application).filter(
+                Application.candidate_id.is_(None),
                 ~Application.status.in_(keep),
                 Application.applied_at < cutoff,
             ).all()

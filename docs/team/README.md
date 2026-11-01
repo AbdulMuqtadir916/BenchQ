@@ -91,4 +91,5 @@ it. Everyone else reads it.
 |---|---|---|---|
 | 0007 | Abdul | Candidate core tables | PR #91 |
 | 0008 | Zuhair | Résumé versioning: `base_resumes`, the new `resumes` columns, `award` claims (additive) | `feat/base-resumes-schema` |
-| 0009+ | — | Claim the next number here in your PR | — |
+| 0009 | Samad | Applications foundation: revisions, immutable status events and BDE review records | PR 1 replacement, `codex/applications-foundation-v2`; code-owner review pending |
+| 0010+ | — | Claim the next number here in your PR | — |
