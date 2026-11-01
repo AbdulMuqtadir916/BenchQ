@@ -12,6 +12,7 @@ from backend.models.db import SessionLocal, Setting, JobRun
 from backend.seed import run_seeds
 from backend.auth.access import enforce as enforce_access
 from backend.auth import throttle
+from backend.body_limit import BodySizeLimit
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
@@ -148,6 +149,11 @@ async def limit_per_user(request: Request, call_next):
 # ── Sessions and access (07 Q37, Q38) ────────────────────────────────────────
 # Every route is classified in backend/auth/access.py; an unclassified one is refused.
 app.middleware("http")(enforce_access)
+
+
+# ── Request body size (docs/team/uzair.md §1) ────────────────────────────────
+# Added last, so it runs first: an oversized request is refused (413) before the session is looked up.
+app.add_middleware(BodySizeLimit)
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -492,6 +498,7 @@ async def trigger_auto_reject():
             cutoff = dt.now(tz.utc) - timedelta(days=days)
             keep = ["rejected", "offer"]
             stale = db.query(Application).filter(
+                Application.candidate_id.is_(None),
                 ~Application.status.in_(keep),
                 Application.applied_at < cutoff,
             ).all()
