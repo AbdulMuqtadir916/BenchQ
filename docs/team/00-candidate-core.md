@@ -71,9 +71,9 @@ require it from now on) and `resume_parse_id` (UUID → `resume_parses`, nullabl
 - **`resumes` holds every version of every résumé:** `base_resume_id` → its base, `category` (`BASE` / `TAILORED`)
   instead of `is_base`, `job_id` for a tailored one, and `version` (1, 2, 3…). One résumé is one
   `(base_resume_id, category, job_id)`; an edit inserts the next version, and a row's content never changes.
-- **Tailored résumé:** made from the active base's version 1 for one job. A candidate has many. Whether "a tailored
-  résumé has a job" is a database CHECK or a route rule is decided in 0008: `jobs` can be deleted, and
-  `resumes.job_id`'s `ON DELETE SET NULL` would then break such a check.
+- **Tailored résumé:** made from the active base's version 1 for one job. A candidate has many. "A tailored résumé
+  has a job" is a database CHECK; since 0008 `resumes.job_id` is `ON DELETE CASCADE`, so deleting a job deletes the
+  résumés tailored for it (Abdul, 2026-11-01). Built: the tables (0008, PR 3) and the first base on create (PR 4).
 - **Dropped in 0009** (approved by Abdul): `resumes.is_base`, `parent_id`, `json_data`, `resume_parse_id` (moved to
   `base_resumes`), `updated_at`, and the one-base index `uq_resumes_one_base_per_candidate`.
 - Applying picks a tailored résumé version (`applications.resume_id`). Rows never change, so what was sent stays

@@ -1,7 +1,8 @@
 # Résumé versioning — `resume_parses`, `base_resumes`, `resumes` (Zuhair)
 
-Design agreed 2026-10-31 by Zuhair, with the approvals in §1 from Abdul. **Built so far: the parser (§2–§2.2, PR 2).**
-The tables, the workflow and the screens (PRs 3–7) are not built yet. This file is
+Design agreed 2026-10-31 by Zuhair, with the approvals in §1 from Abdul. **Built so far: the parser (§2–§2.2, PR 2), the tables
+(§3, PR 3, migration 0008) and the first base on candidate create (§4.2, PR 4).** Versions and bases through the
+API, the clean-up of old rows and the screens (PRs 5–7) are not built yet. This file is
 the single reference for building it: the tables (§3), the workflow (§4), the frontend contract (§5), permissions
 (§6) and the PR plan (§7). Owner of all three tables: Zuhair (`docs/team/README.md` §3).
 
@@ -202,9 +203,17 @@ ALTER TABLE resumes ADD CONSTRAINT fk_resumes_base_candidate
   must be 15+ too).
 - **Content is immutable.** An edit inserts the next version; a row's content columns are never updated.
 - `name` and `template` are labels, not content: they may change in place.
-- `ck_resumes_category_job`: `jobs` rows can be deleted with `ON DELETE SET NULL`, which would then break the check
-  on a tailored row (00-candidate-core notes the same problem). Decide in PR 3: change `resumes.job_id` to
-  `ON DELETE RESTRICT`, or enforce the rule in the routes instead of a CHECK.
+- **Deleting a job deletes the résumés tailored for it** (Abdul, 2026-11-01): `resumes.job_id` is
+  `ON DELETE CASCADE`, so `ck_resumes_category_job` always holds. An application still blocks deleting a job it
+  names (`applications.job_id`), so a résumé that was sent is never lost. The `Job` → `resumes` relationship has
+  `passive_deletes`, so the ORM leaves the cascade to the database. Before a BDE deletes a job, the app asks
+  "Are you sure you want to delete this job?" and names the résumés tailored on it (built with PR 5 and the screens).
+- **Rows from before 0008 have no base.** `ck_resumes_category_job` and `uq_resumes_version` hold for rows with a
+  base only, until PR 6 converts the old rows; 0008 filled their `category` from `is_base`.
+- **`ck_resumes_base_has_candidate`** (`base_resume_id IS NULL OR candidate_id IS NOT NULL`): Postgres skips a
+  composite foreign key while one of its columns is null, so a versioned row must name its candidate.
+- **0007's `uq_resumes_one_base_per_candidate` covers old rows only** (`… AND base_resume_id IS NULL`): a versioned
+  candidate has many bases and many base versions. PR 6 drops it, as approved.
 
 **One résumé = one `(base_resume_id, category, job_id)`.** No `lineage_id` is needed, because tailoring takes only
 two inputs, the job description and the base:
@@ -265,6 +274,14 @@ the parse for the rest. `resume_parses.parse` keeps the AI's original untouched.
 | name, title, email, phone, LinkedIn, city, state, work authorization, summary, skills | country, GitHub, work experience, projects, education, certifications, awards, languages |
 
 No résumé uploaded (`resume_parse_id` null) → no base is created; one can be added later.
+
+Built in PR 4 (`backend/candidates/first_base.py`):
+- The first base's `name` is **"Base"**; `is_base` is true while that column exists (until PR 6).
+- **Work authorization** is the form's code in the app's own label (`USC` → "US Citizen", `H1B` → "H-1B", as
+  `work-auth-chip.tsx`); `OTHER` keeps the résumé's own wording.
+- **`json_data` stays empty** on new rows: the readers that still use it skip an empty one (scoring) or aren't live
+  yet (the résumé list), and PR 6 moves them to the new columns. Filling it would put every candidate's "Base" into
+  the firm's job scoring under one shared name.
 
 ### 4.3 Every action
 
@@ -369,18 +386,24 @@ and contracts.
 |---|---|---|---|
 | 1 | `docs/resume-versioning` | This file; the docs/02 §8.1 addition (§5); the 00-candidate-core résumé rewrite; `zuhair.md` 1.3, 1.4, 3.2 and 3.3 updated; `base_resumes` in `docs/team/README.md` §3. No code. | — |
 | 2 | `feat/parser-format-v2` (**built**) | The new parser (§2–§2.2, from the parser handoff): prompts, strict format, `clean_reply`, link addresses for PDF and DOCX, the `call_llm` options, the settings rows and save check. Frontend: `BackendResumeParseSchema`, `toResumeDraft`, `splitSkills` (bracket depth 0), `ResumeDraftSchema.country`, the mock fixture. The wizard and `applyDraft` are unchanged. Tests; the real-résumé tests run on the team's test résumés, which are shared separately and kept out of the repo. | — |
-| 3 | `feat/base-resumes-schema` | **Additive only**: `base_resumes`, the new `resumes` columns, CHECKs, indexes, composite FK; `award` in `ck_claims_entity_type`; SQLAlchemy models; constraint tests; claim **0008** in `docs/team/README.md` §6. No behaviour change. | **0008** |
-| 4 | `feat/base-resume-from-parse` | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
+| 3 | `feat/base-resumes-schema` (**built**, #99) | **Additive only**: `base_resumes`, the new `resumes` columns, CHECKs, indexes, composite FK; `award` in `ck_claims_entity_type`; SQLAlchemy models; constraint tests; claim **0008** in `docs/team/README.md` §6. No behaviour change. | **0008** |
+| 4 | `feat/base-resume-from-parse` (**built**) | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
 | 5 | `feat/resume-versions` | Routes: save an edit as the next version; "use as base"; list bases + versions; pick a base (v1 flips, v2+ promotes); tailor from the active base's v1 (also sets `candidate_id`, which the tailor route doesn't today). `resume.edit`, `access.py`, `isolation_cases.py`. | — |
 | 6 | `feat/drop-legacy-resume-columns` | **The approved drops** (§3.1, §3.3). First backfill old rows' content from `json_data` (the JobNavigator shape: `header.contact_items`, `experience`, `skills` dict, `education.school`…) into the new columns, so old rows stay readable (team rule 5). Port everything still reading the dropped columns: render/preview/PDF, copy, tailor, import-pdf, score-check, the seed. Claim **0009**. | **0009** |
 | 7 | `integrate/resumes` | Frontend live: the résumé adapter's live path, the DTO mapper (§5), the `BaseResume` schema, the base dropdown, the "Use this as the base?" prompt, version history. Both themes, keyboard, skeleton/empty/error states. | — |
 
 If someone else's 0008 merges first, renumber and fix `down_revision` before merging.
 
-**Still to decide:**
-- **PR 3:** `resumes.job_id` `ON DELETE RESTRICT` with the CHECK, or a route rule instead (§3.3; ask Abdul).
-- **PR 3:** the jsonb content columns `NOT NULL DEFAULT '[]'` (proposed).
-- **PR 4:** the first base's `name` (proposed: `"Base"`).
+**Decided:** `resumes.job_id` cascades (Abdul, §3.3); the content columns are `NOT NULL DEFAULT '[]'`; the first
+base is named "Base" (§4.2).
+
+**Still to decide (Abdul):**
+- **The nightly clean-up** (`scheduler.py`, "skip" jobs older than `job_archive_after_days`) deletes shared jobs
+  with no confirmation, and with them any firm's tailored résumés; and `candidate_jobs.job_id` is RESTRICT, so it
+  errors on a job a candidate still has. Should it skip jobs that still have tailored résumés or candidates?
+- **A BDE's delete** (proposed): act on their candidate only (dismiss that candidate's `candidate_jobs` row with a
+  `dismissed_at`, and delete that candidate's tailored résumés for the job), never the shared job, which other
+  candidates and firms may use. Belongs to the Jobs track (`zuhair.md` §2) with PR 5.
 
 ---
 

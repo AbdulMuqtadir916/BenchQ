@@ -28,6 +28,7 @@ from backend.auth.invites import lock_firm
 from backend.auth.policy import can_assign_to, require
 from backend.auth.scoping import own_scope, scoped, team_scope
 from backend.auth.sessions import Principal
+from backend.candidates.first_base import first_base
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.candidates.serialize import candidate_json
 from backend.models.candidates import (EMPLOYMENT_TYPES, REMOTE_MODES, WORK_AUTHS, WORKING_STATUSES, Candidate,
@@ -219,8 +220,9 @@ def get_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
 @router.post("", status_code=201, summary="Add a candidate with its manager and optional BDE")
 def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
                      principal: Principal = Depends(require("candidate.create")), db: DbSession = Depends(get_db)):
-    """One transaction: the candidate (ON_BENCH), the kept résumé parse, and the CREATE and ASSIGN ledger entries.
-    Skills and the summary are stored UNVERIFIED with their source (07 Q49)."""
+    """One transaction: the candidate (ON_BENCH), the kept résumé parse with the candidate's first base résumé and its
+    version 1 (when a résumé was uploaded), and the CREATE and ASSIGN ledger entries. Skills and the summary are stored
+    UNVERIFIED with their source (07 Q49)."""
     _member_of(firm_id, principal)
     email = body.email.strip().lower()
     if not EMAIL.match(email):
@@ -264,6 +266,11 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     db.flush()
     if parse is not None:
         parse.candidate_id, parse.expires_at = candidate.id, None
+        # Their first base résumé and its version 1, in this same transaction (resume-versioning.md §4.2).
+        base, version = first_base(parse, candidate, body, principal.user_id)
+        db.add(base)
+        db.flush()
+        db.add(version)
     actor = db.get(User, principal.user_id)
     ledger.record(db, actor=actor, action="CREATE", entity_type="candidate", entity_id=candidate.id,
                   entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}")
