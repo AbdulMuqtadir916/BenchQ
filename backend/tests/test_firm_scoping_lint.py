@@ -59,7 +59,7 @@ _F2B_TABLES = {"searches", "applications", "interviews", "resumes", "cover_lette
                # The Candidates track (docs/candidate-onboarding/06-backend.md, migration 0006).
                "candidates", "resume_parses",
                # The candidate core (docs/team/00-candidate-core.md, migration 0007).
-               "candidate_jobs", "favorite_jobs", "candidate_mailboxes", "inbox_messages", "evidence", "claims"}
+               "candidate_jobs", "favorite_jobs", "candidate_mailboxes", "inbox_messages", "evidence", "claims", "application_reviews", "application_status_events"}
 # Firm-owned although `firm_id` may be null: a ledger entry with no firm is a platform-only event (A13), and a
 # firm route must still read only its own firm's entries.
 _NULLABLE_FIRM_OWNED = {"LedgerEntry"}
@@ -101,7 +101,7 @@ def test_the_firm_owned_models_are_known():
                                     "TracerClickEvent", "FirmJob", "LedgerEntry", "Candidate", "ResumeParse",
                                     # The candidate core (migration 0007).
                                     "CandidateJob", "FavoriteJob", "CandidateMailbox", "InboxMessage", "Evidence",
-                                    "Claim"}
+                                    "Claim", "ApplicationReview", "ApplicationStatusEvent"}
 
 
 def test_routes_read_firm_rows_only_through_scoped():

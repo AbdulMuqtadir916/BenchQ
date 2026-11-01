@@ -90,4 +90,5 @@ it. Everyone else reads it.
 | # | Owner | What | Status |
 |---|---|---|---|
 | 0007 | Abdul | Candidate core tables | PR #91 |
+| 0008 | Samad | Applications foundation: revisions, immutable status events and BDE review records | PR 1, `codex/applications-foundation`; code-owner review pending |
 | 0008+ | — | Claim the next number here in your PR | — |
