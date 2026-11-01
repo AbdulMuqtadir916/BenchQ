@@ -99,8 +99,8 @@ def test_owner_and_manager_can_move_candidate_application_both_directions(
     test_db.expire_all()
     restored_app = test_db.get(Application, application.id)
     assert restored_app.status == "saved"
-    assert restored_app.applied_at is None
-    assert restored_app.submitted_by_user_id is None
+    assert restored_app.applied_at.isoformat() == applied.json()["applied_at"]
+    assert restored_app.submitted_by_user_id == actor_id
     assert [transition["to"] for transition in restored_app.status_transitions[-2:]] == ["applied", "saved"]
     assert [transition["actor_user_id"] for transition in restored_app.status_transitions[-2:]] == [
         str(actor_id), str(actor_id)
@@ -214,5 +214,6 @@ def test_candidate_category_status_preserves_submission_and_records_actor(
     assert test_db.query(FavoriteJob).filter_by(candidate_id=candidate.id, job_id=job.id).count() == 0
     restored = api_client.patch(path, json={'status': 'saved', 'expected_revision': 2}, headers=headers)
     assert restored.status_code == 200, restored.text
-    assert restored.json()['applied_at'] is None
+    assert restored.json()['applied_at'] == applied.json()['applied_at']
+    assert restored.json()['submitted_by_user_id'] == applied.json()['submitted_by_user_id']
     assert test_db.query(FavoriteJob).filter_by(candidate_id=candidate.id, job_id=job.id).count() == 1

@@ -85,15 +85,15 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
     favorite = scoped(db, FavoriteJob, app.firm_id).filter_by(
         candidate_id=app.candidate_id, job_id=app.job_id).first()
     if status == 'saved':
-        app.applied_at = None
-        app.submitted_by_user_id = None
+        # Saved changes the queue, not the historical fact of a submission.
         if favorite is None:
             db.add(FavoriteJob(firm_id=app.firm_id, candidate_id=app.candidate_id,
                               job_id=app.job_id, marked_by_user_id=actor.id))
     else:
-        if status == 'applied' and old_status == 'saved':
+        if status == 'applied' and old_status == 'saved' and app.applied_at is None:
             app.applied_at = now
-            app.submitted_by_user_id = actor.id
+            if app.submitted_by_user_id is None:
+                app.submitted_by_user_id = actor.id
         if favorite:
             db.delete(favorite)
     if review:

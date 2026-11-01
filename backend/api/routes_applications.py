@@ -523,37 +523,14 @@ def list_applications(
     total = q.count()
     apps = q.order_by(desc(Application.updated_at), Application.id).offset(offset).limit(limit).all()
 
-    from backend.models.db import build_company_lookup, Resume, CoverLetter
-    lookup = build_company_lookup(db)
-    job_ids = [a.job_id for a in apps]
-    with_letter = set()
-    if job_ids:
-        with_letter = {str(r[0]) for r in scoped(db, CoverLetter, firm_id, CoverLetter.job_id)
-                       .filter(CoverLetter.job_id.in_(job_ids)).distinct().all()}
-    tailored = {}
-    if job_ids:
-        resume_candidate_scope = Resume.candidate_id.in_([a.candidate_id for a in apps if a.candidate_id])
-        if any(a.candidate_id is None for a in apps):
-            resume_candidate_scope = resume_candidate_scope | Resume.candidate_id.is_(None)
-        for r in (scoped(db, Resume, firm_id)
-                  .filter(Resume.job_id.in_(job_ids), resume_candidate_scope,
-                          Resume.is_base == False)  # noqa: E712
-                  .order_by(Resume.updated_at.desc(), Resume.created_at.desc()).all()):
-            key = (str(r.candidate_id), str(r.job_id))
-            tailored.setdefault(key, r)
-    return {
-        "total": total,
-        "applications": [_app_to_dict(a, lookup, tailored.get((str(a.candidate_id), str(a.job_id))),
-                                      str(a.job_id) in with_letter) for a in apps],
-    }
+    return {"total": total, "applications": _application_responses(db, firm_id, apps)}
 
 
 @router.get("/{app_id}")
 def get_application(app_id: str, principal: Principal = Depends(current_principal),
                     db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
-    from backend.models.db import build_company_lookup
     app = _scoped_application(db, firm_id, principal, app_id)
-    return _app_to_dict(app, build_company_lookup(db))
+    return _application_responses(db, firm_id, [app])[0]
 
 
 @router.patch("/{app_id}/candidate-status")
@@ -561,7 +538,6 @@ def move_candidate_application_status(app_id: str, updates: dict,
                                       principal: Principal = Depends(current_principal),
                                       db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     from backend.applications.tracking import accessible_application, move
-    from backend.models.db import build_company_lookup
     try:
         app = accessible_application(db, firm_id, principal, app_id, lock=True)
         if set(updates) - {"status", "expected_revision", "note", "command_id"}:
@@ -570,7 +546,7 @@ def move_candidate_application_status(app_id: str, updates: dict,
              expected_revision=updates.get("expected_revision"), note=updates.get("note"),
              command_id=updates.get("command_id"))
         db.commit()
-        return _app_to_dict(app, build_company_lookup(db))
+        return _application_responses(db, firm_id, [app])[0]
     except Exception:
         db.rollback()
         raise
@@ -581,7 +557,7 @@ def resolve_application_review(app_id: str, updates: dict,
                                 principal: Principal = Depends(current_principal),
                                 db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     from backend.applications.tracking import accessible_application, move
-    from backend.models.db import ApplicationReview, build_company_lookup
+    from backend.models.db import ApplicationReview
     try:
         app = accessible_application(db, firm_id, principal, app_id, lock=True)
         if set(updates) - {"review_id", "status", "expected_revision", "expected_review_revision", "note", "command_id"}:
@@ -608,7 +584,7 @@ def resolve_application_review(app_id: str, updates: dict,
              expected_revision=updates.get("expected_revision"), note=updates.get("note"),
              command_id=updates.get("command_id"), review=review)
         db.commit()
-        return _app_to_dict(app, build_company_lookup(db))
+        return _application_responses(db, firm_id, [app])[0]
     except Exception:
         db.rollback()
         raise
@@ -689,6 +665,8 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
             raise HTTPException(403, "You don't have permission to update applications.")
         if set(updates) - {"status", "expected_revision", "command_id", "note", "notes"}:
             raise HTTPException(400, "Use the candidate status command; unsupported application fields.")
+        if "notes" in updates and set(updates) != {"notes"}:
+            raise HTTPException(400, "Edit application notes separately from status commands.")
         try:
             if "status" in updates:
                 move(db, app, principal, status=updates['status'], expected_revision=updates.get('expected_revision'),
@@ -701,8 +679,7 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
                     app.updated_at = utcnow()
                     _audit_application_edit(db, app, principal, 'Updated application notes.')
             db.commit()
-            from backend.models.db import build_company_lookup
-            return _app_to_dict(app, build_company_lookup(db))
+            return _application_responses(db, firm_id, [app])[0]
         except Exception:
             db.rollback()
             raise
@@ -732,9 +709,7 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
         app.updated_at = utcnow()
         _audit_application_edit(db, app, principal, "Updated application details.")
     db.commit()
-    from backend.models.db import build_company_lookup
-    lookup = build_company_lookup(db)
-    return _app_to_dict(app, lookup)
+    return _application_responses(db, firm_id, [app])[0]
 
 
 def _audit_application_edit(db, app, principal, summary):
@@ -1270,6 +1245,32 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     add("## What I need from you")
     add((ask.value.strip() if ask and ask.value else "") or "Prepare me for this interview.")
     return {"text": "\n".join(L)}
+
+
+def _application_responses(db, firm_id, apps):
+    """Enrich every response consistently, batching candidate/job-scoped documents."""
+    from backend.models.db import build_company_lookup, Resume, CoverLetter
+    if not apps:
+        return []
+    lookup = build_company_lookup(db)
+    job_ids = {app.job_id for app in apps}
+    candidate_scope = Resume.candidate_id.in_({app.candidate_id for app in apps if app.candidate_id})
+    if any(app.candidate_id is None for app in apps):
+        candidate_scope = candidate_scope | Resume.candidate_id.is_(None)
+    tailored = {}
+    for resume in (scoped(db, Resume, firm_id)
+                   .filter(Resume.job_id.in_(job_ids), candidate_scope, Resume.is_base == False)  # noqa: E712
+                   .order_by(Resume.updated_at.desc(), Resume.created_at.desc(), Resume.id).all()):
+        tailored.setdefault((resume.candidate_id, resume.job_id), resume)
+    # Cover letters have no candidate_id: their source resume supplies ownership.
+    # Unattributed/persona letters can describe legacy rows, never a candidate's application.
+    letters = (scoped(db, CoverLetter, firm_id, CoverLetter.job_id, Resume.candidate_id)
+               .outerjoin(Resume, Resume.id == CoverLetter.resume_id)
+               .filter(CoverLetter.job_id.in_(job_ids), candidate_scope,
+                       CoverLetter.resume_id.is_(None) | (Resume.firm_id == firm_id)).all())
+    with_letter = {(candidate_id, job_id) for job_id, candidate_id in letters}
+    return [_app_to_dict(app, lookup, tailored.get((app.candidate_id, app.job_id)),
+                         (app.candidate_id, app.job_id) in with_letter) for app in apps]
 
 
 def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=False) -> dict:

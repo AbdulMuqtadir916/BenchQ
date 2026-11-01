@@ -1291,11 +1291,17 @@ unchanged in this PR; their live DTO integration and display changes belong to l
 - `application_status_events` stores firm/candidate/application, from/to status, actor, source, timestamp, revision,
   optional command/review/note and original payload. SQL update/delete is blocked by an append-only trigger.
   `application_reviews` stores the source email, reason, application/review revision and resolution metadata.
-- Saved drafts have no submission timestamp or submitter. Status changes maintain candidate favorites. Removing
-  an untouched draft can remove its application; retained history, notes or reviews preserve it. Protected legacy
+- Never-submitted Saved drafts have no submission timestamp or submitter. Returning a submitted application to
+  Saved preserves its original submission date and submitter; returning to Applied does not assign a new one.
+  Status changes maintain candidate favorites. Removing an untouched draft can remove its application; retained history, notes or reviews preserve it. Protected legacy
   application deletion returns 409, including atomic validation of bulk deletion.
 - Human changes use the existing permission policy and candidate ledger. Transition notes never replace the
-  application's notes. The legacy email monitor and auto-reject scheduler leave candidate applications untouched.
+  application's notes. Candidate application notes are edited with a standalone `{notes}` PATCH; combining
+  `notes` with status/command/revision/transition-note fields returns 400 before any mutation. This keeps command
+  replays from overwriting subsequent notes edits. List, detail, status, review and notes responses use the same
+  candidate/job-scoped document lookup. A cover letter is attributed through its source résumé; letters without
+  an attributable résumé are shown only for legacy applications. The legacy email monitor and auto-reject
+  scheduler leave candidate applications untouched.
 
 
 ```ts
