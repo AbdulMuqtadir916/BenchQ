@@ -1547,3 +1547,23 @@ export const TimelineEventSchema = z.object({
    history survives upstream edits.
 5. **`ClaimState` appears on Record fields, resume claims and Q&A answers.** That's intentional:
    anything asserted on a candidate's behalf is a claim, wherever it lives.
+
+
+### Candidate Gmail connection — PR 2 (user-confirmed 2026-11-02)
+
+Candidate Inbox imports and displays read-only Google mail. Matching, classification and automatic application
+status changes belong to PR 3. A new import has `signal: null`, `impliedStatus: null` and `scheduledFor: null`;
+render it as Unclassified, never guess a category. Existing mock signals keep their behavior.
+`InboxMessage.sourceAddress?: string` identifies the verified source Google account for retained mail.
+`MailboxConnection` adds `status` (CONNECTED / DISCONNECTED / ERROR; default CONNECTED for old fixtures),
+`lastSyncError` (nullable, default null), and nullable `lastSyncedAt` (null before the first successful sync).
+Disconnect retains messages and their source identity while deleting credentials; read marks are local to BenchQ.
+Tokens and OAuth verifiers are encrypted at rest with an environment-owned Fernet key. OAuth state is hashed,
+one-use and bound to the initiating user/firm/candidate. Callback checks current authorization before and after
+Google exchange. The verified Google address is shown in the Inbox; an active account cannot be replaced without
+an explicit disconnect. Account provenance and deduplication are part of PR 2, not deferred until PR 4.
+Initial import uses the most recent 3 days; incremental Gmail history polling defaults to 5 minutes and can be
+disabled with interval 0. Imported mail is deduplicated by mailbox, source address and provider message ID.
+Every human action uses existing candidate.edit and candidate scope; viewers/support cannot write. Scheduled
+imports use SYSTEM ledger attribution with candidate_id. Required code-owner contract/auth/schema review remains
+pending before merge. No new role rules or live Google secrets are embedded in the UI.

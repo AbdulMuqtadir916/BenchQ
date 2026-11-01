@@ -156,8 +156,11 @@ app.middleware("http")(enforce_access)
 app.add_middleware(BodySizeLimit)
 
 
+from backend.api import routes_inbox
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
+app.include_router(routes_inbox.router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")

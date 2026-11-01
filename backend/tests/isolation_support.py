@@ -297,3 +297,11 @@ def offline(monkeypatch):
 
     monkeypatch.setattr(routes_candidates, "extract_text", lambda kind, content: "isolation résumé text")
     monkeypatch.setattr(routes_candidates, "read_resume", read_resume)
+
+    # Provider I/O is synthetic in F7; Google and mailbox secrets are never contacted.
+    from backend.api import routes_inbox
+    from backend.inbox.google_oauth import Authorization
+    monkeypatch.setattr(routes_inbox, "build_authorization", lambda: Authorization(
+        "https://accounts.google.com/test", "synthetic-state-" + uuid.uuid4().hex, "verifier", "challenge"))
+    monkeypatch.setattr(routes_inbox, "encrypt_secret", lambda value: b"synthetic-test-ciphertext")
+    monkeypatch.setattr(routes_inbox, "sync_mailbox", lambda *args, **kwargs: 0)

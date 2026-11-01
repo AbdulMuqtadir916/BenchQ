@@ -4,7 +4,7 @@ import { ApplicationStatus } from "./enums";
 /**
  * Candidate mailbox (Google account) — the BDE connects the inbox the
  * candidate applies from, and recruiter emails are matched to applications.
- * Frontend-only today: the mock adapter simulates the OAuth hand-off and sync.
+ * The adapter switches between mock data and candidate-scoped Gmail endpoints.
  */
 
 /** What a recruiter email means for the application it belongs to. */
@@ -31,7 +31,8 @@ export const InboxMessageSchema = z.object({
   snippet: z.string(),
   body: z.string(),
   receivedAt: z.string().datetime(),
-  signal: MailSignal,
+  signal: MailSignal.nullable(),
+  sourceAddress: z.string().optional(),
   isRead: z.boolean(),
   /** The stage this email implies. A suggestion is pending while the application is behind it. */
   impliedStatus: ApplicationStatus.nullable(),
@@ -46,7 +47,9 @@ export const MailboxConnectionSchema = z.object({
   provider: z.literal("GOOGLE"),
   address: z.string(),
   connectedAt: z.string().datetime(),
-  lastSyncedAt: z.string().datetime(),
+  lastSyncedAt: z.string().datetime().nullable(),
+  status: z.enum(["CONNECTED", "DISCONNECTED", "ERROR"]).default("CONNECTED"),
+  lastSyncError: z.string().nullable().default(null),
 });
 export type MailboxConnection = z.infer<typeof MailboxConnectionSchema>;
 

@@ -1,4 +1,4 @@
-import { BadgeCheck, CalendarClock, ClipboardCheck, MailCheck, PhoneCall, Star, XCircle, type LucideIcon } from "lucide-react";
+import { BadgeCheck, CalendarClock, ClipboardCheck, Mail, MailCheck, PhoneCall, Star, XCircle, type LucideIcon } from "lucide-react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import type { InboxMessage, MailSignal } from "@/lib/schemas/inbox";
 import type { TagTone } from "@/components/ui/tag";
@@ -13,6 +13,10 @@ export const SIGNAL_META: Record<MailSignal, { label: string; Icon: LucideIcon; 
   REJECTED: { label: "Not selected", Icon: XCircle, tone: "red" },
   CONFIRMATION: { label: "Application received", Icon: MailCheck, tone: "neutral" },
 };
+
+export function mailSignalMeta(signal: MailSignal | null) {
+  return signal ? SIGNAL_META[signal] : { label: "Unclassified email", Icon: Mail, tone: "neutral" as const };
+}
 
 /**
  * An email suggests a status change while its application is still behind the
@@ -30,7 +34,7 @@ export function pendingSuggestion(message: InboxMessage, currentStatus: Applicat
 export function latestSignalByApplication(messages: InboxMessage[]): Map<string, InboxMessage> {
   const map = new Map<string, InboxMessage>();
   for (const m of messages) {
-    if (!m.applicationId || m.signal === "CONFIRMATION") continue;
+    if (!m.applicationId || !m.signal || m.signal === "CONFIRMATION") continue;
     const current = map.get(m.applicationId);
     if (!current || m.receivedAt > current.receivedAt) map.set(m.applicationId, m);
   }

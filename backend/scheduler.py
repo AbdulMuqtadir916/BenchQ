@@ -20,11 +20,11 @@ def get_setting(db, key, default=None):
     return default
 
 
-def _int_setting(db, key: str) -> int:
+def _int_setting(db, key: str, default: str = "0") -> int:
     """A minutes-interval setting, or 0 (= disabled) if the stored value is junk; a bad value
     must not raise, since configure_scheduler() runs inside the app's lifespan and would take
     the whole backend down with it."""
-    raw = get_setting(db, key, "0")
+    raw = get_setting(db, key, default)
     try:
         value = int(str(raw).strip())
     except (TypeError, ValueError):
@@ -44,6 +44,7 @@ def configure_scheduler():
     try:
         scrape_interval = _int_setting(db, "scrape_interval_minutes")
         email_interval = _int_setting(db, "email_check_interval_minutes")
+        candidate_inbox_interval = _int_setting(db, "candidate_gmail_sync_interval_minutes", "5")
         backup_cron = str(get_setting(db, "backup_cron", "") or "").strip()
         digest_cron = str(get_setting(db, "digest_cron", "") or "").strip()
         h1b_cron = str(get_setting(db, "h1b_cron", "") or "").strip()
@@ -88,6 +89,10 @@ def configure_scheduler():
             id="email_check",
             replace_existing=True,
         )
+
+    if candidate_inbox_interval > 0:
+        scheduler.add_job(run_candidate_inbox_sync, IntervalTrigger(minutes=candidate_inbox_interval),
+                          id="candidate_inbox_sync", replace_existing=True, max_instances=1, coalesce=True)
 
     # Cron-based jobs (empty = disabled)
     _add_cron_job(run_db_backup, "db_backup", backup_cron)
@@ -198,6 +203,61 @@ async def run_email_check():
             run.summary = _activity_summary(started, "email", "reply", "replies") or "No new replies"
     except JobAlreadyRunningError as e:
         logger.warning(f"Scheduler skipped: {e}")
+
+
+def _sync_connected_candidate_mailboxes() -> int:
+    """Poll connected accounts once across workers; serialize account mutations."""
+    from sqlalchemy import text
+    from backend.auth.scoping import scoped
+    from backend.auth.ledger import record_automated
+    from backend.inbox.gmail_sync import sync_mailbox, record_sync_error
+    from backend.models.candidates import CandidateMailbox
+    from backend.models.tenancy import Firm
+    from backend.models.db import engine
+    lock_key = 7_201_021_009
+    with engine.connect() as lock:
+        if not lock.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": lock_key}).scalar():
+            return 0
+        try:
+            with SessionLocal() as selection:
+                ids = selection.query(CandidateMailbox.firm_id, CandidateMailbox.id).join(
+                    Firm, Firm.id == CandidateMailbox.firm_id).filter(
+                    CandidateMailbox.status == "CONNECTED", CandidateMailbox.refresh_token_ciphertext.isnot(None),
+                    Firm.status != "SUSPENDED").all()
+            completed = 0
+            for firm_id, mailbox_id in ids:
+                with SessionLocal() as db:
+                    mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(id=mailbox_id).populate_existing().with_for_update(skip_locked=True).first()
+                    if mailbox is None or mailbox.status != "CONNECTED" or not mailbox.refresh_token_ciphertext:
+                        continue
+                    candidate_id, generation = mailbox.candidate_id, mailbox.connected_at
+                    try:
+                        imported = sync_mailbox(db, mailbox)
+                        if imported:
+                            record_automated(db, actor_type="SYSTEM", actor_name="Gmail sync", action="CREATE",
+                                entity_type="email", entity_id=mailbox.id, entity_label="Candidate inbox",
+                                summary=f"Imported {imported} candidate emails.", firm_id=firm_id, candidate_id=candidate_id)
+                        db.commit()
+                        completed += 1
+                    except Exception:
+                        db.rollback()
+                        record_sync_error(db, firm_id, candidate_id, generation)
+                        db.commit()
+            return completed
+        finally:
+            lock.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": lock_key})
+
+
+async def run_candidate_inbox_sync():
+    """Periodic read-only import; classification belongs to the next PR."""
+    from backend.job_monitor import tracked_run, JobAlreadyRunningError
+    import asyncio
+    try:
+        async with tracked_run("candidate_inbox_sync", "scheduler") as run:
+            completed = await asyncio.to_thread(_sync_connected_candidate_mailboxes)
+            run.summary = f"Synced {completed} candidate inboxes."
+    except JobAlreadyRunningError as exc:
+        logger.info("Candidate inbox sync skipped: %s", exc)
 
 
 async def send_daily_digest():

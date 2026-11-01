@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { arrayOf } from "@/lib/api/client";
+import { ApiError, arrayOf } from "@/lib/api/client";
 import { CandidateInboxSchema, InboxMessageSchema, type CandidateInbox, type InboxMessage } from "@/lib/schemas/inbox";
 import inboxSeed from "./data/inbox.json";
 import { allCandidates } from "./candidates";
@@ -13,9 +13,9 @@ const fixture = () =>
 export const allMessages: InboxMessage[] = table("inboxMessages", InboxMessageSchema, () => fixture().messages);
 
 /** Which candidates have a connected inbox, since when. Seeded "12 days before" this browser's seeding instant. */
-const ConnectionSchema = z.object({ candidateId: z.string(), connectedAt: z.string().datetime() });
+const ConnectionSchema = z.object({ candidateId: z.string(), connectedAt: z.string().datetime(), status: z.enum(["CONNECTED", "DISCONNECTED"]).default("CONNECTED") });
 const connections = table("inboxConnections", ConnectionSchema, () =>
-  fixture().initiallyConnected.map((candidateId) => ({ candidateId, connectedAt: new Date(seededAt().getTime() - 12 * 86_400_000).toISOString() })),
+  fixture().initiallyConnected.map((candidateId) => ({ candidateId, connectedAt: new Date(seededAt().getTime() - 12 * 86_400_000).toISOString(), status: "CONNECTED" as const })),
 );
 const connectedSince = (candidateId: string) => connections.find((connection) => connection.candidateId === candidateId)?.connectedAt;
 
@@ -32,6 +32,7 @@ function inboxFor(firmId: string, candidateId: string): CandidateInbox {
       provider: "GOOGLE",
       address: candidate.email ?? `${candidate.fullName.toLowerCase().replace(/\s+/g, ".")}@gmail.com`,
       connectedAt: since,
+      status: connections.find((row) => row.candidateId === candidateId)?.status ?? "CONNECTED",
       lastSyncedAt: new Date(Date.now() - 2 * 60_000).toISOString(),
     },
     messages: inFirm(allMessages, firmId).filter((message) => message.candidateId === candidateId),
@@ -46,8 +47,8 @@ export const inboxMock = firmScoped("inbox", {
     await wait(500);
     const at = new Date().toISOString();
     const existing = connections.find((connection) => connection.candidateId === candidateId);
-    if (existing) existing.connectedAt = at;
-    else connections.push({ candidateId, connectedAt: at });
+    if (existing) { existing.connectedAt = at; existing.status = "CONNECTED"; }
+    else connections.push({ candidateId, connectedAt: at, status: "CONNECTED" });
     changed("inboxConnections");
     return mockResult(inboxFor(firmId, candidateId));
   },
@@ -55,13 +56,14 @@ export const inboxMock = firmScoped("inbox", {
   disconnect: (firmId: string, candidateId: string): Promise<CandidateInbox> => {
     findInFirm(allCandidates, firmId, candidateId, "Candidate");
     const index = connections.findIndex((connection) => connection.candidateId === candidateId);
-    if (index >= 0) connections.splice(index, 1);
+    if (index >= 0) connections[index]!.status = "DISCONNECTED";
     changed("inboxConnections");
     return mockResult(inboxFor(firmId, candidateId));
   },
 
-  markRead: (firmId: string, messageId: string): Promise<InboxMessage> => {
+  markRead: (firmId: string, messageId: string, candidateId?: string): Promise<InboxMessage> => {
     const message = findInFirm(allMessages, firmId, messageId, "Email");
+    if (candidateId && message.candidateId !== candidateId) throw new ApiError("Email not found.", "NOT_FOUND", 404);
     message.isRead = true;
     changed("inboxMessages");
     return mockResult(InboxMessageSchema.parse(message));

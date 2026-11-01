@@ -21,3 +21,9 @@ ALLOWED_ORIGINS = [o.strip() for o in os.getenv(
 # How many proxies in front of the backend append to X-Forwarded-For (the load balancer: 1). The client's address
 # is that many entries from the right; anything further left was sent by the client and can be forged.
 TRUSTED_PROXY_HOPS = max(0, int(os.getenv("TRUSTED_PROXY_HOPS", "1")))
+
+# Candidate-scoped Gmail: separate from the legacy single-account monitor.
+CANDIDATE_GMAIL_CLIENT_ID = os.getenv("CANDIDATE_GMAIL_CLIENT_ID", "")
+CANDIDATE_GMAIL_CLIENT_SECRET = os.getenv("CANDIDATE_GMAIL_CLIENT_SECRET", "")
+CANDIDATE_GMAIL_REDIRECT_URI = os.getenv("CANDIDATE_GMAIL_REDIRECT_URI", "")
+CANDIDATE_GMAIL_ENCRYPTION_KEY = os.getenv("CANDIDATE_GMAIL_ENCRYPTION_KEY", "")

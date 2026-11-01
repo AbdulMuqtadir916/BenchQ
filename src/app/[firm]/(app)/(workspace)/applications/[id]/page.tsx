@@ -25,7 +25,7 @@ import { useRouteAccess } from "@/lib/routes/use-route-access";
 import { isInScope } from "@/lib/routes/scope";
 import { MatchScore } from "@/components/app/match-score";
 import { SkeletonCard } from "@/components/app/skeleton-card";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 import { ResumeSent } from "@/components/app/applications/resume-sent";
 import { StatusTimeline } from "@/components/app/applications/status-timeline";
 import { NEXT_STATUS, STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
@@ -128,7 +128,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                       <p className="line-clamp-2 text-sm text-[var(--color-text-2)]">{m.snippet}</p>
                       <p className="mt-0.5 text-caption text-[var(--color-text-3)]">{m.fromName} · {formatRelative(m.receivedAt)}</p>
                     </div>
-                    <Tag tone={SIGNAL_META[m.signal].tone} className="shrink-0">{SIGNAL_META[m.signal].label}</Tag>
+                    <Tag tone={mailSignalMeta(m.signal).tone} className="shrink-0">{mailSignalMeta(m.signal).label}</Tag>
                   </li>
                 ))}
               </ul>

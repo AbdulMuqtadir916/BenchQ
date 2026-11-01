@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 
 /**
  * The latest recruiter emails, or the prompt to connect the mailbox. Connecting is a write
@@ -47,7 +47,7 @@ export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessag
       ) : (
         <ul className="divide-y divide-[var(--color-border)]">
           {latest.map((m) => {
-            const meta = SIGNAL_META[m.signal];
+            const meta = mailSignalMeta(m.signal);
             return (
               <li key={m.id}>
                 <button type="button" onClick={() => onOpenMessage(m.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--color-surface-2)]">

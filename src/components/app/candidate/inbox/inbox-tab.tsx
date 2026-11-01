@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Mail, RefreshCw } from "lucide-react";
 import type { InboxMessage, MailSignal } from "@/lib/schemas/inbox";
-import { useDisconnectMailbox, useMarkRead } from "@/lib/hooks/use-inbox";
+import { useDisconnectMailbox, useMarkRead, useSyncMailbox } from "@/lib/hooks/use-inbox";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { InboxConnect } from "./inbox-connect";
@@ -29,11 +29,12 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
 
 /** The candidate's recruiter mail, matched to applications. Connect first if it isn't. */
 export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; selectedId: string | null; onSelect: (id: string) => void }) {
-  const [isSyncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<Filter>("ALL");
   const candidate = ws.candidate!;
   const markRead = useMarkRead(candidate.id);
   const disconnect = useDisconnectMailbox(candidate.id);
+  const sync = useSyncMailbox(candidate.id);
+  const connected = ws.inbox?.connection?.status === "CONNECTED";
   const pendingIds = new Set(ws.suggestions.map((s) => s.message.id));
   const inFilter = (f: Filter, m: InboxMessage) =>
     f === "ALL" || (f === "ACTION" ? pendingIds.has(m.id) : m.signal === f || (f === "SHORTLISTED" && m.signal === "ASSESSMENT"));
@@ -45,16 +46,21 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
   // reader (a VIEWER, a support view) leaves the firm's unread state as it is.
   const openId = selected?.id;
   const isUnread = !!selected && !selected.isRead;
-  const { mutate: markAsRead } = markRead;
+  const { mutate: markAsRead, reset: resetRead } = markRead;
+  const readAttempt = useRef<string | null>(null);
   useEffect(() => {
-    if (canAct && openId && isUnread) markAsRead(openId);
-  }, [canAct, openId, isUnread, markAsRead]);
+    if (readAttempt.current !== openId) {
+      readAttempt.current = openId ?? null;
+      resetRead();
+      if (canAct && openId && isUnread) markAsRead(openId);
+    }
+  }, [canAct, openId, isUnread, markAsRead, resetRead]);
 
   if (ws.inboxQuery.error) return <ErrorState error={ws.inboxQuery.error} onRetry={() => void ws.inboxQuery.refetch()} />;
   if (ws.inboxQuery.isLoading) return <SkeletonList rows={6} />;
-  if (!ws.inbox?.connection || isSyncing) {
+  if (!connected && ws.messages.length === 0) {
     return canAct ? (
-      <InboxConnect candidate={candidate} applicationCount={ws.applications.length} onSyncChange={setSyncing} />
+      <InboxConnect candidate={candidate} />
     ) : (
       <EmptyState icon={Mail} title="Inbox not connected" description="A recruiter on this candidate can connect their Google account." />
     );
@@ -65,16 +71,21 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-sm text-[var(--color-text-3)]">
           <span aria-hidden className="inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-info-bg)] text-[var(--color-info-fg)]"><Mail size={13} /></span>
-          <span className="text-body-strong text-[var(--color-text)]">{ws.inbox.connection.address}</span>· synced {formatRelative(ws.inbox.connection.lastSyncedAt)}
+          {connected ? <><span className="text-body-strong text-[var(--color-text)]">{ws.inbox?.connection?.address}</span> · synced {ws.inbox?.connection?.lastSyncedAt ? formatRelative(ws.inbox.connection.lastSyncedAt) : "not yet"}</> : "Mailbox disconnected · imported email retained"}
         </p>
         <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="secondary" onClick={() => void ws.inboxQuery.refetch()} disabled={ws.inboxQuery.isFetching}>
-            <RefreshCw size={13} aria-hidden className={ws.inboxQuery.isFetching ? "animate-spin" : undefined} />Sync now
-          </Button>
-          {canAct ? <Button size="sm" variant="ghost" onClick={() => disconnect.mutate()}>Disconnect</Button> : null}
+          {connected && canAct ? <Button size="sm" variant="secondary" onClick={() => sync.mutate()} disabled={sync.isPending}>
+            <RefreshCw size={13} aria-hidden className={sync.isPending ? "animate-spin" : undefined} />Sync now
+          </Button> : null}
+          {connected && canAct ? <Button size="sm" variant="ghost" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>Disconnect</Button> : null}
         </div>
       </div>
 
+      {!connected && canAct ? <InboxConnect candidate={candidate} compact /> : null}
+      {ws.inbox?.connection?.lastSyncError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{ws.inbox.connection.lastSyncError}</p> : null}
+      {sync.error ? <ErrorState error={sync.error} onRetry={() => sync.mutate()} /> : null}
+      {disconnect.error ? <ErrorState error={disconnect.error} onRetry={() => disconnect.mutate()} /> : null}
+      {markRead.error && selected ? <ErrorState error={markRead.error} onRetry={() => markRead.mutate(selected.id)} /> : null}
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter emails">
         {FILTERS.map((f) => (
           <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)} className={cn("inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-full)] border px-3 text-sm transition-colors", filter === f.id ? "border-[var(--color-primary)] bg-[var(--color-primary-subtle)] font-[550] text-[var(--color-primary-subtle-fg)]" : "border-[var(--color-border)] text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)]")}>
@@ -87,7 +98,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
         <ul className="max-h-[26rem] divide-y divide-[var(--color-border)] overflow-y-auto border-b border-[var(--color-border)] lg:max-h-none lg:border-b-0 lg:border-r" aria-label="Emails">
           {list.length === 0 ? <li className="px-4 py-8 text-center text-sm text-[var(--color-text-3)]">No emails in this view.</li> : null}
           {list.map((m, i) => {
-            const meta = SIGNAL_META[m.signal];
+            const meta = mailSignalMeta(m.signal);
             const isSelected = selected?.id === m.id;
             return (
               <li key={m.id}>
@@ -108,7 +119,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-2">
                       <span className={cn("truncate text-sm text-[var(--color-text)]", !m.isRead && "font-[550]")}>{m.fromName}</span>
-                      <span className="shrink-0 text-caption text-[var(--color-text-3)]">{formatRelative(m.receivedAt)}</span>
+                      <span className={cn("shrink-0 text-caption", isSelected ? "text-[var(--color-text-2)]" : "text-[var(--color-text-3)]")}>{formatRelative(m.receivedAt)}</span>
                     </span>
                     <span className="block truncate text-sm text-[var(--color-text-2)]">{m.subject}</span>
                     <span className="mt-1 flex items-center gap-1.5">
