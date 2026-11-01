@@ -20,8 +20,9 @@ def log_llm_call(
     job_id: Optional[UUID] = None,
     success: bool = True,
     error: Optional[str] = None,
+    firm_id: Optional[UUID] = None,
 ) -> None:
-    """Insert a row into llm_call_log; swallows DB errors so logging never breaks scoring. usage: {input_tokens, output_tokens, cache_read_tokens, cache_write_tokens}."""
+    """Insert a row into llm_call_log; swallows DB errors so logging never breaks scoring. usage: {input_tokens, output_tokens, cache_read_tokens, cache_write_tokens}. `firm_id`: the firm the call was for, so AI spend can be split by firm (Q33); an entry point that knows its firm passes it."""
     try:
         cost = calc_cost(
             provider,
@@ -38,6 +39,7 @@ def log_llm_call(
                 provider=provider,
                 model=model,
                 job_id=job_id,
+                firm_id=firm_id,
                 input_tokens=usage.get("input_tokens", 0),
                 output_tokens=usage.get("output_tokens", 0),
                 cache_read_tokens=usage.get("cache_read_tokens", 0),
@@ -56,7 +58,7 @@ def log_llm_call(
 
 
 @asynccontextmanager
-async def track_llm_call(purpose: str, provider: str, model: str, job_id=None):
+async def track_llm_call(purpose: str, provider: str, model: str, job_id=None, firm_id=None):
     """Async context manager that times an LLM call and logs it to llm_call_log; the caller must set tracker.usage (or call tracker.record(resp)) so a fallback dispatch is logged as the model that actually answered."""
     started = time.monotonic()
 
@@ -102,6 +104,7 @@ async def track_llm_call(purpose: str, provider: str, model: str, job_id=None):
                 job_id=job_id,
                 success=success,
                 error=error,
+                **({"firm_id": firm_id} if firm_id is not None else {}),
             )
         except Exception as e:
             logger.warning(f"track_llm_call finally block failed (non-fatal): {e}")

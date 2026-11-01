@@ -1218,7 +1218,7 @@ export const ExportGateSchema = z.object({
 });
 ```
 
-### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul), NOT BUILT
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul); `ResumeDraftSchema.country` BUILT (versioning PR 2), the rest NOT BUILT
 
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.

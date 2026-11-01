@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import parses from "@/mocks/data/resume-parses.json";
-import { matchWorkAuth, splitLocation, splitSkills, toLinkedinUrl, toResumeDraft, yearsFromWork } from "./resume-parse";
+import { matchWorkAuth, splitSkills, toLinkedinUrl, toResumeDraft, yearsFromWork } from "./resume-parse";
 
-/** docs/candidate-onboarding/04-wizard-steps.md §5: Zuhair's parser format → the new-candidate form's draft. */
+/** docs/candidate-onboarding/04-wizard-steps.md §5, docs/02 §8.1: the base-résumé parser's format → the new-candidate
+ * form's draft. */
 const NOW = new Date("2026-10-27T00:00:00.000Z");
 const fixture = (index: number) => ({ parse_id: `parse_${index}`, ...parses[index]! });
 
@@ -18,6 +19,7 @@ describe("toResumeDraft, on the three sample résumés", () => {
       linkedinUrl: "https://linkedin.com/in/ravi-kommineni",
       city: "Irving",
       state: "TX",
+      country: null, // "Irving, TX" prints no country, and none is guessed
       yearsExperience: 10, // 2015-01 → 2016-01 and 2017-01 → now (overlapping 2021 counted once): 13 + 118 months
       workAuth: "H1B",
       workAuthText: null,
@@ -36,8 +38,11 @@ describe("toResumeDraft, on the three sample résumés", () => {
     });
   });
 
-  it("Priyanka: Green Card, no phone, an overlapping contract and an undated internship", () => {
+  it("Priyanka: Green Card, no phone, a printed country, an overlapping contract and an undated internship", () => {
     expect(toResumeDraft(fixture(1), NOW)).toMatchObject({
+      city: "Charlotte",
+      state: "NC",
+      country: "USA",
       phone: null,
       workAuth: "GC",
       workAuthText: null,
@@ -51,8 +56,9 @@ describe("toResumeDraft, on the three sample résumés", () => {
       fullName: "Karthik S",
       primaryRole: null,
       email: null,
-      city: "New Jersey",
-      state: null,
+      city: null,
+      state: "New Jersey",
+      country: null,
       linkedinUrl: null,
       workAuth: null,
       workAuthText: "Authorized to work in the US",
@@ -68,7 +74,19 @@ describe("toResumeDraft, on the three sample résumés", () => {
 
   it("tolerates missing groups: an empty parse is a draft of nulls", () => {
     expect(toResumeDraft({ parse_id: "p", file_name: "blank.pdf", parse: {} }, NOW)).toMatchObject({
-      fullName: null, email: null, yearsExperience: null, workAuth: null, workAuthText: null, skills: [],
+      fullName: null, email: null, city: null, state: null, country: null, yearsExperience: null, workAuth: null,
+      workAuthText: null, skills: [],
+    });
+  });
+
+  it("a parse with every list empty, as the backend stores it, is an empty form, not an error", () => {
+    const empty = {
+      header: { name: "", title: "", city: "", state: "", country: "", email: "", phone: "", work_authorization: "", github: "", linkedin: "" },
+      professional_summary: "", technical_skills: [], work_experience: [], projects: [], education: [], certifications: [],
+      awards: [], languages: [],
+    };
+    expect(toResumeDraft({ parse_id: "p", file_name: "blank.pdf", parse: empty }, NOW)).toMatchObject({
+      fullName: null, primaryRole: null, city: null, state: null, country: null, yearsExperience: null, skills: [],
     });
   });
 });
@@ -81,13 +99,6 @@ describe("the mapping rules", () => {
       ["US Citizen", "USC"], ["U.S. Citizen", "USC"], ["TN Visa", "TN"], ["Authorized to work in the US", null], ["", null],
     ];
     for (const [printed, expected] of cases) expect(matchWorkAuth(printed), printed).toBe(expected);
-  });
-
-  it("splits a location on its commas", () => {
-    expect(splitLocation("Irving, TX")).toEqual({ city: "Irving", state: "TX" });
-    expect(splitLocation("Hyderabad, Telangana, India")).toEqual({ city: "Hyderabad", state: "Telangana" });
-    expect(splitLocation("Remote")).toEqual({ city: "Remote", state: null });
-    expect(splitLocation("  ")).toEqual({ city: null, state: null });
   });
 
   it("makes a LinkedIn link a URL, or drops it", () => {
@@ -111,6 +122,12 @@ describe("the mapping rules", () => {
   it("splits skills: trimmed, no empties, no case-insensitive duplicates", () => {
     expect(splitSkills([{ category: "A", skills: " Java ,java, ,SQL" }, { category: "", skills: "sql, Go" }])).toEqual([
       { name: "Java", family: "A" }, { name: "SQL", family: "A" }, { name: "Go", family: null },
+    ]);
+  });
+
+  it("splits skills only at top-level commas, so a bracket group stays one skill", () => {
+    expect(splitSkills([{ category: "Cloud", skills: "AWS (ECS, Lambda, S3), Docker" }])).toEqual([
+      { name: "AWS (ECS, Lambda, S3)", family: "Cloud" }, { name: "Docker", family: "Cloud" },
     ]);
   });
 });

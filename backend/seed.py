@@ -5,15 +5,29 @@ import secrets
 from backend.models.db import SessionLocal, Setting, Company, Search, Resume
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.analyzer.llm_client import REASONING_EFFORTS
-from backend.candidates.parse import DEFAULT_PROMPT as RESUME_PARSE_PROMPT
+from backend.candidates import parse as resume_parse
+from backend.candidates.parse_defaults import (DEFAULT_PROMPT as RESUME_PARSE_PROMPT,
+                                               DEFAULT_RESPONSE_FORMAT as RESUME_PARSE_RESPONSE_FORMAT,
+                                               DEFAULT_SYSTEM_PROMPT as RESUME_PARSE_SYSTEM_PROMPT,
+                                               OLD_DEFAULT_PROMPT as OLD_RESUME_PARSE_PROMPT)
 
 logger = logging.getLogger("jobnavigator.seed")
 
 
 DEFAULT_SETTINGS = {
-    # The new-candidate résumé parser (docs/candidate-onboarding/06-backend.md §4): Zuhair's format, as an AI preset.
+    # The new-candidate résumé parser (docs/team/resume-versioning.md §2.2), as an AI preset. Its own model, all three
+    # rows required: it never borrows the shared llm_* rows. The key is seeded empty and set on the settings page.
+    "resume_parse_system_prompt": (RESUME_PARSE_SYSTEM_PROMPT, "Résumé parser system prompt (new-candidate flow)."),
     "resume_parse_prompt": (RESUME_PARSE_PROMPT, "Editable résumé parser prompt for the new-candidate flow. "
-                            "{format} (the JSON format) and {resume_text} are filled in."),
+                            "{input_note} (how the text was extracted) and {resume} (the fenced résumé) are filled in; "
+                            "{resume} is required."),
+    "resume_parse_response_format": (RESUME_PARSE_RESPONSE_FORMAT,
+                                     "The parser's strict response format (json_schema, strict: true), sent on every "
+                                     "parse. Its schema must require every section the parser stores."),
+    "resume_parse_llm_provider": ("openrouter", "Résumé parser provider (required; openrouter only)"),
+    "resume_parse_llm_model": ("openai/gpt-6-luna", "Résumé parser model (required)"),
+    "resume_parse_llm_api_key": ("", "OpenRouter API key for the résumé parser (required; until set, every parse "
+                                 "fails naming this row)"),
     "fit_score_threshold": ("60", "Minimum fit score to trigger Telegram alert"),
     "scrape_interval_minutes": ("60", "How often the job checker runs"),
     "email_check_interval_minutes": ("30", "How often Gmail is polled"),
@@ -417,6 +431,8 @@ ENUM_SETTING_VALUES = {
     "cv_tailor_llm_provider": _LLM_PROVIDERS,
     "cover_letter_llm_provider": _LLM_PROVIDERS,
     "autofill_llm_provider": _LLM_PROVIDERS,
+    # The parser sends a strict format and reasoning-off, which only its openrouter call carries.
+    "resume_parse_llm_provider": {"openrouter"},
     "llm_effort": _EFFORTS,
     "llm_fallback_effort": _EFFORTS,
     "scoring_llm_effort": _EFFORTS,
@@ -483,7 +499,8 @@ def invalid_setting_values(updates: dict) -> list:
             if not isinstance(value, str) or value.strip().lower() not in allowed:
                 shown = ", ".join(sorted(v for v in allowed if v)) or "(empty)"
                 problems.append(f"{key}: must be one of {shown} (got {value!r})")
-    return problems
+    # The parser's response format and prompt: a broken one would fail every parse (candidates/parse.py).
+    return problems + resume_parse.setting_problems(updates)
 
 
 SEED_COMPANIES = [
@@ -522,6 +539,7 @@ def seed_settings(db):
         if key not in existing:
             db.add(Setting(key=key, value=value, description=desc))
     db.commit()
+    upgrade_resume_parse_prompt(db)
     # One-shot: a DB that already holds a mock account keeps signing in with it;
     # every other DB starts on the personal account.
     if "linkedin_use_mock_account" not in existing:
@@ -535,6 +553,18 @@ def seed_settings(db):
     if row is not None and not (row.value or "").strip():
         row.value = secrets.token_urlsafe(32)
         db.commit()
+
+
+def upgrade_resume_parse_prompt(db):
+    """Seeding never replaces a row, so a database seeded with the onboarding parser's prompt would keep it. Replace
+    it with the base-résumé parser's only while it is still that old default; an edited prompt is left alone (the
+    save check and the parse's own check name it if it lacks {resume}). Idempotent, so every worker may run it."""
+    row = db.query(Setting).filter(Setting.key == "resume_parse_prompt").first()
+    if row is not None and (row.value or "").strip() == OLD_RESUME_PARSE_PROMPT.strip():
+        row.value = RESUME_PARSE_PROMPT
+        row.description = DEFAULT_SETTINGS["resume_parse_prompt"][1]
+        db.commit()
+        logger.info("resume_parse_prompt upgraded to the base-résumé parser's default")
 
 
 def seed_companies(db):

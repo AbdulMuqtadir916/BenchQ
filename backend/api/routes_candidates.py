@@ -11,6 +11,7 @@ and another firm is the same 404 as a missing one (principle 4).
 Assigning a BDE to a candidate that had none is blocked at the plan's candidate limit (Q45). Every assignment change
 is one ASSIGN ledger entry, with the handoff note.
 """
+import asyncio
 import re
 import uuid
 from datetime import datetime, timedelta
@@ -186,7 +187,9 @@ async def parse_resume(firm_id: uuid.UUID, file: UploadFile = File(...),
     _member_of(firm_id, principal)
     content = await file.read(MAX_BYTES + 1)
     kind = file_kind(file.filename or "", content)
-    parse = await read_resume(extract_text(kind, content), db)
+    # Reading a PDF is CPU work; off the event loop, so other firms' requests aren't held behind it.
+    text = await asyncio.to_thread(extract_text, kind, content)
+    parse = await read_resume(text, kind, db, firm_id=firm_id)
     now = utcnow()
     # Parses nobody created a candidate from are deleted once they expire; this firm's, on each new read.
     scoped(db, ResumeParse, firm_id).filter(ResumeParse.candidate_id.is_(None), ResumeParse.expires_at < now) \

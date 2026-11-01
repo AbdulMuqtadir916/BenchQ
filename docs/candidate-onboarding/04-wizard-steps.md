@@ -136,13 +136,13 @@ mapper is tested before the backend exists. Mapper: `src/lib/api/dto/resume-pars
 | `header.title` | `primaryRole` | as printed |
 | `header.email`, `header.phone` | `email`, `phone` | as printed; an invalid email → null |
 | `header.linkedin` | `linkedinUrl` | must be a URL, else null |
-| `header.location` | `city`, `state` | "Irving, TX" → city "Irving", state "TX" (split on the last comma); one part → city |
+| `header.city`, `header.state`, `header.country` | `city`, `state`, `country` | as the header prints each (the base-résumé parser splits the location, [resume-versioning.md](../team/resume-versioning.md) §2); empty → null, a country is never guessed |
 | `header.work_authorization` | `workAuth`, `workAuthText` | matched case-insensitively against a table (H1B/H-1B, H4 EAD, OPT, CPT, Green Card/GC/Permanent Resident, GC EAD, US Citizen/USC, TN); no match → `workAuth` null, text kept |
 | `work_experience[].start` / `end` / `current` | `yearsExperience` | months covered by all jobs, overlaps merged, an ongoing job ends today, rounded down to whole years; a job with no start is skipped |
 | `professional_summary` | `summary` | as printed |
-| `technical_skills[]` | `skills[]` | split each group's `skills` on commas, trim, drop empties and duplicates (case-insensitive); `family` = the group's `category` |
+| `technical_skills[]` | `skills[]` | split each group's `skills` on its top-level commas only ("AWS (ECS, Lambda), Docker" is two skills), trim, drop empties and duplicates (case-insensitive); `family` = the group's `category` |
 | `header.github` | — | not stored yet (no field); listed for Zuhair, 06 §6 |
-| `work_experience`, `projects`, `education`, `certifications` | — | not shown in the wizard; the backend builds the Record from them on create (06 §4) |
+| `work_experience`, `projects`, `education`, `certifications`, `awards`, `languages` | — | not shown in the wizard; the backend builds the Record from them on create (06 §4) |
 
 ## 6. Tests
 

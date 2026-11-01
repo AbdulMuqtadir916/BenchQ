@@ -1,0 +1,4 @@
+# The team's test résumés and their recorded model replies stay out of the repo (shared separately, not committed).
+# Put them here to run backend/tests/test_resume_parse_test_set.py locally.
+test_set/
+replies/

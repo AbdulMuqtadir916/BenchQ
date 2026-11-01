@@ -5,7 +5,7 @@ import { applyDraft, EMPTY_VALUES, firstOpenStep, isDirty, toCreateCandidate, va
 
 const draft: ResumeDraft = {
   parseId: "parse_1", fileName: "Ravi.pdf", fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com",
-  phone: null, linkedinUrl: null, city: "Irving", state: "TX", yearsExperience: 9, workAuth: "H1B", workAuthText: null,
+  phone: null, linkedinUrl: null, city: "Irving", state: "TX", country: null, yearsExperience: 9, workAuth: "H1B", workAuthText: null,
   summary: "Nine years of Java.", skills: [{ name: "Java", family: "Languages" }, { name: "AWS", family: "Cloud" }],
 };
 const valid: WizardValues = { ...EMPTY_VALUES, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", workAuth: "H1B" };
