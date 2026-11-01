@@ -77,9 +77,12 @@ The merged PR #100 application command/response fixes are preserved unchanged.
 - Synthetic browser acceptance passed in light/dark, reduced motion, at **1440/1024/390**, with zero axe violations
   and page errors. Verified Google-only navigation, local read failure/no loop/explicit retry, retained messages,
   source-address display, real sync POST, read-only behavior and loading/error/empty states.
-- Full backend suite: running on dedicated temporary PostgreSQL with frequent checkpoints; final result is recorded
-  before publication. No existing database or Google account was used for tests.
-- Final changed-file inventory, whitespace, secret scan and latest-main check are performed before commit/push.
+- Full backend suite on updated main: **3727 passed, 11 skipped, 13 expected failures**, with 54 live tests
+  deselected; no unexpected failures. Ran on dedicated temporary PostgreSQL. No existing database or Google
+  account was used. The first run exposed a fixed-revision assumption in the older rollback test; it now asserts
+  preservation of its actual starting revision and review history.
+- Final inventory covers all **53 changed files**; whitespace and secret-pattern checks passed. Latest main
+  `a1c7a92` is included, retaining résumé creation and database timeout protections.
 
 ## Rollout and rollback
 
