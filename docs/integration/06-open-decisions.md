@@ -95,12 +95,17 @@ Each decision: what the frontend needs → what the backend has → options → 
 
 ## D8 — Per-candidate inbox
 
-- **Frontend needs:** each candidate connects a Gmail account; messages appear on the candidate.
+- **User decision (2026-10-31):** one Gmail account belongs to each candidate. The BDE starts OAuth on that
+  candidate's page; the candidate or an authorized person signs into Google and grants Gmail read-only consent.
+  Google identity must match the candidate's account. Initial sync imports 3 days. Disconnect stops future sync and
+  removes credentials while retaining imported messages.
+- **Frontend needs:** the BDE starts the candidate's Google connection; messages appear in that candidate's Inbox.
 - **Backend has:** one Gmail account monitored to auto-update application statuses
   (`backend/email_monitor/`, `POST /api/email/check-now`).
-- **Recommendation:** after D1 — per-candidate OAuth tokens are a security-sensitive feature, so
-  design it properly.
-- **Mock stays:** `src/mocks/inbox.ts`, `inbox.json`.
+- **Implementation direction:** per-candidate OAuth, encrypted refresh credentials, incremental Gmail history sync,
+  3-day initial import, and no email classification/status mutations until Module 3. Sync cadence and deployment
+  execution topology must be recorded in the module plan.
+- **Mock removal:** after candidate Inbox, overview and activity consumers all use live APIs.
 
 ## D9 — Job requirements and work-authorisation rules
 
@@ -128,5 +133,5 @@ Record each decision here, with date and owner, then update the affected module 
 | D5 | | | |
 | D6 | | | |
 | D7 | | | |
-| D8 | | | |
+| D8 | BDE initiates OAuth; candidate/account owner signs into the candidate's Google account and grants read-only access. Initial import 3 days (updated from 90 days); disconnect removes credentials/stops syncing but keeps imported messages. | 2026-10-31 | Abdul |
 | D9 | | | |

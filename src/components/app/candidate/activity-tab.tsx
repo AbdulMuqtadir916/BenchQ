@@ -33,7 +33,7 @@ export function ActivityTab({ applications, messages, teamName, onOpenApplicatio
     })));
     const email: Entry[] = messages.map((m) => {
       const app = m.applicationId ? byId.get(m.applicationId) : undefined;
-      return { id: m.id, at: m.receivedAt, kind: "email" as const, Icon: Mail, iconClass: "text-[var(--color-info-fg)]", title: `Email: ${SIGNAL_META[m.signal].label}`, detail: `${m.fromName}${app ? ` · ${app.jobTitleAtApply} at ${app.companyNameAtApply}` : ""}`, by: null, applicationId: m.applicationId };
+      return { id: m.id, at: m.receivedAt, kind: "email" as const, Icon: Mail, iconClass: "text-[var(--color-info-fg)]", title: `Email: ${m.signal ? SIGNAL_META[m.signal].label : "Unclassified"}`, detail: `${m.fromName}${app ? ` · ${app.jobTitleAtApply} at ${app.companyNameAtApply}` : ""}`, by: null, applicationId: m.applicationId };
     });
     return [...status, ...email].sort((a, b) => (a.at < b.at ? 1 : -1));
   }, [applications, messages, teamName]);

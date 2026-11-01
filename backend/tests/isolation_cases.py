@@ -31,7 +31,8 @@ class Case:
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate",
+         "message_id": "inbox_message"}
 
 
 def _new(prefix: str) -> str:
@@ -60,6 +61,20 @@ CASES: dict[str, Case] = {
         "full_name": "New candidate", "primary_role": "Data Engineer", "email": "new@example.test", "work_auth": "GC",
         "manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": Case(),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/inbox/unmatched-reviews": Case(shows_rows=True),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": Case(
+        body=lambda i: {"return_to": f"/acme/candidates/{i['candidate']}?tab=inbox"}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/sync": Case(),
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox": Case(),
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/read": Case(),
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": Case(
+        path={"candidate_id": "candidate", "message_id": "review_message"},
+        body=lambda i: {"application_id": str(i["review_app"]), "status": "applied",
+                        "expected_revision": 0, "review_id": str(i["review"]),
+                        "expected_review_revision": 0}, body_ids=True),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": Case(
+        path={"candidate_id": "candidate", "message_id": "inbox_message"}),
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(body=lambda i: {"rate_target": 90}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": Case(
         body=lambda i: {"manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
@@ -92,13 +107,16 @@ CASES: dict[str, Case] = {
 
     # ── Applications (track 03) ──────────────────────────────────────────────
     "GET /api/applications": Case(shows_rows=True),
+    "GET /api/applications/{app_id}": Case(),
+    "PATCH /api/applications/{app_id}/review": Case(path={"app_id": "review_app"}, body=lambda i: {"review_id": str(i["review"]), "status": "assessment", "expected_revision": 0, "expected_review_revision": 0}),
     "POST /api/applications": Case(body=lambda i: {"title": "Logged role", "company": "Logged Co", "url": _new("logged")}),
     "POST /api/applications/extract": Case(body=lambda i: {"url": _new("posting")}),
+    "PATCH /api/applications/{app_id}/candidate-status": Case(body=lambda i: {"status": "saved", "expected_revision": 0}),
     "PATCH /api/applications/{app_id}": Case(body=lambda i: {"notes": "Edited"}),
-    "DELETE /api/applications/{app_id}": Case(),
-    "POST /api/applications/bulk-update": Case(body=lambda i: {"ids": [str(i["app"])], "status": "interview"},
+    "DELETE /api/applications/{app_id}": Case(path={"app_id": "legacy_app"}),
+    "POST /api/applications/bulk-update": Case(body=lambda i: {"ids": [str(i["app"])], "status": "interview_scheduled", "expected_revisions": {str(i["app"]): 0}},
                                                body_ids=True, bulk=True),
-    "POST /api/applications/bulk-delete": Case(body=lambda i: {"ids": [str(i["app"])]}, body_ids=True, bulk=True),
+    "POST /api/applications/bulk-delete": Case(body=lambda i: {"ids": [str(i["legacy_app"])]}, body_ids=True, bulk=True),
     "GET /api/applications/{app_id}/prep": Case(),
     "POST /api/applications/{app_id}/interviews": Case(body=lambda i: {"what": "Panel"}),
     "PATCH /api/applications/interviews/{interview_id}": Case(body=lambda i: {"what": "Panel two"}),
@@ -184,6 +202,7 @@ SIGNED_IN_CASES: dict[str, Case] = {
 }
 SIGNED_IN_REASONS: dict[str, str] = {
     "GET /api/auth/me": "the caller's own session",
+    "GET /api/oauth/google/callback": "one-use state is bound to the signed-in user and candidate that initiated OAuth",
     "GET /api/searches/countries": "global reference data",
     "GET /api/llm/models": "global reference data",
     "GET /api/llm/efforts": "global reference data",

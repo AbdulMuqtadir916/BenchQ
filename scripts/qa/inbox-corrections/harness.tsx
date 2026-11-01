@@ -1,0 +1,33 @@
+import { createRoot } from 'react-dom/client';
+import { useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { useCandidateApplications } from '@/lib/hooks/use-applications';
+import { useCandidateInbox } from '@/lib/hooks/use-inbox';
+import { InboxTab } from '@/components/app/candidate/inbox/inbox-tab';
+import { FirmProvider } from '@/lib/tenancy/firm-context';
+import { FirmSchema } from '@/lib/schemas/session';
+import { ApplicationSchema } from '@/lib/schemas/application';
+import { ApplicationDrawer } from '@/components/app/candidate/applications/application-drawer';
+import { ApplicationProgress } from '@/components/app/applications/application-progress';
+import type { CandidateWorkspace } from '@/components/app/candidate/use-candidate-workspace';
+import type { CandidateActions } from '@/components/app/candidate/candidate-actions';
+import '@/app/globals.css';
+const client = new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}, mutations:{retry:false}}});
+const firm = FirmSchema.parse({id:'qa-firm',name:'Synthetic QA',slug:'synthetic-qa',logoUrl:null,status:'ACTIVE',planId:'qa-plan',seatLimit:10,candidateLimit:10,contactPhone:null,createdAt:'2026-10-31T12:00:00.000Z'});
+const app = ApplicationSchema.parse({id:'qa-app',firmId:firm.id,candidateId:'qa-candidate',jobId:'qa-job',resumeVersionId:null,submittedByUserId:null,status:'SHORTLISTED',companyNameAtApply:'Synthetic Corp',jobTitleAtApply:'Synthetic Engineer',appliedAt:'2026-10-30T12:00:00.000Z',firstResponseAt:null,interviewAt:null,offerAt:null,closedAt:null,expiresAt:null,coverLetterText:null,notes:null,events:[],createdAt:'2026-10-30T12:00:00.000Z'});
+function Harness() {
+ const [selected,setSelected] = useState(new URLSearchParams(location.search).get('message'));
+ const applicationsQuery = useCandidateApplications('qa-candidate');
+ void applicationsQuery;
+ const inboxQuery = useCandidateInbox('qa-candidate',selected);
+ const [canAct] = useState(() => new URLSearchParams(location.search).get("state") !== "readonly");
+ const [drawer,setDrawer] = useState(false);
+ const [status,setStatus] = useState(app.status);
+ const qc = useQueryClient();
+ useEffect(()=> { const onPop = () => setSelected(new URLSearchParams(location.search).get('message')); addEventListener('popstate',onPop); return()=>removeEventListener('popstate',onPop); },[]);
+ useEffect(()=> { const scope = window as unknown as {qa:object}; scope.qa={client:qc,select:(id:string)=>{history.pushState(null,'',`?message=${id}`);setSelected(id);}, status:(value:typeof status)=>setStatus(value)}; },[qc]);
+ const select = (id:string) => {history.pushState(null,'',`?message=${id}`);setSelected(id);};
+ const ws = { candidate:{id:'qa-candidate',fullName:'Synthetic Candidate'}, messages:inboxQuery.data?.messages??[], applications:[app], suggestions:[],inbox:inboxQuery.data??null,inboxQuery, resumesQuery:{ data:[],isLoading:false } } as unknown as CandidateWorkspace;
+ return <div className="bq-page bg-[var(--color-surface)] text-[var(--color-text)]"><h1 className="text-h2">Synthetic Inbox acceptance</h1><button onClick={()=>document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'}>Toggle theme</button><button onClick={()=>select('old-mail')}>Open older email</button><button onClick={()=>select('missing-mail')}>Open missing email</button><button onClick={()=>setDrawer(true)}>Open application drawer</button><InboxTab ws={ws} actions={{openApplication:()=>{},reviewInboxMessage:()=>{},retryInboxClassification:()=>{}} as unknown as CandidateActions} canAct={canAct} selectedId={selected} onSelect={select}/><div className="mt-5 max-w-xl"><ApplicationProgress application={{...app,status}} /><ApplicationDrawer ws={ws} applicationId={drawer ? app.id : null} canAct={true} onMove={(_id,to)=>setStatus(to)} onClose={()=>setDrawer(false)} /></div></div>;
+}
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}><FirmProvider firm={firm}><Harness/></FirmProvider></QueryClientProvider>);

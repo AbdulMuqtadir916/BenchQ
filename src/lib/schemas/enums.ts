@@ -83,6 +83,15 @@ export const ClientType = z.enum([
 export type ClientType = z.infer<typeof ClientType>;
 
 export const ApplicationStatus = z.enum([
+  "SCREENING_CALL",
+  "INTERVIEW_SCHEDULE_REQUEST",
+  "INTERVIEW_SCHEDULED",
+  "SHORTLISTED",
+  "MOVE_ON",
+  "INCOMPLETE_APPLICATION",
+  "ASSESSMENT",
+  "OTHER",
+
   "SAVED",
   "APPLIED",
   "RESPONSE",

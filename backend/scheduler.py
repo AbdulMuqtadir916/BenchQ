@@ -20,11 +20,11 @@ def get_setting(db, key, default=None):
     return default
 
 
-def _int_setting(db, key: str) -> int:
+def _int_setting(db, key: str, default: str = "0") -> int:
     """A minutes-interval setting, or 0 (= disabled) if the stored value is junk; a bad value
     must not raise, since configure_scheduler() runs inside the app's lifespan and would take
     the whole backend down with it."""
-    raw = get_setting(db, key, "0")
+    raw = get_setting(db, key, default)
     try:
         value = int(str(raw).strip())
     except (TypeError, ValueError):
@@ -44,6 +44,7 @@ def configure_scheduler():
     try:
         scrape_interval = _int_setting(db, "scrape_interval_minutes")
         email_interval = _int_setting(db, "email_check_interval_minutes")
+        candidate_inbox_interval = _int_setting(db, "candidate_gmail_sync_interval_minutes", "5")
         backup_cron = str(get_setting(db, "backup_cron", "") or "").strip()
         digest_cron = str(get_setting(db, "digest_cron", "") or "").strip()
         h1b_cron = str(get_setting(db, "h1b_cron", "") or "").strip()
@@ -89,6 +90,16 @@ def configure_scheduler():
             replace_existing=True,
         )
 
+    if candidate_inbox_interval > 0:
+        scheduler.add_job(
+            run_candidate_inbox_sync,
+            IntervalTrigger(minutes=candidate_inbox_interval),
+            id="candidate_inbox_sync",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
     # Cron-based jobs (empty = disabled)
     _add_cron_job(run_db_backup, "db_backup", backup_cron)
     _add_cron_job(send_daily_digest, "daily_digest", digest_cron)
@@ -98,7 +109,8 @@ def configure_scheduler():
 
     logger.info(
         f"Scheduler configured: scrape every {scrape_interval}m, "
-        f"email every {email_interval}m, {len(scheduler.get_jobs())} total jobs"
+        f"email every {email_interval}m, candidate inbox every {candidate_inbox_interval}m, "
+        f"{len(scheduler.get_jobs())} total jobs"
     )
 
 
@@ -200,6 +212,76 @@ async def run_email_check():
         logger.warning(f"Scheduler skipped: {e}")
 
 
+def _sync_connected_candidate_mailboxes() -> tuple[int, int]:
+    """Single-process-safe poller: a PostgreSQL advisory lock fences duplicate API workers."""
+    from sqlalchemy import text
+    from backend.auth.scoping import scoped
+    from backend.inbox.gmail_sync import sync_mailbox, record_sync_error
+    from backend.inbox.classification_worker import classify_imported_messages
+    from backend.models.candidates import CandidateMailbox
+    from backend.models.db import engine
+
+    lock_key = 7_201_021_009
+    lock_connection = engine.connect()
+    try:
+        acquired = lock_connection.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": lock_key}).scalar()
+        if not acquired:
+            return 0, 0
+        ids_db = SessionLocal()
+        try:
+            mailbox_ids = ids_db.query(CandidateMailbox.firm_id, CandidateMailbox.id).filter(
+                CandidateMailbox.status == "CONNECTED", CandidateMailbox.refresh_token_ciphertext.isnot(None)
+            ).all()
+        finally:
+            ids_db.close()
+        completed = classified = 0
+        for firm_id, mailbox_id in mailbox_ids:
+            db = SessionLocal()
+            try:
+                mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(id=mailbox_id).with_for_update(skip_locked=True).first()
+                if mailbox is None:
+                    continue
+                imported_message_ids = []
+                candidate_id = mailbox.candidate_id
+                connection_started_at = mailbox.connected_at
+                try:
+                    sync_mailbox(db, mailbox, imported_message_ids=imported_message_ids)
+                    db.commit()
+                    completed += 1
+                except Exception:
+                    db.rollback()
+                    record_sync_error(db, firm_id, candidate_id, connection_started_at)
+                    db.commit()
+                else:
+                    if imported_message_ids:
+                        classified += classify_imported_messages(firm_id=firm_id, candidate_id=candidate_id,
+                            mailbox_id=mailbox_id, message_ids=imported_message_ids)
+            finally:
+                db.close()
+        return completed, classified
+    finally:
+        try:
+            lock_connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": lock_key})
+        finally:
+            lock_connection.close()
+
+
+async def run_candidate_inbox_sync():
+    """Import and process new mail, then sweep pending/expired work as recovery."""
+    from backend.job_monitor import tracked_run, JobAlreadyRunningError
+    import asyncio
+    try:
+        async with tracked_run("candidate_inbox_sync", "scheduler") as run:
+            started = datetime.now(timezone.utc)
+            completed, immediate = await asyncio.to_thread(_sync_connected_candidate_mailboxes)
+            from backend.inbox.classification_worker import classify_pending_messages
+            classified = immediate + await asyncio.to_thread(classify_pending_messages, created_before=started)
+            run.summary = (f"Synced {completed} candidate inbox{'' if completed == 1 else 'es'}; "
+                           f"classified {classified} email{'' if classified == 1 else 's'}")
+    except JobAlreadyRunningError as exc:
+        logger.info("Candidate inbox sync skipped: %s", exc)
+
+
 async def send_daily_digest():
     from backend.job_monitor import tracked_run, JobAlreadyRunningError
     try:
@@ -250,6 +332,7 @@ async def run_auto_reject():
                 cutoff = datetime.now(timezone.utc) - timedelta(days=days)
                 keep_statuses = ["rejected", "offer"]
                 stale = db.query(Application).filter(
+                    Application.candidate_id.is_(None),
                     ~Application.status.in_(keep_statuses),
                     Application.applied_at < cutoff,
                 ).all()

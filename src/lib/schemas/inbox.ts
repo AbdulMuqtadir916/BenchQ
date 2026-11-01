@@ -4,11 +4,17 @@ import { ApplicationStatus } from "./enums";
 /**
  * Candidate mailbox (Google account) — the BDE connects the inbox the
  * candidate applies from, and recruiter emails are matched to applications.
- * Frontend-only today: the mock adapter simulates the OAuth hand-off and sync.
+ * OAuth and message data are served by the candidate-scoped backend adapter.
  */
 
 /** What a recruiter email means for the application it belongs to. */
 export const MailSignal = z.enum([
+  "APPLIED",
+  "SCREENING_CALL",
+  "INTERVIEW_SCHEDULE_REQUEST",
+  "MOVE_ON",
+  "INCOMPLETE_APPLICATION",
+  "OTHER",
   "SHORTLISTED",
   "CALL_REQUEST",
   "INTERVIEW_SCHEDULED",
@@ -31,7 +37,12 @@ export const InboxMessageSchema = z.object({
   snippet: z.string(),
   body: z.string(),
   receivedAt: z.string().datetime(),
-  signal: MailSignal,
+  /** Null until Module 3 classification has been recorded. */
+  signal: MailSignal.nullable().default(null),
+  classificationState: z.enum(["PENDING", "PROCESSING", "DONE", "ERROR"]).default("PENDING"),
+  classificationConfidence: z.number().min(0).max(1).nullable().default(null),
+  classificationOutcome: z.enum(["UNMATCHED", "REVIEW", "AUTO_APPLIED", "NO_CHANGE"]).nullable().default(null),
+  classificationError: z.string().nullable().default(null),
   isRead: z.boolean(),
   /** The stage this email implies. A suggestion is pending while the application is behind it. */
   impliedStatus: ApplicationStatus.nullable(),
@@ -46,7 +57,9 @@ export const MailboxConnectionSchema = z.object({
   provider: z.literal("GOOGLE"),
   address: z.string(),
   connectedAt: z.string().datetime(),
-  lastSyncedAt: z.string().datetime(),
+  lastSyncedAt: z.string().datetime().nullable().default(null),
+  status: z.enum(["CONNECTED", "DISCONNECTED", "ERROR"]).default("CONNECTED"),
+  lastSyncError: z.string().nullable().default(null),
 });
 export type MailboxConnection = z.infer<typeof MailboxConnectionSchema>;
 

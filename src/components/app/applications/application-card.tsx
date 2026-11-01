@@ -6,7 +6,7 @@ import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { AvatarStack } from "@/components/app/avatar-stack";
 import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
-import { STATUS_ICON, STATUS_COLOR, stageEnteredAt } from "./status-meta";
+import { STATUS_LABEL, STATUS_ICON, STATUS_COLOR, stageEnteredAt } from "./status-meta";
 
 export interface CardFaceProps {
   app: Application;
@@ -21,11 +21,12 @@ export interface CardFaceProps {
 export function ApplicationCardFace({ app, candidateName, owner, followUpDue, signal }: CardFaceProps) {
   const days = daysBetween(stageEnteredAt(app), new Date());
   const Icon = STATUS_ICON[app.status];
-  const meta = signal ? SIGNAL_META[signal.signal] : null;
+  const meta = signal?.signal ? SIGNAL_META[signal.signal] : null;
   const ageTone = days >= 7 ? "text-[var(--color-danger-fg)]" : days >= 3 ? "text-[var(--color-warning-fg)]" : "text-[var(--color-text-3)]";
 
   return (
     <>
+      <p className="text-caption text-[var(--color-text-3)]">{app.pendingReviews.length ? "Last confirmed: " : ""}{STATUS_LABEL[app.status]}</p>
       <div className="flex items-start gap-2.5">
         <span aria-hidden className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] text-body-strong text-[var(--color-text-2)]">
           {app.companyNameAtApply.charAt(0)}

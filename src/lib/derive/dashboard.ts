@@ -51,7 +51,7 @@ export function deriveBdeDashboard(
     followUpsOverdue: pendingFollowups.filter((f) => new Date(f.dueAt) < now && !isSameLocalDay(f.dueAt, now)).length,
     applicationsThisWeek: submittedThisWeek.length,
     responsesThisWeek: responsesThisWeek.length,
-    interviewsScheduled: myApps.filter((a) => a.status === "INTERVIEW").length,
+    interviewsScheduled: myApps.filter((a) => ["INTERVIEW", "INTERVIEW_SCHEDULED"].includes(a.status)).length,
     candidatesAssigned: myCandidates.length,
     atRiskCandidateIds: atRisk.map((c) => c.id),
   };

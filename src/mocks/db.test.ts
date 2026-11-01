@@ -39,6 +39,7 @@ async function load(now = T0, email?: string) {
 }
 const stored = () => JSON.parse(storage.getItem(KEY) ?? "null") as { version: string; seededAt: string; tables: Record<string, unknown[]> } | null;
 const ADNAN = "user_adnan"; // seeded account ids (./sign-in-as.ts)
+const OWNER = "user_imran";
 const FATIMA = "user_fatima";
 const SANA = "padm_sana";
 
@@ -72,7 +73,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
   });
 
   it("keeps a change across a reload, a sign-out and a different account; untouched tables stay fixtures", async () => {
-    const first = await load(T0, ADNAN);
+    const first = await load(T0, OWNER);
     const app = first.applications.allApplications.find((a) => a.id === "app_001")!;
     const before = app.status;
     await first.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "WITHDRAWN", note: "persist me" });
@@ -84,12 +85,12 @@ describe("persistence across reloads, sign-outs and accounts", () => {
     const moved = await second.applications.applicationsMock.byId("firm_hts", "app_001");
     expect(before).not.toBe("WITHDRAWN");
     expect(moved.status).toBe("WITHDRAWN");
-    expect(moved.events.at(-1)).toMatchObject({ note: "persist me", actorUserId: "user_adnan" });
+    expect(moved.events.at(-1)).toMatchObject({ note: "persist me", actorUserId: OWNER });
     expect(stored()!.seededAt).toBe(T0);
   });
 
   it("persists every write the mock backend accepts, in the table it changed", async () => {
-    const m = await load(T0, ADNAN);
+    const m = await load(T0, OWNER);
     const candidate = m.candidates.allCandidates.find((c) => c.firmId === "firm_hts")!;
     await m.candidates.candidatesMock.update("firm_hts", candidate.id, { noticePeriodDays: 45 } as never);
     m.db.flush();
@@ -115,7 +116,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
   });
 
   it("reset (Super Admin only) wipes every change and re-anchors to now; nobody else may reset", async () => {
-    const m = await load(T0, ADNAN);
+    const m = await load(T0, OWNER);
     await m.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "WITHDRAWN", note: null });
     m.db.flush();
     await expect(m.demo.demoDataMock.reset()).rejects.toMatchObject({ status: 403 });
@@ -150,13 +151,13 @@ describe("persistence across reloads, sign-outs and accounts", () => {
   it("another tab's saved change refreshes this tab's tables in place and notifies it", async () => {
     const window = Object.assign(new EventTarget(), {});
     g.window = window;
-    const tabA = await load(T0, ADNAN);
+    const tabA = await load(T0, OWNER);
     const heard: string[] = [];
     tabA.db.watchDemoData(() => heard.push("refresh"));
     const rowsA = tabA.applications.allApplications;
 
     // Tab B (another set of modules) moves an application and saves.
-    const tabB = await load(T0, ADNAN);
+    const tabB = await load(T0, OWNER);
     await tabB.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "WITHDRAWN", note: null });
     tabB.db.flush();
     window.dispatchEvent(Object.assign(new Event("storage"), { key: KEY }));
@@ -233,7 +234,7 @@ describe("a full localStorage (docs/03 §3.3)", () => {
     const full = new FullStorage();
     storage = full;
     g.__BENCHQ_DEMO_STORAGE__ = full as unknown as Storage;
-    const m = await load(T0, ADNAN);
+    const m = await load(T0, OWNER);
     const states: boolean[] = [];
     m.db.watchStorageFull((isFull) => states.push(isFull));
 

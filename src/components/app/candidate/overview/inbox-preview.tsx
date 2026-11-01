@@ -47,7 +47,7 @@ export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessag
       ) : (
         <ul className="divide-y divide-[var(--color-border)]">
           {latest.map((m) => {
-            const meta = SIGNAL_META[m.signal];
+            const meta = m.signal ? SIGNAL_META[m.signal] : { label: "Unclassified email", tone: "neutral" as const, Icon: Mail };
             return (
               <li key={m.id}>
                 <button type="button" onClick={() => onOpenMessage(m.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--color-surface-2)]">

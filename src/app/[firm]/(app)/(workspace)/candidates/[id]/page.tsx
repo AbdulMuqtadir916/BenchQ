@@ -1,12 +1,14 @@
 "use client";
 
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { z } from "zod";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { can } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
+import { useMoveCandidateApplicationStatus } from "@/lib/hooks/use-applications";
+import { useReviewInboxMessage, useRetryInboxClassification } from "@/lib/hooks/use-inbox";
 import { EASE_OUT } from "@/lib/motion";
 import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
@@ -18,7 +20,7 @@ import { CandidateJobsTab } from "@/components/app/candidate/candidate-jobs-tab"
 import { CandidateHeader } from "@/components/app/candidate/candidate-header";
 import { CandidateTabs, isCandidateTab, type CandidateTabId } from "@/components/app/candidate/candidate-tabs";
 import { CandidateToast } from "@/components/app/candidate/candidate-toast";
-import { useCandidateWorkspace, type Suggestion } from "@/components/app/candidate/use-candidate-workspace";
+import { useCandidateWorkspace } from "@/components/app/candidate/use-candidate-workspace";
 import type { CandidateActions } from "@/components/app/candidate/candidate-actions";
 import { OverviewTab, masterReviewHref } from "@/components/app/candidate/overview/overview-tab";
 import { DocumentsTab } from "@/components/app/candidate/documents/documents-tab";
@@ -30,23 +32,27 @@ import { ActivityTab } from "@/components/app/candidate/activity-tab";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
 import { useHref } from "@/lib/routes/use-href";
 
+const EmailSelectionSchema = z.string().min(1).max(100).nullable().catch(null);
+
 export default function CandidateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const toHref = useHref();
   const { id } = use(params);
   const principal = useSignedInPrincipal();
   const router = useRouter();
-  const pathname = usePathname();
-  const tabParam = useSearchParams().get("tab");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const selectedMessageId = EmailSelectionSchema.parse(searchParams.get("message"));
   const tab: CandidateTabId = isCandidateTab(tabParam) ? tabParam : "overview";
   const reduce = useReducedMotion() ?? false;
-  const ws = useCandidateWorkspace(id);
+  const ws = useCandidateWorkspace(id, selectedMessageId);
   const { access } = useRouteAccess();
-  const updateStatus = useUpdateApplicationStatus();
+  const moveCandidateStatus = useMoveCandidateApplicationStatus(id);
+  const reviewInboxMessage = useReviewInboxMessage(id);
+  const retryInboxClassification = useRetryInboxClassification(id);
   const canAct = can(principal, "candidate.edit");
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // Each "Find jobs" press starts a matching run; the Jobs tab plays it until it reports done.
   const [matchRun, setMatchRun] = useState(0);
@@ -61,33 +67,45 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   // The tab lives in the URL, so back/forward and shared links land on the same view.
   const setTab = useCallback(
     (next: CandidateTabId) => {
-      router.replace(next === "overview" ? pathname : `${pathname}?tab=${next}`, { scroll: false });
+      router.replace(toHref("candidates.detail", { id }, next === "overview" ? undefined : { tab: next }), { scroll: false });
       requestAnimationFrame(() => {
         const bar = tabsRef.current;
         if (bar && bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
       });
     },
-    [router, pathname, reduce],
+    [router, toHref, id, reduce],
   );
+
+  const openMessage = useCallback((messageId: string) => {
+    setOpenApplicationId(null);
+    window.history.pushState(null, "", toHref("candidates.detail", { id }, { tab: "inbox", message: messageId }));
+  }, [toHref, id]);
 
   const moveApplication = useCallback(
     (applicationId: string, to: ApplicationStatus, note: string | null = null) => {
       const app = ws.applications.find((a) => a.id === applicationId);
-      updateStatus.mutate({ id: applicationId, status: to, note });
-      setToast(`${app?.companyNameAtApply ?? "Application"} moved to ${STATUS_LABEL[to]}`);
+      moveCandidateStatus.mutate({ id: applicationId, status: to, expectedRevision: app?.statusRevision ?? 0, commandId: crypto.randomUUID() }, {
+        onSuccess: () => setToast(`${app?.companyNameAtApply ?? "Application"} moved to ${STATUS_LABEL[to]}`),
+        onError: (error) => setToast(error.message || "Couldn't update application status."),
+      });
+      void note;
     },
-    [ws.applications, updateStatus],
+    [ws.applications, moveCandidateStatus],
   );
 
   const actions = useMemo<CandidateActions>(() => ({
     openTab: setTab,
     openApplication: setOpenApplicationId,
-    openMessage: (messageId) => {
-      setOpenApplicationId(null);
-      setSelectedMessageId(messageId);
-      setTab("inbox");
-    },
-    applySuggestion: (s: Suggestion) => moveApplication(s.applicationId, s.to, `From recruiter email: ${s.message.subject}`),
+    openMessage,
+    applySuggestion: (suggestion) => openMessage(suggestion.message.id),
+    reviewInboxMessage: (input) => reviewInboxMessage.mutate(input, {
+      onSuccess: () => setToast("Application status updated from the Inbox review."),
+      onError: (error) => setToast(error.message || "Couldn't confirm the email status."),
+    }),
+    retryInboxClassification: (messageId) => retryInboxClassification.mutate(messageId, {
+      onSuccess: () => setToast("Email classification queued for retry."),
+      onError: (error) => setToast(error.message || "Couldn't retry email classification."),
+    }),
     findJobs: () => {
       setMatchRun((n) => n + 1);
       setTab("jobs");
@@ -97,7 +115,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
       const href = masterReviewHref(ws.master, toHref);
       if (href) router.push(href);
     },
-  }), [setTab, moveApplication, reduce, router, ws.master, toHref]);
+  }), [setTab, openMessage, reduce, router, ws.master, toHref, reviewInboxMessage, retryInboxClassification]);
 
   const closeDrawer = useCallback(() => setOpenApplicationId(null), []);
   const finishMatch = useCallback(() => setMatchDone(matchRun), [matchRun]);
@@ -149,11 +167,12 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         >
           {tab === "overview" ? <OverviewTab ws={ws} actions={actions} canAct={canAct} onNotify={setToast} /> : null}
           {tab === "applications" ? <ApplicationsTab ws={ws} actions={actions} canAct={canAct} onMove={moveApplication} /> : null}
-          {tab === "inbox" ? <InboxTab ws={ws} actions={actions} canAct={canAct} selectedId={selectedMessageId} onSelect={setSelectedMessageId} /> : null}
+          {tab === "inbox" ? <InboxTab ws={ws} actions={actions} canAct={canAct} selectedId={selectedMessageId} onSelect={openMessage} /> : null}
           {tab === "jobs" ? (
             <CandidateJobsTab
               candidate={candidate}
               jobs={ws.jobsQuery.data ?? []}
+              favoriteJobIds={ws.favoriteJobIds}
               applications={ws.applications}
               isLoading={ws.jobsQuery.isLoading || ws.applicationsQuery.isLoading}
               isMatching={matchRun > matchDone}
@@ -167,7 +186,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         </motion.div>
       </AnimatePresence>
 
-      <ApplicationDrawer ws={ws} applicationId={openApplicationId} canAct={canAct} actions={actions} onMove={moveApplication} onClose={closeDrawer} />
+      <ApplicationDrawer ws={ws} applicationId={openApplicationId} canAct={canAct} onMove={moveApplication} onClose={closeDrawer} />
       <CandidateToast message={toast} />
     </div>
   );

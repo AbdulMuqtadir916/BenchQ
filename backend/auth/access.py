@@ -52,6 +52,7 @@ ROUTE_ACCESS: dict[str, Access] = {
 
     # ── Any signed-in account ─────────────────────────────────────────────────
     "GET /api/auth/me": S,
+    "GET /api/oauth/google/callback": S,             # one-time OAuth state is bound to its initiating user/candidate
     "GET /api/firms/by-slug/{slug}": S,            # a firm user's own firm only; 404 otherwise
     "GET /api/companies": S,                       # global reference data
     "GET /api/searches/countries": S,
@@ -74,11 +75,21 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates": F,                    # in the principal's scope (07 Q47)
     "POST /api/firms/{firm_id}/candidates": F,                   # OWNER, MANAGER: candidate.create + can_assign_to
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,
+    "GET /api/firms/{firm_id}/inbox/unmatched-reviews": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/sync": F,
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox": F,
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/read": F,
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": F,
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": F,   # candidate.edit, in scope
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": F,   # candidate.assign + can_assign_to (Q43)
     "GET /api/firms/{firm_id}/ledger": F,          # a BDE gets their own entries only (routes_ledger)
     "POST /api/analyze/{job_id}": F,
     "GET /api/applications": F,
+    "GET /api/applications/{app_id}": F,
+    "PATCH /api/applications/{app_id}/review": F,
     "POST /api/applications": F,
     "POST /api/applications/bulk-delete": F,
     "POST /api/applications/bulk-update": F,
@@ -87,6 +98,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "PATCH /api/applications/interviews/{interview_id}": F,
     "DELETE /api/applications/{app_id}": F,
     "PATCH /api/applications/{app_id}": F,
+    "PATCH /api/applications/{app_id}/candidate-status": F,
     "POST /api/applications/{app_id}/interviews": F,
     "GET /api/applications/{app_id}/prep": F,
     "POST /api/autofill/answer": F,

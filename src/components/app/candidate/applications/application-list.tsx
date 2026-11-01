@@ -10,27 +10,11 @@ import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/cn";
 import { Tag } from "@/components/ui/tag";
 import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
-import { STATUS_LABEL, STATUS_TONE, isClosed, stageRank } from "@/components/app/applications/status-meta";
+import { STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
 
-const STEPS: ApplicationStatus[] = ["APPLIED", "RESPONSE", "SCREENING", "INTERVIEW", "OFFER", "PLACED"];
-
-/** Six dots from Applied to Placed — how far along this submission is, at a glance. */
+/** Categories are not a linear pipeline; display the current confirmed status. */
 export function StageDots({ status }: { status: ApplicationStatus }) {
-  const rank = stageRank(status);
-  const closed = isClosed(status);
-  return (
-    <span className="inline-flex items-center gap-1" aria-hidden>
-      {STEPS.map((s) => (
-        <span
-          key={s}
-          className={cn(
-            "h-1.5 w-4 rounded-[var(--radius-full)]",
-            closed ? "bg-[var(--color-surface-3)]" : stageRank(s) <= rank ? "bg-[var(--color-primary)]" : "bg-[var(--color-surface-3)]",
-          )}
-        />
-      ))}
-    </span>
-  );
+  return <span className="text-caption text-[var(--color-text-3)]">{STATUS_LABEL[status]}</span>;
 }
 
 /** Dense list of submissions with stage progress and the latest recruiter email. */
@@ -40,7 +24,7 @@ export function ApplicationList({ apps, signals, onOpen }: { apps: Application[]
     <ul className="bq-card divide-y divide-[var(--color-border)] overflow-hidden p-0">
       {apps.map((app, i) => {
         const signal = signals.get(app.id);
-        const meta = signal ? SIGNAL_META[signal.signal] : null;
+        const meta = signal?.signal ? SIGNAL_META[signal.signal] : null;
         return (
           <motion.li key={app.id} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: Math.min(i, 10) * 0.03, ease: EASE_OUT }}>
             <button type="button" onClick={() => onOpen(app.id)} className="grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left hover:bg-[var(--color-surface-2)] md:grid-cols-[2rem_minmax(0,1.6fr)_8rem_minmax(0,1fr)_6rem_1rem]">
@@ -50,7 +34,7 @@ export function ApplicationList({ apps, signals, onOpen }: { apps: Application[]
                 <span className="block truncate text-sm text-[var(--color-text-3)]">{app.companyNameAtApply}</span>
               </span>
               <span className="flex flex-col items-end gap-1.5 md:items-start">
-                <Tag tone={STATUS_TONE[app.status]}>{STATUS_LABEL[app.status]}</Tag>
+                <Tag tone={app.pendingReviews.length ? "amber" : STATUS_TONE[app.status]}>{app.pendingReviews.length ? "BDE review" : STATUS_LABEL[app.status]}</Tag>
                 <span className="hidden md:inline-flex"><StageDots status={app.status} /></span>
               </span>
               <span className="hidden min-w-0 md:block">

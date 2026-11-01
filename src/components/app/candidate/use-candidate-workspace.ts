@@ -4,51 +4,69 @@ import { useMemo, useState } from "react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import type { InboxMessage } from "@/lib/schemas/inbox";
 import { useCandidate } from "@/lib/hooks/use-candidates";
-import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
+import { useCandidateApplications, useFollowups } from "@/lib/hooks/use-applications";
 import { useRecord } from "@/lib/hooks/use-records";
 import { useResumes } from "@/lib/hooks/use-resumes";
-import { useJobs } from "@/lib/hooks/use-jobs";
+import { useCandidateJobs } from "@/lib/hooks/use-jobs";
 import { useTeam } from "@/lib/hooks/use-team";
 import { useCandidateInbox } from "@/lib/hooks/use-inbox";
 import { useCandidateDocuments } from "@/lib/hooks/use-documents";
 import { deriveCandidateStats, deriveExportGate } from "@/lib/derive";
 import { isClosed } from "@/components/app/applications/status-meta";
-import { latestSignalByApplication, pendingSuggestion } from "@/components/app/inbox/signal-meta";
+import { latestSignalByApplication, needsBdeReview, pendingSuggestion } from "@/components/app/inbox/signal-meta";
 
 export interface Suggestion {
   message: InboxMessage;
   applicationId: string;
   to: ApplicationStatus;
+  reviewId?: string;
+  reviewRevision?: number;
 }
 
 /**
  * Everything the candidate page's tabs share, loaded once and derived in one
  * place — counts, suggestions and upcoming events are computed, never stored.
  */
-export function useCandidateWorkspace(candidateId: string) {
+export function useCandidateWorkspace(candidateId: string, messageId?: string | null) {
   const [now] = useState(() => Date.now());
   const candidateQuery = useCandidate(candidateId);
-  const applicationsQuery = useApplications(candidateId);
+  const applicationsQuery = useCandidateApplications(candidateId);
   const recordQuery = useRecord(candidateId);
   const resumesQuery = useResumes(candidateId);
-  const jobsQuery = useJobs({ limit: 300 });
-  const inboxQuery = useCandidateInbox(candidateId);
+  const candidateJobsQuery = useCandidateJobs(candidateId);
+  const jobsQuery = {
+    data: candidateJobsQuery.data?.jobs,
+    error: candidateJobsQuery.error,
+    isLoading: candidateJobsQuery.isLoading,
+    refetch: candidateJobsQuery.refetch,
+  };
+  const favoriteJobIds = candidateJobsQuery.data?.favoriteJobIds ?? [];
+  const inboxQuery = useCandidateInbox(candidateId, messageId);
   const documentsQuery = useCandidateDocuments(candidateId);
   const followupsQuery = useFollowups();
   const teamQuery = useTeam();
 
   const candidate = candidateQuery.data;
   const applications = useMemo(() => applicationsQuery.data ?? [], [applicationsQuery.data]);
-  const messages = useMemo(() => inboxQuery.data?.messages ?? [], [inboxQuery.data]);
+  const messages = useMemo(() => {
+    const pending = new Set(applications.flatMap((app) => app.pendingReviews.map((review) => review.messageId)));
+    return (inboxQuery.data?.messages ?? []).filter((message) => message.id === messageId || message.signal !== "OTHER"
+      || needsBdeReview(message, pending.has(message.id)));
+  }, [inboxQuery.data, applications, messageId]);
 
   const derived = useMemo(() => {
     const statusById = new Map(applications.map((a) => [a.id, a.status]));
     const byApp = new Map<string, Suggestion>();
     for (const message of messages) {
       if (!message.applicationId) continue;
-      const to = pendingSuggestion(message, statusById.get(message.applicationId));
+      const application = applications.find((a) => a.id === message.applicationId);
+      const pendingReview = application?.pendingReviews.find((review) => review.messageId === message.id);
+      const to = pendingReview ? pendingSuggestion(message, statusById.get(message.applicationId)) : null;
       const existing = byApp.get(message.applicationId);
-      if (to && (!existing || message.receivedAt > existing.message.receivedAt)) byApp.set(message.applicationId, { message, applicationId: message.applicationId, to });
+      if (to && (!existing || message.receivedAt > existing.message.receivedAt)) byApp.set(message.applicationId, {
+        message, applicationId: message.applicationId, to,
+        reviewId: pendingReview?.id, reviewRevision: pendingReview?.revision,
+      });
     }
     const appIds = new Set(applications.map((a) => a.id));
     const followups = (followupsQuery.data ?? [])
@@ -99,6 +117,8 @@ export function useCandidateWorkspace(candidateId: string) {
     recordQuery,
     resumesQuery,
     jobsQuery,
+    candidateJobsQuery,
+    favoriteJobIds,
     inboxQuery,
     inbox: inboxQuery.data ?? null,
     documentsQuery,

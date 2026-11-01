@@ -69,7 +69,8 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     const bde = firmUser("BDE");
     expect(scopeOf(bde)).toEqual({ kind: "own", userId: "u_BDE" });
     expect(ids(scopeCandidates(bde, candidates))).toEqual(["c1"]);
-    expect(ids(scopeApplications(bde, applications, candidates))).toEqual(["a1"]);
+    // BDE scope follows the candidate's current assignment, not the historical submitter.
+    expect(ids(scopeApplications(bde, applications, candidates))).toEqual(["a1", "a3"]);
     expect(ids(scopeLedger(bde, ledger, context))).toEqual(["l1"]);
     // 07 Q52: plus who assigned them the candidates they work now; not other entries about them, nor others' candidates.
     const assigns = [

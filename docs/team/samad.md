@@ -12,10 +12,60 @@ The candidate page already has an Inbox tab and an "Inbox" preview on its Overvi
 (`src/mocks/inbox.ts`, `src/lib/schemas/inbox.ts`: `InboxMessage`, `MailboxConnection`). The backend today watches
 **one** Gmail account for the whole app (`backend/email_monitor/`, `POST /api/email/check-now`).
 
-1. **Design note first (no code), agreed with Abdul:** Google OAuth for a candidate's mailbox (scopes: read-only),
-   where the refresh token is stored (encrypted at rest; the key from the environment, never in the database or the
-   repo), how a sync runs (scheduler job per connected mailbox, incremental by history id), what a disconnect does,
-   and the security of a BDE connecting someone else's account. Write it into this file as §1.0.
+### 1.0 D8 design — user-confirmed decisions (2026-10-31)
+
+**Goal:** replace the simulated Inbox connection and messages with one Gmail mailbox per candidate. The BDE starts
+OAuth from that candidate's page; the candidate (or someone authorized to access that account) signs in on Google's
+page and grants read-only consent. Store messages against that candidate, match them to applications when evidence is
+sufficient, and leave email classification/status changes for Module 3. No email sends, deletes, or provider-side
+read changes are in scope.
+
+**Proposed design:**
+
+1. **User confirmed 2026-10-31:** the mailbox belongs to the candidate, not the BDE. A BDE starts connection from
+   that candidate's Inbox. Google hosts authentication and read-only consent for the candidate's account; BenchQ
+   never asks for or accepts a Google password. The candidate's messages are displayed on that candidate's Inbox.
+   Every action is checked against the caller's existing candidate scope; VIEWER and support-view principals cannot
+   connect, disconnect, sync, or mark messages read.
+2. Store the refresh credential encrypted with authenticated encryption. The encryption key comes from deployment
+   configuration/secret storage, never from Postgres, source control, API responses, or logs. Add only the required
+   encrypted-token and Gmail incremental-sync checkpoint fields to Samad-owned `candidate_mailboxes` in an additive
+   migration. Claim the next migration number in the team README and confirm Alembic head before changing schema.
+3. **User updated 2026-10-31:** the initial sync imports the most recent 3 days, replacing the earlier 90-day window. Disconnect stops future sync and
+   removes credentials while retaining already-imported messages. Run incremental sync per connected mailbox using
+   Gmail history checkpoints.
+   Enforce the existing unique (`mailbox_id`, `provider_message_id`) key for retries. Persist message metadata and the
+   body required by the reader; `is_read` means read in BenchQ and must not modify Gmail. The initial lookback is 90
+   days; disconnect keeps messages but removes credentials and stops future sync.
+4. Match an email to an application by exact Gmail thread/application evidence first, then conservative deterministic
+   company and job evidence. Keep `application_id` null when uncertain; do not force a match with an LLM in the first
+   release. Module 2 stores and displays email only; it does not classify messages or change application statuses.
+   Module 3 applies the user's agreed Decider confidence and BDE-review policy.
+5. Keep the existing single-account `email_check` monitor separate. It currently reads the global
+   `GMAIL_REFRESH_TOKEN` and can update application statuses automatically. Before the per-candidate flow is enabled,
+   either scope that legacy monitor to legacy non-candidate rows or disable its status-writing path so it cannot race
+   or overwrite candidate application history.
+
+**Current code/schema findings:** `candidate_mailboxes` and `inbox_messages` already exist from migration 0007, but
+there are no OAuth token or Gmail history-checkpoint fields and no per-candidate mailbox routes. All four frontend
+adapter operations (`byCandidate`, `connect`, `disconnect`, `markRead`) still use `inboxMock`. The UI simulates consent
+and sync progress. The database permits a null email body while the frontend expects a string, so the DTO must map
+that boundary. The existing global monitor is not a safe replacement for a per-candidate sync: it uses one global
+token and mutates application stages without a user confirmation.
+
+**Remaining operational decisions before production use:**
+
+- Select/record the periodic sync interval and deployment execution topology; keep the local single-process scheduler
+  from starting duplicate mailbox pollers.
+- Configure the Google Cloud OAuth client ID/secret and exact authorized callback URI in local/deployment secrets.
+
+**Approval:** Abdul confirmed this connection flow and retention rule on 2026-10-31. Module 2 is authorized. OAuth/API
+credentials must be configured through Google Cloud and local/deployment secrets before live connection testing. No
+live Gmail account has been connected by this implementation work.
+
+1. **Design is now in §1.0:** BDE initiates OAuth; candidate/account owner consents in Google's hosted flow; the
+   candidate mailbox is read-only; import 3 days; disconnect removes credentials and stops sync but retains stored
+   messages. No status classification or application changes happen in Module 2.
 2. **Connect / disconnect / status:** routes under `/api/firms/{firm}/candidates/{id}/mailbox`; the token columns on
    `candidate_mailboxes` (your migration, claim its number in the team README §6). Policy: who may connect (a new
    action in `src/lib/auth/policy.ts` and `backend/auth/policy.py`, both, with the shared table regenerated).

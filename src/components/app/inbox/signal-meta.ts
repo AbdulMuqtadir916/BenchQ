@@ -1,10 +1,15 @@
-import { BadgeCheck, CalendarClock, ClipboardCheck, MailCheck, PhoneCall, Star, XCircle, type LucideIcon } from "lucide-react";
+import { BadgeCheck, CalendarClock, ClipboardCheck, CircleHelp, FileWarning, MailCheck, PhoneCall, Star, XCircle, type LucideIcon } from "lucide-react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import type { InboxMessage, MailSignal } from "@/lib/schemas/inbox";
 import type { TagTone } from "@/components/ui/tag";
-import { isClosed, stageRank } from "@/components/app/applications/status-meta";
 
 export const SIGNAL_META: Record<MailSignal, { label: string; Icon: LucideIcon; tone: TagTone }> = {
+  APPLIED: { label: "Application received", Icon: MailCheck, tone: "neutral" },
+  SCREENING_CALL: { label: "Screening call", Icon: PhoneCall, tone: "blue" },
+  INTERVIEW_SCHEDULE_REQUEST: { label: "Interview availability requested", Icon: CalendarClock, tone: "amber" },
+  MOVE_ON: { label: "Move on (rejected)", Icon: XCircle, tone: "red" },
+  INCOMPLETE_APPLICATION: { label: "Incomplete application", Icon: FileWarning, tone: "amber" },
+  OTHER: { label: "Other", Icon: CircleHelp, tone: "neutral" },
   SHORTLISTED: { label: "Shortlisted", Icon: Star, tone: "violet" },
   CALL_REQUEST: { label: "Call requested", Icon: PhoneCall, tone: "blue" },
   INTERVIEW_SCHEDULED: { label: "Interview scheduled", Icon: CalendarClock, tone: "amber" },
@@ -15,22 +20,28 @@ export const SIGNAL_META: Record<MailSignal, { label: string; Icon: LucideIcon; 
 };
 
 /**
- * An email suggests a status change while its application is still behind the
- * stage the email implies. Derived — once the status moves, the suggestion is gone.
+ * Only a persisted backend review can propose a human decision. Automatically
+ * handled results and old emails never re-create a suggestion from stage order.
  */
 export function pendingSuggestion(message: InboxMessage, currentStatus: ApplicationStatus | undefined): ApplicationStatus | null {
   const implied = message.impliedStatus;
-  if (!implied || !currentStatus || implied === "APPLIED") return null;
-  if (implied === "REJECTED") return isClosed(currentStatus) || currentStatus === "PLACED" ? null : "REJECTED";
-  const current = stageRank(currentStatus);
-  return current >= 0 && current < stageRank(implied) ? implied : null;
+  if (message.classificationState !== "DONE" || message.classificationOutcome !== "REVIEW"
+      || !message.applicationId || !implied || !currentStatus) return null;
+  return implied;
+}
+
+export function needsBdeReview(message: InboxMessage, hasPendingReview = false): boolean {
+  if (message.classificationState !== "DONE") return false;
+  if (message.classificationOutcome === "REVIEW" && hasPendingReview) return true;
+  return message.classificationOutcome === "UNMATCHED" && !message.applicationId
+    && message.signal !== null && message.signal !== "OTHER";
 }
 
 /** Most recent meaningful email per application — confirmations don't count as news. */
 export function latestSignalByApplication(messages: InboxMessage[]): Map<string, InboxMessage> {
   const map = new Map<string, InboxMessage>();
   for (const m of messages) {
-    if (!m.applicationId || m.signal === "CONFIRMATION") continue;
+    if (!m.applicationId || !m.signal || m.signal === "CONFIRMATION") continue;
     const current = map.get(m.applicationId);
     if (!current || m.receivedAt > current.receivedAt) map.set(m.applicationId, m);
   }

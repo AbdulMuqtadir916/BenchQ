@@ -11,6 +11,7 @@ import { JobMatchIntro } from "@/components/app/jobs/job-match-intro";
 interface CandidateJobsTabProps {
   candidate: Candidate;
   jobs: Job[];
+  favoriteJobIds: string[];
   applications: Application[];
   isLoading: boolean;
   /** "Find jobs" was pressed and the matching sequence hasn't finished yet. */
@@ -21,7 +22,7 @@ interface CandidateJobsTabProps {
 }
 
 /** The candidate's Jobs tab: optional matching sequence, then roles ranked for this profile. */
-export function CandidateJobsTab({ candidate, jobs, applications, isLoading, isMatching, hasMatched, onMatchDone }: CandidateJobsTabProps) {
+export function CandidateJobsTab({ candidate, jobs, favoriteJobIds, applications, isLoading, isMatching, hasMatched, onMatchDone }: CandidateJobsTabProps) {
   const reduce = useReducedMotion() ?? false;
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -44,6 +45,7 @@ export function CandidateJobsTab({ candidate, jobs, applications, isLoading, isM
         >
           <JobExplorer
             jobs={jobs}
+            candidateFavoriteIds={favoriteJobIds}
             applications={applications}
             loading={isLoading}
             lockedCandidate={candidate}

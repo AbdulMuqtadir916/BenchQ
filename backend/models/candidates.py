@@ -177,7 +177,7 @@ class FavoriteJob(Base):
 
 
 class CandidateMailbox(Base):
-    """The candidate's own connected email account (Q53f), one per candidate. Token columns are Samad's (D8)."""
+    """The verified Google mailbox connected for a candidate, one per candidate (Q53f/D8)."""
     __tablename__ = "candidate_mailboxes"
 
     id = _pk()
@@ -187,6 +187,10 @@ class CandidateMailbox(Base):
     address = Column(String, nullable=False)
     status = Column(String, nullable=False, server_default=text("'CONNECTED'"))
     connected_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
+    refresh_token_ciphertext = Column(LargeBinary, nullable=True)
+    history_id = Column(String, nullable=True)
+    initial_sync_complete = Column(Boolean, nullable=False, server_default=text("false"))
+    last_sync_error = Column(Text, nullable=True)
     connected_at = _created_at()
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
     created_at = _created_at()
@@ -196,6 +200,22 @@ class CandidateMailbox(Base):
         CheckConstraint(_in("provider", MAILBOX_PROVIDERS), name="ck_candidate_mailboxes_provider"),
         CheckConstraint(_in("status", MAILBOX_STATUSES), name="ck_candidate_mailboxes_status"),
     )
+
+
+class CandidateGoogleOAuthAttempt(Base):
+    """Single-use, PKCE-bound OAuth handoff for a candidate-scoped mailbox connection."""
+    __tablename__ = "candidate_google_oauth_attempts"
+
+    id = _pk()
+    state_hash = Column(String(64), nullable=False, unique=True)
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False, index=True)
+    initiated_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
+    code_verifier_ciphertext = Column(LargeBinary, nullable=False)
+    return_to = Column(String(500), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = _created_at()
 
 
 class InboxMessage(Base):
@@ -210,6 +230,7 @@ class InboxMessage(Base):
     application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="SET NULL"), nullable=True,
                             index=True)
     provider_message_id = Column(String, nullable=False)
+    source_address = Column(String, nullable=False, server_default=text("''"))
     thread_id = Column(String, nullable=True)
     from_name = Column(String, nullable=False)
     from_email = Column(String, nullable=False)
@@ -218,11 +239,17 @@ class InboxMessage(Base):
     body = Column(Text, nullable=True)
     received_at = Column(DateTime(timezone=True), nullable=False)
     is_read = Column(Boolean, nullable=False, server_default=text("false"))
+    classification_state = Column(String(16), nullable=False, server_default=text("'PENDING'"))
+    classification_attempts = Column(Integer, nullable=False, server_default=text("0"))
+    classification_lease_at = Column(DateTime(timezone=True), nullable=True)
+    classification_error = Column(Text, nullable=True)
     created_at = _created_at()
 
     __table_args__ = (
-        UniqueConstraint("mailbox_id", "provider_message_id", name="uq_inbox_messages_mailbox_message"),
+        UniqueConstraint("mailbox_id", "source_address", "provider_message_id", name="uq_inbox_messages_mailbox_message"),
+        CheckConstraint("classification_state IN ('PENDING', 'PROCESSING', 'DONE', 'ERROR')", name="ck_inbox_messages_classification_state"),
         Index("ix_inbox_messages_candidate_received", "firm_id", "candidate_id", "received_at"),
+        Index("ix_inbox_messages_classification_queue", "classification_state", "received_at"),
     )
 
 
