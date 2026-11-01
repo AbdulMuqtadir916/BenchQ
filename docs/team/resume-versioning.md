@@ -15,7 +15,7 @@ the single reference for building it: the tables (§3), the workflow (§4), the 
 | Drop columns and an index | `resume_parses.updated_at`; `resumes.is_base`, `resumes.parent_id`, `resumes.json_data`, `resumes.resume_parse_id`, `resumes.updated_at`; the index `uq_resumes_one_base_per_candidate` |
 | Rewrite the résumé section of `docs/team/00-candidate-core.md` ("Résumés: one base, many tailored (Q53e)") | Many bases per candidate, one active; `category` instead of `is_base`; no `parent_id`; `resume_parse_id` on `base_resumes` |
 | The `docs/02-DATA-CONTRACTS.md` addition | A `BaseResume` entity; `baseResumeId` on `Resume`; the new parser fields (§2) in `ResumeDraftSchema` and the studio content |
-| Migration numbers | `0008` (additive) and `0009` (drops), claimed in `docs/team/README.md` §6 in the PR that adds each |
+| Migration numbers | `0008` (additive, PR 3) and the next free number for the drops (PR 6; `0009` went to Applications), each claimed in `docs/team/README.md` §6 in the PR that adds it |
 | Awards are claims | `award` added to `claims.entity_type` (0007's `ck_claims_entity_type` widened in 0008), and to the frontend `entityType` enums in docs/02 |
 
 Only what this table lists is approved. Any other rename, drop or `candidates` change still goes to Abdul first.
@@ -389,7 +389,7 @@ and contracts.
 | 3 | `feat/base-resumes-schema` (**built**, #99) | **Additive only**: `base_resumes`, the new `resumes` columns, CHECKs, indexes, composite FK; `award` in `ck_claims_entity_type`; SQLAlchemy models; constraint tests; claim **0008** in `docs/team/README.md` §6. No behaviour change. | **0008** |
 | 4 | `feat/base-resume-from-parse` (**built**) | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
 | 5 | `feat/resume-versions` | Routes: save an edit as the next version; "use as base"; list bases + versions; pick a base (v1 flips, v2+ promotes); tailor from the active base's v1 (also sets `candidate_id`, which the tailor route doesn't today). `resume.edit`, `access.py`, `isolation_cases.py`. | — |
-| 6 | `feat/drop-legacy-resume-columns` | **The approved drops** (§3.1, §3.3). First backfill old rows' content from `json_data` (the JobNavigator shape: `header.contact_items`, `experience`, `skills` dict, `education.school`…) into the new columns, so old rows stay readable (team rule 5). Port everything still reading the dropped columns: render/preview/PDF, copy, tailor, import-pdf, score-check, the seed. Claim **0009**. | **0009** |
+| 6 | `feat/drop-legacy-resume-columns` | **The approved drops** (§3.1, §3.3). First backfill old rows' content from `json_data` (the JobNavigator shape: `header.contact_items`, `experience`, `skills` dict, `education.school`…) into the new columns, so old rows stay readable (team rule 5). Port everything still reading the dropped columns: render/preview/PDF, copy, tailor, import-pdf, score-check, the seed. Claim the next free number (`docs/team/README.md` §6; `0010` or later). | the next free (`0010`+) |
 | 7 | `integrate/resumes` | Frontend live: the résumé adapter's live path, the DTO mapper (§5), the `BaseResume` schema, the base dropdown, the "Use this as the base?" prompt, version history. Both themes, keyboard, skeleton/empty/error states. | — |
 
 If someone else's 0008 merges first, renumber and fix `down_revision` before merging.
