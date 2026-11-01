@@ -47,7 +47,7 @@ it. Everyone else reads it.
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
 | `claims`, `evidence` | Zuhair | Truth Guard is enforced in the database; never relax it |
 | `applications`, `interviews` | Samad | |
-| `candidate_mailboxes`, `inbox_messages` | Samad | |
+| `candidate_mailboxes`, `inbox_messages`, `candidate_google_oauth_attempts` (0010) | Samad | Candidate connection, imported mail and one-use OAuth handoff state |
 | `ledger_entries` | Abdul | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table |
 | billing tables (new) | Abdul | |
 | `users`, `firms`, `plans`, `invites`, `sessions`, `support_views` | Abdul | Tenancy |
@@ -91,5 +91,6 @@ it. Everyone else reads it.
 |---|---|---|---|
 | 0007 | Abdul | Candidate core tables | PR #91 |
 | 0008 | Zuhair | Résumé versioning: `base_resumes`, the new `resumes` columns, `award` claims (additive) | `feat/base-resumes-schema` |
-| 0009 | Samad | Applications foundation: revisions, immutable status events and BDE review records | PR 1 replacement, `codex/applications-foundation-v2`; code-owner review pending |
-| 0010+ | — | Claim the next number here in your PR | — |
+| 0009 | Samad | Applications foundation: revisions, immutable status events and BDE review records | Merged in PR #100 |
+| 0010 | Samad | Candidate Gmail OAuth/sync and retained-account provenance | PR 2, `codex/candidate-gmail-connection`; code-owner review pending |
+| 0011+ | — | Claim the next number here in your PR | — |

@@ -157,9 +157,12 @@ app.add_middleware(BodySizeLimit)
 # Added last, so it runs first: every query of the request, the session lookup included, gets the web limit.
 app.add_middleware(statement_timeout.WebRequestMarker)
 
+from backend.api import routes_inbox
+
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
+app.include_router(routes_inbox.router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")

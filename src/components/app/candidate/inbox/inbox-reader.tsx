@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { EmptyState } from "@/components/app/empty-state";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 import { STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
 import { StageDots } from "../applications/application-list";
 import type { Suggestion } from "../use-candidate-workspace";
@@ -28,7 +28,7 @@ interface ReaderProps {
 export function InboxReader({ message, application, suggestion, canAct, actions }: ReaderProps) {
   const reduce = useReducedMotion() ?? false;
   if (!message) return <EmptyState icon={MailOpen} title="Pick an email" description="Select an email on the left to read it here." />;
-  const meta = SIGNAL_META[message.signal];
+  const meta = mailSignalMeta(message.signal);
 
   return (
     <motion.article key={message.id} initial={reduce ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="flex h-full flex-col">
@@ -38,6 +38,7 @@ export function InboxReader({ message, application, suggestion, canAct, actions 
         <p className="mt-1 text-sm text-[var(--color-text-2)]">
           <span className="font-[550]">{message.fromName}</span> <span className="text-[var(--color-text-3)]">&lt;{message.fromEmail}&gt;</span>
         </p>
+        {message.sourceAddress ? <p className="mt-1 break-words text-caption text-[var(--color-text-3)]">Mailbox: {message.sourceAddress}</p> : null}
         <DualTimestamp iso={message.receivedAt} className="mt-0.5 text-caption text-[var(--color-text-3)]" />
       </header>
 
@@ -75,7 +76,7 @@ export function InboxReader({ message, application, suggestion, canAct, actions 
             </div>
           </div>
         ) : (
-          <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] px-3 py-2.5 text-sm text-[var(--color-text-3)]">Couldn&apos;t match this email to an application.</p>
+          <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] px-3 py-2.5 text-sm text-[var(--color-text-3)]">This email is not linked to an application yet.</p>
         )}
 
         <div className="whitespace-pre-line text-body leading-relaxed text-[var(--color-text)]">{message.body}</div>

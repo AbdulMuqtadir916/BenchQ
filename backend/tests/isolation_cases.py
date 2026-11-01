@@ -31,7 +31,7 @@ class Case:
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message"}
 
 
 def _new(prefix: str) -> str:
@@ -91,6 +91,11 @@ CASES: dict[str, Case] = {
     "POST /api/analyze/{job_id}": Case(body=lambda i: {}),
 
     # ── Applications (track 03) ──────────────────────────────────────────────
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": Case(body=lambda i: {"return_to": f"/acme/candidates/{i['candidate']}?tab=inbox"}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/sync": Case(),
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox": Case(),
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/read": Case(),
     "GET /api/applications": Case(shows_rows=True),
     "GET /api/applications/{app_id}": Case(),
     "PATCH /api/applications/{app_id}/review": Case(path={"app_id": "review_app"}, body=lambda i: {"review_id": str(i["review"]), "status": "assessment", "expected_revision": 0, "expected_review_revision": 0}),
@@ -186,6 +191,7 @@ SIGNED_IN_CASES: dict[str, Case] = {
     "GET /api/companies": Case(),
 }
 SIGNED_IN_REASONS: dict[str, str] = {
+    "GET /api/oauth/google/callback": "one-use state bound to initiating firm/user and current candidate scope",
     "GET /api/auth/me": "the caller's own session",
     "GET /api/searches/countries": "global reference data",
     "GET /api/llm/models": "global reference data",

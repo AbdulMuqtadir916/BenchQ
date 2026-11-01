@@ -9,7 +9,7 @@ import { formatRelative } from "@/lib/format/timezone";
 import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/cn";
 import { Tag } from "@/components/ui/tag";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 import { STATUS_LABEL, STATUS_TONE, isClosed, stageRank } from "@/components/app/applications/status-meta";
 
 const STEPS: ApplicationStatus[] = ["APPLIED", "RESPONSE", "SCREENING", "INTERVIEW", "OFFER", "PLACED"];
@@ -40,7 +40,7 @@ export function ApplicationList({ apps, signals, onOpen }: { apps: Application[]
     <ul className="bq-card divide-y divide-[var(--color-border)] overflow-hidden p-0">
       {apps.map((app, i) => {
         const signal = signals.get(app.id);
-        const meta = signal ? SIGNAL_META[signal.signal] : null;
+        const meta = signal ? mailSignalMeta(signal.signal) : null;
         return (
           <motion.li key={app.id} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: Math.min(i, 10) * 0.03, ease: EASE_OUT }}>
             <button type="button" onClick={() => onOpen(app.id)} className="grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left hover:bg-[var(--color-surface-2)] md:grid-cols-[2rem_minmax(0,1.6fr)_8rem_minmax(0,1fr)_6rem_1rem]">
