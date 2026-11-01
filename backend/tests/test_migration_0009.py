@@ -64,10 +64,11 @@ def test_tracking_downgrade_refuses_to_discard_pending_reviews(scratch_db):
         db.commit()
     with engine.connect() as conn:
         count = conn.execute(text("SELECT count(*) FROM application_reviews")).scalar_one()
+        starting_revision = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
     assert count > 0
     result = _alembic(name, "downgrade", "0008")
     assert result.returncode != 0
     assert "preserve application review history" in result.stderr
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0009"
+        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == starting_revision
         assert conn.execute(text("SELECT count(*) FROM application_reviews")).scalar_one() == count

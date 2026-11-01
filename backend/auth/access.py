@@ -16,7 +16,7 @@ import logging
 from enum import Enum
 
 from fastapi import FastAPI
-from sqlalchemy.exc import TimeoutError as PoolTimeout
+from sqlalchemy.exc import OperationalError, TimeoutError as PoolTimeout
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Match
@@ -24,6 +24,7 @@ from starlette.routing import Match
 from backend.auth.sessions import COOKIE_NAME, clear_cookie_kwargs, cookie_kwargs, resolve
 from backend.config import ALLOWED_ORIGINS, IS_PRODUCTION
 from backend.models.db import SessionLocal
+from backend.statement_timeout import busy_response, is_statement_timeout
 
 logger = logging.getLogger("jobnavigator")
 
@@ -267,14 +268,18 @@ async def enforce(request: Request, call_next):
         return await call_next(request)
 
     token = request.cookies.get(COOKIE_NAME)
-    # A middleware runs outside FastAPI's exception handlers, so a drained pool is answered here.
+    # A middleware runs outside FastAPI's exception handlers, so a drained pool or a timed-out query is answered here.
     db = SessionLocal()
     try:
         resolved = resolve(db, token)
     except PoolTimeout:
         logger.warning("DB pool exhausted while authenticating %s", key)
-        return JSONResponse(status_code=503, content={"detail": "Database is busy, retry shortly"},
-                            headers={"Retry-After": "5"})
+        return busy_response()
+    except OperationalError as exc:
+        if not is_statement_timeout(exc):
+            raise
+        logger.warning("Query timed out while authenticating %s", key)
+        return busy_response()
     finally:
         db.close()
     if resolved is None:

@@ -231,6 +231,9 @@ Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the
   URL.
 - Add a dependency without checking `docs/01-FRONTEND-ARCHITECTURE.md §3`.
 - Use emoji as UI iconography — use the icon set in `docs/05-COMPONENTS.md`.
+- Run anything against the development database other than the standard commands (the app, the test suite as
+  `python -m pytest`, read-only checks) without asking first. Starting pytest from a wrapper that imports the app
+  first emptied the development database once (2026-11-01); `backend/tests/conftest.py` now refuses such a run.
 
 ---
 

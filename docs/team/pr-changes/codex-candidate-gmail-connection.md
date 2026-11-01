@@ -1,6 +1,6 @@
 # PR 2 — Candidate Gmail connection, sync and retained account identity
 
-Branch: `codex/candidate-gmail-connection` → `main`. Base: `1f8a237` (PR #100 merged).
+Branch: `codex/candidate-gmail-connection` → `main`. Base: `a1c7a92` (includes merged PRs #100, #102 and #103).
 User confirmed minimum account-history protection in this slice; no merge is authorized by publishing this PR.
 
 ## Scope
@@ -35,6 +35,7 @@ The merged PR #100 application command/response fixes are preserved unchanged.
 | `backend/tests/test_candidate_google_oauth.py` | Tests read-only scopes, PKCE and return-path safety, plus credential encryption and wrong-key refusal. |
 | `backend/tests/test_candidate_mailbox.py` | Tests current-authority changes before/after Google exchange, one-use state, Viewer denials, account replacement, retained duplicate IDs, audit privacy/idempotency, row locks, generation races, import rollback, bounded checkpoint recovery and SYSTEM scheduled imports. |
 | `backend/tests/test_firm_scoping_lint.py` | Includes OAuth state in the firm-owned inventory and documents the sole opaque-state lookup exception before current-identity authorization. |
+| `backend/tests/test_migration_0009.py` | Compares a blocked downgrade with its starting revision so rollback safety stays valid when newer migrations exist; review-history preservation remains asserted. |
 | `backend/tests/test_migration_0010.py` | Exercises real upgrade/backfill/downgrade round trips and verifies guarded rollback preserves emails, Applications reviews, credentials and active OAuth state. |
 | `docs/02-DATA-CONTRACTS.md` | Records unclassified imports, source address, nullable pre-sync timestamp, connection states, retention and authorization contracts before the frontend schema changes. |
 | `docs/integration/README.md` | Marks the Applications backend foundation merged and records the connection/sync slice separately from later classification. |
