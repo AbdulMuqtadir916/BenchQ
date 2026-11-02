@@ -1,4 +1,4 @@
-"""Cover-letter CRUD, PDF export, and background AI generation; mirrors routes_resumes.py (shared browser singleton, font-embedding render, tracer-link rewriting on export)."""
+"""Cover-letter CRUD, PDF export, and background AI generation; the browser singleton, font-embedding render and tracer-link rewriting live in render_shared.py."""
 import json
 import logging
 import uuid as _uuid
@@ -16,7 +16,8 @@ from backend.api._input import str_field, uuid_filter
 from backend.auth.scoping import firm_ref, reader_firm_id, scoped, scoped_jobs, writer_firm_id
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.job_monitor import launch_background, JobAlreadyRunningError
-from backend.api.routes_resumes import _get_browser, _rewrite_urls_with_tracers, _resolve_tailoring_jd  # shared with resumes
+from backend.api.render_shared import _get_browser, _rewrite_urls_with_tracers, _resolve_tailoring_jd
+from backend.candidates.resume_text import resume_text as version_text
 
 logger = logging.getLogger("jobnavigator.cover_letters")
 
@@ -28,7 +29,7 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "cover_letter_templates"
 # ── Templates ─────────────────────────────────────────────────────────────────
 
 def _discover_templates() -> list[dict]:
-    from backend.api.routes_resumes import template_paths
+    from backend.api.render_shared import template_paths
 
     templates = []
     for name, d in template_paths(TEMPLATES_DIR).items():
@@ -52,7 +53,7 @@ def _default_template_id() -> str:
 
 def _validate_template(name) -> str:
     """422 unless `name` is a real folder directly under cover_letter_templates/ (R4-T5-01)."""
-    from backend.api.routes_resumes import validate_template_name
+    from backend.api.render_shared import validate_template_name
     return validate_template_name(name, TEMPLATES_DIR)
 
 
@@ -62,7 +63,7 @@ def _render_html(json_data: dict, template_name: str, page_format: str) -> str:
     from jinja2 import Environment, FileSystemLoader
     from markupsafe import Markup
 
-    from backend.api.routes_resumes import _load_template_fonts, resolve_template_dir
+    from backend.api.render_shared import _load_template_fonts, resolve_template_dir
 
     # Same on-disk allowlist the résumé renderer uses — the folder comes from the
     # directory listing, the request name is only a key (R4-T5-01).
@@ -86,6 +87,22 @@ def list_templates():
 
 
 # ── Serialization ─────────────────────────────────────────────────────────────
+
+def letter_header(resume) -> dict:
+    """A cover letter's header (name and contact line, the letter's own stored shape) from a résumé version's
+    columns (résumé versioning PR 6: `resumes.json_data` is gone)."""
+    location = ", ".join(x for x in (resume.city, resume.state, resume.country) if x)
+    items = [{"text": location, "url": ""}] if location else []
+    if resume.email:
+        items.append({"text": resume.email, "url": f"mailto:{resume.email}"})
+    if resume.phone:
+        items.append({"text": resume.phone, "url": ""})
+    for link in (resume.linkedin, resume.github):
+        if link:
+            items.append({"text": link.removeprefix("https://").removeprefix("http://"),
+                          "url": link if link.startswith("http") else f"https://{link}"})
+    return {"name": resume.full_name or "", "contact_items": items}
+
 
 def _to_dict(cl: CoverLetter, include_json_data: bool = False, ctx: dict | None = None) -> dict:
     """ctx carries the batch-loaded job/application/resume context so the list can render a row without an N+1 walk (see list_cover_letters)."""
@@ -341,7 +358,7 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_
         resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
         if not resume:
             raise HTTPException(404, "Resume not found")
-        if not (resume.json_data or {}):
+        if not version_text(resume):
             raise HTTPException(400, "Resume has no content")
 
     job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
@@ -391,7 +408,7 @@ async def _generate_impl(resume_id: str, job_id: str, voice: str | None, length:
         resolve_voice_instruction, generate_cover_letter_body,
     )
     from backend.analyzer.llm_logger import track_llm_call
-    from backend.api.routes_resumes import _get_tailoring_semaphore
+    from backend.api.render_shared import _get_tailoring_semaphore
 
     async with _get_tailoring_semaphore():
         # Returned string becomes JobRun.result_summary (Stats -> Run history).
@@ -430,6 +447,7 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
             if not persona or not (persona.resume_content or {}):
                 raise RuntimeError("persona has no resume_content at execution time")
             resume_data = persona.resume_content or {}
+            source_text = None
             base_template = None
             base_page_format = None
             stored_resume_id = None
@@ -438,7 +456,8 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
             resume = db.query(Resume).filter(Resume.id == resume_id).first()
             if not resume:
                 raise RuntimeError("resume missing at execution time")
-            resume_data = resume.json_data or {}
+            resume_data = {"header": letter_header(resume)}
+            source_text = version_text(resume)
             base_template = resume.template
             base_page_format = resume.page_format
             stored_resume_id = resume_id
@@ -465,7 +484,7 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
     async with track_llm_call("cover_letter", _provider, _model, job_id=job_id) as _tracker:
         body = await generate_cover_letter_body(
             resume_data, preferences, job_description,
-            voice_instruction, length, prompt_template,
+            voice_instruction, length, prompt_template, source_text,
         )
         _tracker.record(body.pop("_llm", None))
         body.pop("_usage", None)  # superseded by _llm; keep the dict clean

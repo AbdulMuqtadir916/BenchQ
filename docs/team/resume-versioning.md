@@ -2,7 +2,8 @@
 
 Design agreed 2026-10-31 by Zuhair, with the approvals in §1 from Abdul. **Built so far: the parser (§2–§2.2, PR 2), the tables
 (§3, PR 3, migration 0008), the first base on candidate create (§4.2, PR 4) and versions and bases through the API
-(§4.3, §4.6, §4.7, §6, PR 5, migration 0012).** The clean-up of old rows and the screens (PRs 6–7) are not built yet. This file is
+(§4.3, §4.6, §4.7, §6, PR 5, migration 0012) and the clean-up of the old columns and JobNavigator's résumé code
+(§3.3, §4.8, §8, PR 6, migration 0013).** The screens (PR 7) are not built yet. This file is
 the single reference for building it: the tables (§3), the workflow (§4), the frontend contract (§5), permissions
 (§6) and the PR plan (§7). Owner of all three tables: Zuhair (`docs/team/README.md` §3).
 
@@ -201,10 +202,15 @@ All reads, edits, tailoring, previews and downloads go through this table.
 | `created_by_user_id` | uuid | FK → users | Who saved this version | **new** |
 | `created_at` | timestamptz | `now()` | When this version was saved | exists |
 
-**Dropped (approved):** `is_base` (→ `category`), `parent_id` (not tracking which base version a tailored résumé came
-from; add a `base_version` integer later if that's ever needed), `json_data` (→ the content columns),
-`resume_parse_id` (→ `base_resumes`), `updated_at` (rows never change), and the index
+**Dropped (approved; done in PR 6, migration 0013):** `is_base` (→ `category`), `parent_id` (not tracking which base
+version a tailored résumé came from; add a `base_version` integer later if that's ever needed), `json_data` (→ the
+content columns), `resume_parse_id` (→ `base_resumes`), `updated_at` (rows never change), and the index
 `uq_resumes_one_base_per_candidate` (a candidate now has many base versions).
+
+**Required from 0013 (PR 6, decided 2026-11-02):** every row belongs to a base and a candidate. `base_resume_id` and
+`candidate_id` are `NOT NULL`, and the "rows with a base only" exceptions below are gone: `ck_resumes_category_job`
+holds for every row, `uq_resumes_version` has no `WHERE`, and `ck_resumes_base_has_candidate` is dropped (the
+`NOT NULL` does its job).
 
 **Rules**
 
@@ -228,8 +234,10 @@ ALTER TABLE resumes ADD CONSTRAINT fk_resumes_base_candidate
   `passive_deletes`, so the ORM leaves the cascade to the database. Before a BDE deletes a job, the app asks
   "Are you sure you want to delete this job?" and names the résumés tailored on it (built with the job module,
   `zuhair.md` §2; not in PR 5).
-- **Rows from before 0008 have no base.** `ck_resumes_category_job` and `uq_resumes_version` hold for rows with a
-  base only, until PR 6 converts the old rows; 0008 filled their `category` from `is_base`.
+- **Rows from before 0008** (decided 2026-11-02, PR 6): 0013 converts a candidate's old rows (`json_data` split into
+  the columns, new item ids): their base row becomes a new base (`UPLOAD` with its `resume_parse_id` if it has one,
+  else `PROMOTED`), active if the candidate has none; their tailored rows with a job become that base's `TAILORED`
+  v1. Old rows with no candidate (JobNavigator's seeded "Sample PM") and old copies with no job are deleted.
 - **`ck_resumes_base_has_candidate`** (`base_resume_id IS NULL OR candidate_id IS NOT NULL`): Postgres skips a
   composite foreign key while one of its columns is null, so a versioned row must name its candidate.
 - **0007's `uq_resumes_one_base_per_candidate` covers old rows only** (`… AND base_resume_id IS NULL`): a versioned
@@ -296,12 +304,10 @@ the parse for the rest. `resume_parses.parse` keeps the AI's original untouched.
 No résumé uploaded (`resume_parse_id` null) → no base is created; one can be added later.
 
 Built in PR 4 (`backend/candidates/first_base.py`):
-- The first base's `name` is **"Base"**; `is_base` is true while that column exists (until PR 6).
+- The first base's `name` is **"Base"**. (`is_base` was set while the column existed; PR 6 dropped it.)
 - **Work authorization** is the form's code in the app's own label (`USC` → "US Citizen", `H1B` → "H-1B", as
   `work-auth-chip.tsx`); `OTHER` keeps the résumé's own wording.
-- **`json_data` stays empty** on new rows: the readers that still use it skip an empty one (scoring) or aren't live
-  yet (the résumé list), and PR 6 moves them to the new columns. Filling it would put every candidate's "Base" into
-  the firm's job scoring under one shared name.
+- **`json_data`** was left empty on new rows until PR 6 dropped it; its readers now read the columns (§4.8).
 
 ### 4.3 Every action
 
@@ -399,6 +405,18 @@ item that would exist in no other version of the candidate.
 - **Show again** clears `archived_at`. The base comes back to the dropdown with all its versions, **not active**;
   the BDE picks it to use it. History lists hidden bases with "Show again"; re-uploading the file offers the same.
 
+### 4.8 Reading a résumé as text (PR 6)
+
+`backend/candidates/resume_text.py` `resume_text(version)` is a version's plain text with `## Section` headings, read
+from the columns. Job scoring and interview prep use it; nothing converts the columns back to JobNavigator's shape.
+
+- **Job scoring** (`backend/analyzer/cv_scorer.py`, until the job module scores per candidate): a job is scored
+  against each of the firm's candidates' active base v1, labelled with the candidate's name. The platform-wide
+  `default_resume_id` setting is no longer read; a company's `selected_resume_ids` still narrows the list to those
+  versions. The "persona" option still reads the shared persona.
+- **Interview prep** (`routes_applications.py`): the candidate's tailored résumé for the job, newest version.
+- **Cover letters:** the letter is written from the version's columns.
+
 ---
 
 ## 5. The frontend contract (`docs/02` §8)
@@ -478,7 +496,7 @@ and contracts.
 | 3 | `feat/base-resumes-schema` (**built**, #99) | **Additive only**: `base_resumes`, the new `resumes` columns, CHECKs, indexes, composite FK; `award` in `ck_claims_entity_type`; SQLAlchemy models; constraint tests; claim **0008** in `docs/team/README.md` §6. No behaviour change. | **0008** |
 | 4 | `feat/base-resume-from-parse` (**built**) | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
 | 5 | `feat/resume-versions` (**built**) | Routes under `/api/firms/{firm}/candidates/{candidate}/resumes`: list bases + versions, open a version, save the next version (§4.3), "use as base" and pick a base (v1 flips, v2+ promotes or reuses), the BDE's upload (§4.6), delete / hide / show again with the usage reads for the warning (§4.7). `can_change_resume` / `can_manage_resume` in both policies (§6), `access.py`, `isolation_cases.py`; races tested. Migration 0012: `promoted_from_resume_id`, `archived_at`, `content_sha256` and their unique rules (§3.1, §3.2). Docs: 07 Q54, docs/02 §8.1. **Tailoring is not here**: the tailoring module creates tailored résumés; their edits use PR 5's save. | **0012** |
-| 6 | `feat/drop-legacy-resume-columns` | **The approved drops** (§3.1, §3.3). First backfill old rows' content from `json_data` (the JobNavigator shape: `header.contact_items`, `experience`, `skills` dict, `education.school`…) into the new columns, so old rows stay readable (team rule 5). Port everything still reading the dropped columns: render/preview/PDF, copy, tailor, import-pdf, score-check, the seed. Claim the next free number (`docs/team/README.md` §6; `0013` or later). | the next free (`0013`+) |
+| 6 | `feat/drop-legacy-resume-columns` (**built**) | **The approved drops** (§3.1, §3.3) and the old JobNavigator résumé code (decided 2026-11-02). Migration 0013: converts candidates' old rows and deletes the rest (§3.3), drops the approved columns and index, makes `base_resume_id` and `candidate_id` required. Removes the old `/api/resumes` router (its shared rendering helpers move to `backend/api/render_shared.py` for cover letters), the 8 backend templates, the old parser (`parse_resume_pdf`), `POST /api/persona/import` and the "Sample PM" seed. The other readers read the columns (§4.8): job scoring, interview prep, the jobs checks, cover letters. | **0013** |
 | 7 | `integrate/resumes` | Frontend live: the résumé adapter's live path, the DTO mapper (§5), the `BaseResume` schema, the base dropdown, the "Use this as the base?" prompt, version history. Both themes, keyboard, skeleton/empty/error states. | — |
 
 If someone else's 0008 merges first, renumber and fix `down_revision` before merging.
@@ -510,14 +528,15 @@ base is named "Base" (§4.2).
 
 ## 8. Known issues and out of scope
 
-- **Two template systems**: the studio has 6 CSS designs (`src/components/app/resume-studio/templates.ts`, printed
-  by the browser, `@page { size: letter }`); the backend has 8 HTML designs (`backend/resume_templates/`, PDF via
-  Playwright). Names don't match and BenchQ never saves `template`. Pick one in §3 (tailoring) before
-  `resumes.template` means anything.
-- **The tailor route** writes `resumes` rows without `candidate_id` (fixed when the tailoring module rebuilds it,
-  `zuhair.md` §3).
-- **The old `/api/resumes` routes** take the firm from the session and don't check which candidates the person may
-  see. PR 5's routes don't use them; PR 6 ports them, and the screens (PR 7) call only the new routes.
+- **Résumé designs (decided 2026-11-02, Zuhair):** the studio's 6 designs (`src/components/app/resume-studio/
+  templates.ts`, printed by the browser) are BenchQ's résumé designs. JobNavigator's 8 backend designs
+  (`backend/resume_templates/`) are deleted in PR 6. A PDF the server makes itself (for the extension or email, with
+  tracer links and the export gate enforced by the backend) comes later, built from the studio's designs, in the
+  tailoring module or the extension.
+- **The old `/api/resumes` routes are removed in PR 6** (they took the firm from the session and didn't check the
+  candidate). PR 5's routes replace list, open, save and delete; tailoring and the ATS score (`score-check`) are
+  rebuilt in the tailoring module. JobNavigator's tailoring pipeline and score-check are kept, unwired, in
+  `backend/analyzer/legacy_tailoring.py` for it to port (they still read the dropped `json_data`).
 - **Tailoring prompts** allow content not in the base; Truth Guard keeps it `UNVERIFIED` (§4.5), but the prompts
   are worth tightening in §3.
 - **`personas`** (a singleton without `firm_id` on firm routes) is a firm-isolation gap, flagged to Abdul; not
@@ -525,3 +544,5 @@ base is named "Base" (§4.2).
 - **Word export**: none exists (PDF only). Not part of this design.
 - **File storage** (S3, `docs/integration/06-open-decisions.md` D7): would replace `resume_parses.content` with a
   storage key; nothing else here changes.
+- **Cover letters** (JobNavigator's `cover_letters`, `/api/cover-letters`) are not used by BenchQ. Kept for now
+  (Zuhair, 2026-11-02, "maybe later"); PR 6 only makes them read the résumé from the columns.

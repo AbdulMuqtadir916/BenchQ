@@ -3,6 +3,28 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé versioning PR 6 — the old résumé columns and JobNavigator's résumé code removed (`feat/drop-legacy-resume-columns`, Zuhair)
+
+Design: [resume-versioning.md](./resume-versioning.md) §3.3, §4.8, §8; decided 2026-11-02 (Abdul approved the drops
+on 2026-10-31). Migration 0013.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `backend/api/routes_applications.py` | Interview prep reads the tailored résumé's text from its columns (`resume_text`), newest by `created_at` and `version`; the documents lookup filters `category = 'TAILORED'` instead of `is_base`. Behaviour is the same. | `json_data`, `is_base` and `updated_at` are dropped. An application with no candidate (from before candidates) now shows no tailored résumé: every résumé has a candidate since 0013. |
+| The same, tests | `test_application_tracker.py`, `test_application_review_feedback.py`, `test_application_foundation_regressions.py` | Résumés built as versions (`backend/tests/resume_support.py`); the legacy-application cases expect no tailored résumé. | As above. |
+| Upload size limits (Uzair, production layer 2a) | `backend/body_limit.py` | `resumes/import-pdf` and `persona/import` leave the 11 MB upload routes. | Both routes are removed (PR 5 added the candidate's résumé upload there). |
+| Uzair's notes | `docs/team/uzair.md` | The upload and slow-route lists no longer name the removed routes. | They name routes that no longer exist. |
+| Route access and isolation (Abdul, F7) | `backend/auth/access.py`, `backend/tests/isolation_cases.py`, `isolation_support.py`, `test_isolation.py`, `test_firm_scoping_lint.py` | The `/api/resumes` routes and `POST /api/persona/import` removed from the tables; the test world's résumés are versions; the lint also scans `backend/api/render_shared.py`. | The routes are gone; the helpers that moved keep their lint. |
+| Support views (Abdul) | `backend/tests/test_support_views.py` | The read and write checks use PR 5's candidate résumé routes instead of `/api/resumes`. | The old routes are gone. |
+| The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | The drops marked done; every résumé has a base and a candidate. | Facts only. |
+| Startup seed (shared) | `backend/seed.py` | The "Sample PM" résumé and its seed removed (`seed_mock_resume`). | Q1: a fake person scoring every firm's jobs; a résumé needs a candidate. |
+| Settings (shared) | `backend/api/routes_settings.py` | Imports `reset_tailoring_semaphore` from `render_shared.py`. | Moved with the other helpers. |
+
+Not changed, left to the owner:
+
+- **Cover letters** stay (Zuhair, "maybe later"): they read the résumé from its columns now, nothing else changed.
+- **The shared persona** stays except its résumé import; the rest needs Samad (autofill reads it).
+
 ## Résumé versioning PR 5 — versions and bases through the API (`feat/resume-versions`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §3.1, §3.2, §4.3, §4.6, §4.7, §6; decided with Abdul

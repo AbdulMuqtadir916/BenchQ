@@ -90,12 +90,8 @@ def _make_jobs(test_db, n):
 
 
 def _seed_resume(test_db):
-    import uuid
-    from backend.models.db import Resume
-
-    test_db.add(Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name="PM", is_base=True,
-                       json_data={"summary": "Ten years of product work.",
-                                  "skills": {"core": ["Python"]}}))
+    from backend.tests.resume_support import old_resume
+    old_resume(test_db, DEFAULT_FIRM_ID, "PM", {"summary": "Ten years of product work.", "skills": {"core": ["Python"]}})
     test_db.commit()
 
 

@@ -4,6 +4,7 @@ import asyncio
 from sqlalchemy import null as sa_null
 from sqlalchemy.orm import sessionmaker
 from backend.models.tenancy import DEFAULT_FIRM_ID
+from backend.tests.resume_support import old_resume
 
 pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
@@ -29,17 +30,11 @@ def scorer_ready_db(test_db, monkeypatch):
     test_db.commit()
 
     # Seed a default Resume (the only scoring source); its flattened text must contain the phrase the assertions check for.
-    resume = Resume(firm_id=DEFAULT_FIRM_ID, 
-        name="Default",
-        is_base=True,
-        template="inter",
-        json_data={
+    resume = old_resume(test_db, DEFAULT_FIRM_ID, "Default", {
             "summary": "I am a product manager with 5 years experience at scale.",
             "experience": [],
             "skills": {},
-        },
-    )
-    test_db.add(resume)
+        })
     test_db.commit()
     test_db.add(Setting(key="default_resume_id", value=str(resume.id)))
     test_db.commit()

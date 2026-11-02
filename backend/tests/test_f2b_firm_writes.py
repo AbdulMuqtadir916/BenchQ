@@ -48,12 +48,10 @@ def test_a_hand_added_job_is_captured_by_the_user(api_client, accounts, test_db)
 
 
 def test_documents_belong_to_the_users_firm(api_client, accounts, test_db):
-    resume = api_client.post("/api/resumes", json={"name": "Base"})
-    assert resume.status_code == 201, resume.text
+    """(Résumés are made under the candidate's URL since résumé versioning PR 5; test_resume_versions.py.)"""
     letter = api_client.post("/api/cover-letters", json={"name": "Letter"})
     assert letter.status_code == 201, letter.text
     test_db.expire_all()
-    assert test_db.get(Resume, uuid.UUID(resume.json()["id"])).firm_id == accounts.firm_id
     assert test_db.get(CoverLetter, uuid.UUID(letter.json()["id"])).firm_id == accounts.firm_id
 
 

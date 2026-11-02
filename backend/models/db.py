@@ -552,27 +552,20 @@ class Resume(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = firm_id_column()
     name = Column(String, nullable=False)
-    is_base = Column(Boolean, default=True)
-    parent_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
-    # The candidate core (07 Q53e, migration 0007): one base résumé per candidate (made from the kept parse), many
-    # tailored ones (parent_id → the base, job_id → the job). Null candidate only on rows from before 0007.
-    # Owner: Zuhair.
-    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=True,
+    # The candidate core (07 Q53e, migration 0007): whose résumé. Required from 0013 (PR 6). Owner: Zuhair.
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=False,
                           index=True)
-    resume_parse_id = Column(UUID(as_uuid=True), ForeignKey("resume_parses.id", ondelete="RESTRICT"), nullable=True)
     # Deleting a job deletes the résumés tailored for it (Abdul, 2026-11-01): a tailored résumé always has its job.
     # An application still blocks deleting a job it names, so a résumé that was sent stays.
     job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=True)
-    template = Column(String, default=lambda: first_template("resume_templates"))
+    # The studio's design id (src/components/app/resume-studio/templates.ts); the backend's own designs went in PR 6.
+    template = Column(String, nullable=True)
     page_format = Column(String, default="letter")
-    json_data = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), default=utcnow)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
-    # Versioning (docs/team/resume-versioning.md §3.3, migration 0008). One résumé is one (base_resume_id, category,
-    # job_id); each saved edit is its next `version`, and a row's content is never updated. Rows from before 0008 have
-    # no base (PR 6 converts them), so the version rules below hold for rows with a base only.
-    base_resume_id = Column(UUID(as_uuid=True), nullable=True)            # composite FK below: same candidate
+    # Versioning (docs/team/resume-versioning.md §3.3, migrations 0008 and 0013). One résumé is one (base_resume_id,
+    # category, job_id); each saved edit is its next `version`, and a row's content is never updated.
+    base_resume_id = Column(UUID(as_uuid=True), nullable=False)           # composite FK below: same candidate
     category = Column(String, nullable=False, default="BASE", server_default=text("'BASE'"))
     version = Column(Integer, nullable=False, default=1, server_default=text("1"))
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
@@ -597,22 +590,15 @@ class Resume(Base):
     languages = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
 
     __table_args__ = (
-        # 0007's one-base rule, for rows from before versioning only (0008): a versioned candidate has many bases and
-        # many base versions. Abdul approved dropping it; PR 6 does, once the old rows are converted.
-        Index("uq_resumes_one_base_per_candidate", "candidate_id", unique=True,
-              postgresql_where=text("is_base AND candidate_id IS NOT NULL AND base_resume_id IS NULL")),
         CheckConstraint("category IN ('BASE', 'TAILORED')", name="ck_resumes_category_values"),
-        CheckConstraint("base_resume_id IS NULL OR (category = 'BASE' AND job_id IS NULL) "
-                        "OR (category = 'TAILORED' AND job_id IS NOT NULL)", name="ck_resumes_category_job"),
-        # A composite foreign key isn't checked while one of its columns is null, so a versioned row names its candidate.
-        CheckConstraint("base_resume_id IS NULL OR candidate_id IS NOT NULL", name="ck_resumes_base_has_candidate"),
+        CheckConstraint("(category = 'BASE' AND job_id IS NULL) OR (category = 'TAILORED' AND job_id IS NOT NULL)",
+                        name="ck_resumes_category_job"),
         ForeignKeyConstraint(["base_resume_id", "candidate_id"], ["base_resumes.id", "base_resumes.candidate_id"],
                              name="fk_resumes_base_candidate", ondelete="RESTRICT"),
         Index("uq_resumes_version", "base_resume_id", "category", "job_id", "version", unique=True,
-              postgresql_nulls_not_distinct=True, postgresql_where=text("base_resume_id IS NOT NULL")),
+              postgresql_nulls_not_distinct=True),
     )
 
-    parent = relationship("Resume", remote_side=[id], backref="tailored_versions")
     # passive_deletes: let the database cascade; otherwise the ORM would null job_id on the children first.
     job = relationship("Job", backref=backref("resumes", passive_deletes=True))
 

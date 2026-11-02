@@ -131,7 +131,6 @@ class ResumeParse(Base):
     content_sha256 = Column(String, nullable=False,
                             default=lambda ctx: file_sha256(ctx.get_current_parameters()["content"]))
     created_at = _created_at()
-    updated_at = _updated_at()
 
     __table_args__ = (
         CheckConstraint("size_bytes BETWEEN 1 AND 10485760", name="ck_resume_parses_size"),   # 10 MB

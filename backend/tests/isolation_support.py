@@ -30,6 +30,15 @@ RESUME_JSON = {
     "skills": ["Java", "Spring Boot", "Kafka", "AWS", "PostgreSQL", "Docker", "Kubernetes"],
 }
 
+# The same résumé in the version columns (résumé versioning §3.3), with item ids.
+RESUME_COLUMNS = {
+    "email": "priya@example.test", "summary": RESUME_JSON["summary"],
+    "experiences": [{"id": "exp-1", "job_title": "Senior Java Developer", "company": "Initech", "location": "",
+                     "dates": "", "start": "", "end": "", "current": False,
+                     "bullets": [{"id": f"exp-1-b{n}", "text": text}
+                                 for n, text in enumerate(RESUME_JSON["experience"][0]["bullets"])]}],
+    "skills": [{"id": f"skill-{n}", "category": "", "name": name} for n, name in enumerate(RESUME_JSON["skills"])],
+}
 
 @dataclass
 class Side:
@@ -89,24 +98,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.add_all([app, legacy_app])
     db.flush()
     interview = Interview(firm_id=firm.id, application_id=app.id, what=f"{tag} phone screen")
-    resume = Resume(firm_id=firm.id, name=f"{tag} base résumé", is_base=True,
-                    json_data={**RESUME_JSON, "summary": f"{tag} {RESUME_JSON['summary']}"})
-    db.add_all([interview, resume])
-    db.flush()
-    tailored = Resume(firm_id=firm.id, name=f"{tag} tailored résumé", is_base=False, parent_id=resume.id,
-                      job_id=job.id, json_data=RESUME_JSON)
-    db.add(tailored)
-    db.flush()
-    letter = CoverLetter(firm_id=firm.id, name=f"{tag} cover letter", job_id=job.id, resume_id=resume.id,
-                         json_data={"header": RESUME_JSON["header"], "body": f"{tag} letter body"})
-    db.add(letter)
-    db.flush()
-    link = TracerLink(firm_id=firm.id, token=uuid.uuid4().hex[:16],          # tokens are 16 characters
-                      destination_url="https://linkedin.example.test/in/priya", source_label=f"{tag} LinkedIn",
-                      resume_id=resume.id)
-    db.add(link)
-    db.flush()
-    db.add(TracerClickEvent(firm_id=firm.id, tracer_link_id=link.id))
+    db.add(interview)
     # The hierarchy (07 Q40): a MANAGER and a BDE who reports to them.
     from backend.models.tenancy import User
     from backend.tests.auth_support import password_hash
@@ -123,6 +115,44 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                           full_name=f"{tag} candidate", primary_role=f"{tag} Java Developer", work_auth="H1B")
     db.add(candidate)
     db.flush()
+    # Résumé versioning (PRs 5, 6): the candidate's upload, its active base (the owner's, at onboarding: v1 is
+    # "resume") with a BDE's v2 and a tailored résumé for the job ("tailored"); and a second base the BDE made from
+    # v2, unused, so a delete of it or of v2 goes through.
+    from backend.models.candidates import BaseResume, ResumeParse
+    upload = ResumeParse(firm_id=firm.id, uploaded_by_user_id=owner.id, candidate_id=candidate.id,
+                         file_name=f"{tag}.pdf", mime_type="application/pdf", size_bytes=len(tag),
+                         content=f"{tag} file".encode(), parse={"header": {"name": f"{tag} candidate"}})
+    db.add(upload)
+    db.flush()
+    first = BaseResume(firm_id=firm.id, candidate_id=candidate.id, source="UPLOAD", resume_parse_id=upload.id,
+                       is_active=True, created_by_user_id=owner.id)
+    db.add(first)
+    db.flush()
+    versioned = dict(firm_id=firm.id, candidate_id=candidate.id, full_name=f"{tag} candidate")
+    resume = Resume(**versioned, base_resume_id=first.id, category="BASE", version=1, name=f"{tag} base résumé",
+                    created_by_user_id=owner.id, **{**RESUME_COLUMNS, "summary": f"{tag} {RESUME_COLUMNS['summary']}"})
+    v2 = Resume(**versioned, base_resume_id=first.id, category="BASE", version=2, name=f"{tag} base résumé",
+                created_by_user_id=bde.id, **RESUME_COLUMNS)
+    tailored = Resume(**versioned, base_resume_id=first.id, category="TAILORED", job_id=job.id, version=1,
+                      name=f"{tag} tailored résumé", created_by_user_id=bde.id, **RESUME_COLUMNS)
+    db.add_all([resume, v2, tailored])
+    db.flush()
+    second = BaseResume(firm_id=firm.id, candidate_id=candidate.id, source="PROMOTED", promoted_from_resume_id=v2.id,
+                        created_by_user_id=bde.id)
+    db.add(second)
+    db.flush()
+    db.add(Resume(**versioned, base_resume_id=second.id, category="BASE", version=1, name=f"{tag} base résumé",
+                  created_by_user_id=bde.id, **RESUME_COLUMNS))
+    letter = CoverLetter(firm_id=firm.id, name=f"{tag} cover letter", job_id=job.id, resume_id=resume.id,
+                         json_data={"header": RESUME_JSON["header"], "body": f"{tag} letter body"})
+    db.add(letter)
+    db.flush()
+    link = TracerLink(firm_id=firm.id, token=uuid.uuid4().hex[:16],          # tokens are 16 characters
+                      destination_url="https://linkedin.example.test/in/priya", source_label=f"{tag} LinkedIn",
+                      resume_id=resume.id)
+    db.add(link)
+    db.flush()
+    db.add(TracerClickEvent(firm_id=firm.id, tracer_link_id=link.id))
     # The candidate core (migration 0007): one row of each candidate-owned kind, with `tag` in its text.
     from backend.models.candidates import CandidateJob, CandidateMailbox, Claim, Evidence, FavoriteJob, InboxMessage
     db.add_all([CandidateJob(firm_id=firm.id, candidate_id=candidate.id, job_id=job.id, match_score=80),
@@ -139,7 +169,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.add_all([candidate_message,
                 Claim(firm_id=firm.id, candidate_id=candidate.id, entity_type="skill", text=f"{tag} Java",
                       state="VERIFIED", evidence_id=evidence.id, source="MANUAL")])
-    app.candidate_id, resume.candidate_id, tailored.candidate_id = candidate.id, candidate.id, candidate.id
+    app.candidate_id = candidate.id
     db.flush()
     invite, _ = send_invite(db, inviter=owner, firm=firm, email=f"bde@{tag.lower()}.test", role="BDE",
                             invitee_name=f"{tag} invitee", summary=f"Invited a BDE to {tag}", now=utcnow(),
@@ -162,32 +192,6 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     review = ApplicationReview(firm_id=firm.id, candidate_id=candidate.id, application_id=review_app.id,
         inbox_message_id=review_message.id, reason="LOW_CONFIDENCE", application_revision=0)
     db.add(review)
-    db.flush()
-    # Résumé versioning (PR 5): the candidate's upload, its active base (the owner's, at onboarding) with a BDE's v2,
-    # and a second base the BDE made from it, unused, so a delete of either goes through.
-    from backend.models.candidates import BaseResume, ResumeParse
-    upload = ResumeParse(firm_id=firm.id, uploaded_by_user_id=owner.id, candidate_id=candidate.id,
-                         file_name=f"{tag}.pdf", mime_type="application/pdf", size_bytes=len(tag),
-                         content=f"{tag} file".encode(), parse={"header": {"name": f"{tag} candidate"}})
-    db.add(upload)
-    db.flush()
-    first = BaseResume(firm_id=firm.id, candidate_id=candidate.id, source="UPLOAD", resume_parse_id=upload.id,
-                       is_active=True, created_by_user_id=owner.id)
-    db.add(first)
-    db.flush()
-    versioned = dict(firm_id=firm.id, candidate_id=candidate.id, category="BASE", is_base=True, json_data={})
-    v1 = Resume(**versioned, base_resume_id=first.id, version=1, name=f"{tag} base", created_by_user_id=owner.id,
-                full_name=f"{tag} candidate", summary=f"{tag} summary")
-    v2 = Resume(**versioned, base_resume_id=first.id, version=2, name=f"{tag} base", created_by_user_id=bde.id,
-                full_name=f"{tag} candidate", summary=f"{tag} summary, edited")
-    db.add_all([v1, v2])
-    db.flush()
-    second = BaseResume(firm_id=firm.id, candidate_id=candidate.id, source="PROMOTED", promoted_from_resume_id=v2.id,
-                        created_by_user_id=bde.id)
-    db.add(second)
-    db.flush()
-    db.add(Resume(**versioned, base_resume_id=second.id, version=1, name=f"{tag} base", created_by_user_id=bde.id,
-                  full_name=f"{tag} candidate", summary=f"{tag} summary, edited"))
     db.flush()
     return {"review_app": review_app.id, "review": review.id, "review_message": review_message.id,
             "version": v2.id, "base": second.id,
@@ -291,7 +295,7 @@ class _Response:
 def offline(monkeypatch):
     """Nothing leaves the process: LLM workers aren't launched, pages aren't fetched, PDFs aren't rendered."""
     from backend import main
-    from backend.api import routes_applications, routes_cover_letters, routes_jobs, routes_resumes
+    from backend.api import routes_applications, routes_cover_letters, routes_jobs
 
     def no_launch(*args, **kwargs):
         return "isolation-run"
@@ -305,10 +309,7 @@ def offline(monkeypatch):
     async def browser():
         return _Browser()
 
-    async def parsed_pdf(*args, **kwargs):
-        return dict(RESUME_JSON)
-
-    for module in (main, routes_cover_letters, routes_jobs, routes_resumes):
+    for module in (main, routes_cover_letters, routes_jobs):
         monkeypatch.setattr(module, "launch_background", no_launch)
     monkeypatch.setattr(routes_applications, "_cache_job_page", no_fetch)
     monkeypatch.setattr(routes_applications, "_fetch_and_store_description", no_fetch)
@@ -316,10 +317,8 @@ def offline(monkeypatch):
     monkeypatch.setattr("backend.analyzer.h1b_checker.fetch_h1b_for_company_id", no_fetch)
     monkeypatch.setattr("backend.scraper._shared.url_safety.safe_get", page)
     monkeypatch.setattr("backend.scraper._shared.url_safety.assert_public_http_url", lambda *args, **kwargs: None)
-    monkeypatch.setattr(routes_resumes, "_get_browser", browser)
     if hasattr(routes_cover_letters, "_get_browser"):
         monkeypatch.setattr(routes_cover_letters, "_get_browser", browser)
-    monkeypatch.setattr(routes_resumes, "parse_resume_pdf", parsed_pdf)
     # The new-candidate parser (onboarding 06 PR 3): no text extraction, no model.
     from backend.api import routes_candidates
     from backend.candidates.base_resume import clean_reply

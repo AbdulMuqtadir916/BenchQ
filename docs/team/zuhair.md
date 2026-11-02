@@ -28,7 +28,8 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
    (`base_resumes`, one active) and its version 1 in `resumes`. Spec and PR plan: [resume-versioning.md](./resume-versioning.md).
    **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). **PR 5** (migration 0012):
    versions and bases through the API under the candidate's URL: save, use as base, pick, the BDE's later upload,
-   delete / hide / show again; once a BDE is assigned only that BDE changes résumés (07 Q54).
+   delete / hide / show again; once a BDE is assigned only that BDE changes résumés (07 Q54). **PR 6** (migration
+   0013): the old columns and JobNavigator's résumé code removed; old rows converted (resume-versioning §3.3, §4.8).
 5. **Frontend live:** the Record (`src/lib/api/records.ts`) behind `records`, with a DTO mapper and a real sample.
 
 ## 2. Job scraping — per candidate (Q53b)
@@ -55,7 +56,11 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
    (a candidate has several target roles but one active base).
 3. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
    or re-tailoring inserts the next version.
-4. **ATS score** for a tailored résumé against its job (`cv_score` / `score-check` today).
+4. **ATS score** for a tailored résumé against its job. The old `score-check` route and the old tailor route were
+   removed in résumé versioning PR 6; their pipeline is kept, unwired, in `backend/analyzer/legacy_tailoring.py`
+   (with the prompts in settings and `llm_client.call_cv_tailor_llm`) to port to the versions.
+   A PDF the server makes itself (extension, email, tracer links, the export gate on the backend) is built here
+   from the studio's designs (resume-versioning.md §8).
 5. Frontend live behind `resumes`.
 
 ## Rules for you

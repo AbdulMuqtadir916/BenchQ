@@ -121,9 +121,8 @@ def candidate_base(db, candidate, base_id) -> BaseResume:
 
 
 def candidate_version(db, candidate, resume_id) -> Resume:
-    """One of the candidate's versioned rows (rows from before versioning have no base and aren't served here)."""
-    row = scoped(db, Resume, candidate.firm_id).filter(Resume.id == resume_id, Resume.candidate_id == candidate.id,
-                                                       Resume.base_resume_id.isnot(None)).first()
+    """One of the candidate's versions."""
+    row = scoped(db, Resume, candidate.firm_id).filter(Resume.id == resume_id, Resume.candidate_id == candidate.id).first()
     if row is None:
         raise _not_found()
     return row
@@ -216,8 +215,7 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
     latest = _group(db, source).with_entities(func.max(Resume.version)).scalar() or source.version
     row = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=source.base_resume_id,
                  category=source.category, job_id=source.job_id, version=latest + 1, name=source.name,
-                 template=source.template, page_format=source.page_format, is_base=source.category == "BASE",
-                 created_by_user_id=actor.id, json_data={}, **content)
+                 template=source.template, page_format=source.page_format, created_by_user_id=actor.id, **content)
     db.add(row)
     db.flush()
     _reset_claims(db, candidate, _changed_refs(before, content), before["summary"] != content["summary"])
@@ -254,7 +252,7 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     _activate(db, candidate, base)
     db.add(Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
                   job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                  is_base=True, created_by_user_id=actor.id, json_data={}, **content_of(row)))
+                  created_by_user_id=actor.id, **content_of(row)))
     db.flush()
     number = len(numbers) + 1
     source = f"Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version}"
@@ -354,9 +352,6 @@ def _uses(db, candidate, rows: list[Resume], base: BaseResume | None = None) -> 
         if base.resume_parse_id is not None:
             uses["evidence"] = scoped(db, Evidence, firm_id, func.count(Evidence.id)) \
                 .filter(Evidence.resume_parse_id == base.resume_parse_id).scalar()
-            # A row from before versioning that names the upload holds it too (resumes.resume_parse_id, 0007).
-            uses["evidence"] += scoped(db, Resume, firm_id, func.count(Resume.id)) \
-                .filter(Resume.resume_parse_id == base.resume_parse_id).scalar()
     removed = set().union(*(item_ids(content_of(r)) for r in rows)) if rows else set()
     if removed:
         others = scoped(db, Resume, firm_id).filter(Resume.candidate_id == candidate.id,
