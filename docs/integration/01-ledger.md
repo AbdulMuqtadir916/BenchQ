@@ -165,3 +165,17 @@ sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 - [x] Adapter live behind `ledger`, mapping tested; screen unchanged
 - [ ] Clicked through as OWNER and BDE on the live backend (the PR's test plan)
 - [ ] Mock deleted (with F6)
+
+
+## PR #104 proposed amendment — Samad confirmed; Abdul sign-off pending (2026-11-02)
+
+Candidate history follows its current BDE assignment: candidate-linked entries are visible to the current BDE
+regardless of actor and cease being visible to the previous BDE. Own non-candidate entries retain existing scope.
+Backend and frontend scope use the existing nullable candidate_id relation (candidateId in the DTO); legacy rows
+without reliable candidate attribution are not guessed/backfilled. This supersedes the older own-actor/ASSIGN-only
+example above for candidate-linked records once approved. Owner/Manager permissions otherwise remain unchanged.
+
+Mailbox attestation uses a durable email ledger event containing verified account address, actor/candidate/time and
+consent notice v1. Email deletion retains that restricted connection evidence and discloses the exception. Platform
+support and global audit responses redact email summaries/notes; operational support cannot read candidate mail.
+Background import batches update a single per-job partial/completed summary; they do not append per-batch entries.

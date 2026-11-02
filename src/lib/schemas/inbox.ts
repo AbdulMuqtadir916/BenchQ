@@ -58,6 +58,8 @@ export const CandidateInboxSchema = z.object({
   firmId: z.string(),
   connection: MailboxConnectionSchema.nullable(),
   messages: z.array(InboxMessageSchema),
+  nextCursor: z.string().nullable().default(null),
+  totalCount: z.number().int().nonnegative().optional(),
 });
 export type CandidateInbox = z.infer<typeof CandidateInboxSchema>;
 

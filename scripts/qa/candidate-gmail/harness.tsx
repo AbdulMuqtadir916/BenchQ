@@ -11,6 +11,7 @@ import type { CandidateActions } from "@/components/app/candidate/candidate-acti
 import "@/app/globals.css";
 useSession.setState({principal:{kind:"firm",userId:"qa-owner",firmId:"qa-firm",role: new URLSearchParams(location.search).get("state") === "readonly" ? "VIEWER" : "OWNER"}});
 const client = new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:false}}});
+Object.assign(window, {qaRefetchInbox: () => client.invalidateQueries()});
 const firm = FirmSchema.parse({id:"qa-firm",name:"Synthetic Gmail QA",slug:"synthetic-qa",logoUrl:null,status:"ACTIVE",planId:"qa-plan",seatLimit:10,candidateLimit:10,contactPhone:null,createdAt:"2026-11-02T00:00:00Z"});
 function Harness() {
   const inboxQuery = useCandidateInbox("qa-candidate");

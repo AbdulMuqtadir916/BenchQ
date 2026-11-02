@@ -169,7 +169,11 @@ async def _oauth_browser_result(request: Request, call_next):
     response = await call_next(request)
     if request.url.path == '/api/oauth/google/callback' and response.status_code >= 400:
         from fastapi.responses import RedirectResponse
-        return RedirectResponse('/?mailbox=failed', status_code=303)
+        from urllib.parse import urlsplit, urlunsplit, urlencode, parse_qsl
+        destination = getattr(request.state, 'oauth_return_to', '/')
+        parsed = urlsplit(destination)
+        query = dict(parse_qsl(parsed.query)); query['mailbox'] = 'failed'
+        return RedirectResponse(urlunsplit(('', '', parsed.path, urlencode(query), '')), status_code=303)
     return response
 
 

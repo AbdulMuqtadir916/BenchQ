@@ -85,12 +85,32 @@ def state_digest(state: str) -> str:
     return hashlib.sha256(state.encode("utf-8")).hexdigest()
 
 
+class OAuthGrantError(RuntimeError):
+    """An issued grant needs cleanup even when identity lookup failed."""
+    def __init__(self, token):
+        super().__init__('Google account identity could not be verified. Connect again.')
+        self.token = token
+
+
+def identify_refresh_token(token):
+    from backend.inbox.gmail_sync import _refresh_access_token
+    with httpx.Client(timeout=10, follow_redirects=False) as http:
+        access = _refresh_access_token(token, http)
+        response = http.get(GOOGLE_USERINFO_URL, headers={'Authorization': f'Bearer {access}'})
+        response.raise_for_status()
+        profile = response.json()
+        if profile.get('email_verified') is not True or not isinstance(profile.get('email'), str) or not profile['email'].strip():
+            raise RuntimeError('Google identity is not verified.')
+        return profile['email'].strip().lower()
+
+
 def exchange_code(code: str, verifier: str, *, client: httpx.Client | None = None) -> tuple[str, str]:
     """Exchange the one-time code and verify the Google identity over the authenticated userinfo endpoint."""
     if not CANDIDATE_GMAIL_CLIENT_ID or not CANDIDATE_GMAIL_CLIENT_SECRET or not CANDIDATE_GMAIL_REDIRECT_URI:
         raise RuntimeError("Candidate Gmail OAuth is not configured.")
     own_client = client is None
     http = client or httpx.Client(timeout=20.0, follow_redirects=False)
+    refresh_token = None
     try:
         response = http.post(GOOGLE_TOKEN_URL, data={
             "code": code,
@@ -113,7 +133,9 @@ def exchange_code(code: str, verifier: str, *, client: httpx.Client | None = Non
         if profile.get("email_verified") is not True or not isinstance(profile.get("email"), str) or not profile["email"].strip():
             raise RuntimeError("Google did not verify the authorized email address.")
         return profile["email"].strip().lower(), refresh_token
-    except (httpx.HTTPError, ValueError, TypeError) as exc:
+    except (httpx.HTTPError, ValueError, TypeError, RuntimeError) as exc:
+        if isinstance(refresh_token, str) and refresh_token:
+            raise OAuthGrantError(refresh_token) from None
         raise RuntimeError("Google OAuth could not be completed.") from exc
     finally:
         if own_client:

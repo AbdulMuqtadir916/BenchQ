@@ -94,6 +94,10 @@ def configure_scheduler():
         scheduler.add_job(run_candidate_inbox_sync, IntervalTrigger(minutes=candidate_inbox_interval),
                           id="candidate_inbox_sync", replace_existing=True, max_instances=1, coalesce=True)
 
+    # Grant cleanup must continue even when mailbox polling is disabled.
+    scheduler.add_job(_cleanup_candidate_grants, IntervalTrigger(minutes=5),
+                      id="candidate_google_grant_cleanup", replace_existing=True, max_instances=1, coalesce=True)
+
     # Cron-based jobs (empty = disabled)
     _add_cron_job(run_db_backup, "db_backup", backup_cron)
     _add_cron_job(send_daily_digest, "daily_digest", digest_cron)
@@ -203,6 +207,11 @@ async def run_email_check():
             run.summary = _activity_summary(started, "email", "reply", "replies") or "No new replies"
     except JobAlreadyRunningError as e:
         logger.warning(f"Scheduler skipped: {e}")
+
+
+def _cleanup_candidate_grants():
+    from backend.api.routes_inbox import cleanup_expired_grants
+    return cleanup_expired_grants()
 
 
 def _sync_connected_candidate_mailboxes():

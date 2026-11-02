@@ -64,3 +64,20 @@ def test_revoke_is_bounded_and_reports_provider_failure():
             assert data == {'token': 'synthetic'}
             return type('Response', (), {'status_code': 503})()
     assert revoke_token('synthetic', client=Client()) is False
+
+
+def test_identity_failure_preserves_issued_grant_for_cleanup(monkeypatch):
+    import httpx
+    from backend.inbox import google_oauth as oauth
+    monkeypatch.setattr(oauth, 'CANDIDATE_GMAIL_CLIENT_ID', 'synthetic-client')
+    monkeypatch.setattr(oauth, 'CANDIDATE_GMAIL_CLIENT_SECRET', 'synthetic-secret')
+    monkeypatch.setattr(oauth, 'CANDIDATE_GMAIL_REDIRECT_URI', 'http://localhost/callback')
+    def provider(request):
+        if request.method == 'POST':
+            return httpx.Response(200, json={'access_token':'synthetic-access', 'refresh_token':'issued-synthetic-grant'})
+        return httpx.Response(503)
+    with httpx.Client(transport=httpx.MockTransport(provider)) as client:
+        with pytest.raises(oauth.OAuthGrantError) as error:
+            oauth.exchange_code('synthetic-code', 'verifier', client=client)
+    assert error.value.token == 'issued-synthetic-grant'
+    assert 'issued-synthetic-grant' not in str(error.value)

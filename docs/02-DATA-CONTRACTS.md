@@ -1569,33 +1569,60 @@ imports use SYSTEM ledger attribution with candidate_id. Required code-owner con
 pending before merge. No new role rules or live Google secrets are embedded in the UI.
 
 
-### PR 104 review corrections — proposed for Abdul’s approval (2026-11-02)
+### PR 104 review corrections — implementation proposal (2026-11-02)
 
-Samad requested these changes; product-owner sign-off is pending, not implied by this document.
-Candidate Gmail is disabled by default (`CANDIDATE_GMAIL_ENABLED=false`) until PR 3 matching/BDE review,
-Google verification, privacy acceptance and owner approval. PR 104 imports and stores unclassified Inbox mail
-only in synthetic development acceptance. It never writes application statuses. PR 3's requested >=0.6 automatic
-status policy remains an explicit product decision for Abdul; the existing human-acceptance rule is unchanged here.
+Samad confirmed the implementation decisions during the planning interview. Abdul's newer product replies,
+supplied in the chat, approve the classification/UI sequence and gates below. Global mailbox uniqueness,
+read/empty-sync audit policy and the precise revised contracts still need Abdul's code-owner sign-off.
+Nothing here records a GitHub approval. Candidate Gmail defaults off until matching/BDE review, privacy
+acceptance and Google verification are ready. Classification disabled means imported mail stays readable,
+Unclassified, in the Inbox. PR 104 makes no model requests and changes no application statuses.
 
-OAuth callback stores an encrypted pending grant for ten minutes and redirects to a candidate/Google-address
-confirmation. Only its initiating user with current candidate.edit authority may confirm. Profile and Google emails
-may differ. One active Google address across firms is enforced under a global identity lock without revealing another
-firm. Actor, candidate, verified address, time and confirmation are retained in OAuth/mailbox/ledger records.
+OAuth stores a pending encrypted grant, requires the initiating user's current candidate.edit permission
+and current candidate scope to confirm, and supports DELETE on the same confirmation URL to cancel.
+Expired attempts offer Connect again. Cancel/conflict/expired cleanup revokes only if no active grant is
+at risk; failures retain the encrypted pending token for scheduled retry. A separate five-minute cleanup job continues even when Inbox polling is disabled; expired unused PKCE verifiers are cleared. Provider identity failures also
+retain issued grants for safe cleanup. Google revocation affects an account's whole project grant, so
+exchange/activation/revocation use a bounded, nonblocking advisory guard with no row locks over Google I/O.
+Busy requests receive a retryable error; this intentionally serializes short connection operations.
 
-Connection sync_state is IDLE, QUEUED, IMPORTING or FAILED; status ERROR means authorization requires reconnect.
-Imports persist ten-message batches outside provider-call row locks and use a job lease and connection generation.
-Disconnect invalidates jobs before revocation; failed revocation still removes credentials and exposes manual instructions.
-Bodies and snippets use versioned encrypted storage with a comma-separated Fernet keyring (newest key first).
-The unmerged 0010 migration encrypts existing retained text with the deployment key and decrypts on safe downgrade;
-a missing key fails rather than discarding text. No existing development database was migrated during these corrections.
+Samad's uniqueness proposal is one active Gmail per candidate across all firms, with CONNECTED and ERROR
+reserving the address until explicit disconnect. The generic collision response names no other candidate,
+BDE or firm. Profile/Google addresses may differ. Reassignment preserves the mailbox, jobs, application
+statuses and mapped email history, transfers current-candidate access to the new BDE, and blocks subsequent
+requests and pending confirmation by the former BDE. Candidate-linked ledger history follows current
+assignment too; own non-candidate ledger entries keep their existing scope. Existing ledger candidate_id
+is exposed as nullable/optional candidateId through its serializer/DTO/schema; this adds no database column.
+Historical entries without candidate metadata cannot be safely reassigned by guessing their attribution.
 
-List responses omit full bodies. Selecting message_id returns that message's body; support views receive neither
-bodies nor previews. Offset/limit pages provide older messages. Owner/Manager deletion erases retained body, preview,
-subject, sender and thread content, marks the message deleted and excludes it from reading. Minimal ID/provider/source
-references remain to preserve immutable application reviews and prevent re-import. Gmail originals are untouched.
-Deletion is audited without subject/body. BDE, Viewer and Super Admin cannot delete content. Retention has no automatic
-expiry; the candidate can request deletion. Reads and empty manual sync requests remain audited per Samad’s decision.
+Durable confirmation evidence is the existing ledger entry: actor_user_id, candidate_id, created_at,
+verified Google address and consent notice v1 in its summary. It survives attempt cleanup/reconnection and
+email erasure. It is not the temporary OAuth attempt. This retention exception is disclosed in deletion UI.
+Platform audit/support responses redact email audit summary/note; Inbox support reads return health/counts
+without message rows or mailbox address. Safe diagnostics must not disclose email content.
 
-PR 3 scope: uniquely job-matched mail goes to its application, actionable unmatched mail stays in BDE review until
-matched, and Other content is removed only after BDE confirmation. No classification or Other handling is added here.
-Google Cloud project owner owns submission/security-assessment coordination before real-candidate rollout.
+GET Inbox uses limit (default 200, max 500), optional opaque cursor, next_cursor (nullable) and total_count.
+The cursor encodes a timezone-aware received_at and UUID with matching descending-time/ascending-ID ordering.
+Malformed cursors fail 400. message_id independently selects exactly one scoped undeleted message with body.
+Frontend CandidateInbox adds nextCursor (default null for older fixtures) and optional totalCount.
+Infinite-query pages survive refresh; URL/Zod inbox_pages restores up to 50 loaded pages after navigation/reload; selected older bodies remain independently addressable. Lists omit bodies.
+
+DELETE inbox-content accepts optional message_id and disconnect (default false). The app's bulk dialog defaults
+Disconnect and delete to true. Owner/Manager deletion erases message content on all served surfaces and fences
+in-flight jobs. Stored-only deletion targets content present at server confirmation, permits genuinely new
+arrivals afterward, and preserves tombstones/dedup IDs. Disconnect-and-delete stops import first, completes
+local erasure even if Google revoke fails, and shows manual revocation instructions. Gmail originals and
+application statuses stay unchanged. Minimal source/history IDs and restricted connection attestations remain.
+BDEs, Viewers and platform staff cannot erase email. Quarantine and recoverable auto-purge are later PR scope.
+
+Samad's audit proposal: first unread-to-read transition, each manual sync request including zero imports,
+and one SYSTEM result per background job. Batch commits update that single job result; interruption leaves a
+truthful partial count. Never describe a sync request as completed work. No subject/body/provider secret is logged.
+
+Later product direction: PR 3 classification first, PR 4 UI second. External processing stays off for real mail
+until retention/logging are verified in writing and consent updated. Automatic updates stay off until PR 4 merges
+and Undo works. Other never changes an application; matched Other remains readable, only unmatched Other may
+qualify for approved recoverable purging. Failed processing alone never erases mail. The detailed next plan must
+include lawful test-data provenance, approved recovery duration, sender authentication/approval contract,
+quarantine release and legacy-status mappings. No such table/status migration is introduced by PR 104.
+A named Google verification/security-assessment owner and delegated-access policy confirmation remain launch gates.

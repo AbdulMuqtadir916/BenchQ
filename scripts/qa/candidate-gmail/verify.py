@@ -30,6 +30,7 @@ async def run():
             last_synced_at=None, status='CONNECTED', last_sync_error=None)
         messages = [message('a'), message('b', True)]
         reads = 0
+        paged = [message(f'page-{i}') for i in range(205)]
         async def route_request(route):
             nonlocal reads
             request = route.request
@@ -56,14 +57,19 @@ async def run():
                     await route.fulfill(json=row)
                 return
             if '/mailbox/confirm/' in url.path:
-                if request.method == 'GET':
-                    await route.fulfill(json={'address':'selected@example.test'})
+                if request.method == 'DELETE':
+                    await route.fulfill(json={'cleanup_pending':False})
+                elif request.method == 'GET':
+                    await route.fulfill(status=404 if mode == 'expired' else 200, json={'detail':'Mailbox confirmation expired. Connect again.'} if mode == 'expired' else {'address':'selected@example.test'})
                 else:
                     connection['status'] = 'CONNECTED'
                     connection['sync_state'] = 'QUEUED'
                     await route.fulfill(json={'firm_id':'qa-firm','candidate_id':'qa-candidate','connection':connection,'messages':messages})
                 return
             if url.path.endswith('/inbox-content'):
+                if parse_qs(url.query).get('disconnect') == ['true']:
+                    connection['status'] = 'DISCONNECTED'
+                    connection['last_sync_error'] = 'Sync stopped. Remove BenchQ access at https://myaccount.google.com/permissions because Google revocation could not be confirmed.'
                 selected = parse_qs(url.query).get('message_id', [None])[0]
                 messages[:] = [row for row in messages if selected and row['id'] != selected]
                 await route.fulfill(json={'firm_id':'qa-firm','candidate_id':'qa-candidate','connection':connection,'messages':messages})
@@ -78,6 +84,12 @@ async def run():
                 return
             if url.path.endswith('/inbox') and mode == 'loading':
                 await asyncio.sleep(0.8)
+            if url.path.endswith('/inbox') and mode == 'pagination':
+                query = parse_qs(url.query)
+                selected = query.get('message_id', [None])[0]
+                rows = [row for row in paged if row['id'] == selected] if selected else paged[200:] if query.get('cursor') else paged[:200]
+                await route.fulfill(json={'firm_id':'qa-firm','candidate_id':'qa-candidate','connection':connection,'messages':rows,'next_cursor':None if selected or query.get('cursor') else 'older-page','total_count':len(paged)})
+                return
             payload = dict(firm_id='qa-firm', candidate_id='qa-candidate',
                 connection=None if mode in {'empty','readonly-empty'} else connection,
                 messages=[] if mode in {'empty','readonly-empty'} else messages)
@@ -112,6 +124,7 @@ async def run():
             for width in [1440,1024,390]:
                 await page.set_viewport_size({'width':width,'height':1100})
                 await page.evaluate('(theme)=>document.documentElement.dataset.theme=theme', theme)
+                await page.wait_for_timeout(300)
                 assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (theme,width,'overflow')
                 await page.add_script_tag(path=axe)
                 violations = await page.evaluate("async()=> (await axe.run(document.getElementById('root'),{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))")
@@ -150,10 +163,53 @@ async def run():
         assert 'mailbox_confirmation' not in page.url
         assert await page.get_by_role('button', name='Confirm mailbox', exact=True).count() == 0
         await page.goto(BASE, wait_until='networkidle')
-        page.once('dialog', lambda dialog: dialog.accept())
+        await page.get_by_text('Email storage controls', exact=True).click()
         await page.get_by_role('button', name='Delete selected email', exact=True).click()
+        await page.get_by_role('dialog').wait_for()
+        assert await page.get_by_role('checkbox').is_checked() is False
+        await page.get_by_role('button', name='Delete stored emails', exact=True).click()
         await page.wait_for_timeout(300)
         assert any(method == 'DELETE' and path.endswith('/inbox-content') for method,path in calls)
+        await page.goto(BASE+'?mailbox_confirmation=cancel-attempt', wait_until='networkidle')
+        await page.get_by_role('button', name='Cancel', exact=True).click()
+        await page.wait_for_timeout(150)
+        assert 'mailbox_confirmation' not in page.url
+        await page.goto(BASE+'?state=expired&mailbox_confirmation=expired-attempt', wait_until='networkidle')
+        await page.get_by_role('button', name='Connect again', exact=True).click()
+        await page.wait_for_timeout(150)
+        assert 'mailbox_confirmation' not in page.url
+        connection['status'] = 'ERROR'
+        await page.goto(BASE, wait_until='networkidle')
+        await page.get_by_role('button', name='Disconnect', exact=True).wait_for()
+        connection['status'] = 'CONNECTED'; connection['sync_state'] = 'IDLE'
+        await page.goto(BASE+'?state=pagination', wait_until='networkidle')
+        await page.get_by_role('button', name='Load more', exact=True).click()
+        await page.get_by_role('button', name=re.compile('Synthetic email page-204')).wait_for()
+        assert 'inbox_pages=2' in page.url
+        await page.reload(wait_until='networkidle')
+        await page.get_by_role('button', name=re.compile('Synthetic email page-204')).click()
+        await page.get_by_text('Synthetic body page-204', exact=True).wait_for()
+        await page.evaluate('window.qaRefetchInbox()')
+        await page.get_by_role('button', name=re.compile('Synthetic email page-204')).wait_for()
+        await page.get_by_text('All stored emails loaded.', exact=True).wait_for()
+        await page.get_by_text('Synthetic body page-204', exact=True).wait_for()
+        await page.goto(BASE, wait_until='networkidle')
+        await page.get_by_text('Email storage controls', exact=True).click()
+        await page.get_by_role('button', name='Delete retained emails', exact=True).click()
+        assert await page.get_by_role('checkbox').is_checked()
+        for theme in ['light','dark']:
+            await page.evaluate('(theme)=>document.documentElement.dataset.theme=theme', theme)
+            await page.wait_for_timeout(300)
+            await page.add_script_tag(path=axe)
+            violations = await page.evaluate("async()=> (await axe.run(document.getElementById('root'),{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))")
+            if violations:
+                await page.screenshot(path='/app/.next/pr104-dialog.png')
+            assert not violations, (theme, violations)
+        await page.screenshot(path='/app/.next/pr104-dialog-final.png')
+        await page.get_by_role('button', name='Cancel', exact=True).click()
+        await page.get_by_role('button', name='Delete retained emails', exact=True).click()
+        await page.get_by_role('button', name='Disconnect and delete', exact=True).click()
+        await page.get_by_text(re.compile('^Sync stopped. Remove BenchQ access')).wait_for()
         await page.goto(BASE+'?state=empty', wait_until='networkidle')
         await page.get_by_role('button', name='Continue to Google').focus()
         await page.keyboard.press('Enter')

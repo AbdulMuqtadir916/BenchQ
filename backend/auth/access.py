@@ -87,6 +87,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/oauth/google/callback": S,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": F,
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": F,
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/inbox-content": F,
     "GET /api/applications": F,
     "GET /api/applications/{app_id}": F,

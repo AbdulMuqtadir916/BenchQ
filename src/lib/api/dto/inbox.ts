@@ -16,6 +16,7 @@ export const BackendInboxSchema = z.object({
     status: z.enum(["CONNECTED", "DISCONNECTED", "ERROR"]), last_sync_error: z.string().nullable(),
     sync_state: z.enum(["IDLE", "QUEUED", "IMPORTING", "FAILED"]).default("IDLE"),
   }).nullable(), messages: z.array(BackendInboxMessageSchema),
+  next_cursor: z.string().nullable().default(null), total_count: z.number().int().nonnegative().optional(),
 });
 export function toInboxMessage(dto: z.infer<typeof BackendInboxMessageSchema>): InboxMessage {
   return InboxMessageSchema.parse({
@@ -34,6 +35,6 @@ export function toCandidateInbox(dto: z.infer<typeof BackendInboxSchema>): Candi
       provider: dto.connection.provider, address: dto.connection.address, connectedAt: toIso(dto.connection.connected_at),
       lastSyncedAt: toIsoOrNull(dto.connection.last_synced_at), status: dto.connection.status,
       lastSyncError: dto.connection.last_sync_error, syncState: dto.connection.sync_state,
-    } : null, messages: dto.messages.map(toInboxMessage),
+    } : null, messages: dto.messages.map(toInboxMessage), nextCursor: dto.next_cursor, totalCount: dto.total_count ?? dto.messages.length,
   });
 }

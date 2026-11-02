@@ -107,8 +107,9 @@ def test_support_view_cannot_read_email_body_or_snippet(anonymous_client, test_d
     assert result.status_code == 200, result.text
     response = anonymous_client.get(base(candidate) + '/inbox', headers=admin)
     assert response.status_code == 200, response.text
-    message = response.json()['messages'][0]
-    assert message['body'] == '' and message['snippet'] == ''
+    assert response.json()['messages'] == []
+    assert 'Private synthetic subject' not in response.text
+    assert 'recruiter@example.test' not in response.text
     response = anonymous_client.get(base(candidate) + '/inbox', params={'message_id': str(test_db.query(InboxMessage).filter_by(mailbox_id=mailbox.id).one().id)}, headers=owner)
     assert response.status_code == 200, response.text
     assert response.json()['messages'][0]['body'] == 'Private synthetic body'

@@ -213,3 +213,11 @@ def test_unparseable_cron_does_not_break_the_other_jobs(test_db, monkeypatch, ca
     assert "db_backup" not in job_ids
     assert "daily_digest" in job_ids
     assert "scrape_all" in job_ids
+
+
+def test_pending_google_grants_cleanup_runs_when_mailbox_polling_disabled(test_db, monkeypatch):
+    module, fresh = _fresh(test_db, monkeypatch, {'candidate_gmail_sync_interval_minutes':'0'})
+    module.configure_scheduler()
+    ids = {job.id for job in fresh.get_jobs()}
+    assert 'candidate_inbox_sync' not in ids
+    assert 'candidate_google_grant_cleanup' in ids

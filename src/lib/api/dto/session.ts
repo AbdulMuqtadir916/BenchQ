@@ -99,6 +99,7 @@ export const PlanDto = z.object({
 });
 
 export const LedgerEntryDto = z.object({
+  candidate_id: nullableId.optional(),
   id,
   firm_id: nullableId,
   actor_user_id: nullableId,
@@ -245,6 +246,7 @@ export function toPlan(dto: z.infer<typeof PlanDto>): Plan {
 
 export function toLedgerEntry(dto: z.infer<typeof LedgerEntryDto>): LedgerEntry {
   return LedgerEntrySchema.parse({
+    candidateId: dto.candidate_id ? mapNullableId(dto.candidate_id) : null,
     id: dto.id,
     firmId: mapNullableId(dto.firm_id),
     actorUserId: mapNullableId(dto.actor_user_id),

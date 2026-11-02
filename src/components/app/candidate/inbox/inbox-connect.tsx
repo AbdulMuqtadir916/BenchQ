@@ -14,6 +14,7 @@ export function InboxConnect({ candidate, compact = false }: { candidate: Candid
   function startConnection() {
     const url = new URL(window.location.href);
     url.searchParams.delete("mailbox");
+    url.searchParams.delete("mailbox_confirmation");
     url.searchParams.set("tab", "inbox");
     connect.mutate(`${url.pathname}${url.search}`, {
       onSuccess: (result) => { if (typeof result === "string") window.location.assign(result); },
@@ -27,7 +28,7 @@ export function InboxConnect({ candidate, compact = false }: { candidate: Candid
         <div className={compact ? "min-w-0" : "mt-3"}>
           <h2 className="text-body-strong text-[var(--color-text)]">Connect Gmail for {first}</h2>
           <p className="mt-1 text-sm text-[var(--color-text-3)]">
-            Sign in to the Google account intended for this candidate and grant read-only access. BenchQ never collects your password. Initial sync reads the last three days of Inbox email, excluding drafts, spam and trash. Saved bodies and previews are encrypted. Assigned recruiters, authorized Viewers, Owners and Managers may read saved mail; Super Admin support cannot read its body.
+            Sign in to the Google account intended for this candidate and grant read-only access. BenchQ never collects your password. Initial sync reads the last three days of Inbox email, excluding drafts, spam and trash. New Inbox mail continues importing while connected. Saved bodies and previews are encrypted. Subjects and senders are stored as metadata. Assigned recruiters, authorized Viewers, Owners and Managers may read saved mail; Super Admin support sees only mailbox health and counts, not email content. No external AI classification or automatic application updates run in this connection feature.
           </p>
         </div>
       </div>

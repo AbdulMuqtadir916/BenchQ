@@ -7,7 +7,7 @@ import { useSession } from "@/lib/stores/session-store";
 import { can } from "@/lib/auth/policy";
 import { Mail, RefreshCw } from "lucide-react";
 import type { InboxMessage } from "@/lib/schemas/inbox";
-import { useMoreInbox, useMailboxConfirmation, useInboxBody, useDeleteInboxContent, useDisconnectMailbox, useMarkRead, useSyncMailbox } from "@/lib/hooks/use-inbox";
+import { useInboxBody, useDisconnectMailbox, useMarkRead, useSyncMailbox } from "@/lib/hooks/use-inbox";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { InboxConnect } from "./inbox-connect";
 import { InboxReader } from "./inbox-reader";
+import { MailboxConfirmation } from "./mailbox-confirmation";
+import { InboxContentDialog } from "./inbox-content-dialog";
 
 const InboxFilter = z.enum(["ALL", "ACTION", "INTERVIEW_SCHEDULED", "SHORTLISTED", "CALL_REQUEST", "OFFER", "REJECTED"]).catch("ALL");
 type Filter = z.infer<typeof InboxFilter>;
@@ -44,12 +46,11 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
   };
   const candidate = ws.candidate!;
   const attempt = params.get("mailbox_confirmation");
-  const confirmation = useMailboxConfirmation(candidate.id, attempt);
-  const deletion = useDeleteInboxContent(candidate.id);
-  const more = useMoreInbox(candidate.id);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const more = ws.inboxQuery;
   const principal = useSession(s => s.principal);
   const canDelete = !!principal && can(principal, "candidate.assign");
-  const [callbackMessage] = useState(() => {
+  const [callbackMessage, setCallbackMessage] = useState(() => {
     const result = params.get("mailbox");
     return !result ? null : result === "connected" ? "Google account connected." : "Google connection was not completed. Try again.";
   });
@@ -67,11 +68,13 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
   const pendingIds = new Set(ws.suggestions.map((s) => s.message.id));
   const inFilter = (f: Filter, m: InboxMessage) =>
     f === "ALL" || (f === "ACTION" ? pendingIds.has(m.id) : m.signal === f || (f === "SHORTLISTED" && m.signal === "ASSESSMENT"));
-  const list = ws.messages.filter((m) => inFilter(filter, m));
+  const filtered = ws.messages.filter((m) => inFilter(filter, m));
   const count = (f: Filter) => ws.messages.filter((m) => inFilter(f, m)).length;
-  const selectedSummary = ws.messages.find((m) => m.id === selectedId) ?? list[0] ?? null;
-  const body = useInboxBody(candidate.id, selectedSummary?.id ?? null);
+  const selectedSummary = ws.messages.find((m) => m.id === selectedId) ?? filtered[0] ?? null;
+  const body = useInboxBody(candidate.id, attempt ? null : selectedId ?? selectedSummary?.id ?? null);
   const selected = body.data ?? selectedSummary;
+  const list = body.data && selectedId && !ws.messages.some(m => m.id === selectedId) && inFilter(filter, body.data)
+    ? [...filtered, body.data] : filtered;
 
   // An email counts as read once it's open in the reader — for someone who works the inbox. A read-only
   // reader (a VIEWER, a support view) leaves the firm's unread state as it is.
@@ -83,29 +86,24 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
     if (readAttempt.current !== openId) {
       readAttempt.current = openId ?? null;
       resetRead();
-      if (canAct && openId && isUnread) markAsRead(openId);
+      if (!attempt && canAct && openId && isUnread) markAsRead(openId);
     }
-  }, [canAct, openId, isUnread, markAsRead, resetRead]);
+  }, [attempt, canAct, openId, isUnread, markAsRead, resetRead]);
 
-  if (ws.inboxQuery.error) return <ErrorState error={ws.inboxQuery.error} onRetry={() => void ws.inboxQuery.refetch()} />;
+  if (ws.inboxQuery.error && !ws.inboxQuery.data) return <ErrorState error={ws.inboxQuery.error} onRetry={() => void ws.inboxQuery.refetch()} />;
   if (ws.inboxQuery.isLoading) return <SkeletonList rows={6} />;
-  if (attempt) return <div className="space-y-3">
-    <h2 className="text-h3">Confirm candidate mailbox</h2>
-    <p>{candidate.fullName} · {candidate.email} · {candidate.primaryRole}</p>
-    {confirmation.details.isPending ? <p role="status">Loading Google address…</p> : null}
-    {confirmation.details.data ? <p>Selected Google address: {confirmation.details.data.address}</p> : null}
-    <p>Confirm this is the intended mailbox for this candidate. The profile email may differ. You confirm the account owner authorized this connection.</p>
-    {confirmation.details.error ? <ErrorState error={confirmation.details.error} onRetry={() => void confirmation.details.refetch()} /> : null}
-    {confirmation.confirm.error ? <ErrorState error={confirmation.confirm.error} onRetry={() => confirmation.confirm.mutate()} /> : null}
-    <Button disabled={!confirmation.details.data || confirmation.confirm.isPending} onClick={() => confirmation.confirm.mutate(undefined, {onSuccess: () => {
-      const url = new URL(window.location.href); url.searchParams.delete("mailbox_confirmation");
-      window.history.replaceState(null, "", url.pathname + url.search);
-    }})}>Confirm mailbox</Button>
-  </div>;
+  if (attempt) return <MailboxConfirmation candidate={candidate} attempt={attempt} onClose={cleanupPending => {
+    const url = new URL(window.location.href); url.searchParams.delete("mailbox_confirmation");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    if (cleanupPending) setCallbackMessage("Connection cancelled. Google cleanup is pending and will retry. You can remove BenchQ access in your Google account permissions.");
+  }} />;
   if (!connected && ws.messages.length === 0) {
     return canAct ? (
       <>
-        {ws.inbox?.connection?.status === "ERROR" ? <p role="alert">Reconnect required: Google access expired.</p> : null}
+        {callbackMessage ? <p role="status">{callbackMessage}</p> : null}
+        {ws.inbox?.connection?.status === "ERROR" ? <><p role="alert">Reconnect required: Google access expired.</p><Button variant="secondary" disabled={disconnect.isPending} onClick={() => disconnect.mutate()}>Disconnect</Button></> : null}
+        {ws.inbox?.connection?.lastSyncError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{ws.inbox.connection.lastSyncError}</p> : null}
+        {disconnect.error ? <ErrorState error={disconnect.error} onRetry={() => disconnect.mutate()} /> : null}
         <InboxConnect candidate={candidate} />
       </>
     ) : (
@@ -117,9 +115,6 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
     <div className="space-y-3">
       {callbackMessage ? <p role="status">{callbackMessage}</p> : null}
       {["QUEUED", "IMPORTING"].includes(ws.inbox?.connection?.syncState ?? "") ? <p role="status">Importing emails… You can continue using BenchQ.</p> : null}
-      {canDelete ? <Button variant="ghost" onClick={() => {if (window.confirm("Delete all retained email content for this candidate from BenchQ? Gmail originals remain unchanged.")) deletion.mutate(undefined);}}>Delete retained emails</Button> : null}
-      {canDelete && selected ? <Button variant="ghost" onClick={() => {if (window.confirm("Delete this email content from BenchQ? Gmail original remains unchanged.")) deletion.mutate(selected.id);}}>Delete selected email</Button> : null}
-      {deletion.error ? <ErrorState error={deletion.error} onRetry={() => deletion.reset()} /> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-sm text-[var(--color-text-3)]">
           <span aria-hidden className="inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-info-bg)] text-[var(--color-info-fg)]"><Mail size={13} /></span>
@@ -129,7 +124,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
           {connected && canAct ? <Button size="sm" variant="secondary" onClick={() => sync.mutate()} disabled={sync.isPending}>
             <RefreshCw size={13} aria-hidden className={sync.isPending ? "animate-spin" : undefined} />Sync now
           </Button> : null}
-          {connected && canAct ? <Button size="sm" variant="ghost" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>Disconnect</Button> : null}
+          {ws.inbox?.connection && ws.inbox.connection.status !== "DISCONNECTED" && canAct ? <Button size="sm" variant="ghost" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>Disconnect</Button> : null}
         </div>
       </div>
 
@@ -196,8 +191,20 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
           />
         </div>
       </div>
-      <Button variant="secondary" disabled={more.isPending} onClick={() => more.mutate(ws.messages.length)}>Load more</Button>
-      {more.error ? <ErrorState error={more.error} onRetry={() => more.mutate(ws.messages.length)} /> : null}
+      {more.hasNextPage ? <Button variant="secondary" disabled={more.isFetchingNextPage} onClick={() => void more.fetchNextPage().then(result => {
+        if (!result.isError) {const url = new URL(window.location.href); url.searchParams.set("inbox_pages", String(more.loadedPageCount + 1)); window.history.replaceState(null, "", url.pathname + url.search);}
+      })}>Load more</Button> : ws.messages.length ? <p className="text-sm text-[var(--color-text-3)]">All stored emails loaded.</p> : null}
+      {more.isFetchNextPageError ? <ErrorState error={more.error} onRetry={() => void more.fetchNextPage()} /> : null}
+      {canDelete && (ws.inbox?.totalCount ?? ws.messages.length) > 0 ? <details className="bq-card p-4">
+        <summary className="cursor-pointer text-sm text-[var(--color-text)]">Email storage controls</summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="danger" onClick={() => setDeleteTarget("all")}>Delete retained emails</Button>
+          {selected ? <Button variant="secondary" onClick={() => setDeleteTarget(selected.id)}>Delete selected email</Button> : null}
+        </div>
+      </details> : null}
+      {deleteTarget ? <InboxContentDialog candidateId={candidate.id} candidateName={candidate.fullName}
+        count={deleteTarget === "all" ? ws.inbox?.totalCount ?? ws.messages.length : 1}
+        messageId={deleteTarget === "all" ? undefined : deleteTarget} onDeleted={onSelect} onClose={() => setDeleteTarget(null)} /> : null}
     </div>
   );
 }

@@ -22,7 +22,7 @@ const connectedSince = (candidateId: string) => connections.find((connection) =>
 function inboxFor(firmId: string, candidateId: string): CandidateInbox {
   const candidate = findInFirm(allCandidates, firmId, candidateId, "Candidate");
   const since = connectedSince(candidateId);
-  if (!since) return { firmId: candidate.firmId, connection: null, messages: [] };
+  if (!since) return { firmId: candidate.firmId, connection: null, messages: [], nextCursor: null };
 
   return CandidateInboxSchema.parse({
     firmId: candidate.firmId,

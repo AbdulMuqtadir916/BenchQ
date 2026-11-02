@@ -14,9 +14,10 @@ const AuthorizationSchema = z.object({ authorization_url: z.string().url().refin
 export const inboxApi = {
   confirmation: async (firm: string, candidate: string, attempt: string) => http.get(base(firm, candidate) + `/mailbox/confirm/${encodeURIComponent(attempt)}`, z.object({address: z.string()})),
   confirm: async (firm: string, candidate: string, attempt: string) => toCandidateInbox(await http.post(base(firm, candidate) + `/mailbox/confirm/${encodeURIComponent(attempt)}`, BackendInboxSchema)),
-  deleteContent: async (firm: string, candidate: string, message?: string) => toCandidateInbox(await http.delete(base(firm, candidate) + `/inbox-content${message ? `?message_id=${encodeURIComponent(message)}` : ""}`, BackendInboxSchema)),
-  byCandidate: async (firmId: string, candidateId: string, messageId?: string, offset = 0): Promise<CandidateInbox> => isLive("inbox")
-    ? toCandidateInbox(await http.get(base(firmId, candidateId) + `/inbox${offset || messageId ? `?offset=${offset}${messageId ? `&message_id=${encodeURIComponent(messageId)}` : ""}` : ""}`, BackendInboxSchema))
+  cancelConfirmation: async (firm: string, candidate: string, attempt: string) => http.delete(base(firm, candidate) + `/mailbox/confirm/${encodeURIComponent(attempt)}`, z.object({cleanup_pending: z.boolean()})),
+  deleteContent: async (firm: string, candidate: string, message?: string, disconnect = false) => toCandidateInbox(await http.delete(base(firm, candidate) + "/inbox-content", BackendInboxSchema, {query: {message_id: message, disconnect}})),
+  byCandidate: async (firmId: string, candidateId: string, messageId?: string, cursor?: string | null): Promise<CandidateInbox> => isLive("inbox")
+    ? toCandidateInbox(await http.get(base(firmId, candidateId) + "/inbox", BackendInboxSchema, {query: {message_id: messageId, cursor}}))
     : (await mock()).byCandidate(firmId, candidateId),
   connect: async (firmId: string, candidateId: string, returnTo = "/"): Promise<string | CandidateInbox> => isLive("inbox")
     ? (await http.post(base(firmId, candidateId) + "/mailbox/oauth", AuthorizationSchema, { body: { return_to: returnTo } })).authorization_url

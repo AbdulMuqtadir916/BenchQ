@@ -11,7 +11,7 @@ from backend.inbox import gmail_sync as gmail
 from backend.inbox.google_oauth import decrypt_secret
 from backend.models.candidates import CandidateMailbox
 from backend.models.db import SessionLocal, utcnow
-from backend.models.tenancy import Firm
+from backend.models.tenancy import Firm, LedgerEntry
 
 
 class ConnectionChanged(Exception):
@@ -38,7 +38,10 @@ def run_import(firm_id, candidate_id, generation):
             address=mailbox.address, history_id=mailbox.history_id, token=mailbox.refresh_token_ciphertext)
         db.commit()
 
+    imported_total = 0
+
     def save(batch, *, checkpoint=None, complete=False):
+        nonlocal imported_total
         with SessionLocal() as db:
             current = scoped(db, CandidateMailbox, firm_id).filter_by(id=snapshot.id).with_for_update().first()
             firm = db.get(Firm, firm_id)
@@ -57,11 +60,18 @@ def run_import(firm_id, candidate_id, generation):
                 current.sync_state = 'IDLE'
                 current.sync_job_id = None
                 current.sync_lease_until = None
-            if inserted:
-                record_automated(db, actor_type='SYSTEM', actor_name='Gmail sync', action='CREATE',
-                    entity_type='email', entity_id=current.id, entity_label='Candidate inbox',
-                    summary=f'Imported {inserted} candidate emails.', firm_id=firm_id, candidate_id=candidate_id)
+            total = imported_total + inserted
+            if total:
+                entry = scoped(db, LedgerEntry, firm_id).filter_by(entity_type='email', entity_id=str(job_id)).first()
+                summary = f'Imported {total} candidate emails.' if complete else f'Partial import: saved {total} candidate emails; job not completed.'
+                if entry:
+                    entry.summary = summary
+                else:
+                    record_automated(db, actor_type='SYSTEM', actor_name='Gmail sync', action='CREATE',
+                        entity_type='email', entity_id=job_id, entity_label='Candidate inbox',
+                        summary=summary, firm_id=firm_id, candidate_id=candidate_id)
             db.commit()
+            imported_total = total
             return inserted
 
     count = 0

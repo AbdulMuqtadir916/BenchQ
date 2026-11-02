@@ -54,3 +54,25 @@ describe("candidate Gmail adapter", () => {
     expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
   });
 });
+
+describe("PR104 follow-up contracts", () => {
+  it("passes the stable cursor and maps total/end state", async () => {
+    reply({...inbox, next_cursor:"next-page", total_count:350});
+    const {inboxApi} = await import("./inbox");
+    const result = await inboxApi.byCandidate("firm-a","candidate-a",undefined,"opaque+/=");
+    expect(fetchMock.mock.calls[0][0]).toContain("cursor=opaque%2B%2F%3D");
+    expect(result).toMatchObject({nextCursor:"next-page",totalCount:350});
+  });
+  it("cancels a scoped confirmation and surfaces pending cleanup", async () => {
+    reply({cleanup_pending:true});
+    const {inboxApi} = await import("./inbox");
+    expect(await inboxApi.cancelConfirmation("firm-a","candidate-a","attempt")).toEqual({cleanup_pending:true});
+    expect(fetchMock.mock.calls[0][1].method).toBe("DELETE");
+  });
+  it("explicitly requests disconnect-and-delete", async () => {
+    reply({...inbox,messages:[]});
+    const {inboxApi} = await import("./inbox");
+    await inboxApi.deleteContent("firm-a","candidate-a",undefined,true);
+    expect(fetchMock.mock.calls[0][0]).toContain("disconnect=true");
+  });
+});

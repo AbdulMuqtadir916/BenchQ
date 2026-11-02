@@ -143,7 +143,7 @@ read retry, retained mail and stable list identity during selection. No live Goo
 changes were used. An earlier full run exposed a pending-consent test fixture interfering with the independent
 0009 history guard; that fixture was corrected and the final full run above passed. Latest main `a1c7a92` is included.
 
-Implementation and local verification are complete for this PR slice. Google verification/security assessment,
+The c98538d checks above validate only that earlier correction. Abdul subsequently identified additional blockers; see the follow-up section below. Do not treat this older completion statement as current merge readiness. Google verification/security assessment,
 production worker topology and Abdul's product/code-owner sign-off remain open rollout/merge gates. Candidate Gmail
 remains disabled by default, and PR 3 matching/classification decisions remain separate.
 
@@ -189,3 +189,113 @@ remains disabled by default, and PR 3 matching/classification decisions remain s
 - `src/lib/schemas/inbox.ts`
 
 The additional QA navigation shim mirrors Next’s History API integration; browser tests cover URL filters and confirmation dismissal. The 0009 test changes only its independent fixture cleanup, not the merged migration or history-protection assertion.
+
+
+## Follow-up to Abdul's c98538d review (2026-11-02)
+
+Local work only: not pushed, no new PR, no merge. Worktree `/private/tmp/benchq-pr104-review` preserves the
+combined dirty development folder. Main `a1c7a92` was fetched and is included. The root `pr104_plan.md` and
+`prstatus.md` record the detailed decisions/checklist; Samad's choices are distinguished from Abdul's pending
+code-owner/contract approvals. Required review remains; no promise of zero unknown bugs or Google approval.
+
+### Resulting behavior
+
+- Confirmation can be cancelled or restarted after expiry; cleanup persists failed encrypted grants for scheduled
+  retry, protects active grants, and also handles issued-token/identity-lookup failures.
+- A short nonblocking global grant-operation advisory lock prevents exchange/activation/revoke races. Busy
+  operations return a retryable error. Google revokes project-wide grants, so this intentionally trades concurrent
+  OAuth throughput for safety; it does not lock mailbox rows across provider calls or block ordinary Inbox reads.
+- ERROR retains ownership and has Disconnect. Reassignment does not disconnect a candidate mailbox; former BDE
+  cannot access it or finish confirmation. Candidate-linked ledger history follows current assignment instead of
+  continuing to expose the original actor's old candidates. No historical attribution is guessed for unlinked rows.
+- Stable cursor paging/infinite cache preserves older pages and independent selected-email bodies across refresh.
+- Callback errors return to a trusted destination or an explanatory root screen; no silent redirect or raw JSON.
+- Each import job has one ledger record, updated with committed counts; a worker crash leaves a truthful partial
+  count. This is an explicit mutable job-summary record, not a new ledger row for each batch.
+- Connection confirmation survives in the existing ledger with actor/candidate/address/time/notice version.
+  Platform audit/support cannot read message content, sender or attestation email address.
+- Owner/Manager deletion uses a proper candidate/count dialog outside the everyday toolbar. Bulk defaults to
+  Disconnect and delete; stored-only remains available. In-flight results are fenced, tombstones prevent repeat
+  import, erasure runs as a SQL update rather than loading every full body, and current delete authority is checked
+  again after Google I/O. Google revoke failure cannot prevent local erasure; warnings remain visible even with an
+  empty Inbox. Gmail originals, application statuses and minimal history/connection evidence remain.
+- External classification, automatic status changes and real-candidate rollout remain gated; no classifier,
+  quarantine table, sender approval table, status migration or new database column is added by this follow-up.
+
+### Per-file follow-up inventory
+
+| File | Change and reason |
+|---|---|
+| `backend/api/routes_inbox.py` | Cursor/total response, selected lookup, operational-only support response, guarded pending grant cleanup/cancel, generic global collision, durable consent, ERROR disconnect and fenced SQL erasure with fresh authorization. |
+| `backend/inbox/google_oauth.py` | Preserve issued grants when identity lookup fails; bounded authenticated identity recovery for cleanup without logging tokens. |
+| `backend/inbox/sync_jobs.py` | Update one candidate-scoped SYSTEM result per job with committed total/partial progress. |
+| `backend/scheduler.py` | Retry expired encrypted grant cleanup independently of browser callbacks. |
+| `backend/main.py` | Preserve safe validated callback destinations and fallback error message. |
+| `backend/auth/access.py` | Register cancellation in central access policy. |
+| `backend/api/routes_ledger.py` | Current-candidate BDE audit scope and support redaction. |
+| `backend/api/routes_admin.py` | Prevent platform audit from exposing connection addresses. |
+| `backend/auth/serialize.py` | Redacted email audit summary/note option and existing candidate_id relation in transport. |
+| `backend/tests/isolation_cases.py` | F7 cancellation route coverage. |
+| `backend/tests/test_pr104_followup.py` | Reproduce review blockers, grant outages/races, ownership/assignment, stable cursors, deletion/fresh permissions and platform audit privacy. |
+| `backend/tests/test_candidate_mailbox.py` | Support acceptance now requires no email rows/metadata while authorized candidate reader retains content access. |
+| `backend/tests/test_candidate_google_oauth.py` | Issued token survives failed identity lookup for cleanup and is absent from error messages. |
+| `backend/tests/test_scheduler_configure.py` | Grant cleanup remains scheduled even with Inbox polling disabled. |
+| `backend/tests/test_ledger.py` | Contract shape and history-follows-assignment expectations explicitly updated. |
+| `backend/tests/test_firm_scoping_lint.py` | Narrow reasons for internal global grant safety probes and scheduled cleanup; not general user access. |
+| `src/lib/api/inbox.ts` | Cancel, cursor reads and explicit disconnect-and-delete request. |
+| `src/lib/api/dto/inbox.ts` | Map cursor/end and total count at the adapter boundary. |
+| `src/lib/schemas/inbox.ts` | Compatible nextCursor/totalCount UI contract. |
+| `src/lib/hooks/use-inbox.ts` | Infinite page-aware cache, independent bodies, cancellation, safe mutation invalidation and inaccessible-body cache removal. |
+| `src/lib/hooks/inbox-pagination.test.ts` | Real TanStack observer proves loaded pages survive refetch and reach an end state. |
+| `src/lib/api/inbox.test.ts` | Cursor encoding, cleanup result and deletion-mode contracts. |
+| `src/components/app/candidate/inbox/inbox-tab.tsx` | Cancel/expiry components, retained pagination/selection, ERROR disconnect, storage controls, empty-Inbox revocation warning. |
+| `src/components/app/candidate/inbox/mailbox-confirmation.tsx` | Focused confirmation/cancel/restart UI with truthful retry errors. |
+| `src/components/app/candidate/inbox/inbox-content-dialog.tsx` | Accessible existing dialog primitive, named candidate/count, irreversible local deletion, disconnect default and retained-audit disclosure. |
+| `src/components/app/candidate/inbox/inbox-connect.tsx` | Ongoing-import/storage/readers/disabled-AI disclosure and clear stale confirmation parameter before new OAuth. |
+| `src/app/page.tsx` | Parse fallback callback result through installed Next async searchParams API. |
+| `src/components/routes/landing-mailbox.test.ts` | Render the actual root fallback and prove its failure/continue UI and strict query parsing. |
+| `src/components/routes/landing.tsx` | Display failed connection before deliberate continue to the normal landing destination. |
+| `src/lib/schemas/analytics.ts` | Optional existing candidate relation for ledger ownership checks; no new persistence. |
+| `src/lib/api/dto/session.ts` | Map ledger candidate relation without leaking backend shape. |
+| `src/lib/auth/policy.ts` | Frontend ledger scope mirrors current-candidate backend rule. |
+| `src/lib/auth/permissions.test.ts` | Old actor loses moved candidate; current BDE sees prior candidate history. |
+| `src/mocks/inbox.ts` | Include neutral cursor for disconnected fixture compatibility. |
+| `scripts/qa/candidate-gmail/harness.tsx` | Synthetic cache-refetch hook to exercise real page retention. |
+| `scripts/qa/candidate-gmail/verify.py` | Cancel/expiry/ERROR recovery, older-page selection after refresh, dialog accessibility and revoke-failure warning after bulk deletion; all provider traffic synthetic. |
+| `docs/02-DATA-CONTRACTS.md` | Exact revised proposed contracts, retention/readability, ownership, transport, audit and rollout decisions. |
+| `docs/team/samad.md` | Updated two-PR sequence and conditional automation approval; remove obsolete contradictory policy. |
+| `docs/integration/01-ledger.md` | Explicit proposed assignment/attestation/support privacy contract amendment. |
+| `docs/team/pr-changes/codex-candidate-gmail-connection.md` | This inventory/evidence; supersedes old completion claim. |
+| `pr104_plan.md`, `prstatus.md` | Decisions, execution evidence and honest approval/rollout gates. |
+
+### Verification log (follow-up)
+
+- New baseline regressions: **10 failed, 1 passed**, exposing actual defects before fixes.
+- Focused backend verification before final cursor/SQL-erasure hardening: **224 passed**, one existing warning;
+  includes F7 isolation, scoping lint, OAuth, mailbox, reassignment/audit and provider failures.
+- Final frontend: **572 passed (46 files)**; typecheck and ESLint pass on installed Node 22.23.4 tools.
+- Production `next build --webpack` passes, retaining the existing CSS `::highlight` warning. The machine's pnpm
+  executable stalled before output; installed Node-based tools were invoked directly. No dependency/config change.
+- Browser acceptance passes on synthetic mail/provider responses: both themes, 1440/1024/390, reduced motion,
+  keyboard, axe zero, no page errors; stable list selection, cursor older pages/refetch, confirmation cancel/expiry,
+  ERROR disconnect, proper delete dialog and revoke warning even after all local mail is erased.
+- Full backend: **3,767 passed**, 11 skipped, 54 live deselected, 13 existing expected failures, 6 existing
+  warnings (1,000.29s). Final hardening/isolation after the last production changes: **243 passed**. The expanded
+  follow-up regression module then passed **34 cases**, including 300-message import, concurrent reads, durable
+  reconnect attestation, interrupted-worker recovery, deletion during fetch and callback failures. These runs
+  overlap; do not add their counts. All exit codes were zero. Logs: `/private/tmp/pr104-final-backend.log`,
+  `/private/tmp/pr104-hardening-final.log`, `/private/tmp/pr104-verified-regressions.log`.
+- Final frontend/type/lint logs: `/private/tmp/pr104-completed-frontend.log`, `pr104-completed-types.log`,
+  `pr104-completed-lint.log`; production/browser logs: `pr104-pagination-build.log`, `pr104-pagination-ui.log`.
+- Diff whitespace/credential-pattern checks passed. No model/migration or dependency files changed in this follow-up.
+- No real Google/model calls, main merge, PR comments/push, or existing application database changes.
+
+### Remaining sign-off/launch limits
+
+Abdul must sign off the exact global mailbox reservation policy, revised read/empty-sync audits, current-candidate
+ledger permission/transport amendment, and proposed endpoint/consent changes. Approval was not invented by checking
+local tests. Candidate Gmail stays disabled by default. Google requires a named verification/security-assessment
+owner, legacy Google project-isolation check and policy confirmation for delegated reading; provider logging/retention approval and recoverable purge/data
+provenance remain later launch requirements. The post-#104 plan must also explicitly settle provider re-import when
+an address is reused for a different candidate; retained records themselves never move candidates/firms. Legacy
+mock application/UI integration remains the later tracks; this PR does not rewrite all mock modules.

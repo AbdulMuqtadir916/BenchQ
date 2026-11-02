@@ -21,7 +21,7 @@ Agreed with Samad on 2026-11-01 for separating the existing combined Inbox/Appli
    - PR 3: Email classification — application matching, confidence rules, automatic status updates and BDE review
      routing, and its next available migration.
    - Original PR 4: account provenance and deduplication are moved into PR 2 (Samad requested 2026-11-01; Abdul approval pending). Do not raise a duplicate history PR; later hardening is a separate concern only if needed.
-   - PR 5: Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
+   - PR 4 (remaining UI): Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
    Main owns résumé `0008` and Applications `0009` (PR #100). PR 2 claims `0010`. Claim later migration numbers
    individually after checking the latest Alembic head on `main`; do not reserve numbers from the old combined branch.
    Include dependencies needed for each PR to work independently and explain any necessary scope adjustment.
@@ -44,8 +44,7 @@ The candidate page already has an Inbox tab and an "Inbox" preview on its Overvi
 ### 1.0 Connection and retention proposal — Samad requested; Abdul sign-off pending (2026-11-02)
 
 - The candidate owns the mailbox. An authorized OWNER/MANAGER/BDE starts Google-hosted consent from that
-  candidate’s Inbox, using existing `candidate.edit` plus the shared candidate scope. VIEWER and support views
-  may read stored mail but cannot connect, sync, disconnect or mark it read. No new role checks are introduced.
+  candidate’s Inbox, using existing `candidate.edit` plus the shared candidate scope. VIEWER may read stored mail within existing scope; platform support sees only operational health/counts and cannot connect, sync, disconnect or mark it read. No new role checks are introduced.
 - Request `openid email` and Gmail read-only. Google verifies the selected account address; the UI shows that
   address rather than guessing it from the candidate profile. Complete consent in the browser running the
   initiating BenchQ session; callbacks require that session. BenchQ never accepts a Google password. State is
@@ -109,8 +108,16 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
 
 ### PR 104 review follow-up (2026-11-02)
 
-Samad’s decisions and proposed revised contracts are recorded in docs/02-DATA-CONTRACTS.md under PR 104 review
-corrections. Abdul’s sign-off remains pending. Existing rule: an email suggests a status; a person accepts it.
-Any change to automatic >=0.6 updates is a separate explicit PR 3 product-owner decision, already raised in review.
-The global legacy monitor remains for non-candidate applications only; its candidate-status writers are guarded.
-Candidate Google access is disabled by default until PR 3, Google verification, privacy protections and approval.
+See docs/02-DATA-CONTRACTS.md, PR 104 review corrections, and the root pr104_plan.md/prstatus.md.
+Samad confirmed global one-active-candidate mailbox ownership, ERROR reservation until disconnect, current-BDE
+candidate access with retained data on reassignment, both deletion choices, restricted support metadata and the
+first-read/manual-sync/background audit policy. Items reserved by Abdul remain proposals pending his sign-off.
+No new database columns/tables are added by this follow-up. Durable consent lives in the existing ledger.
+
+Abdul's later replies, supplied in chat, approve automatic updates in principle with the agreed transition
+allowlist; enablement stays OFF until PR 4 merges and Undo is usable. External classification for real mail stays
+OFF until provider retention/logging are verified in writing and consent is updated. These replace the earlier
+unresolved automatic-versus-human acceptance wording; PR 104 itself performs neither classification nor updates.
+After #104 merges, submit the revised contracts/plan, then PR 3 classification, then PR 4 remaining UI. No stacks.
+The global legacy monitor remains for non-candidate applications only; preserve its candidate-status guards.
+Candidate Google access defaults OFF until PR 3 readiness, named Google verification ownership, privacy and approval.

@@ -94,6 +94,7 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/inbox-content": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": Case(body=lambda i: {"return_to": f"/acme/candidates/{i['candidate']}?tab=inbox"}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/sync": Case(),
