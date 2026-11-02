@@ -1,7 +1,7 @@
 # PR 2 — Candidate Gmail connection, sync and retained account identity
 
 Branch: `codex/candidate-gmail-connection` → `main`. Base: `a1c7a92` (includes merged PRs #100, #102 and #103).
-User confirmed minimum account-history protection in this slice; no merge is authorized by publishing this PR.
+Samad requested minimum account-history protection in this slice; no merge is authorized by publishing this PR.
 
 ## Scope
 
@@ -88,8 +88,7 @@ The merged PR #100 application command/response fixes are preserved unchanged.
 
 Configure candidate Google client ID/secret, exact callback origin, and a separately stored Fernet key through
 backend secrets. Enable `inbox` in the frontend live-module list for evaluation. Mock mode uses synthetic fixtures.
-Initial OAuth sync is synchronous and bounded per provider request; provider latency and production scheduler
-execution/topology remain deployment review items. No Gmail sends, deletions, attachment downloads or read changes.
+Initial OAuth hands off to confirmation, then a leased batch import; production scheduler execution/topology remains a deployment review item. No Gmail sends, deletions, attachment downloads or read changes.
 
 Existing stored messages are attributed to their current mailbox during backfill. If mailbox identity was overwritten
 outside this feature, investigate that history first; do not invent an original source. New imports retain explicit
@@ -100,3 +99,93 @@ The older combined local development database has a different applied migration 
 upgraded, downgraded or reset. Use a separate database following main for this branch until a data-preserving
 reconciliation is separately approved. Required code-owner approval for auth, model, migration and contract changes
 remains a merge gate. PR 3 starts from updated main only after this PR merges.
+
+
+## Review correction work (2026-11-02)
+
+These changes address Abdul’s review; Samad requested the product direction, and Abdul’s approval remains open.
+The earlier verification above describes the original PR commit. Final correction results are recorded separately
+below; do not treat earlier checks as validation of the corrections.
+
+| Additional/updated file | Review correction |
+|---|---|
+| `backend/inbox/sync_jobs.py` | Persisted lease, generation fencing, provider fetch outside row locks, ten-message batch commits, retry/reconnect state and SYSTEM audit. |
+| `backend/inbox/content_storage.py` | Key-dependent bounded retained body/preview conversion in the unmerged migration; preserves content on reviewed rollback. |
+| `backend/api/routes_inbox.py` | Pending OAuth confirmation, cross-firm identity lock, body-on-selection, pagination, revocation and Owner/Manager audited content erasure preserving review references. |
+| `backend/inbox/gmail_sync.py` | Deleted-message 404 skip, Inbox-label enforcement, invalid-text skip, encrypted body/preview, distinct invalid-grant error. |
+| `backend/inbox/google_oauth.py` | Disabled-by-default rollout gate, key validation/keyring, versioned content crypto and bounded revocation helper. |
+| `backend/models/candidates.py` | Persist job lease/state, pending consent fields, confirmation time and deletion marker on Samad-owned tables. |
+| `backend/migrations/versions/0010_candidate_gmail_connection.py` | Extend unmerged single revision for these fields and retained-content encryption; no merged revision changed. |
+| `backend/config.py`, `backend/.env.example` | Explicit rollout gate and documented keyring. |
+| `backend/main.py` | Startup key validation when enabled; safe browser redirect on callback errors. |
+| `backend/scheduler.py` | Schedule generation-fenced import jobs, including recovery after restart; skip suspended/disconnected/expired connections. |
+| `backend/auth/access.py` | Register confirmation/content-removal routes and restrict confirmation metadata in support views. |
+| `backend/tests/conftest.py` | Synthetic test-only key/enable settings for isolated provider tests. |
+| `backend/tests/isolation_cases.py`, `backend/tests/isolation_support.py`, `backend/tests/test_isolation.py` | New route inventory, pending-attempt canaries and synthetic provider jobs; support-view denial. |
+| `backend/tests/test_candidate_gmail_sync.py`, `backend/tests/test_candidate_google_oauth.py`, `backend/tests/test_candidate_mailbox.py` | Sync errors/filtering, key rotation, consent/replay/current scope, lock-free fetch, disconnect during fetch, saved-batch failure, deletion/history and revocation fallback. |
+| `backend/tests/test_firm_scoping_lint.py` | Narrowly documented global identity collision check. |
+| `backend/tests/test_migration_0010.py` | Clear pending synthetic consent where testing independent rollback guards. |
+| `src/lib/query/keys.ts` | Central tenant-scoped confirmation/body query keys. |
+| `src/lib/schemas/inbox.ts`, `src/lib/api/dto/inbox.ts` | Documented sync state contract mapped through DTO. |
+| `src/lib/api/inbox.ts`, `src/lib/hooks/use-inbox.ts` | Confirmation, body-on-demand, deletion, older-page loading and import/normal polling. |
+| `src/components/app/candidate/inbox/inbox-tab.tsx` | Confirmation with candidate details, importing indicator, independent reader loading, delete confirmation, load more and reconnect errors. |
+| `src/components/app/candidate/inbox/inbox-connect.tsx` | Explain read scope, permitted readers, retained content and deletion; callback message moved to Inbox. |
+| `src/components/app/candidate/overview/inbox-preview.tsx`, `src/components/app/candidate/overview/attention-card.tsx` | Correct disconnected/expired state and reconnect prompt while retaining saved emails. |
+| `docs/02-DATA-CONTRACTS.md`, `docs/team/samad.md` | Record requested decisions, separate PR 3 classification, and leave product-owner approval open. |
+
+Final correction validation: **3748 backend tests passed**, 11 skipped, 54 live tests deselected, 13 existing
+expected failures and 6 existing warnings; **563 frontend tests passed**. Typecheck and full ESLint passed.
+Production build passed with `next build --webpack`; Turbopack could not bind its internal CSS worker port in this
+execution environment. The initial node_modules symlink was replaced with an isolated dependency copy. No product
+build configuration was changed. Browser checks passed: both themes, 1440/1024/390, reduced motion, keyboard,
+zero axe violations/page errors, confirmation details and dismissal, import indicator, content removal, URL filters,
+read retry, retained mail and stable list identity during selection. No live Google/model calls or existing database
+changes were used. An earlier full run exposed a pending-consent test fixture interfering with the independent
+0009 history guard; that fixture was corrected and the final full run above passed. Latest main `a1c7a92` is included.
+
+Implementation and local verification are complete for this PR slice. Google verification/security assessment,
+production worker topology and Abdul's product/code-owner sign-off remain open rollout/merge gates. Candidate Gmail
+remains disabled by default, and PR 3 matching/classification decisions remain separate.
+
+
+### Exact correction file inventory
+
+- `backend/.env.example`
+- `backend/api/routes_inbox.py`
+- `backend/auth/access.py`
+- `backend/config.py`
+- `backend/inbox/content_storage.py`
+- `backend/inbox/gmail_sync.py`
+- `backend/inbox/google_oauth.py`
+- `backend/inbox/sync_jobs.py`
+- `backend/main.py`
+- `backend/migrations/versions/0010_candidate_gmail_connection.py`
+- `backend/models/candidates.py`
+- `backend/scheduler.py`
+- `backend/tests/conftest.py`
+- `backend/tests/isolation_cases.py`
+- `backend/tests/isolation_support.py`
+- `backend/tests/test_candidate_gmail_sync.py`
+- `backend/tests/test_candidate_google_oauth.py`
+- `backend/tests/test_candidate_mailbox.py`
+- `backend/tests/test_firm_scoping_lint.py`
+- `backend/tests/test_isolation.py`
+- `backend/tests/test_migration_0009.py`
+- `backend/tests/test_migration_0010.py`
+- `docs/02-DATA-CONTRACTS.md`
+- `docs/team/pr-changes/codex-candidate-gmail-connection.md`
+- `docs/team/samad.md`
+- `scripts/qa/candidate-gmail/harness.tsx`
+- `scripts/qa/candidate-gmail/next-navigation.ts`
+- `scripts/qa/candidate-gmail/verify.py`
+- `src/components/app/candidate/inbox/inbox-connect.tsx`
+- `src/components/app/candidate/inbox/inbox-tab.tsx`
+- `src/components/app/candidate/overview/attention-card.tsx`
+- `src/components/app/candidate/overview/inbox-preview.tsx`
+- `src/lib/api/dto/inbox.ts`
+- `src/lib/api/inbox.ts`
+- `src/lib/hooks/use-inbox.ts`
+- `src/lib/query/keys.ts`
+- `src/lib/schemas/inbox.ts`
+
+The additional QA navigation shim mirrors Next’s History API integration; browser tests cover URL filters and confirmation dismissal. The 0009 test changes only its independent fixture cleanup, not the merged migration or history-protection assertion.

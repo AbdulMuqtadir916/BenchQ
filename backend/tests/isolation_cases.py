@@ -31,7 +31,7 @@ class Case:
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt"}
 
 
 def _new(prefix: str) -> str:
@@ -92,6 +92,9 @@ CASES: dict[str, Case] = {
 
     # ── Applications (track 03) ──────────────────────────────────────────────
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/inbox-content": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": Case(body=lambda i: {"return_to": f"/acme/candidates/{i['candidate']}?tab=inbox"}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/sync": Case(),
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox": Case(),

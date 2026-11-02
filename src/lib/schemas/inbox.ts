@@ -50,6 +50,7 @@ export const MailboxConnectionSchema = z.object({
   lastSyncedAt: z.string().datetime().nullable(),
   status: z.enum(["CONNECTED", "DISCONNECTED", "ERROR"]).default("CONNECTED"),
   lastSyncError: z.string().nullable().default(null),
+  syncState: z.enum(["IDLE", "QUEUED", "IMPORTING", "FAILED"]).default("IDLE"),
 });
 export type MailboxConnection = z.infer<typeof MailboxConnectionSchema>;
 

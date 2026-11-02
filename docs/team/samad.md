@@ -20,7 +20,7 @@ Agreed with Samad on 2026-11-01 for separating the existing combined Inbox/Appli
    - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection/sync and minimum retained-account identity protection; migration `0010` follows merged `0009`.
    - PR 3: Email classification — application matching, confidence rules, automatic status updates and BDE review
      routing, and its next available migration.
-   - Original PR 4: account provenance and deduplication are moved into PR 2 (user confirmed 2026-11-01). Do not raise a duplicate history PR; later hardening is a separate concern only if needed.
+   - Original PR 4: account provenance and deduplication are moved into PR 2 (Samad requested 2026-11-01; Abdul approval pending). Do not raise a duplicate history PR; later hardening is a separate concern only if needed.
    - PR 5: Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
    Main owns résumé `0008` and Applications `0009` (PR #100). PR 2 claims `0010`. Claim later migration numbers
    individually after checking the latest Alembic head on `main`; do not reserve numbers from the old combined branch.
@@ -41,7 +41,7 @@ The candidate page already has an Inbox tab and an "Inbox" preview on its Overvi
 (`src/mocks/inbox.ts`, `src/lib/schemas/inbox.ts`: `InboxMessage`, `MailboxConnection`). The backend today watches
 **one** Gmail account for the whole app (`backend/email_monitor/`, `POST /api/email/check-now`).
 
-### 1.0 Connection and retention design — user confirmed, PR 2 (2026-11-02)
+### 1.0 Connection and retention proposal — Samad requested; Abdul sign-off pending (2026-11-02)
 
 - The candidate owns the mailbox. An authorized OWNER/MANAGER/BDE starts Google-hosted consent from that
   candidate’s Inbox, using existing `candidate.edit` plus the shared candidate scope. VIEWER and support views
@@ -105,3 +105,12 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
   elsewhere (e.g. on `candidates`)? Ask the owner; for `candidates`, Abdul.
 - Every candidate-owned row carries `candidate_id` and `firm_id`; read through `scoped()`; new routes go in
   `access.py` and `isolation_cases.py`.
+
+
+### PR 104 review follow-up (2026-11-02)
+
+Samad’s decisions and proposed revised contracts are recorded in docs/02-DATA-CONTRACTS.md under PR 104 review
+corrections. Abdul’s sign-off remains pending. Existing rule: an email suggests a status; a person accepts it.
+Any change to automatic >=0.6 updates is a separate explicit PR 3 product-owner decision, already raised in review.
+The global legacy monitor remains for non-candidate applications only; its candidate-status writers are guarded.
+Candidate Google access is disabled by default until PR 3, Google verification, privacy protections and approval.

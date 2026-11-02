@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { useSearchParams } from "next/navigation";
+import { useSession } from "@/lib/stores/session-store";
+import { can } from "@/lib/auth/policy";
 import { Mail, RefreshCw } from "lucide-react";
-import type { InboxMessage, MailSignal } from "@/lib/schemas/inbox";
-import { useDisconnectMailbox, useMarkRead, useSyncMailbox } from "@/lib/hooks/use-inbox";
+import type { InboxMessage } from "@/lib/schemas/inbox";
+import { useMoreInbox, useMailboxConfirmation, useInboxBody, useDeleteInboxContent, useDisconnectMailbox, useMarkRead, useSyncMailbox } from "@/lib/hooks/use-inbox";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
@@ -16,7 +20,8 @@ import type { CandidateActions } from "../candidate-actions";
 import { InboxConnect } from "./inbox-connect";
 import { InboxReader } from "./inbox-reader";
 
-type Filter = "ALL" | "ACTION" | MailSignal;
+const InboxFilter = z.enum(["ALL", "ACTION", "INTERVIEW_SCHEDULED", "SHORTLISTED", "CALL_REQUEST", "OFFER", "REJECTED"]).catch("ALL");
+type Filter = z.infer<typeof InboxFilter>;
 const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: "ALL", label: "All" },
   { id: "ACTION", label: "Needs update" },
@@ -29,8 +34,32 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
 
 /** The candidate's recruiter mail, matched to applications. Connect first if it isn't. */
 export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; selectedId: string | null; onSelect: (id: string) => void }) {
-  const [filter, setFilter] = useState<Filter>("ALL");
+  const params = useSearchParams();
+  const filter = InboxFilter.parse(params.get("inbox_filter") ?? "ALL");
+  const setFilter = (value: Filter) => {
+    const url = new URL(window.location.href);
+    if (value === "ALL") url.searchParams.delete("inbox_filter");
+    else url.searchParams.set("inbox_filter", value);
+    window.history.replaceState(null, "", url.pathname + url.search);
+  };
   const candidate = ws.candidate!;
+  const attempt = params.get("mailbox_confirmation");
+  const confirmation = useMailboxConfirmation(candidate.id, attempt);
+  const deletion = useDeleteInboxContent(candidate.id);
+  const more = useMoreInbox(candidate.id);
+  const principal = useSession(s => s.principal);
+  const canDelete = !!principal && can(principal, "candidate.assign");
+  const [callbackMessage] = useState(() => {
+    const result = params.get("mailbox");
+    return !result ? null : result === "connected" ? "Google account connected." : "Google connection was not completed. Try again.";
+  });
+  useEffect(() => {
+    const result = params.get("mailbox");
+    if (!result) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("mailbox");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, [params]);
   const markRead = useMarkRead(candidate.id);
   const disconnect = useDisconnectMailbox(candidate.id);
   const sync = useSyncMailbox(candidate.id);
@@ -40,7 +69,9 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
     f === "ALL" || (f === "ACTION" ? pendingIds.has(m.id) : m.signal === f || (f === "SHORTLISTED" && m.signal === "ASSESSMENT"));
   const list = ws.messages.filter((m) => inFilter(filter, m));
   const count = (f: Filter) => ws.messages.filter((m) => inFilter(f, m)).length;
-  const selected = ws.messages.find((m) => m.id === selectedId) ?? list[0] ?? null;
+  const selectedSummary = ws.messages.find((m) => m.id === selectedId) ?? list[0] ?? null;
+  const body = useInboxBody(candidate.id, selectedSummary?.id ?? null);
+  const selected = body.data ?? selectedSummary;
 
   // An email counts as read once it's open in the reader — for someone who works the inbox. A read-only
   // reader (a VIEWER, a support view) leaves the firm's unread state as it is.
@@ -58,20 +89,41 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
 
   if (ws.inboxQuery.error) return <ErrorState error={ws.inboxQuery.error} onRetry={() => void ws.inboxQuery.refetch()} />;
   if (ws.inboxQuery.isLoading) return <SkeletonList rows={6} />;
+  if (attempt) return <div className="space-y-3">
+    <h2 className="text-h3">Confirm candidate mailbox</h2>
+    <p>{candidate.fullName} · {candidate.email} · {candidate.primaryRole}</p>
+    {confirmation.details.isPending ? <p role="status">Loading Google address…</p> : null}
+    {confirmation.details.data ? <p>Selected Google address: {confirmation.details.data.address}</p> : null}
+    <p>Confirm this is the intended mailbox for this candidate. The profile email may differ. You confirm the account owner authorized this connection.</p>
+    {confirmation.details.error ? <ErrorState error={confirmation.details.error} onRetry={() => void confirmation.details.refetch()} /> : null}
+    {confirmation.confirm.error ? <ErrorState error={confirmation.confirm.error} onRetry={() => confirmation.confirm.mutate()} /> : null}
+    <Button disabled={!confirmation.details.data || confirmation.confirm.isPending} onClick={() => confirmation.confirm.mutate(undefined, {onSuccess: () => {
+      const url = new URL(window.location.href); url.searchParams.delete("mailbox_confirmation");
+      window.history.replaceState(null, "", url.pathname + url.search);
+    }})}>Confirm mailbox</Button>
+  </div>;
   if (!connected && ws.messages.length === 0) {
     return canAct ? (
-      <InboxConnect candidate={candidate} />
+      <>
+        {ws.inbox?.connection?.status === "ERROR" ? <p role="alert">Reconnect required: Google access expired.</p> : null}
+        <InboxConnect candidate={candidate} />
+      </>
     ) : (
-      <EmptyState icon={Mail} title="Inbox not connected" description="A recruiter on this candidate can connect their Google account." />
+      <EmptyState icon={Mail} title={ws.inbox?.connection?.status === "ERROR" ? "Reconnect required" : "Inbox not connected"} description="A recruiter on this candidate can connect their Google account." />
     );
   }
 
   return (
     <div className="space-y-3">
+      {callbackMessage ? <p role="status">{callbackMessage}</p> : null}
+      {["QUEUED", "IMPORTING"].includes(ws.inbox?.connection?.syncState ?? "") ? <p role="status">Importing emails… You can continue using BenchQ.</p> : null}
+      {canDelete ? <Button variant="ghost" onClick={() => {if (window.confirm("Delete all retained email content for this candidate from BenchQ? Gmail originals remain unchanged.")) deletion.mutate(undefined);}}>Delete retained emails</Button> : null}
+      {canDelete && selected ? <Button variant="ghost" onClick={() => {if (window.confirm("Delete this email content from BenchQ? Gmail original remains unchanged.")) deletion.mutate(selected.id);}}>Delete selected email</Button> : null}
+      {deletion.error ? <ErrorState error={deletion.error} onRetry={() => deletion.reset()} /> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-sm text-[var(--color-text-3)]">
           <span aria-hidden className="inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-info-bg)] text-[var(--color-info-fg)]"><Mail size={13} /></span>
-          {connected ? <><span className="text-body-strong text-[var(--color-text)]">{ws.inbox?.connection?.address}</span> · synced {ws.inbox?.connection?.lastSyncedAt ? formatRelative(ws.inbox.connection.lastSyncedAt) : "not yet"}</> : "Mailbox disconnected · imported email retained"}
+          {connected ? <><span className="text-body-strong text-[var(--color-text)]">{ws.inbox?.connection?.address}</span> · synced {ws.inbox?.connection?.lastSyncedAt ? formatRelative(ws.inbox.connection.lastSyncedAt) : "not yet"}</> : ws.inbox?.connection?.status === "ERROR" ? "Reconnect required · imported email retained" : "Mailbox disconnected · imported email retained"}
         </p>
         <div className="flex items-center gap-1.5">
           {connected && canAct ? <Button size="sm" variant="secondary" onClick={() => sync.mutate()} disabled={sync.isPending}>
@@ -133,6 +185,8 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
           })}
         </ul>
         <div className="min-h-[24rem] min-w-0">
+          {body.isFetching ? <p role="status">Loading email…</p> : null}
+          {body.error ? <ErrorState error={body.error} onRetry={() => void body.refetch()} /> : null}
           <InboxReader
             message={selected}
             application={ws.applications.find((a) => a.id === selected?.applicationId)}
@@ -142,6 +196,8 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
           />
         </div>
       </div>
+      <Button variant="secondary" disabled={more.isPending} onClick={() => more.mutate(ws.messages.length)}>Load more</Button>
+      {more.error ? <ErrorState error={more.error} onRetry={() => more.mutate(ws.messages.length)} /> : null}
     </div>
   );
 }

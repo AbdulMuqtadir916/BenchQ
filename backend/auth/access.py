@@ -85,6 +85,9 @@ ROUTE_ACCESS: dict[str, Access] = {
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox": F,
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/read": F,
     "GET /api/oauth/google/callback": S,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": F,
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/inbox-content": F,
     "GET /api/applications": F,
     "GET /api/applications/{app_id}": F,
     "PATCH /api/applications/{app_id}/candidate-status": F,
@@ -216,6 +219,7 @@ ROUTE_ACCESS: dict[str, Access] = {
 
 # FIRM GETs a support view may not use: they act rather than read. A view never exports a resume (07 §4).
 SUPPORT_VIEW_REFUSED: frozenset[str] = frozenset({
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}",
     "GET /api/resumes/{resume_id}/pdf",
     "GET /api/cover-letters/{cl_id}/pdf",
 })

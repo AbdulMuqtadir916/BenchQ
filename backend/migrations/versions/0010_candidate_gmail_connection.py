@@ -13,6 +13,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.add_column("candidate_mailboxes", sa.Column("sync_job_id", sa.UUID(), nullable=True))
+    op.add_column("candidate_mailboxes", sa.Column("sync_lease_until", sa.DateTime(timezone=True), nullable=True))
+    op.add_column("candidate_mailboxes", sa.Column("sync_state", sa.String(), server_default="IDLE", nullable=False))
+    op.add_column("inbox_messages", sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("candidate_mailboxes", sa.Column("refresh_token_ciphertext", sa.LargeBinary(), nullable=True))
     op.add_column("candidate_mailboxes", sa.Column("history_id", sa.String(), nullable=True))
     op.add_column("candidate_mailboxes", sa.Column("initial_sync_complete", sa.Boolean(), server_default=sa.text("false"), nullable=False))
@@ -24,6 +28,9 @@ def upgrade() -> None:
         sa.Column("firm_id", sa.UUID(), nullable=False),
         sa.Column("candidate_id", sa.UUID(), nullable=False),
         sa.Column("initiated_by_user_id", sa.UUID(), nullable=False),
+        sa.Column("pending_address", sa.String(), nullable=True),
+        sa.Column("pending_token_ciphertext", sa.LargeBinary(), nullable=True),
+        sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("code_verifier_ciphertext", sa.LargeBinary(), nullable=False),
         sa.Column("return_to", sa.String(length=500), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
@@ -44,10 +51,13 @@ def upgrade() -> None:
     op.create_unique_constraint('uq_inbox_messages_mailbox_message', 'inbox_messages',
                                 ['mailbox_id', 'source_address', 'provider_message_id'])
 
+    from backend.inbox.content_storage import convert_retained_content
+    convert_retained_content(op.get_bind(), encrypt=True)
+
 
 def downgrade() -> None:
     if op.get_bind().execute(sa.text("SELECT EXISTS (SELECT 1 FROM candidate_google_oauth_attempts "
-            "WHERE consumed_at IS NULL AND expires_at > now())")).scalar():
+            "WHERE (consumed_at IS NULL OR pending_token_ciphertext IS NOT NULL) AND expires_at > now())")).scalar():
         raise RuntimeError("Wait for active OAuth attempts to expire before downgrading 0010.")
     if op.get_bind().execute(sa.text("SELECT EXISTS (SELECT 1 FROM inbox_messages m "
             "JOIN candidate_mailboxes b ON b.id=m.mailbox_id "
@@ -61,6 +71,8 @@ def downgrade() -> None:
     bind = op.get_bind()
     if bind.execute(sa.text("SELECT count(*) FROM candidate_mailboxes WHERE refresh_token_ciphertext IS NOT NULL")).scalar():
         raise RuntimeError("Disconnect candidate mailboxes before downgrading 0010; this migration stores live credentials.")
+    from backend.inbox.content_storage import convert_retained_content
+    convert_retained_content(op.get_bind(), encrypt=False)
     op.drop_index("ix_candidate_google_oauth_attempts_candidate_id", table_name="candidate_google_oauth_attempts")
     op.drop_index("ix_candidate_google_oauth_attempts_firm_id", table_name="candidate_google_oauth_attempts")
     op.drop_table("candidate_google_oauth_attempts")
@@ -68,3 +80,7 @@ def downgrade() -> None:
     op.drop_column("candidate_mailboxes", "initial_sync_complete")
     op.drop_column("candidate_mailboxes", "history_id")
     op.drop_column("candidate_mailboxes", "refresh_token_ciphertext")
+    op.drop_column("candidate_mailboxes", "sync_state")
+    op.drop_column("candidate_mailboxes", "sync_lease_until")
+    op.drop_column("candidate_mailboxes", "sync_job_id")
+    op.drop_column("inbox_messages", "deleted_at")

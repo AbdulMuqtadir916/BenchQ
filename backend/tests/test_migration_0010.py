@@ -13,6 +13,8 @@ def populated(scratch_db):
     _ok(_alembic(name, 'upgrade', 'head'))
     with Session(engine) as db:
         world = make_world(db, seed_accounts(db))
+        from backend.models.candidates import CandidateGoogleOAuthAttempt
+        db.query(CandidateGoogleOAuthAttempt).delete()
         db.commit()
     return world.a.ids['candidate']
 

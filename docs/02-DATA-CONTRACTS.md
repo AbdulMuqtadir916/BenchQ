@@ -1549,7 +1549,7 @@ export const TimelineEventSchema = z.object({
    anything asserted on a candidate's behalf is a claim, wherever it lives.
 
 
-### Candidate Gmail connection — PR 2 (user-confirmed 2026-11-02)
+### Candidate Gmail connection — PR 2 (Samad requested 2026-11-02; Abdul sign-off pending)
 
 Candidate Inbox imports and displays read-only Google mail. Matching, classification and automatic application
 status changes belong to PR 3. A new import has `signal: null`, `impliedStatus: null` and `scheduledFor: null`;
@@ -1567,3 +1567,35 @@ disabled with interval 0. Imported mail is deduplicated by mailbox, source addre
 Every human action uses existing candidate.edit and candidate scope; viewers/support cannot write. Scheduled
 imports use SYSTEM ledger attribution with candidate_id. Required code-owner contract/auth/schema review remains
 pending before merge. No new role rules or live Google secrets are embedded in the UI.
+
+
+### PR 104 review corrections — proposed for Abdul’s approval (2026-11-02)
+
+Samad requested these changes; product-owner sign-off is pending, not implied by this document.
+Candidate Gmail is disabled by default (`CANDIDATE_GMAIL_ENABLED=false`) until PR 3 matching/BDE review,
+Google verification, privacy acceptance and owner approval. PR 104 imports and stores unclassified Inbox mail
+only in synthetic development acceptance. It never writes application statuses. PR 3's requested >=0.6 automatic
+status policy remains an explicit product decision for Abdul; the existing human-acceptance rule is unchanged here.
+
+OAuth callback stores an encrypted pending grant for ten minutes and redirects to a candidate/Google-address
+confirmation. Only its initiating user with current candidate.edit authority may confirm. Profile and Google emails
+may differ. One active Google address across firms is enforced under a global identity lock without revealing another
+firm. Actor, candidate, verified address, time and confirmation are retained in OAuth/mailbox/ledger records.
+
+Connection sync_state is IDLE, QUEUED, IMPORTING or FAILED; status ERROR means authorization requires reconnect.
+Imports persist ten-message batches outside provider-call row locks and use a job lease and connection generation.
+Disconnect invalidates jobs before revocation; failed revocation still removes credentials and exposes manual instructions.
+Bodies and snippets use versioned encrypted storage with a comma-separated Fernet keyring (newest key first).
+The unmerged 0010 migration encrypts existing retained text with the deployment key and decrypts on safe downgrade;
+a missing key fails rather than discarding text. No existing development database was migrated during these corrections.
+
+List responses omit full bodies. Selecting message_id returns that message's body; support views receive neither
+bodies nor previews. Offset/limit pages provide older messages. Owner/Manager deletion erases retained body, preview,
+subject, sender and thread content, marks the message deleted and excludes it from reading. Minimal ID/provider/source
+references remain to preserve immutable application reviews and prevent re-import. Gmail originals are untouched.
+Deletion is audited without subject/body. BDE, Viewer and Super Admin cannot delete content. Retention has no automatic
+expiry; the candidate can request deletion. Reads and empty manual sync requests remain audited per Samad’s decision.
+
+PR 3 scope: uniquely job-matched mail goes to its application, actionable unmatched mail stays in BDE review until
+matched, and Other content is removed only after BDE confirmation. No classification or Other handling is added here.
+Google Cloud project owner owns submission/security-assessment coordination before real-candidate rollout.

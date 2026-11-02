@@ -15,6 +15,7 @@ ROUTE_FILES = sorted((BACKEND / "api").glob("routes_*.py")) + [BACKEND / "main.p
 
 # (file, function) -> why it may query a firm-owned model without `scoped()`.
 ALLOWED = {
+    ("routes_inbox.py", "confirm_mailbox"): "global mailbox identity uniqueness; refuses without revealing the other tenant",
     ("routes_inbox.py", "candidate_google_oauth_callback"): "opaque one-use state, then current user/firm/candidate authorization",
     # Searches are run by the platform (Super Admin routes, F2b); a firm's own searches come with the Jobs track.
     ("routes_searches.py", "list_searches"): "platform route",
@@ -129,6 +130,7 @@ def test_every_allowed_function_exists():
 # Jobs are one shared pool; a firm sees the ones `firm_jobs` links it to (07 Q37), read through `scoped_jobs()`.
 # (file, function) -> why it may query `Job` across the whole pool.
 JOBS_ALLOWED = {
+    ("routes_inbox.py", "confirm_mailbox"): "global mailbox identity uniqueness; refuses without revealing the other tenant",
     # Capture: a posting is looked up in the whole pool first (dedup), then linked to the firm (F2b).
     ("routes_applications.py", "create_application"): "dedup over the pool, then links the job to the firm",
     ("routes_jobs.py", "save_from_extension"): "dedup over the pool, then links the job to the firm",

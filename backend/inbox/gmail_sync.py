@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from email.header import decode_header, make_header
 from email.utils import parseaddr
 from datetime import datetime, timedelta, timezone
@@ -12,12 +13,17 @@ from bs4 import BeautifulSoup
 from sqlalchemy.dialects.postgresql import insert
 
 from backend.config import CANDIDATE_GMAIL_CLIENT_ID, CANDIDATE_GMAIL_CLIENT_SECRET
-from backend.inbox.google_oauth import decrypt_secret
+from backend.inbox.google_oauth import decrypt_secret, encrypt_content
 from backend.models.candidates import CandidateMailbox, InboxMessage
 from backend.models.db import utcnow
 
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 MAX_BODY_CHARS = 100_000
+logger = logging.getLogger(__name__)
+
+
+class ReconnectRequired(RuntimeError):
+    """Google revoked or expired the refresh grant; automatic retry cannot fix it."""
 
 
 def _decode(value: str | None) -> str:
@@ -65,6 +71,12 @@ def _refresh_access_token(refresh_token: str, client: httpx.Client) -> str:
         "grant_type": "refresh_token",
     })
     if response.status_code >= 400:
+        try:
+            error = response.json().get("error")
+        except (ValueError, AttributeError):
+            error = None
+        if error == "invalid_grant":
+            raise ReconnectRequired("Google authorization expired. Reconnect the candidate inbox.")
         raise RuntimeError("Google could not refresh the candidate mailbox connection.")
     token = response.json().get("access_token")
     if not isinstance(token, str) or not token:
@@ -82,7 +94,7 @@ def _api_get(client: httpx.Client, path: str, token: str, params: dict | None = 
 
 
 def _store_message(db, mailbox: CandidateMailbox, token: str, message_id: str, client: httpx.Client,
-                   *, imported_message_ids: list[UUID] | None = None) -> bool:
+                   *, imported_message_ids: list[UUID] | None = None, message_data: dict | None = None) -> bool:
     from sqlalchemy import select
 
     existing = db.execute(select(InboxMessage.id).where(
@@ -93,7 +105,16 @@ def _store_message(db, mailbox: CandidateMailbox, token: str, message_id: str, c
         InboxMessage.provider_message_id == message_id)).first()
     if existing:
         return False
-    data = _api_get(client, f"messages/{message_id}", token, {"format": "full"})
+    try:
+        data = message_data if message_data is not None else _api_get(client, f"messages/{message_id}", token, {"format": "full"})
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            # The message can disappear between listing and fetching it.
+            return False
+        raise
+    labels = set(data.get("labelIds") or [])
+    if "INBOX" not in labels or labels.intersection({"DRAFT", "SPAM", "TRASH"}):
+        return False
     payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
     from_name, from_email = parseaddr(_header(payload, "From"))
     raw_date = data.get("internalDate")
@@ -105,6 +126,11 @@ def _store_message(db, mailbox: CandidateMailbox, token: str, message_id: str, c
     snippet = str(data.get("snippet") or "")[:2000]
     body = _body(payload) or snippet
     thread_id = data.get("threadId")
+    # Postgres text cannot contain NUL; reject only this message rather than
+    # aborting the transaction and repeatedly blocking the mailbox checkpoint.
+    if any("\x00" in value for value in (from_name, from_email, subject, snippet, body, str(thread_id or ""))):
+        logger.warning("Skipping Gmail message containing invalid text for candidate mailbox")
+        return False
     imported_id = db.execute(insert(InboxMessage).values(
         firm_id=mailbox.firm_id,
         candidate_id=mailbox.candidate_id,
@@ -116,8 +142,8 @@ def _store_message(db, mailbox: CandidateMailbox, token: str, message_id: str, c
         from_name=from_name[:320] or from_email[:320] or "Unknown sender",
         from_email=from_email[:320],
         subject=subject[:1000],
-        snippet=snippet,
-        body=body,
+        snippet=encrypt_content(snippet),
+        body=encrypt_content(body),
         received_at=received,
         is_read=False,
     ).on_conflict_do_nothing(constraint="uq_inbox_messages_mailbox_message")
@@ -145,7 +171,7 @@ def sync_mailbox(db, mailbox: CandidateMailbox, *, client: httpx.Client | None =
                 raise RuntimeError("Google returned no Gmail history checkpoint.")
             page_token = None
             while True:
-                params = {"q": "newer_than:3d", "maxResults": 500}
+                params = {"q": "newer_than:3d", "labelIds": "INBOX", "maxResults": 500}
                 if page_token:
                     params["pageToken"] = page_token
                 page = _api_get(http, "messages", token, params)
@@ -197,7 +223,7 @@ def sync_mailbox(db, mailbox: CandidateMailbox, *, client: httpx.Client | None =
             http.close()
 
 
-def record_sync_error(db, firm_id, candidate_id, connected_at):
+def record_sync_error(db, firm_id, candidate_id, connected_at, *, reconnect_required=False):
     """After rollback, record failure only on the connection that actually failed.
 
     A newer reconnect/disconnect must not inherit the old account's diagnostics.
@@ -207,4 +233,8 @@ def record_sync_error(db, firm_id, candidate_id, connected_at):
     mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(
         candidate_id=candidate_id).populate_existing().with_for_update().first()
     if mailbox and mailbox.status == "CONNECTED" and mailbox.connected_at == connected_at:
-        mailbox.last_sync_error = "Gmail sync failed. Retry or reconnect the candidate account."
+        if reconnect_required:
+            mailbox.status = "ERROR"
+            mailbox.last_sync_error = "Google access expired. Reconnect the candidate inbox."
+        else:
+            mailbox.last_sync_error = "Gmail sync failed. Try again."

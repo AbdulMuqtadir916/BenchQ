@@ -55,6 +55,19 @@ async def run():
                     row['is_read'] = True
                     await route.fulfill(json=row)
                 return
+            if '/mailbox/confirm/' in url.path:
+                if request.method == 'GET':
+                    await route.fulfill(json={'address':'selected@example.test'})
+                else:
+                    connection['status'] = 'CONNECTED'
+                    connection['sync_state'] = 'QUEUED'
+                    await route.fulfill(json={'firm_id':'qa-firm','candidate_id':'qa-candidate','connection':connection,'messages':messages})
+                return
+            if url.path.endswith('/inbox-content'):
+                selected = parse_qs(url.query).get('message_id', [None])[0]
+                messages[:] = [row for row in messages if selected and row['id'] != selected]
+                await route.fulfill(json={'firm_id':'qa-firm','candidate_id':'qa-candidate','connection':connection,'messages':messages})
+                return
             if url.path.endswith('/mailbox/oauth'):
                 await route.fulfill(json={'authorization_url':'https://accounts.google.com/o/oauth2/v2/auth?state=synthetic'})
                 return
@@ -73,6 +86,7 @@ async def run():
         await page.goto(BASE, wait_until='networkidle')
         await page.get_by_role('list', name='Emails').wait_for()
         assert await page.get_by_text('Unclassified email', exact=True).count() == 3
+        await page.evaluate("window.qaEmailList = document.querySelector('[aria-label=Emails]')")
         await page.get_by_role('button', name=re.compile('Synthetic email a')).focus()
         await page.keyboard.press('ArrowDown')
         await page.get_by_role('alert').wait_for()
@@ -81,6 +95,7 @@ async def run():
         await page.get_by_role('button', name='Retry').click()
         await page.wait_for_timeout(250)
         assert reads == 2
+        assert await page.evaluate("window.qaEmailList === document.querySelector('[aria-label=Emails]')"), 'selection replaced the email list'
         await page.get_by_text('Synthetic body b', exact=True).wait_for()
         await page.get_by_text('Mailbox: retained-account@example.test', exact=True).wait_for()
         await page.get_by_role('button', name='Sync now').click()
@@ -117,6 +132,28 @@ async def run():
         await page.goto(BASE+'?state=loading', wait_until='domcontentloaded')
         assert await page.get_by_role('list', name='Emails').count() == 0
         await page.get_by_role('list', name='Emails').wait_for()
+        connection['status'] = 'CONNECTED'
+        connection['sync_state'] = 'QUEUED'
+        await page.goto(BASE, wait_until='networkidle')
+        await page.get_by_text('Importing emails… You can continue using BenchQ.', exact=True).wait_for()
+        await page.get_by_role('button', name=re.compile('^Calls')).click()
+        await page.get_by_text('No emails in this view.', exact=True).wait_for()
+        assert 'inbox_filter=CALL_REQUEST' in page.url
+        await page.get_by_role('button', name=re.compile('^All')).click()
+        assert 'inbox_filter' not in page.url
+        await page.goto(BASE+'?mailbox_confirmation=synthetic-attempt', wait_until='networkidle')
+        await page.get_by_text('Confirm candidate mailbox', exact=True).wait_for()
+        await page.get_by_text('Selected Google address: selected@example.test', exact=True).wait_for()
+        assert await page.get_by_text('Synthetic Candidate · profile@example.test · Synthetic Engineer').count() == 1
+        await page.get_by_role('button', name='Confirm mailbox', exact=True).click()
+        await page.wait_for_timeout(300)
+        assert 'mailbox_confirmation' not in page.url
+        assert await page.get_by_role('button', name='Confirm mailbox', exact=True).count() == 0
+        await page.goto(BASE, wait_until='networkidle')
+        page.once('dialog', lambda dialog: dialog.accept())
+        await page.get_by_role('button', name='Delete selected email', exact=True).click()
+        await page.wait_for_timeout(300)
+        assert any(method == 'DELETE' and path.endswith('/inbox-content') for method,path in calls)
         await page.goto(BASE+'?state=empty', wait_until='networkidle')
         await page.get_by_role('button', name='Continue to Google').focus()
         await page.keyboard.press('Enter')

@@ -49,8 +49,27 @@ def oauth(api_client, monkeypatch, candidate, *, address='old-account@example.te
     return state
 
 
+@pytest.fixture(autouse=True)
+def offline_mailbox_provider(monkeypatch):
+    from backend.api import routes_inbox
+    monkeypatch.setattr(routes_inbox, 'revoke_token', lambda *args, **kwargs: True)
+    monkeypatch.setattr(routes_inbox, 'run_import', lambda *args, **kwargs: 0)
+
+
 def callback(client, state):
-    return client.get('/api/oauth/google/callback', params={'state': state, 'code': 'synthetic-code'}, follow_redirects=False)
+    from urllib.parse import urlparse, parse_qs
+    response = client.get('/api/oauth/google/callback', params={'state': state, 'code': 'synthetic-code'}, follow_redirects=False)
+    if response.status_code == 303:
+        query = parse_qs(urlparse(response.headers['location']).query)
+        if 'mailbox_confirmation' in query:
+            from backend.models.db import SessionLocal
+            with SessionLocal() as db:
+                attempt = db.get(CandidateGoogleOAuthAttempt, uuid.UUID(query['mailbox_confirmation'][0]))
+                path = f'/api/firms/{attempt.firm_id}/candidates/{attempt.candidate_id}/mailbox/confirm/{attempt.id}'
+            confirmed = client.post(path)
+            if confirmed.status_code != 200:
+                return confirmed
+    return response
 
 
 def base(candidate):
@@ -65,7 +84,7 @@ def test_oauth_state_is_encrypted_bound_and_one_use(api_client, test_db, account
     assert attempt.code_verifier_ciphertext == b'encrypted-test-value'
     assert attempt.initiated_by_user_id == accounts.user_id
     assert callback(api_client, state).status_code == 303
-    assert callback(api_client, state).status_code == 400
+    assert callback(api_client, state).status_code == 303
     test_db.refresh(attempt)
     assert attempt.consumed_at is not None
     assert attempt.code_verifier_ciphertext == b''
@@ -76,6 +95,23 @@ def test_oauth_state_is_encrypted_bound_and_one_use(api_client, test_db, account
     result = api_client.get(base(candidate) + '/inbox')
     assert result.status_code == 200
     assert 'ciphertext' not in result.text and 'private-refresh-token' not in result.text
+
+
+def test_support_view_cannot_read_email_body_or_snippet(anonymous_client, test_db, accounts, mailbox_case):
+    candidate, _, _, mailbox = mailbox_case
+    email(test_db, mailbox)
+    admin = {'cookie': f'bq_session={accounts.admin_token}'}
+    owner = {'cookie': f'bq_session={accounts.firm_token}'}
+    result = anonymous_client.post('/api/support-views', json={
+        'firm_id': str(candidate.firm_id), 'reason': 'Investigate candidate inbox issue'}, headers=admin)
+    assert result.status_code == 200, result.text
+    response = anonymous_client.get(base(candidate) + '/inbox', headers=admin)
+    assert response.status_code == 200, response.text
+    message = response.json()['messages'][0]
+    assert message['body'] == '' and message['snippet'] == ''
+    response = anonymous_client.get(base(candidate) + '/inbox', params={'message_id': str(test_db.query(InboxMessage).filter_by(mailbox_id=mailbox.id).one().id)}, headers=owner)
+    assert response.status_code == 200, response.text
+    assert response.json()['messages'][0]['body'] == 'Private synthetic body'
 
 
 @pytest.mark.parametrize('stage', ['before', 'after'])
@@ -100,7 +136,7 @@ def test_callback_rechecks_authority_around_provider_exchange(api_client, test_d
             return mailbox.address, 'private-refresh'
         monkeypatch.setattr(routes_inbox, 'exchange_code', exchange)
     result = callback(api_client, state)
-    assert result.status_code == (404 if change == 'reassign' else 403), result.text
+    assert result.status_code == 303 and result.headers['location'] == '/?mailbox=failed', result.text
     test_db.refresh(mailbox)
     assert mailbox.refresh_token_ciphertext == b'original-test-ciphertext'
 
@@ -137,7 +173,7 @@ def test_disconnect_retains_old_mail_and_new_account_has_separate_provider_ids(a
     state = oauth(api_client, monkeypatch, candidate, address='new-account@example.test')
     assert callback(api_client, state).status_code == 303
     test_db.refresh(mailbox)
-    monkeypatch.setattr(gmail_sync, '_api_get', lambda *args: {'threadId': 'same-thread', 'snippet': 'Different message', 'payload': {}})
+    monkeypatch.setattr(gmail_sync, '_api_get', lambda *args: {'labelIds': ['INBOX'], 'threadId': 'same-thread', 'snippet': 'Different message', 'payload': {}})
     assert gmail_sync._store_message(test_db, mailbox, 'token', 'same-provider-id', object())
     assert not gmail_sync._store_message(test_db, mailbox, 'token', 'same-provider-id', object())
     test_db.commit()
@@ -164,7 +200,9 @@ def test_read_disconnect_idempotency_and_safe_audit(api_client, test_db, account
     assert all(message.subject not in row.summary and message.body not in row.summary for row in rows)
     result = api_client.get(base(candidate) + '/inbox').json()
     assert result['connection']['status'] == 'DISCONNECTED'
-    assert result['messages'][0]['body'] == message.body
+    assert result['messages'][0]['body'] == ''
+    detail = api_client.get(base(candidate) + '/inbox', params={'message_id': str(message.id)}).json()
+    assert detail['messages'][0]['body'] == message.body
 
 
 def test_provider_failure_preserves_old_credentials(api_client, test_db, monkeypatch, mailbox_case):
@@ -180,95 +218,111 @@ def test_provider_failure_preserves_old_credentials(api_client, test_db, monkeyp
     assert mailbox.refresh_token_ciphertext == b'original-test-ciphertext'
 
 
-def test_initial_sync_holds_account_lock(api_client, test_db, monkeypatch, mailbox_case):
-    from backend.api import routes_inbox
+@pytest.fixture
+def import_provider(monkeypatch):
+    from backend.inbox import sync_jobs
+    class HTTP:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+    monkeypatch.setattr(sync_jobs.httpx, 'Client', lambda **kwargs: HTTP())
+    monkeypatch.setattr(sync_jobs, 'decrypt_secret', lambda value: 'synthetic')
+    monkeypatch.setattr(sync_jobs.gmail, '_refresh_access_token', lambda *args: 'access')
+    def api(http, path, token, params=None):
+        if path == 'profile': return {'historyId': '1'}
+        if path == 'messages': return {'messages': [{'id': 'message-1'}]}
+        if path == 'history': return {'historyId': '2', 'history': []}
+        return {'labelIds': ['INBOX'], 'snippet': 'Private imported body', 'payload': {}}
+    monkeypatch.setattr(sync_jobs.gmail, '_api_get', api)
+    return sync_jobs, api
+
+
+def test_import_fetch_does_not_hold_mailbox_lock_and_encrypts_content(test_db, mailbox_case, monkeypatch, import_provider):
+    jobs, api = import_provider
     candidate, _, _, mailbox = mailbox_case
-    state = oauth(api_client, monkeypatch, candidate)
-    blocked = []
-    def sync(db, connection, **kwargs):
-        with test_db.get_bind().connect() as other:
-            try: other.execute(text('SELECT id FROM candidate_mailboxes WHERE id=:id FOR UPDATE NOWAIT'), {'id': mailbox.id})
-            except OperationalError:
-                blocked.append(True)
-                other.rollback()
-        return 0
-    monkeypatch.setattr(routes_inbox, 'sync_mailbox', sync)
-    assert callback(api_client, state).status_code == 303
-    assert blocked == [True]
+    def fetch(*args, **kwargs):
+        from backend.models.db import engine
+        with engine.begin() as other:
+            other.execute(text('SELECT id FROM candidate_mailboxes WHERE id=:id FOR UPDATE NOWAIT'), {'id': mailbox.id})
+        return api(*args, **kwargs)
+    monkeypatch.setattr(jobs.gmail, '_api_get', fetch)
+    assert jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at) == 1
+    test_db.expire_all()
+    row = test_db.query(InboxMessage).one()
+    assert row.body.startswith('bqenc1:') and 'Private imported body' not in row.body
+    assert mailbox.sync_state == 'IDLE' and mailbox.history_id == '2'
+    audit = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).one()
+    assert audit.actor_type == 'SYSTEM' and audit.actor_user_id is None
 
 
-def test_failed_sync_cannot_mark_a_new_connection_failed(api_client, test_db, monkeypatch, mailbox_case):
-    from backend.api import routes_inbox
+def test_disconnect_during_fetch_prevents_late_writes(test_db, mailbox_case, monkeypatch, import_provider):
+    jobs, api = import_provider
     candidate, _, _, mailbox = mailbox_case
-    state = oauth(api_client, monkeypatch, candidate)
-    def sync(db, connection, **kwargs):
-        db.rollback()
-        with Session(test_db.get_bind()) as other:
-            row = other.get(CandidateMailbox, mailbox.id)
-            row.address, row.connected_at = 'newer-account@example.test', utcnow()
-            row.last_sync_error = None
-            other.commit()
-        raise RuntimeError('synthetic failure')
-    monkeypatch.setattr(routes_inbox, 'sync_mailbox', sync)
-    assert callback(api_client, state).status_code == 303
-    test_db.refresh(mailbox)
-    assert mailbox.address == 'newer-account@example.test' and mailbox.last_sync_error is None
+    def fetch(http, path, token, params=None):
+        if path.startswith('messages/'):
+            from backend.models.db import SessionLocal
+            with SessionLocal() as other:
+                row = other.get(CandidateMailbox, mailbox.id)
+                row.status = 'DISCONNECTED'
+                row.sync_job_id = None
+                row.refresh_token_ciphertext = None
+                other.commit()
+        return api(http, path, token, params)
+    monkeypatch.setattr(jobs.gmail, '_api_get', fetch)
+    jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at)
+    test_db.expire_all()
+    assert test_db.query(InboxMessage).count() == 0
+    assert mailbox.status == 'DISCONNECTED'
 
 
-def test_manual_sync_imports_without_classifying_or_moving_application(api_client, test_db, monkeypatch, mailbox_case):
-    from backend.api import routes_inbox
-    candidate, _, app, mailbox = mailbox_case
-    def sync(db, connection, **kwargs):
-        email(db, connection)
-        connection.last_synced_at = utcnow()
-        return 1
-    monkeypatch.setattr(routes_inbox, 'sync_mailbox', sync)
-    response = api_client.post(base(candidate) + '/mailbox/sync')
-    assert response.status_code == 200, response.text
-    assert response.json()['imported'] == 1
-    test_db.refresh(app)
-    assert app.status == 'saved'
-    assert test_db.query(ApplicationStatusEvent).filter_by(application_id=app.id).count() == 0
-    assert 'classification' not in response.json()['inbox']['messages'][0]
-
-
-def test_scheduler_audits_imports_as_system_and_skips_suspended_firms(test_db, accounts, monkeypatch, mailbox_case):
+def test_revoked_access_stops_scheduler_retries(test_db, mailbox_case, monkeypatch, import_provider):
+    jobs, _ = import_provider
+    candidate, _, _, mailbox = mailbox_case
+    def expired(*args): raise jobs.gmail.ReconnectRequired('synthetic')
+    monkeypatch.setattr(jobs.gmail, '_refresh_access_token', expired)
+    jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at)
+    test_db.expire_all()
+    assert mailbox.status == 'ERROR' and 'Reconnect' in mailbox.last_sync_error
     from backend import scheduler
-    from backend.inbox import gmail_sync
+    assert scheduler._sync_connected_candidate_mailboxes() == 0
+
+
+def test_scheduler_skips_suspended_firms(test_db, mailbox_case, monkeypatch, import_provider):
+    jobs, _ = import_provider
     candidate, _, _, mailbox = mailbox_case
-    calls = []
-    def sync(db, connection):
-        calls.append(connection.id)
-        return 1
-    monkeypatch.setattr(gmail_sync, 'sync_mailbox', sync)
-    assert scheduler._sync_connected_candidate_mailboxes() == 1
-    row = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).one()
-    assert row.actor_type == 'SYSTEM' and row.actor_user_id is None
     test_db.get(Firm, candidate.firm_id).status = 'SUSPENDED'
     test_db.commit()
+    from backend import scheduler
     assert scheduler._sync_connected_candidate_mailboxes() == 0
-    assert calls == [mailbox.id]
+    assert test_db.query(InboxMessage).count() == 0
 
 
-def test_failed_manual_import_rolls_back_rows_and_checkpoint(api_client, test_db, monkeypatch, mailbox_case):
-    from backend.api import routes_inbox
+def test_failed_import_preserves_saved_batches_without_advancing_checkpoint(test_db, mailbox_case, monkeypatch, import_provider):
+    jobs, api = import_provider
     candidate, _, _, mailbox = mailbox_case
-    original_checkpoint = mailbox.history_id
-    def sync(db, connection, **kwargs):
-        connection.history_id = 'must-roll-back'
-        db.add(InboxMessage(firm_id=connection.firm_id, candidate_id=connection.candidate_id,
-            mailbox_id=connection.id, provider_message_id='partial-import', from_name='Recruiter',
-            from_email='recruiter@example.test', subject='Synthetic partial', snippet='Partial', received_at=utcnow()))
-        db.flush()
-        raise RuntimeError('private-provider-diagnostics')
-    monkeypatch.setattr(routes_inbox, 'sync_mailbox', sync)
-    response = api_client.post(base(candidate) + '/mailbox/sync')
-    assert response.status_code == 502
-    assert 'private-provider-diagnostics' not in response.text
-    test_db.refresh(mailbox)
-    assert mailbox.history_id == original_checkpoint
-    assert mailbox.last_sync_error == 'Gmail sync failed. Retry or reconnect the candidate account.'
-    assert test_db.query(InboxMessage).filter_by(provider_message_id='partial-import').count() == 0
+    def fetch(http, path, token, params=None):
+        if path == 'messages': return {'messages': [{'id': str(i)} for i in range(11)]}
+        if path == 'messages/10': raise RuntimeError('private-provider-detail')
+        return api(http, path, token, params)
+    monkeypatch.setattr(jobs.gmail, '_api_get', fetch)
+    jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at)
+    test_db.expire_all()
+    assert test_db.query(InboxMessage).count() == 10
+    assert mailbox.history_id is None and mailbox.sync_state == 'FAILED'
+    assert mailbox.last_sync_error == 'Sync failed. Try again.'
+
+
+def test_manual_sync_queues_before_background_import(api_client, test_db, monkeypatch, mailbox_case):
+    from backend.api import routes_inbox
+    candidate, _, app, mailbox = mailbox_case
+    calls = []
+    monkeypatch.setattr(routes_inbox, 'run_import', lambda *args: calls.append(args))
+    result = api_client.post(base(candidate) + '/mailbox/sync')
+    assert result.status_code == 200 and result.json()['imported'] == 0
+    assert result.json()['inbox']['connection']['sync_state'] == 'QUEUED'
+    assert len(calls) == 1
+    test_db.refresh(app)
+    assert app.status == 'saved'
+    assert test_db.query(ApplicationStatusEvent).count() == 0
 
 
 def test_expired_checkpoint_retries_only_once(test_db, mailbox_case, monkeypatch):
@@ -288,3 +342,87 @@ def test_expired_checkpoint_retries_only_once(test_db, mailbox_case, monkeypatch
     with pytest.raises(RuntimeError, match='newly-created Gmail history checkpoint'):
         gmail_sync.sync_mailbox(test_db, mailbox, client=object())
     assert history_calls == ['history','history']
+
+
+def test_delete_content_keeps_history_reference_and_prevents_reimport(api_client, test_db, mailbox_case):
+    from backend.models.db import ApplicationReview
+    candidate, _, app, mailbox = mailbox_case
+    message = email(test_db, mailbox, application_id=app.id)
+    review = ApplicationReview(firm_id=candidate.firm_id, candidate_id=candidate.id, application_id=app.id,
+        inbox_message_id=message.id, reason='LOW_CONFIDENCE', application_revision=0)
+    test_db.add(review)
+    test_db.commit()
+    result = api_client.delete(base(candidate) + '/inbox-content', params={'message_id': str(message.id)})
+    assert result.status_code == 200 and result.json()['messages'] == []
+    test_db.refresh(message)
+    test_db.refresh(review)
+    assert message.body is None and message.snippet == '' and message.deleted_at is not None
+    assert review.inbox_message_id == message.id
+    assert message.provider_message_id == 'synthetic-message'
+    assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 1
+
+
+def test_bde_cannot_delete_content(api_client, test_db, accounts, mailbox_case):
+    candidate, _, _, mailbox = mailbox_case
+    message = email(test_db, mailbox)
+    test_db.get(User, accounts.user_id).role = 'BDE'
+    candidate.bde_id = accounts.user_id
+    test_db.commit()
+    assert api_client.delete(base(candidate) + '/inbox-content').status_code == 403
+    test_db.refresh(message)
+    assert message.deleted_at is None and message.body == 'Private synthetic body'
+
+
+def test_disconnect_revoke_failure_is_visible_and_local_credentials_still_removed(api_client, test_db, monkeypatch, mailbox_case):
+    from backend.api import routes_inbox
+    candidate, _, _, mailbox = mailbox_case
+    monkeypatch.setattr(routes_inbox, 'decrypt_secret', lambda value: 'synthetic')
+    monkeypatch.setattr(routes_inbox, 'revoke_token', lambda value: False)
+    result = api_client.delete(base(candidate) + '/mailbox')
+    assert result.status_code == 200
+    test_db.refresh(mailbox)
+    assert mailbox.status == 'DISCONNECTED' and mailbox.refresh_token_ciphertext is None
+    assert 'myaccount.google.com' in mailbox.last_sync_error
+
+
+def test_oauth_requires_explicit_confirmation_before_replacing_credentials(api_client, test_db, monkeypatch, mailbox_case):
+    candidate, _, _, mailbox = mailbox_case
+    state = oauth(api_client, monkeypatch, candidate)
+    old = mailbox.refresh_token_ciphertext
+    result = api_client.get('/api/oauth/google/callback', params={'state': state, 'code': 'synthetic'}, follow_redirects=False)
+    assert result.status_code == 303 and 'mailbox_confirmation=' in result.headers['location']
+    test_db.refresh(mailbox)
+    assert mailbox.refresh_token_ciphertext == old
+    attempt = test_db.query(CandidateGoogleOAuthAttempt).one()
+    assert attempt.pending_address == mailbox.address and attempt.pending_token_ciphertext is not None
+    assert attempt.confirmed_at is None
+    assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 0
+
+
+def test_duplicate_mailbox_confirmation_does_not_reveal_other_candidate(api_client, test_db, accounts, monkeypatch, mailbox_case, jobs_in_default_firm):
+    candidate, _, _, mailbox = mailbox_case
+    from backend.models.candidates import Candidate
+    other = Candidate(firm_id=candidate.firm_id, manager_id=candidate.manager_id, created_by_user_id=accounts.user_id, full_name='Other private candidate', work_auth='H1B', primary_role='Engineer')
+    test_db.add(other)
+    test_db.flush()
+    test_db.add(CandidateMailbox(firm_id=other.firm_id, candidate_id=other.id, address='duplicate@example.test',
+        connected_by_user_id=accounts.user_id, status='CONNECTED'))
+    test_db.commit()
+    state = oauth(api_client, monkeypatch, candidate, address='duplicate@example.test')
+    result = callback(api_client, state)
+    assert result.status_code == 409
+    assert str(other.id) not in result.text
+    test_db.refresh(mailbox)
+    assert mailbox.address == 'old-account@example.test'
+
+
+def test_manager_can_delete_candidate_content(api_client, test_db, accounts, mailbox_case):
+    candidate, _, _, mailbox = mailbox_case
+    row = email(test_db, mailbox)
+    test_db.get(User, accounts.user_id).role = 'MANAGER'
+    candidate.manager_id = accounts.user_id
+    test_db.commit()
+    result = api_client.delete(base(candidate) + '/inbox-content', params={'message_id': str(row.id)})
+    assert result.status_code == 200
+    test_db.refresh(row)
+    assert row.deleted_at is not None

@@ -14,6 +14,7 @@ export const BackendInboxSchema = z.object({
     firm_id: z.string(), candidate_id: z.string(), provider: z.literal("GOOGLE"), address: z.string(),
     connected_at: z.string(), last_synced_at: z.string().nullable(),
     status: z.enum(["CONNECTED", "DISCONNECTED", "ERROR"]), last_sync_error: z.string().nullable(),
+    sync_state: z.enum(["IDLE", "QUEUED", "IMPORTING", "FAILED"]).default("IDLE"),
   }).nullable(), messages: z.array(BackendInboxMessageSchema),
 });
 export function toInboxMessage(dto: z.infer<typeof BackendInboxMessageSchema>): InboxMessage {
@@ -32,7 +33,7 @@ export function toCandidateInbox(dto: z.infer<typeof BackendInboxSchema>): Candi
       firmId: fromBackendId(dto.connection.firm_id), candidateId: fromBackendId(dto.connection.candidate_id),
       provider: dto.connection.provider, address: dto.connection.address, connectedAt: toIso(dto.connection.connected_at),
       lastSyncedAt: toIsoOrNull(dto.connection.last_synced_at), status: dto.connection.status,
-      lastSyncError: dto.connection.last_sync_error,
+      lastSyncError: dto.connection.last_sync_error, syncState: dto.connection.sync_state,
     } : null, messages: dto.messages.map(toInboxMessage),
   });
 }

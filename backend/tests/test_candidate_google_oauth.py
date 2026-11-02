@@ -44,3 +44,23 @@ def test_credential_encryption_roundtrip_and_wrong_key(monkeypatch):
     monkeypatch.setattr(google_oauth, 'CANDIDATE_GMAIL_ENCRYPTION_KEY', Fernet.generate_key().decode())
     with pytest.raises(RuntimeError, match='cannot be decrypted'):
         google_oauth.decrypt_secret(encrypted)
+
+
+def test_rotation_decrypts_old_ciphertext_and_writes_with_new_key(monkeypatch):
+    from cryptography.fernet import Fernet
+    from backend.inbox import google_oauth as oauth
+    old, new = Fernet.generate_key(), Fernet.generate_key()
+    ciphertext = Fernet(old).encrypt(b'private synthetic text')
+    monkeypatch.setattr(oauth, 'CANDIDATE_GMAIL_ENCRYPTION_KEY', new.decode() + ',' + old.decode())
+    assert oauth.decrypt_secret(ciphertext) == 'private synthetic text'
+    assert Fernet(new).decrypt(oauth.encrypt_secret('new synthetic text')) == b'new synthetic text'
+
+
+def test_revoke_is_bounded_and_reports_provider_failure():
+    from backend.inbox.google_oauth import revoke_token
+    class Client:
+        def post(self, url, data):
+            assert url == 'https://oauth2.googleapis.com/revoke'
+            assert data == {'token': 'synthetic'}
+            return type('Response', (), {'status_code': 503})()
+    assert revoke_token('synthetic', client=Client()) is False

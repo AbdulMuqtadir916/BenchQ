@@ -95,8 +95,8 @@ export function AttentionCard({ ws, actions, canAct }: { ws: CandidateWorkspace;
           primary: { label: "Open", onClick: () => actions.openApplication(f.applicationId) },
         };
       }),
-    ...(canAct && ws.inbox && !ws.inbox.connection
-      ? [{ key: "connect", Icon: Mail, tone: "blue" as const, title: `Connect ${first}'s inbox`, detail: "Recruiter replies, shortlists and interviews get tracked automatically", primary: { label: "Connect", onClick: () => actions.openTab("inbox") } }]
+    ...(canAct && ws.inbox && ws.inbox.connection?.status !== "CONNECTED"
+      ? [{ key: "connect", Icon: Mail, tone: "blue" as const, title: `${ws.inbox.connection ? "Reconnect" : "Connect"} ${first}'s inbox`, detail: "Connect the inbox to resume syncing emails", primary: { label: ws.inbox.connection ? "Reconnect" : "Connect", onClick: () => actions.openTab("inbox") } }]
       : []),
     ...ws.expiringDocuments.slice(0, 2).map((d): Item => ({
       key: `doc_${d.id}`,

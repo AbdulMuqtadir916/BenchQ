@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from urllib.parse import urlencode, urlsplit
 
 import httpx
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, MultiFernet, InvalidToken
 
 from backend.config import (CANDIDATE_GMAIL_CLIENT_ID, CANDIDATE_GMAIL_CLIENT_SECRET,
-                            CANDIDATE_GMAIL_ENCRYPTION_KEY, CANDIDATE_GMAIL_REDIRECT_URI)
+                            CANDIDATE_GMAIL_ENCRYPTION_KEY, CANDIDATE_GMAIL_REDIRECT_URI, CANDIDATE_GMAIL_ENABLED)
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -28,6 +28,9 @@ class Authorization:
 
 
 def build_authorization() -> Authorization:
+    if not CANDIDATE_GMAIL_ENABLED:
+        raise RuntimeError("Candidate Gmail is disabled pending rollout approval.")
+    _fernet()
     if not CANDIDATE_GMAIL_CLIENT_ID or not CANDIDATE_GMAIL_REDIRECT_URI:
         raise RuntimeError("Candidate Gmail OAuth is not configured.")
     state = secrets.token_urlsafe(32)
@@ -58,11 +61,11 @@ def validate_return_to(value: str) -> str:
     return value
 
 
-def _fernet() -> Fernet:
+def _fernet() -> MultiFernet:
     if not CANDIDATE_GMAIL_ENCRYPTION_KEY:
         raise RuntimeError("Candidate Gmail encryption is not configured.")
     try:
-        return Fernet(CANDIDATE_GMAIL_ENCRYPTION_KEY.encode("ascii"))
+        return MultiFernet([Fernet(key.strip().encode("ascii")) for key in CANDIDATE_GMAIL_ENCRYPTION_KEY.split(",")])
     except (ValueError, UnicodeEncodeError) as exc:
         raise RuntimeError("Candidate Gmail encryption key is invalid.") from exc
 
@@ -114,4 +117,30 @@ def exchange_code(code: str, verifier: str, *, client: httpx.Client | None = Non
         raise RuntimeError("Google OAuth could not be completed.") from exc
     finally:
         if own_client:
+            http.close()
+
+
+def encrypt_content(value: str) -> str:
+    return "bqenc1:" + encrypt_secret(value).decode("ascii")
+
+
+def decrypt_content(value: str | None) -> str:
+    if not value:
+        return ""
+    if value.startswith("bqenc1:"):
+        return decrypt_secret(value[7:].encode("ascii"))
+    return value  # Legacy retained messages are readable until an explicit conversion.
+
+
+def revoke_token(token: str, *, client=None) -> bool:
+    """Best effort; no token or provider error is logged or sent to the browser."""
+    own = client is None
+    http = client or httpx.Client(timeout=10, follow_redirects=False)
+    try:
+        response = http.post("https://oauth2.googleapis.com/revoke", data={"token": token})
+        return response.status_code == 200
+    except httpx.HTTPError:
+        return False
+    finally:
+        if own:
             http.close()

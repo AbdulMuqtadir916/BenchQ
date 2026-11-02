@@ -205,47 +205,15 @@ async def run_email_check():
         logger.warning(f"Scheduler skipped: {e}")
 
 
-def _sync_connected_candidate_mailboxes() -> int:
-    """Poll connected accounts once across workers; serialize account mutations."""
-    from sqlalchemy import text
-    from backend.auth.scoping import scoped
-    from backend.auth.ledger import record_automated
-    from backend.inbox.gmail_sync import sync_mailbox, record_sync_error
+def _sync_connected_candidate_mailboxes():
+    from backend.inbox.sync_jobs import run_import
     from backend.models.candidates import CandidateMailbox
     from backend.models.tenancy import Firm
-    from backend.models.db import engine
-    lock_key = 7_201_021_009
-    with engine.connect() as lock:
-        if not lock.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": lock_key}).scalar():
-            return 0
-        try:
-            with SessionLocal() as selection:
-                ids = selection.query(CandidateMailbox.firm_id, CandidateMailbox.id).join(
-                    Firm, Firm.id == CandidateMailbox.firm_id).filter(
-                    CandidateMailbox.status == "CONNECTED", CandidateMailbox.refresh_token_ciphertext.isnot(None),
-                    Firm.status != "SUSPENDED").all()
-            completed = 0
-            for firm_id, mailbox_id in ids:
-                with SessionLocal() as db:
-                    mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(id=mailbox_id).populate_existing().with_for_update(skip_locked=True).first()
-                    if mailbox is None or mailbox.status != "CONNECTED" or not mailbox.refresh_token_ciphertext:
-                        continue
-                    candidate_id, generation = mailbox.candidate_id, mailbox.connected_at
-                    try:
-                        imported = sync_mailbox(db, mailbox)
-                        if imported:
-                            record_automated(db, actor_type="SYSTEM", actor_name="Gmail sync", action="CREATE",
-                                entity_type="email", entity_id=mailbox.id, entity_label="Candidate inbox",
-                                summary=f"Imported {imported} candidate emails.", firm_id=firm_id, candidate_id=candidate_id)
-                        db.commit()
-                        completed += 1
-                    except Exception:
-                        db.rollback()
-                        record_sync_error(db, firm_id, candidate_id, generation)
-                        db.commit()
-            return completed
-        finally:
-            lock.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": lock_key})
+    with SessionLocal() as db:
+        work = db.query(CandidateMailbox.firm_id, CandidateMailbox.candidate_id, CandidateMailbox.connected_at).join(
+            Firm, Firm.id == CandidateMailbox.firm_id).filter(CandidateMailbox.status == 'CONNECTED',
+            CandidateMailbox.refresh_token_ciphertext.isnot(None), Firm.status != 'SUSPENDED').all()
+    return sum(run_import(firm, candidate, generation) >= 0 for firm, candidate, generation in work)
 
 
 async def run_candidate_inbox_sync():

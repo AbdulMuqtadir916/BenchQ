@@ -61,6 +61,8 @@ def test_tracking_downgrade_refuses_to_discard_pending_reviews(scratch_db):
     _ok(_alembic(name, "upgrade", "head"))
     with Session(engine) as db:
         make_world(db, seed_accounts(db))
+        from backend.models.candidates import CandidateGoogleOAuthAttempt
+        db.query(CandidateGoogleOAuthAttempt).delete()
         db.commit()
     with engine.connect() as conn:
         count = conn.execute(text("SELECT count(*) FROM application_reviews")).scalar_one()
