@@ -4,6 +4,20 @@
 **Product decisions needed before going live:** D1 (candidate on an application) and D3 (status
 set) in [`06-open-decisions.md`](./06-open-decisions.md). You can build and test the mapper first.
 
+## Applications foundation PR 1 — 2026-11-01
+
+The backend foundation is isolated on `codex/applications-foundation-v2`, based on current `main`.
+Migration 0009 is the only revision included. It adds application revision/freshness fields, review records and
+immutable status events, preserving legacy status/history data. Candidate status commands, review confirmation,
+scoped application reads/edits and history deletion guards are included with tests.
+
+See [the backend contract](../02-DATA-CONTRACTS.md#applications-backend-foundation--pr-1-2026-11-01) and
+[the per-file change report](../team/pr-changes/codex-applications-foundation-v2.md). Code-owner review remains pending.
+The frontend workflow and mapper tasks below describe the original integration track; this foundation PR does not
+switch Applications to live data. Gmail OAuth/import, model classification, account provenance and UI changes are
+separate PRs after their dependencies merge. Candidate Jobs feed integration is also deferred; Saved/favorite
+bookkeeping inside application commands is covered here without changing the Jobs API.
+
 ## Frontend surface
 
 | Kind | Path |

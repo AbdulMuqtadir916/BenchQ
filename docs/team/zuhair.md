@@ -26,6 +26,8 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
    verification is a person's act.
 4. **The base résumé:** made from the parse at candidate create, as the first of the candidate's bases
    (`base_resumes`, one active) and its version 1 in `resumes`. Spec and PR plan: [resume-versioning.md](./resume-versioning.md).
+   **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). Versions and bases through the
+   API are PR 5.
 5. **Frontend live:** the Record (`src/lib/api/records.ts`) behind `records`, with a DTO mapper and a real sample.
 
 ## 2. Job scraping — per candidate (Q53b)

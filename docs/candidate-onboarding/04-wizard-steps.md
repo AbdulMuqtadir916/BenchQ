@@ -65,7 +65,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 ### Step 1 — Résumé ([screen](./screens/1-resume.webp))
 
 - Drop zone, or click / `Enter` / `Space` to browse. Accept PDF and Word (`.pdf`, `.doc`, `.docx`) up to 10 MB; reject
-  anything else before uploading, with the reason ("PDF or Word only", "Up to 10 MB").
+  anything else before uploading, with the reason ("PDF or Word only", "Resume too large, please provide one below 10MB").
 - On a file: the zone shows the file name and "Reading the résumé…" with a skeleton of the next step; then step 2 opens
   with the drafted fields filled and a strip "{n} fields drafted from the résumé — review them before you create the
   candidate."

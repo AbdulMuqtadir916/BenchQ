@@ -9,33 +9,37 @@ contract changes and the migration number with Abdul.
 
 ## Status
 
-Updated 2026-11-02. Branch `feat/password-reset-approval`, all work uncommitted; no PR yet.
+Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/password-reset-approval`), one PR to
+`main`. Change document: [pr-changes/feat-password-reset-notifications.md](./pr-changes/feat-password-reset-notifications.md).
 
-**Built in the working tree (not yet verified against current `main`):** the `notifications` and
-`password_reset_requests` models and migration; routing, freeze and session revocation
-(`backend/auth/password_reset.py`); the public request/complete routes and the notification list/read/decision/link
-routes, classified in `backend/auth/access.py`; `notification.approve` and `platform.notification.approve` in both
-policy tables; cancellation from `backend/scripts/reset_password.py`; the `/forgot-password` and `/reset-password`
-pages, the firm and Super Admin Notifications pages and the sidebar entry; backend tests; the Q54 decision in
-`docs/07`, the contract in `docs/02` §3.1 and the team README rows.
+**Done:**
 
-**Before the PR:**
+- §1–§3 built: the `notifications` and `password_reset_requests` models and migration; routing, freeze and session
+  revocation (`backend/auth/password_reset.py`); the public request/complete routes and the notification
+  list/read/decision/link routes, classified in `backend/auth/access.py` and `backend/tests/isolation_cases.py`;
+  `notification.approve` and `platform.notification.approve` in both policy tables; cancellation from
+  `backend/scripts/reset_password.py`; `/forgot-password`, `/reset-password`, the firm and Super Admin Notifications
+  pages and the sidebar entry; backend tests; Q54 in `docs/07`, the contract in `docs/02` §3.1.
+- Merged the latest `main` (2026-11-02). The migration is now `0010` (`0009` went to Applications), claimed in the
+  team README §6.
+- Kept out of the PR, still on disk: `0010_reconcile_resume_versioning.py` (moved to `backups/local-migrations/`;
+  local database only), the reset-demo preview setup (`docker-compose.reset-demo.yml`, `distDir` in
+  `next.config.ts`, the `.next-reset-demo` lines in `tsconfig.json` and `.gitignore`) and `.gitattributes`.
 
-1. Merge the latest `origin/main` (13 commits behind on 2026-11-02; conflicts expected in `backend/auth/access.py`,
-   `backend/main.py`, `docs/02-DATA-CONTRACTS.md`, `docs/team/README.md`).
-2. Renumber the migration: `0009` went to Applications (Samad), so this one is the next free number (`0010` today),
-   with `down_revision` on the new head, and claim it in the team README §6.
-3. Keep out of the PR: `0010_reconcile_resume_versioning.py` (local database only; one revision per PR), and the
-   local preview setup (`docker-compose.reset-demo.yml`, `distDir` in `next.config.ts`, the `.next-reset-demo`
-   lines in `tsconfig.json` and `.gitignore`).
-4. Move the sidebar's notifications query into a hook in `src/lib/hooks/`; firm data keys start with `firmId`.
-5. Fix the indentation of the `docs/02` §3.1 code block.
-6. Add isolation cases for the new routes (`backend/tests/isolation_cases.py`) and run the checks: `pnpm typecheck`,
-   `pnpm lint`, `pnpm test`, the backend suite and `alembic check`; both themes, keyboard, 1440/1024/390.
-7. Write the PR change document `docs/team/pr-changes/feat-password-reset-approval.md` (every file, what and why,
-   scope, migration impact, validation; the format Samad's PRs use).
+**Next, on the same branch:**
 
-**Blocked:** pushing needs write access to `AbdulMuqtadir916/BenchQ` for the GitHub account `umamah-114` (Abdul).
+1. Notifications gets a **Requests** inbox: the password-reset requests, opened from the sidebar's Notifications.
+2. The reset link: confirm it stops working 30 minutes after it is created and its token is removed; tell the
+   approver when it expires when the link is created; an expired or used link says "This link has expired. Contact
+   your manager or firm owner", never anything about a token.
+3. Remove **Design system** from the sidebar (the `/dev/design-system` page itself stays).
+4. A new request also shows in the approver's **bell**, and clicking it opens the Requests inbox.
+5. Move the sidebar's notifications query into a hook in `src/lib/hooks/` (firm data keys start with `firmId`); fix
+   the indentation of the `docs/02` §3.1 code block.
+6. Check both themes, keyboard, 1440/1024/390.
+
+**Known local issue:** `src/mocks/db.test.ts` (fixture fingerprint) fails on this Windows checkout only, because Git
+checks the fixture JSON out with CRLF. CI (Linux) is unaffected; `.gitattributes` would fix it for Windows.
 
 ## 1. Notifications inbox
 

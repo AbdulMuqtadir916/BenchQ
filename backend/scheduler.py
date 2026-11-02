@@ -250,6 +250,7 @@ async def run_auto_reject():
                 cutoff = datetime.now(timezone.utc) - timedelta(days=days)
                 keep_statuses = ["rejected", "offer"]
                 stale = db.query(Application).filter(
+                    Application.candidate_id.is_(None),
                     ~Application.status.in_(keep_statuses),
                     Application.applied_at < cutoff,
                 ).all()

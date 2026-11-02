@@ -19,7 +19,7 @@ export function resumeFileProblem(file: { name: string; size: number; type: stri
   const name = file.name.toLowerCase();
   const isKnownType = (RESUME_FILE.mimeTypes as readonly string[]).includes(file.type) || RESUME_FILE.extensions.some((extension) => name.endsWith(extension));
   if (!isKnownType) return "PDF or Word only.";
-  if (file.size > RESUME_FILE.maxBytes) return "Up to 10 MB.";
+  if (file.size > RESUME_FILE.maxBytes) return "Resume too large, please provide one below 10MB.";
   return null;
 }
 

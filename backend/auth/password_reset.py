@@ -71,6 +71,8 @@ def expire_due_for_user(db: Session, user: User, now=None) -> None:
             # The approval remains valid for 24 hours; the approver may issue a fresh 30-minute link.
             row.reset_token_hash = None
             row.reset_token_expires_at = None
+    # Sessions don't autoflush (models/db.py): the callers query these rows next and must see what expired here.
+    db.flush()
 
 
 def password_frozen(db: Session, user: User, now=None) -> bool:

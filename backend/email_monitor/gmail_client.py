@@ -132,7 +132,7 @@ def _build_gmail_query(db) -> str:
 def _get_active_apps_for_llm(db) -> list:
     """Build numbered list of active applications for LLM prompt."""
     active_statuses = ["applied", "interview"]
-    apps = db.query(Application).filter(Application.status.in_(active_statuses)).all()
+    apps = db.query(Application).filter(Application.candidate_id.is_(None), Application.status.in_(active_statuses)).all()
     result = []
     for i, app in enumerate(apps, 1):
         job = app.job
@@ -152,6 +152,8 @@ def _get_active_apps_for_llm(db) -> list:
 
 def _apply_email_to_app(db, matched_app, class_type: str, body: str, subject: str):
     """Apply phrase-classified email result to an application (existing logic extracted)."""
+    if matched_app.candidate_id is not None:
+        return
     snippet = body[:200] if body else subject[:200]
     matched_app.last_email_received = datetime.now(timezone.utc)
     matched_app.last_email_snippet = snippet
@@ -172,6 +174,8 @@ def _apply_email_to_app(db, matched_app, class_type: str, body: str, subject: st
 
 def _apply_llm_result_to_app(db, matched_app, llm_result: dict, body: str, subject: str):
     """Apply LLM classification result to an application."""
+    if matched_app.candidate_id is not None:
+        return
     snippet = body[:200] if body else subject[:200]
     matched_app.last_email_received = datetime.now(timezone.utc)
     matched_app.last_email_snippet = snippet
@@ -420,7 +424,7 @@ def _match_email_to_application(db, from_header: str, subject: str, body: str, s
     """Match an email to an active application anchored on the sender; a body-only company
     match is used only as a fallback after every app is checked for a stronger sender match."""
     active_statuses = ["applied", "interview"]
-    apps = db.query(Application).filter(Application.status.in_(active_statuses)).all()
+    apps = db.query(Application).filter(Application.candidate_id.is_(None), Application.status.in_(active_statuses)).all()
 
     body_lower = (body or "").lower()
     body_fallback = None

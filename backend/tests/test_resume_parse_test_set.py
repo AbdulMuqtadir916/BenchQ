@@ -104,3 +104,27 @@ def test_a_real_reply_names_only_employers_and_schools_the_file_does(path):
     parse = clean_reply(json.loads(_text(path)), source_text=_source_for(path))
     named = ([r["company"] for r in parse["work_experience"]] + [e["institution"] for e in parse["education"]])
     assert [name for name in named if name and _squash(name) not in source] == []
+
+
+@pytest.mark.skipif(not REPLIES, reason="no recorded replies yet (run the live smoke test)")
+@pytest.mark.parametrize("path", REPLIES, ids=lambda p: p.name)
+def test_a_real_parse_becomes_a_first_base_version_with_every_item(path):
+    """PR 4 (resume-versioning.md §4.2): version 1 built from a real cleaned parse keeps every role, bullet and
+    section, with an id on each item."""
+    from types import SimpleNamespace
+    import uuid
+    from backend.candidates.first_base import first_base
+    parse = clean_reply(json.loads(_text(path)), source_text=_source_for(path))
+    header = parse["header"]
+    candidate = SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), full_name=header["name"] or "Unnamed",
+                                primary_role=header["title"] or "Role", email=header["email"], phone=header["phone"],
+                                linkedin_url=header["linkedin"], city=header["city"], state=header["state"])
+    body = SimpleNamespace(work_auth="USC", summary=parse["professional_summary"], skills=[])
+    _, v1 = first_base(SimpleNamespace(id=uuid.uuid4(), parse=parse), candidate, body, uuid.uuid4())
+    assert [len(r["bullets"]) for r in v1.experiences] == [len(r["bullets"]) for r in parse["work_experience"]]
+    assert [len(p["bullets"]) for p in v1.projects] == [len(p["bullets"]) for p in parse["projects"]]
+    assert (len(v1.educations), len(v1.certifications), len(v1.awards), len(v1.languages)) == (
+        len(parse["education"]), len(parse["certifications"]), len(parse["awards"]), len(parse["languages"]))
+    ids = [i["id"] for i in v1.experiences + v1.projects + v1.educations + v1.certifications + v1.awards
+           + v1.languages + [b for e in v1.experiences + v1.projects for b in e["bullets"]]]
+    assert len(ids) == len(set(ids))

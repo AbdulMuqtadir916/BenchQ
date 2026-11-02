@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from backend.models.db import SessionLocal, JobRun, Setting
+from backend.statement_timeout import leave_web_request
 
 logger = logging.getLogger("jobnavigator.monitor")
 
@@ -328,6 +329,8 @@ async def tracked_run(
     company_id: Optional[str] = None,
 ):
     """Async context manager: tracks a job run in-memory + DB. Raises JobAlreadyRunningError on duplicate."""
+    # Background work gets the background statement timeout, even when the scheduler was reconfigured from a request.
+    leave_web_request()
     key = _make_key(job_type, scope_key)
 
     existing = _running.get(key)
@@ -391,6 +394,8 @@ def launch_background(
     started_at = datetime.now(timezone.utc)
 
     async def _wrapper():
+        # The task copied the launching request's context; its queries get the background statement timeout.
+        leave_web_request()
         try:
             _run_failure.set(None)
             # The gate is taken here, before the worker runs, so a queued task

@@ -3,6 +3,20 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Password reset by approval (`feat/password-reset-notifications`, Mohammed Abdul Ahad Umamah)
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `backend/tests/test_migration_0009.py` `test_tracking_downgrade_refuses_to_discard_pending_reviews` | After the refused downgrade, the test checks `alembic_version` is what it was before (the head), instead of `"0009"`. | This PR adds migration `0010` on top, so the head is no longer `0009`; the test's intent (a refused downgrade changes nothing) is unchanged. |
+
+## Résumé versioning PR 4 — the first base on candidate create (`feat/base-resume-from-parse`, Zuhair)
+
+Design: [resume-versioning.md](./resume-versioning.md) §4.2 (approved with PR 1).
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| The candidate create route (built by Abdul, onboarding 06 PR 4) | `backend/api/routes_candidates.py` `create_candidate` | When the create keeps an uploaded résumé, it also writes the candidate's first `base_resumes` row (UPLOAD, active) and its version 1 in `resumes`, before the route's one commit. The mapping lives in `backend/candidates/first_base.py`. | §4.2: the candidate, the kept parse, the base and v1 in one transaction, so any failure saves nothing. Without an upload the route works exactly as before; its body, permission and checks are unchanged. |
+
 ## Résumé versioning PR 2 — the base-résumé parser (`feat/parser-format-v2`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §2–§2.2.

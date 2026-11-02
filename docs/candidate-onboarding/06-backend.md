@@ -104,7 +104,8 @@ table).
 
 `POST /api/firms/{firm_id}/candidates/parse-resume`, multipart `file` — `require("candidate.create")`.
 
-- PDF, DOC, DOCX up to 10 MB (415 / 413 with the frontend's wording: "PDF or Word only", "Up to 10 MB").
+- PDF, DOC, DOCX up to 10 MB (415 "PDF or Word only." / 413 "Up to 10 MB."; the frontend checks both before
+  uploading, with its own wording).
 - Runs your parser through `ai_config(...)` (AI purpose `RESUME_PARSE`, docs/02 §3.2), and logs usage the way the AI
   presets doc says.
 - **Saves nothing to the candidate tables** (Q49). Keep the file and its parse in temporary storage for 60 minutes under

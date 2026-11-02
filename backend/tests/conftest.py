@@ -77,6 +77,26 @@ def mock_anthropic_client(mock_anthropic_response, monkeypatch):
 
 # ── DB + TestClient fixtures ─────────────────────────────────────────────
 
+def _refuse_unless_test_database():
+    """Stop the run unless the app's engine is on the test database. Forcing DATABASE_URL above only works if nothing
+    imported the app first: a wrapper such as `python -c "import backend...; pytest.main(...)"` builds the engine on
+    the development database, and every test then empties its tables (2026-11-01). Run the tests with
+    `python -m pytest`."""
+    from sqlalchemy.engine import make_url
+    import backend.config as config_mod
+    import backend.models.db as db_mod
+
+    expected = make_url(TEST_DATABASE_URL).database
+    in_use = {
+        "backend.config.DATABASE_URL": make_url(config_mod.DATABASE_URL).database,
+        "backend.models.db.engine": db_mod.engine.url.database,
+    }
+    wrong = {name: database for name, database in in_use.items() if database != expected}
+    if wrong:
+        pytest.exit(f"Refusing to run: the tests would empty {wrong}, not the test database {expected!r}. Something "
+                    "imported the app before conftest.py; run the tests with `python -m pytest`.", returncode=1)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _schema():
     """Build the schema once per run, the way production does: `alembic upgrade head` on an empty database."""
@@ -84,6 +104,7 @@ def _schema():
     from sqlalchemy.pool import NullPool
     from backend.db_schema import upgrade_database
 
+    _refuse_unless_test_database()
     engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
     with engine.begin() as conn:
         conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
@@ -102,6 +123,7 @@ def _clean_db(_schema):
     import backend.models.db as db_mod
 
     def _truncate():
+        _refuse_unless_test_database()
         db_mod.engine.dispose()           # drops connections a failed test left mid-transaction
         with db_mod.engine.begin() as conn:
             conn.execute(text("SET LOCAL lock_timeout = '10s'"))

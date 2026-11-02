@@ -92,13 +92,16 @@ CASES: dict[str, Case] = {
 
     # ── Applications (track 03) ──────────────────────────────────────────────
     "GET /api/applications": Case(shows_rows=True),
+    "GET /api/applications/{app_id}": Case(),
+    "PATCH /api/applications/{app_id}/review": Case(path={"app_id": "review_app"}, body=lambda i: {"review_id": str(i["review"]), "status": "assessment", "expected_revision": 0, "expected_review_revision": 0}),
     "POST /api/applications": Case(body=lambda i: {"title": "Logged role", "company": "Logged Co", "url": _new("logged")}),
     "POST /api/applications/extract": Case(body=lambda i: {"url": _new("posting")}),
+    "PATCH /api/applications/{app_id}/candidate-status": Case(body=lambda i: {"status": "saved", "expected_revision": 0}),
     "PATCH /api/applications/{app_id}": Case(body=lambda i: {"notes": "Edited"}),
-    "DELETE /api/applications/{app_id}": Case(),
-    "POST /api/applications/bulk-update": Case(body=lambda i: {"ids": [str(i["app"])], "status": "interview"},
+    "DELETE /api/applications/{app_id}": Case(path={"app_id": "legacy_app"}),
+    "POST /api/applications/bulk-update": Case(body=lambda i: {"ids": [str(i["app"])], "status": "interview_scheduled", "expected_revisions": {str(i["app"]): 0}},
                                                body_ids=True, bulk=True),
-    "POST /api/applications/bulk-delete": Case(body=lambda i: {"ids": [str(i["app"])]}, body_ids=True, bulk=True),
+    "POST /api/applications/bulk-delete": Case(body=lambda i: {"ids": [str(i["legacy_app"])]}, body_ids=True, bulk=True),
     "GET /api/applications/{app_id}/prep": Case(),
     "POST /api/applications/{app_id}/interviews": Case(body=lambda i: {"what": "Panel"}),
     "PATCH /api/applications/interviews/{interview_id}": Case(body=lambda i: {"what": "Panel two"}),
@@ -189,6 +192,12 @@ SIGNED_IN_REASONS: dict[str, str] = {
     "GET /api/llm/efforts": "global reference data",
     "GET /api/resumes/templates": "global reference data: the template files",
     "GET /api/cover-letters/templates": "global reference data: the template files",
+    # 07 Q54: filtered to the caller as recipient (and their firm); another account's id is a 404
+    # (test_password_reset.py, test_password_reset_approval.py).
+    "GET /api/notifications": "the caller's own notifications",
+    "PATCH /api/notifications/{notification_id}/read": "the caller's own notifications",
+    "POST /api/notifications/{notification_id}/password-reset-decision": "the caller's own notifications",
+    "POST /api/notifications/{notification_id}/password-reset-link": "the caller's own notifications",
 }
 PUBLIC_REASONS: dict[str, str] = {
     "GET /health": "health check, no data",
@@ -197,6 +206,8 @@ PUBLIC_REASONS: dict[str, str] = {
     "POST /api/telegram/webhook": "Telegram, with its own secret header; a platform integration",
     "POST /api/auth/sign-in": "signing in",
     "POST /api/auth/sign-out": "signing out ends the caller's own session only",
+    "POST /api/auth/password-reset/request": "forgot password: the same generic answer for any email (07 Q54)",
+    "POST /api/auth/password-reset/complete": "a reset link: its one-use token is the secret (07 Q54)",
     "GET /api/invites/{token}": "an invite link: its 256-bit token is the secret",
     "POST /api/invites/{token}/accept": "an invite link: its 256-bit token is the secret",
 }
