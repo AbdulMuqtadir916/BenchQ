@@ -5,8 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useQuery } from "@tanstack/react-query";
-import { notificationsApi } from "@/lib/api/password-recovery";
+import { isPendingRequest, useNotifications } from "@/lib/hooks/use-notifications";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { activeNavId, navFor, type RouteDef } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
@@ -38,14 +37,7 @@ export function Sidebar({
   const pathname = usePathname() ?? "";
   const groups = GROUPS[variant].map((group) => ({ ...group, routes: navFor(principal, group.section) }));
   const activeId = activeNavId(groups.flatMap((group) => group.routes), pathname);
-  const notifications = useQuery({
-    queryKey: ["notifications", "inbox"],
-    queryFn: notificationsApi.list,
-    refetchOnWindowFocus: true,
-  });
-  const pendingRequestCount = (notifications.data?.items ?? []).filter(
-    item => item.type === "PASSWORD_RESET" && item.requestStatus === "PENDING",
-  ).length;
+  const pendingRequestCount = (useNotifications().data ?? []).filter(isPendingRequest).length;
   const fade = { duration: reduceMotion ? 0 : 0.14, ease: EASE_OUT };
 
   // Width, padding and label opacity transition in CSS (.bq-sidebar in globals.css), so the

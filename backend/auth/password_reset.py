@@ -15,6 +15,8 @@ from backend.models.tenancy import Firm, PlatformUser, User
 REQUEST_LIFETIME = timedelta(hours=24)
 LINK_LIFETIME = timedelta(minutes=30)
 GENERIC_REQUEST = "If the account is eligible, its approver will see a reset request in Notifications."
+# One answer for an unknown, used, replaced or timed-out link: it never says which, or that a token exists.
+LINK_EXPIRED = "This link has expired. Contact your manager or firm owner for a new one."
 
 
 def approvers_for(db: Session, user: User):

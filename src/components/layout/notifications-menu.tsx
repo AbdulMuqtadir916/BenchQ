@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import { Bell, BriefcaseBusiness, MessageSquareText, TimerReset, type LucideIcon } from "lucide-react";
+import { Bell, BriefcaseBusiness, KeyRound, MessageSquareText, TimerReset, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { CONTENT_EXIT, POPOVER_TRANSITION } from "@/lib/motion";
+import { isPendingRequest, useMarkNotificationRead, useNotifications } from "@/lib/hooks/use-notifications";
 import type { RouteId, RouteQuery } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 
@@ -18,7 +19,17 @@ type Notification = {
   query?: RouteQuery;
   icon: LucideIcon;
   tone: "blue" | "green" | "amber";
+  /** A backend request: its read state is the server's. Absent for the demo items. */
+  isRequestUnread?: boolean;
 };
+
+function relativeTime(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (minutes < 1) return "Now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `${hours}h` : `${Math.round(hours / 24)}d`;
+}
 
 const NOTIFICATIONS: Notification[] = [
   {
@@ -57,15 +68,34 @@ const TONE_CLASS: Record<Notification["tone"], string> = {
   amber: "bg-[var(--color-warning-bg)] text-[var(--color-warning-fg)]",
 };
 
-export function NotificationsMenu() {
+/**
+ * The bell. Password-reset requests waiting for this person's decision come from the backend (07 Q54) and open the
+ * Requests inbox; the firm's other updates are still demo data. The admin variant shows only the requests.
+ */
+export function NotificationsMenu({ variant = "firm" }: { variant?: "firm" | "admin" }) {
   const toHref = useHref();
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const markRequestRead = useMarkNotificationRead();
+  const inboxRoute: RouteId = variant === "admin" ? "admin.notifications" : "notifications";
+  const requestsRoute: RouteId = variant === "admin" ? "admin.notifications.requests" : "notifications.requests";
+  const requests: Notification[] = (useNotifications().data ?? []).filter(isPendingRequest).map((item) => ({
+    id: item.id,
+    title: item.title,
+    detail: item.detail,
+    time: relativeTime(item.createdAt),
+    route: requestsRoute,
+    icon: KeyRound,
+    tone: "amber",
+    isRequestUnread: item.readAt === null,
+  }));
+  const notifications = [...requests, ...(variant === "firm" ? NOTIFICATIONS : [])];
   const reduceMotion = useReducedMotion() ?? false;
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
-  const unreadCount = NOTIFICATIONS.length - readIds.size;
+  const isUnread = (n: Notification) => (n.isRequestUnread ?? true) && !readIds.has(n.id);
+  const unreadCount = notifications.filter(isUnread).length;
 
   useEffect(() => {
     if (!open) return;
@@ -83,8 +113,14 @@ export function NotificationsMenu() {
     buttonRef.current?.focus();
   }
 
-  function markRead(id: string) {
-    setReadIds(current => new Set(current).add(id));
+  function markRead(notification: Notification) {
+    setReadIds(current => new Set(current).add(notification.id));
+    if (notification.isRequestUnread) markRequestRead.mutate(notification.id);
+  }
+
+  function markAllRead() {
+    setReadIds(new Set(notifications.map(({ id }) => id)));
+    for (const request of requests) if (request.isRequestUnread) markRequestRead.mutate(request.id);
   }
 
   return (
@@ -126,25 +162,26 @@ export function NotificationsMenu() {
                 <div className="mt-0.5 text-caption text-[var(--color-text-3)]">{unreadCount ? `${unreadCount} unread updates` : "You're all caught up"}</div>
               </div>
               {unreadCount ? (
-                <button type="button" onClick={() => setReadIds(new Set(NOTIFICATIONS.map(({ id }) => id)))} className="rounded-[var(--radius-sm)] px-2 py-1 text-caption font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]">
+                <button type="button" onClick={markAllRead} className="rounded-[var(--radius-sm)] px-2 py-1 text-caption font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]">
                   Mark all read
                 </button>
               ) : null}
             </div>
 
             <div className="p-1.5">
-              {NOTIFICATIONS.map(notification => {
+              {notifications.length === 0 ? <p className="px-2.5 py-6 text-center text-caption text-[var(--color-text-3)]">Nothing waiting for you.</p> : null}
+              {notifications.map(notification => {
                 const Icon = notification.icon;
-                const isUnread = !readIds.has(notification.id);
+                const unread = isUnread(notification);
                 return (
                   <Link
                     key={notification.id}
                     href={toHref(notification.route, {}, notification.query)}
                     role="menuitem"
-                    onClick={() => markRead(notification.id)}
+                    onClick={() => { markRead(notification); setOpen(false); }}
                     className={cn(
                       "flex items-start gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2.5 transition-colors hover:bg-[var(--color-surface-2)]",
-                      isUnread && "bg-[var(--color-primary-subtle)]/45",
+                      unread && "bg-[var(--color-primary-subtle)]/45",
                     )}
                   >
                     <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-sm)]", TONE_CLASS[notification.tone])}>
@@ -152,20 +189,20 @@ export function NotificationsMenu() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start gap-2">
-                        <span className={cn("min-w-0 flex-1 text-sm leading-4 text-[var(--color-text)]", isUnread && "font-semibold")}>{notification.title}</span>
+                        <span className={cn("min-w-0 flex-1 text-sm leading-4 text-[var(--color-text)]", unread && "font-semibold")}>{notification.title}</span>
                         <span className="shrink-0 text-mono-sm text-[var(--color-text-3)]">{notification.time}</span>
                       </span>
                       <span className="mt-1 block text-caption leading-4 text-[var(--color-text-3)]">{notification.detail}</span>
                     </span>
-                    {isUnread ? <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)]" aria-label="Unread" /> : null}
+                    {unread ? <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)]" aria-label="Unread" /> : null}
                   </Link>
                 );
               })}
             </div>
 
             <div className="border-t border-[var(--color-border)] p-2">
-              <Link href={toHref("followups")} role="menuitem" className="flex h-8 items-center justify-center rounded-[var(--radius-md)] text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]">
-                View all follow-ups
+              <Link href={toHref(inboxRoute)} role="menuitem" onClick={() => setOpen(false)} className="flex h-8 items-center justify-center rounded-[var(--radius-md)] text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-subtle)]">
+                View all notifications
               </Link>
             </div>
           </motion.div>

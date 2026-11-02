@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth import ledger, support, throttle
-from backend.auth.password_reset import (GENERIC_REQUEST, expire_due_for_user, expire_request, make_reset_link, password_frozen,
+from backend.auth.password_reset import (GENERIC_REQUEST, LINK_EXPIRED, expire_due_for_user, expire_request, make_reset_link, password_frozen,
                                          request_reset)
 from backend.auth.tokens import hash_token
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password, needs_rehash, verify_password
@@ -34,7 +34,8 @@ class PasswordResetRequestBody(BaseModel):
 
 
 class PasswordResetCompleteBody(BaseModel):
-    token: str = Field(min_length=32, max_length=128)
+    # No length rule: a link cut short when pasted gets the same "expired" answer as any other bad link.
+    token: str = Field(max_length=1024)
     password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=1024)
 
 
@@ -101,7 +102,7 @@ def password_reset_complete(body: PasswordResetCompleteBody, db: DbSession = Dep
     row = db.query(PasswordResetRequest).filter(PasswordResetRequest.reset_token_hash == token_hash).first()
     now = utcnow()
     if row is None:
-        raise HTTPException(status_code=400, detail="This reset link is invalid or expired.")
+        raise HTTPException(status_code=400, detail=LINK_EXPIRED)
     row_id = row.id
     user = db.query(User).filter(User.id == row.requester_user_id).with_for_update().first()
     if user:
@@ -118,7 +119,7 @@ def password_reset_complete(body: PasswordResetCompleteBody, db: DbSession = Dep
                 row.reset_token_hash = None
                 row.reset_token_expires_at = None
             db.commit()
-        raise HTTPException(status_code=400, detail="This reset link is invalid or expired.")
+        raise HTTPException(status_code=400, detail=LINK_EXPIRED)
     if verify_password(user.password_hash, body.password):
         raise HTTPException(status_code=422, detail="Choose a password different from your current password.")
     user.password_hash = hash_password(body.password)

@@ -156,6 +156,40 @@ def test_expired_approved_link_can_be_reissued_only_by_its_original_approver(
     assert replay_old.status_code == 400
 
 
+def test_reset_link_lives_thirty_minutes_then_its_token_is_removed(api_client, anonymous_client, accounts, test_db):
+    from backend.auth.password_reset import LINK_EXPIRED
+    from backend.models.notifications import PasswordResetRequest
+    from backend.models.tenancy import Firm
+
+    bde = make_user(test_db, test_db.get(Firm, accounts.firm_id), email="thirty-minutes@acme.test", role="BDE")
+    test_db.commit()
+    assert anonymous_client.post("/api/auth/password-reset/request", json={"email": bde.email}).status_code == 202
+    notice = next(item for item in api_client.get("/api/notifications").json()["items"]
+                  if item["type"] == "PASSWORD_RESET")
+    before = utcnow()
+    approved = api_client.post(f"/api/notifications/{notice['id']}/password-reset-decision", json={"approve": True})
+    token = approved.json()["resetLink"].split("#", 1)[1]
+    row = test_db.query(PasswordResetRequest).filter_by(requester_user_id=bde.id).one()
+    test_db.refresh(row)
+    assert timedelta(minutes=30) <= row.reset_token_expires_at - before <= timedelta(minutes=30, seconds=10)
+
+    row.reset_token_expires_at = utcnow() - timedelta(seconds=1)
+    test_db.commit()
+    expired = anonymous_client.post("/api/auth/password-reset/complete", json={
+        "token": token, "password": "a-new-safe-password",
+    })
+    assert (expired.status_code, expired.json()["detail"]) == (400, LINK_EXPIRED)
+    test_db.refresh(row)
+    assert row.reset_token_hash is None and row.reset_token_expires_at is None
+    assert row.status == "APPROVED"    # the approver can still create a fresh link until the 24-hour request ends
+
+    for bad in ("x" * 43, token[:10]):     # unknown, or cut short when pasted
+        response = anonymous_client.post("/api/auth/password-reset/complete", json={
+            "token": bad, "password": "a-new-safe-password",
+        })
+        assert (response.status_code, response.json()["detail"]) == (400, LINK_EXPIRED)
+
+
 def test_foreign_firm_cannot_list_or_act_on_another_firms_reset_notification(
     api_client, anonymous_client, accounts, test_db
 ):

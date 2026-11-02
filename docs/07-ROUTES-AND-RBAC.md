@@ -131,7 +131,8 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | `/[firm]/focus`                                     | focus       | full                                                  | full                | full            | —                | —                        |
 | `/[firm]/analytics`                                 | app         | full                                                  | team                | —               | read             | read                     |
 | `/[firm]/ledger`                                    | app         | full                                                  | team                | own             | read             | read                     |
-| `/[firm]/notifications`                             | app         | full; approve own firm's requests                     | full; approve only assigned BDE requests | full; view own notifications | full; view own notifications | —; main sidebar → Preferences |
+| `/[firm]/notifications`                             | app         | full; approve own firm's requests                     | full; approve only assigned BDE requests | full; view own notifications | full; view own notifications | —; main sidebar → Preferences; its own sidebar of inboxes |
+| `/[firm]/notifications/requests`                    | app         | full; approve own firm's requests                     | full; approve only assigned BDE requests | full; view own notifications | full; view own notifications | —; in the Notifications sidebar |
 | `/[firm]/settings`                                  | app         | → first allowed                                       | → first allowed     | → first allowed | → first allowed  | → `firm`                 |
 | `/[firm]/settings/firm`                             | app         | full                                                  | —                   | —               | —                | read                     |
 | `/[firm]/settings/team`                             | app         | full                                                  | team: read + assign (Q15, Q47) | —               | —                | read                     |
@@ -158,7 +159,8 @@ routes (`settings/preferences`), which are `—`.
 | `/admin/audit`                   | Platform audit log: firm created/suspended, plan changed, support views, admin sign-ins                                                                     |
 | `/admin/system`                  | Backend health, scraper runs, AI spend by firm/model                                                                                                        |
 | `/admin/team`                    | BenchQ staff with `PLATFORM_ADMIN`; invite / deactivate                                                                                                     |
-| `/admin/notifications`           | Super Admin's notification inbox in the main sidebar → Preferences; approve Owner password-reset requests                                                  |
+| `/admin/notifications`           | Super Admin's notifications in the main sidebar → Preferences; its own sidebar of inboxes                                                                       |
+| `/admin/notifications/requests`  | The Requests inbox, in the Notifications sidebar: approve Owner password-reset requests                                                                      |
 
 Admin URLs use `firmId` (stable), firm URLs use `slug` (readable).
 

@@ -52,6 +52,30 @@ ledger. No change to any table another person owns. No new dependency.
 | `src/lib/auth/policy.ts`, `src/lib/auth/policy-table.test.ts` | The two actions, mirrored from Python. |
 | `src/lib/routes/registry.ts`, `src/lib/routes/registry.test.ts` | Routes `forgot-password`, `reset-password`, `notifications`, `admin.notifications`, and their access table rows. |
 
+## Second commit: the Requests inbox, the bell, the link wording
+
+Removing Design system from the sidebar is not in this PR; it is `feat/remove-design-system-nav`.
+
+| File | Changes and reason |
+|---|---|
+| `src/lib/routes/registry.ts`, `src/lib/routes/registry.test.ts` | A `notifications` nav section and its first inbox, **Requests**: `notifications.requests` (`/[firm]/notifications/requests`, every firm role, not in a support view) and `admin.notifications.requests` (`/admin/notifications/requests`); access, support and palette rows in the table test. |
+| `src/app/[firm]/(app)/notifications/requests/page.tsx`, `src/app/admin/notifications/requests/page.tsx` | New. The Requests inbox pages. |
+| `src/components/app/notifications/requests-inbox.tsx` | Replaces `src/components/app/notifications-inbox.tsx`. The password-reset requests, with skeleton, empty and error states. |
+| `docs/07-ROUTES-AND-RBAC.md` | The two Requests routes in the route map. |
+| `src/components/app/notifications/notifications-shell.tsx`, `src/app/[firm]/(app)/notifications/layout.tsx`, `src/app/admin/notifications/layout.tsx` | Notifications' own sidebar of inboxes (the `notifications` section), like Settings' sections; the inbox opens beside it. |
+| `src/components/app/notifications/notification-card.tsx` | One notification with approve / deny / fresh link; errors shown on the card. |
+| `src/components/app/notifications/reset-link-panel.tsx` | The link with its creation and expiry time; says when it has expired. |
+| `src/lib/hooks/use-notifications.ts` | New. The list (refetched every minute while visible), mark read, decide, reissue; no query from a support view. |
+| `src/lib/query/keys.ts`, `src/lib/query/keys.test.ts` | `notifications.mine(firmId)` and `platform.notifications()`, replacing the unscoped `["notifications", "inbox"]`. |
+| `src/components/layout/notifications-menu.tsx`, `src/components/layout/topbar.tsx` | The bell lists requests awaiting the person's decision and opens the Requests inbox; the admin shell gets the bell too (requests only). |
+| `src/components/layout/sidebar.tsx` | The pending count on Notifications, through the hook. |
+| `src/app/[firm]/(app)/notifications/page.tsx`, `src/app/admin/notifications/page.tsx` | Empty until an inbox is picked. |
+| `src/app/reset-password/page.tsx` | The missing-link message matches the expired one. |
+| `backend/auth/password_reset.py`, `backend/api/routes_auth.py` | One message for any bad link: "This link has expired. Contact your manager or firm owner for a new one." The token has no minimum length, so a cut-short link gets that message, not a validation error. |
+| `backend/tests/test_password_reset.py` | The link lives 30 minutes, then is refused with that message and its token removed; unknown and cut-short links get the same answer. |
+
+The once-a-minute refetch is one request a minute per open tab, far under the per-user limit (uzair.md §1).
+
 ## Migration and rollback
 
 - One revision, `0010`, on main's `0009`. Two new tables only; no existing table changes.
@@ -72,8 +96,8 @@ ledger. No change to any table another person owns. No new dependency.
 
 ## Remaining limits
 
-- The Requests inbox, the bell entry for new requests, the link-expiry wording and removing Design system from the
-  sidebar are next on this branch ([umamah.md](../umamah.md) Status).
-- The sidebar's notifications query moves into a hook with a firm-scoped key in that change.
+- Removing Design system from the sidebar is a separate branch, `feat/remove-design-system-nav`.
+- The local dev database of whoever ran the old branch has the old 0009/0010; it needs a data-safe fix before it
+  runs this code (not part of this PR).
 - Anyone who knows an account's email can freeze it until the approver denies or the request expires (Q54 accepts
   this trade-off; rate limits and the 24-hour expiry bound it).

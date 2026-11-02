@@ -1,6 +1,4 @@
-import { NotificationsInbox } from "@/components/app/notifications-inbox";
-import { PageHeader } from "@/components/app/page-header";
-
+/** Nothing opens until an inbox is picked in the Notifications sidebar (layout.tsx). */
 export default function AdminNotificationsPage() {
-  return <div className="bq-page"><PageHeader title="Notifications" subtitle="Review platform approval requests." /><NotificationsInbox /></div>;
+  return null;
 }

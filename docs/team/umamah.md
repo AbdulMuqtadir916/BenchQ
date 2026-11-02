@@ -9,8 +9,8 @@ contract changes and the migration number with Abdul.
 
 ## Status
 
-Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/password-reset-approval`), one PR to
-`main`. Change document: [pr-changes/feat-password-reset-notifications.md](./pr-changes/feat-password-reset-notifications.md).
+Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/password-reset-approval`), PR #105 to
+`main` (open, awaiting Abdul's review; backend suite 3705 passed). Change document: [pr-changes/feat-password-reset-notifications.md](./pr-changes/feat-password-reset-notifications.md).
 
 **Done:**
 
@@ -26,17 +26,31 @@ Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/passw
   local database only), the reset-demo preview setup (`docker-compose.reset-demo.yml`, `distDir` in
   `next.config.ts`, the `.next-reset-demo` lines in `tsconfig.json` and `.gitignore`) and `.gitattributes`.
 
-**Next, on the same branch:**
+**Added to PR #105 (2026-11-02), tasks 1 and 3:**
 
-1. Notifications gets a **Requests** inbox: the password-reset requests, opened from the sidebar's Notifications.
-2. The reset link: confirm it stops working 30 minutes after it is created and its token is removed; tell the
-   approver when it expires when the link is created; an expired or used link says "This link has expired. Contact
-   your manager or firm owner", never anything about a token.
-3. Remove **Design system** from the sidebar (the `/dev/design-system` page itself stays).
-4. A new request also shows in the approver's **bell**, and clicking it opens the Requests inbox.
-5. Move the sidebar's notifications query into a hook in `src/lib/hooks/` (firm data keys start with `firmId`); fix
-   the indentation of the `docs/02` §3.1 code block.
-6. Check both themes, keyboard, 1440/1024/390.
+1. Notifications has its own sidebar of inboxes inside the page, like Settings' sections; only **Requests** for now
+   (`/[firm]/notifications/requests`, `/admin/notifications/requests`, registry section `notifications`). The main
+   sidebar keeps just Notifications. Nothing opens until an inbox is clicked. The count awaiting approval shows on
+   Notifications in the main sidebar and on Requests inside.
+2. The reset link: confirmed it expires exactly 30 minutes after it is created (checked in the database) and its token
+   is wiped when it is next used, refused with the same message. The approver sees "This link expires 30 minutes after
+   it was created: created at …, expires at …"; once that passes, the panel says it has expired. An expired, used,
+   unknown or cut-short link says "This link has expired. Contact your manager or firm owner for a new one."
+3. A request waiting for the approver shows in their **bell** (firm users and the Super Admin) and opens the Requests
+   inbox; opening it marks it read. The inbox refetches once a minute while the tab is visible.
+4. The sidebar's notifications query is a hook (`src/lib/hooks/use-notifications.ts`) with firm-scoped keys.
+
+Checked 2026-11-02 on a fresh reset-demo stack (`localhost:3001`, database built 0001→0010 from this branch): Adnan
+(BDE) asks for a reset, Fatima (his manager) sees it in the bell, opens Requests, approves, sees the expiry time; the
+link, expired, gives the new message. Then Sneha's request: Notifications, then Requests in its own sidebar, and the bell
+opening Requests. Light and dark, desktop and phone width.
+
+**Task 2, its own branch:** `feat/remove-design-system-nav`, from this branch: **Design system** out of the sidebar
+(the `/dev/design-system` page itself stays). The change is ready; branch and PR when the lead decides (no stacked PRs:
+`CONTRIBUTING.md`).
+
+**Still to do:** fix the indentation of the `docs/02` §3.1 code block; bring the local dev database in line with
+`main` (it ran the old local 0009/0010, not Samad's 0009) without losing data.
 
 **Known local issue:** `src/mocks/db.test.ts` (fixture fingerprint) fails on this Windows checkout only, because Git
 checks the fixture JSON out with CRLF. CI (Linux) is unaffected; `.gitattributes` would fix it for Windows.
