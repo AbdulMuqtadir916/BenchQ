@@ -45,6 +45,8 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /cv/{token}": P,
     "POST /api/telegram/webhook": P,               # checks its own secret header
     "POST /api/auth/sign-in": P,
+    "POST /api/auth/password-reset/request": P,
+    "POST /api/auth/password-reset/complete": P,
     "POST /api/auth/sign-out": P,                  # clears the cookie even when the session is already gone
     "GET /api/invites/{token}": P,                 # /invite/[token]: the link's 256-bit token is the secret
     "POST /api/invites/{token}/accept": P,
@@ -52,6 +54,10 @@ ROUTE_ACCESS: dict[str, Access] = {
 
     # ── Any signed-in account ─────────────────────────────────────────────────
     "GET /api/auth/me": S,
+    "GET /api/notifications": S,
+    "PATCH /api/notifications/{notification_id}/read": S,
+    "POST /api/notifications/{notification_id}/password-reset-decision": S,
+    "POST /api/notifications/{notification_id}/password-reset-link": S,
     "GET /api/firms/by-slug/{slug}": S,            # a firm user's own firm only; 404 otherwise
     "GET /api/companies": S,                       # global reference data
     "GET /api/searches/countries": S,

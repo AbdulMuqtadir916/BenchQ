@@ -84,7 +84,7 @@ export function NotificationsMenu() {
   }
 
   function markRead(id: string) {
-    setReadIds((current) => new Set(current).add(id));
+    setReadIds(current => new Set(current).add(id));
   }
 
   return (
@@ -97,7 +97,7 @@ export function NotificationsMenu() {
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         title="Notifications"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setOpen(current => !current)}
         className="bq-secondary relative inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-text-2)] hover:text-[var(--color-text)]"
       >
         <Bell size={15} aria-hidden />
@@ -118,8 +118,7 @@ export function NotificationsMenu() {
             animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: reduceMotion ? 0 : -2, scale: reduceMotion ? 1 : 0.99, filter: reduceMotion ? "none" : "blur(2px)", transition: CONTENT_EXIT }}
             transition={POPOVER_TRANSITION}
-            style={{ transformOrigin: "top right" }}
-            className="absolute right-0 z-50 mt-2 w-[340px] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-md)]"
+            className="absolute right-0 z-50 mt-2 w-[340px] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-md)] origin-top-right"
           >
             <div className="flex items-center justify-between border-b border-[var(--color-border)] px-3.5 py-3">
               <div>
@@ -134,7 +133,7 @@ export function NotificationsMenu() {
             </div>
 
             <div className="p-1.5">
-              {NOTIFICATIONS.map((notification) => {
+              {NOTIFICATIONS.map(notification => {
                 const Icon = notification.icon;
                 const isUnread = !readIds.has(notification.id);
                 return (

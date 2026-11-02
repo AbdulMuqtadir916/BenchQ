@@ -321,6 +321,61 @@ export const PlatformUserSchema = z.object({
 });                                        // no firmId: platform users belong to no firm (07 Q9)
 ```
 
+#### Notifications and password-reset approvals — Q54
+
+```ts
+export const NotificationSchema = z.object({
+  id: z.string(),
+    type: z.string(),                         // extensible event kind; first: PASSWORD_RESET
+  entityId: z.string(),                     // id of the typed entity; never a secret or reset URL
+    requestStatus: z.string().nullable(),      // present for PASSWORD_RESET notifications
+    canReissue: z.boolean(),                   // true only for the approver who approved the request
+  title: z.string(),
+  detail: z.string(),
+  createdAt: z.string().datetime(),
+  readAt: z.string().datetime().nullable(),
+    resolvedAt: z.string().datetime().nullable(),
+});
+
+export const PasswordResetRequestSchema = z.object({
+  id: z.string(),
+    requesterUserId: z.string(),
+  requesterRole: FirmRole,
+    approverRole: z.enum(['OWNER', 'MANAGER', 'PLATFORM_ADMIN']),
+  firmId: z.string(),
+    status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'EXPIRED', 'COMPLETED', 'CANCELLED']),
+  createdAt: z.string().datetime(),
+  expiresAt: z.string().datetime(),         // approval request lifetime: 24 hours
+  decidedAt: z.string().datetime().nullable(),
+});
+```
+
+`notifications` is addressed to exactly one firm user or one platform user. Firm notifications carry their
+`firmId`; platform notifications have no firm. `password_reset_requests` is firm-owned, points to the requesting
+`User`, and records the designated approver (a same-firm `User` or the Super Admin tier). A BDE's approver is its
+assigned active Manager, or its own firm Owner when no active same-firm Manager is assigned; a Manager's approver
+is their own firm Owner; an Owner's approver is a Super Admin. A VIEWER follows the Owner path. The Super Admin
+does not initiate this flow. A stale or inactive designated approver expires the request; a BDE Manager already
+inactive at routing time goes to the same-firm Owner. No request crosses firms.
+
+  If no eligible approver exists, no request is created and the account is not frozen; the requester can retry once
+  an active same-firm Owner or Super Admin is available.
+
+Creating a valid request immediately freezes the unchanged old password and revokes all sessions. Denial or request
+expiry unlocks it; successful completion replaces it. The 24-hour request deadline is independent of the 30-minute
+reset-link lifetime. The request row stores only a hash of the one-use link. On approval the raw URL is returned
+once to the approver's UI for manual sharing; it is never emailed, logged, stored in a notification or included in
+this DTO. A replacement link invalidates the previous link.
+
+The public forgot-password response is generic for known/unknown, inactive, VIEWER and Super Admin emails. Only an
+active eligible firm account with an approver creates a request. One pending request per account; per-IP and
+per-keyed-email rate limits; repeated submissions do not extend expiry. Since the account is frozen before the
+approver decides, someone who knows an email can temporarily lock that account; this trade-off is mitigated, not
+eliminated, by rate limits, deduplication, notifications and expiry.
+
+Approval permissions are `notification.approve` (OWNER/MANAGER; request recipient is checked too) and
+`platform.notification.approve` (Super Admin only). A platform support view has no approval permission.
+
 #### `firmId` on records (07 §7, 07 Q13, A17)
 
 | Record | Change | Note |

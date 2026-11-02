@@ -36,6 +36,7 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["member.changeManager", "Y - - - - -"],   // 07 Q40
   ["candidate.assign", "Y Y - - - -"],
   ["firmSettings.edit", "Y - - - - -"],      // 07 Q46
+  ["notification.approve", "Y Y - - - -"],  // 07 Q54; only the routed approver acts
   ["team.view", "Y Y - - - Y"],
   // platform (07 §2.3)
   ["firm.create", "- - - - Y Y"],
@@ -46,6 +47,7 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["invite.resend", "- - - - Y Y"],
   ["invite.revoke", "- - - - Y Y"],
   ["platformTeam.manage", "- - - - Y Y"],
+  ["platform.notification.approve", "- - - - Y -"],
 ];
 
 describe("principal × action table (docs/07 Phase C)", () => {

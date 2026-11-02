@@ -35,6 +35,7 @@ from backend.api.routes_team import router as team_router
 from backend.api.routes_candidates import router as candidates_router
 from backend.api.routes_ledger import router as ledger_router
 from backend.api.routes_support import router as support_router
+from backend.api.routes_notifications import router as notifications_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("jobnavigator")
@@ -152,6 +153,7 @@ app.middleware("http")(enforce_access)
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")
