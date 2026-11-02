@@ -193,7 +193,7 @@ The additional QA navigation shim mirrors Next’s History API integration; brow
 
 ## Follow-up to Abdul's c98538d review (2026-11-02)
 
-Local work only: not pushed, no new PR, no merge. Worktree `/private/tmp/benchq-pr104-review` preserves the
+At the implementation checkpoint below this was local work only. The publication update at the end supersedes that status. Worktree `/private/tmp/benchq-pr104-review` preserves the
 combined dirty development folder. Main `a1c7a92` was fetched and is included. The root `pr104_plan.md` and
 `prstatus.md` record the detailed decisions/checklist; Samad's choices are distinguished from Abdul's pending
 code-owner/contract approvals. Required review remains; no promise of zero unknown bugs or Google approval.
@@ -303,3 +303,8 @@ mock application/UI integration remains the later tracks; this PR does not rewri
 Local implementation checkpoint: `21d2a76`. All test commands exited zero. The synthetic UI server and temporary
 PostgreSQL container were removed/stopped after verification. Only documentation was updated afterward to record
 this checkpoint; no push, review replies or merge occurred.
+
+
+## Publication update (2026-11-02)
+
+Fetched main and the PR branch immediately before publication; main `a1c7a92` was already included and no remote corrections needed reconciliation. Published implementation `21d2a76` and evidence checkpoint `449398b` to existing PR #104, updated its description and replied to all nine follow-up review threads. Threads remain open for Abdul to verify. The new-head frontend/backend checks are pending; code-owner/product approvals and launch gates remain pending. No merge or real-candidate enablement occurred. PR #95 remains draft. No product code changed after the recorded verification.

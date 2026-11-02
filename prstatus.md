@@ -4,9 +4,9 @@ Updated: 2026-11-02. Plan: [pr104_plan.md](pr104_plan.md).
 
 `[x]` means completed with evidence; `[ ]` means pending, including work awaiting a decision. Only mark implementation complete after its regression/acceptance checks pass. This tracker is not a GitHub approval or authorization to launch.
 
-## Current execution — local technical corrections verified
+## Current execution — corrections published; review and CI pending
 
-Implementation checkout: `/private/tmp/benchq-pr104-review`, branch `codex/candidate-gmail-connection`, based on published `c98538d` with main `a1c7a92` included. The running combined development folder and its database are unchanged. Local implementation commit: `21d2a76`. No push or merge.
+Implementation checkout: `/private/tmp/benchq-pr104-review`, branch `codex/candidate-gmail-connection`, based on published `c98538d` with main `a1c7a92` included. The running combined development folder and its database are unchanged. Implementation commit: `21d2a76`; evidence checkpoint: `449398b`. Both are published to existing PR #104. No merge.
 
 Update this tracker after each completed module/check or meaningful failure. Never tick pending code-owner decisions as approved.
 
@@ -26,7 +26,7 @@ Update this tracker after each completed module/check or meaningful failure. Nev
 | Browser acceptance | Passed including URL-reload extension | `/private/tmp/pr104-pagination-ui.log`; light/dark 1440/1024/390, keyboard/reduced motion, axe zero, no page errors; dialog screenshot visually checked |
 | Focused backend | Passed: 243 hardening/isolation checks; final expanded regression module 34 passed | `/private/tmp/pr104-hardening-final.log`, `/private/tmp/pr104-verified-regressions.log`; counts overlap and are not added to the full-suite total |
 | Full backend | Passed: 3,767; 11 skipped; 54 live deselected; 13 existing xfailed; 6 existing warnings | `/private/tmp/pr104-final-backend.log`; final late-added cases separately verified in hardening/race runs |
-| Publication/merge | Not performed | Abdul sign-offs, final CI and explicit merge instruction remain gates |
+| Publication/merge | Corrections published to existing #104; nine review replies posted | New-head GitHub frontend/backend checks pending; Abdul sign-offs and explicit merge instruction remain gates |
 
 ## Baseline
 
@@ -73,7 +73,7 @@ Update this tracker after each completed module/check or meaningful failure. Nev
 ## M4 — Pagination/cache
 
 - [x] Document stable cursor/total/URL restoration contract.
-- [ ] Obtain Abdul's sign-off on the exact revised transport contract before publishing/merge.
+- [ ] Obtain Abdul's sign-off on the exact revised transport contract before merge; published for review as a pending proposal.
 - [x] Implement deterministic timestamp/ID pagination, limit validation and explicit end state.
 - [x] Preserve loaded pages during refetch; remove offset-count dependence.
 - [x] Preserve selected older email and independent body loading.
@@ -137,7 +137,7 @@ Update this tracker after each completed module/check or meaningful failure. Nev
 - [x] Record future automation approval with PR 4/Undo gate; eliminate contradictory policy wording.
 - [x] Keep unresolved product choices explicitly pending; record approver/date when settled.
 - [x] Update per-file PR change document with exact scope and verification evidence.
-- [ ] Post evidence to review threads after authorized publication; no replies sent in this pass.
+- [x] Post evidence to the nine follow-up review threads after authorized publication; leave threads open for Abdul to verify.
 - [x] Confirm no classification, quarantine, stage mapping or sender table slipped into #104.
 
 ## M10 — Verification/publication/merge
@@ -152,10 +152,10 @@ Update this tracker after each completed module/check or meaningful failure. Nev
 - [x] Verify skeleton/empty/error/not-found, cancel/expiry, pagination and deletion flows.
 - [x] Single Alembic head; approved unmerged revision upgrade/backfill/downgrade guards pass.
 - [x] Secret scan/diff checks pass; real credentials/mail/existing DB remain untouched.
-- [ ] Fetch/integrate latest main; rerun affected verification after integration.
+- [x] Fetch/check latest main before publication: `a1c7a92` already included; no integration changes or affected rerun needed.
 - [x] Record final implementation commit `21d2a76`, commands/results/logs and per-file inventory.
 - [x] Stop the synthetic browser harness and remove the disposable test databases after verification; leave the running app/database untouched.
-- [ ] Push authorized corrections to existing #104; reply to review threads with evidence.
+- [x] Push authorized corrections to existing #104; update PR description and reply to nine review threads with evidence.
 - [ ] GitHub CI green and Abdul code-owner approval obtained.
 - [x] Report real-candidate launch gates separately; do not imply merge enables production.
 - [ ] Receive Samad's explicit merge instruction; merge commit only; keep #95 draft.
@@ -198,3 +198,6 @@ Update this tracker after each completed module/check or meaningful failure. Nev
 | 2026-11-02 | Final 30-case follow-up module passed, including 300-message audit, simultaneous read marks, interrupted-worker recovery and unchanged reassigned application/email history | Added fallback-page rendering regressions and started final frontend checks; no product-code changes |
 | 2026-11-02 | All local technical checks passed: full backend 3,767; hardening 243; final regression module 34; frontend 572; typecheck/lint/build/browser | Counts overlap; approvals, publication, live rollout and later PRs remain pending |
 | 2026-11-02 | Saved verified corrections in local commit 21d2a76; stopped synthetic harness and removed disposable test database container | No push, review replies or merge; existing localhost app/database unchanged |
+
+| 2026-11-02 | Initial push was not executed because automatic approval review hit a usage limit; on user-requested continuation the same approval path succeeded | No approval bypass used |
+| 2026-11-02 | Fetched main/PR branch; confirmed main a1c7a92 included; pushed 21d2a76 and 449398b to existing #104; updated description and replied to nine follow-up threads | Threads left open; new-head frontend/backend CI pending; no merge or real-candidate enablement |

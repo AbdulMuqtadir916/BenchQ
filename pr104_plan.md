@@ -16,13 +16,13 @@ Sources: Abdul's GitHub reviews and his subsequent decisions supplied by Samad i
 
 Earlier reported results for c98538d were 3,748 backend passes and 563 frontend passes, plus typecheck, lint, Webpack production build and synthetic browser checks. Those results do not validate the changes in this plan. The earlier report's statement that correction work was complete must be superseded when implementation resumes.
 
-## Local implementation progress (2026-11-02)
+## Implementation and publication progress (2026-11-02)
 
-Implementation is saved locally as `21d2a76` in `/private/tmp/benchq-pr104-review`; the running combined checkout/database are unchanged.
+Implementation is published to existing PR #104 as `21d2a76` (evidence checkpoint `449398b`) in `/private/tmp/benchq-pr104-review`; the running combined checkout/database are unchanged.
 See prstatus.md for continuously updated checks. The eight correction modules are implemented locally;
 all local technical verification has passed: full backend 3,767, focused hardening 243, final regression module
 34, frontend 572, typecheck/lint/production build and synthetic browser acceptance. Counts overlap. Code-owner
-approvals, publication and rollout gates remain pending. Nothing is pushed or merged.
+approvals and rollout gates remain pending. Corrections and evidence are pushed; the PR description and nine review replies are updated. New-head CI is pending. Nothing is merged.
 
 Implementation details now explicit for review: provider grant operations use a short nonblocking global
 advisory guard because identity is unknown before exchange; cleanup has a separate five-minute scheduler job
