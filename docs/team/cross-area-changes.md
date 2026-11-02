@@ -16,6 +16,7 @@ Design: [resume-versioning.md](./resume-versioning.md) §3.1, §3.2, §4.3, §4.
 | The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | One bullet in the résumé section: who changes résumés, and what PR 5 adds. | The section described the résumés without Q54. |
 | The team flows (team doc) | `docs/team/FLOWS.md` | A row for editing résumé versions (who, which tables); Q54 added to the rules under the table. | The same. |
 | Applications migration test (Samad) | `backend/tests/test_migration_0009.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `"0009"`. | With PR 5's migration (0012) on top, a refused downgrade leaves the database at 0010; the test's point (nothing moved) is unchanged. |
+| Upload size limits (Uzair, production layer 2a) | `backend/body_limit.py` | The candidate's résumé upload (`POST …/candidates/{candidate}/resumes/upload`) joins the 11 MB upload routes. | A résumé file over 1 MB was refused (413) before reaching the route; the route keeps its own 10 MB check, like parse-resume. |
 
 Not changed, left to the owner:
 
