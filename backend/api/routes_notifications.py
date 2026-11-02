@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
-from backend.auth.password_reset import decide_request, expire_due_for_user, make_reset_link
+from backend.auth import ledger
+from backend.auth.password_reset import LEDGER_ENTITY, decide_request, expire_due_for_user, make_reset_link
 from backend.auth.policy import can
 from backend.auth.sessions import Principal
 from backend.models.db import get_db, utcnow
@@ -28,11 +29,14 @@ def list_notifications(response: Response, principal: Principal = Depends(curren
     rows = recipient_query(db, principal).order_by(Notification.created_at.desc()).limit(100).all()
     reset_ids = [uuid.UUID(n.entity_id) for n in rows if n.type == "PASSWORD_RESET"]
     requests = db.query(PasswordResetRequest).filter(PasswordResetRequest.id.in_(reset_ids)).all() if reset_ids else []
-    for request_row in requests:
-        requester = db.query(User).filter(User.id == request_row.requester_user_id).with_for_update().first()
-        if requester:
+    # Settle expiry only for requests still open: a resolved one never changes again. This is polled every minute, so
+    # lock nothing otherwise, and lock requesters in one query in id order, so two polls can't deadlock.
+    open_requester_ids = sorted({r.requester_user_id for r in requests if r.status in ("PENDING", "APPROVED")})
+    if open_requester_ids:
+        for requester in (db.query(User).filter(User.id.in_(open_requester_ids)).order_by(User.id)
+                          .with_for_update().populate_existing().all()):
             expire_due_for_user(db, requester)
-    db.commit()
+        db.commit()
     response.headers["Cache-Control"] = "private, no-store"
     request_map = {str(r.id): r for r in requests}
     return {"items": [{"id": str(n.id), "type": n.type, "entityId": n.entity_id,
@@ -96,16 +100,24 @@ def reissue_reset_link(notification_id: uuid.UUID, response: Response,
         raise HTTPException(status_code=403, detail="You don't have permission to do that.")
     row = db.query(PasswordResetRequest).filter(PasswordResetRequest.id == uuid.UUID(notice.entity_id)).first()
     now = utcnow()
-    requester = db.query(User).filter(User.id == row.requester_user_id).with_for_update().first() if row else None
+    # populate_existing on both locks, as in decide_request: re-read the rows rather than reuse the copies above.
+    requester = (db.query(User).filter(User.id == row.requester_user_id).with_for_update().populate_existing().first()
+                 if row else None)
     if requester:
         expire_due_for_user(db, requester, now)
-        row = db.query(PasswordResetRequest).filter(PasswordResetRequest.id == row.id).with_for_update().first()
+        row = (db.query(PasswordResetRequest).filter(PasswordResetRequest.id == row.id).with_for_update()
+               .populate_existing().first())
     if (not row or row.status != "APPROVED" or row.expires_at <= now or row.decided_at is None
             or (principal.is_platform and row.decided_by_platform_user_id != principal.user_id)
             or (not principal.is_platform and row.decided_by_user_id != principal.user_id)):
         db.commit()
         raise HTTPException(status_code=409, detail="A reset link is not available for this notification.")
-    link = make_reset_link(db, row, db.get(PlatformUser if principal.is_platform else User, principal.user_id))
+    actor = db.get(PlatformUser if principal.is_platform else User, principal.user_id)
+    link = make_reset_link(db, row, actor)
+    ledger.record(db, actor=actor, action="UPDATE", entity_type=LEDGER_ENTITY, entity_id=row.id,
+                  entity_label=requester.name, firm_id=row.firm_id,
+                  summary=f"{actor.name} created a new password reset link for {requester.name}; the previous one no "
+                          "longer works")
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     db.commit()

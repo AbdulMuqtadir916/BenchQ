@@ -5,16 +5,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth import ledger, support, throttle
-from backend.auth.password_reset import (GENERIC_REQUEST, LINK_EXPIRED, expire_due_for_user, expire_request, make_reset_link, password_frozen,
-                                         request_reset)
+from backend.auth.password_reset import (GENERIC_REQUEST, LINK_EXPIRED, expire_due_for_user, expire_request,
+                                         make_reset_link, password_frozen, request_reset, system_entry)
 from backend.auth.tokens import hash_token
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password, needs_rehash, verify_password
 from backend.auth.serialize import session_json
-from backend.auth.sessions import (COOKIE_NAME, Principal, clear_cookie_kwargs, cookie_kwargs, end_session,
-                                   principal_for, start_session)
+from backend.auth.sessions import (COOKIE_NAME, Principal, clear_cookie_kwargs, cookie_kwargs, end_all_sessions,
+                                   end_session, principal_for, start_session)
 from backend.models.db import get_db, utcnow
 from backend.models.notifications import Notification, PasswordResetRequest
-from backend.models.tenancy import LedgerEntry, PlatformUser, User
+from backend.models.tenancy import PlatformUser, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -64,8 +64,13 @@ def sign_in(body: SignInBody, request: Request, response: Response, db: DbSessio
         raise HTTPException(status_code=401, detail=INVALID_CREDENTIALS)
     if isinstance(account, User):
         # Serialize with reset requests so an old password cannot create a session after a request freezes it.
-        account = db.query(User).filter(User.id == account.id).with_for_update().first()
-        if not account.is_active or password_frozen(db, account):
+        # populate_existing: the lock must re-read the row, not return the object loaded above. If the hash changed
+        # during the Argon2 check, check the password again against the new one: a completed reset replaced it (refuse),
+        # or a concurrent sign-in only rehashed the same password (still right).
+        verified_hash = account.password_hash
+        account = db.query(User).filter(User.id == account.id).with_for_update().populate_existing().first()
+        still_valid = account.password_hash == verified_hash or verify_password(account.password_hash, body.password)
+        if not account.is_active or not still_valid or password_frozen(db, account):
             db.commit()  # persist expiry cleanup if the request had already timed out
             throttle.record_failure(request, email)
             raise HTTPException(status_code=401, detail=INVALID_CREDENTIALS)
@@ -103,11 +108,16 @@ def password_reset_complete(body: PasswordResetCompleteBody, db: DbSession = Dep
     now = utcnow()
     if row is None:
         raise HTTPException(status_code=400, detail=LINK_EXPIRED)
+    # Hash once a real link is found (an unknown token costs no Argon2), and before the locks, so they aren't held for it.
+    new_hash = hash_password(body.password)
     row_id = row.id
-    user = db.query(User).filter(User.id == row.requester_user_id).with_for_update().first()
+    # populate_existing on both locks: each must re-read its row, or a second call with the same token checks the
+    # copy loaded above and spends the one-use link twice.
+    user = db.query(User).filter(User.id == row.requester_user_id).with_for_update().populate_existing().first()
     if user:
         expire_due_for_user(db, user, now)
-    row = db.query(PasswordResetRequest).filter(PasswordResetRequest.id == row_id).with_for_update().first()
+    row = (db.query(PasswordResetRequest).filter(PasswordResetRequest.id == row_id).with_for_update()
+           .populate_existing().first())
     if (not user or not user.is_active or not row or row.status != "APPROVED"
             or row.reset_token_hash != token_hash or row.reset_token_consumed_at is not None
             or row.reset_token_expires_at is None or row.reset_token_expires_at <= now or row.expires_at <= now):
@@ -122,7 +132,8 @@ def password_reset_complete(body: PasswordResetCompleteBody, db: DbSession = Dep
         raise HTTPException(status_code=400, detail=LINK_EXPIRED)
     if verify_password(user.password_hash, body.password):
         raise HTTPException(status_code=422, detail="Choose a password different from your current password.")
-    user.password_hash = hash_password(body.password)
+    user.password_hash = new_hash
+    end_all_sessions(db, user)     # Q54: every session made before or during the request ends with the old password
     row.status = "COMPLETED"
     row.reset_token_consumed_at = now
     row.reset_token_hash = None
@@ -130,9 +141,7 @@ def password_reset_complete(body: PasswordResetCompleteBody, db: DbSession = Dep
     for notification in db.query(Notification).filter(Notification.type == "PASSWORD_RESET",
         Notification.entity_id == str(row.id), Notification.resolved_at.is_(None)).all():
         notification.resolved_at = now
-    db.add(LedgerEntry(firm_id=user.firm_id, actor_type="SYSTEM", actor_user_id=None, actor_name="password_reset",
-                       entity_type="user", entity_id=str(user.id), entity_label=user.name, action="UPDATE",
-                       summary=f"{user.name} completed an approved password reset"))
+    system_entry(db, row, user.name, "STATE_CHANGE", f"{user.name} completed an approved password reset")
     db.commit()
     return {"message": "Password reset successfully. You can now sign in."}
 

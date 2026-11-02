@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Bell, BriefcaseBusiness, KeyRound, MessageSquareText, TimerReset, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/cn";
+import { CountBadge } from "@/components/ui/count-badge";
 import { CONTENT_EXIT, POPOVER_TRANSITION } from "@/lib/motion";
 import { isPendingRequest, useMarkNotificationRead, useNotifications } from "@/lib/hooks/use-notifications";
 import type { RouteId, RouteQuery } from "@/lib/routes/registry";
@@ -137,11 +138,7 @@ export function NotificationsMenu({ variant = "firm" }: { variant?: "firm" | "ad
         className="bq-secondary relative inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-text-2)] hover:text-[var(--color-text)]"
       >
         <Bell size={15} aria-hidden />
-        {unreadCount ? (
-          <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full border-2 border-[var(--color-surface)] bg-[var(--color-primary)] px-1 text-[9px] font-semibold leading-3 text-white">
-            {unreadCount}
-          </span>
-        ) : null}
+        <CountBadge count={unreadCount} className="absolute -right-1 -top-1" />
       </button>
 
       <AnimatePresence initial={false}>

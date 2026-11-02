@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useHref } from "@/lib/routes/use-href";
-import { passwordRecoveryApi } from "@/lib/api/password-recovery";
+import { useCompletePasswordReset } from "@/lib/hooks/use-password-recovery";
 
 const RESET_TOKEN_KEY = "benchq.reset-password.token";
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -19,8 +19,9 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [done, setDone] = useState(false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const completeReset = useCompletePasswordReset();
+  const busy = completeReset.isPending;
+  const error = completeReset.error ? completeReset.error.message || "Couldn't reset your password. Try again." : "";
   function clearStoredToken() {
     try { window.sessionStorage.removeItem(RESET_TOKEN_KEY); } catch { /* Storage may be disabled. */ }
   }
@@ -77,14 +78,14 @@ export default function ResetPasswordPage() {
     }
     return () => window.removeEventListener("hashchange", consumeHash);
   }, []);
-  async function submit(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
-    try {
-      await passwordRecoveryApi.complete(token, password);
-      clearStoredToken();
-      setDone(true);
-    } catch (e) { setError(e instanceof Error ? e.message : "Couldn't reset your password. Try again."); }
-    finally { setBusy(false); }
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    completeReset.mutate({ token, password }, {
+      onSuccess: () => {
+        clearStoredToken();
+        setDone(true);
+      },
+    });
   }
   return <main className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-4"><Card className="w-full max-w-xl p-8 shadow-lg">
     <div className="text-center mb-8"><h1 className="text-display text-[var(--color-text)]">BenchQ</h1><h2 className="mt-5 text-xl font-semibold text-[var(--color-text)]">Choose a new password</h2><p className="mt-2 text-[var(--color-text-3)]">Your approver shared this one-time reset link with you.</p></div>

@@ -10,6 +10,7 @@ import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { activeNavId, navFor, type RouteDef } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { EASE_OUT } from "@/lib/motion";
+import { CountBadge } from "@/components/ui/count-badge";
 
 /**
  * Frosted navigation: 208px expanded, 60px collapsed, 48px mobile rail.
@@ -127,7 +128,7 @@ function SidebarItem({ route, isActive, pendingRequestCount }: { route: RouteDef
       >
         {Icon ? <Icon size={16} aria-hidden="true" className="shrink-0" /> : null}
         <span className="sidebar-label flex-1 truncate">{route.title}</span>
-        {pendingRequestCount > 0 ? <span aria-hidden="true" className="absolute right-2 top-1/2 flex min-w-4 -translate-y-1/2 items-center justify-center rounded-full border-2 border-[var(--color-surface)] bg-[var(--color-primary)] px-1 text-[9px] font-semibold leading-3 text-white">{pendingRequestCount}</span> : null}
+        <CountBadge count={pendingRequestCount} className="absolute right-2 top-1/2 -translate-y-1/2" />
       </Link>
     </li>
   );

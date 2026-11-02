@@ -6,21 +6,18 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useHref } from "@/lib/routes/use-href";
-import { passwordRecoveryApi } from "@/lib/api/password-recovery";
+import { useRequestPasswordReset } from "@/lib/hooks/use-password-recovery";
 
 export default function ForgotPasswordPage() {
   const toHref = useHref();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function submit(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
-    try {
-      await passwordRecoveryApi.request(email);
-      setSent(true);
-    } catch (e) { setError(e instanceof Error ? e.message : "Couldn't submit the request right now. Try again."); }
-    finally { setBusy(false); }
+  const requestReset = useRequestPasswordReset();
+  const busy = requestReset.isPending;
+  const error = requestReset.error ? requestReset.error.message || "Couldn't submit the request right now. Try again." : "";
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    requestReset.mutate(email, { onSuccess: () => setSent(true) });
   }
   return <main className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-4"><Card className="w-full max-w-xl p-8 shadow-lg">
     <div className="text-center mb-8"><h1 className="text-display text-[var(--color-text)]">BenchQ</h1><h2 className="mt-5 text-xl font-semibold text-[var(--color-text)]">Reset your password</h2><p className="mt-2 text-[var(--color-text-3)]">Enter the email address on your BenchQ account.</p></div>

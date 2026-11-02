@@ -4,19 +4,35 @@ from datetime import timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from backend.auth import ledger
 from backend.auth.sessions import end_all_sessions
 from backend.auth.tokens import hash_token, new_token
 from backend.auth.passwords import verify_password
 from backend.config import IS_PRODUCTION, PASSWORD_RESET_BASE_URL
 from backend.models.db import utcnow
 from backend.models.notifications import Notification, PasswordResetRequest
-from backend.models.tenancy import Firm, PlatformUser, User
+from backend.models.tenancy import Firm, LedgerEntry, PlatformUser, User
 
 REQUEST_LIFETIME = timedelta(hours=24)
 LINK_LIFETIME = timedelta(minutes=30)
 GENERIC_REQUEST = "If the account is eligible, its approver will see a reset request in Notifications."
 # One answer for an unknown, used, replaced or timed-out link: it never says which, or that a token exists.
 LINK_EXPIRED = "This link has expired. Contact your manager or firm owner for a new one."
+LEDGER_ENTITY = "password_reset_request"
+
+
+def require_reset_base_url() -> None:
+    """Startup check: in production a reset link needs the public HTTPS origin. Without it every Approve would fail
+    with 503 after the request had already frozen the password, locking the requester out for 24 hours."""
+    if IS_PRODUCTION and not PASSWORD_RESET_BASE_URL.startswith("https://"):
+        raise RuntimeError("PASSWORD_RESET_BASE_URL must be the public https:// origin of the frontend in production.")
+
+
+def system_entry(db: Session, row: PasswordResetRequest, label: str, action: str, summary: str) -> None:
+    """A ledger entry no person acted for (the request comes from a signed-out page; an expiry has no actor)."""
+    db.add(LedgerEntry(firm_id=row.firm_id, actor_type="SYSTEM", actor_user_id=None, actor_name="password_reset",
+                       entity_type=LEDGER_ENTITY, entity_id=str(row.id), entity_label=label, action=action,
+                       summary=summary))
 
 
 def approvers_for(db: Session, user: User):
@@ -36,6 +52,9 @@ def approvers_for(db: Session, user: User):
 
 
 def expire_request(db: Session, row: PasswordResetRequest, now=None) -> None:
+    requester = db.get(User, row.requester_user_id)
+    system_entry(db, row, requester.name if requester else "", "STATE_CHANGE",
+                  f"Password reset request for {requester.name if requester else 'a user'} expired")
     row.status = "EXPIRED"
     row.reset_token_hash = None
     row.reset_token_expires_at = None
@@ -48,7 +67,7 @@ def expire_request(db: Session, row: PasswordResetRequest, now=None) -> None:
 def expire_due_for_user(db: Session, user: User, now=None) -> None:
     now = now or utcnow()
     rows = db.query(PasswordResetRequest).filter(PasswordResetRequest.requester_user_id == user.id,
-        PasswordResetRequest.status.in_(["PENDING", "APPROVED"])).with_for_update().all()
+        PasswordResetRequest.status.in_(["PENDING", "APPROVED"])).with_for_update().populate_existing().all()
     for row in rows:
         if row.expires_at <= now:
             expire_request(db, row, now)
@@ -126,6 +145,8 @@ def request_reset(db: Session, email: str):
         db.add(Notification(firm_id=None if platform else user.firm_id,
             user_id=None if platform else approver.id, platform_user_id=approver.id if platform else None,
             type="PASSWORD_RESET", entity_id=str(row.id), title=title, detail=detail))
+    who = "a Super Admin" if platform else f"{approvers[0].name} ({approvers[0].role.title()})"
+    system_entry(db, row, user.name, "CREATE", f"{user.name} asked for a password reset; sent to {who}")
     # Freeze at request creation, and terminate sessions immediately. The lock serializes with sign-in.
     end_all_sessions(db, user)
 
@@ -133,8 +154,11 @@ def request_reset(db: Session, email: str):
 def decide_request(db: Session, row: PasswordResetRequest, *, actor_user: User | None = None,
                    actor_platform: PlatformUser | None = None, approve: bool):
     now = utcnow()
-    user = db.query(User).filter(User.id == row.requester_user_id).with_for_update().first()
-    row = db.query(PasswordResetRequest).filter(PasswordResetRequest.id == row.id).with_for_update().first()
+    # populate_existing: the caller already loaded this row, and a lock without it returns that copy. Two decisions
+    # at once (two Super Admins, a double click) must see each other: the second finds it no longer PENDING.
+    user = db.query(User).filter(User.id == row.requester_user_id).with_for_update().populate_existing().first()
+    row = (db.query(PasswordResetRequest).filter(PasswordResetRequest.id == row.id).with_for_update()
+           .populate_existing().first())
     if not user or not user.is_active or row is None or row.status != "PENDING" or row.expires_at <= now:
         if row and row.status == "PENDING":
             expire_request(db, row, now)
@@ -159,9 +183,13 @@ def decide_request(db: Session, row: PasswordResetRequest, *, actor_user: User |
     row.decided_by_user_id = actor_user.id if actor_user else None
     row.decided_by_platform_user_id = actor_platform.id if actor_platform else None
     row.status = "DENIED" if not approve else "APPROVED"
+    actor = actor_user or actor_platform
+    ledger.record(db, actor=actor, action="STATE_CHANGE", entity_type=LEDGER_ENTITY, entity_id=row.id,
+                  entity_label=user.name, firm_id=row.firm_id,
+                  summary=f"{actor.name} {'approved' if approve else 'denied'} {user.name}'s password reset request")
     link = None
     if approve:
-        link = make_reset_link(db, row, actor_user or actor_platform)
+        link = make_reset_link(db, row, actor)
     for notification in db.query(Notification).filter(Notification.type == "PASSWORD_RESET",
         Notification.entity_id == str(row.id), Notification.resolved_at.is_(None)).all():
         notification.resolved_at = now

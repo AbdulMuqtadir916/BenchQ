@@ -326,24 +326,24 @@ export const PlatformUserSchema = z.object({
 ```ts
 export const NotificationSchema = z.object({
   id: z.string(),
-    type: z.string(),                         // extensible event kind; first: PASSWORD_RESET
-  entityId: z.string(),                     // id of the typed entity; never a secret or reset URL
-    requestStatus: z.string().nullable(),      // present for PASSWORD_RESET notifications
-    canReissue: z.boolean(),                   // true only for the approver who approved the request
+  type: z.string(),                        // extensible event kind; first: PASSWORD_RESET
+  entityId: z.string(),                    // id of the typed entity; never a secret or reset URL
+  requestStatus: z.string().nullable(),    // present for PASSWORD_RESET notifications
+  canReissue: z.boolean(),                 // true only for the approver who approved the request
   title: z.string(),
   detail: z.string(),
   createdAt: z.string().datetime(),
   readAt: z.string().datetime().nullable(),
-    resolvedAt: z.string().datetime().nullable(),
+  resolvedAt: z.string().datetime().nullable(),
 });
 
 export const PasswordResetRequestSchema = z.object({
   id: z.string(),
-    requesterUserId: z.string(),
+  requesterUserId: z.string(),
   requesterRole: FirmRole,
-    approverRole: z.enum(['OWNER', 'MANAGER', 'PLATFORM_ADMIN']),
+  approverRole: z.enum(['OWNER', 'MANAGER', 'PLATFORM_ADMIN']),
   firmId: z.string(),
-    status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'EXPIRED', 'COMPLETED', 'CANCELLED']),
+  status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'EXPIRED', 'COMPLETED', 'CANCELLED']),
   createdAt: z.string().datetime(),
   expiresAt: z.string().datetime(),         // approval request lifetime: 24 hours
   decidedAt: z.string().datetime().nullable(),
@@ -423,6 +423,7 @@ entries.
 | `platform_user` | `STATE_CHANGE` when staff are deactivated; `LOGIN` | null |
 | `plan` | `CREATE` / `UPDATE` on the plan catalogue (implication 3) | null |
 | `support_view` | `ADMIN_ACCESS`, `ADMIN_ACCESS_END` (07 P4); `entityId` is the support view's id | the firm |
+| `password_reset_request` | 07 Q54, existing actions only: `CREATE` (the request, actor `SYSTEM`: it comes from a signed-out page), `STATE_CHANGE` (approved or denied, under the approver's name, a Super Admin's included; expired, `SYSTEM`), `UPDATE` (a fresh link, under the approver's name); completed, `STATE_CHANGE`, `SYSTEM`. `entityId` is the request's id; no entry holds a link or token | the requester's firm |
 
 #### Decisions — answers to the 17 open questions (2026-10-14)
 

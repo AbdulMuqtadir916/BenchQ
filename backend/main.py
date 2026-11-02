@@ -55,6 +55,8 @@ async def lifespan(app: FastAPI):
     before this process starts (backend/scripts/db_upgrade.py); deploy exactly one worker (docs/integration/07)."""
     logger.info("Starting JobNavigator backend...")
     check_schema_at_head()
+    from backend.auth.password_reset import require_reset_base_url
+    require_reset_base_url()
     run_seeds()
 
     # Clean up stale job runs from previous process

@@ -45,11 +45,17 @@ Checked 2026-11-02 on a fresh reset-demo stack (`localhost:3001`, database built
 link, expired, gives the new message. Then Sneha's request: Notifications, then Requests in its own sidebar, and the bell
 opening Requests. Light and dark, desktop and phone width.
 
+**Abdul's review of PR #105 (2026-11-02), 10 findings, all fixed on this branch:** the four races (a link spent
+twice, concurrent decisions, sign-in during a reset, a reissue on a finished request), sessions ended on completion,
+the ledger trail (request, decision, expiry, fresh link), the polled list's locks, the production startup check, the
+duplicate adapter, the reset pages on hooks, and one token-based count badge. New concurrency tests
+(`backend/tests/test_password_reset_races.py`). Details: the change document, "Third commit".
+
 **Task 2, its own branch:** `feat/remove-design-system-nav`, from this branch: **Design system** out of the sidebar
 (the `/dev/design-system` page itself stays). The change is ready; branch and PR when the lead decides (no stacked PRs:
 `CONTRIBUTING.md`).
 
-**Still to do:** fix the indentation of the `docs/02` §3.1 code block; bring the local dev database in line with
+**Still to do:** bring the local dev database in line with
 `main` (it ran the old local 0009/0010, not Samad's 0009) without losing data.
 
 **Known local issue:** `src/mocks/db.test.ts` (fixture fingerprint) fails on this Windows checkout only, because Git

@@ -76,6 +76,26 @@ Removing Design system from the sidebar is not in this PR; it is `feat/remove-de
 
 The once-a-minute refetch is one request a minute per open tab, far under the per-user limit (uzair.md §1).
 
+## Third commit: Abdul's review (2026-11-02)
+
+| Finding | Fix | File(s) |
+|---|---|---|
+| A one-use link could be spent twice | Both locks in `/complete` re-read their rows (`populate_existing()`, as in `backend/applications/tracking.py`); so does the lock in `expire_due_for_user` | `backend/api/routes_auth.py`, `backend/auth/password_reset.py` |
+| Two decisions at once both passed the PENDING check; a reissue could hit a finished request | `decide_request` and the reissue route re-read the requester and the request under their locks | `backend/auth/password_reset.py`, `backend/api/routes_notifications.py` |
+| Completion didn't end sessions | `/complete` calls `end_all_sessions` (Q54) | `backend/api/routes_auth.py` |
+| Sign-in checked the old password before the lock | The lock re-reads the user, and the hash must still be the one just verified | `backend/api/routes_auth.py` |
+| Decisions weren't in the ledger | Request (`CREATE`, SYSTEM), approval or denial (`STATE_CHANGE`, the approver), expiry and completion (`STATE_CHANGE`, SYSTEM), fresh link (`UPDATE`, the approver), all `password_reset_request` in the requester's firm, existing actions only (no change to `ledger_entries`); `docs/02` §3.1 lists them | `backend/auth/password_reset.py`, `backend/api/routes_notifications.py`, `docs/02-DATA-CONTRACTS.md` |
+| The polled list locked every requester, N+1, unordered | Only requesters with an open request are locked, in one query, in id order; nothing is locked or committed otherwise | `backend/api/routes_notifications.py` |
+| A missing reset URL only failed at approval | Startup refuses to run in production without an `https://` `PASSWORD_RESET_BASE_URL` | `backend/auth/password_reset.py`, `backend/main.py` |
+| Unused duplicate adapter and hook | Deleted | `src/lib/api/password-reset.ts`, `src/lib/hooks/use-password-reset.ts` |
+| The reset pages called the adapter | Mutation hooks | `src/lib/hooks/use-password-recovery.ts` (new), `src/app/forgot-password/page.tsx`, `src/app/reset-password/page.tsx` |
+| The badges hardcoded `text-[9px]` and `text-white` | One `CountBadge` on theme tokens (`text-mono-sm`, `--color-primary-fg`) for the sidebar and the bell | `src/components/ui/count-badge.tsx` (new), `src/components/layout/sidebar.tsx`, `src/components/layout/notifications-menu.tsx` |
+
+`backend/tests/test_password_reset_races.py` (new) makes each race deterministic: a wrapper commits the competing
+change from a second session between the route's read and its lock. Its 8 tests all fail on the code before this
+commit (the second use of a link succeeds; an approval after a denial, and a fresh link after completion, return 200;
+sign-in on a replaced password returns 200; a session survives completion) and pass after it.
+
 ## Migration and rollback
 
 - One revision, `0010`, on main's `0009`. Two new tables only; no existing table changes.
