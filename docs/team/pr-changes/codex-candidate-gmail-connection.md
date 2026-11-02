@@ -299,3 +299,7 @@ owner, legacy Google project-isolation check and policy confirmation for delegat
 provenance remain later launch requirements. The post-#104 plan must also explicitly settle provider re-import when
 an address is reused for a different candidate; retained records themselves never move candidates/firms. Legacy
 mock application/UI integration remains the later tracks; this PR does not rewrite all mock modules.
+
+Local implementation checkpoint: `21d2a76`. All test commands exited zero. The synthetic UI server and temporary
+PostgreSQL container were removed/stopped after verification. Only documentation was updated afterward to record
+this checkpoint; no push, review replies or merge occurred.

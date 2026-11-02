@@ -18,7 +18,7 @@ Earlier reported results for c98538d were 3,748 backend passes and 563 frontend 
 
 ## Local implementation progress (2026-11-02)
 
-Implementation is in `/private/tmp/benchq-pr104-review`; the running combined checkout/database are unchanged.
+Implementation is saved locally as `21d2a76` in `/private/tmp/benchq-pr104-review`; the running combined checkout/database are unchanged.
 See prstatus.md for continuously updated checks. The eight correction modules are implemented locally;
 all local technical verification has passed: full backend 3,767, focused hardening 243, final regression module
 34, frontend 572, typecheck/lint/production build and synthetic browser acceptance. Counts overlap. Code-owner

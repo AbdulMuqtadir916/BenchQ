@@ -6,7 +6,7 @@ Updated: 2026-11-02. Plan: [pr104_plan.md](pr104_plan.md).
 
 ## Current execution — local technical corrections verified
 
-Implementation checkout: `/private/tmp/benchq-pr104-review`, branch `codex/candidate-gmail-connection`, based on published `c98538d` with main `a1c7a92` included. The running combined development folder and its database are unchanged. No push or merge.
+Implementation checkout: `/private/tmp/benchq-pr104-review`, branch `codex/candidate-gmail-connection`, based on published `c98538d` with main `a1c7a92` included. The running combined development folder and its database are unchanged. Local implementation commit: `21d2a76`. No push or merge.
 
 Update this tracker after each completed module/check or meaningful failure. Never tick pending code-owner decisions as approved.
 
@@ -153,7 +153,8 @@ Update this tracker after each completed module/check or meaningful failure. Nev
 - [x] Single Alembic head; approved unmerged revision upgrade/backfill/downgrade guards pass.
 - [x] Secret scan/diff checks pass; real credentials/mail/existing DB remain untouched.
 - [ ] Fetch/integrate latest main; rerun affected verification after integration.
-- [ ] Record final commit/commands/results/logs and per-file inventory.
+- [x] Record final implementation commit `21d2a76`, commands/results/logs and per-file inventory.
+- [x] Stop the synthetic browser harness and remove the disposable test databases after verification; leave the running app/database untouched.
 - [ ] Push authorized corrections to existing #104; reply to review threads with evidence.
 - [ ] GitHub CI green and Abdul code-owner approval obtained.
 - [x] Report real-candidate launch gates separately; do not imply merge enables production.
@@ -196,3 +197,4 @@ Update this tracker after each completed module/check or meaningful failure. Nev
 | 2026-11-02 | Full backend passed: 3,767 passed, 11 skipped, 54 deselected, 13 existing xfailed, 6 existing warnings; integrated deletion-during-fetch passed | Final follow-up module rerun in progress; no push/merge |
 | 2026-11-02 | Final 30-case follow-up module passed, including 300-message audit, simultaneous read marks, interrupted-worker recovery and unchanged reassigned application/email history | Added fallback-page rendering regressions and started final frontend checks; no product-code changes |
 | 2026-11-02 | All local technical checks passed: full backend 3,767; hardening 243; final regression module 34; frontend 572; typecheck/lint/build/browser | Counts overlap; approvals, publication, live rollout and later PRs remain pending |
+| 2026-11-02 | Saved verified corrections in local commit 21d2a76; stopped synthetic harness and removed disposable test database container | No push, review replies or merge; existing localhost app/database unchanged |
