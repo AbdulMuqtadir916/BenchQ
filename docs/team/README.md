@@ -92,4 +92,5 @@ it. Everyone else reads it.
 | 0007 | Abdul | Candidate core tables | PR #91 |
 | 0008 | Zuhair | Résumé versioning: `base_resumes`, the new `resumes` columns, `award` claims (additive) | `feat/base-resumes-schema` |
 | 0009 | Samad | Applications foundation: revisions, immutable status events and BDE review records | PR 1 replacement, `codex/applications-foundation-v2`; code-owner review pending |
-| 0010+ | — | Claim the next number here in your PR | — |
+| 0012 | Zuhair | Résumé versioning PR 5: `base_resumes.promoted_from_resume_id` and `archived_at`, `resume_parses.content_sha256`, and their unique rules (additive). Agreed with Abdul: 0010 and 0011 go to branches not merged yet; until they merge, 0012 follows 0009, then it follows 0011 | `feat/resume-versions` |
+| 0010, 0011, 0013+ | — | Claim the number here in your PR | — |

@@ -35,6 +35,7 @@ flowchart TD
 | Upload résumé, review profile, assign | Owner, Manager | **Built** (onboarding 01–07); profile and Record improvements: **Zuhair** | `candidates`, `resume_parses`, `claims`, `evidence` |
 | Find jobs | BDE | **Zuhair** (job scraping per candidate) | `searches`, `candidate_jobs`, `jobs` |
 | Favorite | BDE | **Samad** (with the extension) | `favorite_jobs` |
+| Edit résumé versions, choose the base, upload a later résumé | BDE (Owner, Manager only before a BDE is assigned, 07 Q54) | **Zuhair** (résumé versioning PR 5) | `base_resumes`, `resumes`, `resume_parses` |
 | Tailor résumé (+ ATS score) | BDE | **Zuhair** | `resumes` (base + tailored) |
 | Apply | BDE | **Samad** (applications, then the extension) | `applications` |
 | Emails arrive, status updates | BDE | **Samad** (inbox first) | `candidate_mailboxes`, `inbox_messages`, `applications` |
@@ -43,7 +44,7 @@ flowchart TD
 | Billing, deployment, clean-up | — | **Abdul** | billing tables (new) |
 
 Rules the flow depends on: a candidate always has a manager and at most one BDE (a candidate without a BDE waits in
-the manager's "Needs a BDE" queue); an application uses a **tailored** résumé, frozen once sent; nothing is VERIFIED
+the manager's "Needs a BDE" queue); an application uses a **tailored** résumé, frozen once sent; once a BDE is assigned only that BDE changes the candidate's résumés (07 Q54); nothing is VERIFIED
 without evidence; every row carries `firm_id`, and data never crosses firms.
 
 ## 2. The architecture

@@ -3,6 +3,26 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé versioning PR 5 — versions and bases through the API (`feat/resume-versions`, Zuhair)
+
+Design: [resume-versioning.md](./resume-versioning.md) §3.1, §3.2, §4.3, §4.6, §4.7, §6; decided with Abdul
+2026-11-02, who asked for it to be written into the docs in this PR.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Routes and permissions (Abdul) | `docs/07-ROUTES-AND-RBAC.md` | Q54 added (who changes a candidate's résumés); a line under the §2.2 route map (résumé actions are per candidate); a Phase C row for the two helpers. The route map's access levels and the registry are unchanged. | Abdul's decision: once a BDE is assigned, only that BDE changes the candidate's résumés. |
+| The permission policy (Abdul) | `backend/auth/policy.py`, `src/lib/auth/policy.ts` | Two helpers, `can_change_resume` / `canChangeResume` and `can_manage_resume` / `canManageResume`, next to `can_assign_to`. The role table (and `policy_table.json`) is unchanged: `resume.edit` stays OWNER, MANAGER, BDE, and the helpers narrow it by the candidate's BDE. | Q54 depends on the candidate (has a BDE, and which), which a role table can't express; the project forbids inline role checks in routes. The screens switch to the helpers in PR 7. |
+| The frontend contract (Abdul approves) | `docs/02-DATA-CONTRACTS.md` §8.1 | `BaseResume` gains `promotedFromResumeId` and `archivedAt` (both nullable). Not built in `src/lib/schemas/` until PR 7. | The dropdown leaves out promoted versions and hidden bases (§3.2, §4.7). |
+| The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | One bullet in the résumé section: who changes résumés, and what PR 5 adds. | The section described the résumés without Q54. |
+| The team flows (team doc) | `docs/team/FLOWS.md` | A row for editing résumé versions (who, which tables); Q54 added to the rules under the table. | The same. |
+| Applications migration test (Samad) | `backend/tests/test_migration_0009.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `"0009"`. | With PR 5's migration (0012) on top, a refused downgrade leaves the database at 0010; the test's point (nothing moved) is unchanged. |
+
+Not changed, left to the owner:
+
+- **Email required and unique per firm (Abdul, `candidates`):** decided 2026-11-02 (one candidate per person per
+  firm, never checked across firms). The create route already requires and lowercases it; the unique rule and its
+  migration are Abdul's.
+
 ## Résumé versioning PR 4 — the first base on candidate create (`feat/base-resume-from-parse`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §4.2 (approved with PR 1).

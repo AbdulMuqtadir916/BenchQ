@@ -1,0 +1,265 @@
+"""A candidate's résumé versions and bases (docs/team/resume-versioning.md §4.3, §4.6, §4.7, §6; PR 5). Under the
+candidate's URL: another firm, a candidate outside the principal's scope, or a résumé that isn't the candidate's is the
+same 404 as a missing one.
+
+- GET    …/resumes                          the bases with their versions, and the tailored résumés
+- GET    …/resumes/{resume_id}              one version with its content
+- POST   …/resumes/{resume_id}/save         its next version (the edit), with a notice if another was saved meanwhile
+- POST   …/resumes/{resume_id}/use-as-base  "Use this as the base?" Yes, and a pick in the base dropdown
+- POST   …/resumes/upload                   a later résumé: a new active base from the parse (the BDE)
+- GET    …/resumes/{resume_id}/removal      what deleting this version would do (for the warning)
+- DELETE …/resumes/{resume_id}              delete one version
+- GET    …/resumes/bases/{base_id}/removal  what deleting this base would do
+- DELETE …/resumes/bases/{base_id}          delete or hide a base
+- POST   …/resumes/bases/{base_id}/show     show a hidden base again (not made active)
+
+Who (07 Q54): reads, anyone who can see the candidate; save, use as base and pick, `can_change_resume` (the
+candidate's BDE, or the OWNER and a MANAGER while it has none); upload, delete and show again, `can_manage_resume`
+(the candidate's BDE). Checked with the candidate row locked, so an assignment can't land in between. A support view
+reads only (backend/auth/access.py).
+"""
+import asyncio
+import uuid
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session as DbSession
+
+from backend.api.routes_auth import current_principal
+from backend.api.routes_candidates import _candidate, _member_of
+from backend.auth.policy import can_change_resume, can_manage_resume, require
+from backend.auth.sessions import Principal
+from backend.candidates import versions
+from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
+from backend.models.candidates import ResumeParse, file_sha256
+from backend.models.db import get_db
+from backend.models.tenancy import User
+
+router = APIRouter(prefix="/firms/{firm_id}/candidates/{candidate_id}/resumes", tags=["candidate résumés"])
+
+Short = Field(default="", max_length=300)
+
+
+class BulletIn(BaseModel):
+    id: str | None = Field(default=None, max_length=64)
+    text: str = Field(default="", max_length=2000)
+
+
+class SkillIn(BaseModel):
+    id: str | None = Field(default=None, max_length=64)
+    category: str = Short
+    name: str = Field(min_length=1, max_length=300)
+
+
+class ExperienceIn(BaseModel):
+    id: str | None = Field(default=None, max_length=64)
+    job_title: str = Short
+    company: str = Short
+    location: str = Short
+    dates: str = Short
+    start: str = Short
+    end: str = Short
+    current: bool = False
+    bullets: list[BulletIn] = Field(default_factory=list, max_length=100)
+
+
+class ProjectIn(BaseModel):
+    id: str | None = Field(default=None, max_length=64)
+    name: str = Short
+    url: str = Field(default="", max_length=500)
+    dates: str = Short
+    technologies: str = Field(default="", max_length=1000)
+    bullets: list[BulletIn] = Field(default_factory=list, max_length=100)
+
+
+class EducationIn(BaseModel):
+    id: str | None = Field(default=None, max_length=64)
+    degree: str = Short
+    institution: str = Short
+    graduation_date: str = Short
+    grade: str = Short
+
+
+class EntryIn(BaseModel):
+    """A certification or an award."""
+    id: str | None = Field(default=None, max_length=64)
+    name: str = Field(min_length=1, max_length=300)
+    issuer: str = Short
+    date: str = Short
+    detail: str = Field(default="", max_length=1000)
+
+
+class LanguageIn(BaseModel):
+    id: str | None = Field(default=None, max_length=64)
+    name: str = Field(min_length=1, max_length=100)
+
+
+class ContentIn(BaseModel):
+    """A version's whole content, as the editor holds it (the shape of resumes' content columns, §3.3)."""
+    full_name: str | None = Field(default=None, max_length=300)
+    title: str | None = Field(default=None, max_length=300)
+    city: str | None = Field(default=None, max_length=300)
+    state: str | None = Field(default=None, max_length=300)
+    country: str | None = Field(default=None, max_length=300)
+    email: str | None = Field(default=None, max_length=320)
+    phone: str | None = Field(default=None, max_length=300)
+    work_authorization: str | None = Field(default=None, max_length=300)
+    github: str | None = Field(default=None, max_length=500)
+    linkedin: str | None = Field(default=None, max_length=500)
+    summary: str | None = Field(default=None, max_length=10000)
+    skills: list[SkillIn] = Field(default_factory=list, max_length=500)
+    experiences: list[ExperienceIn] = Field(default_factory=list, max_length=100)
+    projects: list[ProjectIn] = Field(default_factory=list, max_length=100)
+    educations: list[EducationIn] = Field(default_factory=list, max_length=50)
+    certifications: list[EntryIn] = Field(default_factory=list, max_length=100)
+    awards: list[EntryIn] = Field(default_factory=list, max_length=100)
+    languages: list[LanguageIn] = Field(default_factory=list, max_length=50)
+
+    def stored(self) -> dict:
+        """As the columns hold it: blank header text is NULL, as the first base writes it; ids left for the save."""
+        data = self.model_dump()
+        for key in versions.HEADER:
+            data[key] = (data[key] or "").strip() or None
+        for section in versions.SECTIONS:
+            for item in data[section]:
+                if item.get("id") is None:
+                    item.pop("id")
+                for bullet in item.get("bullets", []):
+                    if bullet.get("id") is None:
+                        bullet.pop("id")
+        return data
+
+
+def _forbidden() -> HTTPException:
+    return HTTPException(status_code=403, detail="This candidate's BDE changes their résumés; you can view them.")
+
+
+def _writer(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID, check):
+    """The candidate, locked, once `check` (`can_change_resume` / `can_manage_resume`) allows the principal."""
+    _member_of(firm_id, principal)
+    candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
+    if not check(principal, candidate):
+        raise _forbidden()
+    return candidate, db.get(User, principal.user_id)
+
+
+@router.get("", summary="A candidate's bases with their versions, and their tailored résumés")
+def list_resumes(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Principal = Depends(current_principal),
+                 db: DbSession = Depends(get_db)):
+    _member_of(firm_id, principal)
+    return versions.listing(db, _candidate(db, firm_id, principal, candidate_id))
+
+
+@router.get("/{resume_id}", summary="One version of a candidate's résumé, with its content")
+def get_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+               principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    _member_of(firm_id, principal)
+    candidate = _candidate(db, firm_id, principal, candidate_id)
+    return versions.version_json(versions.candidate_version(db, candidate, resume_id), with_content=True)
+
+
+@router.post("/{resume_id}/save", status_code=201, summary="Save an edit as the résumé's next version")
+def save_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID, body: ContentIn,
+                principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+    """`resume_id` is the version the edit was made from. The answer's `notice` says when another version was saved
+    meanwhile (both are kept; the new one doesn't include the other's changes)."""
+    candidate, actor = _writer(db, firm_id, principal, candidate_id, can_change_resume)
+    source = versions.candidate_version(db, candidate, resume_id)
+    saved = versions.save_version(db, actor, candidate, source, body.stored())
+    db.commit()
+    return {**versions.version_json(saved.row, with_content=True), "notice": saved.notice}
+
+
+@router.post("/{resume_id}/use-as-base", summary="Make this version the base the workflow uses")
+def use_resume_as_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+                       principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+    """A base's v1: that base becomes active. Any other version: copied as v1 of a new base, which becomes active; if
+    a base was already made from it, that one becomes active instead."""
+    candidate, actor = _writer(db, firm_id, principal, candidate_id, can_change_resume)
+    base = versions.use_as_base(db, actor, candidate, versions.candidate_version(db, candidate, resume_id))
+    db.commit()
+    return versions.base_json(base, versions.base_numbers(db, candidate)[base.id])
+
+
+@router.post("/upload", status_code=201, summary="Upload a later résumé as the candidate's new base")
+async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, file: UploadFile = File(...),
+                        principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+    """PDF or Word, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
+    with the base it is; otherwise the parser reads it and one transaction keeps the file and writes a new active
+    base with its v1. Nothing is saved if the parse fails (§4.6)."""
+    _member_of(firm_id, principal)
+    if not can_manage_resume(principal, _candidate(db, firm_id, principal, candidate_id)):
+        raise _forbidden()                   # refused before the file is read
+    db.commit()
+    content = await file.read(MAX_BYTES + 1)
+    kind = file_kind(file.filename or "", content)
+    sha256 = file_sha256(content)
+    candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
+    if (kept := versions.kept_file(db, candidate, sha256)) is not None:
+        if (answer := versions.already_uploaded(db, candidate, kept)) is not None:
+            raise answer
+        parse_row = kept                     # kept by a candidate made before bases existed: it becomes one now
+    else:
+        db.commit()                          # no lock, and no connection, held while the parser works
+        text = await asyncio.to_thread(extract_text, kind, content)
+        parse = await read_resume(text, kind, db, firm_id=firm_id)
+        candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
+        if (kept := versions.kept_file(db, candidate, sha256)) is not None:   # the same file, uploaded meanwhile
+            raise versions.already_uploaded(db, candidate, kept) or HTTPException(status_code=409,
+                                                                                  detail="Upload it again.")
+        parse_row = ResumeParse(firm_id=firm_id, uploaded_by_user_id=actor.id, candidate_id=candidate.id,
+                                file_name=(file.filename or "")[:255], mime_type=PDF_MIME if kind == "pdf" else DOCX_MIME,
+                                size_bytes=len(content), content=content, parse=parse, expires_at=None)
+        db.add(parse_row)
+    try:
+        db.flush()
+        base = versions.upload_base(db, actor, candidate, parse_row)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This résumé was just uploaded for this candidate. Reload to see it.")
+    return versions.base_json(base, versions.base_numbers(db, candidate)[base.id])
+
+
+@router.get("/bases/{base_id}/removal", summary="What deleting this base would do")
+def base_removal(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID,
+                 principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    _member_of(firm_id, principal)
+    candidate = _candidate(db, firm_id, principal, candidate_id)
+    return versions.base_removal(db, candidate, versions.candidate_base(db, candidate, base_id)).json()
+
+
+@router.delete("/bases/{base_id}", summary="Delete a base, or hide it if something uses it")
+def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID,
+                principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+    candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
+    removal = versions.delete_base(db, actor, candidate, versions.candidate_base(db, candidate, base_id))
+    db.commit()
+    return removal.json()
+
+
+@router.post("/bases/{base_id}/show", summary="Show a hidden base again (it isn't made active)")
+def show_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID,
+              principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+    candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
+    base = versions.show_again(db, actor, candidate, versions.candidate_base(db, candidate, base_id))
+    db.commit()
+    return versions.base_json(base, versions.base_numbers(db, candidate)[base.id])
+
+
+@router.get("/{resume_id}/removal", summary="What deleting this version would do")
+def version_removal(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+                    principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    _member_of(firm_id, principal)
+    candidate = _candidate(db, firm_id, principal, candidate_id)
+    return versions.version_removal(db, candidate, versions.candidate_version(db, candidate, resume_id)).json()
+
+
+@router.delete("/{resume_id}", summary="Delete one version (refused if something uses it)")
+def delete_version(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+                   principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+    candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
+    removal = versions.delete_version(db, actor, candidate, versions.candidate_version(db, candidate, resume_id))
+    db.commit()
+    return removal.json()

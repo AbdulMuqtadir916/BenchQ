@@ -162,8 +162,8 @@ def test_firm_data_never_crosses_firms(key, anonymous_client, world):
         assert in_b.status_code < 400, in_b.text
     assert snapshot_of(world.db, b.firm_id) == untouched, "a support view changed firm B's rows"
 
-    # Firm B's own OWNER gets through, for real.
-    own = _call(client, key, case, b.ids, b.cookie)
+    # Firm B's own OWNER (or its BDE, for what only a candidate's BDE does) gets through, for real.
+    own = _call(client, key, case, b.ids, b.bde_cookie if case.as_bde else b.cookie)
     assert own.status_code < 400, own.text
     if case.shows_rows:
         assert CANARY in own.text, "firm B's own answer should list its rows"
