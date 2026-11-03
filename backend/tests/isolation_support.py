@@ -33,10 +33,12 @@ RESUME_JSON = {
 
 @dataclass
 class Side:
-    """One firm: its OWNER's cookie and its rows' ids, by the names the case table uses."""
+    """One firm: its OWNER's cookie, its BDE's (for the routes only a candidate's BDE takes, 07 Q55) and its rows' ids,
+    by the names the case table uses."""
     firm_id: uuid.UUID
     cookie: dict
     ids: dict = field(default_factory=dict)
+    bde_cookie: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -169,7 +171,36 @@ def build_firm(db, firm, owner, tag: str) -> dict:
         expires_at=utcnow() + timedelta(minutes=10))
     db.add(attempt)
     db.flush()
+
+    # Résumé versioning (PR 5): the candidate's upload, its active base (the owner's, at onboarding) with a BDE's v2,
+    # and a second base the BDE made from it, unused, so a delete of either goes through.
+    from backend.models.candidates import BaseResume, ResumeParse
+    upload = ResumeParse(firm_id=firm.id, uploaded_by_user_id=owner.id, candidate_id=candidate.id,
+                         file_name=f"{tag}.pdf", mime_type="application/pdf", size_bytes=len(tag),
+                         content=f"{tag} file".encode(), parse={"header": {"name": f"{tag} candidate"}})
+    db.add(upload)
+    db.flush()
+    first = BaseResume(firm_id=firm.id, candidate_id=candidate.id, source="UPLOAD", resume_parse_id=upload.id,
+                       is_active=True, created_by_user_id=owner.id)
+    db.add(first)
+    db.flush()
+    versioned = dict(firm_id=firm.id, candidate_id=candidate.id, category="BASE", is_base=True, json_data={})
+    v1 = Resume(**versioned, base_resume_id=first.id, version=1, name=f"{tag} base", created_by_user_id=owner.id,
+                full_name=f"{tag} candidate", summary=f"{tag} summary")
+    v2 = Resume(**versioned, base_resume_id=first.id, version=2, name=f"{tag} base", created_by_user_id=bde.id,
+                full_name=f"{tag} candidate", summary=f"{tag} summary, edited")
+    db.add_all([v1, v2])
+    db.flush()
+    second = BaseResume(firm_id=firm.id, candidate_id=candidate.id, source="PROMOTED", promoted_from_resume_id=v2.id,
+                        created_by_user_id=bde.id)
+    db.add(second)
+    db.flush()
+    db.add(Resume(**versioned, base_resume_id=second.id, version=1, name=f"{tag} base", created_by_user_id=bde.id,
+                  full_name=f"{tag} candidate", summary=f"{tag} summary, edited"))
+    db.flush()
     return {"oauth_attempt": attempt.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
+            "version": v2.id, "base": second.id,
+
             "firm": firm.id, "slug": firm.slug, "job": job.id,
             "app": app.id, "legacy_app": legacy_app.id, "inbox_message": candidate_message.id, "interview": interview.id,
             "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id,
@@ -192,7 +223,8 @@ def make_world(db, accounts) -> World:
     db.add(shared)
     db.flush()
     link_job_to_firm(db, firm_a.id, shared.id, "SCRAPED")
-    a = Side(firm_a.id, cookie(accounts.firm_token), build_firm(db, firm_a, owner_a, "ACME"))
+    ids = build_firm(db, firm_a, owner_a, "ACME")
+    a = Side(firm_a.id, cookie(accounts.firm_token), ids, _session(db, db.get(User, ids["bde_user"])))
     db.commit()
     return World(db=db, a=a, b=None, admin=cookie(accounts.admin_token), shared_job=shared.id,
                  plan_id=firm_a.plan_id)
@@ -206,7 +238,9 @@ def add_firm_b(world: World) -> Side:
     firm_b = make_firm(db, db.get(Plan, world.plan_id), slug="globex", name=f"Globex {CANARY}")
     owner_b = make_user(db, firm_b, email="owner@globex.test", name=f"Gary {CANARY}")
     link_job_to_firm(db, firm_b.id, world.shared_job, "SCRAPED")
-    world.b = Side(firm_b.id, _session(db, owner_b), build_firm(db, firm_b, owner_b, CANARY))
+    from backend.models.tenancy import User
+    ids = build_firm(db, firm_b, owner_b, CANARY)
+    world.b = Side(firm_b.id, _session(db, owner_b), ids, _session(db, db.get(User, ids["bde_user"])))
     db.commit()
     return world.b
 
@@ -315,3 +349,8 @@ def offline(monkeypatch):
     monkeypatch.setattr(routes_inbox, "sync_mailbox", lambda *args, **kwargs: 0)
     monkeypatch.setattr(routes_inbox, "run_import", lambda *args, **kwargs: 0)
     monkeypatch.setattr(routes_inbox, "revoke_token", lambda *args, **kwargs: True)
+
+    from backend.api import routes_candidate_resumes
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: "isolation résumé text")
+    monkeypatch.setattr(routes_candidate_resumes, "read_resume", read_resume)
+

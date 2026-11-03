@@ -135,6 +135,26 @@ export function canAssignTo(
 }
 
 /**
+ * Who may change a candidate's résumés (07 Q55; docs/team/resume-versioning.md §6): edit and save, "Use as base?",
+ * pick a base. The candidate's BDE once one is assigned; before that the OWNER and a MANAGER (the candidate is already
+ * in their scope). VIEWER and a support view never. The backend's `can_change_resume` is the same rule.
+ */
+export function canChangeResume(principal: Principal, candidate: { bdeId: string | null }): boolean {
+  if (!can(principal, "resume.edit") || principal.kind !== "firm") return false;
+  if (candidate.bdeId === null) return OWNER_AND_MANAGER.includes(principal.role);
+  return candidate.bdeId === principal.userId;
+}
+
+/**
+ * What only the candidate's BDE does with their résumés (07 Q55): upload a later résumé, delete or hide, show again,
+ * tailor. The backend's `can_manage_resume` is the same rule.
+ */
+export function canManageResume(principal: Principal, candidate: { bdeId: string | null }): boolean {
+  return can(principal, "resume.edit") && principal.kind === "firm" && candidate.bdeId !== null
+    && candidate.bdeId === principal.userId;
+}
+
+/**
  * Whose work a page shows (07 §2.2 data scope, Q47): the OWNER, a VIEWER and a support view see the whole firm; a
  * MANAGER their team (the candidates they manage, and their BDEs' work); a BDE their own (assigned candidates, their
  * applications and follow-ups). Records outside the scope are not rendered.

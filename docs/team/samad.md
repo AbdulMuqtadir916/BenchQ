@@ -17,12 +17,12 @@ Agreed with Samad on 2026-11-01 for separating the existing combined Inbox/Appli
    approved and merged, then prepare the next branch from the updated `main`; do not stack PRs on open branches.
 3. **Split the existing work in this order:**
    - PR 1: Applications foundation — statuses, status history, BDE review records, and migration `0009` — merged in PR #100.
-   - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection/sync and minimum retained-account identity protection; migration `0011` follows merged notifications `0010`.
+   - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection/sync and minimum retained-account identity protection; migration `0012` follows merged résumé `0011`.
    - PR 3: Email classification — application matching, confidence rules, automatic status updates and BDE review
      routing, and its next available migration.
    - Original PR 4: account provenance and deduplication are moved into PR 2 (Samad requested 2026-11-01; Abdul approval pending). Do not raise a duplicate history PR; later hardening is a separate concern only if needed.
    - PR 4 (remaining UI): Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
-   Main owns résumé `0008` and Applications `0009` (PR #100). Notifications owns `0010` (PR #105); PR 2 claims `0011`. Claim later migration numbers
+   Main owns résumé `0008` and Applications `0009` (PR #100). Notifications owns `0010` (PR #105); Résumé versions owns `0011` (#106); PR 2 claims `0012`. Claim later migration numbers
    individually after checking the latest Alembic head on `main`; do not reserve numbers from the old combined branch.
    Include dependencies needed for each PR to work independently and explain any necessary scope adjustment.
 4. **Include a Markdown change document in every PR.** Use `docs/team/pr-changes/<branch-name>.md` (replace `/`
@@ -70,7 +70,7 @@ The candidate page already has an Inbox tab and an "Inbox" preview on its Overvi
   synthetic fixtures without a fake consent screen. Sync/read/disconnect errors are visible and read failures roll
   back optimistic state with explicit retry. Google Cloud client/redirect and encryption key must be configured
   through local/deployment secrets before live connection testing. Verification uses synthetic providers only.
-- One new migration, `0011` after `0010`, contains OAuth and minimum provenance. Downgrade refuses to discard
+- One new migration, `0012` after `0011`, contains OAuth and minimum provenance. Downgrade refuses to discard
   active OAuth attempts, live credentials or retained provenance that cannot be reconstructed. No merged migration
   or existing development data is rewritten. Required code-owner review remains pending before merge.
 
@@ -140,3 +140,5 @@ Accept Abdul’s 2026-11-03 removal of read/manual-sync request business-ledger 
 separate access logging later. Retain encrypted failed/busy revocations in expired existing OAuth cleanup attempts
 for scheduled retry, protecting any still-live shared grant. No new table or migration. Existing business events
 (import result, connection, confirmation, deletion) remain audited.
+
+Main integration: merged main ff923c3 (#106 résumé versions); preserved both fixture families and moved only unmerged Gmail migration/tests to 0012 after 0011. New integration checks pending.

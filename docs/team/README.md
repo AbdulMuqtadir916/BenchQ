@@ -94,7 +94,8 @@ it. Everyone else reads it.
 |---|---|---|---|
 | 0007 | Abdul | Candidate core tables | PR #91 |
 | 0008 | Zuhair | Résumé versioning: `base_resumes`, the new `resumes` columns, `award` claims (additive) | `feat/base-resumes-schema` |
-| 0009 | Samad | Applications foundation: revisions, immutable status events and BDE review records | Merged in PR #100 |
-| 0010 | Mohammed Abdul Ahad Umamah | Notifications inbox and password-reset approval requests | Merged in PR #105 |
-| 0011 | Samad | Candidate Gmail OAuth/sync and retained-account provenance | PR #104; code-owner review pending |
-| 0012+ | — | Claim the next number here in your PR | — |
+| 0009 | Samad | Applications foundation | Merged #100 |
+| 0010 | Mohammed Abdul Ahad Umamah | Notifications and password-reset approvals | Merged #105 |
+| 0011 | Zuhair | Résumé versioning and upload fingerprints | Merged #106 |
+| 0012 | Samad | Candidate Gmail OAuth/sync and provenance | PR #104; review pending |
+| 0013+ | — | Claim the next number here in your PR | — |

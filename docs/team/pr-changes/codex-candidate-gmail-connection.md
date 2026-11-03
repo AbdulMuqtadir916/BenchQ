@@ -47,7 +47,7 @@ Read-only Google OAuth with explicit candidate/address confirmation, encrypted c
 
 ## Migration and data safety
 
-One unmerged Gmail migration: **0011 after main’s notifications 0010**. The rename resolves a number collision after #105; no merged migration is edited. Upgrade backfills current mailbox provenance and encrypts retained text; guarded downgrade refuses to discard live credentials, active OAuth or irrecoverable account history. Existing development data was not migrated, reset or stamped. Configure deployment OAuth/callback and Fernet keys before enabling/migrating retained content; preserve old keys until re-encryption. Job progress uses existing columns only.
+One unmerged Gmail migration: **0012 after main’s résumé 0011**. The rename resolves a number collision after #105; no merged migration is edited. Upgrade backfills current mailbox provenance and encrypts retained text; guarded downgrade refuses to discard live credentials, active OAuth or irrecoverable account history. Existing development data was not migrated, reset or stamped. Configure deployment OAuth/callback and Fernet keys before enabling/migrating retained content; preserve old keys until re-encryption. Job progress uses existing columns only.
 
 ## Verification — current revision
 
@@ -96,7 +96,7 @@ Candidate Gmail remains disabled by default. Launch needs a named Google verific
 | `backend/inbox/import_progress.py` | Finalize durable counts once under row lock; recover expired, detached or suspended runs without editing ledger history or adding a table. |
 | `backend/inbox/sync_jobs.py` | Commit imported messages and existing JobRun progress atomically; append an immutable terminal/recovery result, with generation/lease fencing. |
 | `backend/main.py` | Preserve safe validated callback destinations and fallback error message. |
-| `backend/migrations/versions/0011_candidate_gmail_connection.py` | Single unmerged Gmail revision after main notifications 0010: OAuth/provenance/encrypted retention and guarded downgrade. No merged migration edited. |
+| `backend/migrations/versions/0012_candidate_gmail_connection.py` | Single unmerged Gmail revision after main notifications 0010: OAuth/provenance/encrypted retention and guarded downgrade. No merged migration edited. |
 | `backend/models/candidates.py` | Persist job lease/state, pending consent fields, confirmation time and deletion marker on Samad-owned tables. |
 | `backend/requirements.txt` | Adds cryptography for authenticated Fernet encryption of credentials and PKCE verifiers. |
 | `backend/scheduler.py` | Import polling plus independent expired-grant and abandoned-run recovery, including when import polling is off. |
@@ -110,7 +110,7 @@ Candidate Gmail remains disabled by default. Launch needs a named Google verific
 | `backend/tests/test_isolation.py` | Extend reusable F7 support-view expectations: confirmation details are refused in read-only support; existing negative routes remain covered. |
 | `backend/tests/test_ledger.py` | Keep backend Q52 own/ASSIGN expectations; deny other actors’ updates while preserving handoff notes. |
 | `backend/tests/test_migration_0009.py` | Compares a blocked downgrade with its starting revision so rollback safety stays valid when newer migrations exist; review-history preservation remains asserted. |
-| `backend/tests/test_migration_0011.py` | Real PostgreSQL upgrade/backfill/downgrade and credential/provenance guards, aligned to parent 0010. |
+| `backend/tests/test_migration_0012.py` | Real PostgreSQL upgrade/backfill/downgrade and credential/provenance guards, aligned to parent 0010. |
 | `backend/tests/test_pr104_followup.py` | Review regressions including current-assignment Inbox isolation, stable cursors, pending cleanup, immutable recovery and safe erasure. |
 | `backend/tests/test_pr104_revision.py` | Immutable ledger/progress atomicity, crash recovery, cross-firm concurrent callbacks/confirmation, lock release and revoked pending-confirmation regressions. |
 | `backend/tests/test_scheduler_configure.py` | Grant cleanup remains scheduled even with Inbox polling disabled. |
@@ -155,3 +155,5 @@ Candidate Gmail remains disabled by default. Launch needs a named Google verific
 | `src/lib/schemas/inbox.ts` | Compatible nextCursor/totalCount UI contract. |
 | `src/mocks/inbox.ts` | Include neutral cursor for disconnected fixture compatibility. |
 | `src/mocks/membership.test.ts` | Supplies candidate scope to the read-mark adapter authorization tests. |
+
+Main integration: merged main ff923c3 (#106 résumé versions); preserved both fixture families and moved only unmerged Gmail migration/tests to 0012 after 0011. New integration checks pending.

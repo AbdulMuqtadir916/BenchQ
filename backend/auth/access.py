@@ -83,6 +83,18 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": F,
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": F,   # candidate.edit, in scope
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": F,   # candidate.assign + can_assign_to (Q43)
+    # A candidate's résumé versions and bases (résumé versioning PR 5): reads in the candidate's scope; writes by
+    # can_change_resume / can_manage_resume (07 Q55)
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/removal": F,
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/removal": F,
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/show": F,
     "GET /api/firms/{firm_id}/ledger": F,          # a BDE gets their own entries only (routes_ledger)
     "POST /api/analyze/{job_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,

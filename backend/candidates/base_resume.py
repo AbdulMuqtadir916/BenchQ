@@ -303,7 +303,7 @@ def drop_empty_entries(data: dict) -> dict:
     return out
 
 
-def _split_skills(value) -> list:
+def split_skills(value) -> list:
     """A skills line into its items, ignoring commas inside brackets.
 
     "AWS (ECS, Lambda, S3), Docker" is two skills, not five. Splitting blindly on every
@@ -382,7 +382,7 @@ def _each_skill_once(skills: dict) -> dict:
     seen, out = [], {}
     for label, value in skills.items():
         kept = []
-        for item in _split_skills(value):
+        for item in split_skills(value):
             group = _names_in(item)[1:]
             repeated = any(_same_skill(item, s) for s in seen)
             if repeated and all(any(_same_skill(g, s) for s in seen) for g in group):

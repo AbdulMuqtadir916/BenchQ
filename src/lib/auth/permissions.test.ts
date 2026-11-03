@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Principal } from "@/lib/schemas/tenancy";
-import { can, canAssignTo, dashboardFor, hasOwnScope, hasTeamScope, isSupportView, scopeApplications, scopeByCandidate, scopeCandidates, scopeFollowups, scopeFollowupsUserId, scopeLedger, scopeOf, scopeTeam, type FirmAction } from "./permissions";
+import { can, canAssignTo, canChangeResume, canManageResume, dashboardFor, hasOwnScope, hasTeamScope, isSupportView, scopeApplications, scopeByCandidate, scopeCandidates, scopeFollowups, scopeFollowupsUserId, scopeLedger, scopeOf, scopeTeam, type FirmAction } from "./permissions";
 
 const firmUser = (role: "OWNER" | "MANAGER" | "BDE" | "VIEWER"): Principal => ({ kind: "firm", userId: `u_${role}`, firmId: "f", role });
 const admin: Principal = { kind: "platform", userId: "padm", role: "PLATFORM_ADMIN", support: null };
@@ -159,6 +159,31 @@ describe("canAssignTo (07 Q41, Q43)", () => {
   it("a BDE, a VIEWER and a support view never", () => {
     for (const principal of [firmUser("BDE"), firmUser("VIEWER"), support, admin]) {
       expect(canAssignTo(principal, null, { managerId: "u_MANAGER", bdeId: "u_BDE" }, team)).toBe(false);
+    }
+  });
+});
+
+describe("canChangeResume and canManageResume (07 Q55)", () => {
+  const unassigned = { bdeId: null };
+  const theirs = { bdeId: "u_BDE" };
+  const someoneElses = { bdeId: "b2" };
+
+  it("before a BDE is assigned: the OWNER and a MANAGER change the résumé; nobody manages it", () => {
+    expect(["OWNER", "MANAGER", "BDE", "VIEWER"].map((role) => canChangeResume(firmUser(role as "OWNER"), unassigned))).toEqual([true, true, false, false]);
+    for (const role of ["OWNER", "MANAGER", "BDE", "VIEWER"] as const) expect(canManageResume(firmUser(role), unassigned), role).toBe(false);
+  });
+
+  it("once a BDE is assigned: only that BDE changes and manages it; the OWNER and MANAGER view", () => {
+    expect(["OWNER", "MANAGER", "BDE", "VIEWER"].map((role) => canChangeResume(firmUser(role as "OWNER"), theirs))).toEqual([false, false, true, false]);
+    expect(["OWNER", "MANAGER", "BDE", "VIEWER"].map((role) => canManageResume(firmUser(role as "OWNER"), theirs))).toEqual([false, false, true, false]);
+    expect(canChangeResume(firmUser("BDE"), someoneElses)).toBe(false);
+    expect(canManageResume(firmUser("BDE"), someoneElses)).toBe(false);
+  });
+
+  it("a support view and a platform admin never", () => {
+    for (const principal of [support, admin]) for (const candidate of [unassigned, theirs]) {
+      expect(canChangeResume(principal, candidate)).toBe(false);
+      expect(canManageResume(principal, candidate)).toBe(false);
     }
   });
 });
