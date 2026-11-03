@@ -87,7 +87,7 @@ def test_the_entry_has_the_frontends_shape(api_client, accounts, ledger):
     entry = api_client.get(_url(accounts.firm_id, "?limit=1")).json()[0]
     assert set(entry) == {"id", "firm_id", "actor_user_id", "actor_type", "actor_name", "entity_type", "entity_id",
                           "entity_label", "action", "summary", "note", "model_id", "prompt_version", "evidence_ids",
-                          "claim_state", "created_at"}
+                          "claim_state", "created_at", "candidate_id"}
     assert entry["firm_id"] == str(accounts.firm_id) and entry["evidence_ids"] == []
 
 
@@ -144,7 +144,7 @@ def _assign(firm_id, actor, candidate, summary, minutes_ago, note=None):
 @pytest.fixture
 def assignments(test_db, accounts, ledger):
     """Bea works Asha (assigned by a manager); Ben works Ravi; Kiran is in the manager's queue. Plus a manager's
-    UPDATE on Asha, which Bea must not see (only ASSIGN entries widen her view)."""
+    UPDATE on Asha, which Bea can see while assigned (candidate history follows the current BDE)."""
     from backend.models.tenancy import User
     acme = test_db.get(Firm, accounts.firm_id)
     manager = make_user(test_db, acme, email="mgr@acme.test", role="MANAGER", name="Mira")

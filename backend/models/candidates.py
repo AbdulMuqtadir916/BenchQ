@@ -11,6 +11,8 @@ the candidate's Record (with evidence) from them and the kept résumé parse. No
 Conventions as backend/models/tenancy.py (Q38): UUID keys, timestamps with time zone, CHECKs not enum types,
 foreign keys ON DELETE RESTRICT.
 """
+import hashlib
+
 from sqlalchemy import (
     ARRAY, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, LargeBinary, Numeric, String, Text,
     UniqueConstraint, text,
@@ -108,9 +110,11 @@ class Candidate(Base):
 
 
 class ResumeParse(Base):
-    """A résumé read for a new candidate (06 §4, decided 2026-10-27): the file and the parser's answer, kept for 60
-    minutes. Nothing about a candidate is saved until create (Q49); create links the parse to the candidate and keeps
-    it (expires_at null), and Track 04 builds the Record from it. Unused parses are deleted once expired."""
+    """A résumé read for a candidate: the file and the parser's answer. For a new candidate (06 §4, decided 2026-10-27)
+    it waits 60 minutes: nothing about a candidate is saved until create (Q49); create links the parse to the
+    candidate and keeps it (expires_at null), and Track 04 builds the Record from it. Unused parses are deleted once
+    expired. A BDE's later upload (docs/team/resume-versioning.md §4.6) is kept from the start. One candidate never
+    keeps the same file twice (`content_sha256`, migration 0011)."""
     __tablename__ = "resume_parses"
 
     id = _pk()
@@ -123,6 +127,9 @@ class ResumeParse(Base):
     content = Column(LargeBinary, nullable=False)
     parse = Column(JSONB, nullable=False)                 # the parser's answer, Zuhair's format, as returned
     expires_at = Column(DateTime(timezone=True), nullable=True)
+    # The file's fingerprint, worked out from `content` on every insert, so no route has to remember it (0011).
+    content_sha256 = Column(String, nullable=False,
+                            default=lambda ctx: file_sha256(ctx.get_current_parameters()["content"]))
     created_at = _created_at()
     updated_at = _updated_at()
 
@@ -130,7 +137,15 @@ class ResumeParse(Base):
         CheckConstraint("size_bytes BETWEEN 1 AND 10485760", name="ck_resume_parses_size"),   # 10 MB
         # Either still waiting for a create (and expiring), or kept with its candidate.
         CheckConstraint("(candidate_id IS NULL) = (expires_at IS NOT NULL)", name="ck_resume_parses_kept_or_expiring"),
+        # A candidate keeps a file once (resume-versioning.md §4.6); drafts aren't anyone's yet.
+        Index("uq_resume_parses_candidate_file", "candidate_id", "content_sha256", unique=True,
+              postgresql_where=text("candidate_id IS NOT NULL")),
     )
+
+
+def file_sha256(content: bytes) -> str:
+    """The fingerprint `resume_parses.content_sha256` holds: the hex SHA-256 of the file."""
+    return hashlib.sha256(content).hexdigest()
 
 
 BASE_RESUME_SOURCES = ("UPLOAD", "PROMOTED")
@@ -151,6 +166,11 @@ class BaseResume(Base):
     is_active = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     created_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
     created_at = _created_at()
+    # 0011 (PR 5): the version a PROMOTED base was copied from, left out of the base dropdown from then on; and when a
+    # used base was deleted (hidden: out of the dropdown, kept in history and on its applications).
+    promoted_from_resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL", use_alter=True),
+                                     nullable=True)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(_in("source", BASE_RESUME_SOURCES), name="ck_base_resumes_source_values"),
@@ -158,6 +178,11 @@ class BaseResume(Base):
         # For the composite foreign key from resumes: a version's base belongs to the same candidate.
         UniqueConstraint("id", "candidate_id", name="uq_base_resumes_id_candidate"),
         Index("uq_base_resumes_one_active", "candidate_id", unique=True, postgresql_where=text("is_active")),
+        # One upload gives one base; one version gives one promoted base (0011).
+        Index("uq_base_resumes_one_per_parse", "resume_parse_id", unique=True,
+              postgresql_where=text("resume_parse_id IS NOT NULL")),
+        Index("uq_base_resumes_one_per_version", "promoted_from_resume_id", unique=True,
+              postgresql_where=text("promoted_from_resume_id IS NOT NULL")),
         Index("ix_base_resumes_firm_candidate", "firm_id", "candidate_id"),
     )
 
@@ -216,6 +241,13 @@ class CandidateMailbox(Base):
     address = Column(String, nullable=False)
     status = Column(String, nullable=False, server_default=text("'CONNECTED'"))
     connected_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
+    refresh_token_ciphertext = Column(LargeBinary, nullable=True)
+    history_id = Column(String, nullable=True)
+    initial_sync_complete = Column(Boolean, nullable=False, server_default=text("false"))
+    sync_job_id = Column(UUID(as_uuid=True), nullable=True)
+    sync_lease_until = Column(DateTime(timezone=True), nullable=True)
+    sync_state = Column(String, nullable=False, server_default=text("'IDLE'"))
+    last_sync_error = Column(Text, nullable=True)
     connected_at = _created_at()
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
     created_at = _created_at()
@@ -225,6 +257,25 @@ class CandidateMailbox(Base):
         CheckConstraint(_in("provider", MAILBOX_PROVIDERS), name="ck_candidate_mailboxes_provider"),
         CheckConstraint(_in("status", MAILBOX_STATUSES), name="ck_candidate_mailboxes_status"),
     )
+
+
+class CandidateGoogleOAuthAttempt(Base):
+    """Single-use, PKCE-bound OAuth handoff for a candidate-scoped mailbox connection."""
+    __tablename__ = "candidate_google_oauth_attempts"
+
+    id = _pk()
+    state_hash = Column(String(64), nullable=False, unique=True)
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False, index=True)
+    initiated_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
+    code_verifier_ciphertext = Column(LargeBinary, nullable=False)
+    pending_address = Column(String, nullable=True)
+    pending_token_ciphertext = Column(LargeBinary, nullable=True)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    return_to = Column(String(500), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = _created_at()
 
 
 class InboxMessage(Base):
@@ -239,6 +290,8 @@ class InboxMessage(Base):
     application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="SET NULL"), nullable=True,
                             index=True)
     provider_message_id = Column(String, nullable=False)
+    source_address = Column(String, nullable=False, server_default=text("''"))
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     thread_id = Column(String, nullable=True)
     from_name = Column(String, nullable=False)
     from_email = Column(String, nullable=False)
@@ -250,7 +303,7 @@ class InboxMessage(Base):
     created_at = _created_at()
 
     __table_args__ = (
-        UniqueConstraint("mailbox_id", "provider_message_id", name="uq_inbox_messages_mailbox_message"),
+        UniqueConstraint("mailbox_id", "source_address", "provider_message_id", name="uq_inbox_messages_mailbox_message"),
         Index("ix_inbox_messages_candidate_received", "firm_id", "candidate_id", "received_at"),
     )
 

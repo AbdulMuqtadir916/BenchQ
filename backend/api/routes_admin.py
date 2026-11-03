@@ -186,4 +186,4 @@ def list_audit(limit: int = Query(default=AUDIT_LIMIT, ge=1, le=2000), db: DbSes
     support.settle_expired(db)
     db.commit()
     entries = db.query(LedgerEntry).order_by(LedgerEntry.created_at.desc(), LedgerEntry.id).limit(limit)
-    return [ledger_entry_json(e) for e in entries]
+    return [ledger_entry_json(e, hide_email=True) for e in entries]

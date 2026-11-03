@@ -53,6 +53,15 @@ def test_an_upload_over_1_mb_but_under_the_upload_cap_reaches_the_route(api_clie
     assert (r.status_code, r.json()) == (415, {"detail": "PDF or Word only."})   # the route's own check
 
 
+def test_a_later_resume_over_1_mb_reaches_its_route_too(api_client, accounts):
+    """The candidate's résumé upload (résumé versioning PR 5) takes files up to 10 MB like parse-resume: past the 1 MB
+    cap, the route itself answers (here: no such candidate)."""
+    import uuid
+    files = {"file": ("ravi.pdf", b"%PDF" + b"0" * (2 * LIMIT), "application/pdf")}
+    r = api_client.post(f"/api/firms/{accounts.firm_id}/candidates/{uuid.uuid4()}/resumes/upload", files=files)
+    assert (r.status_code, r.json()) == (404, {"detail": "Not found."})
+
+
 def test_a_chunked_body_over_1_mb_is_refused(anonymous_client):
     r = anonymous_client.post("/api/auth/sign-in", content=_chunks(LIMIT + 1),
                               headers={"Content-Type": "application/json"})

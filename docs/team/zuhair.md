@@ -26,8 +26,9 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
    verification is a person's act.
 4. **The base résumé:** made from the parse at candidate create, as the first of the candidate's bases
    (`base_resumes`, one active) and its version 1 in `resumes`. Spec and PR plan: [resume-versioning.md](./resume-versioning.md).
-   **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). Versions and bases through the
-   API are PR 5.
+   **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). **PR 5** (migration 0011):
+   versions and bases through the API under the candidate's URL: save, use as base, pick, the BDE's later upload,
+   delete / hide / show again; once a BDE is assigned only that BDE changes résumés (07 Q55).
 5. **Frontend live:** the Record (`src/lib/api/records.ts`) behind `records`, with a DTO mapper and a real sample.
 
 ## 2. Job scraping — per candidate (Q53b)
@@ -40,12 +41,18 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
 2. A run writes the pool **and** `candidate_jobs` (with the search, and `match_score` when scored).
 3. The candidate's job list in the app reads `candidate_jobs`; the Jobs page shows a candidate's jobs.
 4. Frontend live (`docs/integration/02-jobs.md`, Track 02) behind `jobs`.
+5. **Deleting a job** (Abdul, 2026-11-01): before a BDE deletes one, ask "Are you sure you want to delete this job?"
+   and name the résumés tailored on it (they are deleted with it, `resumes.job_id` CASCADE). The per-candidate
+   delete proposal is in [resume-versioning.md](./resume-versioning.md) §7.
 
 ## 3. Résumé tailoring (+ ATS score) (Track 04, `docs/integration/04-resumes-and-tailoring.md`)
 
 1. Its Phase 0 design review first (no code).
 2. **Tailored résumés** from the active base's version 1 for one job (`category = 'TAILORED'`, `base_resume_id`,
    `job_id`; [resume-versioning.md](./resume-versioning.md) §4), many per candidate. The claims a tailored résumé uses keep their state; an UNVERIFIED claim blocks export (CLAUDE.md).
+   Tailoring creates them; editing one is résumé versioning PR 5's save (the next version), and only the
+   candidate's BDE tailors (07 Q55, `can_manage_resume`). Decide here whether tailoring may choose the base per job
+   (a candidate has several target roles but one active base).
 3. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
    or re-tailoring inserts the next version.
 4. **ATS score** for a tailored résumé against its job (`cv_score` / `score-check` today).

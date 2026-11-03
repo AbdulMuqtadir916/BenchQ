@@ -591,6 +591,7 @@ class Resume(Base):
     github = Column(String, nullable=True)
     linkedin = Column(String, nullable=True)
     summary = Column(Text, nullable=True)
+    summary_id = Column(String, nullable=True)        # the summary's id (§3.4, 0011): new text, new id
     skills = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     experiences = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     projects = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))

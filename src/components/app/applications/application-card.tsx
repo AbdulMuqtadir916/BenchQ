@@ -5,7 +5,7 @@ import { daysBetween } from "@/lib/derive/dates";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { AvatarStack } from "@/components/app/avatar-stack";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 import { STATUS_ICON, STATUS_COLOR, stageEnteredAt } from "./status-meta";
 
 export interface CardFaceProps {
@@ -21,7 +21,7 @@ export interface CardFaceProps {
 export function ApplicationCardFace({ app, candidateName, owner, followUpDue, signal }: CardFaceProps) {
   const days = daysBetween(stageEnteredAt(app), new Date());
   const Icon = STATUS_ICON[app.status];
-  const meta = signal ? SIGNAL_META[signal.signal] : null;
+  const meta = signal ? mailSignalMeta(signal.signal) : null;
   const ageTone = days >= 7 ? "text-[var(--color-danger-fg)]" : days >= 3 ? "text-[var(--color-warning-fg)]" : "text-[var(--color-text-3)]";
 
   return (

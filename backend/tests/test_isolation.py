@@ -26,7 +26,7 @@ from backend.tests.isolation_cases import (CASES, DEV_ONLY_REASONS, KNOWN_GAPS, 
 from backend.tests.isolation_support import CANARY, add_firm_b, make_world, offline, snapshot_of  # noqa: F401
 
 READ_ONLY = {"detail": "A support view is read-only."}
-SUPPORT_REFUSED_GETS = {"GET /api/resumes/{resume_id}/pdf", "GET /api/cover-letters/{cl_id}/pdf"}
+SUPPORT_REFUSED_GETS = {"GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}", "GET /api/resumes/{resume_id}/pdf", "GET /api/cover-letters/{cl_id}/pdf"}
 
 
 def _app_routes() -> set[str]:
@@ -162,8 +162,8 @@ def test_firm_data_never_crosses_firms(key, anonymous_client, world):
         assert in_b.status_code < 400, in_b.text
     assert snapshot_of(world.db, b.firm_id) == untouched, "a support view changed firm B's rows"
 
-    # Firm B's own OWNER gets through, for real.
-    own = _call(client, key, case, b.ids, b.cookie)
+    # Firm B's own OWNER (or its BDE, for what only a candidate's BDE does) gets through, for real.
+    own = _call(client, key, case, b.ids, b.bde_cookie if case.as_bde else b.cookie)
     assert own.status_code < 400, own.text
     if case.shows_rows:
         assert CANARY in own.text, "firm B's own answer should list its rows"

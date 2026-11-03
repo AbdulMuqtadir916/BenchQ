@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Principal } from "@/lib/schemas/tenancy";
-import { can, canAssignTo, dashboardFor, hasOwnScope, hasTeamScope, isSupportView, scopeApplications, scopeByCandidate, scopeCandidates, scopeFollowups, scopeFollowupsUserId, scopeLedger, scopeOf, scopeTeam, type FirmAction } from "./permissions";
+import { can, canAssignTo, canChangeResume, canManageResume, dashboardFor, hasOwnScope, hasTeamScope, isSupportView, scopeApplications, scopeByCandidate, scopeCandidates, scopeFollowups, scopeFollowupsUserId, scopeLedger, scopeOf, scopeTeam, type FirmAction } from "./permissions";
 
 const firmUser = (role: "OWNER" | "MANAGER" | "BDE" | "VIEWER"): Principal => ({ kind: "firm", userId: `u_${role}`, firmId: "f", role });
 const admin: Principal = { kind: "platform", userId: "padm", role: "PLATFORM_ADMIN", support: null };
@@ -71,7 +71,7 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     expect(ids(scopeCandidates(bde, candidates))).toEqual(["c1"]);
     expect(ids(scopeApplications(bde, applications, candidates))).toEqual(["a1"]);
     expect(ids(scopeLedger(bde, ledger, context))).toEqual(["l1"]);
-    // 07 Q52: plus who assigned them the candidates they work now; not other entries about them, nor others' candidates.
+    // 07 Q52: plus who assigned them the candidates they work now; assignments only, never other actors’ updates.
     const assigns = [
       { id: "l5", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c1", action: "ASSIGN" },
       { id: "l6", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c1", action: "UPDATE" },
@@ -81,6 +81,14 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     expect(ids(scopeFollowups(bde, followups, context))).toEqual(["f1"]);
     expect(scopeFollowupsUserId(bde)).toBe("u_BDE");
     expect(hasOwnScope(bde)).toBe(true);
+  });
+
+  it("candidate assignment does not expose other actors’ ledger history", () => {
+    const rows = [
+      {id:"past-owner", candidateId:"c1", actorUserId:"b2", entityType:"email", entityId:"mail-a", action:"UPDATE"},
+      {id:"moved-away", candidateId:"c2", actorUserId:"u_BDE", entityType:"email", entityId:"mail-b", action:"UPDATE"},
+    ];
+    expect(ids(scopeLedger(firmUser("BDE"), rows, context))).toEqual(["moved-away"]);
   });
 
   it("a MANAGER sees their team: the candidates they manage, their queue, their BDEs' work, never the other team's", () => {
@@ -151,6 +159,31 @@ describe("canAssignTo (07 Q41, Q43)", () => {
   it("a BDE, a VIEWER and a support view never", () => {
     for (const principal of [firmUser("BDE"), firmUser("VIEWER"), support, admin]) {
       expect(canAssignTo(principal, null, { managerId: "u_MANAGER", bdeId: "u_BDE" }, team)).toBe(false);
+    }
+  });
+});
+
+describe("canChangeResume and canManageResume (07 Q55)", () => {
+  const unassigned = { bdeId: null };
+  const theirs = { bdeId: "u_BDE" };
+  const someoneElses = { bdeId: "b2" };
+
+  it("before a BDE is assigned: the OWNER and a MANAGER change the résumé; nobody manages it", () => {
+    expect(["OWNER", "MANAGER", "BDE", "VIEWER"].map((role) => canChangeResume(firmUser(role as "OWNER"), unassigned))).toEqual([true, true, false, false]);
+    for (const role of ["OWNER", "MANAGER", "BDE", "VIEWER"] as const) expect(canManageResume(firmUser(role), unassigned), role).toBe(false);
+  });
+
+  it("once a BDE is assigned: only that BDE changes and manages it; the OWNER and MANAGER view", () => {
+    expect(["OWNER", "MANAGER", "BDE", "VIEWER"].map((role) => canChangeResume(firmUser(role as "OWNER"), theirs))).toEqual([false, false, true, false]);
+    expect(["OWNER", "MANAGER", "BDE", "VIEWER"].map((role) => canManageResume(firmUser(role as "OWNER"), theirs))).toEqual([false, false, true, false]);
+    expect(canChangeResume(firmUser("BDE"), someoneElses)).toBe(false);
+    expect(canManageResume(firmUser("BDE"), someoneElses)).toBe(false);
+  });
+
+  it("a support view and a platform admin never", () => {
+    for (const principal of [support, admin]) for (const candidate of [unassigned, theirs]) {
+      expect(canChangeResume(principal, candidate)).toBe(false);
+      expect(canManageResume(principal, candidate)).toBe(false);
     }
   });
 });

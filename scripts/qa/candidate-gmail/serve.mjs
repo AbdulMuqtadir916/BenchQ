@@ -1,0 +1,11 @@
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+const require = createRequire(import.meta.url);
+const viteRequire = createRequire(require.resolve('vitest/package.json'));
+const vite = path.join(path.dirname(viteRequire.resolve('vite/package.json')), 'bin/vite.js');
+const config = fileURLToPath(new URL('./vite.config.mjs', import.meta.url));
+const child = spawn(process.execPath, [vite, '--config', config], { stdio: 'inherit', env: process.env });
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
+child.on('exit', code => process.exit(code ?? 1));

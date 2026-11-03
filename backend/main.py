@@ -37,6 +37,7 @@ from backend.api.routes_firms import router as firms_router
 from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
 from backend.api.routes_candidates import router as candidates_router
+from backend.api.routes_candidate_resumes import router as candidate_resumes_router
 from backend.api.routes_ledger import router as ledger_router
 from backend.api.routes_support import router as support_router
 from backend.api.routes_notifications import router as notifications_router
@@ -52,6 +53,10 @@ async def lifespan(app: FastAPI):
     before this process starts (backend/scripts/db_upgrade.py); deploy exactly one worker (docs/integration/07)."""
     logger.info("Starting JobNavigator backend...")
     check_schema_at_head()
+    from backend.config import CANDIDATE_GMAIL_ENABLED
+    if CANDIDATE_GMAIL_ENABLED:
+        from backend.inbox.google_oauth import _fernet
+        _fernet()
     from backend.auth.password_reset import require_reset_base_url
     require_reset_base_url()
     run_seeds()
@@ -157,6 +162,21 @@ app.add_middleware(BodySizeLimit)
 # Added last, so it runs first: every query of the request, the session lookup included, gets the web limit.
 app.add_middleware(statement_timeout.WebRequestMarker)
 
+from backend.api import routes_inbox
+
+
+@app.middleware("http")
+async def _oauth_browser_result(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path == '/api/oauth/google/callback' and response.status_code >= 400:
+        from fastapi.responses import RedirectResponse
+        from urllib.parse import urlsplit, urlunsplit, urlencode, parse_qsl
+        destination = getattr(request.state, 'oauth_return_to', '/')
+        parsed = urlsplit(destination)
+        query = dict(parse_qsl(parsed.query)); query['mailbox'] = 'failed'
+        return RedirectResponse(urlunsplit(('', '', parsed.path, urlencode(query), '')), status_code=303)
+    return response
+
 
 # ── Request log (docs/team/uzair.md §1, step 4a) ─────────────────────────────
 # Added last, so it runs first: the request id covers every line of the request, and the access line times and
@@ -166,12 +186,14 @@ app.add_middleware(RequestLog)
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
+app.include_router(routes_inbox.router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
 app.include_router(candidates_router, prefix="/api")
+app.include_router(candidate_resumes_router, prefix="/api")
 app.include_router(ledger_router, prefix="/api")
 app.include_router(support_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
