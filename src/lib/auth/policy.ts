@@ -41,7 +41,8 @@ export type TeamAction =
   | "member.deactivate"
   | "member.changeManager"
   | "candidate.assign"
-  | "firmSettings.edit";
+  | "firmSettings.edit"
+  | "notification.approve";
 
 /** Not an action: whether the person sees the team (members, owner, assignments) on firm pages (Q15). */
 export type FirmVisibility = "team.view";
@@ -55,13 +56,14 @@ export type PlatformAction =
   | "plan.edit"
   | "invite.resend"
   | "invite.revoke"
-  | "platformTeam.manage";
+  | "platformTeam.manage"
+  | "platform.notification.approve";
 
 export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
 
 export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act"];
-export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "firmSettings.edit"];
-export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage"];
+export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "firmSettings.edit", "notification.approve"];
+export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
 export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
 
 const ALL_ACTING: readonly FirmRole[] = ["OWNER", "MANAGER", "BDE"];
@@ -86,6 +88,7 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   "member.changeManager": OWNER_ONLY,
   "candidate.assign": OWNER_AND_MANAGER,
   "firmSettings.edit": OWNER_ONLY,
+  "notification.approve": OWNER_AND_MANAGER,
   "team.view": OWNER_AND_MANAGER,
 };
 
@@ -95,6 +98,7 @@ export function can(principal: Principal, action: Action): boolean;
 export function can(principal: Principal, action: "route.view", route: RouteDef): boolean;
 export function can(principal: Principal, action: Action | "route.view", route?: RouteDef): boolean {
   if (action === "route.view") return route ? canOpen(route, principal) : false;
+  if (action === "platform.notification.approve") return principal.kind === "platform" && principal.support === null;
   if (isPlatformAction(action)) return principal.kind === "platform";
   if (principal.kind === "platform") return principal.support !== null && action === "team.view";
   return FIRM_TABLE[action].includes(principal.role);
@@ -131,7 +135,7 @@ export function canAssignTo(
 }
 
 /**
- * Who may change a candidate's résumés (07 Q54; docs/team/resume-versioning.md §6): edit and save, "Use as base?",
+ * Who may change a candidate's résumés (07 Q55; docs/team/resume-versioning.md §6): edit and save, "Use as base?",
  * pick a base. The candidate's BDE once one is assigned; before that the OWNER and a MANAGER (the candidate is already
  * in their scope). VIEWER and a support view never. The backend's `can_change_resume` is the same rule.
  */
@@ -142,7 +146,7 @@ export function canChangeResume(principal: Principal, candidate: { bdeId: string
 }
 
 /**
- * What only the candidate's BDE does with their résumés (07 Q54): upload a later résumé, delete or hide, show again,
+ * What only the candidate's BDE does with their résumés (07 Q55): upload a later résumé, delete or hide, show again,
  * tailor. The backend's `can_manage_resume` is the same rule.
  */
 export function canManageResume(principal: Principal, candidate: { bdeId: string | null }): boolean {

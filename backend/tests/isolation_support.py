@@ -42,7 +42,7 @@ RESUME_COLUMNS = {
 
 @dataclass
 class Side:
-    """One firm: its OWNER's cookie, its BDE's (for the routes only a candidate's BDE takes, 07 Q54) and its rows' ids,
+    """One firm: its OWNER's cookie, its BDE's (for the routes only a candidate's BDE takes, 07 Q55) and its rows' ids,
     by the names the case table uses."""
     firm_id: uuid.UUID
     cookie: dict

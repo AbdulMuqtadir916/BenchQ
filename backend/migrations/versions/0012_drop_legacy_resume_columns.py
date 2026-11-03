@@ -1,13 +1,13 @@
 """Résumé versioning PR 6: old résumé rows converted or deleted, the approved drops, every résumé on a base
 (docs/team/resume-versioning.md §3.3; decided 2026-11-02)
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0012
+Revises: 0011
 Create Date: 2026-11-02 18:00:00.000000
 
 Old rows (no `base_resume_id`, JobNavigator's `json_data`):
 - **No candidate** (JobNavigator's seeded "Sample PM", firm-level résumés): deleted. A base needs a candidate.
-- **A candidate's base** (`is_base`): split into the content columns (new item ids) and given a base of its own:
+- **A candidate's base** (`is_base`): split into the content columns (new item ids, a `summary_id`) and given a base of its own:
   `UPLOAD` with its upload when it names one nobody else's base uses, else `PROMOTED`; active when the candidate has
   none.
 - **A candidate's tailored résumé with a job:** split the same way and made `TAILORED` on that candidate's base
@@ -30,8 +30,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = '0013'
-down_revision = '0012'
+revision = '0012'
+down_revision = '0011'
 branch_labels = None
 depends_on = None
 
@@ -110,6 +110,7 @@ def columns_from_json(data: dict) -> dict:
         "email": contact["email"] or None, "phone": contact["phone"] or None,
         "linkedin": contact["linkedin"] or None, "github": contact["github"] or None, "work_authorization": None,
         "summary": _t(data.get("summary")) or None,
+        "summary_id": _id() if _t(data.get("summary")) else None,        # the summary is an item too (0011, §3.4)
         "skills": [{"id": _id(), "category": _t(category), "name": name} for category, line in pairs
                    for name in _split(line)],
         "experiences": [{"id": _id(), "job_title": _t(e.get("title")), "company": _t(e.get("company")),

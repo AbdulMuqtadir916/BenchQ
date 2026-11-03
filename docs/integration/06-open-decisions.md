@@ -115,6 +115,27 @@ Each decision: what the frontend needs → what the backend has → options → 
 
 ---
 
+## D10 — Keeping deleted résumé versions for the ledger (suggestion, not decided)
+
+> **Suggested by Zuhair Baig, 2026-11-03.** Not decided: the ledger is Abdul's (`docs/team/README.md` §3), so he
+> decides. Context: résumé versioning PR 5 (`docs/team/resume-versioning.md` §4.7).
+
+- **Need:** the owner and manager can see what each BDE worked on, including résumé versions a BDE later deleted.
+- **Today:** every résumé action writes a ledger entry (who, what — "Saved Base 2 v3", "Deleted Base 2 v3" — the
+  version's id, when, the candidate), and ledger entries are never deleted. What a delete loses is the **content**
+  of the version. Only an unused version a BDE made can be deleted (never one sent, tailored from or verified).
+- **Options:**
+  1. A copy table: every version written to `resumes` is also copied into a never-deleted table the ledger reads.
+  2. **Soft delete:** deleting a version sets `resumes.deleted_at` instead of removing the row; it disappears from
+     the base list and the workflow, stays readable from the ledger, and the history can show it greyed out
+     ("v2 — deleted by the BDE, 2 Nov"). One table, no copying. A deleted version keeps its number, so numbers are
+     never reused after a delete (§4.7 today lets the latest number come back).
+  3. The ledger's "Deleted …" entry stores a copy of the deleted content (changes `ledger_entries`).
+  4. Keep as today: who, what and when are kept; a deleted unused version's text is gone.
+- **Zuhair's preference:** 2 (soft delete). `resumes` is Zuhair's table, so the ledger itself wouldn't change.
+
+---
+
 ## Decision log
 
 Record each decision here, with date and owner, then update the affected module files.

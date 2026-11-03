@@ -321,6 +321,61 @@ export const PlatformUserSchema = z.object({
 });                                        // no firmId: platform users belong to no firm (07 Q9)
 ```
 
+#### Notifications and password-reset approvals — Q54
+
+```ts
+export const NotificationSchema = z.object({
+  id: z.string(),
+  type: z.string(),                        // extensible event kind; first: PASSWORD_RESET
+  entityId: z.string(),                    // id of the typed entity; never a secret or reset URL
+  requestStatus: z.string().nullable(),    // present for PASSWORD_RESET notifications
+  canReissue: z.boolean(),                 // true only for the approver who approved the request
+  title: z.string(),
+  detail: z.string(),
+  createdAt: z.string().datetime(),
+  readAt: z.string().datetime().nullable(),
+  resolvedAt: z.string().datetime().nullable(),
+});
+
+export const PasswordResetRequestSchema = z.object({
+  id: z.string(),
+  requesterUserId: z.string(),
+  requesterRole: FirmRole,
+  approverRole: z.enum(['OWNER', 'MANAGER', 'PLATFORM_ADMIN']),
+  firmId: z.string(),
+  status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'EXPIRED', 'COMPLETED', 'CANCELLED']),
+  createdAt: z.string().datetime(),
+  expiresAt: z.string().datetime(),         // approval request lifetime: 24 hours
+  decidedAt: z.string().datetime().nullable(),
+});
+```
+
+`notifications` is addressed to exactly one firm user or one platform user. Firm notifications carry their
+`firmId`; platform notifications have no firm. `password_reset_requests` is firm-owned, points to the requesting
+`User`, and records the designated approver (a same-firm `User` or the Super Admin tier). A BDE's approver is its
+assigned active Manager, or its own firm Owner when no active same-firm Manager is assigned; a Manager's approver
+is their own firm Owner; an Owner's approver is a Super Admin. A VIEWER follows the Owner path. The Super Admin
+does not initiate this flow. A stale or inactive designated approver expires the request; a BDE Manager already
+inactive at routing time goes to the same-firm Owner. No request crosses firms.
+
+  If no eligible approver exists, no request is created and the account is not frozen; the requester can retry once
+  an active same-firm Owner or Super Admin is available.
+
+Creating a valid request immediately freezes the unchanged old password and revokes all sessions. Denial or request
+expiry unlocks it; successful completion replaces it. The 24-hour request deadline is independent of the 30-minute
+reset-link lifetime. The request row stores only a hash of the one-use link. On approval the raw URL is returned
+once to the approver's UI for manual sharing; it is never emailed, logged, stored in a notification or included in
+this DTO. A replacement link invalidates the previous link.
+
+The public forgot-password response is generic for known/unknown, inactive, VIEWER and Super Admin emails. Only an
+active eligible firm account with an approver creates a request. One pending request per account; per-IP and
+per-keyed-email rate limits; repeated submissions do not extend expiry. Since the account is frozen before the
+approver decides, someone who knows an email can temporarily lock that account; this trade-off is mitigated, not
+eliminated, by rate limits, deduplication, notifications and expiry.
+
+Approval permissions are `notification.approve` (OWNER/MANAGER; request recipient is checked too) and
+`platform.notification.approve` (Super Admin only). A platform support view has no approval permission.
+
 #### `firmId` on records (07 §7, 07 Q13, A17)
 
 | Record | Change | Note |
@@ -368,6 +423,7 @@ entries.
 | `platform_user` | `STATE_CHANGE` when staff are deactivated; `LOGIN` | null |
 | `plan` | `CREATE` / `UPDATE` on the plan catalogue (implication 3) | null |
 | `support_view` | `ADMIN_ACCESS`, `ADMIN_ACCESS_END` (07 P4); `entityId` is the support view's id | the firm |
+| `password_reset_request` | 07 Q54, existing actions only: `CREATE` (the request, actor `SYSTEM`: it comes from a signed-out page), `STATE_CHANGE` (approved or denied, under the approver's name, a Super Admin's included; expired, `SYSTEM`), `UPDATE` (a fresh link, under the approver's name); completed, `STATE_CHANGE`, `SYSTEM`. `entityId` is the request's id; no entry holds a link or token | the requester's firm |
 
 #### Decisions — answers to the 17 open questions (2026-10-14)
 
@@ -1218,7 +1274,7 @@ export const ExportGateSchema = z.object({
 });
 ```
 
-### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId` and `archivedAt` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2), the rest NOT BUILT
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2), the rest NOT BUILT
 
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
@@ -1253,6 +1309,8 @@ export const AwardEntrySchema = z.object({
   id: z.string(), name: z.string(), issuer: z.string(), date: z.string(), detail: z.string(),
 });
 // ResumeDocumentSchema: awards: z.array(AwardEntrySchema), languages: z.array(z.string()) (kept, never printed);
+// summaryId: z.string().nullable() (versioning PR 5: the summary's id; an id names one exact text, a changed one
+// gets a new id, so claims follow only the text they were checked against);
 // ResumeSectionKey: + 'awards'
 
 // src/lib/schemas/record.ts — RecordEvidenceSchema.entityType becomes, matching the backend's claims.entity_type:

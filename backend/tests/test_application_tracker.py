@@ -40,7 +40,7 @@ def test_latest_tailored_resume_stays_with_its_candidate_or_legacy_application(
     rows = {row["id"]: row for row in result.json()["applications"]}
     assert rows[str(app.id)]["tailored_resume_id"] == str(own_newer.id)
     if legacy_app is not None:
-        # A résumé always has a candidate since 0013, so an application from before candidates has none to show.
+        # A résumé always has a candidate since 0012, so an application from before candidates has none to show.
         assert rows[str(legacy_app.id)]["tailored_resume_id"] is None
     candidate_only = api_client.get("/api/applications", headers=headers,
                                     params={"candidate_id": str(candidate.id), "tracked_only": True})

@@ -1,5 +1,5 @@
 """A candidate's résumé versions and bases through the API (docs/team/resume-versioning.md §4.3, §4.6, §4.7, §6;
-PR 5): save, use as base and pick, the BDE's upload, delete / hide / show again, and who may do each (07 Q54)."""
+PR 5): save, use as base and pick, the BDE's upload, delete / hide / show again, and who may do each (07 Q55)."""
 import uuid
 
 import pytest
@@ -125,24 +125,69 @@ def test_two_saves_from_the_same_version_are_both_kept_and_the_second_is_told(an
     assert second["notice"] == "v2 was saved while you were editing; your v3 doesn't include those changes."
 
 
-def test_a_changed_items_claims_go_back_to_unverified_and_the_others_stay(anonymous_client, test_db, world):
+def _verified(test_db, c, entity_type, ref, text="x"):
+    """A VERIFIED claim on `ref` (an item, bullet or summary id), with its evidence."""
     from backend.models.candidates import Claim, Evidence
+    evidence = Evidence(firm_id=uuid.UUID(c["firm_id"]), candidate_id=uuid.UUID(c["id"]), excerpt="x", source="MANUAL")
+    test_db.add(evidence)
+    test_db.flush()
+    claim = Claim(firm_id=uuid.UUID(c["firm_id"]), candidate_id=uuid.UUID(c["id"]), entity_type=entity_type,
+                  entity_ref=ref, text=text, state="VERIFIED", evidence_id=evidence.id, source="RESUME_UPLOAD")
+    test_db.add(claim)
+    test_db.commit()
+    return claim
+
+
+def test_a_changed_item_gets_a_new_id_and_the_old_versions_keep_their_claims(anonymous_client, test_db, world):
+    """An id stands for one exact text (§3.4, §4.5): the edited job gets a new id, so v2 shows it unverified, while v1
+    still holds the old id and its VERIFIED claim. The job left as it was keeps its id and its claim. No claim moves."""
     c = _candidate(anonymous_client, test_db, world)
     v1 = _v(anonymous_client, world, c)
     changed, kept = v1["experiences"]
-    evidence = Evidence(firm_id=world["firm"].id, candidate_id=uuid.UUID(c["id"]), excerpt="x", source="MANUAL")
-    test_db.add(evidence)
-    test_db.flush()
-    claims = [Claim(firm_id=world["firm"].id, candidate_id=uuid.UUID(c["id"]), entity_type="experience",
-                    entity_ref=item["id"], text=item["company"], state="VERIFIED", evidence_id=evidence.id,
-                    source="RESUME_UPLOAD") for item in (changed, kept)]
-    test_db.add_all(claims)
-    test_db.commit()
+    claims = [_verified(test_db, c, "experience", item["id"]) for item in (changed, kept)]
     r = _save(anonymous_client, world, c, v1, experiences=[{**changed, "company": "Capital Payments Inc"}, kept])
     assert r.status_code == 201, r.text
+    v2 = r.json()
+    assert v2["experiences"][0]["id"] != changed["id"] and v2["experiences"][1]["id"] == kept["id"]
+    assert _v(anonymous_client, world, c)["experiences"][0]["id"] == changed["id"]            # v1 untouched
     for claim in claims:
         test_db.refresh(claim)
-    assert [claim.state for claim in claims] == ["UNVERIFIED", "VERIFIED"]
+    assert [claim.state for claim in claims] == ["VERIFIED", "VERIFIED"]
+
+
+def test_a_changed_added_or_removed_bullet_gives_its_job_a_new_id(anonymous_client, test_db, world):
+    """A job's claim covers its bullets: any bullet change makes the job new text, so it gets a new id (only the
+    changed bullet gets one too); v1's job and its claim stay as they were."""
+    c = _candidate(anonymous_client, test_db, world)
+    v1 = _v(anonymous_client, world, c)
+    job = v1["experiences"][0]
+    claim = _verified(test_db, c, "experience", job["id"])
+    bullet, *rest = job["bullets"]
+    edits = [[{**bullet, "text": "Led a team of 40."}, *rest], [*job["bullets"], {"text": "A new bullet."}], rest]
+    for bullets in edits:
+        r = _save(anonymous_client, world, c, v1, experiences=[{**job, "bullets": bullets}, *v1["experiences"][1:]])
+        assert r.status_code == 201, r.text
+        saved = r.json()["experiences"][0]
+        assert saved["id"] != job["id"]
+        assert [b["id"] for b in saved["bullets"] if b["text"] == rest[0]["text"]] == [rest[0]["id"]]   # unchanged
+        test_db.refresh(claim)
+        assert claim.state == "VERIFIED"
+
+
+def test_the_summary_is_an_item_too(anonymous_client, test_db, world):
+    """The summary has an id (0011): unchanged it's kept, so its claim follows; changed it's new, and only the new
+    version is unverified."""
+    c = _candidate(anonymous_client, test_db, world)
+    v1 = _v(anonymous_client, world, c)
+    assert v1["summary_id"]
+    claim = _verified(test_db, c, "summary", v1["summary_id"])
+    same = _save(anonymous_client, world, c, v1, title="A new headline").json()
+    assert same["summary_id"] == v1["summary_id"]
+    edited = _save(anonymous_client, world, c, v1, summary="A different pitch.").json()
+    assert edited["summary_id"] not in (None, v1["summary_id"])
+    assert _save(anonymous_client, world, c, v1, summary=None).json()["summary_id"] is None
+    test_db.refresh(claim)
+    assert claim.state == "VERIFIED"
 
 
 # ── Use as base, pick ────────────────────────────────────────────────────────
@@ -177,7 +222,7 @@ def test_picking_a_bases_version_1_moves_the_active_base_and_copies_nothing(anon
     assert [len(b["versions"]) for b in listing["bases"]] == [2, 1]
 
 
-# ── Who (07 Q54) ─────────────────────────────────────────────────────────────
+# ── Who (07 Q55) ─────────────────────────────────────────────────────────────
 
 def test_before_a_bde_the_owner_and_manager_change_it_and_nobody_deletes_or_uploads(anonymous_client, test_db, world,
                                                                                     parser):

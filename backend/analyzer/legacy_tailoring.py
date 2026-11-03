@@ -4,8 +4,8 @@
 **Not wired to anything.** The routes that ran this (`POST /api/resumes/tailor`, `POST /api/resumes/{id}/score-check`)
 were removed with the old `/api/resumes` router in PR 6, and their `@router` lines are dropped here. The code is
 unchanged otherwise, so it still reads JobNavigator's résumé shape (`Resume.json_data`, `is_base`, `parent_id`), which
-migration 0013 dropped: it imports, but it can't run as it is. The tailoring module ports what it keeps to the
-versions (a TAILORED v1 from the active base's v1, the candidate's BDE only, 07 Q54).
+migration 0012 dropped: it imports, but it can't run as it is. The tailoring module ports what it keeps to the
+versions (a TAILORED v1 from the active base's v1, the candidate's BDE only, 07 Q55).
 
 What's here: the duplicate-bullet and persona-merge helpers; the tailor request's checks (`tailor_resume`) and run
 (`_tailor_impl`), with the "JSON only" retry; the chain-score depth; the score-check's checks (`score_check`) and run

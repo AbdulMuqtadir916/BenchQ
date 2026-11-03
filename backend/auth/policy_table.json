@@ -27,10 +27,12 @@
     "member.changeRole": "Y - - - - -",
     "member.deactivate": "Y - - - - -",
     "member.invite": "Y - - - - -",
+    "notification.approve": "Y Y - - - -",
     "member.remove": "Y - - - - -",
     "outreach.act": "Y Y Y - - -",
     "plan.edit": "- - - - Y Y",
     "platformTeam.manage": "- - - - Y Y",
+    "platform.notification.approve": "- - - - Y -",
     "resume.edit": "Y Y Y - - -",
     "team.view": "Y Y - - - Y"
   }

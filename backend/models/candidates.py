@@ -114,7 +114,7 @@ class ResumeParse(Base):
     it waits 60 minutes: nothing about a candidate is saved until create (Q49); create links the parse to the
     candidate and keeps it (expires_at null), and Track 04 builds the Record from it. Unused parses are deleted once
     expired. A BDE's later upload (docs/team/resume-versioning.md §4.6) is kept from the start. One candidate never
-    keeps the same file twice (`content_sha256`, migration 0012)."""
+    keeps the same file twice (`content_sha256`, migration 0011)."""
     __tablename__ = "resume_parses"
 
     id = _pk()
@@ -127,7 +127,7 @@ class ResumeParse(Base):
     content = Column(LargeBinary, nullable=False)
     parse = Column(JSONB, nullable=False)                 # the parser's answer, Zuhair's format, as returned
     expires_at = Column(DateTime(timezone=True), nullable=True)
-    # The file's fingerprint, worked out from `content` on every insert, so no route has to remember it (0012).
+    # The file's fingerprint, worked out from `content` on every insert, so no route has to remember it (0011).
     content_sha256 = Column(String, nullable=False,
                             default=lambda ctx: file_sha256(ctx.get_current_parameters()["content"]))
     created_at = _created_at()
@@ -165,7 +165,7 @@ class BaseResume(Base):
     is_active = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     created_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
     created_at = _created_at()
-    # 0012 (PR 5): the version a PROMOTED base was copied from, left out of the base dropdown from then on; and when a
+    # 0011 (PR 5): the version a PROMOTED base was copied from, left out of the base dropdown from then on; and when a
     # used base was deleted (hidden: out of the dropdown, kept in history and on its applications).
     promoted_from_resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL", use_alter=True),
                                      nullable=True)
@@ -177,7 +177,7 @@ class BaseResume(Base):
         # For the composite foreign key from resumes: a version's base belongs to the same candidate.
         UniqueConstraint("id", "candidate_id", name="uq_base_resumes_id_candidate"),
         Index("uq_base_resumes_one_active", "candidate_id", unique=True, postgresql_where=text("is_active")),
-        # One upload gives one base; one version gives one promoted base (0012).
+        # One upload gives one base; one version gives one promoted base (0011).
         Index("uq_base_resumes_one_per_parse", "resume_parse_id", unique=True,
               postgresql_where=text("resume_parse_id IS NOT NULL")),
         Index("uq_base_resumes_one_per_version", "promoted_from_resume_id", unique=True,

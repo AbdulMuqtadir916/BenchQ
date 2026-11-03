@@ -1,8 +1,8 @@
 """Résumé versions and bases through the API: promoted and hidden bases, file fingerprints (resume-versioning.md §3.1,
 §3.2; PR 5)
 
-Revision ID: 0012
-Revises: 0009
+Revision ID: 0011
+Revises: 0010
 Create Date: 2026-11-02 12:00:00.000000
 
 Additive only:
@@ -12,15 +12,16 @@ Additive only:
 - One upload gives at most one base (`uq_base_resumes_one_per_parse`).
 - `resume_parses.content_sha256`: the file's fingerprint, filled in here for existing rows. One candidate never keeps
   the same file twice (`uq_resume_parses_candidate_file`); drafts aren't checked.
+- `resumes.summary_id`: the summary's id, like every item's (§3.4): one id per exact summary text of a candidate, so
+  claims on it follow it from version to version and an edit gives the new text a new id (§4.5). Filled in here for
+  versions that have a summary; rows from before versioning get theirs when PR 6 converts them.
 """
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = '0012'
-# 0010 and 0011 are claimed by branches not merged yet (docs/team/README.md §6). Until they merge this
-# follows 0009; once they do, it follows 0011.
-down_revision = '0009'
+revision = '0011'
+down_revision = '0010'
 branch_labels = None
 depends_on = None
 
@@ -42,8 +43,20 @@ def upgrade() -> None:
     op.create_index('uq_resume_parses_candidate_file', 'resume_parses', ['candidate_id', 'content_sha256'], unique=True,
                     postgresql_where=sa.text('candidate_id IS NOT NULL'))
 
+    op.add_column('resumes', sa.Column('summary_id', sa.String(), nullable=True))
+    # One id per candidate per exact summary text: versions that copied it share it, as items share theirs.
+    op.execute("""
+        WITH ids AS (
+            SELECT candidate_id, summary, gen_random_uuid()::text AS id
+            FROM (SELECT DISTINCT candidate_id, summary FROM resumes
+                  WHERE base_resume_id IS NOT NULL AND btrim(coalesce(summary, '')) <> '') texts)
+        UPDATE resumes r SET summary_id = ids.id FROM ids
+        WHERE r.base_resume_id IS NOT NULL AND r.candidate_id = ids.candidate_id AND r.summary = ids.summary
+    """)
+
 
 def downgrade() -> None:
+    op.drop_column('resumes', 'summary_id')
     op.drop_index('uq_resume_parses_candidate_file', table_name='resume_parses',
                   postgresql_where=sa.text('candidate_id IS NOT NULL'))
     op.drop_column('resume_parses', 'content_sha256')

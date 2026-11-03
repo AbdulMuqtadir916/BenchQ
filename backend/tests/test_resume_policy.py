@@ -1,4 +1,4 @@
-"""Who changes a candidate's résumés (07 Q54; docs/team/resume-versioning.md §6): `can_change_resume` and
+"""Who changes a candidate's résumés (07 Q55; docs/team/resume-versioning.md §6): `can_change_resume` and
 `can_manage_resume`, the same rule as `canChangeResume` / `canManageResume` (src/lib/auth/permissions.test.ts)."""
 import uuid
 from types import SimpleNamespace

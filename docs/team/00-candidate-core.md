@@ -74,11 +74,11 @@ require it from now on) and `resume_parse_id` (UUID → `resume_parses`, nullabl
 - **Tailored résumé:** made from the active base's version 1 for one job. A candidate has many. "A tailored résumé
   has a job" is a database CHECK; since 0008 `resumes.job_id` is `ON DELETE CASCADE`, so deleting a job deletes the
   résumés tailored for it (Abdul, 2026-11-01). Built: the tables (0008, PR 3) and the first base on create (PR 4).
-- **Who changes them** (07 Q54): once a BDE is assigned, only that BDE (save, choose the base, upload a later
-  résumé, delete or hide); before that the owner and manager may edit, save and choose the base. PR 5 (0012) adds
+- **Who changes them** (07 Q55): once a BDE is assigned, only that BDE (save, choose the base, upload a later
+  résumé, delete or hide); before that the owner and manager may edit, save and choose the base. PR 5 (0011) adds
   the routes, `base_resumes.promoted_from_resume_id` / `archived_at` and `resume_parses.content_sha256`.
-- **Dropped in PR 6** (migration 0013; approved by Abdul): `resumes.is_base`, `parent_id`, `json_data`, `resume_parse_id` (moved to
-  `base_resumes`), `updated_at`, and the one-base index `uq_resumes_one_base_per_candidate`. From 0013 every résumé row
+- **Dropped in PR 6** (migration 0012; approved by Abdul): `resumes.is_base`, `parent_id`, `json_data`, `resume_parse_id` (moved to
+  `base_resumes`), `updated_at`, and the one-base index `uq_resumes_one_base_per_candidate`. From 0012 every résumé row
   has a base and a candidate (both `NOT NULL`); old rows were converted or, without a candidate, deleted.
 - Applying picks a tailored résumé version (`applications.resume_id`). Rows never change, so what was sent stays
   exactly as it was.

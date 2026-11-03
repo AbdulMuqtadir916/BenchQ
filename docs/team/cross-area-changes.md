@@ -6,11 +6,11 @@ listed here: what changed, in whose area, and why. Newest PR first.
 ## Résumé versioning PR 6 — the old résumé columns and JobNavigator's résumé code removed (`feat/drop-legacy-resume-columns`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §3.3, §4.8, §8; decided 2026-11-02 (Abdul approved the drops
-on 2026-10-31). Migration 0013.
+on 2026-10-31). Migration 0012.
 
 | Area (owner) | File | What changed | Why |
 |---|---|---|---|
-| Applications (Samad) | `backend/api/routes_applications.py` | Interview prep reads the tailored résumé's text from its columns (`resume_text`), newest by `created_at` and `version`; the documents lookup filters `category = 'TAILORED'` instead of `is_base`. Behaviour is the same. | `json_data`, `is_base` and `updated_at` are dropped. An application with no candidate (from before candidates) now shows no tailored résumé: every résumé has a candidate since 0013. |
+| Applications (Samad) | `backend/api/routes_applications.py` | Interview prep reads the tailored résumé's text from its columns (`resume_text`), newest by `created_at` and `version`; the documents lookup filters `category = 'TAILORED'` instead of `is_base`. Behaviour is the same. | `json_data`, `is_base` and `updated_at` are dropped. An application with no candidate (from before candidates) now shows no tailored résumé: every résumé has a candidate since 0012. |
 | The same, tests | `test_application_tracker.py`, `test_application_review_feedback.py`, `test_application_foundation_regressions.py` | Résumés built as versions (`backend/tests/resume_support.py`); the legacy-application cases expect no tailored résumé. | As above. |
 | Upload size limits (Uzair, production layer 2a) | `backend/body_limit.py` | `resumes/import-pdf` and `persona/import` leave the 11 MB upload routes. | Both routes are removed (PR 5 added the candidate's résumé upload there). |
 | Uzair's notes | `docs/team/uzair.md` | The upload and slow-route lists no longer name the removed routes. | They name routes that no longer exist. |
@@ -19,6 +19,7 @@ on 2026-10-31). Migration 0013.
 | The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | The drops marked done; every résumé has a base and a candidate. | Facts only. |
 | Startup seed (shared) | `backend/seed.py` | The "Sample PM" résumé and its seed removed (`seed_mock_resume`). | Q1: a fake person scoring every firm's jobs; a résumé needs a candidate. |
 | Settings (shared) | `backend/api/routes_settings.py` | Imports `reset_tailoring_semaphore` from `render_shared.py`. | Moved with the other helpers. |
+| Ledger (Abdul) | `docs/integration/06-open-decisions.md`, `docs/integration/01-ledger.md` | D10 added: keeping deleted résumé versions for the ledger, **a suggestion by Zuhair Baig (soft delete preferred), not decided**; one line under the ledger's "Gaps" points to it. | Today a delete keeps who/what/when in the ledger but loses the version's content; the ledger is Abdul's to decide. |
 
 Not changed, left to the owner:
 
@@ -32,12 +33,12 @@ Design: [resume-versioning.md](./resume-versioning.md) §3.1, §3.2, §4.3, §4.
 
 | Area (owner) | File | What changed | Why |
 |---|---|---|---|
-| Routes and permissions (Abdul) | `docs/07-ROUTES-AND-RBAC.md` | Q54 added (who changes a candidate's résumés); a line under the §2.2 route map (résumé actions are per candidate); a Phase C row for the two helpers. The route map's access levels and the registry are unchanged. | Abdul's decision: once a BDE is assigned, only that BDE changes the candidate's résumés. |
-| The permission policy (Abdul) | `backend/auth/policy.py`, `src/lib/auth/policy.ts` | Two helpers, `can_change_resume` / `canChangeResume` and `can_manage_resume` / `canManageResume`, next to `can_assign_to`. The role table (and `policy_table.json`) is unchanged: `resume.edit` stays OWNER, MANAGER, BDE, and the helpers narrow it by the candidate's BDE. | Q54 depends on the candidate (has a BDE, and which), which a role table can't express; the project forbids inline role checks in routes. The screens switch to the helpers in PR 7. |
-| The frontend contract (Abdul approves) | `docs/02-DATA-CONTRACTS.md` §8.1 | `BaseResume` gains `promotedFromResumeId` and `archivedAt` (both nullable). Not built in `src/lib/schemas/` until PR 7. | The dropdown leaves out promoted versions and hidden bases (§3.2, §4.7). |
-| The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | One bullet in the résumé section: who changes résumés, and what PR 5 adds. | The section described the résumés without Q54. |
-| The team flows (team doc) | `docs/team/FLOWS.md` | A row for editing résumé versions (who, which tables); Q54 added to the rules under the table. | The same. |
-| Applications migration test (Samad) | `backend/tests/test_migration_0009.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `"0009"`. | With PR 5's migration (0012) on top, a refused downgrade leaves the database at 0010; the test's point (nothing moved) is unchanged. |
+| Routes and permissions (Abdul) | `docs/07-ROUTES-AND-RBAC.md` | Q55 added (who changes a candidate's résumés; numbered after #105's Q54, password recovery); a line under the §2.2 route map (résumé actions are per candidate); a Phase C row for the two helpers. The route map's access levels and the registry are unchanged. | Abdul's decision: once a BDE is assigned, only that BDE changes the candidate's résumés. |
+| The permission policy (Abdul) | `backend/auth/policy.py`, `src/lib/auth/policy.ts` | Two helpers, `can_change_resume` / `canChangeResume` and `can_manage_resume` / `canManageResume`, next to `can_assign_to`. The role table (and `policy_table.json`) is unchanged: `resume.edit` stays OWNER, MANAGER, BDE, and the helpers narrow it by the candidate's BDE. | Q55 depends on the candidate (has a BDE, and which), which a role table can't express; the project forbids inline role checks in routes. The screens switch to the helpers in PR 7. |
+| The frontend contract (Abdul approves) | `docs/02-DATA-CONTRACTS.md` §8.1 | `BaseResume` gains `promotedFromResumeId` and `archivedAt` (both nullable); the studio's content gains `summaryId`. Not built in `src/lib/schemas/` until PR 7. | The dropdown leaves out promoted versions and hidden bases (§3.2, §4.7). |
+| The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | One bullet in the résumé section: who changes résumés, and what PR 5 adds. | The section described the résumés without Q55. |
+| The team flows (team doc) | `docs/team/FLOWS.md` | A row for editing résumé versions (who, which tables); Q55 added to the rules under the table. | The same. |
+| Applications migration test (Samad) | `backend/tests/test_migration_0009.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `"0009"`. | With PR 5's migration (0011) on top, a refused downgrade leaves the database at 0010; the test's point (nothing moved) is unchanged. |
 | Upload size limits (Uzair, production layer 2a) | `backend/body_limit.py` | The candidate's résumé upload (`POST …/candidates/{candidate}/resumes/upload`) joins the 11 MB upload routes. | A résumé file over 1 MB was refused (413) before reaching the route; the route keeps its own 10 MB check, like parse-resume. |
 
 Not changed, left to the owner:
@@ -45,6 +46,12 @@ Not changed, left to the owner:
 - **Email required and unique per firm (Abdul, `candidates`):** decided 2026-11-02 (one candidate per person per
   firm, never checked across firms). The create route already requires and lowercases it; the unique rule and its
   migration are Abdul's.
+
+## Password reset by approval (`feat/password-reset-notifications`, Mohammed Abdul Ahad Umamah)
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `backend/tests/test_migration_0009.py` `test_tracking_downgrade_refuses_to_discard_pending_reviews` | After the refused downgrade, the test checks `alembic_version` is what it was before (the head), instead of `"0009"`. | This PR adds migration `0010` on top, so the head is no longer `0009`; the test's intent (a refused downgrade changes nothing) is unchanged. |
 
 ## Résumé versioning PR 4 — the first base on candidate create (`feat/base-resume-from-parse`, Zuhair)
 
