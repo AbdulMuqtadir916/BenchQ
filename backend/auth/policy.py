@@ -102,3 +102,28 @@ def can_assign_to(principal: Principal, candidate_manager_id, target_manager, ta
     if target_manager.id != principal.user_id:
         return False
     return target_bde is not None if candidate_manager_id is None else candidate_manager_id == principal.user_id
+
+
+def can_change_resume(principal: Principal, candidate) -> bool:
+    """Who may change `candidate`'s résumés (07 Q55; docs/team/resume-versioning.md §6): edit and save, "Use as base?",
+    pick a base. The Python mirror of `canChangeResume` in src/lib/auth/policy.ts. The candidate's BDE once one is
+    assigned; before that the OWNER and a MANAGER (the caller has already checked the candidate is in their scope). A
+    VIEWER and a support view never. Checked when the request arrives, with the candidate row locked."""
+    if not can(principal, "resume.edit") or principal.kind != "firm":
+        return False
+    if candidate.bde_id is None:
+        return principal.role in _OWNER_AND_MANAGER
+    return candidate.bde_id == principal.user_id
+
+
+def can_manage_resume(principal: Principal, candidate) -> bool:
+    """What only `candidate`'s BDE does with their résumés (07 Q55): upload a later résumé, delete or hide, show again,
+    tailor. The Python mirror of `canManageResume`."""
+    return (can(principal, "resume.edit") and principal.kind == "firm" and candidate.bde_id is not None
+            and candidate.bde_id == principal.user_id)
+
+
+def is_lead_role(role: str | None) -> bool:
+    """A user's role (the maker of a row, not the person asking) is the OWNER's or a MANAGER's: what they added to a
+    candidate's résumés a BDE can't delete (07 Q55; resume-versioning.md §4.7)."""
+    return role in _OWNER_AND_MANAGER

@@ -28,10 +28,13 @@ class Case:
     shows_rows: bool = False
     # A multipart upload instead of a JSON body.
     upload: bool = False
+    # Only the candidate's BDE takes it (07 Q55): firm B's own call is made as its BDE, not its OWNER.
+    as_bde: bool = False
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate",
+         "base_id": "base"}
 
 
 def _new(prefix: str) -> str:
@@ -63,6 +66,18 @@ CASES: dict[str, Case] = {
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(body=lambda i: {"rate_target": 90}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": Case(
         body=lambda i: {"manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
+    # Résumé versions and bases (résumé versioning PR 5): under the candidate; writes are the candidate's BDE's.
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": Case(path={"resume_id": "version"}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": Case(path={"resume_id": "version"}, as_bde=True,
+                                       body=lambda i: {"full_name": "Edited", "summary": "An edited summary"}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": Case(path={"resume_id": "version"}, as_bde=True),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload": Case(upload=True, as_bde=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/removal": Case(path={"resume_id": "version"}),
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": Case(path={"resume_id": "version"}, as_bde=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/removal": Case(),
+    "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}": Case(as_bde=True),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/show": Case(as_bde=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": Case(),
 

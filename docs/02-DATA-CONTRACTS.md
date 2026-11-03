@@ -1274,7 +1274,7 @@ export const ExportGateSchema = z.object({
 });
 ```
 
-### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul); `ResumeDraftSchema.country` BUILT (versioning PR 2), the rest NOT BUILT
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2), the rest NOT BUILT
 
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
@@ -1294,6 +1294,8 @@ export const BaseResumeSchema = z.object({
   isActive: z.boolean(),                    // exactly one per candidate
   createdByUserId: z.string(),
   createdAt: z.string().datetime(),
+  promotedFromResumeId: z.string().nullable(), // PROMOTED: the version it was copied from (left out of the dropdown)
+  archivedAt: z.string().datetime().nullable(), // set while hidden (a used base the BDE deleted); null otherwise
 });
 
 // ResumeSchema gains:
@@ -1307,6 +1309,8 @@ export const AwardEntrySchema = z.object({
   id: z.string(), name: z.string(), issuer: z.string(), date: z.string(), detail: z.string(),
 });
 // ResumeDocumentSchema: awards: z.array(AwardEntrySchema), languages: z.array(z.string()) (kept, never printed);
+// summaryId: z.string().nullable() (versioning PR 5: the summary's id; an id names one exact text, a changed one
+// gets a new id, so claims follow only the text they were checked against);
 // ResumeSectionKey: + 'awards'
 
 // src/lib/schemas/record.ts — RecordEvidenceSchema.entityType becomes, matching the backend's claims.entity_type:
