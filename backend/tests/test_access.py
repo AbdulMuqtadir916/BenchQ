@@ -37,6 +37,7 @@ def test_the_public_allowlist_is_exactly_the_agreed_one():
     assert public == sorted([
         "GET /health", "GET /", "GET /cv/{token}", "POST /api/telegram/webhook",
         "POST /api/auth/sign-in", "POST /api/auth/sign-out",
+        "POST /api/auth/password-reset/request", "POST /api/auth/password-reset/complete",
         "GET /api/invites/{token}", "POST /api/invites/{token}/accept",
     ])
 

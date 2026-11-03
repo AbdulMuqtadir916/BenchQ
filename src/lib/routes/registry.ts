@@ -5,6 +5,7 @@ import {
   Briefcase,
   Building2,
   FileText,
+  KeyRound,
   Layers,
   LayoutDashboard,
   ShieldCheck,
@@ -56,7 +57,7 @@ export interface RouteDef {
   access: RouteAccess;
   /** What a role with "none" sees. Default: the Forbidden screen in place. */
   onDenied?: "forbidden" | "landing";
-  nav?: { section: "workspace" | "preferences" | "settings" | "admin"; order: number; icon?: LucideIcon };
+  nav?: { section: "workspace" | "preferences" | "settings" | "notifications" | "admin"; order: number; icon?: LucideIcon };
   /** Second key of a `g` shortcut, e.g. "c" for `g c`. */
   shortcut?: string;
   palette?: boolean;
@@ -76,6 +77,8 @@ const ROUTE_DEFS = [
   // Auth and onboarding
   { id: "root", path: "/", title: "BenchQ", area: "public", shell: "auth", access: PUBLIC },
   { id: "sign-in", path: "/sign-in", title: "Sign in", area: "public", shell: "auth", access: PUBLIC },
+  { id: "forgot-password", path: "/forgot-password", title: "Forgot password", area: "public", shell: "auth", access: PUBLIC },
+  { id: "reset-password", path: "/reset-password", title: "Reset password", area: "public", shell: "auth", access: PUBLIC },
   { id: "invite", path: "/invite/[token]", title: "Accept invite", area: "public", shell: "auth", access: PUBLIC },
   { id: "welcome", path: "/[firm]/welcome", title: "Welcome", area: "firm", shell: "auth", access: firm(roles("full", "none", "none", "none"), "none"), onDenied: "landing" },
 
@@ -106,6 +109,9 @@ const ROUTE_DEFS = [
   { id: "settings.team", path: "/[firm]/settings/team", title: "Team", area: "firm", shell: "app", access: firm(roles("full", "team", "none", "none")), nav: { section: "settings", order: 2, icon: Users }, palette: true },
   { id: "settings.templates", path: "/[firm]/settings/templates", title: "Templates", area: "firm", shell: "app", access: firm(roles("full", "full", "none", "none")), nav: { section: "settings", order: 3, icon: FileText }, palette: true },
   { id: "settings.preferences", path: "/[firm]/settings/preferences", title: "Preferences", area: "firm", shell: "app", access: firm(everyone("full"), "none"), nav: { section: "settings", order: 4, icon: SlidersHorizontal }, palette: true },
+  { id: "notifications", path: "/[firm]/notifications", title: "Notifications", area: "firm", shell: "app", access: firm(everyone("full"), "none"), nav: { section: "preferences", order: 3, icon: Bell }, palette: true },
+  // The inboxes in Notifications' own sidebar (07 Q54; notifications-shell.tsx). Only Requests for now.
+  { id: "notifications.requests", path: "/[firm]/notifications/requests", title: "Requests", area: "firm", shell: "app", access: firm(everyone("full"), "none"), nav: { section: "notifications", order: 1, icon: KeyRound }, palette: true },
 
   // Platform tier (docs/07 §2.3): PLATFORM_ADMIN only; everyone else gets not-found from the admin layout.
   // `g` keys here are the admin map (docs/04 §14.1): they apply only in the admin shell, so `g f` / `g a`
@@ -121,6 +127,8 @@ const ROUTE_DEFS = [
   { id: "admin.audit", path: "/admin/audit", title: "Audit", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 4, icon: ScrollText }, shortcut: "a", palette: true },
   { id: "admin.system", path: "/admin/system", title: "System", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 5, icon: Activity }, shortcut: "s", palette: true },
   { id: "admin.team", path: "/admin/team", title: "Team", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 6, icon: Users }, shortcut: "t", palette: true },
+  { id: "admin.notifications", path: "/admin/notifications", title: "Notifications", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "preferences", order: 1, icon: Bell }, palette: true },
+  { id: "admin.notifications.requests", path: "/admin/notifications/requests", title: "Requests", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "notifications", order: 1, icon: KeyRound }, palette: true },
 ] as const satisfies readonly RouteDef[];
 
 /** Every registered route id. A mistyped id fails the typecheck instead of failing at render time. */

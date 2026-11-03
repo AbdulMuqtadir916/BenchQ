@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { GateSkeleton } from "@/components/routes/gate-screen";
 import { useCurrentSession, useSignIn } from "@/lib/hooks/use-session";
 import { safeReturnTo, signedInRedirect } from "@/lib/routes/landing";
 import { useIsSessionSettling, useSession } from "@/lib/stores/session-store";
+import { useHref } from "@/lib/routes/use-href";
 
 /** useSearchParams needs a Suspense boundary for the static build. */
 export default function SignInPage() {
@@ -58,6 +60,7 @@ function signInError(error: Error): string {
  * auth until Phase D). On success: back to the same-origin `returnTo`, or the principal's landing.
  */
 function SignInForm() {
+  const toHref = useHref();
   const searchParams = useSearchParams();
   const returnTo = safeReturnTo(searchParams.get("returnTo"));
   const signIn = useSignIn(returnTo);
@@ -102,7 +105,7 @@ function SignInForm() {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-label text-[var(--color-text-2)]" htmlFor="password">Password</label>
-              <a href="#" className="text-caption text-[var(--color-primary)]">Forgot password?</a>
+              <Link href={toHref("forgot-password")} className="text-caption text-[var(--color-primary)]">Forgot password?</Link>
             </div>
             <Input
               id="password"

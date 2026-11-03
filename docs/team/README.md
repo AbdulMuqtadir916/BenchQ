@@ -29,6 +29,7 @@ without changing each other's tables.
 | **Zuhair** | Candidate table improvement (profile from the résumé, the Record) | Job scraping per candidate | Résumé tailoring (+ ATS score) | — | [zuhair.md](./zuhair.md) |
 | **Uzair** | Production layer (rate limits, req/s handling, timeouts, logging, errors) | Production testing (load, security, failure) | — | — | [uzair.md](./uzair.md) — detailed when he starts |
 | **Abdul** | Candidate core tables (before everyone) | Billing layer | Deployment | Cleaning the project dump | [abdul.md](./abdul.md) |
+| **Mohammed Abdul Ahad Umamah** | Password recovery approval workflow | Extensible Notifications inbox | — | — | [umamah.md](./umamah.md) |
 
 Nobody starts their 1st task until the candidate core PR is merged (`00-candidate-core.md` §5).
 
@@ -51,6 +52,7 @@ it. Everyone else reads it.
 | `ledger_entries` | Abdul | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table |
 | billing tables (new) | Abdul | |
 | `users`, `firms`, `plans`, `invites`, `sessions`, `support_views` | Abdul | Tenancy |
+| `notifications`, `password_reset_requests` | Mohammed Abdul Ahad Umamah | Extensible inbox; password recovery approvals |
 | everything production-layer (middleware, limits, logging config) | Uzair | Not tables: `backend/main.py` middleware and config |
 
 ## 4. Rules that keep the work conflict-free
@@ -83,6 +85,7 @@ it. Everyone else reads it.
 | Jobs, scraping | `docs/integration/02-jobs.md` |
 | Résumés, tailoring, claims (D4) | `docs/integration/04-resumes-and-tailoring.md` |
 | Connecting a module to the frontend | `docs/integration/README.md` "The workflow for one module" |
+| Password recovery approvals and Notifications inbox | [umamah.md](./umamah.md) |
 | Decisions | `docs/07-ROUTES-AND-RBAC.md` §0 (Q53 is this plan) |
 
 ## 6. Migration numbers
@@ -92,4 +95,5 @@ it. Everyone else reads it.
 | 0007 | Abdul | Candidate core tables | PR #91 |
 | 0008 | Zuhair | Résumé versioning: `base_resumes`, the new `resumes` columns, `award` claims (additive) | `feat/base-resumes-schema` |
 | 0009 | Samad | Applications foundation: revisions, immutable status events and BDE review records | PR 1 replacement, `codex/applications-foundation-v2`; code-owner review pending |
-| 0010+ | — | Claim the next number here in your PR | — |
+| 0010 | Mohammed Abdul Ahad Umamah | Notifications inbox and password-reset approval requests | `feat/password-reset-notifications` |
+| 0011+ | — | Claim the next number here in your PR | — |

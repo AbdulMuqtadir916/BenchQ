@@ -56,12 +56,12 @@ describe("route registry", () => {
     for (const route of ROUTES) {
       expect(route.path.startsWith("/[firm]/"), route.id).toBe(route.area === "firm");
     }
-    expect(ROUTES.filter((route) => route.area === "public").map((route) => route.path)).toEqual(["/", "/sign-in", "/invite/[token]"]);
+    expect(ROUTES.filter((route) => route.area === "public").map((route) => route.path)).toEqual(["/", "/sign-in", "/forgot-password", "/reset-password", "/invite/[token]"]);
   });
 
   it("reserves every top-level static segment, so no firm slug can shadow a route (docs/07 §2.4)", () => {
     const topLevel = new Set(pagePaths().map((path) => path.split("/")[1]!).filter((segment) => segment && !segment.startsWith("[")));
-    expect([...topLevel].sort()).toEqual(["admin", "dev", "invite", "sign-in"]);
+    expect([...topLevel].sort()).toEqual(["admin", "dev", "forgot-password", "invite", "reset-password", "sign-in"]);
     for (const segment of topLevel) expect(RESERVED_SLUGS as readonly string[], segment).toContain(segment);
   });
 
@@ -107,6 +107,10 @@ describe("route registry", () => {
     expect(navFor(asRole("VIEWER"), "workspace").map((r) => r.id)).not.toContain("followups");
     expect(navFor(asRole("MANAGER"), "settings").map((r) => r.id)).toEqual(["settings.team", "settings.templates", "settings.preferences"]);
     expect(navFor(asRole("BDE"), "settings").map((r) => r.id)).toEqual(["settings.preferences"]);
+    expect(navFor(asRole("MANAGER"), "preferences").map((r) => r.id)).toContain("notifications");
+    expect(navFor(asRole("BDE"), "preferences").map((r) => r.id)).toContain("notifications");
+    expect(navFor(asRole("BDE"), "settings").map((r) => r.id)).not.toContain("notifications");
+    for (const role of ROLES) expect(navFor(asRole(role), "notifications").map((r) => r.id), role).toEqual(["notifications.requests"]);
   });
 });
 
@@ -191,15 +195,17 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["settings.team", "full", "team", "none", "none"], // MANAGER: their team, read-only + assign through can() (Q15, Q47)
   ["settings.templates", "full", "full", "none", "none"],
   ["settings.preferences", "full", "full", "full", "full"],
+  ["notifications", "full", "full", "full", "full"],
+  ["notifications.requests", "full", "full", "full", "full"],
 ];
 
 /** Routes outside the firm table: public pages, and the dev-only design system (docs/07 §2.1, §2.4). */
-const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in", "invite"];
+const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in", "forgot-password", "reset-password", "invite"];
 const DEV_ROUTES: readonly RouteId[] = ["design-system"];
 /** docs/07 §2.3: PLATFORM_ADMIN only, every route of the list (P3). */
 const PLATFORM_ROUTES: readonly RouteId[] = [
   "admin", "admin.firms", "admin.firms.new", "admin.firms.detail", "admin.firms.detail.users", "admin.firms.detail.plan", "admin.firms.detail.activity",
-  "admin.plans", "admin.audit", "admin.system", "admin.team",
+  "admin.plans", "admin.audit", "admin.system", "admin.team", "admin.notifications", "admin.notifications.requests",
 ];
 
 describe("access table (docs/07 §2.2)", () => {
@@ -324,7 +330,7 @@ const SUPPORT_TABLE: ReadonlyArray<readonly [RouteId, Access]> = [
   ["jobs", "read"], ["jobs.detail", "read"], ["jobs.capture", "none"], ["applications", "read"], ["applications.detail", "read"],
   ["resumes", "read"], ["resumes.studio", "read"], ["outreach", "read"], ["followups", "read"], ["focus", "none"],
   ["analytics", "read"], ["ledger", "read"], ["settings", "read"], ["settings.firm", "read"], ["settings.team", "read"],
-  ["settings.templates", "read"], ["settings.preferences", "none"],
+  ["settings.templates", "read"], ["settings.preferences", "none"], ["notifications", "none"], ["notifications.requests", "none"],
 ];
 
 const admin: Principal = { kind: "platform", userId: "padm", role: "PLATFORM_ADMIN", support: null };
@@ -357,6 +363,8 @@ describe("platform tier (docs/07 §2.3, §2.2 Support, P1)", () => {
     expect(landingFor(admin)).toBe("admin");
     expect(hrefFor(landingFor(admin))).toBe("/admin");
     expect(navFor(admin, "admin").map((route) => route.id)).toEqual(["admin", "admin.firms", "admin.plans", "admin.audit", "admin.system", "admin.team"]);
+    expect(navFor(admin, "preferences").map((route) => route.id)).toEqual(["admin.notifications"]);
+    expect(navFor(admin, "notifications").map((route) => route.id)).toEqual(["admin.notifications.requests"]);
     expect(navFor(admin, "workspace")).toEqual([]);
     for (const role of ROLES) expect(navFor(asRole(role), "admin"), role).toEqual([]);
   });
@@ -400,7 +408,7 @@ describe("⌘K navigation by area (P5, docs/04 §14.1)", () => {
   const ids = (principal: Principal, area: "firm" | "platform") => paletteRoutesFor(principal, area).map((route) => route.id).sort();
 
   it("a platform admin in the admin shell: the admin pages, nothing of a firm", () => {
-    expect(ids(admin, "platform")).toEqual(["admin", "admin.audit", "admin.firms", "admin.plans", "admin.system", "admin.team"]);
+    expect(ids(admin, "platform")).toEqual(["admin", "admin.audit", "admin.firms", "admin.notifications", "admin.notifications.requests", "admin.plans", "admin.system", "admin.team"]);
     expect(ids(admin, "firm")).toEqual([]);
   });
 

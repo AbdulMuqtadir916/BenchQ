@@ -16,9 +16,9 @@ from backend.auth.sessions import Principal
 FIRM_ACTIONS = ("candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit",
                 "outreach.act", "followup.act")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
-                "candidate.assign", "firmSettings.edit")
+                "candidate.assign", "firmSettings.edit", "notification.approve")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
-                    "invite.revoke", "platformTeam.manage")
+                    "invite.revoke", "platformTeam.manage", "platform.notification.approve")
 ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + ("team.view",) + PLATFORM_ACTIONS
 
 _ALL_ACTING = ("OWNER", "MANAGER", "BDE")
@@ -42,6 +42,7 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "member.changeManager": _OWNER_ONLY,          # 07 Q40
     "candidate.assign": _OWNER_AND_MANAGER,
     "firmSettings.edit": _OWNER_ONLY,             # 07 Q46
+    "notification.approve": _OWNER_AND_MANAGER,   # 07 Q54; recipient check remains request-specific
     "team.view": _OWNER_AND_MANAGER,
 }
 
@@ -49,6 +50,8 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
 def can(principal: Principal, action: str) -> bool:
     if action not in ALL_ACTIONS:
         raise ValueError(f"unknown action {action!r}")    # a typo must fail loudly, never deny or allow quietly
+    if action == "platform.notification.approve":
+        return principal.is_platform and principal.support_view_id is None
     if action in PLATFORM_ACTIONS:
         return principal.is_platform
     if principal.is_platform:
