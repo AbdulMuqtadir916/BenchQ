@@ -16,13 +16,13 @@ Agreed with Samad on 2026-11-01 for separating the existing combined Inbox/Appli
 2. **One concern per PR, raised step by step.** Each PR targets `main`. Wait for the preceding dependency to be
    approved and merged, then prepare the next branch from the updated `main`; do not stack PRs on open branches.
 3. **Split the existing work in this order:**
-   - PR 1: Applications foundation — statuses, status history, BDE review records, and migration `0009` (follows main’s résumé migration `0008`).
-   - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection and sync, and its next available migration.
+   - PR 1: Applications foundation — statuses, status history, BDE review records, and migration `0009` — merged in PR #100.
+   - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection/sync and minimum retained-account identity protection; migration `0012` follows merged résumé `0011`.
    - PR 3: Email classification — application matching, confidence rules, automatic status updates and BDE review
      routing, and its next available migration.
-   - PR 4: Mailbox history protection — account provenance, account-scoped deduplication, and its next available migration.
-   - PR 5: Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
-   Main owns résumé migration `0008`; Applications claims `0009` in this PR. Claim later migration numbers
+   - Original PR 4: account provenance and deduplication are moved into PR 2 (Samad requested 2026-11-01; Abdul approval pending). Do not raise a duplicate history PR; later hardening is a separate concern only if needed.
+   - PR 4 (remaining UI): Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
+   Main owns résumé `0008` and Applications `0009` (PR #100). Notifications owns `0010` (PR #105); Résumé versions owns `0011` (#106); PR 2 claims `0012`. Claim later migration numbers
    individually after checking the latest Alembic head on `main`; do not reserve numbers from the old combined branch.
    Include dependencies needed for each PR to work independently and explain any necessary scope adjustment.
 4. **Include a Markdown change document in every PR.** Use `docs/team/pr-changes/<branch-name>.md` (replace `/`
@@ -41,21 +41,41 @@ The candidate page already has an Inbox tab and an "Inbox" preview on its Overvi
 (`src/mocks/inbox.ts`, `src/lib/schemas/inbox.ts`: `InboxMessage`, `MailboxConnection`). The backend today watches
 **one** Gmail account for the whole app (`backend/email_monitor/`, `POST /api/email/check-now`).
 
-1. **Design note first (no code), agreed with Abdul:** Google OAuth for a candidate's mailbox (scopes: read-only),
-   where the refresh token is stored (encrypted at rest; the key from the environment, never in the database or the
-   repo), how a sync runs (scheduler job per connected mailbox, incremental by history id), what a disconnect does,
-   and the security of a BDE connecting someone else's account. Write it into this file as §1.0.
-2. **Connect / disconnect / status:** routes under `/api/firms/{firm}/candidates/{id}/mailbox`; the token columns on
-   `candidate_mailboxes` (your migration, claim its number in the team README §6). Policy: who may connect (a new
-   action in `src/lib/auth/policy.ts` and `backend/auth/policy.py`, both, with the shared table regenerated).
-3. **Sync into `inbox_messages`:** per mailbox, deduped by (`mailbox_id`, `provider_message_id`). Replace the
-   single-account monitor; keep its parsing where it helps.
-4. **Matching emails to applications:** set `inbox_messages.application_id` (by company, job title, thread). Unmatched
-   stay null and show as such.
-5. **Status suggestions:** an email that implies a stage (`InboxMessage.impliedStatus`) suggests it; a person accepts.
-   Never change a status silently.
-6. **Frontend live:** `src/lib/api/inbox.ts` behind `NEXT_PUBLIC_LIVE_MODULES=inbox`, a DTO mapper with a real sample,
-   the module workflow's states (skeleton, empty, error). Every write logs to the ledger with `candidate_id`.
+### 1.0 Connection and retention proposal — Samad requested; Abdul sign-off pending (2026-11-02)
+
+- The candidate owns the mailbox. An authorized OWNER/MANAGER/BDE starts Google-hosted consent from that
+  candidate’s Inbox, using existing `candidate.edit` plus the shared candidate scope. VIEWER may read stored mail within existing scope; platform support sees only operational health/counts and cannot connect, sync, disconnect or mark it read. No new role checks are introduced.
+- Request `openid email` and Gmail read-only. Google verifies the selected account address; the UI shows that
+  address rather than guessing it from the candidate profile. Complete consent in the browser running the
+  initiating BenchQ session; callbacks require that session. BenchQ never accepts a Google password. State is
+  random, stored hashed, single-use and bound to the initiating user/firm/candidate; the PKCE verifier and refresh
+  token are encrypted with a Fernet key held outside the database. Recheck current authorization around exchange.
+- Initial import is **3 days** (the former 90-day proposal is superseded). Retain message text, headers, provider
+  IDs and the source address, skip attachments, cap stored bodies at 100,000 characters. Incremental history sync
+  defaults to 5 minutes; 0 disables polling. Expired history checkpoints rebuild the deduplicated recent window.
+- Disconnect removes credentials/checkpoints and stops sync, retaining imported messages. Replacing an active
+  address requires disconnect first. Reconnect generations and row locks prevent stale sync/error callbacks from
+  changing a newer connection. A PostgreSQL advisory lock prevents duplicate pollers in the current single-process
+  deployment; production worker topology remains Uzair’s track.
+- **Minimum account-history protection is included now:** `source_address` records the verified address at import.
+  Deduplicate by `(mailbox_id, source_address, provider_message_id)`. Before changing an account, attribute blank
+  legacy sources to the existing address. Existing database rows are backfilled from their current mailbox; unknown
+  historical replacement must be investigated before rollout rather than inventing original provenance.
+- Imports are unclassified and do not match new application links or change application statuses in this PR.
+  Matching/classification/BDE routing and the agreed confidence policy belong to PR 3. A null signal renders as
+  Unclassified in all existing consumers; retained mail remains readable after disconnect.
+- Connection, confirmation and deletion mutations are attributed to their actor/candidate in the ledger; reads and manual sync requests are excluded. Initial/background imports use SYSTEM
+  attribution when records are added; no email body, subject, credential or provider diagnostic is logged.
+- Ship behind the existing `inbox` live-module adapter flag. The connect flow navigates to Google; mock mode keeps
+  synthetic fixtures without a fake consent screen. Sync/read/disconnect errors are visible and read failures roll
+  back optimistic state with explicit retry. Google Cloud client/redirect and encryption key must be configured
+  through local/deployment secrets before live connection testing. Verification uses synthetic providers only.
+- One new migration, `0012` after `0011`, contains OAuth and minimum provenance. Downgrade refuses to discard
+  active OAuth attempts, live credentials or retained provenance that cannot be reconstructed. No merged migration
+  or existing development data is rewritten. Required code-owner review remains pending before merge.
+
+Connection implementation: `backend/api/routes_inbox.py`, `backend/inbox/`, the Inbox adapter/DTO/hooks and current
+connect/reader components. [Per-file changes and evidence](./pr-changes/codex-candidate-gmail-connection.md).
 
 ## 2. Applications (Track 03, `docs/integration/03-applications.md`)
 
@@ -84,3 +104,41 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
   elsewhere (e.g. on `candidates`)? Ask the owner; for `candidates`, Abdul.
 - Every candidate-owned row carries `candidate_id` and `firm_id`; read through `scoped()`; new routes go in
   `access.py` and `isolation_cases.py`.
+
+
+### PR 104 review follow-up (2026-11-02)
+
+See docs/02-DATA-CONTRACTS.md, PR 104 review corrections, and the per-file PR change report. Working plans/checklists are kept locally, outside the PR.
+The final written decision is firm-local one-active-candidate mailbox ownership, ERROR reservation until disconnect, current-BDE
+candidate access with retained data on reassignment, both deletion choices, restricted support metadata and the
+background import audit policy. The latest correction below supersedes earlier read/manual-sync choices.
+No new database columns/tables are added by this follow-up. Durable consent lives in the existing ledger.
+
+Abdul's later replies, supplied in chat, approve automatic updates in principle with the agreed transition
+allowlist; enablement stays OFF until PR 4 merges and Undo is usable. External classification for real mail stays
+OFF until provider retention/logging are verified in writing and consent is updated. These replace the earlier
+unresolved automatic-versus-human acceptance wording; PR 104 itself performs neither classification nor updates.
+After #104 merges, submit the revised contracts/plan, then PR 3 classification, then PR 4 remaining UI. No stacks.
+The global legacy monitor remains for non-candidate applications only; preserve its candidate-status guards.
+Candidate Google access defaults OFF until PR 3 readiness, named Google verification ownership, privacy and approval.
+
+### PR 104 latest review corrections (2026-11-03)
+
+Restore Q52 unchanged: current assignment does not expose every Owner/Manager/SYSTEM ledger event. Store batch
+progress atomically in existing JobRun metadata and append one terminal/recovery result; never update the ledger.
+Use per-account lifecycle locks and concurrent unknown-account exchange coordination with bounded waiting.
+Refresh newest mail while retaining cached older pages; cap automatic reload restoration at three pages and
+keep selected body loading independent. Expired confirmation action is Return to Inbox, then a separate Connect.
+Support health/counts-only visibility was approved in Abdul’s GitHub review. Abdul’s written 2026-11-03 decision, accepted by Samad, permits the same Gmail across firms and blocks duplicate active candidates only within a firm. The latest correction below removes read/manual-sync request auditing; cursor pagination and exact remaining contracts still require code-owner sign-off before merge.
+
+### Latest Samad clarification and accepted audit/retry decisions (2026-11-03)
+
+Adopt Abdul’s written decision dated 2026-11-03: one active candidate per Gmail within each firm; the same
+Gmail is allowed across firms simultaneously. Return only an in-firm candidate conflict; never announce another
+firm’s use. Disconnect/retry protects any remaining shared grant. This supersedes earlier global-rule proposals.
+Accept Abdul’s 2026-11-03 removal of read/manual-sync request business-ledger entries; keep is_read and propose
+separate access logging later. Retain encrypted failed/busy revocations in expired existing OAuth cleanup attempts
+for scheduled retry, protecting any still-live shared grant. No new table or migration. Existing business events
+(import result, connection, confirmation, deletion) remain audited.
+
+Main integration: merged main ff923c3 (#106 résumé versions); preserved both fixture families and moved only unmerged Gmail migration/tests to 0012 after 0011. New integration checks pending.

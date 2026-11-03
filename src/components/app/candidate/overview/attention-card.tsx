@@ -9,7 +9,7 @@ import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
 import { expiryStatus } from "../documents/document-meta";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
@@ -67,7 +67,7 @@ export function AttentionCard({ ws, actions, canAct }: { ws: CandidateWorkspace;
     }),
     ...ws.suggestions.map((s): Item => {
       const app = appById.get(s.applicationId);
-      const meta = SIGNAL_META[s.message.signal];
+      const meta = mailSignalMeta(s.message.signal);
       return {
         key: `sg_${s.message.id}`,
         Icon: meta.Icon,
@@ -95,8 +95,8 @@ export function AttentionCard({ ws, actions, canAct }: { ws: CandidateWorkspace;
           primary: { label: "Open", onClick: () => actions.openApplication(f.applicationId) },
         };
       }),
-    ...(canAct && ws.inbox && !ws.inbox.connection
-      ? [{ key: "connect", Icon: Mail, tone: "blue" as const, title: `Connect ${first}'s inbox`, detail: "Recruiter replies, shortlists and interviews get tracked automatically", primary: { label: "Connect", onClick: () => actions.openTab("inbox") } }]
+    ...(canAct && ws.inbox && ws.inbox.connection?.status !== "CONNECTED"
+      ? [{ key: "connect", Icon: Mail, tone: "blue" as const, title: `${ws.inbox.connection ? "Reconnect" : "Connect"} ${first}'s inbox`, detail: "Connect the inbox to resume syncing emails", primary: { label: ws.inbox.connection ? "Reconnect" : "Connect", onClick: () => actions.openTab("inbox") } }]
       : []),
     ...ws.expiringDocuments.slice(0, 2).map((d): Item => ({
       key: `doc_${d.id}`,

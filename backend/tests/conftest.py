@@ -17,6 +17,9 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 # Development settings (plain-http cookies, API docs on), as docker-compose runs the app locally. Tests that
 # need production behaviour patch backend.config / backend.auth.access themselves.
 os.environ["BENCHQ_ENV"] = "development"
+# Synthetic Gmail encryption key, never used outside the disposable test environment.
+os.environ["CANDIDATE_GMAIL_ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
+os.environ["CANDIDATE_GMAIL_ENABLED"] = "true"
 
 
 def pytest_configure(config):
