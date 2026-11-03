@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
-from backend.db_schema import head_revision
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.tests.auth_support import seed_accounts
 from backend.tests.isolation_support import make_world
@@ -66,10 +65,11 @@ def test_tracking_downgrade_refuses_to_discard_pending_reviews(scratch_db):
     with engine.connect() as conn:
         count = conn.execute(text("SELECT count(*) FROM application_reviews")).scalar_one()
     assert count > 0
+    with engine.connect() as conn:
+        head = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
     result = _alembic(name, "downgrade", "0008")
     assert result.returncode != 0
     assert "preserve application review history" in result.stderr
     with engine.connect() as conn:
-        # Nothing moved: still at head (0009 when this was written; later revisions sit on top of it).
-        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == head_revision()
+        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == head
         assert conn.execute(text("SELECT count(*) FROM application_reviews")).scalar_one() == count

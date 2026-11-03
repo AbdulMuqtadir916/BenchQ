@@ -17,7 +17,8 @@ from fastapi import HTTPException
 from backend.auth.invites import normal_email
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password
 from backend.auth.sessions import end_all_sessions
-from backend.models.db import SessionLocal
+from backend.models.db import SessionLocal, utcnow
+from backend.models.notifications import Notification, PasswordResetRequest
 from backend.models.tenancy import LedgerEntry, PlatformUser, User
 
 
@@ -39,6 +40,17 @@ def reset_password(db, *, email: str, password: str) -> User | PlatformUser:
     account.password_hash = hash_password(password)
     end_all_sessions(db, account)
     is_firm_user = isinstance(account, User)
+    if is_firm_user:
+        now = utcnow()
+        rows = db.query(PasswordResetRequest).filter(PasswordResetRequest.requester_user_id == account.id,
+            PasswordResetRequest.status.in_(["PENDING", "APPROVED"])).all()
+        for row in rows:
+            row.status = "CANCELLED"
+            row.reset_token_hash = None
+            row.reset_token_expires_at = None
+            for notice in db.query(Notification).filter(Notification.type == "PASSWORD_RESET",
+                Notification.entity_id == str(row.id), Notification.resolved_at.is_(None)).all():
+                notice.resolved_at = now
     # In the firm's own ledger for a firm user, so the OWNER sees it; a platform event for a Super Admin (A13).
     db.add(LedgerEntry(firm_id=account.firm_id if is_firm_user else None, actor_type="SYSTEM", actor_user_id=None,
                        actor_name="reset_password", entity_type="user" if is_firm_user else "platform_user",

@@ -26,9 +26,9 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
    verification is a person's act.
 4. **The base résumé:** made from the parse at candidate create, as the first of the candidate's bases
    (`base_resumes`, one active) and its version 1 in `resumes`. Spec and PR plan: [resume-versioning.md](./resume-versioning.md).
-   **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). **PR 5** (migration 0012):
+   **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). **PR 5** (migration 0011):
    versions and bases through the API under the candidate's URL: save, use as base, pick, the BDE's later upload,
-   delete / hide / show again; once a BDE is assigned only that BDE changes résumés (07 Q54).
+   delete / hide / show again; once a BDE is assigned only that BDE changes résumés (07 Q55).
 5. **Frontend live:** the Record (`src/lib/api/records.ts`) behind `records`, with a DTO mapper and a real sample.
 
 ## 2. Job scraping — per candidate (Q53b)
@@ -51,7 +51,7 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
 2. **Tailored résumés** from the active base's version 1 for one job (`category = 'TAILORED'`, `base_resume_id`,
    `job_id`; [resume-versioning.md](./resume-versioning.md) §4), many per candidate. The claims a tailored résumé uses keep their state; an UNVERIFIED claim blocks export (CLAUDE.md).
    Tailoring creates them; editing one is résumé versioning PR 5's save (the next version), and only the
-   candidate's BDE tailors (07 Q54, `can_manage_resume`). Decide here whether tailoring may choose the base per job
+   candidate's BDE tailors (07 Q55, `can_manage_resume`). Decide here whether tailoring may choose the base per job
    (a candidate has several target roles but one active base).
 3. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
    or re-tailoring inserts the next version.

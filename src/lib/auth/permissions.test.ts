@@ -155,7 +155,7 @@ describe("canAssignTo (07 Q41, Q43)", () => {
   });
 });
 
-describe("canChangeResume and canManageResume (07 Q54)", () => {
+describe("canChangeResume and canManageResume (07 Q55)", () => {
   const unassigned = { bdeId: null };
   const theirs = { bdeId: "u_BDE" };
   const someoneElses = { bdeId: "b2" };

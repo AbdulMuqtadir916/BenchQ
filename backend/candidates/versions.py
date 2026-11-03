@@ -5,8 +5,9 @@ assignment locks too: a save, a promote, an upload and a delete for one candidat
 permission checked under the lock can't change before the commit. Nothing here commits; the route does, once.
 
 - **Save:** the next version of the résumé the edit came from, whatever was saved in between (two saves from v2 give
-  v3 and v4, Abdul); the second is told. Item ids come from the version edited; new items get one. Changed items'
-  claims go back to UNVERIFIED (§4.5).
+  v3 and v4, Abdul); the second is told. An id stands for one exact text (§3.4, §4.5): an item kept as it was keeps
+  its id, so its claims follow it; a changed or new item, bullet or summary gets a new id, so it starts unverified
+  while the versions that hold the old text keep their claims. No claim is ever reset.
 - **Use as base / pick:** a base's v1 makes that base active; any other version is copied as v1 of a new PROMOTED
   base, or the base already made from it is made active.
 - **Upload:** a new UPLOAD base, active, its v1 from the parse (`first_base()` without a form).
@@ -17,7 +18,8 @@ import uuid
 from dataclasses import dataclass, field
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import func
+from sqlalchemy.orm import load_only
 
 from backend.auth import ledger
 from backend.auth.policy import is_lead_role
@@ -44,13 +46,15 @@ def _bad(detail) -> HTTPException:
 # ── Content and item ids ─────────────────────────────────────────────────────
 
 def content_of(row: Resume) -> dict:
-    """A version's content: the header columns, the summary and every section, as stored."""
-    return {**{k: getattr(row, k) for k in HEADER}, **{k: copy.deepcopy(getattr(row, k) or []) for k in SECTIONS}}
+    """A version's content: the header columns, the summary and its id, and every section, as stored."""
+    return {**{k: getattr(row, k) for k in HEADER}, "summary_id": row.summary_id,
+            **{k: copy.deepcopy(getattr(row, k) or []) for k in SECTIONS}}
 
 
 def _items(content: dict):
     """Every item with an id, bullets included: (id, its fields without the id). A job's or project's fields hold its
-    bullets' text, since its claim covers them: a changed, added or removed bullet changes the job too (§4.5)."""
+    bullets' text, since its claim covers them: a changed, added or removed bullet changes the job too (§4.5). The
+    summary is one more item (`summary_id`)."""
     for section in SECTIONS:
         for item in content.get(section) or []:
             bullets = item.get("bullets") or [] if section in WITH_BULLETS else []
@@ -60,6 +64,8 @@ def _items(content: dict):
             yield item.get("id"), fields
             for bullet in bullets:
                 yield bullet.get("id"), {k: v for k, v in bullet.items() if k != "id"}
+    if content.get("summary_id"):
+        yield content["summary_id"], {"summary": content.get("summary")}
 
 
 def item_ids(content: dict) -> set[str]:
@@ -67,45 +73,44 @@ def item_ids(content: dict) -> set[str]:
 
 
 def _with_ids(source: dict, submitted: dict) -> dict:
-    """The submitted content with every item's id settled: an id from the version edited is kept, an item without one
-    is new and gets one. Any other id is refused, so a save can't take over another item's claim (§3.4)."""
-    known, seen = item_ids(source), set()
-    content = copy.deepcopy(submitted)
+    """The submitted content with every id settled (§3.4, §4.5): an item, bullet or summary kept exactly as it was in
+    the version edited keeps its id, so its claims follow it; a changed or new one gets a new id, so it starts
+    unverified and the versions holding the old text keep their claims. An id the version edited doesn't have is
+    refused, so a save can't take over another item's claim."""
+    before = dict(_items(source))
+    content, seen = copy.deepcopy(submitted), set()
 
-    def settle(item: dict) -> None:
+    def settle(item: dict, fields: dict) -> None:
         item_id = item.get("id")
-        if not item_id:
-            item["id"] = str(uuid.uuid4())
-        elif item_id not in known or item_id in seen:
+        if item_id and (item_id not in before or item_id in seen):
             raise _bad("This version names an item it doesn't have. Reload the résumé and edit it again.")
+        if not item_id or before[item_id] != fields:
+            item["id"] = str(uuid.uuid4())
         seen.add(item["id"])
 
-    for section in SECTIONS:
-        for item in content.get(section) or []:
-            settle(item)
-            for bullet in item.get("bullets") or [] if section in WITH_BULLETS else []:
-                settle(bullet)
+    for item, fields in list(_with_fields(content)):
+        settle(item, fields)
+    summary = content.get("summary") or None
+    if summary is None:
+        content["summary_id"] = None
+    elif summary == source.get("summary") and source.get("summary_id"):
+        content["summary_id"] = source["summary_id"]
+    else:
+        content["summary_id"] = str(uuid.uuid4())
     return content
 
 
-def _changed_refs(source: dict, content: dict) -> set[str]:
-    """The ids of items kept from the version edited whose own text changed."""
-    before = dict(_items(source))
-    return {item_id for item_id, fields in _items(content) if item_id in before and before[item_id] != fields}
-
-
-def _reset_claims(db, candidate, refs: set[str], summary_changed: bool) -> None:
-    """A changed item's claims go back to UNVERIFIED (§4.5); their evidence stays linked for the person to re-check."""
-    conditions = []
-    if refs:
-        conditions.append(Claim.entity_ref.in_(refs))
-    if summary_changed:
-        conditions.append(Claim.entity_type == "summary")
-    if not conditions:
-        return
-    scoped(db, Claim, candidate.firm_id).filter(Claim.candidate_id == candidate.id, Claim.state != "UNVERIFIED",
-                                                or_(*conditions)) \
-        .update({Claim.state: "UNVERIFIED", Claim.updated_at: utcnow()}, synchronize_session=False)
+def _with_fields(content: dict):
+    """(item dict, its fields as _items compares them) for every item and bullet of `content`."""
+    for section in SECTIONS:
+        for item in content.get(section) or []:
+            bullets = item.get("bullets") or [] if section in WITH_BULLETS else []
+            fields = {k: v for k, v in item.items() if k not in ("id", "bullets")}
+            if section in WITH_BULLETS:
+                fields["bullets"] = [{k: v for k, v in b.items() if k != "id"} for b in bullets]
+            for bullet in bullets:
+                yield bullet, {k: v for k, v in bullet.items() if k != "id"}
+            yield item, fields
 
 
 # ── Reading ──────────────────────────────────────────────────────────────────
@@ -165,8 +170,12 @@ def listing(db, candidate) -> dict:
     numbers = base_numbers(db, candidate)
     bases = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.candidate_id == candidate.id).all()
     promoted_to = {b.promoted_from_resume_id: b.id for b in bases if b.promoted_from_resume_id}
+    # The list shows each version's details, never its content: only those columns are read.
     rows = scoped(db, Resume, candidate.firm_id).filter(Resume.candidate_id == candidate.id,
                                                         Resume.base_resume_id.isnot(None)) \
+        .options(load_only(Resume.id, Resume.base_resume_id, Resume.category, Resume.job_id, Resume.version,
+                           Resume.name, Resume.template, Resume.page_format, Resume.created_by_user_id,
+                           Resume.created_at)) \
         .order_by(Resume.version).all()
 
     def entry(row: Resume) -> dict:
@@ -225,7 +234,6 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
                  created_by_user_id=actor.id, json_data={}, **content)
     db.add(row)
     db.flush()
-    _reset_claims(db, candidate, _changed_refs(before, content), before["summary"] != content["summary"])
     number = base_numbers(db, candidate)[source.base_resume_id]
     kind = "" if source.category == "BASE" else " (tailored)"
     _record(db, actor, candidate, "UPDATE", row.id, _label(candidate, number, row),
@@ -362,7 +370,9 @@ def _uses(db, candidate, rows: list[Resume], base: BaseResume | None = None) -> 
             # A row from before versioning that names the upload holds it too (resumes.resume_parse_id, 0007).
             uses["evidence"] += scoped(db, Resume, firm_id, func.count(Resume.id)) \
                 .filter(Resume.resume_parse_id == base.resume_parse_id).scalar()
-    removed = set().union(*(item_ids(content_of(r)) for r in rows)) if rows else set()
+    # Claims are checked only when the candidate has any: otherwise no version's content needs reading.
+    has_claims = scoped(db, Claim, firm_id, Claim.id).filter(Claim.candidate_id == candidate.id).first() is not None
+    removed = set().union(*(item_ids(content_of(r)) for r in rows)) if rows and has_claims else set()
     if removed:
         others = scoped(db, Resume, firm_id).filter(Resume.candidate_id == candidate.id,
                                                     Resume.base_resume_id.isnot(None), Resume.id.notin_(ids)).all()
@@ -391,8 +401,8 @@ def version_removal(db, candidate, row: Resume) -> Removal:
     return Removal("DELETE", f"Delete v{row.version}? This can't be undone.", uses)
 
 
-def base_removal(db, candidate, base: BaseResume) -> Removal:
-    number = base_numbers(db, candidate)[base.id]
+def base_removal(db, candidate, base: BaseResume, numbers: dict | None = None) -> Removal:
+    number = (numbers or base_numbers(db, candidate))[base.id]
     if base.is_active:
         return Removal("REFUSED", f"Base {number} is the base the workflow uses. Pick another base first.")
     if base.archived_at is not None:
@@ -422,10 +432,11 @@ def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
 
 
 def delete_base(db, actor: User, candidate, base: BaseResume) -> Removal:
-    removal = base_removal(db, candidate, base)
+    numbers = base_numbers(db, candidate)
+    removal = base_removal(db, candidate, base, numbers)
     if removal.outcome == "REFUSED":
         raise HTTPException(status_code=409, detail=removal.message)
-    number = base_numbers(db, candidate)[base.id]
+    number = numbers[base.id]
     if removal.outcome == "HIDE":
         base.archived_at = utcnow()
         _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number), f"Hid Base {number}")

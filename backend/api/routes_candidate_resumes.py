@@ -13,7 +13,7 @@ same 404 as a missing one.
 - DELETE …/resumes/bases/{base_id}          delete or hide a base
 - POST   …/resumes/bases/{base_id}/show     show a hidden base again (not made active)
 
-Who (07 Q54): reads, anyone who can see the candidate; save, use as base and pick, `can_change_resume` (the
+Who (07 Q55): reads, anyone who can see the candidate; save, use as base and pick, `can_change_resume` (the
 candidate's BDE, or the OWNER and a MANAGER while it has none); upload, delete and show again, `can_manage_resume`
 (the candidate's BDE). Checked with the candidate row locked, so an assignment can't land in between. A support view
 reads only (backend/auth/access.py).
@@ -204,7 +204,7 @@ async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, file: Uploa
 def _may_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID) -> None:
     _member_of(firm_id, principal)
     if not can_manage_resume(principal, _candidate(db, firm_id, principal, candidate_id)):
-        raise _forbidden()                   # refused before the file is read
+        raise _forbidden()                   # refused before the file is parsed or kept (its bytes have arrived)
     db.commit()
 
 
@@ -219,6 +219,10 @@ def _is_new_file(db: DbSession, firm_id: uuid.UUID, principal: Principal, candid
         return False
     db.commit()                              # no lock, and no connection, held while the parser works
     return True
+
+
+# The rules a second copy of one upload trips (resume-versioning.md §3.1, §3.2).
+_SAME_FILE_RULES = ("uq_resume_parses_candidate_file", "uq_base_resumes_one_per_parse")
 
 
 def _keep_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID, file_name: str,
@@ -240,8 +244,11 @@ def _keep_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candid
         db.flush()
         base = versions.upload_base(db, actor, candidate, parse_row)
         db.commit()
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
+        # Only the same file arriving twice at once is "just uploaded"; any other refusal is a real error.
+        if not any(rule in str(e.orig) for rule in _SAME_FILE_RULES):
+            raise
         raise HTTPException(status_code=409, detail="This résumé was just uploaded for this candidate. Reload to see it.")
     return versions.base_json(base, versions.base_numbers(db, candidate)[base.id])
 

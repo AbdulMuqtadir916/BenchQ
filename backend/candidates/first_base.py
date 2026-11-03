@@ -12,7 +12,7 @@ PR 6 moves them to the new columns.
 """
 import uuid
 
-from backend.candidates.base_resume import _split_skills
+from backend.candidates.base_resume import split_skills
 from backend.models.candidates import BaseResume
 from backend.models.db import Resume
 
@@ -74,7 +74,7 @@ def _parse_header(candidate, parse, header) -> dict:
         work_authorization=_text(header.get("work_authorization")) or None,
         summary=_text(parse.get("professional_summary")) or None,
         skills=[{"id": _id(), "category": _text(group.get("category")), "name": name}
-                for group in _dicts(parse.get("technical_skills")) for name in _split_skills(group.get("skills"))],
+                for group in _dicts(parse.get("technical_skills")) for name in split_skills(group.get("skills"))],
     )
 
 
@@ -104,4 +104,5 @@ def first_base(parse_row, candidate, body, created_by_user_id) -> tuple[BaseResu
         awards=_entries(parse.get("awards"), ("name", "issuer", "date", "detail")),
         languages=[{"id": _id(), "name": _text(lang)} for lang in _list(parse.get("languages")) if _text(lang)],
     )
+    version.summary_id = _id() if version.summary else None     # the summary is an item too (§3.4)
     return base, version

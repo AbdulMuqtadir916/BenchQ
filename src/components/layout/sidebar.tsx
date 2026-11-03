@@ -5,21 +5,23 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { isPendingRequest, useNotifications } from "@/lib/hooks/use-notifications";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { activeNavId, navFor, type RouteDef } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { EASE_OUT } from "@/lib/motion";
+import { CountBadge } from "@/components/ui/count-badge";
 
 /**
  * Frosted navigation: 208px expanded, 60px collapsed, 48px mobile rail.
  * Items come from the route registry: a route the principal can't open isn't rendered. The admin
- * variant (docs/07 P2) shows the platform nav instead of the firm's workspace and preferences.
+ * variant (docs/07 P2) shows platform navigation plus its own Preferences section.
  */
 
 type NavGroup = { label: string; section: NonNullable<RouteDef["nav"]>["section"] };
 const GROUPS: Record<"firm" | "admin", NavGroup[]> = {
   firm: [{ label: "Workspace", section: "workspace" }, { label: "Preferences", section: "preferences" }],
-  admin: [{ label: "Platform", section: "admin" }],
+  admin: [{ label: "Platform", section: "admin" }, { label: "Preferences", section: "preferences" }],
 };
 
 export function Sidebar({
@@ -36,6 +38,7 @@ export function Sidebar({
   const pathname = usePathname() ?? "";
   const groups = GROUPS[variant].map((group) => ({ ...group, routes: navFor(principal, group.section) }));
   const activeId = activeNavId(groups.flatMap((group) => group.routes), pathname);
+  const pendingRequestCount = (useNotifications().data ?? []).filter(isPendingRequest).length;
   const fade = { duration: reduceMotion ? 0 : 0.14, ease: EASE_OUT };
 
   // Width, padding and label opacity transition in CSS (.bq-sidebar in globals.css), so the
@@ -95,7 +98,12 @@ export function Sidebar({
             <p className="sidebar-label mb-2 px-2.5 text-caption text-[var(--color-text-3)]" aria-hidden={collapsed}>{group.label}</p>
             <ul className="space-y-0.5">
               {group.routes.map((route) => (
-                <SidebarItem key={route.id} route={route} isActive={route.id === activeId} />
+                <SidebarItem
+                  key={route.id}
+                  route={route}
+                  isActive={route.id === activeId}
+                  pendingRequestCount={route.id === "notifications" || route.id === "admin.notifications" ? pendingRequestCount : 0}
+                />
               ))}
             </ul>
           </div>
@@ -105,7 +113,7 @@ export function Sidebar({
   );
 }
 
-function SidebarItem({ route, isActive }: { route: RouteDef; isActive: boolean }) {
+function SidebarItem({ route, isActive, pendingRequestCount }: { route: RouteDef; isActive: boolean; pendingRequestCount: number }) {
   const toHref = useHref();
   const Icon = route.nav?.icon;
 
@@ -115,11 +123,12 @@ function SidebarItem({ route, isActive }: { route: RouteDef; isActive: boolean }
         href={toHref(route)}
         aria-current={isActive ? "page" : undefined}
         title={route.title}
-        aria-label={route.title}
-        className="bq-nav-item text-body"
+        aria-label={pendingRequestCount ? `${route.title}, ${pendingRequestCount} pending password reset requests` : route.title}
+        className="bq-nav-item relative text-body"
       >
         {Icon ? <Icon size={16} aria-hidden="true" className="shrink-0" /> : null}
         <span className="sidebar-label flex-1 truncate">{route.title}</span>
+        <CountBadge count={pendingRequestCount} className="absolute right-2 top-1/2 -translate-y-1/2" />
       </Link>
     </li>
   );

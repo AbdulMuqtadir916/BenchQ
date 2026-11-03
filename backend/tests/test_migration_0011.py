@@ -1,4 +1,4 @@
-"""Migration 0012 (docs/team/resume-versioning.md §3.1, §3.2; PR 5): promoted and hidden bases, file fingerprints; the
+"""Migration 0011 (docs/team/resume-versioning.md §3.1, §3.2; PR 5): promoted and hidden bases, file fingerprints; the
 rules the database holds, and existing uploads fingerprinted on the way up."""
 import hashlib
 import uuid
@@ -81,7 +81,7 @@ def test_a_base_starts_shown(test_db, world):
 
 def test_existing_uploads_are_fingerprinted_on_the_way_up_and_the_columns_go_on_the_way_down(scratch_db):
     name, engine = scratch_db
-    _ok(_alembic(name, "upgrade", "0009"))
+    _ok(_alembic(name, "upgrade", "0010"))
     with Session(engine) as db:
         accounts = seed_accounts(db)
         db.commit()
@@ -98,7 +98,36 @@ def test_existing_uploads_are_fingerprinted_on_the_way_up_and_the_columns_go_on_
             sha = conn.execute(text("SELECT content_sha256 FROM resume_parses WHERE id = :id"),
                                {"id": parse_id}).scalar_one()
         assert sha == hashlib.sha256(b"abc").hexdigest()
-        _ok(_alembic(name, "downgrade", "0009"))
+        _ok(_alembic(name, "downgrade", "0010"))
         assert "content_sha256" not in {c["name"] for c in inspect(engine).get_columns("resume_parses")}
         assert not {"promoted_from_resume_id", "archived_at"} & {c["name"] for c in
                                                                  inspect(engine).get_columns("base_resumes")}
+
+
+def test_versions_with_the_same_summary_share_its_id_on_the_way_up(scratch_db):
+    """0011 gives each candidate's distinct summary text one id, so versions that copied it share it (§3.4)."""
+    from backend.models.tenancy import Firm
+    from backend.tests.auth_support import make_user
+    name, engine = scratch_db
+    _ok(_alembic(name, "upgrade", "0010"))
+    with Session(engine) as db:
+        accounts = seed_accounts(db)
+        manager = make_user(db, db.get(Firm, accounts.firm_id), email="m@acme.test", role="MANAGER")
+        db.commit()
+        firm, owner, manager_id = accounts.firm_id, accounts.user_id, manager.id
+    cand, base = uuid.uuid4(), uuid.uuid4()
+    rows = {n: uuid.uuid4() for n in (1, 2, 3, 4)}
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO candidates (id, firm_id, manager_id, created_by_user_id, full_name, email, "
+                          "work_auth) VALUES (:id, :f, :m, :o, 'Asha', 'asha@example.test', 'H1B')"),
+                     {"id": cand, "f": firm, "m": manager_id, "o": owner})
+        conn.execute(text("INSERT INTO base_resumes (id, firm_id, candidate_id, source, is_active, created_by_user_id) "
+                          "VALUES (:id, :f, :c, 'PROMOTED', true, :o)"), {"id": base, "f": firm, "c": cand, "o": owner})
+        for n, summary in ((1, "Nine years of Java."), (2, "Nine years of Java."), (3, "Ten years."), (4, None)):
+            conn.execute(text("INSERT INTO resumes (id, firm_id, candidate_id, name, base_resume_id, category, version, "
+                              "summary) VALUES (:id, :f, :c, 'Base', :b, 'BASE', :v, :s)"),
+                         {"id": rows[n], "f": firm, "c": cand, "b": base, "v": n, "s": summary})
+    _ok(_alembic(name, "upgrade", "0011"))
+    with engine.connect() as conn:
+        ids = dict(conn.execute(text("SELECT version, summary_id FROM resumes WHERE candidate_id = :c"), {"c": cand}).all())
+    assert ids[1] and ids[1] == ids[2] and ids[3] not in (None, ids[1]) and ids[4] is None

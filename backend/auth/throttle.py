@@ -5,6 +5,7 @@ In-memory is right for the one backend worker the deployment runs (docs/integrat
 Postgres or Redis comes with a second worker. A restart forgives everything, which is fine.
 """
 import logging
+import hashlib
 import time
 
 from fastapi import HTTPException, Request
@@ -20,6 +21,8 @@ EMAIL_LIMIT = (5, 15 * 60.0)
 # Every accept attempt counts, not just failures. An invite's token can't be guessed, so this only stops a
 # client hammering the route; it is loose enough for an office of new BDEs accepting from one address.
 INVITE_ACCEPT_LIMIT = (20, 15 * 60.0)
+RESET_IP_LIMIT = (10, 60.0)
+RESET_EMAIL_LIMIT = (3, 60 * 60.0)
 # Every request a signed-in firm user makes. A BDE clicking job by job stays far below this; it stops a broken script
 # or a screen stuck in a loop. In production a proxy in front of Next also limits per IP (uzair.md §1).
 USER_LIMIT = (300, 60.0)
@@ -87,6 +90,16 @@ def check_invite_accept(request: Request) -> None:
     key = f"invite-ip:{client_ip(request)}"
     _refuse_if_over(key, INVITE_ACCEPT_LIMIT, now)
     _hits.setdefault(key, []).append(now)
+
+
+def check_password_reset(request: Request, email: str) -> None:
+    """Count reset requests even when an account is unknown, preventing account enumeration by timing."""
+    now = time.monotonic()
+    email_key = hashlib.sha256(email.strip().lower().encode()).hexdigest()
+    for key, limit in ((f"reset-ip:{client_ip(request)}", RESET_IP_LIMIT),
+                       (f"reset-email:{email_key}", RESET_EMAIL_LIMIT)):
+        _refuse_if_over(key, limit, now)
+        _hits.setdefault(key, []).append(now)
 
 
 def check_user(principal) -> None:

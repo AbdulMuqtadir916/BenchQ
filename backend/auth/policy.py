@@ -16,9 +16,9 @@ from backend.auth.sessions import Principal
 FIRM_ACTIONS = ("candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit",
                 "outreach.act", "followup.act")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
-                "candidate.assign", "firmSettings.edit")
+                "candidate.assign", "firmSettings.edit", "notification.approve")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
-                    "invite.revoke", "platformTeam.manage")
+                    "invite.revoke", "platformTeam.manage", "platform.notification.approve")
 ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + ("team.view",) + PLATFORM_ACTIONS
 
 _ALL_ACTING = ("OWNER", "MANAGER", "BDE")
@@ -42,6 +42,7 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "member.changeManager": _OWNER_ONLY,          # 07 Q40
     "candidate.assign": _OWNER_AND_MANAGER,
     "firmSettings.edit": _OWNER_ONLY,             # 07 Q46
+    "notification.approve": _OWNER_AND_MANAGER,   # 07 Q54; recipient check remains request-specific
     "team.view": _OWNER_AND_MANAGER,
 }
 
@@ -49,6 +50,8 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
 def can(principal: Principal, action: str) -> bool:
     if action not in ALL_ACTIONS:
         raise ValueError(f"unknown action {action!r}")    # a typo must fail loudly, never deny or allow quietly
+    if action == "platform.notification.approve":
+        return principal.is_platform and principal.support_view_id is None
     if action in PLATFORM_ACTIONS:
         return principal.is_platform
     if principal.is_platform:
@@ -102,7 +105,7 @@ def can_assign_to(principal: Principal, candidate_manager_id, target_manager, ta
 
 
 def can_change_resume(principal: Principal, candidate) -> bool:
-    """Who may change `candidate`'s résumés (07 Q54; docs/team/resume-versioning.md §6): edit and save, "Use as base?",
+    """Who may change `candidate`'s résumés (07 Q55; docs/team/resume-versioning.md §6): edit and save, "Use as base?",
     pick a base. The Python mirror of `canChangeResume` in src/lib/auth/policy.ts. The candidate's BDE once one is
     assigned; before that the OWNER and a MANAGER (the caller has already checked the candidate is in their scope). A
     VIEWER and a support view never. Checked when the request arrives, with the candidate row locked."""
@@ -114,7 +117,7 @@ def can_change_resume(principal: Principal, candidate) -> bool:
 
 
 def can_manage_resume(principal: Principal, candidate) -> bool:
-    """What only `candidate`'s BDE does with their résumés (07 Q54): upload a later résumé, delete or hide, show again,
+    """What only `candidate`'s BDE does with their résumés (07 Q55): upload a later résumé, delete or hide, show again,
     tailor. The Python mirror of `canManageResume`."""
     return (can(principal, "resume.edit") and principal.kind == "firm" and candidate.bde_id is not None
             and candidate.bde_id == principal.user_id)
@@ -122,5 +125,5 @@ def can_manage_resume(principal: Principal, candidate) -> bool:
 
 def is_lead_role(role: str | None) -> bool:
     """A user's role (the maker of a row, not the person asking) is the OWNER's or a MANAGER's: what they added to a
-    candidate's résumés a BDE can't delete (07 Q54; resume-versioning.md §4.7)."""
+    candidate's résumés a BDE can't delete (07 Q55; resume-versioning.md §4.7)."""
     return role in _OWNER_AND_MANAGER
