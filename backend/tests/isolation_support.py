@@ -353,4 +353,3 @@ def offline(monkeypatch):
     from backend.api import routes_candidate_resumes
     monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: "isolation résumé text")
     monkeypatch.setattr(routes_candidate_resumes, "read_resume", read_resume)
-

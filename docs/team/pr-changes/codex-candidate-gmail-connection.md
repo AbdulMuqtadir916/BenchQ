@@ -1,6 +1,6 @@
 # PR #104 — Candidate Gmail connection, import and retained mail
 
-Branch: `codex/candidate-gmail-connection` → `main`. Current integration base: `fc1bf67` (includes password-reset notifications #105). This report supersedes earlier mutable-ledger/broad-BDE-scope descriptions. Local working plans/checklists remain outside the PR.
+Branch: `codex/candidate-gmail-connection` → `main`. Current integration base: `ff923c3` (includes résumé versions #106 and notifications #105). This report supersedes earlier mutable-ledger/broad-BDE-scope descriptions. Local working plans/checklists remain outside the PR.
 
 ## Latest policy correction — 2026-11-03
 
@@ -25,7 +25,7 @@ Changed files in this correction: routes_inbox.py (audits, generic conflict and 
 (remove unnecessary ledger invalidations), candidate mailbox/follow-up/revision regression tests (policy and
 retry coverage), and the data-contract, ledger, team and per-file documentation.
 
-Final firm-scope regression/isolation checks: **271 passed**, one existing warning. Prior frontend 582/typecheck/lint/build checks remain applicable; no frontend code changed. They cover simultaneous same-Gmail connections across firms, tenant-isolated email rows, safe disconnect, and concurrent duplicate rejection within one firm. No frontend/model/migration changes in this correction.
+Initial firm-scope regression/isolation checks: **271 passed**, one existing warning. Final updated-main validation: **282 passed**, one existing warning; frontend **585 passed**, typecheck/lint/build passed. Prior frontend 582/typecheck/lint/build checks remain applicable; no frontend code changed. They cover simultaneous same-Gmail connections across firms, tenant-isolated email rows, safe disconnect, and concurrent duplicate rejection within one firm. No frontend/model/migration changes in this correction.
 
 ## Scope and review corrections
 
@@ -47,7 +47,7 @@ Read-only Google OAuth with explicit candidate/address confirmation, encrypted c
 
 ## Migration and data safety
 
-One unmerged Gmail migration: **0012 after main’s résumé 0011**. The rename resolves a number collision after #105; no merged migration is edited. Upgrade backfills current mailbox provenance and encrypts retained text; guarded downgrade refuses to discard live credentials, active OAuth or irrecoverable account history. Existing development data was not migrated, reset or stamped. Configure deployment OAuth/callback and Fernet keys before enabling/migrating retained content; preserve old keys until re-encryption. Job progress uses existing columns only.
+One unmerged Gmail migration: **0012 after main’s résumé 0011**. The rename resolves a number collision after #106; no merged migration is edited. Upgrade backfills current mailbox provenance and encrypts retained text; guarded downgrade refuses to discard live credentials, active OAuth or irrecoverable account history. Existing development data was not migrated, reset or stamped. Configure deployment OAuth/callback and Fernet keys before enabling/migrating retained content; preserve old keys until re-encryption. Job progress uses existing columns only.
 
 ## Verification — current revision
 
@@ -96,7 +96,7 @@ Candidate Gmail remains disabled by default. Launch needs a named Google verific
 | `backend/inbox/import_progress.py` | Finalize durable counts once under row lock; recover expired, detached or suspended runs without editing ledger history or adding a table. |
 | `backend/inbox/sync_jobs.py` | Commit imported messages and existing JobRun progress atomically; append an immutable terminal/recovery result, with generation/lease fencing. |
 | `backend/main.py` | Preserve safe validated callback destinations and fallback error message. |
-| `backend/migrations/versions/0012_candidate_gmail_connection.py` | Single unmerged Gmail revision after main notifications 0010: OAuth/provenance/encrypted retention and guarded downgrade. No merged migration edited. |
+| `backend/migrations/versions/0012_candidate_gmail_connection.py` | Single unmerged Gmail revision after main résumé 0011: OAuth/provenance/encrypted retention and guarded downgrade. No merged migration edited. |
 | `backend/models/candidates.py` | Persist job lease/state, pending consent fields, confirmation time and deletion marker on Samad-owned tables. |
 | `backend/requirements.txt` | Adds cryptography for authenticated Fernet encryption of credentials and PKCE verifiers. |
 | `backend/scheduler.py` | Import polling plus independent expired-grant and abandoned-run recovery, including when import polling is off. |
@@ -156,4 +156,4 @@ Candidate Gmail remains disabled by default. Launch needs a named Google verific
 | `src/mocks/inbox.ts` | Include neutral cursor for disconnected fixture compatibility. |
 | `src/mocks/membership.test.ts` | Supplies candidate scope to the read-mark adapter authorization tests. |
 
-Main integration: merged main ff923c3 (#106 résumé versions); preserved both fixture families and moved only unmerged Gmail migration/tests to 0012 after 0011. New integration checks pending.
+Main integration: merged main ff923c3 (#106 résumé versions); preserved both fixture families and moved only unmerged Gmail migration/tests to 0012 after 0011. Post-integration checks: 282 backend/migration/résumé/isolation tests passed (one existing warning); 585 frontend tests, typecheck/lint/production build passed.
