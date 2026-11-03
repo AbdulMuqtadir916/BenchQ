@@ -17,7 +17,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from backend.auth.access import route_key
+from backend.auth.access import SAVED_ROUTE, route_key
 from backend.logging_setup import LOGGED_MARK, request_id
 
 logger = logging.getLogger("benchq.request")
@@ -27,6 +27,8 @@ _SAFE_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 NO_ROUTE = "(no route)"
 # Polled by the deployment; logged at DEBUG so it doesn't bury everything else.
 QUIET_ROUTES = frozenset({"GET /health"})
+# No response was started and nothing failed: the client went away first (nginx's "client closed request").
+CLIENT_CLOSED = 499
 
 
 def _incoming_id(scope: Scope) -> str:
@@ -65,8 +67,11 @@ class RequestLog:
         scope.setdefault("state", {})["request_id"] = rid
         key = route_key(scope["app"], Request(scope)) if "app" in scope else None
         method = scope["method"]
+        # backend/auth/access.py reuses it instead of matching every route again, while the method and path still match.
+        scope["state"][SAVED_ROUTE] = (method, scope["path"], key)
         route = key.split(" ", 1)[1] if key else NO_ROUTE
-        status = 500
+        status: int | None = None                       # set when the response starts
+        failed = False
         started = time.perf_counter()
 
         async def _send(message: Message) -> None:
@@ -79,6 +84,7 @@ class RequestLog:
         try:
             await self.app(scope, receive, _send)
         except Exception as exc:
+            failed = True
             logger.exception("Unhandled error on %s %s", method, route)
             try:
                 setattr(exc, LOGGED_MARK, True)
@@ -86,6 +92,8 @@ class RequestLog:
                 pass
             raise
         finally:
+            if status is None:
+                status = 500 if failed else CLIENT_CLOSED
             duration_ms = round((time.perf_counter() - started) * 1000)
             fields = {"method": method, "route": route, "status": status, "duration_ms": duration_ms, **_who(scope)}
             level = logging.DEBUG if key in QUIET_ROUTES else logging.INFO

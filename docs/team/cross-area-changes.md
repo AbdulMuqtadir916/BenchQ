@@ -3,6 +3,14 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Logging, production layer 4a (`feat/logging`, Uzair)
+
+Abdul's review note 5 on PR #107; agreed with Abdul 2026-11-03.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Access control (Abdul) | `backend/auth/access.py` `enforce` | Uses the route the request log already matched (`SAVED_ROUTE` in the request's state) when it was matched for the same method and path, otherwise matches it again as before (`_request_route_key`). Classification, refusals, the Origin check and sessions are unchanged; `test_access.py` and the isolation suite pass unchanged. | `RequestLog` and `enforce` both walked all ~200 routes for every request. |
+
 ## Résumé versioning PR 5 — versions and bases through the API (`feat/resume-versions`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §3.1, §3.2, §4.3, §4.6, §4.7, §6; decided with Abdul

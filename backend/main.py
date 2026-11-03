@@ -11,11 +11,11 @@ from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun, engine
 from backend import statement_timeout
 from backend.seed import run_seeds
-from backend.auth.access import enforce as enforce_access
+from backend.auth.access import enforce as enforce_access, route_key
 from backend.auth import throttle
 from backend.body_limit import BodySizeLimit
 from backend.logging_setup import configure_logging
-from backend.request_log import HEADER as REQUEST_ID_HEADER, RequestLog
+from backend.request_log import HEADER as REQUEST_ID_HEADER, NO_ROUTE, RequestLog
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
@@ -214,18 +214,27 @@ app.include_router(llm_router, prefix="/api")
 from sqlalchemy.exc import DataError as _SADataError
 
 
+def _route(request: Request) -> str:
+    """The route pattern for a log line, never the raw path: invite and tracer links carry their token there. It runs
+    inside error handlers, so it never raises: a failed lookup is logged as no route, not a second error."""
+    try:
+        return route_key(request.app, request) or NO_ROUTE
+    except Exception:
+        return NO_ROUTE
+
+
 @app.exception_handler(_SADataError)
 async def _bad_uuid_to_404(request: Request, exc: _SADataError):
     if "invalid input syntax for type uuid" in str(exc.orig or exc):
         return JSONResponse(status_code=404, content={"detail": "Not found"})
-    logger.exception("Database DataError on %s %s", request.method, request.url.path)
+    logger.exception("Database DataError on %s %s", request.method, _route(request))
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.exception_handler(_PoolTimeout)
 async def _pool_timeout_to_503(request: Request, exc: _PoolTimeout):
     """A handler that could not get a connection answers 503, not 500."""
-    logger.warning("DB pool exhausted on %s %s", request.method, request.url.path)
+    logger.warning("DB pool exhausted on %s %s", request.method, _route(request))
     return statement_timeout.busy_response()
 
 
@@ -234,7 +243,7 @@ async def _statement_timeout_to_503(request: Request, exc: _OperationalError):
     """A query cancelled at its statement timeout answers 503; any other OperationalError stays a 500."""
     if not statement_timeout.is_statement_timeout(exc):
         raise exc
-    logger.warning("Query timed out on %s %s: %s", request.method, request.url.path, exc.statement)
+    logger.warning("Query timed out on %s %s: %s", request.method, _route(request), exc.statement)
     return statement_timeout.busy_response()
 
 

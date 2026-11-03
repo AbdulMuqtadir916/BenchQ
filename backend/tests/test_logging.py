@@ -73,6 +73,15 @@ def _route_session(make):
     ('DETAIL:  Key (email)=(a@b.co) already exists.\n[SQL: INSERT …]', "[SQL: INSERT …]", "Key (email)"),
     ("[parameters: {'name': 'Ravi'}]", "[parameters:", "Ravi"),
     ("input_value='Ravi Teja', input_type=str]", "input_type=str", "Ravi Teja"),
+    ('Failed: (psycopg.errors.InvalidTextRepresentation) invalid input syntax for type integer: "Ravi Teja"',
+     "invalid input syntax for type integer:", "Ravi Teja"),
+    ('invalid input value for enum status: "Ravi Teja"\nLINE 1: SELECT', "LINE 1:", "Ravi Teja"),
+    ("invalid input syntax for type integer: \"x\"\nLINE 1: SELECT CAST('Ravi Teja' AS integer)\n        ^",
+     "LINE 1: [redacted]", "Ravi Teja"),
+    ("call 555-013-7799 today", "call", "013-7799"),
+    ("call +1 (555) 013-7799 today", "today", "013-7799"),
+    ("ph +91 98765 43210.", "ph", "98765"),
+    ("ph 9876543210", "ph", "9876543210"),
 ])
 def test_what_looks_secret_or_personal_is_masked(raw, kept, gone):
     masked = redact(raw)
@@ -81,7 +90,21 @@ def test_what_looks_secret_or_personal_is_masked(raw, kept, gone):
 
 def test_ids_and_ordinary_words_are_kept():
     line = ("job 9a02c4be-1f3e-4b7a-9c1d-2e5f6a7b8c9d scored by test_scheduled_work_gets_the_background_limit in "
-            "/api/firms/{firm_id}/candidates")
+            "/api/firms/{firm_id}/candidates; run 9a02c4be1f3e4b7a9c1d2e5f6a7b8c9d done")
+    assert redact(line) == line
+
+
+def test_a_sha256_hash_is_still_masked():
+    digest = "9a02c4be1f3e4b7a9c1d2e5f6a7b8c9d" * 2               # 64 hex characters, like hashlib.sha256().hexdigest()
+    assert redact(f"key {digest} locked") == f"key {REDACTED} locked"
+
+
+@pytest.mark.parametrize("line", [
+    "next run at: 2026-11-03 13:19:48 UTC, missed by 0:22:48.885146",
+    "GET /api/notifications 200 24ms",
+    "peer 192.168.1.20, cost 0.0012345678, took 1054.81s, version 2.2.0, size 10485760, years 2019-2024",
+])
+def test_dates_times_addresses_and_numbers_are_not_taken_for_phones(line):
     assert redact(line) == line
 
 
@@ -176,6 +199,51 @@ def test_the_access_line_names_the_route_pattern_not_the_path(anonymous_client, 
     first, second = _access(log)
     assert "GET /api/invites/{token} " in first and "Xk3v9" not in log.getvalue()
     assert "GET (no route) 404" in second
+
+
+def test_access_reuses_the_request_logs_route_lookup(api_client, monkeypatch):
+    import backend.auth.access as access
+    calls = []
+    real = access.route_key
+    monkeypatch.setattr(access, "route_key", lambda app, request: calls.append(1) or real(app, request))
+    assert api_client.get("/api/auth/me").status_code == 200
+    assert calls == []                                       # enforce used the request log's lookup
+
+
+def test_a_saved_route_for_another_path_is_ignored():
+    from starlette.requests import Request
+
+    import backend.auth.access as access
+    from backend.main import app
+    scope = {"type": "http", "method": "GET", "path": "/api/auth/me", "headers": [], "query_string": b"", "app": app,
+             "state": {access.SAVED_ROUTE: ("GET", "/api/invites/abc", "GET /api/invites/{token}")}}
+    assert access._request_route_key(Request(scope)) == "GET /api/auth/me"
+
+
+@pytest.mark.asyncio
+async def test_a_client_that_left_before_the_answer_is_499_not_500(log):
+    from backend.request_log import RequestLog
+
+    async def _receive():
+        return {"type": "http.disconnect"}
+
+    async def _send(message):
+        pass
+
+    async def _gone(scope, receive, send):         # the client disconnected: the server stops without answering
+        raise asyncio.CancelledError
+
+    async def _broken(scope, receive, send):
+        raise RuntimeError("boom")
+
+    scope = {"type": "http", "method": "GET", "path": "/x", "headers": []}
+    with pytest.raises(asyncio.CancelledError):
+        await RequestLog(_gone)(dict(scope), _receive, _send)
+    with pytest.raises(RuntimeError):
+        await RequestLog(_broken)(dict(scope), _receive, _send)
+    gone, broken = _access(log)
+    assert "GET (no route) 499 " in gone
+    assert "GET (no route) 500 " in broken
 
 
 def test_a_refusal_before_the_route_is_logged_too(anonymous_client, accounts, log):

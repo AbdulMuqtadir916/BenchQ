@@ -43,25 +43,50 @@ _SECRET_FIELD = re.compile(
     r"|cookie|bq_session)(\"?'?\s*[:=]\s*\"?'?)[^\s\"'&,;)}\]]+")
 # A Postgres error repeats the row's values ("Key (email)=(…) already exists"); a Pydantic one repeats the input.
 _PG_DETAIL = re.compile(r"DETAIL:[^\n]*")
+# A value Postgres quotes in the error's first line ('invalid input syntax for type integer: "Ravi Teja"'), which
+# reaches a message through the ~120 calls that log f"...{e}". On a line naming a psycopg error, or in the shapes
+# Postgres uses for a bad value, everything from the first quote to the last is masked.
+_PG_ERROR_LINE = re.compile(r"[^\n]*psycopg2?\.errors\.[^\n]*")
+_PG_BAD_VALUE = re.compile(r"((?:invalid input (?:syntax|value) for|malformed|out of range)[^\n\"]*: )\"[^\n]*\"")
+_QUOTED = re.compile(r"\"[^\n]*\"")
+# Postgres also quotes the statement around the error, and psycopg2 has already put the values into it:
+# "LINE 1: SELECT CAST('Ravi Teja' AS integer)".
+_PG_CONTEXT = re.compile(r"^(\s*LINE \d+: )[^\n]*", re.MULTILINE)
+# Phone numbers: 10 to 15 digits, written plain (9876543210), with a country code (+91 98765 43210) or in groups
+# (555-013-7799, (555) 013-7799). Not inside a longer token, and not a date or time (2026-11-03 13:12).
+_PHONE = re.compile(r"(?<![\w+:./-])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,5}\)[\s.-]?)?(?:\d{2,5}(?:[\s.-]\d{2,5}){1,4}"
+                    r"|\d{10,13})(?![\w:-]|\.\d)")
 _PG_PARAMETERS = re.compile(r"\[parameters: [^\n]*")
 _INPUT_VALUE = re.compile(r"input_value=.*?(?=, input_type=|\]\n|$)", re.MULTILINE)
 # Tokens, hashes and keys: a long run of word characters with letters and digits in it. UUIDs are ids, kept.
 _LONG = re.compile(r"[A-Za-z0-9_-]{32,}")
+# A UUID written without hyphens (uuid.hex, run ids). Exactly 32 hex characters: the secrets are token_urlsafe (never
+# plain hex) and the hashes are SHA-256 (64), so both stay masked.
+_UUID_HEX = re.compile(r"[0-9a-fA-F]{32}")
 
 REDACTED = "[redacted]"
 
 
 def _long_string(match: re.Match) -> str:
     text = match.group(0)
-    if _UUID.fullmatch(text) or not re.search(r"\d", text) or not re.search(r"[A-Za-z]", text):
+    if (_UUID.fullmatch(text) or _UUID_HEX.fullmatch(text)
+            or not re.search(r"\d", text) or not re.search(r"[A-Za-z]", text)):
         return text
     return REDACTED
+
+
+def _phone(match: re.Match) -> str:
+    text = match.group(0)
+    return REDACTED if 10 <= sum(c.isdigit() for c in text) <= 15 else text
 
 
 def redact(text: str) -> str:
     """Mask what looks like a secret or contact detail in a log line."""
     if not text:
         return text
+    text = _PG_ERROR_LINE.sub(lambda m: _QUOTED.sub(f'"{REDACTED}"', m.group(0)), text)
+    text = _PG_BAD_VALUE.sub(lambda m: f'{m.group(1)}"{REDACTED}"', text)
+    text = _PG_CONTEXT.sub(lambda m: f"{m.group(1)}{REDACTED}", text)
     text = _PG_DETAIL.sub(f"DETAIL: {REDACTED}", text)
     text = _PG_PARAMETERS.sub(f"[parameters: {REDACTED}]", text)
     text = _INPUT_VALUE.sub(f"input_value={REDACTED}", text)
@@ -70,6 +95,7 @@ def redact(text: str) -> str:
     text = _API_KEY.sub(REDACTED, text)
     text = _SECRET_FIELD.sub(lambda m: f"{m.group(1)}{m.group(2)}{REDACTED}", text)
     text = _EMAIL.sub(lambda m: f"{m.group(0)[0]}***@***.{m.group(1)}", text)
+    text = _PHONE.sub(_phone, text)
     return _LONG.sub(_long_string, text)
 
 

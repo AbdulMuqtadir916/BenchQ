@@ -15,7 +15,7 @@ import backend.main  # noqa: F401  configures logging, as the running app does
 import backend.models.db as db_mod
 from backend.logging_setup import installed_handler
 from backend.tests.auth_support import make_user
-from backend.tests.test_resume_parse import _pdf, model  # noqa: F401  the stubbed parser model
+from backend.tests.test_resume_parse import _pdf  # builds a one-page PDF; no parser setup from that file
 
 NAME = "Zorvath Quillane"
 EMAIL = "zorvath.quillane@canary-mail.test"
@@ -51,6 +51,33 @@ def _assert_clean(buffer: io.StringIO) -> str:
     leaked = [m for m in MARKERS if m in written.lower()]
     assert not leaked, f"planted values reached the log: {leaked}\n{written}"
     return written
+
+
+@pytest.fixture
+def parser_model(test_db, monkeypatch):
+    """The résumé parser set up as seeded (its key filled in), and a stubbed model whose reply carries the planted
+    values, so a parse that logged its reply would leak them. The canary's own: it needs nothing from the parser's
+    tests."""
+    import json
+
+    from backend.models.db import Setting
+    from backend.seed import DEFAULT_SETTINGS
+    values = {key: DEFAULT_SETTINGS[key][0] for key in DEFAULT_SETTINGS if key.startswith("resume_parse_")}
+    values["resume_parse_llm_api_key"] = "test-key"
+    for key, value in values.items():
+        row = test_db.query(Setting).filter(Setting.key == key).first()
+        if row is None:
+            test_db.add(Setting(key=key, value=value))
+        else:
+            row.value = value
+    test_db.commit()
+    answer = {"header": {"name": NAME, "email": EMAIL, "phone": PHONE}, "professional_summary": RESUME}
+
+    async def planted_reply(prompt, system, max_tokens=1200, **kwargs):
+        return {"text": json.dumps(answer), "usage": {"input_tokens": 1, "output_tokens": 1},
+                "provider": kwargs.get("provider"), "model": kwargs.get("model")}
+
+    monkeypatch.setattr("backend.analyzer.llm_client.call_llm", planted_reply)
 
 
 def _cookie(token):
@@ -125,7 +152,7 @@ def test_creating_and_editing_a_candidate(anonymous_client, accounts, test_db, l
     _assert_clean(log)
 
 
-def test_parsing_a_resume(anonymous_client, accounts, model, monkeypatch, log):  # noqa: F811
+def test_parsing_a_resume(anonymous_client, accounts, parser_model, monkeypatch, log):
     resume = f"{NAME}\n{EMAIL} | {PHONE}\n{RESUME}"
     url = f"/api/firms/{accounts.firm_id}/candidates/parse-resume"
     files = {"file": (f"{NAME}.pdf", _pdf(resume), "application/pdf")}
@@ -169,6 +196,36 @@ def test_database_errors_name_no_values(api_client, accounts, log):
                 assert client.get("/api/auth/me", headers=_cookie(accounts.firm_token)).status_code == 500
     written = _assert_clean(log)
     assert "SQLSTATE 22P02" in written and "SQLSTATE 23505" in written
+
+
+def test_a_caught_database_error_logged_in_the_message_names_no_values(api_client, accounts, log):
+    """The ~120 calls like `logger.warning(f"Failed to log activity: {e}")` (backend/activity.py) put the error in
+    the message itself, where Postgres has already quoted the value; the traceback path never sees them."""
+    from sqlalchemy.exc import DataError
+
+    from backend.main import app
+
+    app_log = logging.getLogger("jobnavigator.activity")
+
+    def _caught():
+        db = db_mod.SessionLocal()
+        try:
+            for value_sql in ("CAST(:v AS integer)", "CAST(:v AS uuid)"):
+                try:
+                    db.execute(text(f"SELECT {value_sql}"), {"v": NAME})
+                except DataError as e:
+                    db.rollback()
+                    app_log.warning(f"Failed to log activity: {e}")
+                    app_log.warning(f"Failed to log activity: {e.orig}")
+            yield db
+        finally:
+            db.close()
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        with _route_session(_caught):
+            assert client.get("/api/auth/me", headers=_cookie(accounts.firm_token)).status_code == 200
+    written = _assert_clean(log)
+    assert "Failed to log activity" in written
 
 
 def test_unexpected_errors_carry_no_input(api_client, accounts, log):

@@ -138,8 +138,10 @@ Python's `logging` sends every module's records up to one root logger. Each file
   DEBUG. uvicorn's own access log is off (`--no-access-log` in `start.sh`).
 - **A run id in background work:** lines from `launch_background()` and `tracked_run()` carry `run=` (the `job_runs`
   id). A run started from a request keeps that request's id too; a scheduled run has none.
-- **Masked in every line:** emails (first letter kept), Bearer tokens, JWTs, `sk-` keys, `password=` / `token=` /
-  `secret=` style fields, and long strings of letters and digits (tokens, hashes); UUIDs are kept. Database errors are
+- **Masked in every line:** emails (first letter kept), phone numbers (10 to 15 digits; dates, times and addresses are
+  left alone), Bearer tokens, JWTs, `sk-` keys, `password=` / `token=` / `secret=` style fields, the value Postgres
+  quotes in a bad-value error (`invalid input syntax for type integer: "…"`, which ~120 calls log as `f"...{e}"`) and
+  the statement line it quotes with it (`LINE 1: …`, where psycopg2 has already put the values), and long strings of letters and digits (tokens, hashes); UUIDs are kept. Database errors are
   written as their type, SQLSTATE and statement, without the values Postgres repeats (`DETAIL: Key (email)=(…)`);
   `hide_parameters` in `backend/models/db.py` keeps bound values out of their text. Validation errors keep where and
   why, not the input. SQLAlchemy is held at WARNING, so `LOG_LEVEL=DEBUG` never prints rows.
@@ -147,12 +149,15 @@ Python's `logging` sends every module's records up to one root logger. Each file
   "Internal Server Error", plus `X-Request-ID`.
 - **The canary test** (`backend/tests/test_logging_canary.py`) plants a name, email, phone number, résumé text, password
   and token in sign-in, invites, the password reset from request to new password, candidate create and edit, the
-  résumé parse (the model stubbed), database errors and unexpected errors, and fails if any of them reaches the log.
+  résumé parse (the model stubbed), database errors (uncaught, and caught then logged as `f"...{e}"`) and unexpected
+  errors, and fails if any of them reaches the log.
   With the masking switched off, it fails on the database and validation errors; the other flows log no personal data
   in the first place.
 - **The rule** is in `CLAUDE.md` ("Things you must not do"): masking is the safety net, not permission.
 - **Fixed on the way:** the tracer redirect logged its link's token on a failed click write; it logs the link id.
-- **Left as they are:** the existing log calls (the masking covers them); the two backfill scripts, which print a report
+- **Left as they are:** the existing log calls. The masking covers what it recognises (database errors, emails, phone
+  numbers, tokens), not free text: the calls that log an AI reply are listed for their owners below. The two backfill
+  scripts print a report
   in their own format; `backend/scripts/reset_password.py`, which prints the account's name to whoever runs it.
 
 **For teammates (4a):**
@@ -163,6 +168,22 @@ Python's `logging` sends every module's records up to one root logger. Each file
 - **Samad:** `backend/email_monitor/gmail_client.py:36` logs Google's whole reply (`resp.text`) when a token refresh
   fails. The masking catches what it recognises, but logging the status code and Google's `error` field is safer.
   Your file, so not changed here.
+- **Samad:** `backend/email_monitor/response_parser.py:171` and `:186` log 200–300 characters of the model's reply
+  about an email, which can quote the email itself. Log its length and the parse error instead. `gmail_client.py:224`
+  logs Google's whole reply when listing messages fails, like `:36` above: log the status code and Google's `error`
+  field.
+- **Zuhair:** three calls log up to 500 characters of the model's reply, which carries the candidate's name, phone and
+  résumé text: `backend/analyzer/cover_letter_generator.py:103` (cover letter), `backend/api/routes_resumes.py:979`
+  (tailoring) and `:1314` (PDF import). Log the reply's length and the parse error instead, as
+  `backend/candidates/parse.py:220` does. `backend/api/routes_persona.py:278` logs the uploaded file's name
+  (`pdf:{filename}`) and the résumé's name, which usually carry the person's name (`Ravi_Teja_Resume.pdf`): log the
+  kind and an id. The scrapers (`backend/scraper/orchestrator.py`, `sources/jobspy.py`, `freehire.py`, `jobright.py`,
+  `levelsfyi.py`, `linkedin_personal.py`, and `backend/api/routes_searches.py:328`) log `search.name`, and JobSpy the
+  search term. Searches are per candidate now (0007), and a BDE may name one after the candidate ("Ravi – Java"):
+  log `search.id` instead.
+- **Samad and Zuhair, the calls above:** each is a one-line change (log a length, a status or an id instead of the
+  text). Fix them in your own PR, or agree that Uzair fixes them in a small follow-up PR after #107, listed in
+  `docs/team/cross-area-changes.md`. Found in Abdul's review of #107 and a search of every log call (2026-11-03).
 - **Abdul (deployment):** the collector reads JSON lines from stdout. If the production proxy sets `X-Request-ID`, the
   backend keeps it, so the proxy's lines and ours share one id. Log retention is the deployment's.
 
