@@ -108,11 +108,23 @@ def test_different_firm_callbacks_and_confirmations_run_concurrently(api_client,
         return api_client.post(base([first,second][index])+'/mailbox/confirm/'+str(attempts[index]), headers=headers[index])
     with ThreadPoolExecutor(max_workers=2) as workers:
         results = list(workers.map(confirm, range(2)))
-    assert sorted(r.status_code for r in results) == ([200,409] if same_address else [200,200])
-    assert test_db.query(CandidateMailbox).filter_by(status='CONNECTED').count() == (1 if same_address else 2)
+    assert [r.status_code for r in results] == [200,200]
+    assert test_db.query(CandidateMailbox).filter_by(status='CONNECTED').count() == 2
     if same_address:
-        rejected = next(r for r in results if r.status_code == 409)
-        assert rejected.json()['detail'] == 'This email is already connected to another firm.'
+        from backend.tests.test_candidate_mailbox import email
+        boxes = [test_db.query(CandidateMailbox).filter_by(candidate_id=c.id).one() for c in (first,second)]
+        rows = [email(test_db, box, key='same-provider-id') for box in boxes]
+        for index in range(2):
+            response = api_client.get(base([first,second][index])+'/inbox', headers=headers[index])
+            assert [m['id'] for m in response.json()['messages']] == [str(rows[index].id)]
+            forbidden = api_client.get(base([first,second][index])+'/inbox',
+                params={'message_id':str(rows[1-index].id)}, headers=headers[index])
+            assert forbidden.status_code == 404
+        revocations=[]
+        monkeypatch.setattr(routes_inbox,'revoke_token',lambda token:revocations.append(token) or True)
+        assert api_client.delete(base(first)+'/mailbox').status_code == 200
+        test_db.refresh(boxes[1])
+        assert boxes[1].status == 'CONNECTED' and revocations == []
 
 
 def test_revoke_waits_for_unknown_identity_exchange_then_releases():
@@ -283,3 +295,24 @@ def test_disconnect_does_not_revoke_another_firms_existing_grant(api_client, tes
     test_db.refresh(other)
     assert calls == [] and other.status == status and other.refresh_token_ciphertext == b'other-encrypted-token'
     assert test_db.query(CandidateGoogleOAuthAttempt).filter(CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None)).count() == 0
+
+
+def test_two_candidates_in_one_firm_cannot_claim_same_gmail_concurrently(api_client, test_db, accounts, monkeypatch, mailbox_case):
+    from backend.api import routes_inbox
+    from backend.tests.test_pr104_followup import pending
+    first, _, _, mailbox = mailbox_case
+    mailbox.status = 'DISCONNECTED'
+    second = Candidate(firm_id=first.firm_id, manager_id=first.manager_id, created_by_user_id=accounts.user_id,
+        full_name='Second candidate same firm', work_auth='H1B')
+    test_db.add(second); test_db.commit()
+    attempts = [pending(api_client,monkeypatch,c,'shared-in-firm@example.test') for c in (first,second)]
+    calls=[]
+    monkeypatch.setattr(routes_inbox,'revoke_token',lambda token:calls.append(token) or True)
+    def confirm(index):
+        return api_client.post(base([first,second][index])+'/mailbox/confirm/'+attempts[index])
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        responses=list(workers.map(confirm,range(2)))
+    assert sorted(r.status_code for r in responses) == [200,409]
+    assert next(r for r in responses if r.status_code==409).json()['detail']=='This email is already connected to another candidate.'
+    assert test_db.query(CandidateMailbox).filter_by(address='shared-in-firm@example.test',status='CONNECTED').count()==1
+    assert calls == []

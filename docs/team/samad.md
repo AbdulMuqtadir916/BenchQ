@@ -109,7 +109,7 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
 ### PR 104 review follow-up (2026-11-02)
 
 See docs/02-DATA-CONTRACTS.md, PR 104 review corrections, and the per-file PR change report. Working plans/checklists are kept locally, outside the PR.
-Samad confirmed global one-active-candidate mailbox ownership, ERROR reservation until disconnect, current-BDE
+The final written decision is firm-local one-active-candidate mailbox ownership, ERROR reservation until disconnect, current-BDE
 candidate access with retained data on reassignment, both deletion choices, restricted support metadata and the
 background import audit policy. The latest correction below supersedes earlier read/manual-sync choices.
 No new database columns/tables are added by this follow-up. Durable consent lives in the existing ledger.
@@ -129,14 +129,13 @@ progress atomically in existing JobRun metadata and append one terminal/recovery
 Use per-account lifecycle locks and concurrent unknown-account exchange coordination with bounded waiting.
 Refresh newest mail while retaining cached older pages; cap automatic reload restoration at three pages and
 keep selected body loading independent. Expired confirmation action is Return to Inbox, then a separate Connect.
-Support health/counts-only visibility was approved in Abdul’s GitHub review. Samad reports Abdul approved one
-active candidate per Gmail globally in an in-person discussion. The latest correction below removes read/manual-sync request auditing; cursor pagination and exact remaining contracts still require code-owner sign-off before merge.
+Support health/counts-only visibility was approved in Abdul’s GitHub review. Abdul’s written 2026-11-03 decision, accepted by Samad, permits the same Gmail across firms and blocks duplicate active candidates only within a firm. The latest correction below removes read/manual-sync request auditing; cursor pagination and exact remaining contracts still require code-owner sign-off before merge.
 
 ### Latest Samad clarification and accepted audit/retry decisions (2026-11-03)
 
-Keep one active candidate per Gmail globally. A blocked cross-firm attempt says “This email is already connected
-to another firm,” without naming it; after disconnect another firm can connect. This is Samad’s latest clarified
-request, differing from Abdul’s written per-firm decision; record that difference openly for review.
+Adopt Abdul’s written decision dated 2026-11-03: one active candidate per Gmail within each firm; the same
+Gmail is allowed across firms simultaneously. Return only an in-firm candidate conflict; never announce another
+firm’s use. Disconnect/retry protects any remaining shared grant. This supersedes earlier global-rule proposals.
 Accept Abdul’s 2026-11-03 removal of read/manual-sync request business-ledger entries; keep is_read and propose
 separate access logging later. Retain encrypted failed/busy revocations in expired existing OAuth cleanup attempts
 for scheduled retry, protecting any still-live shared grant. No new table or migration. Existing business events

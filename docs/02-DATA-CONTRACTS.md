@@ -1628,8 +1628,7 @@ pending before merge. No new role rules or live Google secrets are embedded in t
 ### PR 104 review corrections — revised 2026-11-03
 
 Samad confirmed the implementation decisions during the planning interview. Abdul's newer product replies,
-supplied in the chat, approve the classification/UI sequence and gates below. Samad reports Abdul approved global
-one-active-candidate Gmail uniqueness in person (recorded 2026-11-03); this is not a GitHub review approval.
+supplied in the chat, approve the classification/UI sequence and gates below. Abdul’s written decision dated 2026-11-03, now accepted by Samad, makes Gmail uniqueness firm-local; the same address may connect across firms. This supersedes earlier global-uniqueness notes.
 Abdul’s written 2026-11-03 decision removes read/manual-sync request business-ledger events; is_read remains message state. A separate access-log proposal is deferred. Exact remaining contracts still require code-owner approval. Support
 health/counts-only visibility was explicitly approved in Abdul's 2026-11-03 GitHub review.
 Nothing here records a GitHub approval. Candidate Gmail defaults off until matching/BDE review, privacy
@@ -1649,10 +1648,11 @@ admission, and exchanges leave their group before account cleanup. Group admissi
 lock-wait budget, then returns a retryable error;
 provider calls hold no mailbox row locks. Disconnect invalidates pending confirmations for the revoked grant.
 
-The global uniqueness rule (Abdul’s in-person approval reported by Samad) is one active candidate per Gmail across all firms, with CONNECTED and ERROR
-reserving the address until explicit disconnect. A cross-firm conflict says “This email is already connected to another firm,” without its name, candidate or BDE.
-An in-firm conflict says it is already connected to another candidate. This global rule follows Samad’s latest
-clarification/request; it differs from Abdul’s linked written per-firm rule and remains explicit for code-owner review. Profile/Google addresses may differ. Reassignment preserves the mailbox, jobs, application
+The approved rule is one active candidate per Gmail within a firm. CONNECTED and ERROR reserve that address
+only in that firm until disconnect; other firms may connect the same Gmail simultaneously. In-firm conflicts say
+“This email is already connected to another candidate.” No cross-firm conflict or existence notice is returned.
+Provider grant safety probes/locks remain global internally, without changing tenant read permissions.
+Profile/Google addresses may differ. Reassignment preserves the mailbox, jobs, application
 statuses and mapped email history, transfers current-candidate access to the new BDE, and blocks subsequent
 requests and pending confirmation by the former BDE. Ledger visibility retains Q52: BDEs see entries they
 authored and ASSIGN entries for currently handled candidates, not all other actors’ candidate activity. No broad

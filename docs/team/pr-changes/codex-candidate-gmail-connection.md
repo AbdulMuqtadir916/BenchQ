@@ -4,10 +4,10 @@ Branch: `codex/candidate-gmail-connection` → `main`. Current integration base:
 
 ## Latest policy correction — 2026-11-03
 
-Samad clarified that global one-active-candidate Gmail ownership stays: a cross-firm collision returns only
-“This email is already connected to another firm”; no firm name or other identity. Explicit disconnect permits
-reuse. This differs from Abdul’s linked written per-firm rule; it is recorded as Samad’s request for code-owner
-review, not silently presented as Abdul’s approval.
+Abdul’s written decision dated 2026-11-03, accepted by Samad, is now implemented: one active candidate per
+Gmail within a firm; the same Gmail can connect across firms. The duplicate query uses scoped(...). No cross-firm
+existence message is returned. In-firm conflicts mention another candidate only. Earlier global-rule proposals
+are superseded. Shared-grant safety and encrypted failed-revocation retry remain unchanged.
 
 Accept Abdul’s written audit decisions: remove email-read and manual Sync request ledger events, including
 empty requests. Keep local is_read state; a separate privacy access log is a follow-up proposal. Existing import,
@@ -16,7 +16,7 @@ connection, confirmation and deletion business events stay. The hooks no longer 
 Disconnect now atomically queues the encrypted token in an expired/consumed existing OAuth cleanup attempt
 before removing usable mailbox credentials. Failures or busy coordination retain it for scheduled retry; a live
 shared mailbox/newer pending grant prevents destructive revocation. Successful cleanup clears the disconnected
-warning. No new table, field or migration. Current validation: **268 backend/isolation tests passed**, one existing warning; **582 frontend tests**,
+warning. No new table, field or migration. Prior correction validation: **268 backend/isolation tests passed**, one existing warning; **582 frontend tests**,
 typecheck/lint and production Webpack build passed. The first run exposed a stale cleanup warning; fixed with
 an explicit flush before querying remaining work. Disposable resources removed; development data untouched.
 Earlier evidence below remains baseline evidence; it was not rerun as a full backend suite for this correction.
@@ -24,6 +24,8 @@ Earlier evidence below remains baseline evidence; it was not rerun as a full bac
 Changed files in this correction: routes_inbox.py (audits, generic conflict and durable retry), use-inbox.ts
 (remove unnecessary ledger invalidations), candidate mailbox/follow-up/revision regression tests (policy and
 retry coverage), and the data-contract, ledger, team and per-file documentation.
+
+Final firm-scope regression/isolation checks: **271 passed**, one existing warning. Prior frontend 582/typecheck/lint/build checks remain applicable; no frontend code changed. They cover simultaneous same-Gmail connections across firms, tenant-isolated email rows, safe disconnect, and concurrent duplicate rejection within one firm. No frontend/model/migration changes in this correction.
 
 ## Scope and review corrections
 
@@ -39,7 +41,7 @@ Read-only Google OAuth with explicit candidate/address confirmation, encrypted c
 ## Decisions and approval provenance
 
 - Abdul’s 2026-11-03 GitHub review approves health/counts-only support visibility. Support receives no email rows, subject/sender/body/preview or identifying audit text.
-- Samad reports Abdul approved **one active candidate connection per Gmail globally** in person; recorded on 2026-11-03. Explicit disconnect releases ownership; ERROR retains it; collision messages disclose no other firm/candidate/BDE. This is attributed reporting, not a GitHub approval.
+- Abdul’s final written 2026-11-03 decision is firm-local uniqueness, accepted by Samad; no cross-firm existence disclosure. ERROR retains the in-firm reservation until disconnect.
 - The latest section supersedes earlier read/manual-sync audit choices. Cursor pagination/attestation and other exact contracts still require code-owner sign-off.
 - Classification off means imported mail stays readable and Unclassified in Inbox. External real-mail classification stays off until written provider retention/logging verification and consent update. Automatic updates stay off until PR 4 is merged and Undo is usable.
 

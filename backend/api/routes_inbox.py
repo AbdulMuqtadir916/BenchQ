@@ -452,15 +452,14 @@ def confirm_mailbox(candidate_id: uuid.UUID, attempt_id: uuid.UUID, background_t
                 _retire_attempt(db, attempt)
             raise HTTPException(409, 'Mailbox confirmation expired. Connect again.')
         address = attempt.pending_address.strip().lower()
-        # Serialize this identity across firms without revealing another firm's data.
-        existing = db.query(CandidateMailbox.id, CandidateMailbox.firm_id).filter(
+        # Uniqueness is firm-local; account lifecycle locks remain global only
+        # to protect Google's shared grant, never to reveal another firm.
+        existing = scoped(db, CandidateMailbox, firm_id, CandidateMailbox.id).filter(
             func.lower(func.trim(CandidateMailbox.address)) == address,
             CandidateMailbox.status.in_(['CONNECTED', 'ERROR']), CandidateMailbox.candidate_id != candidate_id).first()
         if existing:
             _retire_attempt(db, attempt)
-            detail = ('This email is already connected to another firm.' if existing.firm_id != firm_id
-                      else 'This email is already connected to another candidate.')
-            raise HTTPException(409, detail)
+            raise HTTPException(409, 'This email is already connected to another candidate.')
         mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(candidate_id=candidate_id).with_for_update().first()
         if mailbox and mailbox.status != 'DISCONNECTED' and mailbox.address.strip().lower() != address:
             _retire_attempt(db, attempt)

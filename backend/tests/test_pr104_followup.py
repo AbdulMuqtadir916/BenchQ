@@ -312,14 +312,21 @@ def test_delete_rechecks_owner_permission_after_google_call(api_client, test_db,
 
 
 @pytest.mark.parametrize('status', ['CONNECTED', 'ERROR'])
-def test_global_mailbox_reservation_is_private_and_protects_live_grant(api_client, test_db, accounts, monkeypatch, mailbox_case, status):
+@pytest.mark.parametrize('across_firms', [False, True])
+def test_mailbox_reservation_is_firm_scoped_and_protects_live_grant(api_client, test_db, accounts, monkeypatch, mailbox_case, status, across_firms):
     from backend.api import routes_inbox
     from backend.tests.auth_support import make_firm, make_user
     from backend.models.tenancy import Plan
     from backend.models.candidates import Candidate, CandidateMailbox
-    candidate, _, _, _ = mailbox_case
-    foreign_firm = make_firm(test_db, test_db.get(Plan, accounts.plan_id), slug='private-other-firm')
-    owner = make_user(test_db, foreign_firm, email='other-owner@example.test')
+    candidate, _, _, mailbox = mailbox_case
+    mailbox.status = 'DISCONNECTED'
+    if across_firms:
+        foreign_firm = make_firm(test_db, test_db.get(Plan, accounts.plan_id), slug='private-other-firm')
+        owner = make_user(test_db, foreign_firm, email='other-owner@example.test')
+    else:
+        from backend.models.tenancy import Firm
+        foreign_firm = test_db.get(Firm, candidate.firm_id)
+        owner = test_db.get(User, accounts.user_id)
     foreign = Candidate(firm_id=foreign_firm.id, manager_id=owner.id, created_by_user_id=owner.id,
         full_name='Never disclose this candidate', work_auth='H1B')
     test_db.add(foreign); test_db.flush()
@@ -330,8 +337,9 @@ def test_global_mailbox_reservation_is_private_and_protects_live_grant(api_clien
     calls = []
     monkeypatch.setattr(routes_inbox, 'revoke_token', lambda token:calls.append(token) or True)
     response = api_client.post(base(candidate) + '/mailbox/confirm/' + attempt)
-    assert response.status_code == 409
-    assert response.json()['detail'] == 'This email is already connected to another firm.'
+    assert response.status_code == (200 if across_firms else 409)
+    if not across_firms:
+        assert response.json()['detail'] == 'This email is already connected to another candidate.'
     assert str(foreign.id) not in response.text and foreign.full_name not in response.text
     assert calls == []
 

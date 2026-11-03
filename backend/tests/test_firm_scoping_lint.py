@@ -18,7 +18,6 @@ ALLOWED = {
     ("routes_inbox.py", "_disconnect_locked"): "internal same-Gmail pending grant invalidation under project revoke barrier; no cross-firm data returned",
     ("routes_inbox.py", "_retire_attempt"): "internal global grant-safety probe only; never returns another tenant identity; Google revoke is project-wide",
     ("routes_inbox.py", "cleanup_expired_grants"): "scheduled cross-firm encrypted-grant cleanup, not a user-readable query",
-    ("routes_inbox.py", "confirm_mailbox"): "global mailbox identity uniqueness; refuses without revealing the other tenant",
     ("routes_inbox.py", "candidate_google_oauth_callback"): "opaque one-use state, then current user/firm/candidate authorization",
     # Searches are run by the platform (Super Admin routes, F2b); a firm's own searches come with the Jobs track.
     ("routes_searches.py", "list_searches"): "platform route",
@@ -136,7 +135,6 @@ JOBS_ALLOWED = {
     ("routes_inbox.py", "_disconnect_locked"): "internal same-Gmail pending grant invalidation under project revoke barrier; no cross-firm data returned",
     ("routes_inbox.py", "_retire_attempt"): "internal global grant-safety probe only; never returns another tenant identity; Google revoke is project-wide",
     ("routes_inbox.py", "cleanup_expired_grants"): "scheduled cross-firm encrypted-grant cleanup, not a user-readable query",
-    ("routes_inbox.py", "confirm_mailbox"): "global mailbox identity uniqueness; refuses without revealing the other tenant",
     # Capture: a posting is looked up in the whole pool first (dedup), then linked to the firm (F2b).
     ("routes_applications.py", "create_application"): "dedup over the pool, then links the job to the firm",
     ("routes_jobs.py", "save_from_extension"): "dedup over the pool, then links the job to the firm",
