@@ -13,6 +13,7 @@ config, logging. Changing a route's behaviour for its owner (Samad, Zuhair, Abdu
 What exists today: a sign-in throttle and an invite-acceptance limit, per IP and per email, and a per-user limit on
 every signed-in request, all in memory (`backend/auth/throttle.py`; the table below); a request body size cap
 (`backend/body_limit.py`); database statement and connect timeouts (`backend/statement_timeout.py`, step 2b below);
+one logging setup with request ids and masking (`backend/logging_setup.py`, `backend/request_log.py`, step 4a below);
 per-scraper throttles
 (`backend/scraper/sources/*`); one uvicorn worker with the scheduler inside it.
 
@@ -121,11 +122,55 @@ Three PRs, in order:
 - **Abdul:** the production proxy needs per-path timeouts (2c above), and a migration or backfill that must run one
   long statement should do it through Alembic or its own connection, not the app's pool.
 
-### Step 4, errors: one error shape (planned)
+### Step 4a, logging (done; plan agreed 2026-11-03)
+
+Python's `logging` sends every module's records up to one root logger. Each file keeps its
+`logger = logging.getLogger("jobnavigator.…")`; what changed is the one place that decides how a line looks.
+
+- **One setup:** `configure_logging()` in `backend/logging_setup.py`, called once by `backend/main.py` and
+  `backend/scripts/db_upgrade.py`. It replaces `logging.basicConfig`. Lines go to stdout (Docker keeps them: json-file,
+  20 MB × 5): JSON in production, readable text otherwise; `LOG_FORMAT` and `LOG_LEVEL` override
+  (`backend/.env.example`). uvicorn's and the other libraries' lines go through the same handler.
+- **A request id on every line:** `backend/request_log.py`, the outermost middleware. It keeps a safe incoming
+  `X-Request-ID` (up to 64 letters, digits, `_`, `-`) or makes one, sends it back in the response, and writes one line
+  per request: method, **route pattern** (never the raw path: invite links carry their token there), status, time
+  taken, and the user and firm ids (for a Super Admin in a support view, the firm it reads). `/health` is logged at
+  DEBUG. uvicorn's own access log is off (`--no-access-log` in `start.sh`).
+- **A run id in background work:** lines from `launch_background()` and `tracked_run()` carry `run=` (the `job_runs`
+  id). A run started from a request keeps that request's id too; a scheduled run has none.
+- **Masked in every line:** emails (first letter kept), Bearer tokens, JWTs, `sk-` keys, `password=` / `token=` /
+  `secret=` style fields, and long strings of letters and digits (tokens, hashes); UUIDs are kept. Database errors are
+  written as their type, SQLSTATE and statement, without the values Postgres repeats (`DETAIL: Key (email)=(…)`);
+  `hide_parameters` in `backend/models/db.py` keeps bound values out of their text. Validation errors keep where and
+  why, not the input. SQLAlchemy is held at WARNING, so `LOG_LEVEL=DEBUG` never prints rows.
+- **An unexpected error** is logged once, with its traceback and request id; the answer stays the plain
+  "Internal Server Error", plus `X-Request-ID`.
+- **The canary test** (`backend/tests/test_logging_canary.py`) plants a name, email, phone number, résumé text, password
+  and token in sign-in, invites, the password reset from request to new password, candidate create and edit, the
+  résumé parse (the model stubbed), database errors and unexpected errors, and fails if any of them reaches the log.
+  With the masking switched off, it fails on the database and validation errors; the other flows log no personal data
+  in the first place.
+- **The rule** is in `CLAUDE.md` ("Things you must not do"): masking is the safety net, not permission.
+- **Fixed on the way:** the tracer redirect logged its link's token on a failed click write; it logs the link id.
+- **Left as they are:** the existing log calls (the masking covers them); the two backfill scripts, which print a report
+  in their own format; `backend/scripts/reset_password.py`, which prints the account's name to whoever runs it.
+
+**For teammates (4a):**
+
+- **Everyone:** keep `logging.getLogger("jobnavigator.<area>")` and never call `logging.basicConfig` or add a handler.
+  A new program (the worker in step 3, a new script) calls `configure_logging()` first. Log ids, counts and timings.
+  A new route that handles people's data gets a case in the canary test.
+- **Samad:** `backend/email_monitor/gmail_client.py:36` logs Google's whole reply (`resp.text`) when a token refresh
+  fails. The masking catches what it recognises, but logging the status code and Google's `error` field is safer.
+  Your file, so not changed here.
+- **Abdul (deployment):** the collector reads JSON lines from stdout. If the production proxy sets `X-Request-ID`, the
+  backend keeps it, so the proxy's lines and ours share one id. Log retention is the deployment's.
+
+### Step 4b, errors: one error shape (planned)
 
 The frontend shows the backend's `detail` text word for word (`src/components/app/error-state.tsx`), so backend wording reaches users. Step 4 gives every backend error a machine-readable code, RFC 9457 "Problem Details" style, next to the message. The frontend then shows its own plain-language message per code: busy, rate-limited, offline, unexpected. The wording is a product call (Abdul). Internal details (the database, a query) stay in the server logs (OWASP error handling).
 
-Also in step 4: the frontend retries a failed query after about 1 s and 2 s (TanStack Query's default delay;
+Also in 4b: the frontend retries a failed query after about 1 s and 2 s (TanStack Query's default delay;
 `src/lib/query/retry.ts`), while a 503 asks for `Retry-After: 5`. It should wait what the backend asks.
 
 ## 2. Production testing (second)

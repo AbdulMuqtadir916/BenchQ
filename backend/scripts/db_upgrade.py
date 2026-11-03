@@ -8,10 +8,11 @@ The Dockerfile CMD does this. The database is built by the migrations only; one 
 import logging
 
 from backend.db_schema import upgrade_database
+from backend.logging_setup import configure_logging
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    configure_logging()
     upgrade_database()
     logging.getLogger(__name__).info("Database schema is up to date.")
 

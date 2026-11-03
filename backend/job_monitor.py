@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
+from backend.logging_setup import request_id as log_request_id, run_id as log_run_id
 from backend.models.db import SessionLocal, JobRun, Setting
 from backend.statement_timeout import leave_web_request
 
@@ -340,6 +341,11 @@ async def tracked_run(
 
     run_id = uuid.uuid4()
     _insert_job_run(run_id, job_type, trigger, meta, target_job_id=target_job_id)
+    # Its log lines carry the run's id (job_runs.id). A scheduled run isn't part of any request, even when the
+    # scheduler was woken from one.
+    log_tokens = [log_run_id.set(str(run_id))]
+    if trigger == "scheduler":
+        log_tokens.append(log_request_id.set(None))
 
     running_job = RunningJob(
         run_id=run_id,
@@ -364,6 +370,9 @@ async def tracked_run(
         raise
     finally:
         _running.pop(key, None)
+        log_run_id.reset(log_tokens[0])
+        if len(log_tokens) > 1:
+            log_request_id.reset(log_tokens[1])
 
 
 # ── Background launcher for manual triggers ────────────────────────────────
@@ -396,6 +405,8 @@ def launch_background(
     async def _wrapper():
         # The task copied the launching request's context; its queries get the background statement timeout.
         leave_web_request()
+        # Its log lines carry the run's id, and keep the id of the request that started it.
+        log_run_id.set(str(run_id))
         try:
             _run_failure.set(None)
             # The gate is taken here, before the worker runs, so a queued task

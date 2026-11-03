@@ -14,6 +14,8 @@ from backend.seed import run_seeds
 from backend.auth.access import enforce as enforce_access
 from backend.auth import throttle
 from backend.body_limit import BodySizeLimit
+from backend.logging_setup import configure_logging
+from backend.request_log import HEADER as REQUEST_ID_HEADER, RequestLog
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
@@ -39,14 +41,9 @@ from backend.api.routes_ledger import router as ledger_router
 from backend.api.routes_support import router as support_router
 from backend.api.routes_notifications import router as notifications_router
 
-logging.basicConfig(level=logging.INFO)
+# One logging setup for every module's logger (backend/logging_setup.py): format, request ids, masking.
+configure_logging()
 logger = logging.getLogger("jobnavigator")
-
-# httpx logs every request URL at INFO, and the Telegram API carries the bot token in
-# the path — so each alert wrote the token into the container log in cleartext
-# (R4-T5-03). The app logs its own outcomes for every outbound call it cares about.
-for _noisy in ("httpx", "httpcore"):
-    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 
 @asynccontextmanager
@@ -161,6 +158,12 @@ app.add_middleware(BodySizeLimit)
 app.add_middleware(statement_timeout.WebRequestMarker)
 
 
+# ── Request log (docs/team/uzair.md §1, step 4a) ─────────────────────────────
+# Added last, so it runs first: the request id covers every line of the request, and the access line times and
+# reports everything, a 413 or 401 from the middleware above included.
+app.add_middleware(RequestLog)
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
@@ -211,6 +214,16 @@ async def _statement_timeout_to_503(request: Request, exc: _OperationalError):
         raise exc
     logger.warning("Query timed out on %s %s: %s", request.method, request.url.path, exc.statement)
     return statement_timeout.busy_response()
+
+
+@app.exception_handler(Exception)
+async def _unexpected_error(request: Request, exc: Exception):
+    """An error nothing else handled: the plain 500 Starlette sends, plus the request id to find it in the log
+    (backend/request_log.py logged it with its traceback)."""
+    from fastapi.responses import PlainTextResponse
+    rid = getattr(request.state, "request_id", None)
+    return PlainTextResponse("Internal Server Error", status_code=500,
+                             headers={REQUEST_ID_HEADER: rid} if rid else None)
 
 
 @app.get("/health", tags=["system"], summary="Health check")
@@ -278,6 +291,7 @@ async def _tracer_click_and_redirect(token: str, request: Request):
         # Capture destination before the click-log write so redirect still happens
         # even if the click-log commit fails (best-effort logging).
         destination = link.destination_url
+        link_id = link.id
 
         try:
             event = TracerClickEvent(
@@ -292,8 +306,8 @@ async def _tracer_click_and_redirect(token: str, request: Request):
             )
             db.add(event)
             db.commit()
-        except Exception as e:
-            logger.exception("Tracer click log failed for token=%s: %s", token, e)
+        except Exception:
+            logger.exception("Tracer click log failed for link %s", link_id)
             # Rollback so the session isn't left in an error state.
             try:
                 db.rollback()
