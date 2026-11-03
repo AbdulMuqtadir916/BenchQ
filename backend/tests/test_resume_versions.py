@@ -145,6 +145,30 @@ def test_a_changed_items_claims_go_back_to_unverified_and_the_others_stay(anonym
     assert [claim.state for claim in claims] == ["UNVERIFIED", "VERIFIED"]
 
 
+def test_a_changed_added_or_removed_bullet_sends_its_jobs_claim_back_to_unverified(anonymous_client, test_db, world):
+    from backend.models.candidates import Claim, Evidence
+    c = _candidate(anonymous_client, test_db, world)
+    v1 = _v(anonymous_client, world, c)
+    job = v1["experiences"][0]
+    evidence = Evidence(firm_id=world["firm"].id, candidate_id=uuid.UUID(c["id"]), excerpt="x", source="MANUAL")
+    test_db.add(evidence)
+    test_db.flush()
+    claim = Claim(firm_id=world["firm"].id, candidate_id=uuid.UUID(c["id"]), entity_type="experience",
+                  entity_ref=job["id"], text=job["company"], state="VERIFIED", evidence_id=evidence.id,
+                  source="RESUME_UPLOAD")
+    test_db.add(claim)
+    test_db.commit()
+    bullet, *rest = job["bullets"]
+    edits = [[{**bullet, "text": "Led a team of 40."}, *rest], [*job["bullets"], {"text": "A new bullet."}], rest]
+    for bullets in edits:
+        claim.state = "VERIFIED"
+        test_db.commit()
+        r = _save(anonymous_client, world, c, v1, experiences=[{**job, "bullets": bullets}, *v1["experiences"][1:]])
+        assert r.status_code == 201, r.text
+        test_db.refresh(claim)
+        assert claim.state == "UNVERIFIED"
+
+
 # ── Use as base, pick ────────────────────────────────────────────────────────
 
 def test_use_as_base_copies_the_version_into_a_new_active_base_once(anonymous_client, test_db, world):

@@ -49,11 +49,16 @@ def content_of(row: Resume) -> dict:
 
 
 def _items(content: dict):
-    """Every item with an id, bullets included: (id, its own fields without the id or the bullets)."""
+    """Every item with an id, bullets included: (id, its fields without the id). A job's or project's fields hold its
+    bullets' text, since its claim covers them: a changed, added or removed bullet changes the job too (§4.5)."""
     for section in SECTIONS:
         for item in content.get(section) or []:
-            yield item.get("id"), {k: v for k, v in item.items() if k not in ("id", "bullets")}
-            for bullet in item.get("bullets") or [] if section in WITH_BULLETS else []:
+            bullets = item.get("bullets") or [] if section in WITH_BULLETS else []
+            fields = {k: v for k, v in item.items() if k not in ("id", "bullets")}
+            if section in WITH_BULLETS:
+                fields["bullets"] = [{k: v for k, v in b.items() if k != "id"} for b in bullets]
+            yield item.get("id"), fields
+            for bullet in bullets:
                 yield bullet.get("id"), {k: v for k, v in bullet.items() if k != "id"}
 
 

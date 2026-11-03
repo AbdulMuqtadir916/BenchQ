@@ -187,29 +187,53 @@ async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, file: Uploa
                         principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
     """PDF or Word, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
     with the base it is; otherwise the parser reads it and one transaction keeps the file and writes a new active
-    base with its v1. Nothing is saved if the parse fails (§4.6)."""
+    base with its v1. Nothing is saved if the parse fails (§4.6). The database work runs off the event loop
+    (`asyncio.to_thread`): waiting for the candidate lock would otherwise hold up every request on the worker."""
+    await asyncio.to_thread(_may_upload, db, firm_id, principal, candidate_id)
+    content = await file.read(MAX_BYTES + 1)
+    kind = file_kind(file.filename or "", content)
+    sha256 = file_sha256(content)
+    parse = None
+    if await asyncio.to_thread(_is_new_file, db, firm_id, principal, candidate_id, sha256):
+        text = await asyncio.to_thread(extract_text, kind, content)
+        parse = await read_resume(text, kind, db, firm_id=firm_id)
+    return await asyncio.to_thread(_keep_upload, db, firm_id, principal, candidate_id, file.filename or "", kind,
+                                   content, sha256, parse)
+
+
+def _may_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID) -> None:
     _member_of(firm_id, principal)
     if not can_manage_resume(principal, _candidate(db, firm_id, principal, candidate_id)):
         raise _forbidden()                   # refused before the file is read
     db.commit()
-    content = await file.read(MAX_BYTES + 1)
-    kind = file_kind(file.filename or "", content)
-    sha256 = file_sha256(content)
-    candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
+
+
+def _is_new_file(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID,
+                 sha256: str) -> bool:
+    """With the candidate locked: the answer (409) for a file the candidate already has. False, still locked, for
+    one kept by a candidate made before bases existed (it becomes a base now); True, unlocked, for a new file."""
+    candidate, _ = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
     if (kept := versions.kept_file(db, candidate, sha256)) is not None:
         if (answer := versions.already_uploaded(db, candidate, kept)) is not None:
             raise answer
-        parse_row = kept                     # kept by a candidate made before bases existed: it becomes one now
+        return False
+    db.commit()                              # no lock, and no connection, held while the parser works
+    return True
+
+
+def _keep_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID, file_name: str,
+                 kind: str, content: bytes, sha256: str, parse: dict | None) -> dict:
+    """The new active base, from `parse` (a new file) or from the kept upload `_is_new_file` found (`parse` None)."""
+    candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
+    kept = versions.kept_file(db, candidate, sha256)
+    if parse is None:
+        parse_row = kept                     # found above, under the same lock
     else:
-        db.commit()                          # no lock, and no connection, held while the parser works
-        text = await asyncio.to_thread(extract_text, kind, content)
-        parse = await read_resume(text, kind, db, firm_id=firm_id)
-        candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
-        if (kept := versions.kept_file(db, candidate, sha256)) is not None:   # the same file, uploaded meanwhile
+        if kept is not None:                 # the same file, uploaded meanwhile
             raise versions.already_uploaded(db, candidate, kept) or HTTPException(status_code=409,
                                                                                   detail="Upload it again.")
         parse_row = ResumeParse(firm_id=firm_id, uploaded_by_user_id=actor.id, candidate_id=candidate.id,
-                                file_name=(file.filename or "")[:255], mime_type=PDF_MIME if kind == "pdf" else DOCX_MIME,
+                                file_name=file_name[:255], mime_type=PDF_MIME if kind == "pdf" else DOCX_MIME,
                                 size_bytes=len(content), content=content, parse=parse, expires_at=None)
         db.add(parse_row)
     try:
