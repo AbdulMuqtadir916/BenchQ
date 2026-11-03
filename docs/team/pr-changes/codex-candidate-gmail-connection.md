@@ -28,8 +28,21 @@ One unmerged Gmail migration: **0011 after main’s notifications 0010**. The re
 
 - Latest targeted frontend check: 582 passed; typecheck/lint passed. Production Webpack build passed with the existing CSS optimizer warning.
 - Synthetic Chromium acceptance passed in light/dark, 1440/1024/390, keyboard/reduced motion, axe zero and no page errors. The actual hook also proves a refresh issues only a newest-page request while preserving the older selected reader. Actual components and hooks are exercised; no real Google/model requests or candidate mail.
-- Final affected backend/isolation/migration suite: **256 passed**, one existing warning. Complete backend suite is running on a separate disposable PostgreSQL database; its result remains pending. Counts overlap, not additive. The final group-coordination hardening occurred after the complete-suite snapshot; the 256-case affected run validates that group-coordination change and additional concurrency cases. A subsequent **75-case** callback/lifecycle run passed after the final permission/expiry recheck was added following admission. No product code changed after that final affected run.
+- Complete backend snapshot: **3,825 passed**, 11 skipped, 54 live tests deselected, 13 existing expected failures and 6 existing warnings (25m19s), with no unexpected failures. Final affected hardening/isolation suite: **256 passed**; final callback/lifecycle suite after the last backend edit: **75 passed**. Counts overlap. The full run began before the last Google coordination/authorization hardening; those final production changes are validated by the affected runs.
 - New regressions cover immutable ledger history, atomic batch counts, restart recovery, concurrent accounts across firms, bounded lock waiting/release, cancellation after coordination wait, pending-grant invalidation and newest-only history refresh.
+
+All local technical checks passed. Implementation checkpoint: `8a13a9f`; no backend code changed after the final
+75-case run and no frontend code changed after the final 582-test/build/browser runs. The temporary browser
+harness, disposable PostgreSQL container and private test network were stopped/removed; development services
+and data were unchanged. Final publication preflight fetched main `fc1bf67`, already included, with no remote
+branch changes to reconcile. Publication and new-head CI are recorded separately in the PR.
+
+### Reproduce checks
+
+- Backend: `python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider` with an isolated PostgreSQL test database.
+- Final hardening: run the candidate mailbox, Gmail sync, ledger, migration 0011, firm-scoping, F7 isolation and PR 104 revision/follow-up modules with the same pytest flags; final callback check covers revision/follow-up/mailbox modules.
+- Frontend: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` (Node 22). Verification used the installed Node CLI entry points for these same tools; no dependency/build configuration changes.
+- Browser: follow `scripts/qa/candidate-gmail/README.md`; synthetic-only requests and installed axe are required.
 
 ## Remaining review and launch limits
 
