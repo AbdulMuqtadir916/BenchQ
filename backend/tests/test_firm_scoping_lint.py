@@ -15,6 +15,10 @@ ROUTE_FILES = sorted((BACKEND / "api").glob("routes_*.py")) + [BACKEND / "main.p
 
 # (file, function) -> why it may query a firm-owned model without `scoped()`.
 ALLOWED = {
+    ("routes_inbox.py", "_disconnect_locked"): "internal same-Gmail pending grant invalidation under project revoke barrier; no cross-firm data returned",
+    ("routes_inbox.py", "_retire_attempt"): "internal global grant-safety probe only; never returns another tenant identity; Google revoke is project-wide",
+    ("routes_inbox.py", "cleanup_expired_grants"): "scheduled cross-firm encrypted-grant cleanup, not a user-readable query",
+    ("routes_inbox.py", "candidate_google_oauth_callback"): "opaque one-use state, then current user/firm/candidate authorization",
     # Searches are run by the platform (Super Admin routes, F2b); a firm's own searches come with the Jobs track.
     ("routes_searches.py", "list_searches"): "platform route",
     ("routes_searches.py", "update_search"): "platform route",
@@ -61,7 +65,7 @@ _F2B_TABLES = {"searches", "applications", "interviews", "resumes", "cover_lette
                # The candidate core (docs/team/00-candidate-core.md, migration 0007).
                "candidate_jobs", "favorite_jobs", "candidate_mailboxes", "inbox_messages", "evidence", "claims",
                # Résumé versioning (docs/team/resume-versioning.md, migration 0008).
-               "base_resumes", "application_reviews", "application_status_events"}
+               "base_resumes", "candidate_google_oauth_attempts", "application_reviews", "application_status_events"}
 # Firm-owned although `firm_id` may be null: a ledger entry with no firm is a platform-only event (A13), and a
 # firm route must still read only its own firm's entries.
 _NULLABLE_FIRM_OWNED = {"LedgerEntry"}
@@ -105,7 +109,7 @@ def test_the_firm_owned_models_are_known():
                                     "CandidateJob", "FavoriteJob", "CandidateMailbox", "InboxMessage", "Evidence",
                                     "Claim",
                                     # Résumé versioning (migration 0008).
-                                    "BaseResume", "ApplicationReview", "ApplicationStatusEvent"}
+                                    "BaseResume", "CandidateGoogleOAuthAttempt", "ApplicationReview", "ApplicationStatusEvent"}
 
 
 def test_routes_read_firm_rows_only_through_scoped():
@@ -128,6 +132,9 @@ def test_every_allowed_function_exists():
 # Jobs are one shared pool; a firm sees the ones `firm_jobs` links it to (07 Q37), read through `scoped_jobs()`.
 # (file, function) -> why it may query `Job` across the whole pool.
 JOBS_ALLOWED = {
+    ("routes_inbox.py", "_disconnect_locked"): "internal same-Gmail pending grant invalidation under project revoke barrier; no cross-firm data returned",
+    ("routes_inbox.py", "_retire_attempt"): "internal global grant-safety probe only; never returns another tenant identity; Google revoke is project-wide",
+    ("routes_inbox.py", "cleanup_expired_grants"): "scheduled cross-firm encrypted-grant cleanup, not a user-readable query",
     # Capture: a posting is looked up in the whole pool first (dedup), then linked to the firm (F2b).
     ("routes_applications.py", "create_application"): "dedup over the pool, then links the job to the firm",
     ("routes_jobs.py", "save_from_extension"): "dedup over the pool, then links the job to the firm",

@@ -26,7 +26,7 @@ from backend.tests.isolation_cases import (CASES, DEV_ONLY_REASONS, KNOWN_GAPS, 
 from backend.tests.isolation_support import CANARY, add_firm_b, make_world, offline, snapshot_of  # noqa: F401
 
 READ_ONLY = {"detail": "A support view is read-only."}
-SUPPORT_REFUSED_GETS = {"GET /api/resumes/{resume_id}/pdf", "GET /api/cover-letters/{cl_id}/pdf"}
+SUPPORT_REFUSED_GETS = {"GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}", "GET /api/resumes/{resume_id}/pdf", "GET /api/cover-letters/{cl_id}/pdf"}
 
 
 def _app_routes() -> set[str]:

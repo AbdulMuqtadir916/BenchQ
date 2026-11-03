@@ -75,7 +75,7 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["inbox", "byCandidate", (f, i) => inboxApi.byCandidate(f, i.candidate), false],
   ["inbox", "connect", (f, i) => inboxApi.connect(f, i.candidate), true],
   ["inbox", "disconnect", (f, i) => inboxApi.disconnect(f, i.candidate), true],
-  ["inbox", "markRead", (f, i) => inboxApi.markRead(f, i.message), true],
+  ["inbox", "markRead", (f, i) => inboxApi.markRead(f, i.candidate, i.message), true],
   ["jobMarks", "list", (f) => jobMarksApi.list(f), false],
   ["jobMarks", "mark", (f, i) => jobMarksApi.mark(f, i.job, "SAVED"), true],
   ["jobMarks", "unmark", (f, i) => jobMarksApi.unmark(f, i.job, "SAVED"), true],

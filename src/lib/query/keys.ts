@@ -33,7 +33,7 @@ export const queryKeys = {
   },
   records: { byCandidate: (firmId: string, candidateId: string) => [firmId, "records", "byCandidate", candidateId] as const },
   documents: { byCandidate: (firmId: string, candidateId: string) => [firmId, "documents", "byCandidate", candidateId] as const },
-  inbox: { byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const },
+  inbox: { confirmation: (firm: string, candidate: string, attempt: string | null) => [firm, "mailbox-confirmation", candidate, attempt] as const, body: (firm: string, candidate: string, message?: string | null) => message === undefined ? [firm, "inbox-body", candidate] as const : [firm, "inbox-body", candidate, message] as const, byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const },
   ledger: { all: (firmId: string) => [firmId, "ledger"] as const, list: (firmId: string, params?: Params) => [firmId, "ledger", "list", params ?? {}] as const },
   team: {
     all: (firmId: string) => [firmId, "team"] as const,

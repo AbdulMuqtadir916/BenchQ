@@ -46,13 +46,16 @@ def support_view_json(view: SupportView) -> dict:
     }
 
 
-def ledger_entry_json(entry: LedgerEntry) -> dict:
+def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
     """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case."""
     return {
         "id": str(entry.id), "firm_id": str(entry.firm_id) if entry.firm_id else None,
+        "candidate_id": str(entry.candidate_id) if entry.candidate_id else None,
         "actor_user_id": str(entry.actor_user_id) if entry.actor_user_id else None, "actor_type": entry.actor_type,
         "actor_name": entry.actor_name, "entity_type": entry.entity_type, "entity_id": entry.entity_id,
-        "entity_label": entry.entity_label, "action": entry.action, "summary": entry.summary, "note": entry.note,
+        "entity_label": entry.entity_label, "action": entry.action,
+        "summary": "Candidate inbox activity (content restricted)." if hide_email and entry.entity_type == "email" else entry.summary,
+        "note": None if hide_email and entry.entity_type == "email" else entry.note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
         "evidence_ids": list(entry.evidence_ids or []), "claim_state": entry.claim_state,
         "created_at": _iso(entry.created_at),
