@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
+import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 
 /**
  * The latest recruiter emails, or the prompt to connect the mailbox. Connecting is a write
@@ -17,6 +17,7 @@ import { SIGNAL_META } from "@/components/app/inbox/signal-meta";
  */
 export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessage, onOpenInbox }: { inbox: CandidateInbox | null; isLoading: boolean; firstName: string; canAct: boolean; onOpenMessage: (id: string) => void; onOpenInbox: () => void }) {
   const latest = (inbox?.messages ?? []).filter((m) => m.signal !== "CONFIRMATION").slice(0, 4);
+  const needsReconnect = !!inbox?.connection && inbox.connection.status !== "CONNECTED";
 
   return (
     <Card className="p-0">
@@ -28,6 +29,12 @@ export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessag
           </button>
         ) : null}
       </div>
+      {!isLoading && needsReconnect ? (
+        <div role="status" className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-2)]">
+          <span>{inbox?.connection?.status === "ERROR" ? "Google access expired. Reconnect to resume syncing." : "Inbox disconnected. New emails are not syncing."}</span>
+          {canAct ? <Button size="sm" onClick={onOpenInbox}>Reconnect</Button> : null}
+        </div>
+      ) : null}
       {isLoading ? (
         <div role="status" aria-label="Loading emails" className="space-y-3 p-4"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /></div>
       ) : !inbox?.connection ? (
@@ -47,7 +54,7 @@ export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessag
       ) : (
         <ul className="divide-y divide-[var(--color-border)]">
           {latest.map((m) => {
-            const meta = SIGNAL_META[m.signal];
+            const meta = mailSignalMeta(m.signal);
             return (
               <li key={m.id}>
                 <button type="button" onClick={() => onOpenMessage(m.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--color-surface-2)]">

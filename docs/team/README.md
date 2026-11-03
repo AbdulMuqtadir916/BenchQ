@@ -48,7 +48,7 @@ it. Everyone else reads it.
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
 | `claims`, `evidence` | Zuhair | Truth Guard is enforced in the database; never relax it |
 | `applications`, `interviews` | Samad | |
-| `candidate_mailboxes`, `inbox_messages` | Samad | |
+| `candidate_mailboxes`, `inbox_messages`, `candidate_google_oauth_attempts` (0010) | Samad | Candidate connection, imported mail and one-use OAuth handoff state |
 | `ledger_entries` | Abdul | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table |
 | billing tables (new) | Abdul | |
 | `users`, `firms`, `plans`, `invites`, `sessions`, `support_views` | Abdul | Tenancy |
@@ -94,8 +94,9 @@ it. Everyone else reads it.
 |---|---|---|---|
 | 0007 | Abdul | Candidate core tables | PR #91 |
 | 0008 | Zuhair | Résumé versioning: `base_resumes`, the new `resumes` columns, `award` claims (additive) | `feat/base-resumes-schema` |
-| 0009 | Samad | Applications foundation: revisions, immutable status events and BDE review records | PR 1 replacement, `codex/applications-foundation-v2`; code-owner review pending |
-| 0010 | Mohammed Abdul Ahad Umamah | Notifications inbox and password-reset approval requests | `feat/password-reset-notifications` |
-| 0011 | Zuhair | Résumé versioning PR 5: `base_resumes.promoted_from_resume_id` and `archived_at`, `resume_parses.content_sha256`, and their unique rules (additive). | `feat/resume-versions` |
-| 0012 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0011 | `feat/drop-legacy-resume-columns` |
-| 0013+ | — | Claim the next number here in your PR | — |
+| 0009 | Samad | Applications foundation | Merged #100 |
+| 0010 | Mohammed Abdul Ahad Umamah | Notifications and password-reset approvals | Merged #105 |
+| 0011 | Zuhair | Résumé versioning and upload fingerprints | Merged #106 |
+| 0012 | Samad | Candidate Gmail OAuth/sync and provenance | Merged #104 |
+| 0013 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0012 (Samad's) | `feat/drop-legacy-resume-columns` |
+| 0014+ | — | Claim the next number here in your PR | — |

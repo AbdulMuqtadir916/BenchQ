@@ -6,7 +6,7 @@ listed here: what changed, in whose area, and why. Newest PR first.
 ## Résumé versioning PR 6 — the old résumé columns and JobNavigator's résumé code removed (`feat/drop-legacy-resume-columns`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §3.3, §4.8, §8; decided 2026-11-02 (Abdul approved the drops
-on 2026-10-31). Migration 0012.
+on 2026-10-31). Migration 0013.
 
 | Area (owner) | File | What changed | Why |
 |---|---|---|---|
@@ -20,6 +20,7 @@ on 2026-10-31). Migration 0012.
 | Startup seed (shared) | `backend/seed.py` | The "Sample PM" résumé and its seed removed (`seed_mock_resume`). | Q1: a fake person scoring every firm's jobs; a résumé needs a candidate. |
 | Settings (shared) | `backend/api/routes_settings.py` | Imports `reset_tailoring_semaphore` from `render_shared.py`. | Moved with the other helpers. |
 | Ledger (Abdul) | `docs/integration/06-open-decisions.md`, `docs/integration/01-ledger.md` | D10 added: keeping deleted résumé versions for the ledger, **a suggestion by Zuhair Baig (soft delete preferred), not decided**; one line under the ledger's "Gaps" points to it. | Today a delete keeps who/what/when in the ledger but loses the version's content; the ledger is Abdul's to decide. |
+| Candidate Gmail migration test (Samad) | `backend/tests/test_migration_0012.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `'0012'`. | With PR 6's 0013 on top (PR 6 merged after #104, so it renumbered), a refused downgrade leaves the database at 0013; the test's point (nothing moved) is unchanged. |
 
 Not changed, left to the owner:
 

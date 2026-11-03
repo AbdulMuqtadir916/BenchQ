@@ -193,8 +193,18 @@ def build_firm(db, firm, owner, tag: str) -> dict:
         inbox_message_id=review_message.id, reason="LOW_CONFIDENCE", application_revision=0)
     db.add(review)
     db.flush()
-    return {"review_app": review_app.id, "review": review.id, "review_message": review_message.id,
+    from backend.models.candidates import CandidateGoogleOAuthAttempt
+    from datetime import timedelta
+    attempt = CandidateGoogleOAuthAttempt(firm_id=firm.id, candidate_id=candidate.id,
+        initiated_by_user_id=owner.id, state_hash=uuid.uuid4().hex, code_verifier_ciphertext=b'',
+        pending_address=mailbox.address, pending_token_ciphertext=b'synthetic', return_to='/',
+        expires_at=utcnow() + timedelta(minutes=10))
+    db.add(attempt)
+    db.flush()
+
+    return {"oauth_attempt": attempt.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
             "version": v2.id, "base": second.id,
+
             "firm": firm.id, "slug": firm.slug, "job": job.id,
             "app": app.id, "legacy_app": legacy_app.id, "inbox_message": candidate_message.id, "interview": interview.id,
             "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id,
@@ -328,6 +338,17 @@ def offline(monkeypatch):
 
     monkeypatch.setattr(routes_candidates, "extract_text", lambda kind, content: "isolation résumé text")
     monkeypatch.setattr(routes_candidates, "read_resume", read_resume)
+
+    # Provider I/O is synthetic in F7; Google and mailbox secrets are never contacted.
+    from backend.api import routes_inbox
+    from backend.inbox.google_oauth import Authorization
+    monkeypatch.setattr(routes_inbox, "build_authorization", lambda: Authorization(
+        "https://accounts.google.com/test", "synthetic-state-" + uuid.uuid4().hex, "verifier", "challenge"))
+    monkeypatch.setattr(routes_inbox, "encrypt_secret", lambda value: b"synthetic-test-ciphertext")
+    monkeypatch.setattr(routes_inbox, "sync_mailbox", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(routes_inbox, "run_import", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(routes_inbox, "revoke_token", lambda *args, **kwargs: True)
+
     from backend.api import routes_candidate_resumes
     monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: "isolation résumé text")
     monkeypatch.setattr(routes_candidate_resumes, "read_resume", read_resume)

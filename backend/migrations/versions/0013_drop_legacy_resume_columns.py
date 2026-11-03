@@ -1,8 +1,8 @@
 """Résumé versioning PR 6: old résumé rows converted or deleted, the approved drops, every résumé on a base
 (docs/team/resume-versioning.md §3.3; decided 2026-11-02)
 
-Revision ID: 0012
-Revises: 0011
+Revision ID: 0013
+Revises: 0012
 Create Date: 2026-11-02 18:00:00.000000
 
 Old rows (no `base_resume_id`, JobNavigator's `json_data`):
@@ -30,8 +30,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = '0012'
-down_revision = '0011'
+revision = '0013'
+down_revision = '0012'
 branch_labels = None
 depends_on = None
 

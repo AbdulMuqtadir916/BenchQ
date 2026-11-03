@@ -1,4 +1,4 @@
-"""A résumé version for tests (docs/team/resume-versioning.md §3.3): since 0012 every `resumes` row belongs to a
+"""A résumé version for tests (docs/team/resume-versioning.md §3.3): since 0013 every `resumes` row belongs to a
 candidate and a base, so a test that needs "a résumé" makes one here instead of a bare row."""
 import uuid
 
@@ -36,12 +36,12 @@ def make_version(db, firm_id, *, candidate=None, candidate_name=None, category="
 
 
 def columns_from_json(data: dict) -> dict:
-    """JobNavigator's json_data in the version columns: migration 0012's own mapping, so a test written with the old
+    """JobNavigator's json_data in the version columns: migration 0013's own mapping, so a test written with the old
     shape gets exactly what the migration would have made of it."""
     import importlib.util
     from pathlib import Path
-    path = Path(__file__).resolve().parents[1] / "migrations" / "versions" / "0012_drop_legacy_resume_columns.py"
-    spec = importlib.util.spec_from_file_location("_migration_0012", path)
+    path = Path(__file__).resolve().parents[1] / "migrations" / "versions" / "0013_drop_legacy_resume_columns.py"
+    spec = importlib.util.spec_from_file_location("_migration_0013", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.columns_from_json(data)

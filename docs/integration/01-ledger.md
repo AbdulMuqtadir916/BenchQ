@@ -168,3 +168,17 @@ sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 - [x] Adapter live behind `ledger`, mapping tested; screen unchanged
 - [ ] Clicked through as OWNER and BDE on the live backend (the PR's test plan)
 - [ ] Mock deleted (with F6)
+
+
+## PR #104 audit behavior (2026-11-03)
+
+Q52 stays unchanged: a BDE reads their authored entries plus ASSIGN entries for currently handled candidates.
+Current candidate Inbox access does not grant access to other actors’ ledger events. A broader reassignment
+confirmation view would require a separate approved proposal.
+
+Mailbox attestation uses a durable email ledger event containing verified account address, actor/candidate/time
+and consent notice v1. Erasure retains that disclosed connection evidence. Platform/support audit responses redact
+email summaries/notes; operational support sees mailbox health/counts only (approved in Abdul’s latest review).
+Background import progress lives in existing JobRun metadata and commits atomically with each saved batch. One
+immutable SYSTEM result is appended on completion/failure/recovery for a nonempty run; prior events never change.
+Abdul decided on 2026-11-03, and Samad accepted: no read/manual-sync request ledger entries, even for empty requests. Keep is_read; propose separate access logging later. Import results/connections/confirmation/deletion remain audited.

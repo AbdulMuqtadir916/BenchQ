@@ -1,7 +1,7 @@
 """A firm's ledger: who did what in the firm, newest first (docs/integration/01-ledger.md, 07-auth §4 track 01).
 
 The worked example of a firm-scoped read: the path names the firm, `reader_firm_id` says which firm the caller
-may read, `scoped()` adds the filter, and a BDE sees the entries they made (`own_scope`, 07 §2.2) plus the ASSIGN
+may read, `scoped()` adds the filter, and a BDE sees the entries they made (`own_scope`, 07 §2.2) plus the assignment
 entries about the candidates they work now (07 Q52: "New assignments" and the handoff note). Another firm's ledger
 is 404, the same as a missing firm (principle 4). Platform-only events (`firm_id` null) are the Super Admin's, in
 `/api/admin/audit`.
@@ -39,7 +39,7 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     db.commit()
     entries = scoped(db, LedgerEntry, my_firm)
     if (actor := own_scope(principal)) is not None:
-        # 07 Q52: also who assigned them the candidates they work now, and the note. Nothing else others wrote.
+        # Q52: own entries plus assignments for currently handled candidates.
         theirs = scoped(db, Candidate, my_firm, cast(Candidate.id, String)).filter(Candidate.bde_id == actor).scalar_subquery()
         entries = entries.filter(or_(
             LedgerEntry.actor_user_id == actor,
@@ -54,4 +54,4 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     if candidate_id is not None:     # the candidate's activity (07 Q53h)
         entries = entries.filter(LedgerEntry.candidate_id == candidate_id)
     entries = entries.order_by(LedgerEntry.created_at.desc(), LedgerEntry.id).offset(offset).limit(limit)
-    return [ledger_entry_json(e) for e in entries]
+    return [ledger_entry_json(e, hide_email=principal.support_view_id is not None) for e in entries]

@@ -53,7 +53,7 @@ def test_a_verified_claim_needs_evidence(test_db, world):
     _refused(test_db, Claim(**{**claim, "entity_type": "hobby"}), "ck_claims_entity_type")
 
 
-# 0007's one-base rule (uq_resumes_one_base_per_candidate) was replaced by versioning (0008) and dropped in 0012;
+# 0007's one-base rule (uq_resumes_one_base_per_candidate) was replaced by versioning (0008) and dropped in 0013;
 # test_migration_0008.py holds the résumé rules now.
 
 

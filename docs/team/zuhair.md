@@ -29,7 +29,7 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
    **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). **PR 5** (migration 0011):
    versions and bases through the API under the candidate's URL: save, use as base, pick, the BDE's later upload,
    delete / hide / show again; once a BDE is assigned only that BDE changes résumés (07 Q55). **PR 6** (migration
-   0012): the old columns and JobNavigator's résumé code removed; old rows converted (resume-versioning §3.3, §4.8).
+   0013): the old columns and JobNavigator's résumé code removed; old rows converted (resume-versioning §3.3, §4.8).
 5. **Frontend live:** the Record (`src/lib/api/records.ts`) behind `records`, with a DTO mapper and a real sample.
 
 ## 2. Job scraping — per candidate (Q53b)

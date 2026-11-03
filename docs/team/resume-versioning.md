@@ -3,7 +3,7 @@
 Design agreed 2026-10-31 by Zuhair, with the approvals in §1 from Abdul. **Built so far: the parser (§2–§2.2, PR 2), the tables
 (§3, PR 3, migration 0008), the first base on candidate create (§4.2, PR 4) and versions and bases through the API
 (§4.3, §4.6, §4.7, §6, PR 5, migration 0011) and the clean-up of the old columns and JobNavigator's résumé code
-(§3.3, §4.8, §8, PR 6, migration 0012).** The screens (PR 7) are not built yet. This file is
+(§3.3, §4.8, §8, PR 6, migration 0013).** The screens (PR 7) are not built yet. This file is
 the single reference for building it: the tables (§3), the workflow (§4), the frontend contract (§5), permissions
 (§6) and the PR plan (§7). Owner of all three tables: Zuhair (`docs/team/README.md` §3).
 
@@ -203,12 +203,12 @@ All reads, edits, tailoring, previews and downloads go through this table.
 | `created_by_user_id` | uuid | FK → users | Who saved this version | **new** |
 | `created_at` | timestamptz | `now()` | When this version was saved | exists |
 
-**Dropped (approved; done in PR 6, migration 0012):** `is_base` (→ `category`), `parent_id` (not tracking which base
+**Dropped (approved; done in PR 6, migration 0013):** `is_base` (→ `category`), `parent_id` (not tracking which base
 version a tailored résumé came from; add a `base_version` integer later if that's ever needed), `json_data` (→ the
 content columns), `resume_parse_id` (→ `base_resumes`), `updated_at` (rows never change), and the index
 `uq_resumes_one_base_per_candidate` (a candidate now has many base versions).
 
-**Required from 0012 (PR 6, decided 2026-11-02):** every row belongs to a base and a candidate. `base_resume_id` and
+**Required from 0013 (PR 6, decided 2026-11-02):** every row belongs to a base and a candidate. `base_resume_id` and
 `candidate_id` are `NOT NULL`, and the "rows with a base only" exceptions below are gone: `ck_resumes_category_job`
 holds for every row, `uq_resumes_version` has no `WHERE`, and `ck_resumes_base_has_candidate` is dropped (the
 `NOT NULL` does its job).
@@ -235,7 +235,7 @@ ALTER TABLE resumes ADD CONSTRAINT fk_resumes_base_candidate
   `passive_deletes`, so the ORM leaves the cascade to the database. Before a BDE deletes a job, the app asks
   "Are you sure you want to delete this job?" and names the résumés tailored on it (built with the job module,
   `zuhair.md` §2; not in PR 5).
-- **Rows from before 0008** (decided 2026-11-02, PR 6): 0012 converts a candidate's old rows (`json_data` split into
+- **Rows from before 0008** (decided 2026-11-02, PR 6): 0013 converts a candidate's old rows (`json_data` split into
   the columns, new item ids): their base row becomes a new base (`UPLOAD` with its `resume_parse_id` if it has one,
   else `PROMOTED`), active if the candidate has none; their tailored rows with a job become that base's `TAILORED`
   v1. Old rows with no candidate (JobNavigator's seeded "Sample PM") and old copies with no job are deleted.
@@ -517,7 +517,7 @@ and contracts.
 | 3 | `feat/base-resumes-schema` (**built**, #99) | **Additive only**: `base_resumes`, the new `resumes` columns, CHECKs, indexes, composite FK; `award` in `ck_claims_entity_type`; SQLAlchemy models; constraint tests; claim **0008** in `docs/team/README.md` §6. No behaviour change. | **0008** |
 | 4 | `feat/base-resume-from-parse` (**built**) | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
 | 5 | `feat/resume-versions` (**built**) | Routes under `/api/firms/{firm}/candidates/{candidate}/resumes`: list bases + versions, open a version, save the next version (§4.3), "use as base" and pick a base (v1 flips, v2+ promotes or reuses), the BDE's upload (§4.6), delete / hide / show again with the usage reads for the warning (§4.7). `can_change_resume` / `can_manage_resume` in both policies (§6), `access.py`, `isolation_cases.py`; races tested. Migration 0011: `promoted_from_resume_id`, `archived_at`, `content_sha256` and their unique rules (§3.1, §3.2), `summary_id` (§3.4). Saving gives changed text new ids instead of resetting claims (§4.5). Docs: 07 Q55, docs/02 §8.1. **Tailoring is not here**: the tailoring module creates tailored résumés; their edits use PR 5's save. | **0011** |
-| 6 | `feat/drop-legacy-resume-columns` (**built**) | **The approved drops** (§3.1, §3.3) and the old JobNavigator résumé code (decided 2026-11-02). Migration 0012: converts candidates' old rows and deletes the rest (§3.3), drops the approved columns and index, makes `base_resume_id` and `candidate_id` required. Removes the old `/api/resumes` router (its shared rendering helpers move to `backend/api/render_shared.py` for cover letters), the 8 backend templates, the old parser (`parse_resume_pdf`), `POST /api/persona/import` and the "Sample PM" seed. The other readers read the columns (§4.8): job scoring, interview prep, the jobs checks, cover letters. | **0012** |
+| 6 | `feat/drop-legacy-resume-columns` (**built**) | **The approved drops** (§3.1, §3.3) and the old JobNavigator résumé code (decided 2026-11-02). Migration 0013: converts candidates' old rows and deletes the rest (§3.3), drops the approved columns and index, makes `base_resume_id` and `candidate_id` required. Removes the old `/api/resumes` router (its shared rendering helpers move to `backend/api/render_shared.py` for cover letters), the 8 backend templates, the old parser (`parse_resume_pdf`), `POST /api/persona/import` and the "Sample PM" seed. The other readers read the columns (§4.8): job scoring, interview prep, the jobs checks, cover letters. | **0013** |
 | 7 | `integrate/resumes` | Frontend live: the résumé adapter's live path, the DTO mapper (§5), the `BaseResume` schema, the base dropdown, the "Use this as the base?" prompt, version history. Both themes, keyboard, skeleton/empty/error states. | — |
 
 If someone else's 0008 merges first, renumber and fix `down_revision` before merging.

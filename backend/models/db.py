@@ -552,7 +552,7 @@ class Resume(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = firm_id_column()
     name = Column(String, nullable=False)
-    # The candidate core (07 Q53e, migration 0007): whose résumé. Required from 0012 (PR 6). Owner: Zuhair.
+    # The candidate core (07 Q53e, migration 0007): whose résumé. Required from 0013 (PR 6). Owner: Zuhair.
     candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=False,
                           index=True)
     # Deleting a job deletes the résumés tailored for it (Abdul, 2026-11-01): a tailored résumé always has its job.
@@ -563,7 +563,7 @@ class Resume(Base):
     page_format = Column(String, default="letter")
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
-    # Versioning (docs/team/resume-versioning.md §3.3, migrations 0008 and 0012). One résumé is one (base_resume_id,
+    # Versioning (docs/team/resume-versioning.md §3.3, migrations 0008 and 0013). One résumé is one (base_resume_id,
     # category, job_id); each saved edit is its next `version`, and a row's content is never updated.
     base_resume_id = Column(UUID(as_uuid=True), nullable=False)           # composite FK below: same candidate
     category = Column(String, nullable=False, default="BASE", server_default=text("'BASE'"))

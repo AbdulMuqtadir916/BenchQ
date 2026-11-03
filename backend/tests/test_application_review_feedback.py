@@ -120,7 +120,7 @@ def test_candidate_responses_share_scoped_resume_and_letter_metadata(api_client,
 
 
 def test_legacy_detail_and_update_match_list_document_metadata(api_client, test_db, submission):
-    """An application from before candidates has no tailored résumé (every résumé has a candidate since 0012); an
+    """An application from before candidates has no tailored résumé (every résumé has a candidate since 0013); an
     unattributed letter still describes it."""
     _, job, app, _, headers, _ = submission
     legacy = Application(firm_id=app.firm_id, job_id=job.id, status='applied')
