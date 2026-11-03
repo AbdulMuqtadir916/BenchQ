@@ -46,7 +46,7 @@ A step that doesn't end as described: [`docs/troubleshooting.md`](docs/troublesh
 | `CONTRIBUTING.md` | How the team works: branches, PRs, reviews, code owners, migrations, secrets | Before your first PR |
 | `docs/troubleshooting.md` | Setup failures: symptom, cause, fix | A Quick start step fails |
 | `product.md` | Why it exists: the user, his night, vocabulary, judgment principles | Once per session; when a spec doesn't cover a case |
-| `design.md` | Visual language: colour, type, spacing, motion, component rules (`/dev/design-system` shows it running) | Anything visual |
+| `design.md` | Visual language: colour, type, spacing, motion, component rules (`/dev/design-system` shows it running: Super Admin, with `NEXT_PUBLIC_SHOW_DEV_ROUTES=true`) | Anything visual |
 | `docs/01-FRONTEND-ARCHITECTURE.md` | Stack, folder structure, the adapter rule, routing, env | Adding a dependency, wiring data |
 | `docs/02-DATA-CONTRACTS.md` | Every Zod schema; JobNavigator alignment | Defining a type or fixture |
 | `docs/03-MOCK-DATA.md` | Fixture volumes, the demo accounts (§3.2), derived counters | Adding fixtures |

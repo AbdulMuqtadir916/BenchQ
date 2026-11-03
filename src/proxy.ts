@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { devRoutesEnabled } from "@/lib/routes/registry";
 import { SESSION_COOKIE, signedOutRedirect } from "@/lib/routes/proxy-access";
 import { PATH_HEADER } from "@/lib/server/path-header";
 
@@ -9,9 +8,7 @@ import { PATH_HEADER } from "@/lib/server/path-header";
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const target = signedOutRedirect(pathname, search, request.cookies.has(SESSION_COOKIE), {
-    devRoutes: devRoutesEnabled(),
-  });
+  const target = signedOutRedirect(pathname, search, request.cookies.has(SESSION_COOKIE));
   if (target) return NextResponse.redirect(new URL(target, request.url));
   // A layout can't see its own URL; the server gates (src/lib/server/principal.ts) read it from here.
   const headers = new Headers(request.headers);
