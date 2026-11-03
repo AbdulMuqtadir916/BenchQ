@@ -170,8 +170,8 @@ def _mailbox_lock(db, firm_id, candidate_id):
             yield
 
 
-def _retire_attempt(db, attempt):
-    """Called under the grant guard. Retain failed cleanup encrypted for retry."""
+def _retire_attempt(db, attempt, *, invalidate_pending=False):
+    """Retire under account/phase locks; preserve failed cleanup encrypted for retry."""
     token = attempt.pending_token_ciphertext
     address = (attempt.pending_address or '').strip().lower()
     attempt.expires_at = utcnow()
@@ -194,11 +194,15 @@ def _retire_attempt(db, attempt):
         # Cross-firm existence probe is internal only: never revoke another live grant.
         live = db.query(CandidateMailbox.id).filter(func.lower(func.trim(CandidateMailbox.address)) == address,
             CandidateMailbox.status.in_(['CONNECTED', 'ERROR'])).first()
-        newer_pending = db.query(CandidateGoogleOAuthAttempt.id).filter(
+        pending_query = db.query(CandidateGoogleOAuthAttempt).filter(
             func.lower(CandidateGoogleOAuthAttempt.pending_address) == address,
             CandidateGoogleOAuthAttempt.id != attempt.id,
             CandidateGoogleOAuthAttempt.expires_at > utcnow(),
-            CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None)).first()
+            CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None))
+        newer_pending = pending_query.first()
+        if invalidate_pending and not live:
+            pending_query.update({CandidateGoogleOAuthAttempt.expires_at: utcnow()}, synchronize_session=False)
+            newer_pending = None
         db.commit()  # Never hold row locks while calling Google.
         try:
             done = bool(live or newer_pending) or revoke_token(decrypt_secret(token))
@@ -207,6 +211,16 @@ def _retire_attempt(db, attempt):
         attempt = db.get(CandidateGoogleOAuthAttempt, attempt.id)
         if done:
             attempt.pending_token_ciphertext = None
+            db.flush()  # SessionLocal disables autoflush; exclude this completed token from the probe.
+            outstanding = scoped(db, CandidateGoogleOAuthAttempt, attempt.firm_id).filter(
+                CandidateGoogleOAuthAttempt.candidate_id == attempt.candidate_id,
+                CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None),
+                CandidateGoogleOAuthAttempt.expires_at <= utcnow()).first()
+            if not outstanding:
+                mailbox = scoped(db, CandidateMailbox, attempt.firm_id).filter_by(candidate_id=attempt.candidate_id).first()
+                if (mailbox and mailbox.status == 'DISCONNECTED'
+                        and (mailbox.last_sync_error or '').startswith('Google revocation pending;')):
+                    mailbox.last_sync_error = None
         db.commit()
         return done
 
@@ -340,8 +354,6 @@ def sync_candidate_inbox(candidate_id: uuid.UUID, background_tasks: BackgroundTa
         raise HTTPException(status_code=409, detail="Connect the candidate's Google account first.")
     generation = mailbox.connected_at
     mailbox.sync_state = 'QUEUED'
-    _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=mailbox.id,
-           summary='Requested candidate Google inbox sync.')
     db.commit()
     background_tasks.add_task(run_import, firm_id, candidate_id, generation)
     return {'imported': 0, 'inbox': _load_inbox(db, firm_id, candidate_id)}
@@ -366,6 +378,13 @@ def _disconnect_locked(db, principal, firm_id, candidate_id):
         return
     _attribute_retained_messages(db, mailbox)
     ciphertext = mailbox.refresh_token_ciphertext
+    cleanup = None
+    if ciphertext:
+        cleanup = CandidateGoogleOAuthAttempt(firm_id=firm_id, candidate_id=candidate_id,
+            initiated_by_user_id=principal.user_id, state_hash=state_digest(uuid.uuid4().hex),
+            code_verifier_ciphertext=b'', pending_address=mailbox.address.strip().lower(),
+            pending_token_ciphertext=ciphertext, return_to='/', consumed_at=utcnow(), expires_at=utcnow())
+        db.add(cleanup)
     mailbox.status = 'DISCONNECTED'
     mailbox.refresh_token_ciphertext = None
     mailbox.history_id = None
@@ -377,29 +396,15 @@ def _disconnect_locked(db, principal, firm_id, candidate_id):
     _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=mailbox.id,
            summary='Disconnected candidate Google inbox; retained imported email.')
     db.commit()
-    revoked = True
-    if ciphertext:
+    if cleanup is not None:
         try:
-            with revoke_barrier():
-                # Revoking Google's project-wide grant also invalidates pending
-                # confirmations for this address. Do not activate them afterward.
-                pending = db.query(CandidateGoogleOAuthAttempt).filter(
-                    func.lower(CandidateGoogleOAuthAttempt.pending_address) == mailbox.address.strip().lower(),
-                    CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None)).all()
-                for attempt in pending:
-                    attempt.expires_at = utcnow()
-                db.commit()
-                revoked = revoke_token(decrypt_secret(ciphertext))
-                if revoked:
-                    for attempt in pending:
-                        attempt.pending_token_ciphertext = None
-                    db.commit()
+            done = _retire_attempt(db, cleanup, invalidate_pending=True)
         except (RuntimeError, HTTPException):
-            revoked = False
-    if not revoked:
-        mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(candidate_id=candidate_id).with_for_update().first()
-        mailbox.last_sync_error = 'Sync stopped. Remove BenchQ access at https://myaccount.google.com/permissions because Google revocation could not be confirmed.'
-        db.commit()
+            done = False
+        if not done:
+            mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(candidate_id=candidate_id).with_for_update().first()
+            mailbox.last_sync_error = 'Google revocation pending; BenchQ will retry automatically. Sync is stopped. You can also remove access at https://myaccount.google.com/permissions.'
+            db.commit()
 
 
 @router.patch("/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/read")
@@ -415,8 +420,6 @@ def mark_candidate_message_read(candidate_id: uuid.UUID, message_id: uuid.UUID,
         raise HTTPException(status_code=404, detail="Inbox message not found.")
     if not message.is_read:
         message.is_read = True  # Local state only; Gmail read status is never changed.
-        _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=message.id,
-               summary="Marked candidate email read in BenchQ.")
     db.commit()
     return _message_json(message)
 
@@ -450,12 +453,14 @@ def confirm_mailbox(candidate_id: uuid.UUID, attempt_id: uuid.UUID, background_t
             raise HTTPException(409, 'Mailbox confirmation expired. Connect again.')
         address = attempt.pending_address.strip().lower()
         # Serialize this identity across firms without revealing another firm's data.
-        existing = db.query(CandidateMailbox.id).filter(
+        existing = db.query(CandidateMailbox.id, CandidateMailbox.firm_id).filter(
             func.lower(func.trim(CandidateMailbox.address)) == address,
             CandidateMailbox.status.in_(['CONNECTED', 'ERROR']), CandidateMailbox.candidate_id != candidate_id).first()
         if existing:
             _retire_attempt(db, attempt)
-            raise HTTPException(409, 'This mailbox cannot be connected. Contact your manager.')
+            detail = ('This email is already connected to another firm.' if existing.firm_id != firm_id
+                      else 'This email is already connected to another candidate.')
+            raise HTTPException(409, detail)
         mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(candidate_id=candidate_id).with_for_update().first()
         if mailbox and mailbox.status != 'DISCONNECTED' and mailbox.address.strip().lower() != address:
             _retire_attempt(db, attempt)

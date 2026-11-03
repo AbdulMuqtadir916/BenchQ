@@ -112,7 +112,7 @@ def test_different_firm_callbacks_and_confirmations_run_concurrently(api_client,
     assert test_db.query(CandidateMailbox).filter_by(status='CONNECTED').count() == (1 if same_address else 2)
     if same_address:
         rejected = next(r for r in results if r.status_code == 409)
-        assert rejected.json()['detail'] == 'This mailbox cannot be connected. Contact your manager.'
+        assert rejected.json()['detail'] == 'This email is already connected to another firm.'
 
 
 def test_revoke_waits_for_unknown_identity_exchange_then_releases():
@@ -218,3 +218,68 @@ def test_callback_rechecks_cancellation_after_coordination_wait(api_client, test
     response = api_client.get('/api/oauth/google/callback', params={'state':state,'code':'synthetic'}, follow_redirects=False)
     assert response.status_code == 303
     assert calls == []
+
+
+def test_read_and_manual_empty_sync_do_not_write_business_ledger(api_client, test_db, mailbox_case):
+    from backend.tests.test_candidate_mailbox import email
+    candidate, _, _, mailbox = mailbox_case
+    row = email(test_db, mailbox)
+    for _ in range(2):
+        assert api_client.patch(base(candidate)+f'/inbox-messages/{row.id}/read').status_code == 200
+        assert api_client.post(base(candidate)+'/mailbox/sync').status_code == 200
+    test_db.refresh(row)
+    assert row.is_read is True
+    assert test_db.query(LedgerEntry).count() == 0
+
+
+@pytest.mark.parametrize('failure', ['provider', 'busy'])
+def test_disconnect_retains_encrypted_revocation_for_scheduled_retry(api_client, test_db, monkeypatch, mailbox_case, failure):
+    from contextlib import contextmanager
+    from fastapi import HTTPException
+    from backend.api import routes_inbox
+    candidate, _, _, mailbox = mailbox_case
+    ciphertext = b'synthetic-encrypted-refresh'
+    mailbox.refresh_token_ciphertext = ciphertext
+    test_db.commit()
+    monkeypatch.setattr(routes_inbox, 'decrypt_secret', lambda value:'synthetic-refresh')
+    original_barrier = routes_inbox.revoke_barrier
+    @contextmanager
+    def busy():
+        raise HTTPException(503, 'busy')
+        yield
+    monkeypatch.setattr(routes_inbox, 'revoke_token', lambda value:False)
+    if failure == 'busy': monkeypatch.setattr(routes_inbox, 'revoke_barrier', busy)
+    response = api_client.delete(base(candidate)+'/mailbox')
+    assert response.status_code == 200
+    test_db.refresh(mailbox)
+    assert mailbox.status == 'DISCONNECTED' and mailbox.refresh_token_ciphertext is None
+    cleanup = test_db.query(CandidateGoogleOAuthAttempt).filter(CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None)).one()
+    assert cleanup.pending_token_ciphertext == ciphertext and cleanup.expires_at <= utcnow()
+    assert 'retry automatically' in mailbox.last_sync_error
+    monkeypatch.setattr(routes_inbox, 'revoke_barrier', original_barrier)
+    monkeypatch.setattr(routes_inbox, 'revoke_token', lambda value:True)
+    assert routes_inbox.cleanup_expired_grants() == 1
+    test_db.refresh(cleanup); test_db.refresh(mailbox)
+    assert cleanup.pending_token_ciphertext is None and mailbox.last_sync_error is None
+
+
+@pytest.mark.parametrize('status', ['CONNECTED', 'ERROR'])
+def test_disconnect_does_not_revoke_another_firms_existing_grant(api_client, test_db, accounts, monkeypatch, mailbox_case, status):
+    from backend.api import routes_inbox
+    from backend.tests.auth_support import make_firm, make_user
+    candidate, _, _, mailbox = mailbox_case
+    foreign_firm = make_firm(test_db, test_db.get(Plan, accounts.plan_id), slug='shared-existing-firm')
+    owner = make_user(test_db, foreign_firm, email='shared-owner@example.test')
+    foreign = Candidate(firm_id=foreign_firm.id, manager_id=owner.id, created_by_user_id=owner.id,
+        full_name='Legacy shared candidate', work_auth='H1B')
+    test_db.add(foreign); test_db.flush()
+    other = CandidateMailbox(firm_id=foreign_firm.id, candidate_id=foreign.id, address=mailbox.address,
+        status=status, connected_by_user_id=owner.id, refresh_token_ciphertext=b'other-encrypted-token')
+    mailbox.refresh_token_ciphertext = b'own-encrypted-token'
+    test_db.add(other); test_db.commit()
+    calls=[]
+    monkeypatch.setattr(routes_inbox, 'revoke_token', lambda value:calls.append(value) or True)
+    assert api_client.delete(base(candidate)+'/mailbox').status_code == 200
+    test_db.refresh(other)
+    assert calls == [] and other.status == status and other.refresh_token_ciphertext == b'other-encrypted-token'
+    assert test_db.query(CandidateGoogleOAuthAttempt).filter(CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None)).count() == 0

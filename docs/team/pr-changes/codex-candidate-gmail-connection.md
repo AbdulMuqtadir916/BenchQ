@@ -2,6 +2,29 @@
 
 Branch: `codex/candidate-gmail-connection` → `main`. Current integration base: `fc1bf67` (includes password-reset notifications #105). This report supersedes earlier mutable-ledger/broad-BDE-scope descriptions. Local working plans/checklists remain outside the PR.
 
+## Latest policy correction — 2026-11-03
+
+Samad clarified that global one-active-candidate Gmail ownership stays: a cross-firm collision returns only
+“This email is already connected to another firm”; no firm name or other identity. Explicit disconnect permits
+reuse. This differs from Abdul’s linked written per-firm rule; it is recorded as Samad’s request for code-owner
+review, not silently presented as Abdul’s approval.
+
+Accept Abdul’s written audit decisions: remove email-read and manual Sync request ledger events, including
+empty requests. Keep local is_read state; a separate privacy access log is a follow-up proposal. Existing import,
+connection, confirmation and deletion business events stay. The hooks no longer refetch ledger after reads/Sync.
+
+Disconnect now atomically queues the encrypted token in an expired/consumed existing OAuth cleanup attempt
+before removing usable mailbox credentials. Failures or busy coordination retain it for scheduled retry; a live
+shared mailbox/newer pending grant prevents destructive revocation. Successful cleanup clears the disconnected
+warning. No new table, field or migration. Current validation: **268 backend/isolation tests passed**, one existing warning; **582 frontend tests**,
+typecheck/lint and production Webpack build passed. The first run exposed a stale cleanup warning; fixed with
+an explicit flush before querying remaining work. Disposable resources removed; development data untouched.
+Earlier evidence below remains baseline evidence; it was not rerun as a full backend suite for this correction.
+
+Changed files in this correction: routes_inbox.py (audits, generic conflict and durable retry), use-inbox.ts
+(remove unnecessary ledger invalidations), candidate mailbox/follow-up/revision regression tests (policy and
+retry coverage), and the data-contract, ledger, team and per-file documentation.
+
 ## Scope and review corrections
 
 Read-only Google OAuth with explicit candidate/address confirmation, encrypted credentials/body/preview storage, initial three-day Inbox import and incremental sync, background progress, retained mail, current candidate access and Owner/Manager deletion. No matching, external classification, quarantine, sender tables or application-status automation is added.
@@ -17,7 +40,7 @@ Read-only Google OAuth with explicit candidate/address confirmation, encrypted c
 
 - Abdul’s 2026-11-03 GitHub review approves health/counts-only support visibility. Support receives no email rows, subject/sender/body/preview or identifying audit text.
 - Samad reports Abdul approved **one active candidate connection per Gmail globally** in person; recorded on 2026-11-03. Explicit disconnect releases ownership; ERROR retains it; collision messages disclose no other firm/candidate/BDE. This is attributed reporting, not a GitHub approval.
-- Samad reaffirmed first unread-to-read auditing, every manual Sync request even with zero imports, and cursor pagination. Reopening read mail adds no event. Exact audit/pagination/attestation contracts still require Abdul’s code-owner sign-off; the in-person uniqueness discussion is not treated as approval of those contracts.
+- The latest section supersedes earlier read/manual-sync audit choices. Cursor pagination/attestation and other exact contracts still require code-owner sign-off.
 - Classification off means imported mail stays readable and Unclassified in Inbox. External real-mail classification stays off until written provider retention/logging verification and consent update. Automatic updates stay off until PR 4 is merged and Undo is usable.
 
 ## Migration and data safety

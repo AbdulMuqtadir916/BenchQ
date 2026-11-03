@@ -178,4 +178,4 @@ and consent notice v1. Erasure retains that disclosed connection evidence. Platf
 email summaries/notes; operational support sees mailbox health/counts only (approved in Abdul’s latest review).
 Background import progress lives in existing JobRun metadata and commits atomically with each saved batch. One
 immutable SYSTEM result is appended on completion/failure/recovery for a nonempty run; prior events never change.
-Samad confirmed first-read and manual zero-import Sync audits; Abdul’s exact audit-policy sign-off remains pending.
+Abdul decided on 2026-11-03, and Samad accepted: no read/manual-sync request ledger entries, even for empty requests. Keep is_read; propose separate access logging later. Import results/connections/confirmation/deletion remain audited.

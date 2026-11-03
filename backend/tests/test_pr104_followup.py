@@ -194,7 +194,7 @@ def test_reassignment_preserves_inbox_access_without_broadening_q52_ledger(api_c
     candidate.bde_id = new_bde.id
     test_db.commit()
     path = f'/api/firms/{candidate.firm_id}/ledger?candidate_id={candidate.id}'
-    assert len(api_client.get(path).json()) == 1
+    assert api_client.get(path).json() == []
     response = anonymous_client.get(path, headers={'cookie':f'bq_session={token}'})
     assert response.status_code == 200 and response.json() == []
 
@@ -331,7 +331,7 @@ def test_global_mailbox_reservation_is_private_and_protects_live_grant(api_clien
     monkeypatch.setattr(routes_inbox, 'revoke_token', lambda token:calls.append(token) or True)
     response = api_client.post(base(candidate) + '/mailbox/confirm/' + attempt)
     assert response.status_code == 409
-    assert response.json()['detail'] == 'This mailbox cannot be connected. Contact your manager.'
+    assert response.json()['detail'] == 'This email is already connected to another firm.'
     assert str(foreign.id) not in response.text and foreign.full_name not in response.text
     assert calls == []
 
@@ -411,7 +411,7 @@ def test_interrupted_worker_keeps_one_durable_partial_audit_and_recovers(test_db
     assert '10' in entry.summary and 'partial' in entry.summary.lower()
 
 
-def test_concurrent_read_marks_record_only_first_transition(api_client, test_db, mailbox_case):
+def test_concurrent_read_marks_do_not_write_business_ledger(api_client, test_db, mailbox_case):
     from concurrent.futures import ThreadPoolExecutor
     candidate, _, _, mailbox = mailbox_case
     row = email(test_db, mailbox)
@@ -419,7 +419,7 @@ def test_concurrent_read_marks_record_only_first_transition(api_client, test_db,
     with ThreadPoolExecutor(max_workers=2) as workers:
         results = list(workers.map(lambda _:api_client.patch(path), range(2)))
     assert [response.status_code for response in results] == [200, 200]
-    assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 1
+    assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 0
 
 
 def test_provider_denial_returns_to_inbox_without_exchanging_grant(api_client, test_db, monkeypatch, mailbox_case):

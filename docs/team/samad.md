@@ -64,7 +64,7 @@ The candidate page already has an Inbox tab and an "Inbox" preview on its Overvi
 - Imports are unclassified and do not match new application links or change application statuses in this PR.
   Matching/classification/BDE routing and the agreed confidence policy belong to PR 3. A null signal renders as
   Unclassified in all existing consumers; retained mail remains readable after disconnect.
-- Every human mutation is attributed to its actor/candidate in the ledger. Initial/background imports use SYSTEM
+- Connection, confirmation and deletion mutations are attributed to their actor/candidate in the ledger; reads and manual sync requests are excluded. Initial/background imports use SYSTEM
   attribution when records are added; no email body, subject, credential or provider diagnostic is logged.
 - Ship behind the existing `inbox` live-module adapter flag. The connect flow navigates to Google; mock mode keeps
   synthetic fixtures without a fake consent screen. Sync/read/disconnect errors are visible and read failures roll
@@ -111,7 +111,7 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
 See docs/02-DATA-CONTRACTS.md, PR 104 review corrections, and the per-file PR change report. Working plans/checklists are kept locally, outside the PR.
 Samad confirmed global one-active-candidate mailbox ownership, ERROR reservation until disconnect, current-BDE
 candidate access with retained data on reassignment, both deletion choices, restricted support metadata and the
-first-read/manual-sync/background audit policy. Items reserved by Abdul remain proposals pending his sign-off.
+background import audit policy. The latest correction below supersedes earlier read/manual-sync choices.
 No new database columns/tables are added by this follow-up. Durable consent lives in the existing ledger.
 
 Abdul's later replies, supplied in chat, approve automatic updates in principle with the agreed transition
@@ -130,5 +130,14 @@ Use per-account lifecycle locks and concurrent unknown-account exchange coordina
 Refresh newest mail while retaining cached older pages; cap automatic reload restoration at three pages and
 keep selected body loading independent. Expired confirmation action is Return to Inbox, then a separate Connect.
 Support health/counts-only visibility was approved in Abdul’s GitHub review. Samad reports Abdul approved one
-active candidate per Gmail globally in an in-person discussion. Samad reaffirmed first-read/manual empty-sync
-auditing and cursor pagination; exact remaining contracts still require code-owner sign-off before merge.
+active candidate per Gmail globally in an in-person discussion. The latest correction below removes read/manual-sync request auditing; cursor pagination and exact remaining contracts still require code-owner sign-off before merge.
+
+### Latest Samad clarification and accepted audit/retry decisions (2026-11-03)
+
+Keep one active candidate per Gmail globally. A blocked cross-firm attempt says “This email is already connected
+to another firm,” without naming it; after disconnect another firm can connect. This is Samad’s latest clarified
+request, differing from Abdul’s written per-firm decision; record that difference openly for review.
+Accept Abdul’s 2026-11-03 removal of read/manual-sync request business-ledger entries; keep is_read and propose
+separate access logging later. Retain encrypted failed/busy revocations in expired existing OAuth cleanup attempts
+for scheduled retry, protecting any still-live shared grant. No new table or migration. Existing business events
+(import result, connection, confirmation, deletion) remain audited.

@@ -86,7 +86,7 @@ export function useMarkRead(candidateId: string) {
       return {wasRead};
     },
     onError: (_error, id, context) => {if (context?.wasRead !== undefined) setRead(id, context.wasRead);},
-    onSuccess: () => {void cache.invalidateQueries({queryKey: queryKeys.ledger.all(firm)});}});
+  });
 }
 
 export function useSyncMailbox(candidateId: string) {
@@ -94,7 +94,6 @@ export function useSyncMailbox(candidateId: string) {
   const cache = useQueryClient();
   return useMutation({mutationFn: () => inboxApi.sync(firm, candidateId), onSuccess: () => {
     void cache.invalidateQueries({queryKey: queryKeys.inbox.byCandidate(firm, candidateId)});
-    void cache.invalidateQueries({queryKey: queryKeys.ledger.all(firm)});
   }});
 }
 

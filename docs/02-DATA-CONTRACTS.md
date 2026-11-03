@@ -1630,7 +1630,7 @@ pending before merge. No new role rules or live Google secrets are embedded in t
 Samad confirmed the implementation decisions during the planning interview. Abdul's newer product replies,
 supplied in the chat, approve the classification/UI sequence and gates below. Samad reports Abdul approved global
 one-active-candidate Gmail uniqueness in person (recorded 2026-11-03); this is not a GitHub review approval.
-Read/empty-sync audit policy and the precise revised contracts still need Abdul's code-owner sign-off. Support
+Abdul’s written 2026-11-03 decision removes read/manual-sync request business-ledger events; is_read remains message state. A separate access-log proposal is deferred. Exact remaining contracts still require code-owner approval. Support
 health/counts-only visibility was explicitly approved in Abdul's 2026-11-03 GitHub review.
 Nothing here records a GitHub approval. Candidate Gmail defaults off until matching/BDE review, privacy
 acceptance and Google verification are ready. Classification disabled means imported mail stays readable,
@@ -1650,8 +1650,9 @@ lock-wait budget, then returns a retryable error;
 provider calls hold no mailbox row locks. Disconnect invalidates pending confirmations for the revoked grant.
 
 The global uniqueness rule (Abdul’s in-person approval reported by Samad) is one active candidate per Gmail across all firms, with CONNECTED and ERROR
-reserving the address until explicit disconnect. The generic collision response names no other candidate,
-BDE or firm. Profile/Google addresses may differ. Reassignment preserves the mailbox, jobs, application
+reserving the address until explicit disconnect. A cross-firm conflict says “This email is already connected to another firm,” without its name, candidate or BDE.
+An in-firm conflict says it is already connected to another candidate. This global rule follows Samad’s latest
+clarification/request; it differs from Abdul’s linked written per-firm rule and remains explicit for code-owner review. Profile/Google addresses may differ. Reassignment preserves the mailbox, jobs, application
 statuses and mapped email history, transfers current-candidate access to the new BDE, and blocks subsequent
 requests and pending confirmation by the former BDE. Ledger visibility retains Q52: BDEs see entries they
 authored and ASSIGN entries for currently handled candidates, not all other actors’ candidate activity. No broad
@@ -1679,17 +1680,20 @@ DELETE inbox-content accepts optional message_id and disconnect (default false).
 Disconnect and delete to true. Owner/Manager deletion erases message content on all served surfaces and fences
 in-flight jobs. Stored-only deletion targets content present at server confirmation, permits genuinely new
 arrivals afterward, and preserves tombstones/dedup IDs. Disconnect-and-delete stops import first, completes
-local erasure even if Google revoke fails, and shows manual revocation instructions. Gmail originals and
+local erasure even if Google revoke fails, retains encrypted cleanup for scheduled retry, and shows truthful pending/manual fallback instructions. Gmail originals and
 application statuses stay unchanged. Minimal source/history IDs and restricted connection attestations remain.
 BDEs, Viewers and platform staff cannot erase email. Quarantine and recoverable auto-purge are later PR scope.
 
-Samad's audit proposal: first unread-to-read transition, each manual sync request including zero imports,
-and one immutable SYSTEM result per nonempty background job. No-change background polls do not add noise.
-The existing JobRun meta stores candidate/mailbox/generation, committed count and finalized marker; each batch
-saves messages/count atomically. Terminal or interrupted-run recovery appends the result once under row lock,
-never edits an existing ledger event. Recovery runs independently of import polling; disconnect/reconnect and
-content erasure finalize/fence the prior run. No new table, column or revision is needed for progress. Never
-describe a sync request as completed work. No subject/body/provider secret is logged.
+Audit policy (Abdul’s written decision, 2026-11-03, accepted by Samad): no read or manual Sync request ledger
+entries, including empty requests. is_read remains local message state. Import results, connections,
+confirmations and deletion remain business-ledger events. Propose a separate privacy access log in a follow-up;
+no access-log table is added here. Existing JobRun metadata stores committed batch counts and appends one
+immutable SYSTEM terminal/recovery result per nonempty run; no-change polls produce no result.
+
+Disconnect atomically removes usable mailbox credentials and stores any token in an expired, consumed OAuth
+cleanup attempt in the existing encrypted table. Failed/busy revocations remain encrypted for scheduled retry;
+they cannot be used to activate a connection or sync mail. Cleanup skips revocation for another CONNECTED/ERROR
+mailbox or a newer pending grant, and clears the pending warning after successful cleanup. No new table/column.
 
 Later product direction: PR 3 classification first, PR 4 UI second. External processing stays off for real mail
 until retention/logging are verified in writing and consent updated. Automatic updates stay off until PR 4 merges

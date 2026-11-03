@@ -197,7 +197,7 @@ def test_read_disconnect_idempotency_and_safe_audit(api_client, test_db, account
     assert message.source_address == 'old-account@example.test'
     assert mailbox.refresh_token_ciphertext is None and mailbox.history_id is None
     rows = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).all()
-    assert len(rows) == 2 and all(row.actor_user_id == accounts.user_id for row in rows)
+    assert len(rows) == 1 and all(row.actor_user_id == accounts.user_id for row in rows)
     assert all(message.subject not in row.summary and message.body not in row.summary for row in rows)
     result = api_client.get(base(candidate) + '/inbox').json()
     assert result['connection']['status'] == 'DISCONNECTED'
