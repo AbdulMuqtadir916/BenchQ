@@ -1625,31 +1625,37 @@ imports use SYSTEM ledger attribution with candidate_id. Required code-owner con
 pending before merge. No new role rules or live Google secrets are embedded in the UI.
 
 
-### PR 104 review corrections — implementation proposal (2026-11-02)
+### PR 104 review corrections — revised 2026-11-03
 
 Samad confirmed the implementation decisions during the planning interview. Abdul's newer product replies,
-supplied in the chat, approve the classification/UI sequence and gates below. Global mailbox uniqueness,
-read/empty-sync audit policy and the precise revised contracts still need Abdul's code-owner sign-off.
+supplied in the chat, approve the classification/UI sequence and gates below. Samad reports Abdul approved global
+one-active-candidate Gmail uniqueness in person (recorded 2026-11-03); this is not a GitHub review approval.
+Read/empty-sync audit policy and the precise revised contracts still need Abdul's code-owner sign-off. Support
+health/counts-only visibility was explicitly approved in Abdul's 2026-11-03 GitHub review.
 Nothing here records a GitHub approval. Candidate Gmail defaults off until matching/BDE review, privacy
 acceptance and Google verification are ready. Classification disabled means imported mail stays readable,
 Unclassified, in the Inbox. PR 104 makes no model requests and changes no application statuses.
 
 OAuth stores a pending encrypted grant, requires the initiating user's current candidate.edit permission
 and current candidate scope to confirm, and supports DELETE on the same confirmation URL to cancel.
-Expired attempts offer Connect again. Cancel/conflict/expired cleanup revokes only if no active grant is
+Expired attempts offer Return to Inbox, which cancels/cleans the attempt; Connect starts a fresh OAuth flow. Cancel/conflict/expired cleanup revokes only if no active grant is
 at risk; failures retain the encrypted pending token for scheduled retry. A separate five-minute cleanup job continues even when Inbox polling is disabled; expired unused PKCE verifiers are cleared. Provider identity failures also
 retain issued grants for safe cleanup. Google revocation affects an account's whole project grant, so
-exchange/activation/revocation use a bounded, nonblocking advisory guard with no row locks over Google I/O.
-Busy requests receive a retryable error; this intentionally serializes short connection operations.
+known-account activation/cleanup uses normalized-account advisory locks across firms. Unknown-identity code
+exchanges run concurrently, as do revocations for different known accounts. A two-group advisory barrier
+prevents exchange and revocation groups overlapping, so revocation cannot invalidate an unidentified new grant.
+Its global entry lock is held only for group admission, never during provider I/O. Account locks precede group
+admission, and exchanges leave their group before account cleanup. Group admission has a five-second total
+lock-wait budget, then returns a retryable error;
+provider calls hold no mailbox row locks. Disconnect invalidates pending confirmations for the revoked grant.
 
-Samad's uniqueness proposal is one active Gmail per candidate across all firms, with CONNECTED and ERROR
+The global uniqueness rule (Abdul’s in-person approval reported by Samad) is one active candidate per Gmail across all firms, with CONNECTED and ERROR
 reserving the address until explicit disconnect. The generic collision response names no other candidate,
 BDE or firm. Profile/Google addresses may differ. Reassignment preserves the mailbox, jobs, application
 statuses and mapped email history, transfers current-candidate access to the new BDE, and blocks subsequent
-requests and pending confirmation by the former BDE. Candidate-linked ledger history follows current
-assignment too; own non-candidate ledger entries keep their existing scope. Existing ledger candidate_id
-is exposed as nullable/optional candidateId through its serializer/DTO/schema; this adds no database column.
-Historical entries without candidate metadata cannot be safely reassigned by guessing their attribution.
+requests and pending confirmation by the former BDE. Ledger visibility retains Q52: BDEs see entries they
+authored and ASSIGN entries for currently handled candidates, not all other actors’ candidate activity. No broad
+candidate-ledger permission amendment ships here. Existing backend candidate_id supports scoped filtering; this PR adds no frontend ledger field or access rights.
 
 Durable confirmation evidence is the existing ledger entry: actor_user_id, candidate_id, created_at,
 verified Google address and consent notice v1 in its summary. It survives attempt cleanup/reconnection and
@@ -1657,11 +1663,17 @@ email erasure. It is not the temporary OAuth attempt. This retention exception i
 Platform audit/support responses redact email audit summary/note; Inbox support reads return health/counts
 without message rows or mailbox address. Safe diagnostics must not disclose email content.
 
-GET Inbox uses limit (default 200, max 500), optional opaque cursor, next_cursor (nullable) and total_count.
+GET Inbox uses limit (default 200, max 500), optional opaque cursor, next_cursor (nullable) and optional total_count on first-page list reads.
+Older-page and selected-body reads skip the count query.
 The cursor encodes a timezone-aware received_at and UUID with matching descending-time/ascending-ID ordering.
 Malformed cursors fail 400. message_id independently selects exactly one scoped undeleted message with body.
 Frontend CandidateInbox adds nextCursor (default null for older fixtures) and optional totalCount.
-Infinite-query pages survive refresh; URL/Zod inbox_pages restores up to 50 loaded pages after navigation/reload; selected older bodies remain independently addressable. Lists omit bodies.
+Infinite-query pages survive ordinary refresh without HTTP requests for previously cached history. When first-page
+counts indicate historical backfill or erasure rather than just new head mail, loaded history is refreshed once
+and subsequent ordinary polls reuse it. Refresh fetches the
+newest page and bridges newly arrived pages to the previous head if necessary, preserving the historical cursor
+without skipping a burst of new mail. URL/Zod inbox_pages automatically restores at most three loaded pages;
+further history loads explicitly. Selected older bodies remain independently addressable. Lists omit bodies.
 
 DELETE inbox-content accepts optional message_id and disconnect (default false). The app's bulk dialog defaults
 Disconnect and delete to true. Owner/Manager deletion erases message content on all served surfaces and fences
@@ -1672,8 +1684,12 @@ application statuses stay unchanged. Minimal source/history IDs and restricted c
 BDEs, Viewers and platform staff cannot erase email. Quarantine and recoverable auto-purge are later PR scope.
 
 Samad's audit proposal: first unread-to-read transition, each manual sync request including zero imports,
-and one SYSTEM result per background job. Batch commits update that single job result; interruption leaves a
-truthful partial count. Never describe a sync request as completed work. No subject/body/provider secret is logged.
+and one immutable SYSTEM result per nonempty background job. No-change background polls do not add noise.
+The existing JobRun meta stores candidate/mailbox/generation, committed count and finalized marker; each batch
+saves messages/count atomically. Terminal or interrupted-run recovery appends the result once under row lock,
+never edits an existing ledger event. Recovery runs independently of import polling; disconnect/reconnect and
+content erasure finalize/fence the prior run. No new table, column or revision is needed for progress. Never
+describe a sync request as completed work. No subject/body/provider secret is logged.
 
 Later product direction: PR 3 classification first, PR 4 UI second. External processing stays off for real mail
 until retention/logging are verified in writing and consent updated. Automatic updates stay off until PR 4 merges

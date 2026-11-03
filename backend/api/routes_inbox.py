@@ -12,7 +12,7 @@ from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, or_, func, text
+from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session
 
 from backend.auth.policy import can
@@ -23,9 +23,11 @@ from backend.api.routes_candidates import _candidate as visible_candidate
 from backend.inbox.google_oauth import (build_authorization, encrypt_secret, exchange_code, state_digest,
                                         validate_return_to, decrypt_content, decrypt_secret, revoke_token, OAuthGrantError, identify_refresh_token)
 from backend.inbox.sync_jobs import run_import
+from backend.inbox.import_progress import finish_import
+from backend.inbox.grant_locks import account_lock, exchange_barrier, revoke_barrier
 from backend.inbox.gmail_sync import ReconnectRequired, sync_mailbox, record_sync_error
 from backend.models.candidates import Candidate, CandidateGoogleOAuthAttempt, CandidateMailbox, InboxMessage
-from backend.models.db import get_db, utcnow, SessionLocal, engine
+from backend.models.db import get_db, utcnow, SessionLocal
 
 router = APIRouter(tags=["candidate-inbox"])
 
@@ -106,7 +108,7 @@ def _load_inbox(db: Session, firm_id: uuid.UUID, candidate_id: uuid.UUID, limit:
                 message_id: uuid.UUID | None = None, *, cursor: str | None = None, hide_body: bool = False) -> dict:
     mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(candidate_id=candidate_id).first()
     query = scoped(db, InboxMessage, firm_id).filter_by(candidate_id=candidate_id, deleted_at=None)
-    total = query.count()
+    total = query.count() if cursor is None and message_id is None else None
     if cursor:
         try:
             values = json.loads(base64.b64decode(cursor.encode(), altchars=b'-_', validate=True))
@@ -131,7 +133,9 @@ def _load_inbox(db: Session, firm_id: uuid.UUID, candidate_id: uuid.UUID, limit:
             raise HTTPException(404, 'Email not found.')
         messages = [selected]
     result = _inbox_json(db, firm_id, candidate_id, mailbox, [] if hide_body else messages, hide_body=hide_body, body_message_id=message_id)
-    result.update(next_cursor=next_cursor, total_count=total)
+    result.update(next_cursor=next_cursor)
+    if total is not None:
+        result['total_count'] = total
     return result
 
 
@@ -146,21 +150,24 @@ def candidate_inbox(candidate_id: uuid.UUID, principal: Principal = Depends(curr
 
 
 @contextmanager
-def _grant_guard():
-    """Serialize grant activation/exchange/revoke without row locks over Google I/O.
-
-    Google revokes every client token for an account/project. The account is not
-    known before exchange, so the short provider lifecycle uses a global try-lock.
-    Busy callers can retry; cleanup waits for the next scheduled pass.
-    """
-    with engine.connect() as conn:
-        acquired = conn.execute(text('SELECT pg_try_advisory_lock(104, 104)')).scalar()
-        if not acquired:
-            raise HTTPException(503, 'Another Google connection is being processed. Try again shortly.')
-        try:
+def _attempt_lock(db, firm_id, candidate_id, attempt_id, user_id):
+    with account_lock('candidate:' + str(candidate_id)):
+        attempt = scoped(db, CandidateGoogleOAuthAttempt, firm_id).filter_by(
+            id=attempt_id, candidate_id=candidate_id, initiated_by_user_id=user_id).first()
+        address = attempt.pending_address if attempt else None
+        db.commit()
+        with account_lock(address or str(attempt_id)):
             yield
-        finally:
-            conn.execute(text('SELECT pg_advisory_unlock(104, 104)'))
+
+
+@contextmanager
+def _mailbox_lock(db, firm_id, candidate_id):
+    with account_lock('candidate:' + str(candidate_id)):
+        mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(candidate_id=candidate_id).first()
+        address = mailbox.address if mailbox else str(candidate_id)
+        db.commit()
+        with account_lock(address):
+            yield
 
 
 def _retire_attempt(db, attempt):
@@ -183,24 +190,25 @@ def _retire_attempt(db, attempt):
         except Exception:
             return False  # Identity/provider outage: keep encrypted for scheduled retry.
         attempt.pending_address = address
-    # Cross-firm existence probe is internal only: never revoke another live grant.
-    live = db.query(CandidateMailbox.id).filter(func.lower(func.trim(CandidateMailbox.address)) == address,
-        CandidateMailbox.status.in_(['CONNECTED', 'ERROR'])).first()
-    newer_pending = db.query(CandidateGoogleOAuthAttempt.id).filter(
-        func.lower(CandidateGoogleOAuthAttempt.pending_address) == address,
-        CandidateGoogleOAuthAttempt.id != attempt.id,
-        CandidateGoogleOAuthAttempt.expires_at > utcnow(),
-        CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None)).first()
-    db.commit()  # Never hold row locks while calling Google.
-    try:
-        done = bool(live or newer_pending) or revoke_token(decrypt_secret(token))
-    except RuntimeError:
-        done = False
-    attempt = db.get(CandidateGoogleOAuthAttempt, attempt.id)
-    if done:
-        attempt.pending_token_ciphertext = None
-    db.commit()
-    return done
+    with account_lock(address), revoke_barrier():
+        # Cross-firm existence probe is internal only: never revoke another live grant.
+        live = db.query(CandidateMailbox.id).filter(func.lower(func.trim(CandidateMailbox.address)) == address,
+            CandidateMailbox.status.in_(['CONNECTED', 'ERROR'])).first()
+        newer_pending = db.query(CandidateGoogleOAuthAttempt.id).filter(
+            func.lower(CandidateGoogleOAuthAttempt.pending_address) == address,
+            CandidateGoogleOAuthAttempt.id != attempt.id,
+            CandidateGoogleOAuthAttempt.expires_at > utcnow(),
+            CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None)).first()
+        db.commit()  # Never hold row locks while calling Google.
+        try:
+            done = bool(live or newer_pending) or revoke_token(decrypt_secret(token))
+        except (RuntimeError, HTTPException):
+            done = False
+        attempt = db.get(CandidateGoogleOAuthAttempt, attempt.id)
+        if done:
+            attempt.pending_token_ciphertext = None
+        db.commit()
+        return done
 
 
 def cleanup_expired_grants():
@@ -218,7 +226,7 @@ def cleanup_expired_grants():
     count = 0
     for identity in ids:
         try:
-            with _grant_guard(), SessionLocal() as db:
+            with SessionLocal() as db:
                 attempt = db.get(CandidateGoogleOAuthAttempt, identity)
                 if attempt and attempt.expires_at <= utcnow() and attempt.pending_token_ciphertext:
                     count += int(_retire_attempt(db, attempt))
@@ -258,58 +266,66 @@ def candidate_google_oauth_callback(request: Request,
                                     error: str | None = Query(default=None, max_length=200),
                                     principal: Principal = Depends(current_principal),
                                     db: Session = Depends(get_db)):
-    with _grant_guard():
-        attempt = db.query(CandidateGoogleOAuthAttempt).filter_by(state_hash=state_digest(state)).with_for_update().first()
-        if (attempt is None or attempt.consumed_at is not None or attempt.expires_at <= utcnow()
-                or attempt.initiated_by_user_id != principal.user_id or attempt.firm_id != principal.firm_id):
-            raise HTTPException(status_code=400, detail="Google authorization expired. Start the connection again.")
+    attempt = db.query(CandidateGoogleOAuthAttempt).filter_by(state_hash=state_digest(state)).with_for_update().first()
+    if (attempt is None or attempt.consumed_at is not None or attempt.expires_at <= utcnow()
+            or attempt.initiated_by_user_id != principal.user_id or attempt.firm_id != principal.firm_id):
+        raise HTTPException(status_code=400, detail="Google authorization expired. Start the connection again.")
+    try:
+        return_to = validate_return_to(attempt.return_to)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid return path.") from exc
+    principal = _authorize_oauth_write(db, principal, attempt.firm_id, attempt.candidate_id)
+    request.state.oauth_return_to = return_to
+    attempt.consumed_at = utcnow()
+    verifier_ciphertext = attempt.code_verifier_ciphertext
+    attempt.code_verifier_ciphertext = b""
+    db.commit()  # Consume state before the network call so the authorization code cannot be replayed.
+    result = "failed"
+    refresh_token = None
+    if not error and code:
         try:
-            return_to = validate_return_to(attempt.return_to)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid return path.") from exc
-        principal = _authorize_oauth_write(db, principal, attempt.firm_id, attempt.candidate_id)
-        request.state.oauth_return_to = return_to
-        attempt.consumed_at = utcnow()
-        verifier_ciphertext = attempt.code_verifier_ciphertext
-        attempt.code_verifier_ciphertext = b""
-        db.commit()  # Consume state before the network call so the authorization code cannot be replayed.
-        result = "failed"
-        refresh_token = None
-        if not error and code:
-            try:
-                from backend.inbox.google_oauth import decrypt_secret
+            from backend.inbox.google_oauth import decrypt_secret
+            with exchange_barrier():
+                # Admission may have waited: access or cancellation/expiry can
+                # change meanwhile. Recheck before contacting Google, then
+                # release all row locks before the provider call.
+                principal = _authorize_oauth_write(db, principal, attempt.firm_id, attempt.candidate_id)
+                db.refresh(attempt)
+                if attempt.expires_at <= utcnow():
+                    raise HTTPException(400, 'Google authorization expired. Start the connection again.')
+                db.commit()
                 address, refresh_token = exchange_code(code, decrypt_secret(verifier_ciphertext))
                 attempt.pending_address = address
                 attempt.pending_token_ciphertext = encrypt_secret(refresh_token)
                 db.commit()
-                principal = _authorize_oauth_write(db, principal, attempt.firm_id, attempt.candidate_id)
-                parsed = urlsplit(return_to)
-                query = dict(parse_qsl(parsed.query, keep_blank_values=True))
-                query['mailbox_confirmation'] = str(attempt.id)
-                return RedirectResponse(urlunsplit(('', '', parsed.path, urlencode(query), '')), status_code=303)
+            principal = _authorize_oauth_write(db, principal, attempt.firm_id, attempt.candidate_id)
+            parsed = urlsplit(return_to)
+            query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            query['mailbox_confirmation'] = str(attempt.id)
+            return RedirectResponse(urlunsplit(('', '', parsed.path, urlencode(query), '')), status_code=303)
 
-            except OAuthGrantError as exc:
-                db.rollback()
-                attempt.pending_token_ciphertext = encrypt_secret(exc.token)
-                attempt.expires_at = utcnow()
-                db.commit()
+        except OAuthGrantError as exc:
+            db.rollback()
+            attempt.pending_token_ciphertext = encrypt_secret(exc.token)
+            attempt.expires_at = utcnow()
+            db.commit()
+            _retire_attempt(db, attempt)
+            result = "failed"
+        except HTTPException:
+            request.state.oauth_return_to = '/'
+            db.rollback()
+            if refresh_token and attempt.pending_token_ciphertext:
                 _retire_attempt(db, attempt)
-                result = "failed"
-            except HTTPException:
-                request.state.oauth_return_to = '/'
-                db.rollback()
-                if refresh_token and attempt.pending_token_ciphertext:
-                    _retire_attempt(db, attempt)
-                raise
-            except Exception:
-                db.rollback()
-                if refresh_token and attempt.pending_token_ciphertext:
-                    _retire_attempt(db, attempt)
-                result = "failed"
-        parsed = urlsplit(return_to)
-        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
-        query["mailbox"] = result if not error else "cancelled"
-        return RedirectResponse(urlunsplit(("", "", parsed.path, urlencode(query), "")), status_code=303)
+            raise
+        except Exception:
+            db.rollback()
+            if refresh_token and attempt.pending_token_ciphertext:
+                _retire_attempt(db, attempt)
+            result = "failed"
+    parsed = urlsplit(return_to)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query["mailbox"] = result if not error else "cancelled"
+    return RedirectResponse(urlunsplit(("", "", parsed.path, urlencode(query), "")), status_code=303)
 
 
 @router.post("/firms/{firm_id}/candidates/{candidate_id}/mailbox/sync")
@@ -337,7 +353,7 @@ def disconnect_candidate_inbox(candidate_id: uuid.UUID, principal: Principal = D
     if not can(principal, "candidate.edit"):
         raise HTTPException(status_code=403, detail="You don't have permission to disconnect this inbox.")
     _candidate(db, firm_id, candidate_id, principal)
-    with _grant_guard():
+    with _mailbox_lock(db, firm_id, candidate_id):
         principal = _authorize_oauth_write(db, principal, firm_id, candidate_id)
         _disconnect_locked(db, principal, firm_id, candidate_id)
     return _load_inbox(db, firm_id, candidate_id)
@@ -353,6 +369,7 @@ def _disconnect_locked(db, principal, firm_id, candidate_id):
     mailbox.status = 'DISCONNECTED'
     mailbox.refresh_token_ciphertext = None
     mailbox.history_id = None
+    finish_import(db, firm_id, mailbox.sync_job_id)
     mailbox.sync_job_id = None
     mailbox.sync_lease_until = None
     mailbox.sync_state = 'IDLE'
@@ -363,8 +380,21 @@ def _disconnect_locked(db, principal, firm_id, candidate_id):
     revoked = True
     if ciphertext:
         try:
-            revoked = revoke_token(decrypt_secret(ciphertext))
-        except RuntimeError:
+            with revoke_barrier():
+                # Revoking Google's project-wide grant also invalidates pending
+                # confirmations for this address. Do not activate them afterward.
+                pending = db.query(CandidateGoogleOAuthAttempt).filter(
+                    func.lower(CandidateGoogleOAuthAttempt.pending_address) == mailbox.address.strip().lower(),
+                    CandidateGoogleOAuthAttempt.pending_token_ciphertext.isnot(None)).all()
+                for attempt in pending:
+                    attempt.expires_at = utcnow()
+                db.commit()
+                revoked = revoke_token(decrypt_secret(ciphertext))
+                if revoked:
+                    for attempt in pending:
+                        attempt.pending_token_ciphertext = None
+                    db.commit()
+        except (RuntimeError, HTTPException):
             revoked = False
     if not revoked:
         mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(candidate_id=candidate_id).with_for_update().first()
@@ -407,7 +437,7 @@ def mailbox_confirmation(candidate_id: uuid.UUID, attempt_id: uuid.UUID,
 def confirm_mailbox(candidate_id: uuid.UUID, attempt_id: uuid.UUID, background_tasks: BackgroundTasks,
                     principal: Principal = Depends(current_principal), db: Session = Depends(get_db),
                     firm_id: uuid.UUID = Depends(reader_firm_id)):
-    with _grant_guard():
+    with _attempt_lock(db, firm_id, candidate_id, attempt_id, principal.user_id):
         from backend.config import CANDIDATE_GMAIL_ENABLED
         if not CANDIDATE_GMAIL_ENABLED:
             raise HTTPException(503, "Candidate Gmail is disabled pending rollout approval.")
@@ -444,6 +474,7 @@ def confirm_mailbox(candidate_id: uuid.UUID, attempt_id: uuid.UUID, background_t
         mailbox.history_id = None
         mailbox.initial_sync_complete = False
         mailbox.sync_state = 'QUEUED'
+        finish_import(db, firm_id, mailbox.sync_job_id)
         mailbox.sync_job_id = None
         mailbox.sync_lease_until = None
         mailbox.last_sync_error = None
@@ -462,7 +493,7 @@ def confirm_mailbox(candidate_id: uuid.UUID, attempt_id: uuid.UUID, background_t
 def cancel_mailbox(candidate_id: uuid.UUID, attempt_id: uuid.UUID,
                    principal: Principal = Depends(current_principal), db: Session = Depends(get_db),
                    firm_id: uuid.UUID = Depends(reader_firm_id)):
-    with _grant_guard():
+    with _attempt_lock(db, firm_id, candidate_id, attempt_id, principal.user_id):
         principal = _authorize_oauth_write(db, principal, firm_id, candidate_id)
         attempt = scoped(db, CandidateGoogleOAuthAttempt, firm_id).filter_by(id=attempt_id,
             candidate_id=candidate_id, initiated_by_user_id=principal.user_id).first()
@@ -480,7 +511,7 @@ def delete_retained_content(candidate_id: uuid.UUID, message_id: uuid.UUID | Non
         raise HTTPException(403, 'Only an Owner or Manager can delete retained email.')
     _candidate(db, firm_id, candidate_id, principal)
     if disconnect:
-        with _grant_guard():
+        with _mailbox_lock(db, firm_id, candidate_id):
             principal = _authorize_oauth_write(db, principal, firm_id, candidate_id)
             _disconnect_locked(db, principal, firm_id, candidate_id)
             return _erase_content(db, principal, firm_id, candidate_id, message_id)
@@ -493,6 +524,7 @@ def _erase_content(db, principal, firm_id, candidate_id, message_id):
         raise HTTPException(403, 'Only an Owner or Manager can delete retained email.')
     mailbox = scoped(db, CandidateMailbox, firm_id).filter_by(candidate_id=candidate_id).with_for_update().first()
     if mailbox:
+        finish_import(db, firm_id, mailbox.sync_job_id)
         mailbox.sync_job_id = None
         mailbox.sync_lease_until = None
         mailbox.sync_state = 'IDLE'

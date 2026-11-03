@@ -167,8 +167,8 @@ def assignments(test_db, accounts, ledger):
 
 def test_a_bde_also_sees_who_assigned_them_their_candidates(anonymous_client, accounts, ledger, assignments):
     resp = anonymous_client.get(_url(accounts.firm_id), headers=ledger["bde"])
-    assert _summaries(resp) == ["Bea edit", "Mira edited Asha", "Assigned Asha to Bea"]
-    assert resp.json()[2]["note"] == "Push banking."
+    assert _summaries(resp) == ["Bea edit", "Assigned Asha to Bea"]
+    assert resp.json()[1]["note"] == "Push banking."
 
 
 def test_a_candidate_moved_away_takes_its_assignments_with_it(anonymous_client, accounts, ledger, assignments, test_db):

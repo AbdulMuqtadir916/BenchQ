@@ -15,6 +15,7 @@ ROUTE_FILES = sorted((BACKEND / "api").glob("routes_*.py")) + [BACKEND / "main.p
 
 # (file, function) -> why it may query a firm-owned model without `scoped()`.
 ALLOWED = {
+    ("routes_inbox.py", "_disconnect_locked"): "internal same-Gmail pending grant invalidation under project revoke barrier; no cross-firm data returned",
     ("routes_inbox.py", "_retire_attempt"): "internal global grant-safety probe only; never returns another tenant identity; Google revoke is project-wide",
     ("routes_inbox.py", "cleanup_expired_grants"): "scheduled cross-firm encrypted-grant cleanup, not a user-readable query",
     ("routes_inbox.py", "confirm_mailbox"): "global mailbox identity uniqueness; refuses without revealing the other tenant",
@@ -132,6 +133,7 @@ def test_every_allowed_function_exists():
 # Jobs are one shared pool; a firm sees the ones `firm_jobs` links it to (07 Q37), read through `scoped_jobs()`.
 # (file, function) -> why it may query `Job` across the whole pool.
 JOBS_ALLOWED = {
+    ("routes_inbox.py", "_disconnect_locked"): "internal same-Gmail pending grant invalidation under project revoke barrier; no cross-firm data returned",
     ("routes_inbox.py", "_retire_attempt"): "internal global grant-safety probe only; never returns another tenant identity; Google revoke is project-wide",
     ("routes_inbox.py", "cleanup_expired_grants"): "scheduled cross-firm encrypted-grant cleanup, not a user-readable query",
     ("routes_inbox.py", "confirm_mailbox"): "global mailbox identity uniqueness; refuses without revealing the other tenant",

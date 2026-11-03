@@ -211,6 +211,8 @@ async def run_email_check():
 
 def _cleanup_candidate_grants():
     from backend.api.routes_inbox import cleanup_expired_grants
+    from backend.inbox.import_progress import recover_imports
+    recover_imports()
     return cleanup_expired_grants()
 
 

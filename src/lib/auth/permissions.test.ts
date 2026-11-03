@@ -71,24 +71,24 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     expect(ids(scopeCandidates(bde, candidates))).toEqual(["c1"]);
     expect(ids(scopeApplications(bde, applications, candidates))).toEqual(["a1"]);
     expect(ids(scopeLedger(bde, ledger, context))).toEqual(["l1"]);
-    // 07 Q52: plus who assigned them the candidates they work now; all their current candidates' history, never other candidates.
+    // 07 Q52: plus who assigned them the candidates they work now; assignments only, never other actors’ updates.
     const assigns = [
       { id: "l5", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c1", action: "ASSIGN" },
       { id: "l6", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c1", action: "UPDATE" },
       { id: "l7", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c2", action: "ASSIGN" },
     ];
-    expect(ids(scopeLedger(bde, [...ledger, ...assigns], context))).toEqual(["l1", "l5", "l6"]);
+    expect(ids(scopeLedger(bde, [...ledger, ...assigns], context))).toEqual(["l1", "l5"]);
     expect(ids(scopeFollowups(bde, followups, context))).toEqual(["f1"]);
     expect(scopeFollowupsUserId(bde)).toBe("u_BDE");
     expect(hasOwnScope(bde)).toBe(true);
   });
 
-  it("candidate ledger history follows reassignment instead of its original actor", () => {
+  it("candidate assignment does not expose other actors’ ledger history", () => {
     const rows = [
       {id:"past-owner", candidateId:"c1", actorUserId:"b2", entityType:"email", entityId:"mail-a", action:"UPDATE"},
       {id:"moved-away", candidateId:"c2", actorUserId:"u_BDE", entityType:"email", entityId:"mail-b", action:"UPDATE"},
     ];
-    expect(ids(scopeLedger(firmUser("BDE"), rows, context))).toEqual(["past-owner"]);
+    expect(ids(scopeLedger(firmUser("BDE"), rows, context))).toEqual(["moved-away"]);
   });
 
   it("a MANAGER sees their team: the candidates they manage, their queue, their BDEs' work, never the other team's", () => {

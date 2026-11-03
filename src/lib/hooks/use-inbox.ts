@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { inboxApi } from "@/lib/api/inbox";
+import { loadInboxPage, MAX_RESTORE_PAGES } from "./inbox-pages";
 import type { CandidateInbox } from "@/lib/schemas/inbox";
 import { queryKeys } from "@/lib/query/keys";
 import { useFirmId } from "@/lib/tenancy/firm-context";
@@ -12,8 +13,13 @@ import { useFirmId } from "@/lib/tenancy/firm-context";
 type Pages = InfiniteData<CandidateInbox, string | null>;
 export function flattenInbox(data: Pages): CandidateInbox {
   const first = data.pages[0];
+  const seen = new Set<string>();
   return {...first, nextCursor: data.pages.at(-1)?.nextCursor ?? null,
-    messages: [...new Map(data.pages.flatMap(page => page.messages).map(message => [message.id, message])).values()]};
+    messages: data.pages.flatMap(page => page.messages).filter(message => {
+      if (seen.has(message.id)) return false;
+      seen.add(message.id);
+      return true;
+    })};
 }
 const initialPages = (inbox: CandidateInbox): Pages => ({pages: [inbox], pageParams: [null]});
 
@@ -21,10 +27,16 @@ export function useCandidateInbox(candidateId: string) {
   const firm = useFirmId();
   const cache = useQueryClient();
   const params = useSearchParams();
-  const desiredPages = z.coerce.number().int().min(1).max(50).catch(1).parse(params.get("inbox_pages") ?? 1);
+  const refreshCycles = useRef(new WeakMap<AbortSignal, boolean>());
+  const desiredPages = z.coerce.number().int().min(1).catch(1).transform(value => Math.min(value, MAX_RESTORE_PAGES)).parse(params.get("inbox_pages") ?? 1);
   const query = useInfiniteQuery({queryKey: queryKeys.inbox.byCandidate(firm, candidateId),
     initialPageParam: null as string | null,
-    queryFn: ({pageParam}) => inboxApi.byCandidate(firm, candidateId, undefined, pageParam),
+    queryFn: ({pageParam, signal}) => loadInboxPage(pageParam, cache.getQueryData<Pages>(queryKeys.inbox.byCandidate(firm, candidateId)), async cursor => {
+      signal.throwIfAborted();
+      const page = await inboxApi.byCandidate(firm, candidateId, undefined, cursor);
+      signal.throwIfAborted();
+      return page;
+    }, {signal, cycles: refreshCycles.current}),
     getNextPageParam: page => page.nextCursor ?? undefined, select: flattenInbox, enabled: !!candidateId,
     refetchInterval: query => {
       const connection = query.state.data?.pages[0]?.connection;

@@ -6,12 +6,12 @@ import uuid
 import httpx
 
 from backend.auth.scoping import scoped
-from backend.auth.ledger import record_automated
+from backend.inbox.import_progress import JOB_TYPE, finish_import
 from backend.inbox import gmail_sync as gmail
 from backend.inbox.google_oauth import decrypt_secret
 from backend.models.candidates import CandidateMailbox
-from backend.models.db import SessionLocal, utcnow
-from backend.models.tenancy import Firm, LedgerEntry
+from backend.models.db import JobRun, SessionLocal, utcnow
+from backend.models.tenancy import Firm
 
 
 class ConnectionChanged(Exception):
@@ -30,6 +30,10 @@ def run_import(firm_id, candidate_id, generation):
                 or not firm or firm.status == 'SUSPENDED'
                 or (mailbox.sync_lease_until and mailbox.sync_lease_until > utcnow())):
             return -1
+        finish_import(db, firm_id, mailbox.sync_job_id)
+        db.add(JobRun(id=job_id, firm_id=firm_id, job_type=JOB_TYPE, trigger='scheduler',
+            status='running', meta={'candidate_id': str(candidate_id), 'mailbox_id': str(mailbox.id),
+                'generation': generation.isoformat() if generation else None, 'imported': 0, 'finalized': False}))
         mailbox.sync_job_id = job_id
         mailbox.sync_lease_until = utcnow() + timedelta(minutes=10)
         mailbox.sync_state = 'IMPORTING'
@@ -38,10 +42,7 @@ def run_import(firm_id, candidate_id, generation):
             address=mailbox.address, history_id=mailbox.history_id, token=mailbox.refresh_token_ciphertext)
         db.commit()
 
-    imported_total = 0
-
     def save(batch, *, checkpoint=None, complete=False):
-        nonlocal imported_total
         with SessionLocal() as db:
             current = scoped(db, CandidateMailbox, firm_id).filter_by(id=snapshot.id).with_for_update().first()
             firm = db.get(Firm, firm_id)
@@ -52,7 +53,10 @@ def run_import(firm_id, candidate_id, generation):
             for key, data in batch:
                 inserted += int(gmail._store_message(db, current, '', key, None, message_data=data))
             current.sync_lease_until = utcnow() + timedelta(minutes=10)
+            run = scoped(db, JobRun, firm_id).filter_by(id=job_id, job_type=JOB_TYPE).with_for_update().one()
+            run.meta = {**run.meta, 'imported': run.meta['imported'] + inserted}
             if complete:
+                finish_import(db, firm_id, job_id, completed=True)
                 current.history_id = checkpoint
                 current.initial_sync_complete = True
                 current.last_synced_at = utcnow()
@@ -60,18 +64,7 @@ def run_import(firm_id, candidate_id, generation):
                 current.sync_state = 'IDLE'
                 current.sync_job_id = None
                 current.sync_lease_until = None
-            total = imported_total + inserted
-            if total:
-                entry = scoped(db, LedgerEntry, firm_id).filter_by(entity_type='email', entity_id=str(job_id)).first()
-                summary = f'Imported {total} candidate emails.' if complete else f'Partial import: saved {total} candidate emails; job not completed.'
-                if entry:
-                    entry.summary = summary
-                else:
-                    record_automated(db, actor_type='SYSTEM', actor_name='Gmail sync', action='CREATE',
-                        entity_type='email', entity_id=job_id, entity_label='Candidate inbox',
-                        summary=summary, firm_id=firm_id, candidate_id=candidate_id)
             db.commit()
-            imported_total = total
             return inserted
 
     count = 0
@@ -131,10 +124,14 @@ def run_import(firm_id, candidate_id, generation):
                 save([], checkpoint=checkpoint, complete=True)
                 return count
     except ConnectionChanged:
+        with SessionLocal() as db:
+            finish_import(db, firm_id, job_id)
+            db.commit()
         return -1
     except Exception as exc:
         with SessionLocal() as db:
             current = scoped(db, CandidateMailbox, firm_id).filter_by(id=snapshot.id).with_for_update().first()
+            finish_import(db, firm_id, job_id)
             if current and current.connected_at == generation and current.sync_job_id == job_id:
                 current.sync_state = 'FAILED'
                 current.sync_job_id = None
@@ -143,5 +140,5 @@ def run_import(firm_id, candidate_id, generation):
                 if isinstance(exc, gmail.ReconnectRequired):
                     current.status = 'ERROR'
                     current.last_sync_error = 'Google access expired. Reconnect the candidate inbox.'
-                db.commit()
+            db.commit()
         return -1

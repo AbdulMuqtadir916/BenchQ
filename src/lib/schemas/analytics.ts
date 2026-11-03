@@ -61,7 +61,6 @@ export const BdeDashboardSchema = z.object({
 export type BdeDashboard = z.infer<typeof BdeDashboardSchema>;
 
 export const LedgerEntrySchema = z.object({
-  candidateId: z.string().nullable().optional(),
   id: z.string(),
   /** Set for any event about a firm (shows in that firm's ledger); null only for platform-only events (A13). */
   firmId: z.string().nullable(),

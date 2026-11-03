@@ -167,15 +167,15 @@ sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 - [ ] Mock deleted (with F6)
 
 
-## PR #104 proposed amendment — Samad confirmed; Abdul sign-off pending (2026-11-02)
+## PR #104 audit behavior (2026-11-03)
 
-Candidate history follows its current BDE assignment: candidate-linked entries are visible to the current BDE
-regardless of actor and cease being visible to the previous BDE. Own non-candidate entries retain existing scope.
-Backend and frontend scope use the existing nullable candidate_id relation (candidateId in the DTO); legacy rows
-without reliable candidate attribution are not guessed/backfilled. This supersedes the older own-actor/ASSIGN-only
-example above for candidate-linked records once approved. Owner/Manager permissions otherwise remain unchanged.
+Q52 stays unchanged: a BDE reads their authored entries plus ASSIGN entries for currently handled candidates.
+Current candidate Inbox access does not grant access to other actors’ ledger events. A broader reassignment
+confirmation view would require a separate approved proposal.
 
-Mailbox attestation uses a durable email ledger event containing verified account address, actor/candidate/time and
-consent notice v1. Email deletion retains that restricted connection evidence and discloses the exception. Platform
-support and global audit responses redact email summaries/notes; operational support cannot read candidate mail.
-Background import batches update a single per-job partial/completed summary; they do not append per-batch entries.
+Mailbox attestation uses a durable email ledger event containing verified account address, actor/candidate/time
+and consent notice v1. Erasure retains that disclosed connection evidence. Platform/support audit responses redact
+email summaries/notes; operational support sees mailbox health/counts only (approved in Abdul’s latest review).
+Background import progress lives in existing JobRun metadata and commits atomically with each saved batch. One
+immutable SYSTEM result is appended on completion/failure/recovery for a nonempty run; prior events never change.
+Samad confirmed first-read and manual zero-import Sync audits; Abdul’s exact audit-policy sign-off remains pending.

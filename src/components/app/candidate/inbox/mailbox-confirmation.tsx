@@ -19,7 +19,7 @@ export function MailboxConfirmation({candidate, attempt, onClose}: {
     <p>Confirm this is the intended mailbox for this candidate. The profile email may differ. You confirm the account owner authorized this connection.</p>
     {details.error || confirm.error || cancel.error ? <p role="alert">{(cancel.error ?? confirm.error ?? details.error)?.message}</p> : null}
     <div className="flex flex-wrap gap-2">
-      {expired ? <Button disabled={pending} onClick={abandon}>Connect again</Button> : <Button disabled={!details.data || pending} onClick={() => confirm.mutate(undefined, {onSuccess: () => onClose()})}>Confirm mailbox</Button>}
+      {expired ? <Button disabled={pending} onClick={abandon}>Return to Inbox</Button> : <Button disabled={!details.data || pending} onClick={() => confirm.mutate(undefined, {onSuccess: () => onClose()})}>Confirm mailbox</Button>}
       <Button variant="secondary" disabled={pending} onClick={abandon}>{cancel.isPending ? "Cancelling…" : "Cancel"}</Button>
       {details.error && !expired ? <Button variant="secondary" onClick={() => void details.refetch()}>Retry</Button> : null}
     </div>

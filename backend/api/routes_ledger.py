@@ -1,7 +1,7 @@
 """A firm's ledger: who did what in the firm, newest first (docs/integration/01-ledger.md, 07-auth §4 track 01).
 
 The worked example of a firm-scoped read: the path names the firm, `reader_firm_id` says which firm the caller
-may read, `scoped()` adds the filter, and a BDE sees the entries they made (`own_scope`, 07 §2.2) plus the history
+may read, `scoped()` adds the filter, and a BDE sees the entries they made (`own_scope`, 07 §2.2) plus the assignment
 entries about the candidates they work now (07 Q52: "New assignments" and the handoff note). Another firm's ledger
 is 404, the same as a missing firm (principle 4). Platform-only events (`firm_id` null) are the Super Admin's, in
 `/api/admin/audit`.
@@ -12,7 +12,7 @@ handoff note), `action` (e.g. ASSIGN) and `candidate_id` (everything about a can
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, or_
+from sqlalchemy import String, and_, cast, or_
 from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
@@ -39,12 +39,11 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     db.commit()
     entries = scoped(db, LedgerEntry, my_firm)
     if (actor := own_scope(principal)) is not None:
-        # Candidate history follows current assignment, including inbox attestations.
-        # Own historical actions cannot leak a candidate after reassignment.
-        theirs = scoped(db, Candidate, my_firm, Candidate.id).filter(Candidate.bde_id == actor).scalar_subquery()
+        # Q52: own entries plus assignments for currently handled candidates.
+        theirs = scoped(db, Candidate, my_firm, cast(Candidate.id, String)).filter(Candidate.bde_id == actor).scalar_subquery()
         entries = entries.filter(or_(
-            and_(LedgerEntry.candidate_id.is_(None), LedgerEntry.actor_user_id == actor),
-            LedgerEntry.candidate_id.in_(theirs),
+            LedgerEntry.actor_user_id == actor,
+            and_(LedgerEntry.action == "ASSIGN", LedgerEntry.entity_type == "candidate", LedgerEntry.entity_id.in_(theirs)),
         ))
     if entity_type is not None:
         entries = entries.filter(LedgerEntry.entity_type == entity_type)

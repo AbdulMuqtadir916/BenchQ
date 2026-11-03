@@ -17,12 +17,12 @@ Agreed with Samad on 2026-11-01 for separating the existing combined Inbox/Appli
    approved and merged, then prepare the next branch from the updated `main`; do not stack PRs on open branches.
 3. **Split the existing work in this order:**
    - PR 1: Applications foundation — statuses, status history, BDE review records, and migration `0009` — merged in PR #100.
-   - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection/sync and minimum retained-account identity protection; migration `0010` follows merged `0009`.
+   - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection/sync and minimum retained-account identity protection; migration `0011` follows merged notifications `0010`.
    - PR 3: Email classification — application matching, confidence rules, automatic status updates and BDE review
      routing, and its next available migration.
    - Original PR 4: account provenance and deduplication are moved into PR 2 (Samad requested 2026-11-01; Abdul approval pending). Do not raise a duplicate history PR; later hardening is a separate concern only if needed.
    - PR 4 (remaining UI): Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
-   Main owns résumé `0008` and Applications `0009` (PR #100). PR 2 claims `0010`. Claim later migration numbers
+   Main owns résumé `0008` and Applications `0009` (PR #100). Notifications owns `0010` (PR #105); PR 2 claims `0011`. Claim later migration numbers
    individually after checking the latest Alembic head on `main`; do not reserve numbers from the old combined branch.
    Include dependencies needed for each PR to work independently and explain any necessary scope adjustment.
 4. **Include a Markdown change document in every PR.** Use `docs/team/pr-changes/<branch-name>.md` (replace `/`
@@ -70,7 +70,7 @@ The candidate page already has an Inbox tab and an "Inbox" preview on its Overvi
   synthetic fixtures without a fake consent screen. Sync/read/disconnect errors are visible and read failures roll
   back optimistic state with explicit retry. Google Cloud client/redirect and encryption key must be configured
   through local/deployment secrets before live connection testing. Verification uses synthetic providers only.
-- One new migration, `0010` after `0009`, contains OAuth and minimum provenance. Downgrade refuses to discard
+- One new migration, `0011` after `0010`, contains OAuth and minimum provenance. Downgrade refuses to discard
   active OAuth attempts, live credentials or retained provenance that cannot be reconstructed. No merged migration
   or existing development data is rewritten. Required code-owner review remains pending before merge.
 
@@ -108,7 +108,7 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
 
 ### PR 104 review follow-up (2026-11-02)
 
-See docs/02-DATA-CONTRACTS.md, PR 104 review corrections, and the root pr104_plan.md/prstatus.md.
+See docs/02-DATA-CONTRACTS.md, PR 104 review corrections, and the per-file PR change report. Working plans/checklists are kept locally, outside the PR.
 Samad confirmed global one-active-candidate mailbox ownership, ERROR reservation until disconnect, current-BDE
 candidate access with retained data on reassignment, both deletion choices, restricted support metadata and the
 first-read/manual-sync/background audit policy. Items reserved by Abdul remain proposals pending his sign-off.
@@ -121,3 +121,14 @@ unresolved automatic-versus-human acceptance wording; PR 104 itself performs nei
 After #104 merges, submit the revised contracts/plan, then PR 3 classification, then PR 4 remaining UI. No stacks.
 The global legacy monitor remains for non-candidate applications only; preserve its candidate-status guards.
 Candidate Google access defaults OFF until PR 3 readiness, named Google verification ownership, privacy and approval.
+
+### PR 104 latest review corrections (2026-11-03)
+
+Restore Q52 unchanged: current assignment does not expose every Owner/Manager/SYSTEM ledger event. Store batch
+progress atomically in existing JobRun metadata and append one terminal/recovery result; never update the ledger.
+Use per-account lifecycle locks and concurrent unknown-account exchange coordination with bounded waiting.
+Refresh newest mail while retaining cached older pages; cap automatic reload restoration at three pages and
+keep selected body loading independent. Expired confirmation action is Return to Inbox, then a separate Connect.
+Support health/counts-only visibility was approved in Abdul’s GitHub review. Samad reports Abdul approved one
+active candidate per Gmail globally in an in-person discussion. Samad reaffirmed first-read/manual empty-sync
+auditing and cursor pagination; exact remaining contracts still require code-owner sign-off before merge.

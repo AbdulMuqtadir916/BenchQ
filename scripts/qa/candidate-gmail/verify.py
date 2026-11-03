@@ -23,7 +23,7 @@ async def run():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=['--no-sandbox'])
         page = await browser.new_page(viewport={'width':1440, 'height':1100}, reduced_motion='reduce')
-        errors, calls = [], []
+        errors, calls, pagination_requests = [], [], []
         page.on('pageerror', lambda error: errors.append(str(error)))
         connection = dict(firm_id='qa-firm', candidate_id='qa-candidate', provider='GOOGLE',
             address='candidate@example.test', connected_at='2026-11-02T00:00:00Z',
@@ -87,6 +87,7 @@ async def run():
             if url.path.endswith('/inbox') and mode == 'pagination':
                 query = parse_qs(url.query)
                 selected = query.get('message_id', [None])[0]
+                if not selected: pagination_requests.append(query.get('cursor', [None])[0])
                 rows = [row for row in paged if row['id'] == selected] if selected else paged[200:] if query.get('cursor') else paged[:200]
                 await route.fulfill(json={'firm_id':'qa-firm','candidate_id':'qa-candidate','connection':connection,'messages':rows,'next_cursor':None if selected or query.get('cursor') else 'older-page','total_count':len(paged)})
                 return
@@ -175,7 +176,7 @@ async def run():
         await page.wait_for_timeout(150)
         assert 'mailbox_confirmation' not in page.url
         await page.goto(BASE+'?state=expired&mailbox_confirmation=expired-attempt', wait_until='networkidle')
-        await page.get_by_role('button', name='Connect again', exact=True).click()
+        await page.get_by_role('button', name='Return to Inbox', exact=True).click()
         await page.wait_for_timeout(150)
         assert 'mailbox_confirmation' not in page.url
         connection['status'] = 'ERROR'
@@ -189,7 +190,9 @@ async def run():
         await page.reload(wait_until='networkidle')
         await page.get_by_role('button', name=re.compile('Synthetic email page-204')).click()
         await page.get_by_text('Synthetic body page-204', exact=True).wait_for()
+        before_refresh = len(pagination_requests)
         await page.evaluate('window.qaRefetchInbox()')
+        assert pagination_requests[before_refresh:] == [None], pagination_requests[before_refresh:]
         await page.get_by_role('button', name=re.compile('Synthetic email page-204')).wait_for()
         await page.get_by_text('All stored emails loaded.', exact=True).wait_for()
         await page.get_by_text('Synthetic body page-204', exact=True).wait_for()

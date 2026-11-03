@@ -179,7 +179,7 @@ def test_confirm_after_reassignment_denied_without_changing_mailbox(api_client, 
     assert mailbox.status == 'CONNECTED'
 
 
-def test_reassignment_transfers_candidate_ledger_access_including_old_bde_actions(api_client, anonymous_client, test_db, accounts, mailbox_case):
+def test_reassignment_preserves_inbox_access_without_broadening_q52_ledger(api_client, anonymous_client, test_db, accounts, mailbox_case):
     from backend.tests.auth_support import make_user
     from backend.auth.sessions import start_session
     from backend.models.tenancy import Firm
@@ -194,10 +194,9 @@ def test_reassignment_transfers_candidate_ledger_access_including_old_bde_action
     candidate.bde_id = new_bde.id
     test_db.commit()
     path = f'/api/firms/{candidate.firm_id}/ledger?candidate_id={candidate.id}'
-    assert api_client.get(path).json() == []
+    assert len(api_client.get(path).json()) == 1
     response = anonymous_client.get(path, headers={'cookie':f'bq_session={token}'})
-    assert response.status_code == 200 and len(response.json()) == 1
-    assert response.json()[0]['actor_user_id'] == str(old_bde.id)
+    assert response.status_code == 200 and response.json() == []
 
     old_response = api_client.get(f'/api/applications/{app.id}')
     assert old_response.status_code == 404
@@ -254,12 +253,25 @@ def test_cleanup_cannot_revoke_newly_live_account(api_client, test_db, monkeypat
     assert calls == []
 
 
-def test_lifecycle_lock_refuses_concurrent_activation(api_client, test_db, monkeypatch, mailbox_case):
-    from backend.api import routes_inbox
+def test_same_account_lock_waits_then_times_out_without_activation(api_client, test_db, monkeypatch, mailbox_case):
+    from backend.inbox.grant_locks import account_lock
     candidate, _, _, _ = mailbox_case
     attempt_id = pending(api_client, monkeypatch, candidate)
-    with routes_inbox._grant_guard():
-        response = api_client.post(base(candidate) + '/mailbox/confirm/' + attempt_id)
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    locked, release = Event(), Event()
+    def hold():
+        with account_lock('fresh@example.test'):
+            locked.set()
+            assert release.wait(10)
+    with ThreadPoolExecutor(max_workers=1) as workers:
+        holder = workers.submit(hold)
+        assert locked.wait(2)
+        try:
+            response = api_client.post(base(candidate) + '/mailbox/confirm/' + attempt_id)
+        finally:
+            release.set()
+        holder.result()
     assert response.status_code == 503
     test_db.refresh(test_db.get(CandidateGoogleOAuthAttempt, uuid.UUID(attempt_id)))
 
@@ -382,7 +394,9 @@ def test_interrupted_worker_keeps_one_durable_partial_audit_and_recovers(test_db
     with pytest.raises(WorkerStopped): jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at)
     test_db.expire_all()
     entries = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).all()
-    assert len(entries) == 1 and '10' in entries[0].summary and 'partial' in entries[0].summary.lower()
+    assert entries == []
+    from backend.models.db import JobRun
+    assert test_db.query(JobRun).filter_by(job_type='candidate_gmail_import').one().meta['imported'] == 10
     mailbox.sync_lease_until = utcnow() - timedelta(seconds=1)
     test_db.commit()
     def retry(http, path, token, params=None):
@@ -393,6 +407,8 @@ def test_interrupted_worker_keeps_one_durable_partial_audit_and_recovers(test_db
     test_db.expire_all()
     assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 1
     assert mailbox.sync_state == 'IDLE'
+    entry = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).one()
+    assert '10' in entry.summary and 'partial' in entry.summary.lower()
 
 
 def test_concurrent_read_marks_record_only_first_transition(api_client, test_db, mailbox_case):
