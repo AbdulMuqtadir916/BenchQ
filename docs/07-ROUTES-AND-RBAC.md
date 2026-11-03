@@ -173,7 +173,9 @@ Admin URLs use `firmId` (stable), firm URLs use `slug` (readable).
 invite, dev, _next, static, assets, favicon.ico, robots.txt, sitemap.xml, www, app, support,
 help, status, settings, new`.
 - **Dev routes** live under `/dev/…` (`/dev/design-system`), `devOnly: true`, not-found unless
-  `devRoutesEnabled()`.
+  `devRoutesEnabled()`: `NEXT_PUBLIC_SHOW_DEV_ROUTES=true`, in `pnpm dev` and a build alike (2026-11-02; it no longer
+  follows `NODE_ENV=development`). The design system is **Super Admin only** (`access: PLATFORM`, the `/dev` layout's
+  `PlatformGate`): in the admin sidebar's Preferences, and not-found for every firm role, flag or not.
 
 ### 2.5 Firm-layout outcomes (in order)
 
