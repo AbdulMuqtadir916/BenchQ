@@ -42,6 +42,8 @@ export const queryKeys = {
   },
   /** The signed-in person's own marks (docs/02 §6.x); a principal change clears the cache. */
   jobMarks: { mine: (firmId: string) => [firmId, "jobMarks", "mine"] as const },
+  /** The signed-in person's own notifications (07 Q54): a firm user's are under their firm. */
+  notifications: { mine: (firmId: string) => [firmId, "notifications", "mine"] as const },
 
   // not firm-scoped
   /** The platform tier (docs/07 §2.3): every firm's rows, PLATFORM_ADMIN only. One prefix, so an admin write refreshes it all. */
@@ -55,6 +57,8 @@ export const queryKeys = {
     audit: () => ["platform", "audit"] as const,
     team: () => ["platform", "team"] as const,
     candidateUsage: () => ["platform", "candidateUsage"] as const,
+    /** The Super Admin's own notifications (07 Q54). */
+    notifications: () => ["platform", "notifications"] as const,
   },
   /** /invite/[token]: public, before anyone signs in. */
   invite: (token: string) => ["invite", token] as const,

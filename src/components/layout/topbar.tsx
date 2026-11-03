@@ -7,7 +7,7 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { useCommandPalette } from "@/components/command/command-palette";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
 
-/** The firm's notifications are firm work: the admin variant (docs/07 P2) leaves them out. */
+/** The admin variant (docs/07 P2) has no shift clock; its bell shows only the Super Admin's own requests. */
 export function Topbar({ variant = "firm" }: { variant?: "firm" | "admin" }) {
   const { open } = useCommandPalette();
   return (
@@ -21,7 +21,7 @@ export function Topbar({ variant = "firm" }: { variant?: "firm" | "admin" }) {
           <span className="hidden sm:inline">Search</span>
           <kbd className="hidden sm:inline text-mono-sm text-[var(--color-text-3)] ml-3">⌘ K</kbd>
         </button>
-        {variant === "firm" ? <NotificationsMenu /> : null}
+        <NotificationsMenu variant={variant} />
         <ThemeToggle />
       </div>
     </header>

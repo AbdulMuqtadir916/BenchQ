@@ -1,13 +1,13 @@
 """Candidate Gmail connection and retained account identity.
 
-Revision ID: 0010
-Revises: 0009
+Revision ID: 0011
+Revises: 0010
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0010'
-down_revision = '0009'
+revision = '0011'
+down_revision = '0010'
 branch_labels = None
 depends_on = None
 
@@ -58,19 +58,19 @@ def upgrade() -> None:
 def downgrade() -> None:
     if op.get_bind().execute(sa.text("SELECT EXISTS (SELECT 1 FROM candidate_google_oauth_attempts "
             "WHERE (consumed_at IS NULL OR pending_token_ciphertext IS NOT NULL) AND expires_at > now())")).scalar():
-        raise RuntimeError("Wait for active OAuth attempts to expire before downgrading 0010.")
+        raise RuntimeError("Wait for active OAuth attempts to expire before downgrading 0011.")
     if op.get_bind().execute(sa.text("SELECT EXISTS (SELECT 1 FROM inbox_messages m "
             "JOIN candidate_mailboxes b ON b.id=m.mailbox_id "
             "WHERE m.source_address NOT IN ('', lower(trim(b.address)))) "
             "OR EXISTS (SELECT 1 FROM inbox_messages GROUP BY mailbox_id, provider_message_id HAVING count(*) > 1)")).scalar():
-        raise RuntimeError('Keep revision 0010 to preserve retained mailbox account provenance.')
+        raise RuntimeError('Keep revision 0011 to preserve retained mailbox account provenance.')
     op.drop_constraint('uq_inbox_messages_mailbox_message', 'inbox_messages', type_='unique')
     op.create_unique_constraint('uq_inbox_messages_mailbox_message', 'inbox_messages',
                                 ['mailbox_id', 'provider_message_id'])
     op.drop_column('inbox_messages', 'source_address')
     bind = op.get_bind()
     if bind.execute(sa.text("SELECT count(*) FROM candidate_mailboxes WHERE refresh_token_ciphertext IS NOT NULL")).scalar():
-        raise RuntimeError("Disconnect candidate mailboxes before downgrading 0010; this migration stores live credentials.")
+        raise RuntimeError("Disconnect candidate mailboxes before downgrading 0011; this migration stores live credentials.")
     from backend.inbox.content_storage import convert_retained_content
     convert_retained_content(op.get_bind(), encrypt=False)
     op.drop_index("ix_candidate_google_oauth_attempts_candidate_id", table_name="candidate_google_oauth_attempts")

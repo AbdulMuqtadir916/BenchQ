@@ -37,6 +37,7 @@ from backend.api.routes_team import router as team_router
 from backend.api.routes_candidates import router as candidates_router
 from backend.api.routes_ledger import router as ledger_router
 from backend.api.routes_support import router as support_router
+from backend.api.routes_notifications import router as notifications_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("jobnavigator")
@@ -58,6 +59,8 @@ async def lifespan(app: FastAPI):
     if CANDIDATE_GMAIL_ENABLED:
         from backend.inbox.google_oauth import _fernet
         _fernet()
+    from backend.auth.password_reset import require_reset_base_url
+    require_reset_base_url()
     run_seeds()
 
     # Clean up stale job runs from previous process
@@ -180,6 +183,7 @@ async def _oauth_browser_result(request: Request, call_next):
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
 app.include_router(routes_inbox.router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")
