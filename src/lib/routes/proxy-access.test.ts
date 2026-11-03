@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ROUTES, hrefFor } from "./registry";
 import { signedOutRedirect } from "./proxy-access";
 
-const live = { devRoutes: false };
-const signedOut = (path: string, search = "", options = live) => signedOutRedirect(path, search, false, options);
+const signedOut = (path: string, search = "") => signedOutRedirect(path, search, false);
 
 describe("signedOutRedirect", () => {
   it("sends signed-out visitors on firm and admin routes to sign-in, remembering where they were", () => {
@@ -32,12 +31,11 @@ describe("signedOutRedirect", () => {
     expect(signedOut("/gsc/not-a-page")).not.toBeNull();
   });
 
-  it("opens /dev only where dev routes are served", () => {
-    expect(signedOut("/dev/design-system")).not.toBeNull();
-    expect(signedOut("/dev/design-system", "", { devRoutes: true })).toBeNull();
+  it("sends signed-out visitors on /dev to sign-in: the design system is Super Admin only", () => {
+    expect(signedOut("/dev/design-system")).toBe("/sign-in?returnTo=%2Fdev%2Fdesign-system");
   });
 
   it("lets a request with a session cookie through", () => {
-    expect(signedOutRedirect("/gsc/dashboard", "", true, live)).toBeNull();
+    expect(signedOutRedirect("/gsc/dashboard", "", true)).toBeNull();
   });
 });
