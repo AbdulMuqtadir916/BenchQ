@@ -48,7 +48,7 @@ const COLUMNS: ColumnDef<TaskRow, unknown>[] = [
 const TABS = ["Overview", "Foundations", "Patterns", "Interactive lab"] as const;
 type Tab = typeof TABS[number];
 
-/** Dev-only (docs/07 A7): not found in production unless NEXT_PUBLIC_SHOW_DEV_ROUTES=true. */
+/** Dev-only (docs/07 §2.4): not found unless NEXT_PUBLIC_SHOW_DEV_ROUTES=true, in `pnpm dev` too; Super Admin only (the layout). */
 export default function DesignSystemPage() {
   if (!devRoutesEnabled()) notFound();
   return <ShowcasePage />;

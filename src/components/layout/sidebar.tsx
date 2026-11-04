@@ -15,7 +15,9 @@ import { CountBadge } from "@/components/ui/count-badge";
 /**
  * Frosted navigation: 208px expanded, 60px collapsed, 48px mobile rail.
  * Items come from the route registry: a route the principal can't open isn't rendered. The admin
- * variant (docs/07 P2) shows platform navigation plus its own Preferences section.
+ * variant (docs/07 P2) shows platform navigation plus its own Preferences section (Notifications, and the Design
+ * system when dev routes are on). The firm variant lists only firm routes and the admin variant only the rest, so a
+ * Super Admin's own pages never appear in a firm's sidebar during a support view.
  */
 
 type NavGroup = { label: string; section: NonNullable<RouteDef["nav"]>["section"] };
@@ -36,7 +38,10 @@ export function Sidebar({
   const principal = useSignedInPrincipal();
   const reduceMotion = useReducedMotion() ?? false;
   const pathname = usePathname() ?? "";
-  const groups = GROUPS[variant].map((group) => ({ ...group, routes: navFor(principal, group.section) }));
+  const groups = GROUPS[variant].map((group) => ({
+    ...group,
+    routes: navFor(principal, group.section).filter((route) => (route.area === "firm") === (variant === "firm")),
+  }));
   const activeId = activeNavId(groups.flatMap((group) => group.routes), pathname);
   const pendingRequestCount = (useNotifications().data ?? []).filter(isPendingRequest).length;
   const fade = { duration: reduceMotion ? 0 : 0.14, ease: EASE_OUT };

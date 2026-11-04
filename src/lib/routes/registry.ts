@@ -101,7 +101,8 @@ const ROUTE_DEFS = [
   { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", access: firm(roles("full", "full", "full", "none"), "none") },
 
   // Preferences
-  { id: "design-system", path: "/dev/design-system", title: "Design system", area: "dev", shell: "app", access: PUBLIC, nav: { section: "preferences", order: 1, icon: SwatchBook }, devOnly: true },
+  // Super Admin only, and only when NEXT_PUBLIC_SHOW_DEV_ROUTES=true (devOnly): in the admin sidebar's Preferences.
+  { id: "design-system", path: "/dev/design-system", title: "Design system", area: "dev", shell: "app", access: PLATFORM, nav: { section: "preferences", order: 0, icon: SwatchBook }, devOnly: true },
   { id: "settings", path: "/[firm]/settings", title: "Settings", area: "firm", shell: "app", access: firm(everyone("full")), nav: { section: "preferences", order: 2, icon: Settings }, palette: true },
   { id: "settings.firm", path: "/[firm]/settings/firm", title: "Firm", area: "firm", shell: "app", access: firm(roles("full", "none", "none", "none")), nav: { section: "settings", order: 1, icon: Building2 }, palette: true },
   // docs/07 Q15, Q47: OWNER manages the team; a MANAGER opens the page read-only and sees their own team (`team`), plus
@@ -168,8 +169,9 @@ export function hrefFor(target: RouteId | RouteDef, params: RouteParams = {}, qu
   return queryString ? `${path}?${queryString}` : path;
 }
 
+/** Dev-only routes exist only when NEXT_PUBLIC_SHOW_DEV_ROUTES=true, in `pnpm dev` and in a build alike. */
 export function devRoutesEnabled(): boolean {
-  return process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_SHOW_DEV_ROUTES === "true";
+  return process.env.NEXT_PUBLIC_SHOW_DEV_ROUTES === "true";
 }
 
 const segments = (path: string) => path.split("/").filter(Boolean);

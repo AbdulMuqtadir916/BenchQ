@@ -1,7 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ROLES, ROUTES, accessFor, accessForPath, activeNavId, canOpen, hrefFor, isRouteActive, landingFor, matchRoute, navFor, paletteRoutesFor, routeById, shortcutsFor, supportAccess, type Access, type RouteId } from "./registry";
 import { RESERVED_SLUGS } from "@/lib/schemas/tenancy";
 import type { FirmRole } from "@/lib/schemas/enums";
@@ -245,6 +245,39 @@ describe("access table (docs/07 §2.2)", () => {
       // vitest runs with NODE_ENV=test and no NEXT_PUBLIC_SHOW_DEV_ROUTES
       for (const role of ROLES) expect(canOpen(route, asRole(role))).toBe(false);
     }
+  });
+});
+
+describe("design system: Super Admin only, and only when NEXT_PUBLIC_SHOW_DEV_ROUTES=true", () => {
+  const admin: Principal = { kind: "platform", userId: "padm", role: "PLATFORM_ADMIN", support: null };
+  const route = routeById("design-system");
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("is open to the Super Admin, in their sidebar's Preferences, only when the flag is true", () => {
+    vi.stubEnv("NEXT_PUBLIC_SHOW_DEV_ROUTES", "true");
+    expect(canOpen(route, admin)).toBe(true);
+    expect(navFor(admin, "preferences").map((r) => r.id)).toEqual(["design-system", "admin.notifications"]);
+    for (const value of ["false", "", "TRUE", "True", "1", "yes", " true"]) {
+      vi.stubEnv("NEXT_PUBLIC_SHOW_DEV_ROUTES", value);
+      expect(canOpen(route, admin), value).toBe(false);
+      expect(navFor(admin, "preferences").map((r) => r.id), value).toEqual(["admin.notifications"]);
+    }
+  });
+
+  it("is never open to a firm role, flag or not", () => {
+    for (const value of ["true", "false"]) {
+      vi.stubEnv("NEXT_PUBLIC_SHOW_DEV_ROUTES", value);
+      for (const role of ROLES) {
+        expect(canOpen(route, asRole(role)), `${role} ${value}`).toBe(false);
+        expect(navFor(asRole(role), "preferences").map((r) => r.id), `${role} ${value}`).not.toContain("design-system");
+      }
+    }
+  });
+
+  it("does not follow `pnpm dev`: development without the flag keeps it closed", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_SHOW_DEV_ROUTES", "false");
+    expect(canOpen(route, admin)).toBe(false);
   });
 });
 
