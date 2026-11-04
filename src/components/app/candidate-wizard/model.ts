@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { NEEDS_SPONSOR } from "@/components/app/work-auth-chip";
 import type { CreateCandidate } from "@/lib/schemas/candidate";
 import type { EmploymentType, FieldSource, RemoteMode, WorkAuth } from "@/lib/schemas/enums";
 import type { ResumeDraft } from "@/lib/schemas/resume-draft";
@@ -181,8 +180,6 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     yearsExperience: asNumber(values.yearsExperience),
     workAuth,
     workAuthExpiry: toIsoDate(values.workAuthExpiry),
-    needsSponsorship: workAuth === "OTHER" ? null : NEEDS_SPONSOR.includes(workAuth),
-    needsTransfer: workAuth === "H1B",
     employmentTypes: values.employmentTypes,
     rateTarget: asNumber(values.rateTarget),
     rateMin: asNumber(values.rateMin),

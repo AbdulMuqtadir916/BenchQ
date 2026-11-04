@@ -36,7 +36,7 @@ def _world(db):
     def version(number, category="BASE", job=None):
         row = Resume(firm_id=DEFAULT_FIRM_ID, candidate_id=candidate.id, base_resume_id=base2.id, category=category,
                      version=number, name="Base 2", job_id=job.id if job else None, created_by_user_id=bde.id,
-                     summary=f"B2 {category} {number}")
+                     summary=f"B2 {category} {number}", summary_id=f"sum-{category}-{number}-{job.id if job else 0}")
         db.add(row)
         db.flush()
         return row
@@ -137,3 +137,63 @@ def test_an_application_keeps_showing_the_resume_it_was_sent_with_after_it_is_de
     (row,) = _application_responses(test_db, DEFAULT_FIRM_ID, [app])
     assert (row["tailored_resume_id"], row["tailored_resume_name"], row["tailored_resume_deleted"]) == (
         str(w["t1"].id), "Base 2", True)
+
+
+def _claims(db, candidate):
+    from backend.models.candidates import Claim
+    return db.query(Claim).filter(Claim.candidate_id == candidate.id).all()
+
+
+def test_deleting_a_base_drops_its_unverified_claims_and_restoring_it_writes_them_again(test_db):
+    from backend.candidates.record import write_record
+    w = _world(test_db)
+    write_record(test_db, w["candidate"], w["v1"])
+    write_record(test_db, w["candidate"], w["v2"])
+    test_db.commit()
+    before = len(_claims(test_db, w["candidate"]))
+    assert before >= 2
+    versions.delete_base(test_db, w["bde"], w["candidate"], w["base2"])
+    test_db.commit()
+    assert _claims(test_db, w["candidate"]) == []                       # nothing holds that content any more
+    versions.restore_base(test_db, w["bde"], w["candidate"], w["base2"])
+    test_db.commit()
+    texts = {k.text for k in _claims(test_db, w["candidate"])}
+    assert w["v1"].summary in texts and w["v2"].summary not in texts      # only v1 came back, with its claims
+
+
+def test_deleting_a_version_keeps_the_claims_of_text_other_versions_still_hold(test_db):
+    from backend.candidates.record import write_record
+    w = _world(test_db)
+    w["v2"].summary, w["v2"].summary_id = w["v1"].summary, w["v1"].summary_id          # the same summary item
+    write_record(test_db, w["candidate"], w["v1"])
+    test_db.commit()
+    versions.delete_version(test_db, w["bde"], w["candidate"], w["v2"])
+    test_db.commit()
+    assert {k.text for k in _claims(test_db, w["candidate"])} == {w["v1"].summary}
+
+
+def test_an_acted_on_claim_is_never_dropped(test_db):
+    from backend.candidates.record import write_record
+    w = _world(test_db)
+    write_record(test_db, w["candidate"], w["v1"])
+    claim = next(k for k in _claims(test_db, w["candidate"]) if k.entity_type == "summary")
+    claim.state = "CONTRADICTED"
+    test_db.commit()
+    assert versions.drop_orphan_claims(test_db, w["candidate"]) == 0
+    assert any(k.id == claim.id for k in _claims(test_db, w["candidate"]))
+
+
+def test_writing_the_record_twice_adds_no_second_claim(test_db):
+    from backend.candidates.record import write_record
+    w = _world(test_db)
+    first = write_record(test_db, w["candidate"], w["v1"])
+    assert first > 0 and write_record(test_db, w["candidate"], w["v1"]) == 0
+
+
+def test_an_application_sent_with_a_base_version_shows_that_version(test_db):
+    from backend.api.routes_applications import _application_responses
+    w = _world(test_db)
+    app = _apply(test_db, w, w["v2"])
+    (row,) = _application_responses(test_db, DEFAULT_FIRM_ID, [app])
+    # A BDE can send any résumé, base or tailored: the application shows the one it was sent with.
+    assert row["tailored_resume_id"] == str(w["v2"].id) and row["tailored_resume_deleted"] is False

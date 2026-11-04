@@ -304,6 +304,12 @@ def restore_base(db, actor: User, candidate, base: BaseResume) -> BaseResume:
                                                                               synchronize_session="fetch")
     _activate(db, candidate, base)
     db.flush()
+    # Its claims were dropped when it was deleted (drop_orphan_claims): write them again for the v1 that came back.
+    v1 = scoped(db, Resume, candidate.firm_id).filter(Resume.base_resume_id == base.id, Resume.category == "BASE",
+                                                      Resume.version == 1).first()
+    parse_row = db.get(ResumeParse, base.resume_parse_id) if base.resume_parse_id else None
+    if v1 is not None:
+        write_record(db, candidate, v1, parse_row)
     number = base_numbers(db, candidate)[base.id]
     _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number),
             f"Restored Base {number} (its v1) from the same file; the workflow uses it")
@@ -360,6 +366,7 @@ class Removal:
     message: str
     uses: dict = field(default_factory=dict)
     rest: dict = field(default_factory=dict)      # HIDE: what "keep what is in use, delete the rest" would delete
+    plan: tuple = field(default=(), repr=False)   # HIDE: the (versions, tailored) rows `rest` counts; never sent
 
     def json(self) -> dict:
         return {"outcome": self.outcome, "message": self.message, "uses": self.uses, "rest": self.rest}
@@ -387,10 +394,12 @@ def _live_applications(db, firm_id):
         or_(Application.status.is_(None), func.lower(Application.status).notin_(NOT_LIVE)))
 
 
-def _live_resume_ids(db, firm_id) -> set:
-    """The résumés a live application was sent with."""
-    return {rid for (rid,) in _live_applications(db, firm_id).filter(Application.resume_id.isnot(None))
-            .with_entities(Application.resume_id).all()}
+def _live_counts(db, firm_id) -> dict:
+    """{résumé id: how many live applications were sent with it}, in one query. Computed once per request and passed
+    on, so a preview or a cleanup over many versions doesn't scan the firm's applications for each."""
+    rows = _live_applications(db, firm_id).filter(Application.resume_id.isnot(None)) \
+        .with_entities(Application.resume_id, func.count(Application.id)).group_by(Application.resume_id).all()
+    return {rid: n for rid, n in rows}
 
 
 def _tailored_of(db, candidate, base: BaseResume) -> list[Resume]:
@@ -398,17 +407,16 @@ def _tailored_of(db, candidate, base: BaseResume) -> list[Resume]:
         Resume.base_resume_id == base.id, Resume.category == "TAILORED", Resume.deleted_at.is_(None)).all()
 
 
-def _uses(db, candidate, rows: list[Resume], base: BaseResume | None = None) -> dict:
+def _uses(db, candidate, rows: list[Resume], base: BaseResume | None = None, live: dict | None = None) -> dict:
     """What keeps these rows (and, for a whole base, the base and its upload) in use: a live application sent with
     them, a tailored résumé of the base sent in a live application, evidence a person confirmed on its upload, a claim
     only it holds that a person has acted on. Cover letters and tracking links aren't counted (Zuhair, 2026-11-04: not
     planned for BenchQ yet). Claims count only for items no other version of the candidate has, since a claim follows
     its item from version to version."""
     firm_id, ids = candidate.firm_id, [r.id for r in rows]
-    uses = {"applications": _live_applications(db, firm_id).filter(Application.resume_id.in_(ids)).count(),
-            "tailored": 0, "evidence": 0, "claims": 0}
+    live = _live_counts(db, firm_id) if live is None else live
+    uses = {"applications": sum(live.get(rid, 0) for rid in ids), "tailored": 0, "evidence": 0, "claims": 0}
     if base is not None:
-        live = _live_resume_ids(db, firm_id)
         uses["tailored"] = sum(1 for t in _tailored_of(db, candidate, base) if t.id in live)
         if base.resume_parse_id is not None:
             # Only evidence a person confirmed: the row every upload gets with its UNVERIFIED claims (record.py) is
@@ -458,26 +466,26 @@ def base_removal(db, candidate, base: BaseResume, numbers: dict | None = None) -
                                                         Resume.deleted_at.is_(None)).all()
     if _made_by_lead(db, [base.created_by_user_id, *(r.created_by_user_id for r in rows)]):
         return Removal("REFUSED", f"Base {number} holds what an owner or manager added, so it can't be deleted.")
-    uses = _uses(db, candidate, rows, base)
+    live = _live_counts(db, candidate.firm_id)
+    uses = _uses(db, candidate, rows, base, live)
     tailored = _tailored_of(db, candidate, base)
     if any(uses.values()):
-        rest = _rest(db, candidate, base, rows, tailored)
+        rest = _rest(db, candidate, base, rows, tailored, live)
         counts = {"versions": len(rest[0]), "tailored": len(rest[1])}
         return Removal("HIDE", f"{_phrase(uses)}. Base {number} will be hidden: out of the base list, kept in the "
                                "history and on everything that uses it. Keep what is in use and delete the rest "
-                               f"({_rest_words(counts)})?", uses, counts)
+                               f"({_rest_words(counts)})?", uses, counts, rest)
     extra = f" and {len(tailored)} tailored résumé{'' if len(tailored) == 1 else 's'} nobody sent" if tailored else ""
     return Removal("DELETE", f"Delete Base {number} and its {len(rows)} version{'' if len(rows) == 1 else 's'}{extra}? "
                              "They're removed from view; the ledger keeps the record. Uploading the same file again "
                              "brings the base's version 1 back.", uses)
 
 
-def _rest(db, candidate, base: BaseResume, rows: list[Resume], tailored: list[Resume]):
+def _rest(db, candidate, base: BaseResume, rows: list[Resume], tailored: list[Resume], live: dict):
     """What "keep what is in use, delete the rest" deletes from a base that is in use: its versions after v1 that nothing
     uses (v1 is the base itself and stays), and the tailored résumés no live application was sent with."""
-    live = _live_resume_ids(db, candidate.firm_id)
     versions = [r for r in rows if r.version > 1 and not _made_by_lead(db, [r.created_by_user_id])
-                and not any(_uses(db, candidate, [r]).values())]
+                and not any(_uses(db, candidate, [r], live=live).values())]
     return versions, [t for t in tailored if t.id not in live]
 
 
@@ -485,6 +493,21 @@ def _rest_words(counts: dict) -> str:
     parts = [f"{n} unused version{'' if n == 1 else 's'}" if k == "versions" else
              f"{n} tailored résumé{'' if n == 1 else 's'} nobody sent" for k, n in counts.items() if n]
     return ", ".join(parts) or "nothing else"
+
+
+def drop_orphan_claims(db, candidate) -> int:
+    """Delete the UNVERIFIED claims whose item is in no live version of the candidate any more: the Record shouldn't
+    keep claims for content nothing holds. A claim a person has acted on is never deleted (it keeps its version in
+    use, so that version isn't deleted at all)."""
+    live_ids: set = set()
+    for row in scoped(db, Resume, candidate.firm_id).filter(
+            Resume.candidate_id == candidate.id, Resume.base_resume_id.isnot(None), Resume.deleted_at.is_(None)).all():
+        live_ids |= item_ids(content_of(row))
+    query = scoped(db, Claim, candidate.firm_id).filter(Claim.candidate_id == candidate.id,
+                                                        Claim.state == "UNVERIFIED")
+    if live_ids:
+        query = query.filter(Claim.entity_ref.notin_(live_ids))
+    return query.delete(synchronize_session=False)
 
 
 def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
@@ -496,6 +519,7 @@ def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
             f"Deleted Base {number} v{row.version}")
     row.deleted_at = utcnow()
     db.flush()
+    drop_orphan_claims(db, candidate)
     return removal
 
 
@@ -512,15 +536,14 @@ def delete_base(db, actor: User, candidate, base: BaseResume, keep_used: bool = 
         base.archived_at = utcnow()
         summary = f"Hid Base {number}"
         if keep_used:
-            rows = scoped(db, Resume, candidate.firm_id).filter(
-                Resume.base_resume_id == base.id, Resume.category == "BASE", Resume.deleted_at.is_(None)).all()
-            versions, tailored = _rest(db, candidate, base, rows, _tailored_of(db, candidate, base))
+            versions, tailored = removal.plan                  # worked out once, by the preview above
             now = utcnow()
             for row in (*versions, *tailored):
                 row.deleted_at = now
             summary += f" and deleted {_rest_words({'versions': len(versions), 'tailored': len(tailored)})}"
         _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number), summary)
         db.flush()
+        drop_orphan_claims(db, candidate)
         return removal
     # Soft delete: a base with version rows can't be removed from the table anyway (the versions point at it), and
     # nothing is lost: its versions are marked with it, its upload stays (so the same file is recognised later).
@@ -530,4 +553,5 @@ def delete_base(db, actor: User, candidate, base: BaseResume, keep_used: bool = 
         .update({Resume.deleted_at: now}, synchronize_session="fetch")
     base.deleted_at = now
     db.flush()
+    drop_orphan_claims(db, candidate)
     return removal

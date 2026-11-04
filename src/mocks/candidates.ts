@@ -1,4 +1,5 @@
 import { ApiError, arrayOf } from "@/lib/api/client";
+import { NEEDS_SPONSOR } from "@/components/app/work-auth-chip";
 import { canAssignTo } from "@/lib/auth/policy";
 import { isBde, isManager } from "@/lib/auth/roles";
 import { assignBlockReason } from "@/lib/derive/platform";
@@ -73,8 +74,9 @@ export const candidatesMock = firmScoped("candidates", {
       willingToRelocate: input.willingToRelocate,
       workAuth: input.workAuth,
       workAuthExpiry: input.workAuthExpiry,
-      needsSponsorship: input.needsSponsorship,
-      needsTransfer: input.needsTransfer,
+      // The backend works these out from workAuth when they are left out; the mock does the same.
+      needsSponsorship: input.needsSponsorship ?? (input.workAuth === "OTHER" ? null : NEEDS_SPONSOR.includes(input.workAuth)),
+      needsTransfer: input.needsTransfer ?? input.workAuth === "H1B",
       employmentTypes: input.employmentTypes,
       rateMin: input.rateMin,
       rateTarget: input.rateTarget,

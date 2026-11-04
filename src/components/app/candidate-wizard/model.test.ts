@@ -92,9 +92,11 @@ describe("toCreateCandidate", () => {
     expect(CreateCandidateSchema.parse(body)).toEqual(body);
     expect(body).toMatchObject({
       phone: null, yearsExperience: 9, rateTarget: 85, rateMin: 70, workAuthExpiry: "2027-03-01T00:00:00.000Z",
-      needsSponsorship: true, needsTransfer: true, resumeParseId: "parse_1", managerId: "user_fatima", bdeId: "user_adnan",
+      resumeParseId: "parse_1", managerId: "user_fatima", bdeId: "user_adnan",
       handoffNote: "Push banking.",
     });
-    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ needsSponsorship: false, needsTransfer: false, resumeParseId: null, bdeId: null, handoffNote: null });
+    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ resumeParseId: null, bdeId: null, handoffNote: null });
+    // The flow no longer decides sponsorship: left out, the backend works it out from the work authorization.
+    expect(toCreateCandidate({ ...valid, workAuth: "H1B", managerId: "m" })).not.toHaveProperty("needsSponsorship");
   });
 });

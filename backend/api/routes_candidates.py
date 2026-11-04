@@ -67,8 +67,8 @@ class CreateCandidateBody(BaseModel):
     years_experience: float | None = Field(default=None, ge=0, le=60)
     work_auth: WorkAuth
     work_auth_expiry: datetime | None = None
-    needs_sponsorship: bool | None = None     # entered: kept; left out (null): worked out from work_auth
-    needs_transfer: bool | None = None        # same
+    needs_sponsorship: bool | None = None     # yes or no; left out or null: worked out from work_auth
+    needs_transfer: bool | None = None        # yes or no; left out or null: worked out from work_auth
     employment_types: list[EmploymentType] = Field(default_factory=list)
     rate_target: float | None = Field(default=None, gt=0)
     rate_min: float | None = Field(default=None, gt=0)
@@ -99,7 +99,7 @@ class UpdateCandidateBody(BaseModel):
     notice_period_days: int | None = Field(default=None, ge=0, le=365)
     willing_to_relocate: bool | None = None
     employment_types: list[EmploymentType] | None = None
-    # Entered here they are kept; when work_auth changes without them, they are worked out again.
+    # Sent (even as null = unknown) they are kept; when work_auth changes without them, they are worked out again.
     needs_sponsorship: bool | None = None
     needs_transfer: bool | None = None
 
@@ -252,9 +252,8 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
         full_name=body.full_name.strip(), email=email, phone=_clean(body.phone), linkedin_url=_clean(body.linkedin_url),
         city=_clean(body.city), state=_clean(body.state), willing_to_relocate=body.willing_to_relocate,
         work_auth=body.work_auth, work_auth_expiry=body.work_auth_expiry,
-        needs_sponsorship=(needs_sponsorship(body.work_auth) if body.needs_sponsorship is None
-                           else body.needs_sponsorship),
-        needs_transfer=needs_transfer(body.work_auth) if body.needs_transfer is None else body.needs_transfer,
+        needs_sponsorship=(needs_sponsorship(body.work_auth) if body.needs_sponsorship is None else body.needs_sponsorship),
+        needs_transfer=(needs_transfer(body.work_auth) if body.needs_transfer is None else body.needs_transfer),
         employment_types=list(dict.fromkeys(body.employment_types)),
         rate_min=body.rate_min, rate_target=body.rate_target, status="ON_BENCH", bench_start_date=now,
         available_from=body.available_from, notice_period_days=body.notice_period_days,
@@ -295,17 +294,20 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     changes = body.model_dump(exclude_unset=True)
+    work_auth_before = candidate.work_auth
     for field, value in changes.items():
         if value is None and field in ("work_auth", "willing_to_relocate", "employment_types"):
             raise _bad(f"{field} can't be empty.")
-        if value is not None or field not in ("needs_sponsorship", "needs_transfer"):
-            setattr(candidate, field, value)
-    # A new work authorization works the two out again, unless the same edit entered them (a null counts as not entered).
-    if "work_auth" in changes:
-        if changes.get("needs_sponsorship") is None:
-            candidate.needs_sponsorship = needs_sponsorship(candidate.work_auth)
-        if changes.get("needs_transfer") is None:
-            candidate.needs_transfer = needs_transfer(candidate.work_auth)
+        if value is None and field in ("needs_sponsorship", "needs_transfer"):
+            continue                                   # null means "work it out": done below
+        setattr(candidate, field, value)               # a sent yes or no is kept as given
+    # Worked out from the work authorization (null counts as not sent) when it really changed, or when null was sent.
+    # A work authorization that stayed the same leaves what someone entered alone.
+    changed = candidate.work_auth != work_auth_before
+    if changes.get("needs_sponsorship") is None and (changed or "needs_sponsorship" in changes):
+        candidate.needs_sponsorship = needs_sponsorship(candidate.work_auth)
+    if changes.get("needs_transfer") is None and (changed or "needs_transfer" in changes):
+        candidate.needs_transfer = needs_transfer(candidate.work_auth)
     if candidate.rate_min is not None and candidate.rate_target is not None and candidate.rate_min > candidate.rate_target:
         raise _bad("The floor can't be above the target rate.")
     if changes:

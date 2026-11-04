@@ -428,8 +428,12 @@ says what it would do). A base that is in use is only hidden; with `keep_used` i
 deleted: its versions after v1 that nothing uses and were made by a BDE, and its tailored résumés no live application
 was sent with. A base nothing uses is deleted whole, with all its tailorings. The screen asks twice.
 
+**Claims follow the content.** Deleting a version or a base drops the UNVERIFIED claims whose item is in no live version of
+the candidate any more (`drop_orphan_claims`); a claim a person has acted on is never dropped. Restoring a base writes the
+claims for its v1 again. The Record never holds claims for content nothing holds.
+
 **An application keeps showing the résumé it was sent with** (`resume_id`) after it is deleted: read-only, with
-`tailored_resume_deleted: true`. Only an application with no `resume_id` falls back to the newest tailored résumé of its
+`tailored_resume_deleted: true` (any résumé a BDE sent, base version or tailored; the field names still say "tailored"). Only an application with no `resume_id` falls back to the newest tailored résumé of its
 candidate and job. Lists, dropdowns and scoring still skip deleted rows.
 
 | | Made by a BDE (this one or an earlier one) | Made by an owner or manager |

@@ -90,10 +90,11 @@ def test_the_way_back_rebuilds_the_columns_from_the_claims_and_the_base_and_up_a
     ids = _world(engine)
     _ok(_alembic(name, "upgrade", "0015"))
     _manual_base(engine, ids)
-    with engine.begin() as conn:
-        conn.execute(text("INSERT INTO claims (id, firm_id, candidate_id, entity_type, entity_ref, state, text, source) "
-                          "VALUES (gen_random_uuid(), :f, :c, 'skill', 's1', 'UNVERIFIED', 'Java', 'RESUME_UPLOAD')"),
-                     {"f": ids["firm"], "c": ids["asha"]})
+    with engine.begin() as conn:                                                  # the same skill from two uploads
+        for ref in ("s1", "s2"):
+            conn.execute(text("INSERT INTO claims (id, firm_id, candidate_id, entity_type, entity_ref, state, text, "
+                              "source) VALUES (gen_random_uuid(), :f, :c, 'skill', :r, 'UNVERIFIED', 'Java', "
+                              "'RESUME_UPLOAD')"), {"f": ids["firm"], "c": ids["asha"], "r": ref})
     with engine.begin() as conn:
         conn.execute(text("UPDATE candidates SET needs_sponsorship = NULL WHERE id = :id"), {"id": ids["plain"]})
     _ok(_alembic(name, "downgrade", "0013"))

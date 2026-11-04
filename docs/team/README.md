@@ -99,5 +99,6 @@ it. Everyone else reads it.
 | 0011 | Zuhair | Résumé versioning and upload fingerprints | Merged #106 |
 | 0012 | Samad | Candidate Gmail OAuth/sync and provenance | Merged #104 |
 | 0013 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0012 (Samad's) | `feat/drop-legacy-resume-columns` |
-| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; the Record is claims), `base_resumes.source` `MANUAL`. `down_revision` is 0013 until Samad's 0014 (merge queue) lands, then 0014 | `feat/candidates-final-schema` |
+| 0014 | Samad | Candidate email classification | Merged #111 |
+| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; the Record is claims), `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
 | 0016+ | — | Claim the next number here in your PR | — |

@@ -936,7 +936,8 @@ inside it were stale copies of `willingToRelocate` and `noticePeriodDays`, `tone
 is the active base résumé's (`resumes.summary`). `candidates.skills` and `summary_state` are removed too: skills, the
 summary and every other item of the résumé are `claims` (one UNVERIFIED claim per item, pointing at the item's id,
 written when a candidate or a later upload is made; one evidence row per upload, no quote). `needsSponsorship` and
-`needsTransfer`: a value a person entered wins; one nobody entered is worked out from `workAuth` by the backend (H-1B,
+`needsTransfer`: a yes or no a person sent wins; one left out or sent as `null` is worked out from
+`workAuth` by the backend, on create, on an edit that really changes `workAuth`, and when an edit sends `null` (H-1B,
 H4 EAD, OPT, CPT, TN need sponsorship; H-1B needs a transfer; `OTHER` has no rule, so `needsSponsorship` stays `null`
 (unknown) until a person enters it; a question for Abdul: should the flow ask). A candidate created without a résumé file gets a `MANUAL` base from the form alone, so every candidate has a base.
 

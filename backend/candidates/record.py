@@ -55,14 +55,17 @@ def _upload_evidence(db, candidate, parse_row) -> Evidence:
 
 
 def write_record(db, candidate, version: Resume, parse_row=None, skill_sources: dict[str, str] | None = None) -> int:
-    """Add the UNVERIFIED claims for `version`'s items; returns how many. `parse_row` is the upload the version came
+    """Add the UNVERIFIED claims for `version`'s items that have none; returns how many. `parse_row` is the upload the version came
     from (None for a form-only base); `skill_sources` maps a skill's name to the source the form recorded for it."""
     default_source = "RESUME_UPLOAD" if parse_row is not None else "MANUAL"
-    evidence_id = _upload_evidence(db, candidate, parse_row).id if parse_row is not None else None
+    items = [(t, i, x) for t, i, x in claim_items(version) if i and x]
+    # Idempotent: an item that already has a claim (a restored base, a version sharing the item) gets no second one.
+    have = {ref for (ref,) in scoped(db, Claim, candidate.firm_id, Claim.entity_ref)
+            .filter(Claim.candidate_id == candidate.id, Claim.entity_ref.in_([i for _, i, _ in items])).all()}
+    items = [item for item in items if item[1] not in have]
+    evidence_id = _upload_evidence(db, candidate, parse_row).id if parse_row is not None and items else None
     made = 0
-    for entity_type, item_id, text in claim_items(version):
-        if not item_id or not text:
-            continue
+    for entity_type, item_id, text in items:
         source = (skill_sources or {}).get(text, default_source) if entity_type == "skill" else default_source
         db.add(Claim(firm_id=candidate.firm_id, candidate_id=candidate.id, entity_type=entity_type, entity_ref=item_id,
                      state="UNVERIFIED", text=text, evidence_id=evidence_id, source=source))

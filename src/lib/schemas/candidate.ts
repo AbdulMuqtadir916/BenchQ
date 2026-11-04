@@ -118,8 +118,6 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   yearsExperience: true,
   workAuth: true,
   workAuthExpiry: true,
-  needsSponsorship: true,
-  needsTransfer: true,
   employmentTypes: true,
   rateTarget: true,
   rateMin: true,
@@ -131,6 +129,9 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   preferredLocations: true,
   contactNotes: true,
 }).extend({
+  /** Left out, the backend works them out from `workAuth` (backend/candidates/work_auth.py); sent, they are kept. */
+  needsSponsorship: z.boolean().nullable().optional(),
+  needsTransfer: z.boolean().optional(),
   fullName: z.string().trim().min(1, "Enter the candidate's name."),
   primaryRole: z.string().trim().min(1, "Enter the title they're marketed as."),
   email: z.string().trim().email("Enter a valid email."),

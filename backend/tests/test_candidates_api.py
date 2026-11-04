@@ -186,22 +186,42 @@ def test_an_entered_sponsorship_wins_over_the_rule(anonymous_client, world):
     assert (c["needs_sponsorship"], c["needs_transfer"]) == (False, False)
 
 
-def test_changing_the_work_authorization_works_sponsorship_out_again_unless_entered(anonymous_client, world):
+def test_changing_the_work_authorization_works_sponsorship_out_again_unless_sent(anonymous_client, world):
     c = _create(anonymous_client, world, work_auth="GC", bde="adnan").json()
     url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
     mine = world["as"]["adnan"]
-    r = anonymous_client.patch(url, json={"work_auth": "H1B"}, headers=mine).json()
+    patch = lambda body: anonymous_client.patch(url, json=body, headers=mine).json()      # noqa: E731
+    r = patch({"work_auth": "H1B"})
     assert (r["needs_sponsorship"], r["needs_transfer"]) == (True, True)
-    r = anonymous_client.patch(url, json={"work_auth": "USC"}, headers=mine).json()
+    r = patch({"work_auth": "USC"})
     assert (r["needs_sponsorship"], r["needs_transfer"]) == (False, False)
-    r = anonymous_client.patch(url, json={"work_auth": "OTHER", "needs_sponsorship": True}, headers=mine).json()
+    r = patch({"work_auth": "OTHER", "needs_sponsorship": True})                  # sent with the change: kept
     assert (r["needs_sponsorship"], r["needs_transfer"]) == (True, False)
-    r = anonymous_client.patch(url, json={"rate_target": 80}, headers=mine).json()           # no work_auth change: kept
-    assert r["needs_sponsorship"] is True
-    r = anonymous_client.patch(url, json={"work_auth": "OPT", "needs_sponsorship": None}, headers=mine).json()
-    assert (r["needs_sponsorship"], r["needs_transfer"]) == (True, False)                  # null counts as not entered
-    r = anonymous_client.patch(url, json={"work_auth": "OTHER"}, headers=mine).json()
-    assert (r["needs_sponsorship"], r["needs_transfer"]) == (None, False)                  # no rule for Other: unknown
+    assert patch({"rate_target": 80})["needs_sponsorship"] is True                # no work_auth in the edit: kept
+    assert patch({"work_auth": "OTHER"})["needs_sponsorship"] is True             # same work_auth sent again: kept
+    assert patch({"work_auth": "OPT"})["needs_sponsorship"] is True               # changed: worked out again (OPT = yes)
+    assert patch({"work_auth": "OTHER"})["needs_sponsorship"] is None             # Other has no rule: unknown
+    assert patch({"needs_sponsorship": False})["needs_sponsorship"] is False      # entered by itself
+    assert patch({"needs_sponsorship": None})["needs_sponsorship"] is None        # null = work it out: Other has no rule
+    assert patch({"needs_sponsorship": True})["needs_sponsorship"] is True
+    assert patch({"needs_sponsorship": None})["needs_sponsorship"] is None        # worked out again from OTHER
+    assert patch({"work_auth": "H1B", "needs_sponsorship": None})["needs_sponsorship"] is True   # null: worked out (H-1B)
+
+
+def test_a_sent_null_transfer_is_not_stored(anonymous_client, world):
+    c = _create(anonymous_client, world, work_auth="H1B", bde="adnan").json()
+    url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
+    r = anonymous_client.patch(url, json={"needs_transfer": None}, headers=world["as"]["adnan"])
+    assert (r.status_code, r.json()["needs_transfer"]) == (200, True)
+
+
+def test_a_create_with_a_sponsorship_null_or_left_out_works_it_out(anonymous_client, world):
+    sent = _create(anonymous_client, world, work_auth="H1B", needs_sponsorship=None).json()
+    assert sent["needs_sponsorship"] is True                                     # sent null = worked out
+    left_out = _create(anonymous_client, world, work_auth="H1B").json()
+    assert left_out["needs_sponsorship"] is True                                 # not sent = worked out
+    other = _create(anonymous_client, world, work_auth="OTHER", needs_sponsorship=None).json()
+    assert other["needs_sponsorship"] is None                                    # no rule: unknown
 
 
 # ── The résumé parse ─────────────────────────────────────────────────────────

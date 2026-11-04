@@ -2,7 +2,7 @@
 from the form alone (docs/team/zuhair.md §1.1 and §1.3; docs/team/resume-versioning.md §3.2; decided 2026-11-04)
 
 Revision ID: 0015
-Revises: 0013
+Revises: 0014
 Create Date: 2026-11-04 20:00:00.000000
 
 `candidates.persona` (a JSON column holding the summary, tone notes, two stale copies of real columns, the preferred
@@ -22,8 +22,7 @@ work it out from, and nobody entering a value is not the same as "no". The downg
 `base_resumes.source` gains `MANUAL`: a candidate created without a résumé file gets a base made from the new-candidate
 form alone, so every candidate has a base. Such a base has no parse (`resume_parse_id` NULL), like a promoted one.
 
-`down_revision` is 0013 while 0014 (Samad's candidate Gmail follow-up) waits in the merge queue; it is set to 0014 the
-day that merges.
+Follows 0014 (Samad's email classification, PR #111).
 
 The downgrade rebuilds `persona` from the columns (its summary from the active base's version 1; `tone_notes` empty),
 `skills` from the candidate's skill claims (no family), `summary_state` as UNVERIFIED, and turns each `MANUAL` base into
@@ -36,7 +35,7 @@ from sqlalchemy.dialects import postgresql
 
 
 revision = '0015'
-down_revision = '0013'
+down_revision = '0014'
 branch_labels = None
 depends_on = None
 
@@ -83,9 +82,11 @@ def downgrade() -> None:
     op.add_column('candidates', sa.Column('persona', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
     conn.execute(sa.text("""
         UPDATE candidates c SET skills = COALESCE((
-            SELECT jsonb_agg(jsonb_build_object('name', k.text, 'family', NULL, 'source', k.source,
-                                                'state', 'UNVERIFIED') ORDER BY k.created_at)
-            FROM claims k WHERE k.candidate_id = c.id AND k.entity_type = 'skill'), '[]'::jsonb)
+            SELECT jsonb_agg(jsonb_build_object('name', d.text, 'family', NULL, 'source', d.source,
+                                                'state', 'UNVERIFIED') ORDER BY d.created_at)
+            FROM (SELECT DISTINCT ON (k.text) k.text, k.source, k.created_at FROM claims k
+                  WHERE k.candidate_id = c.id AND k.entity_type = 'skill' ORDER BY k.text, k.created_at) d),
+            '[]'::jsonb)
     """))
     conn.execute(sa.text("""
         UPDATE candidates c SET persona = jsonb_build_object(
