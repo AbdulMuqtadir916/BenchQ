@@ -1,0 +1,218 @@
+[
+  {
+    "id": "applied-1",
+    "category": "applied",
+    "job_related": true,
+    "subject": "Application received",
+    "body": "Thank you for applying. We received your Backend Engineer application at Alderbyte Systems.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "applied-2",
+    "category": "applied",
+    "job_related": true,
+    "subject": "Submission confirmation",
+    "body": "Your application was submitted successfully.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "screening_call-1",
+    "category": "screening_call",
+    "job_related": true,
+    "subject": "Screening call",
+    "body": "Can we schedule an initial recruiter screening call for your application?",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "screening_call-2",
+    "category": "screening_call",
+    "job_related": true,
+    "subject": "Initial phone screen",
+    "body": "We would like to arrange an introductory screening call.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "shortlisted-1",
+    "category": "shortlisted",
+    "job_related": true,
+    "subject": "You have been shortlisted",
+    "body": "You have been shortlisted for the next hiring stage.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "shortlisted-2",
+    "category": "shortlisted",
+    "job_related": true,
+    "subject": "Advancing your application",
+    "body": "We selected your application for the next round; availability details will follow.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "interview_schedule_request-1",
+    "category": "interview_schedule_request",
+    "job_related": true,
+    "subject": "Interview availability",
+    "body": "Please share your availability so we can schedule your technical interview.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "interview_schedule_request-2",
+    "category": "interview_schedule_request",
+    "job_related": true,
+    "subject": "Arrange your interview",
+    "body": "Which dates work for an interview next week?",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "interview_scheduled-1",
+    "category": "interview_scheduled",
+    "job_related": true,
+    "subject": "Interview confirmed",
+    "body": "Your technical interview is confirmed for Tuesday at 2 PM ET.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "interview_scheduled-2",
+    "category": "interview_scheduled",
+    "job_related": true,
+    "subject": "Confirmed booking",
+    "body": "Your interview has been scheduled for Friday at 10 AM ET.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "assessment-1",
+    "category": "assessment",
+    "job_related": true,
+    "subject": "Coding assessment",
+    "body": "Please complete the attached hiring coding assessment by Friday.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "assessment-2",
+    "category": "assessment",
+    "job_related": true,
+    "subject": "Application task",
+    "body": "Please complete this aptitude assessment as the next step of your application.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "offer-1",
+    "category": "offer",
+    "job_related": true,
+    "subject": "Job offer",
+    "body": "We are pleased to offer you the Backend Engineer position.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "offer-2",
+    "category": "offer",
+    "job_related": true,
+    "subject": "Offer of employment",
+    "body": "We would like to extend an offer of employment for the role you interviewed for.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "move_on-1",
+    "category": "move_on",
+    "job_related": true,
+    "subject": "Application decision",
+    "body": "We will not proceed with your application for this position.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "move_on-2",
+    "category": "move_on",
+    "job_related": true,
+    "subject": "Hiring update",
+    "body": "We decided to proceed with another candidate and reject your application.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "incomplete_application-1",
+    "category": "incomplete_application",
+    "job_related": true,
+    "subject": "Incomplete application",
+    "body": "Your application is incomplete. Please submit the missing required employment details.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "incomplete_application-2",
+    "category": "incomplete_application",
+    "job_related": true,
+    "subject": "Complete your submission",
+    "body": "Required application steps are missing; please finish your application.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "other-1",
+    "category": "other",
+    "job_related": false,
+    "subject": "Bank statement",
+    "body": "Your monthly personal account statement is available.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "other-2",
+    "category": "other",
+    "job_related": false,
+    "subject": "Family dinner",
+    "body": "Can you bring dessert to dinner this weekend?",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "other-3",
+    "category": "other",
+    "job_related": false,
+    "subject": "Shopping discount",
+    "body": "Use this discount code for your next purchase.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "other-4",
+    "category": "other",
+    "job_related": false,
+    "subject": "Career advice",
+    "body": "Read our career newsletter with interview tips.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "other-5",
+    "category": "other",
+    "job_related": false,
+    "subject": "Job alerts",
+    "body": "Recommended jobs for you; browse this weekly digest.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  },
+  {
+    "id": "other-6",
+    "category": "other",
+    "job_related": true,
+    "subject": "Application still under review",
+    "body": "Your application is still under review. No hiring decision has been made.",
+    "source": "authored synthetic; no real candidate content",
+    "adjudication": "pending owner review"
+  }
+]

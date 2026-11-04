@@ -27,6 +27,12 @@ P, AI, FIRM, UNUSED = Scope.PLATFORM, Scope.AI_PRESET, Scope.FIRM_LATER, Scope.U
 
 # key -> (scope, the track that moves or deletes it; "" for PLATFORM keys that stay)
 SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
+    "candidate_email_llm_provider": (AI, "AI presets"),
+    "candidate_email_llm_model": (AI, "AI presets"),
+    "candidate_email_llm_api_key": (AI, "AI presets"),
+    "candidate_email_llm_effort": (AI, "AI presets"),
+    "candidate_email_instructions": (AI, "AI presets"),
+
     # ── Platform: schedules, limits, scraping filters ────────────────────────
     "scrape_interval_minutes": (P, ""),
     "h1b_cron": (P, ""),

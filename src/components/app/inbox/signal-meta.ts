@@ -14,8 +14,8 @@ export const SIGNAL_META: Record<MailSignal, { label: string; Icon: LucideIcon; 
   CONFIRMATION: { label: "Application received", Icon: MailCheck, tone: "neutral" },
 };
 
-export function mailSignalMeta(signal: MailSignal | null) {
-  return signal ? SIGNAL_META[signal] : { label: "Unclassified email", Icon: Mail, tone: "neutral" as const };
+export function mailSignalMeta(signal: MailSignal | null, state?: InboxMessage["classificationState"]) {
+  return signal ? SIGNAL_META[signal] : { label: state === "DONE" ? "Classified" : "Not classified", Icon: Mail, tone: "neutral" as const };
 }
 
 /**

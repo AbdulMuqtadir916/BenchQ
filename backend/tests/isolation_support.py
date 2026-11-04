@@ -341,6 +341,10 @@ def offline(monkeypatch):
     monkeypatch.setattr(routes_candidates, "read_resume", read_resume)
 
     # Provider I/O is synthetic in F7; Google and mailbox secrets are never contacted.
+    from backend import config
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_CLASSIFICATION_ENABLED', True)
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_REAL_MAIL_APPROVED', True)
+    monkeypatch.setattr('backend.inbox.classification_worker.wake_worker', lambda: None)
     from backend.api import routes_inbox
     from backend.inbox.google_oauth import Authorization
     monkeypatch.setattr(routes_inbox, "build_authorization", lambda: Authorization(

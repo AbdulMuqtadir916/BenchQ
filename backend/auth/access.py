@@ -98,6 +98,10 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/ledger": F,          # a BDE gets their own entries only (routes_ledger)
     "POST /api/analyze/{job_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": F,
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/sync": F,
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox": F,

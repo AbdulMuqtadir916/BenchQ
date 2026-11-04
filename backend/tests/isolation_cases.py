@@ -30,6 +30,20 @@ class Case:
     upload: bool = False
     # Only the candidate's BDE takes it (07 Q55): firm B's own call is made as its BDE, not its OWNER.
     as_bde: bool = False
+    # Optional action preconditions, applied independently to each tenant before assertions.
+    prepare: Callable | None = None
+
+
+def _classification_ready(state):
+    def prepare(db, ids):
+        from backend.models.candidates import InboxMessage, CandidateMailbox
+        message = db.get(InboxMessage, ids['inbox_message'])
+        mailbox = db.get(CandidateMailbox, message.mailbox_id)
+        mailbox.refresh_token_ciphertext = b'synthetic-test-only'
+        message.source_address = mailbox.address
+        message.classification_state = state
+        db.commit()
+    return prepare
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
@@ -107,6 +121,10 @@ CASES: dict[str, Case] = {
 
     # ── Applications (track 03) ──────────────────────────────────────────────
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": Case(),
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": Case(path={"message_id":"review_message"}, body=lambda i: {"review_id": str(i["review"]), "command_id": "22222222-2222-4222-8222-222222222222", "expected_review_revision": 0, "expected_content_revision": 0, "application_id": str(i["review_app"]), "expected_application_revision":0, "action": "SET_STATUS", "status":"assessment"}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": Case(prepare=_classification_ready("ERROR"), body=lambda i: {"command_id": "22222222-2222-4222-8222-222222222222", "expected_content_revision": 0, "expected_result_version": 0}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify": Case(prepare=_classification_ready("DONE"), body=lambda i: {"command_id": "22222222-2222-4222-8222-222222222222", "expected_content_revision": 0, "expected_result_version": 0}),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),

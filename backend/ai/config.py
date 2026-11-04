@@ -27,6 +27,7 @@ class AiModule:
 
 # The AI modules that get presets first (08 Q3). Email classification and autofill join when their tracks are live.
 AI_MODULES: dict[str, AiModule] = {
+    "email_classification": AiModule("candidate_email", {"instructions": "candidate_email_instructions"}),
     "scoring": AiModule("scoring", {"rubric": "scoring_rubric"}),
     "tailoring": AiModule("cv_tailor", {"tailor": "cv_tailor_prompt", "persona_tailor": "persona_tailor_prompt"}),
     # Résumé building (PDF -> structured résumé) uses the primary model; its prompt is still in code

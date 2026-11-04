@@ -31,3 +31,11 @@ CANDIDATE_GMAIL_REDIRECT_URI = os.getenv("CANDIDATE_GMAIL_REDIRECT_URI", "")
 CANDIDATE_GMAIL_ENCRYPTION_KEY = os.getenv("CANDIDATE_GMAIL_ENCRYPTION_KEY", "")
 
 CANDIDATE_GMAIL_ENABLED = os.getenv("CANDIDATE_GMAIL_ENABLED", "false").lower() == "true"
+
+# PR 3: real-mail external processing requires both switches and written operational approval.
+CANDIDATE_EMAIL_CLASSIFICATION_ENABLED = os.getenv("CANDIDATE_EMAIL_CLASSIFICATION_ENABLED", "false").lower() == "true"
+CANDIDATE_EMAIL_REAL_MAIL_APPROVED = os.getenv("CANDIDATE_EMAIL_REAL_MAIL_APPROVED", "false").lower() == "true"
+CANDIDATE_EMAIL_PURGE_ENABLED = os.getenv("CANDIDATE_EMAIL_PURGE_ENABLED", "false").lower() == "true"
+CANDIDATE_EMAIL_PURGE_EVALUATED = os.getenv("CANDIDATE_EMAIL_PURGE_EVALUATED", "false").lower() == "true"
+# Bind purge evaluation to the exact recorded model/prompt/taxonomy/policy fingerprint.
+CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID = os.getenv("CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID", "")

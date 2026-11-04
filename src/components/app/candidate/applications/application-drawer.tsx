@@ -96,7 +96,7 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
         {suggestion && canAct ? (
           <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-violet-bg)] p-3">
-            <p className="text-sm text-[var(--color-violet-fg)]"><span className="font-[550]">{mailSignalMeta(suggestion.message.signal).label}</span> — email from {suggestion.message.fromName} {formatRelative(suggestion.message.receivedAt)}.</p>
+            <p className="text-sm text-[var(--color-violet-fg)]"><span className="font-[550]">{mailSignalMeta(suggestion.message.signal, suggestion.message.classificationState).label}</span> — email from {suggestion.message.fromName} {formatRelative(suggestion.message.receivedAt)}.</p>
             <Button size="sm" className="mt-2" onClick={() => actions.applySuggestion(suggestion)}>Move to {STATUS_LABEL[suggestion.to]}</Button>
           </div>
         ) : null}
@@ -141,7 +141,7 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
           ) : (
             <ul className="space-y-1.5">
               {emails.map((m) => {
-                const meta = mailSignalMeta(m.signal);
+                const meta = mailSignalMeta(m.signal, m.classificationState);
                 return (
                   <li key={m.id}>
                     <button type="button" onClick={() => actions.openMessage(m.id)} className="flex w-full items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 text-left hover:bg-[var(--color-surface-2)]">

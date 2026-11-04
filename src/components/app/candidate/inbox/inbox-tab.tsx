@@ -145,7 +145,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
         <ul className="max-h-[26rem] divide-y divide-[var(--color-border)] overflow-y-auto border-b border-[var(--color-border)] lg:max-h-none lg:border-b-0 lg:border-r" aria-label="Emails">
           {list.length === 0 ? <li className="px-4 py-8 text-center text-sm text-[var(--color-text-3)]">No emails in this view.</li> : null}
           {list.map((m, i) => {
-            const meta = mailSignalMeta(m.signal);
+            const meta = mailSignalMeta(m.signal, m.classificationState);
             const isSelected = selected?.id === m.id;
             return (
               <li key={m.id}>

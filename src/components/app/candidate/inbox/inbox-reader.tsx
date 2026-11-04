@@ -28,7 +28,7 @@ interface ReaderProps {
 export function InboxReader({ message, application, suggestion, canAct, actions }: ReaderProps) {
   const reduce = useReducedMotion() ?? false;
   if (!message) return <EmptyState icon={MailOpen} title="Pick an email" description="Select an email on the left to read it here." />;
-  const meta = mailSignalMeta(message.signal);
+  const meta = mailSignalMeta(message.signal, message.classificationState);
 
   return (
     <motion.article key={message.id} initial={reduce ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="flex h-full flex-col">

@@ -1,6 +1,7 @@
 """PR 2 migration: OAuth storage and retained account identity, one linear revision."""
 import pytest
 from sqlalchemy import text
+from backend.db_schema import head_revision
 from sqlalchemy.orm import Session
 
 from backend.tests.auth_support import seed_accounts
@@ -59,5 +60,5 @@ def test_downgrade_refuses_to_discard_credentials_or_account_provenance(scratch_
     expected = {'credential':'Disconnect candidate mailboxes', 'retained-account':'preserve retained mailbox account provenance', 'active-oauth':'active OAuth attempts'}
     assert expected[protected] in result.stderr
     with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0012'
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision()
         assert conn.execute(text('SELECT count(*) FROM inbox_messages')).scalar_one() > 0
