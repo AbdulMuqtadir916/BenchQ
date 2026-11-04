@@ -154,6 +154,14 @@ Python's `logging` sends every module's records up to one root logger. Each file
   With the masking switched off, it fails on the database and validation errors; the other flows log no personal data
   in the first place.
 - **The rule** is in `CLAUDE.md` ("Things you must not do"): masking is the safety net, not permission.
+- **CI keeps it for new code** (added 2026-11-04), so nobody has to come back to logging for each new route:
+  - every route is logged by `RequestLog` with no per-route work, and `test_logging.py` fails if that breaks;
+  - `backend/tests/test_log_lint.py` reads every log call and fails on one that puts a person's data in its message
+    (`candidate.full_name`, `user.email`, a raw AI reply, Google's whole reply, a search's name), and on `print()` in
+    the server. Its `KNOWN` list holds the calls already reported to their owners; it only shrinks;
+  - `backend/tests/test_logging_coverage.py` lists every POST/PUT/PATCH route as `canary` (planted data goes
+    through it), `none` (no one's data) or `todo` (people's data, no canary case yet, owner named). A new route
+    fails CI until it is listed.
 - **Fixed on the way:** the tracer redirect logged its link's token on a failed click write; it logs the link id.
 - **Left as they are:** the existing log calls. The masking covers what it recognises (database errors, emails, phone
   numbers, tokens), not free text: the calls that log an AI reply are listed for their owners below. The two backfill
@@ -164,7 +172,9 @@ Python's `logging` sends every module's records up to one root logger. Each file
 
 - **Everyone:** keep `logging.getLogger("jobnavigator.<area>")` and never call `logging.basicConfig` or add a handler.
   A new program (the worker in step 3, a new script) calls `configure_logging()` first. Log ids, counts and timings.
-  A new route that handles people's data gets a case in the canary test.
+  A new route that takes a body goes in `LOG_REVIEW` (`backend/tests/test_logging_coverage.py`); if it handles
+  people's data, it gets a case in the canary test and is listed as `canary`. Your `todo` routes there are yours to
+  move to `canary` when you next work on them.
 - **Samad:** `backend/email_monitor/gmail_client.py:36` logs Google's whole reply (`resp.text`) when a token refresh
   fails. The masking catches what it recognises, but logging the status code and Google's `error` field is safer.
   Your file, so not changed here.
