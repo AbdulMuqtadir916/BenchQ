@@ -302,9 +302,25 @@ class InboxMessage(Base):
     is_read = Column(Boolean, nullable=False, server_default=text("false"))
     created_at = _created_at()
 
+    classification_state = Column(String(16), nullable=False, server_default=text("'NOT_QUEUED'"))
+    classification_attempts = Column(Integer, nullable=False, server_default=text("0"))
+    classification_version = Column(Integer, nullable=False, server_default=text("0"))
+    content_revision = Column(Integer, nullable=False, server_default=text("0"))
+    classification_token = Column(UUID(as_uuid=True), nullable=True)
+    classification_lease_until = Column(DateTime(timezone=True), nullable=True)
+    classification_next_retry_at = Column(DateTime(timezone=True), nullable=True)
+    classification_error = Column(String(64), nullable=True)
+    sender_auth_result = Column(String(8), nullable=False, server_default=text("'UNKNOWN'"))
+    receive_time_verified = Column(Boolean, nullable=False, server_default=text("false"))
+    hidden_at = Column(DateTime(timezone=True), nullable=True)
+    other_purge_after = Column(DateTime(timezone=True), nullable=True)
+
     __table_args__ = (
         UniqueConstraint("mailbox_id", "source_address", "provider_message_id", name="uq_inbox_messages_mailbox_message"),
         Index("ix_inbox_messages_candidate_received", "firm_id", "candidate_id", "received_at"),
+        CheckConstraint("classification_state IN ('NOT_QUEUED','PENDING','PROCESSING','DONE','ERROR','EXCLUDED')", name="ck_inbox_classification_state"),
+        CheckConstraint("sender_auth_result IN ('PASS','FAIL','UNKNOWN')", name="ck_inbox_sender_auth"),
+        Index("ix_inbox_classification_queue", "classification_state", "classification_next_retry_at"),
     )
 
 

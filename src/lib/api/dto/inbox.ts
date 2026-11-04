@@ -6,6 +6,7 @@ import { toIso, toIsoOrNull } from "./shared";
 export const BackendInboxMessageSchema = z.object({
   id: z.string(), firm_id: z.string(), candidate_id: z.string(), application_id: z.string().nullable(),
   from_name: z.string(), from_email: z.string(), subject: z.string(), snippet: z.string(), body: z.string(),
+  classification_state: z.enum(["NOT_QUEUED", "PENDING", "PROCESSING", "DONE", "ERROR", "EXCLUDED"]).default("NOT_QUEUED"),
   received_at: z.string(), is_read: z.boolean(), source_address: z.string().default(""),
 });
 export const BackendInboxSchema = z.object({
@@ -24,6 +25,7 @@ export function toInboxMessage(dto: z.infer<typeof BackendInboxMessageSchema>): 
     applicationId: dto.application_id ? fromBackendId(dto.application_id) : null,
     fromName: dto.from_name, fromEmail: dto.from_email, subject: dto.subject, snippet: dto.snippet, body: dto.body,
     receivedAt: toIso(dto.received_at), isRead: dto.is_read, sourceAddress: dto.source_address,
+    classificationState: dto.classification_state,
     signal: null, impliedStatus: null, scheduledFor: null,
   });
 }

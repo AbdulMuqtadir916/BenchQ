@@ -717,3 +717,6 @@ These new contracts (CLAUDE.md: no new entity without product sign-off) were **a
 | `firmId` on records        | Job, Application, Resume, Record, Document, Inbox, Followup, **agent and tailoring runs**; LedgerEntry nullable (null only for platform-only events, Q20). Company stays global (Q13)                              |
 | Ledger actions             | add `ADMIN_ACCESS_END`, `FIRM_CREATED`, `FIRM_SUSPENDED`, `FIRM_REACTIVATED`, `PLAN_CHANGED`, `INVITE_SENT`, `INVITE_ACCEPTED`, `INVITE_REVOKED`. No `PlanChange` entity                                           |
 | Derived, never stored      | `seatsUsed`, `activeCandidates`, over-limit flags (Q17)                                                                                                                                                            |
+
+
+PR #111 email classification actions: `email.retry` allows OWNER/MANAGER/BDE; `email.reclassify` allows OWNER/MANAGER. Both require current candidate access; VIEWER and platform/support cannot act. Backend and frontend policies and the generated shared table enforce these dedicated actions.

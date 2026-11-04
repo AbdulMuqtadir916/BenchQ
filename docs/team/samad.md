@@ -1,81 +1,168 @@
 # Samad — Inbox, then Applications, then the Extension
 
-Read first: [team README](./README.md), [00-candidate-core.md](./00-candidate-core.md) (your tables:
-`candidate_mailboxes`, `inbox_messages`, `applications`, `interviews`, `favorite_jobs`), `docs/integration/README.md`
-"The workflow for one module", `CONTRIBUTING.md`.
+Read first: [team README](./README.md), [00-candidate-core.md](./00-candidate-core.md),
+`docs/integration/README.md`, `CLAUDE.md` and `CONTRIBUTING.md`.
 
-**Starts after** the candidate core PR (0007) is merged. One branch and one PR per numbered step below, from `main`.
+**Current authority:** [Abdul’s written decisions on issue #110, 2026-11-04](https://github.com/AbdulMuqtadir916/BenchQ/issues/110#issuecomment-6624344616).
+These decisions supersede the earlier five-PR split, blanket human-acceptance rule, 0.6 automatic-update threshold,
+immediate Other-content removal and manual sender-approval proposals. This file is the reviewer’s current module
+plan. Historical proposals in local working documents are not approval to implement conflicting behavior.
 
 ## PR raise rules
 
-Agreed with Samad on 2026-11-01 for separating the existing combined Inbox/Applications work:
+1. **Check the latest main before every PR.** Fetch origin/main, start each branch from updated main and integrate
+   subsequent main changes before publication. Preserve the combined local code and running development data.
+2. **One branch per PR, targeting main; no stacked PRs.** Wait for each dependency to merge before preparing the
+   next PR from refreshed main. Merge only with the required review and Samad’s explicit merge instruction.
+3. **Approved split:**
+   - PR 1 — Applications foundation: statuses, immutable history and BDE-review records (completed).
+   - PR 2 — Candidate Gmail connection and encrypted Inbox/import foundation (merged as #104).
+   - **PR 3 — Email matching, classification and review backend; no application-status writes.** See §1.2.
+   - **PR 4 — Automatic status updates, compensating Undo and existing UI integration.** See §1.3.
+   The old separate mailbox-history/UI PRs are superseded by this split; preserve #104’s merged protections.
+   Do not reuse historical migration numbers. Recheck main’s Alembic head before claiming a revision.
+4. **Include a per-file Markdown change document in every PR.** Use
+   `docs/team/pr-changes/<branch-name>.md`, replacing `/` with `-`. List added/modified/deleted/renamed files,
+   explain purpose, scope, dependencies, migration impact, checks and remaining limits.
+5. **Reuse and adapt existing code.** Move only relevant changes from the combined local implementation; preserve
+   merged main’s encryption, OAuth, background import and permissions. Reuse existing tables/commands instead of
+   introducing parallel application, review, history, job or ledger structures. New schema/API changes still need
+   review in the canonical data/policy documents. Leases, usage accounting and evaluation work must remain lean.
+6. **Complete repository checks and review gates.** Fill in the PR template; include at most one additive migration
+   per PR with a real, safe downgrade; pass required checks; obtain code-owner approval. Use merge commits.
+   Keep #95 as draft; supersede it with replacement links when the replacement sequence is established.
 
-1. **Check the latest `main` before every PR.** Fetch `origin/main`, start each PR branch from it, and merge or
-   rebase any newer `main` changes into the branch before publication. Resolve conflicts and run the required checks
-   against that updated branch.
-2. **One concern per PR, raised step by step.** Each PR targets `main`. Wait for the preceding dependency to be
-   approved and merged, then prepare the next branch from the updated `main`; do not stack PRs on open branches.
-3. **Split the existing work in this order:**
-   - PR 1: Applications foundation — statuses, status history, BDE review records, and migration `0009` — merged in PR #100.
-   - PR 2: Candidate Inbox connection — Gmail OAuth, mailbox connection/sync and minimum retained-account identity protection; migration `0012` follows merged résumé `0011`.
-   - PR 3: Email classification — application matching, confidence rules, automatic status updates and BDE review
-     routing, and its next available migration.
-   - Original PR 4: account provenance and deduplication are moved into PR 2 (Samad requested 2026-11-01; Abdul approval pending). Do not raise a duplicate history PR; later hardening is a separate concern only if needed.
-   - PR 4 (remaining UI): Remaining UI improvements — recruiter reply cards, exact-email navigation, and display changes.
-   Main owns résumé `0008` and Applications `0009` (PR #100). Notifications owns `0010` (PR #105); Résumé versions owns `0011` (#106); PR 2 claims `0012`. Claim later migration numbers
-   individually after checking the latest Alembic head on `main`; do not reserve numbers from the old combined branch.
-   Include dependencies needed for each PR to work independently and explain any necessary scope adjustment.
-4. **Include a Markdown change document in every PR.** Use `docs/team/pr-changes/<branch-name>.md` (replace `/`
-   in the branch name with `-`). List every added, modified, deleted, or renamed file, explain what changed in each
-   file and why, and record the PR's scope, dependencies, migration impact, validation results, and remaining limits.
-5. **Preserve existing work while splitting.** Keep the combined implementation and local UI changes available;
-   move only the relevant changes into each PR. Each PR includes its own relevant tests and documentation, with no
-   dependency on changes left only in a later branch.
-6. **Follow the repository merge gates.** Fill in the PR template, include at most one migration with a real
-   downgrade, pass the required CI checks, and obtain Abdul's code-owner approval where required. Merge using a
-   merge commit. Supersede PR #95 with links to the replacement PRs when the replacement sequence is established.
+## 1. Inbox — approved remaining workflow (D8)
 
-## 1. Inbox — each candidate's own Gmail, linked to their applications (D8)
+### 1.0 Existing foundation to preserve
 
-The candidate page already has an Inbox tab and an "Inbox" preview on its Overview, on mocks
-(`src/mocks/inbox.ts`, `src/lib/schemas/inbox.ts`: `InboxMessage`, `MailboxConnection`). The backend today watches
-**one** Gmail account for the whole app (`backend/email_monitor/`, `POST /api/email/check-now`).
+PR #104 provides per-candidate read-only Gmail OAuth, confirmation, encrypted retained body/snippet, background
+import, current-source provenance/deduplication and retained-content deletion controls. Initial import uses the
+recent three-day window; subsequent imports use the established incremental-sync mechanism.
 
-### 1.0 Connection and retention proposal — Samad requested; Abdul sign-off pending (2026-11-02)
+- Access follows the existing firm/candidate permission policy. BDE access follows current candidate assignment;
+  reassignment preserves the candidate’s retained applications/emails and removes the previous BDE’s access.
+- One active candidate connection per Gmail **within a firm**. The same Gmail may be connected in other firms.
+  Never disclose another firm’s mailbox use. Disconnect/revocation retries must preserve another live shared grant.
+- Keep `is_read` local to BenchQ. Do not send, delete or mark messages read in Gmail. Reads/manual-sync requests
+  do not create business-ledger entries; a separate access log is a future proposal.
+- Preserve #104’s content encryption/key rotation and source-account isolation on reconnect/replacement. The legacy
+  global monitor remains limited to non-candidate applications and must not bypass candidate status commands.
+- Existing application résumé associations (`applications.resume_id`) and Notes remain intact. No new résumé
+  functionality is included in PR 3 or PR 4.
 
-- The candidate owns the mailbox. An authorized OWNER/MANAGER/BDE starts Google-hosted consent from that
-  candidate’s Inbox, using existing `candidate.edit` plus the shared candidate scope. VIEWER may read stored mail within existing scope; platform support sees only operational health/counts and cannot connect, sync, disconnect or mark it read. No new role checks are introduced.
-- Request `openid email` and Gmail read-only. Google verifies the selected account address; the UI shows that
-  address rather than guessing it from the candidate profile. Complete consent in the browser running the
-  initiating BenchQ session; callbacks require that session. BenchQ never accepts a Google password. State is
-  random, stored hashed, single-use and bound to the initiating user/firm/candidate; the PKCE verifier and refresh
-  token are encrypted with a Fernet key held outside the database. Recheck current authorization around exchange.
-- Initial import is **3 days** (the former 90-day proposal is superseded). Retain message text, headers, provider
-  IDs and the source address, skip attachments, cap stored bodies at 100,000 characters. Incremental history sync
-  defaults to 5 minutes; 0 disables polling. Expired history checkpoints rebuild the deduplicated recent window.
-- Disconnect removes credentials/checkpoints and stops sync, retaining imported messages. Replacing an active
-  address requires disconnect first. Reconnect generations and row locks prevent stale sync/error callbacks from
-  changing a newer connection. A PostgreSQL advisory lock prevents duplicate pollers in the current single-process
-  deployment; production worker topology remains Uzair’s track.
-- **Minimum account-history protection is included now:** `source_address` records the verified address at import.
-  Deduplicate by `(mailbox_id, source_address, provider_message_id)`. Before changing an account, attribute blank
-  legacy sources to the existing address. Existing database rows are backfilled from their current mailbox; unknown
-  historical replacement must be investigated before rollout rather than inventing original provenance.
-- Imports are unclassified and do not match new application links or change application statuses in this PR.
-  Matching/classification/BDE routing and the agreed confidence policy belong to PR 3. A null signal renders as
-  Unclassified in all existing consumers; retained mail remains readable after disconnect.
-- Connection, confirmation and deletion mutations are attributed to their actor/candidate in the ledger; reads and manual sync requests are excluded. Initial/background imports use SYSTEM
-  attribution when records are added; no email body, subject, credential or provider diagnostic is logged.
-- Ship behind the existing `inbox` live-module adapter flag. The connect flow navigates to Google; mock mode keeps
-  synthetic fixtures without a fake consent screen. Sync/read/disconnect errors are visible and read failures roll
-  back optimistic state with explicit retry. Google Cloud client/redirect and encryption key must be configured
-  through local/deployment secrets before live connection testing. Verification uses synthetic providers only.
-- One new migration, `0012` after `0011`, contains OAuth and minimum provenance. Downgrade refuses to discard
-  active OAuth attempts, live credentials or retained provenance that cannot be reconstructed. No merged migration
-  or existing development data is rewritten. Required code-owner review remains pending before merge.
+### 1.1 Approved processing, visibility and retention
 
-Connection implementation: `backend/api/routes_inbox.py`, `backend/inbox/`, the Inbox adapter/DTO/hooks and current
-connect/reader components. [Per-file changes and evidence](./pr-changes/codex-candidate-gmail-connection.md).
+- **No prefilter in V1:** every imported email goes to the configured classifier when processing is authorized and
+  enabled. There is no manual sender allowlist/approval click in V1. A future prefilter is explicitly tracked in §1.6.
+- Decrypt body/snippet transiently in backend memory for matching/classification; redact/minimize before external
+  calls. Never persist a decrypted duplicate or log raw email content, prompts, credentials or provider diagnostics.
+  Key failure is a processing error, never a reason to send ciphertext or erase mail.
+- Keep classifications versioned. Automatically discover eligible retained unclassified mail only for the current
+  connected source; leave disconnected/replaced-source history unchanged. Model/prompt changes do not silently
+  reclassify old results; explicit authorized reruns append evidence without replaying past status decisions.
+- **Pending or failed classification stays readable** under current firm/candidate access, like unclassified mail
+  in #104, with a **Not classified** badge. Failure never hides or erases mail. Preserve disabled-mode readability.
+- Below-0.8 classification, including uncertain Other, stays readable for review; do not treat it as a confident Other disposition.
+- **Other is not a selectable application status.** It never changes application status. Hide matched Other from
+  Inbox instead of deleting it on classification; keep it encrypted. Hidden Other mail is retained encrypted for
+  **30 days**, then becomes eligible for purge only when the purge gate below is passed and purge is enabled.
+  Keep the approved minimal scoped exclusion marker afterward to prevent reimport; Gmail originals are untouched.
+- **Purge remains OFF** until evaluation demonstrates zero job-related would-remove decisions. Never interpret
+  the superseded 0.6 status threshold as permission for immediate deletion. Respect explicit deletion controls and
+  minimal history/dedup requirements; content cleanup must cover derivatives, not just the visible message body.
+- Owner/Manager quarantine inspection/release UI is **deferred to V2**. Do not build that workflow as a PR 3 blocker
+  or use its absence to hide failed/pending mail contrary to the readable V1 behavior above.
+
+### 1.2 PR 3 — matching, classification and review backend
+
+**PR 3 makes no application-status writes.** Its job is to supply classified evidence and review records while
+preserving #104’s import/readability/tenancy behavior.
+
+1. Integrate the existing AI classifier with committed background-import batches. Reuse main’s import/decryption
+   helpers; do not bring back the combined local code’s obsolete OAuth/router/import implementation.
+2. Match submitted applications by a unique valid existing Gmail thread link first, then a unique complete
+   company/title match. Scope by firm, candidate and source mailbox; exclude never-submitted Saved drafts and
+   retain ambiguous/unmatched mail for BDE review. Matching does not authorize a status write.
+3. Persist versioned category, confidence, model/prompt identity, source email and match/application-revision
+   evidence. Reuse/adapt local classification code and existing reviews; unmatched review must not create a fake
+   application. Preserve historical results and human decisions.
+4. **Sender authentication:** automatic-update eligibility for PR 4 requires trusted Gmail Authentication-Results
+   evidence showing **DMARC pass, or SPF and DKIM pass aligned with the From domain**. Anything else goes to
+   review. Store the normalized pass/fail result with the classification, **not the raw header**. Unknown evidence
+   never qualifies. Validate the trusted Gmail header boundary rather than trusting arbitrary message text.
+5. Prepare review reasons, Other visibility/retention and safe retry/failure information. Preserve the existing
+   BDE review column’s exact-email navigation contract. Since PR 3 does not automate changes, job-related results
+   remain available for explicit human review/confirmation until PR 4 is ready.
+6. Keep duplicate handling, disconnect/deletion/content-revision checks and bounded retry work safe. Worker leases
+   and attempt cost tracking are acceptable, but avoid making a larger infrastructure redesign/new-table exercise
+   a blocker for this lean slice. Record actual implementation limits honestly.
+7. Include affected regression tests, labelled evaluation evidence, a safe additive migration if needed and the
+   per-file change report. A **smaller labelled set is acceptable to start**; the earlier 1,000-message plan is not
+   a hard PR 3 startup gate. Zero job-related would-remove decisions is mandatory before purge can be switched on.
+
+### 1.3 PR 4 — automatic updates, Undo and UI
+
+1. Use one shared status-command path, preserving revisions, source evidence, immutable history, submission facts
+   and résumé association. Manual decisions record actor/time and take precedence over older email decisions.
+2. The approved initial automatic forward-move targets are **Screening call, Shortlisted, Interview schedule
+   request, Interview scheduled and Assessment**, at **confidence >=0.8**. Everything below 0.8 goes to review.
+   **Offer and Move On always require BDE review**, regardless of confidence. Do not carry the superseded >=0.6
+   proposal or automatic Offer/Move On policy into code. Other never changes status.
+3. Unique matching, trustworthy sender authentication and freshness are independent requirements; high model
+   confidence does not override them. Backward/stale/ambiguous decisions and repeated interview rounds go to review.
+   Display order alone must not invent automatic-transition permission. Special Applied/Incomplete/legacy mapping
+   behavior requires the final vocabulary/transition sign-off referenced in §1.4.
+4. A pending review does not automatically prevent a newer independently eligible email from advancing the
+   application. Preserve human work and recheck revisions when an older review is resolved; no silent overwrite.
+5. Automatic changes have an automatic ledger label and exact source-email link. **Undo appends a compensating
+   event**, preserves the original history and suppresses reapplication from the same email. Recheck current state
+   so Undo cannot overwrite a later decision silently.
+6. Connect the existing application board/BDE review column and Inbox review actions to the backend. Keep last
+   confirmed application status visible; review cards open the exact email. Add recruiter-email evidence/navigation,
+   progress filling and conditional Incomplete display while preserving Notes and avoiding full Inbox resets.
+7. Keep automation OFF until PR 4 is **merged and Undo is verified usable**. Run affected backend/frontend, build,
+   isolation and UI checks before publication; maintain the per-file change document.
+
+### 1.4 Documentation required before implementation / UI sign-off
+
+Abdul authorized proceeding with PR 3 **once the required documentation is updated**. Updating this file alone does
+not complete all prerequisites:
+
+- This file’s PR raise rules and §1 now record the approved split and decisions above.
+- Write the final application-status list and explicit frontend/backend/legacy mappings into
+  `docs/02-DATA-CONTRACTS.md`. Backend currently accepts `other`, while frontend still uses older D3 vocabulary;
+  remove Other from new selectable statuses without destroying legacy reads or historical replay.
+- Resolve/close D3 in `docs/integration/06-open-decisions.md` against that final mapping. Do not invent a new Response
+  stage or silently convert legacy values based on display order.
+- Abdul will sign off the vocabulary/mapping in the canonical documentation before PR 4 UI work. This approval
+  comment does not itself settle every legacy mapping or new field/endpoint definition.
+
+### 1.5 Safety gates and review evidence
+
+- **External real-mail AI OFF** until provider/downstream retention and logging are confirmed in writing, consent
+  is updated and the agreed Google/delegated-access requirements are satisfied. Every-email classification does not
+  bypass this gate, and redaction is not proof of anonymity.
+- **Status automation OFF** until PR 4 and usable Undo are merged and verified.
+- **Other purge OFF** until evaluation passes the zero job-related would-remove requirement. Keep hidden content
+  encrypted for the approved 30-day recovery period rather than immediately erasing it.
+- Reuse existing tables/commands rather than adding parallel structures. New schema/permission/API details still
+  require review and canonical documentation; no provisional migration number or proposed column is approved merely
+  because it appeared in an earlier local draft.
+- Use lawful labelled data, preferably synthetic/authored first. A smaller initial corpus is acceptable; record
+  provenance, category/matching accuracy, calibration and removal mistakes. Test decryption, privacy/visibility,
+  duplicates, retries, source changes, scope, manual/automatic races and Undo. Never claim a disabled purge switch
+  alone proves a zero-error removal policy; evaluate shadow would-remove decisions.
+
+### 1.6 Next phase — prefilter and deferred review workflow
+
+Explicit future work, as requested by Abdul: add a relevance prefilter so non-job mail need not reach external AI.
+Candidate signals include **known ATS/job-board sender domains, company domains from the candidate’s submitted
+applications and job-related keywords**. Design for unfamiliar recruiters, ambiguous wording and false negatives;
+no prefilter is implemented/enabled in V1 under this approval.
+
+Also deferred: Owner/Manager private inspection/release workflow, a possible local classifier and a separately
+proposed access log. These are future scope, not hidden dependencies for PR 3.
 
 ## 2. Applications (Track 03, `docs/integration/03-applications.md`)
 

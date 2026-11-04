@@ -54,7 +54,7 @@ export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessag
       ) : (
         <ul className="divide-y divide-[var(--color-border)]">
           {latest.map((m) => {
-            const meta = mailSignalMeta(m.signal);
+            const meta = mailSignalMeta(m.signal, m.classificationState);
             return (
               <li key={m.id}>
                 <button type="button" onClick={() => onOpenMessage(m.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--color-surface-2)]">
@@ -63,7 +63,7 @@ export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessag
                     <p className={cn("truncate text-sm text-[var(--color-text)]", !m.isRead && "font-[550]")}>{m.subject}</p>
                     <p className="truncate text-caption text-[var(--color-text-3)]">{m.fromName} · {formatRelative(m.receivedAt)}</p>
                   </div>
-                  <Tag tone={meta.tone} className="shrink-0"><meta.Icon size={11} aria-hidden />{meta.label}</Tag>
+                  {m.classificationState !== "NOT_QUEUED" ? <Tag tone={meta.tone} className="shrink-0"><meta.Icon size={11} aria-hidden />{meta.label}</Tag> : null}
                 </button>
               </li>
             );

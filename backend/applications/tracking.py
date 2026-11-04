@@ -10,7 +10,7 @@ from backend.models.tenancy import User
 
 STATUSES = frozenset({
     'saved', 'applied', 'screening_call', 'interview_schedule_request', 'interview_scheduled',
-    'offer', 'shortlisted', 'move_on', 'incomplete_application', 'assessment', 'other',
+    'offer', 'shortlisted', 'move_on', 'incomplete_application', 'assessment',
 })
 
 
@@ -31,8 +31,6 @@ def accessible_application(db, firm_id, principal, app_id, *, lock=False):
 def move(db, app, principal, *, status, expected_revision, note=None, command_id=None, review=None):
     if not can(principal, 'application.move'):
         raise HTTPException(403, "You don't have permission to move applications.")
-    if not isinstance(status, str) or status not in STATUSES:
-        raise HTTPException(400, 'Unsupported candidate application status.')
     if note is not None and (not isinstance(note, str) or len(note) > 2000):
         raise HTTPException(400, 'Status note must be at most 2000 characters.')
     if command_id is not None:
@@ -48,6 +46,8 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
                     or previous.review_id != (review.id if review else None)):
                 raise HTTPException(409, 'Command ID was already used for another decision.')
             return app
+    if not isinstance(status, str) or status not in STATUSES:
+        raise HTTPException(400, 'Unsupported candidate application status.')
     if type(expected_revision) is not int or expected_revision != app.status_revision:
         raise HTTPException(409, 'Application changed. Reload before changing its status.')
     pending = scoped(db, ApplicationReview, app.firm_id).filter_by(application_id=app.id, state='PENDING')

@@ -376,6 +376,12 @@ DEFAULT_SETTINGS = {
 # Settings the app writes at runtime but never seeds. PATCH /api/settings rejects
 # keys outside DEFAULT_SETTINGS, so these have to be listed explicitly.
 RUNTIME_SETTING_KEYS = {
+    "candidate_email_llm_provider",
+    "candidate_email_llm_model",
+    "candidate_email_llm_api_key",
+    "candidate_email_llm_effort",
+    "candidate_email_instructions",
+
     "gmail_processed_ids",   # email_monitor/gmail_client.py — processed-message dedup
     "gmail_refresh_token",   # Gmail OAuth setup (gmail_oauth_setup.py)
     "llm_seeded_models",     # migrate_llm_settings() — one-time "defaults offered" marker

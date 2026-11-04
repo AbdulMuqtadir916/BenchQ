@@ -361,21 +361,63 @@ class ApplicationReview(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = firm_id_column()
     candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=False)
-    application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="RESTRICT"), nullable=False)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="RESTRICT"), nullable=True)
     inbox_message_id = Column(UUID(as_uuid=True), ForeignKey("inbox_messages.id", ondelete="RESTRICT"), nullable=False)
     state = Column(String, nullable=False, default="PENDING", server_default=text("'PENDING'"))
     reason = Column(Text, nullable=False)
-    application_revision = Column(Integer, nullable=False)
+    application_revision = Column(Integer, nullable=True)
     revision = Column(Integer, nullable=False, default=0, server_default=text("0"))
     created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, server_default=text("now()"))
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     resolved_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
     resolved_status = Column(String, nullable=True)
     note = Column(Text, nullable=True)
+    classification_version = Column(Integer, nullable=True)
+    classification_id = Column(UUID(as_uuid=True), ForeignKey("email_classifications.id", ondelete="SET NULL"), nullable=True)
     __table_args__ = (
-        UniqueConstraint("application_id", "inbox_message_id", name="uq_application_reviews_email"),
+        Index("uq_application_reviews_email", "application_id", "inbox_message_id", unique=True,
+              postgresql_where=text("classification_version IS NULL")),
+        UniqueConstraint("inbox_message_id", "classification_version", name="uq_review_result_version"),
+        Index("uq_pending_classified_email", "inbox_message_id", unique=True,
+              postgresql_where=text("state = 'PENDING' AND classification_version IS NOT NULL")),
+        CheckConstraint("(application_id IS NULL) = (application_revision IS NULL)", name="ck_review_match_revision"),
+        Index("uq_unmatched_review_email", "inbox_message_id", unique=True,
+              postgresql_where=text("application_id IS NULL AND classification_version IS NULL")),
         CheckConstraint("state IN ('PENDING', 'RESOLVED')", name="ck_application_reviews_state"),
         Index("ix_application_reviews_candidate_state", "firm_id", "candidate_id", "state"),
+    )
+
+
+class EmailClassification(Base):
+    """Versioned structured evidence; no email text or automatic application writes."""
+    __tablename__ = "email_classifications"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = firm_id_column()
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=False)
+    inbox_message_id = Column(UUID(as_uuid=True), ForeignKey("inbox_messages.id", ondelete="RESTRICT"), nullable=False)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("applications.id", ondelete="RESTRICT"), nullable=True)
+    application_revision = Column(Integer, nullable=True)
+    result_version = Column(Integer, nullable=False)
+    content_revision = Column(Integer, nullable=False)
+    category = Column(String(40), nullable=False)
+    confidence = Column(Float, nullable=False)
+    probabilities = Column(JSON, nullable=False)
+    model = Column(String(120), nullable=False)
+    provider = Column(String(80), nullable=False)
+    prompt_version = Column(String(64), nullable=False)
+    category_version = Column(String(40), nullable=False)
+    sender_auth_result = Column(String(8), nullable=False)
+    receive_time_verified = Column(Boolean, nullable=False)
+    outcome = Column(String(24), nullable=False)
+    reason = Column(String(64), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, server_default=text("now()"))
+    __table_args__ = (
+        UniqueConstraint("inbox_message_id", "result_version", name="uq_email_result_version"),
+        CheckConstraint("category IN ('applied','screening_call','shortlisted','interview_schedule_request','interview_scheduled','assessment','offer','move_on','incomplete_application','other')", name="ck_email_category"),
+        CheckConstraint("confidence >= 0 AND confidence <= 1 AND confidence != 'NaN'::float", name="ck_email_confidence"),
+        CheckConstraint("sender_auth_result IN ('PASS','FAIL','UNKNOWN')", name="ck_email_sender_auth"),
+        CheckConstraint("outcome IN ('REVIEW','OTHER','NO_CHANGE')", name="ck_email_outcome"),
+        Index("ix_email_results_scope", "firm_id", "candidate_id", "created_at"),
     )
 
 

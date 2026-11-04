@@ -96,9 +96,12 @@ export const ClientType = z.enum([
   'DIRECT_CLIENT', 'PRIME_VENDOR', 'IMPLEMENTATION_PARTNER', 'STAFFING_AGENCY', 'UNKNOWN',
 ]);
 
+// Target new-write vocabulary (D3, 2026-11-04): exact mapping awaits Abdul's sign-off.
+// Read compatibility retains legacy values/history separately; see section 2.1.
 export const ApplicationStatus = z.enum([
-  'SAVED', 'APPLIED', 'RESPONSE', 'SCREENING', 'INTERVIEW',
-  'OFFER', 'PLACED', 'REJECTED', 'WITHDRAWN', 'EXPIRED',
+  'SAVED', 'APPLIED', 'SCREENING_CALL', 'SHORTLISTED',
+  'INTERVIEW_SCHEDULE_REQUEST', 'INTERVIEW_SCHEDULED', 'ASSESSMENT',
+  'OFFER', 'MOVE_ON', 'INCOMPLETE_APPLICATION',
 ]);
 
 export const OutreachChannel = z.enum([
@@ -116,6 +119,108 @@ export const ScoringDepth = z.enum(['LIGHT', 'FULL']);
 export const RequirementKind = z.enum(['MANDATORY', 'PREFERRED', 'ADJACENT']);
 export const RequirementMatch = z.enum(['HAVE', 'MISSING', 'ADJACENT']);
 ```
+
+---
+
+### 2.1 Application-status vocabulary and legacy mapping — D3
+
+**Decision record: 2026-11-04.** Source: [Abdul’s issue #110 reply](https://github.com/AbdulMuqtadir916/BenchQ/issues/110#issuecomment-6624344616)
+and the stage display order confirmed by Samad. The target vocabulary and no-loss mapping policy are recorded below.
+**Abdul’s sign-off on this exact list/mapping is pending before PR 4 UI work.** This documentation does not change
+runtime schemas, status writers or stored rows. PR 3 makes no application-status writes.
+
+#### Target: ten selectable candidate application statuses
+
+| Backend / new command value | Frontend target value | User-facing label | Display/meaning |
+|---|---|---|---|
+| `saved` | `SAVED` | Saved | Draft/favorite; not proof of submission; not an email category |
+| `applied` | `APPLIED` | Applied | Submitted application |
+| `screening_call` | `SCREENING_CALL` | Screening call | Initial screening stage |
+| `shortlisted` | `SHORTLISTED` | Shortlisted | Explicit advancement |
+| `interview_schedule_request` | `INTERVIEW_SCHEDULE_REQUEST` | Interview schedule request | Availability/request to schedule; not a confirmed booking |
+| `interview_scheduled` | `INTERVIEW_SCHEDULED` | Interview scheduled | Explicit confirmed interview booking |
+| `assessment` | `ASSESSMENT` | Assessment | Hiring assessment/task |
+| `offer` | `OFFER` | Offer | Offer outcome; always BDE review before applying an email suggestion |
+| `move_on` | `MOVE_ON` | Move On (rejected) | Rejection/closing outcome; always BDE review before applying an email suggestion |
+| `incomplete_application` | `INCOMPLETE_APPLICATION` | Incomplete application | Conditional stage, visible only with explicit incomplete-application email evidence |
+
+Forward display order: Saved -> Applied -> Screening call -> Shortlisted -> Interview schedule request ->
+Interview scheduled -> Assessment -> Offer. Move On is a separate closing outcome, not a step after Offer.
+Incomplete application is conditional; omit it when no explicit evidence exists. Display order is not a transition
+allowlist, and it must not reinterpret legacy records or fabricate status changes.
+
+There is **no new Response stage**. **BDE review is a queue/indicator, not an application status**; preserve the
+last confirmed application status while review is pending. Repeated rounds, backwards/old/ambiguous decisions go
+to review; email presence alone is not a status write.
+
+#### Separate email taxonomy
+
+Ten email categories: `applied`, `screening_call`, `shortlisted`, `interview_schedule_request`,
+`interview_scheduled`, `assessment`, `offer`, `move_on`, `incomplete_application`, `other`.
+`other` belongs only to the email taxonomy, never the selectable application-status set; `saved` belongs only to
+application statuses. A classified email can remain unmatched or require review without inventing an application
+stage. `other` never changes application status, even at high confidence.
+
+Required backend correction: remove `other` from the new-write `STATUSES` set in
+`backend/applications/tracking.py` and enforce the same rule through candidate-status, review, legacy candidate
+PATCH and bulk paths. Preserve reads, immutable history and identical historical command replay separately;
+retaining `other` in a new-write allowlist is not required for legacy compatibility. Do not rewrite old events.
+
+#### Explicit frontend/backend/legacy mapping policy
+
+The first table defines the exact bidirectional spelling for new candidate commands. The following table covers
+all old D3 values and known legacy backend values. **Mapping is read/display compatibility unless stated; it is
+not an instruction to backfill stored statuses or rewrite event history.**
+
+| Stored / old frontend value | Read/display mapping | New-write / automation behavior |
+|---|---|---|
+| `saved` / `SAVED` | Saved -> `SAVED` | Exact target value; no automatic match to a never-submitted draft |
+| `applied` / `APPLIED` | Applied -> `APPLIED` | Exact target value |
+| `offer` / `OFFER` | Offer -> `OFFER` | Exact target value; email outcome always BDE review |
+| `rejected` / `REJECTED` | Display as Move On (rejected), retaining original `rejected` in stored history | New candidate rejection commands use `move_on`; email outcome always BDE review. This alias needs the pending mapping sign-off |
+| `response` / `RESPONSE` | Preserve as Recruiter reply (legacy) | No equivalent target stage; no automatic conversion to Applied/Shortlisted; an authorized human chooses the current stage |
+| `screening` / `SCREENING` | Preserve as Screening (legacy) | Ambiguous between old shortlist/screening meanings; do not assume `screening_call` or `shortlisted` |
+| `interview` / `INTERVIEW` | Preserve as Interview (legacy) | Does not prove request versus confirmed booking; no automatic conversion to `interview_scheduled` |
+| `placed` / `PLACED` | Preserve as Placed (legacy), closed outcome | Placement is not merely an offer; never collapse it into Offer or rejection |
+| `withdrawn` / `WITHDRAWN` | Preserve as Withdrawn (legacy), closed outcome | Withdrawal is not rejection; no automatic conversion to Move On |
+| `expired` / `EXPIRED` | Preserve as Expired (legacy), closed outcome | Expiry is not rejection; no automatic conversion to Move On |
+| `other` / `OTHER` already on an application | Preserve as Other (legacy), outside progress/normal target choices | Read-only legacy value; reject new candidate commands selecting it; Other email never overwrites it |
+| `phone_screen` | Preserve as Phone screen (legacy) if encountered | Do not silently remap; known historical migration may already have rewritten it, so inspect actual provenance before any future remediation |
+| `final_round` | Preserve as Final round (legacy) if encountered | Not proof of a scheduled booking or an offer; review/manual correction |
+| `null`, blank or any unknown value | Preserve the raw value; show a safe Unknown/legacy label and require review | Never fall back to Applied, Other or a guessed target; no automatic transition |
+
+All additional modern backend/frontend spellings (`screening_call`/`SCREENING_CALL`, `shortlisted`/`SHORTLISTED`,
+`interview_schedule_request`/`INTERVIEW_SCHEDULE_REQUEST`, `interview_scheduled`/`INTERVIEW_SCHEDULED`,
+`assessment`/`ASSESSMENT`, `move_on`/`MOVE_ON`, `incomplete_application`/`INCOMPLETE_APPLICATION`) use the exact
+mapping in the target table; no ambiguity or legacy rewrite is implied by the spelling conversion.
+
+The frontend read mapper must accept preserved legacy values/history separately from the new-selectable-status
+schema. It must not crash on an old transition or silently turn an unsupported status into Applied. Exact target
+spelling applies at the adapter/DTO boundary; the backend does not start accepting arbitrary uppercase commands.
+Candidate commands may correct a legacy application explicitly under current scope/revision/audit rules; the
+classifier must not guess a forward rank for a legacy value. Existing legacy non-candidate APIs retain their
+separate compatibility policy until explicitly changed; this decision does not expand or retire them.
+
+#### Classification, automation and retention are different policies
+
+- PR 3 records classification/review evidence and performs **no application-status writes**.
+- PR 4 initial automatic forward targets: `screening_call`, `shortlisted`, `interview_schedule_request`,
+  `interview_scheduled`, `assessment`; **confidence >=0.8**, trustworthy Gmail sender-authentication evidence,
+  unique submitted-application match and freshness are independent requirements.
+- `offer` and `move_on` always go to BDE review. No automatic return from closed/legacy states is inferred. Other
+  and Saved are never automatic targets. Special email-driven Applied/Incomplete transitions described during
+  discussion are not added to the approved five-target allowlist by this mapping document.
+- Pending/failed classification is readable in the existing candidate scope with a **Not classified** badge.
+  Hiding matched Other is separate: keep hidden Other encrypted for **30 days**, then purge only when enabled
+  after evaluation proves zero job-related would-remove decisions; retain minimal exclusion references afterward.
+- New-write status validation is not classification gating or purge authorization. Never use a confidence/status
+  mapping change to silently enable real-mail AI, status automation or content deletion.
+- Existing `applications.resume_id`, Notes, submission facts, status revisions and immutable events remain intact.
+
+This section supersedes D3’s old four-vs-ten recommendation and original enum, earlier candidate
+foundation wording that allowed new `other` stage selections, and any older module guidance to default unknown
+status to Applied or map generic Interview to a confirmed booking. No such code/data conversion occurs in this
+change. UI vocabulary/read compatibility and any new DTO details await Abdul’s sign-off before PR 4.
 
 ---
 
@@ -1333,8 +1438,13 @@ This backend-only slice implements the user's agreed candidate status/history an
 Code-owner contract/schema approval is required before merge. The existing frontend schemas below remain
 unchanged in this PR; their live DTO integration and display changes belong to later PRs.
 
-- Candidate statuses are `saved`, `applied`, `screening_call`, `shortlisted`, `interview_schedule_request`,
-  `interview_scheduled`, `assessment`, `offer`, `move_on`, `incomplete_application`, and `other`.
+- Historical PR 1 vocabulary included `saved`, `applied`, `screening_call`, `shortlisted`, `interview_schedule_request`,
+  `interview_scheduled`, `assessment`, `offer`, `move_on`, `incomplete_application`, and `other`. The current
+  target selectable vocabulary is the ten-status list in §2.1; Other is excluded from new writes.
+  PR 3 correction approved in Abdul’s reply supplied by Samad: `other` remains an email category and legacy
+  stored value, but new candidate status/review commands selecting it return 400. Identical historical command
+  replays remain idempotent; reads and existing evidence are preserved. The rule also applies through the
+  candidate legacy PATCH and bulk routes. Frontend selection removal is PR 4.
   Legacy applications retain their existing four-status API. Statuses remain text; migration 0009 does not
   rewrite existing status values or invent a status enum.
 - Application responses add nullable `candidate_id` / `submitted_by_user_id`, integer `status_revision`, nullable
@@ -1612,8 +1722,8 @@ export const TimelineEventSchema = z.object({
 
 ### Candidate Gmail connection — PR 2 (Samad requested 2026-11-02; Abdul sign-off pending)
 
-Candidate Inbox imports and displays read-only Google mail. Matching, classification and automatic application
-status changes belong to PR 3. A new import has `signal: null`, `impliedStatus: null` and `scheduledFor: null`;
+Candidate Inbox imports and displays read-only Google mail. Matching and classification belong to PR 3;
+automatic application-status changes and Undo belong to PR 4 under the later approved split. A new import has `signal: null`, `impliedStatus: null` and `scheduledFor: null`;
 render it as Unclassified, never guess a category. Existing mock signals keep their behavior.
 `InboxMessage.sourceAddress?: string` identifies the verified source Google account for retained mail.
 `MailboxConnection` adds `status` (CONNECTED / DISCONNECTED / ERROR; default CONNECTED for old fixtures),
@@ -1707,3 +1817,57 @@ qualify for approved recoverable purging. Failed processing alone never erases m
 include lawful test-data provenance, approved recovery duration, sender authentication/approval contract,
 quarantine release and legacy-status mappings. No such table/status migration is introduced by PR 104.
 A named Google verification/security-assessment owner and delegated-access policy confirmation remain launch gates.
+
+
+### PR 3 classification evidence — implementation of issue #110 direction (2026-11-04)
+
+Source: [Abdul’s written approval](https://github.com/AbdulMuqtadir916/BenchQ/issues/110#issuecomment-6624344616).
+This records the lean schema/API implementation submitted for code-owner review, not approval of every field name
+or activation of external processing/purge/automation. Exact legacy/UI status mapping sign-off remains separate.
+
+- One additive revision 0014 after main revision 0013 (résumé versioning), to be rechecked before publication. No application
+  status/history backfill. Reuse existing inbox_messages, application_reviews and job_runs; adapt the local
+  email_classifications table to versioned evidence rather than introduce a parallel result table.
+- email_classifications: scoped UUID email/application references, nullable application_revision, result_version,
+  content_revision, category, finite confidence/probabilities, model/provider/prompt/category identity,
+  normalized sender_auth_result, receive_time_verified, reason/outcome and created_at. Unique email/result version;
+  database trigger rejects updates and permits deletion only after explicit content tombstoning. No raw prompts,
+  bodies or authentication headers. Other is retained hidden/encrypted, not a new application status.
+- inbox_messages: classification_state PENDING/PROCESSING/DONE/ERROR/EXCLUDED, attempts/result version,
+  content_revision, lease owner/expiry, next retry and safe error; normalized sender verdict UNKNOWN/PASS/FAIL,
+  receive-time provenance, hidden_at and other_purge_after. Hidden subject/sender values are encrypted too.
+  Explicit deletion/purge clears content and derived results, fences workers and preserves minimal source/provider
+  dedup references. Purge is independently gated and requires 30-day retention and evaluated selection.
+- application_reviews: nullable application_id/application_revision together for unmatched work, classification_id
+  with SET NULL on privacy erasure and a separate classification_version so historical uniqueness survives erasure; preserve legacy linked-review uniqueness/history and unique unmatched-email
+  review. Reruns cannot silently overwrite pending/resolved human work. No placeholder applications.
+- Reuse JobRun for durable minimal attempt usage and idempotent human command journal; no separate attempt table.
+  Unknown provider usage/cost remains UNKNOWN, never zero. Background notifier is bounded, leases fence stale work;
+  there are no automatic application-status writes in PR 3.
+- ai_config("email_classification") uses candidate_email_llm_* and candidate_email_instructions platform AI settings,
+  separate from the legacy global email monitor. No new firm-owned model/prompt controls or preset-admin UI.
+- Existing Inbox/read APIs centrally exclude hidden/deleted rows, including selected IDs and read-mark responses.
+  Pending/failed rows remain readable, label Not classified, safe error/retry-exhausted metadata. No raw model output
+  is returned. Support sees counts/health, never private message content or classifications.
+- GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews returns scoped pending linked/unmatched review
+  IDs, revisions and reasons, UUID after-cursor and bounded limit. Current candidate read access applies.
+- PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review requires application.move
+  and current candidate access. Body: review_id, command_id, expected_review_revision, expected_content_revision,
+  optional application_id/expected_application_revision, action LINK_ONLY/KEEP_CURRENT/SET_STATUS/DISMISS_NON_APPLICATION,
+  optional status/note. Only existing submitted same-candidate apps can be linked. Status writes are explicit human
+  commands through the established command service. No AI result can directly execute them.
+- POST at the same message prefix /classification/retry (candidate.edit) or /classification/reclassify
+  (candidate.assign, scoped Owner/Manager): command_id, expected_content_revision and expected_result_version.
+  Retry requires ERROR; reclassification requires visible DONE and an authorized current connected source. Hidden
+  Other has no V1 inspection/release endpoint; switching flags OFF never releases hidden mail. Mutations reject
+  unknown fields and stale revisions; replay returns without duplicate decisions/audit writes.
+- Candidate scope is checked with the central helper; no inline role checks. Missing/out-of-scope records are 404,
+  denied actions 403, stale/reused commands 409. Both scopes and synthetic failure/visibility paths are covered by
+  the access/F7 inventory. Existing mailbox/deletion/status endpoints and submitted résumé links remain intact.
+- All sensitive env switches default false: CANDIDATE_EMAIL_CLASSIFICATION_ENABLED,
+  CANDIDATE_EMAIL_REAL_MAIL_APPROVED, CANDIDATE_EMAIL_PURGE_ENABLED, CANDIDATE_EMAIL_PURGE_EVALUATED.
+  Purge additionally requires CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID to match the classified configuration fingerprint.
+  Real-mail provider/consent verification, zero-job-related shadow removal and PR 4/Undo activation are independent
+  gates. A passing synthetic integration test is not model accuracy or launch approval.
+
+PR 3 routing clarification: below-0.8 Other remains readable in review, consistent with the below-threshold review rule. Confident Other is hidden/encrypted; no classification confidence alone enables purge.

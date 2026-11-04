@@ -117,9 +117,12 @@ def _store_message(db, mailbox: CandidateMailbox, token: str, message_id: str, c
         return False
     payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
     from_name, from_email = parseaddr(_header(payload, "From"))
+    from backend.inbox.delivery_evidence import sender_authentication
     raw_date = data.get("internalDate")
+    receive_time_verified = False
     try:
         received = datetime.fromtimestamp(int(raw_date) / 1000, tz=timezone.utc)
+        receive_time_verified = received <= utcnow() + timedelta(minutes=5)
     except (TypeError, ValueError, OSError):
         received = utcnow()
     subject = _header(payload, "Subject") or "(no subject)"
@@ -131,7 +134,9 @@ def _store_message(db, mailbox: CandidateMailbox, token: str, message_id: str, c
     if any("\x00" in value for value in (from_name, from_email, subject, snippet, body, str(thread_id or ""))):
         logger.warning("Skipping Gmail message containing invalid text for candidate mailbox")
         return False
+    from backend.inbox.classification_worker import enabled
     imported_id = db.execute(insert(InboxMessage).values(
+        classification_state="PENDING" if enabled() else "NOT_QUEUED",
         firm_id=mailbox.firm_id,
         candidate_id=mailbox.candidate_id,
         mailbox_id=mailbox.id,
@@ -145,6 +150,8 @@ def _store_message(db, mailbox: CandidateMailbox, token: str, message_id: str, c
         snippet=encrypt_content(snippet),
         body=encrypt_content(body),
         received_at=received,
+        sender_auth_result=sender_authentication(payload),
+        receive_time_verified=receive_time_verified,
         is_read=False,
     ).on_conflict_do_nothing(constraint="uq_inbox_messages_mailbox_message")
       .returning(InboxMessage.id)).scalar_one_or_none()

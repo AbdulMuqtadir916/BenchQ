@@ -63,7 +63,7 @@ def test_status_revision_idempotency_and_note_are_persisted(api_client, test_db,
     assert stale.status_code == 409
     reused = api_client.patch(path, json={**body, 'status': 'assessment'}, headers=headers)
     assert reused.status_code == 409
-    missing_revision = api_client.patch(path, json={'status': 'other'}, headers=headers)
+    missing_revision = api_client.patch(path, json={'status': 'assessment'}, headers=headers)
     assert missing_revision.status_code == 409
     detail = api_client.get(f'/api/applications/{app.id}', headers=headers)
     assert detail.status_code == 200
@@ -135,7 +135,7 @@ def test_review_scope_validation_and_event_immutability(api_client, test_db, acc
         request_review(test_db, app, message, reason='LOW_CONFIDENCE')
     message.application_id = original
     test_db.rollback()
-    body = dict(review_id=str(review.id), status='other', expected_revision=0, expected_review_revision=0)
+    body = dict(review_id=str(review.id), status='assessment', expected_revision=0, expected_review_revision=0)
     response = api_client.patch(f'/api/applications/{app.id}/review', json=body, headers=headers)
     assert response.status_code == 200, response.text
     event = test_db.query(ApplicationStatusEvent).filter_by(application_id=app.id).one()

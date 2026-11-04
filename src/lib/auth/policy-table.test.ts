@@ -22,6 +22,8 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   // firm work
   ["candidate.create", "Y Y - - - -"],   // 07 Q41: a BDE no longer adds candidates
   ["candidate.edit", "Y Y Y - - -"],
+  ["email.retry", "Y Y Y - - -"],
+  ["email.reclassify", "Y Y - - - -"],
   ["job.capture", "Y Y Y - - -"],
   ["job.apply", "Y Y Y - - -"],
   ["application.move", "Y Y Y - - -"],
