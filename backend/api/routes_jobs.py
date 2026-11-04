@@ -183,7 +183,7 @@ def list_jobs(
     tailored_map = {}
     if job_ids:
         rows = scoped(db, Resume, firm_id, Resume.job_id, Resume.id).filter(
-            Resume.job_id.in_(job_ids), Resume.category == "TAILORED"
+            Resume.job_id.in_(job_ids), Resume.category == "TAILORED", Resume.deleted_at.is_(None)
         ).order_by(Resume.created_at.desc(), Resume.version.desc()).all()
         for jid, rid in rows:
             if jid not in tailored_map:
@@ -981,7 +981,7 @@ def get_job(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_f
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     tailored = scoped(db, Resume, firm_id, Resume.id).filter(
-        Resume.job_id == job.id, Resume.category == "TAILORED"
+        Resume.job_id == job.id, Resume.category == "TAILORED", Resume.deleted_at.is_(None)
     ).order_by(Resume.created_at.desc(), Resume.version.desc()).first()
     import backend.job_monitor as _mon
     running = [r for r in _mon._running.values() if r.target_job_id == job.id]

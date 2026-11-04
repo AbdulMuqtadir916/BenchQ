@@ -1210,13 +1210,13 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     if app.job_id:
         tailored = (scoped(db, Resume, firm_id)
                     .filter(Resume.job_id == app.job_id, Resume.category == "TAILORED",
-                            Resume.candidate_id == app.candidate_id)
+                            Resume.candidate_id == app.candidate_id, Resume.deleted_at.is_(None))
                     .order_by(Resume.created_at.desc(), Resume.version.desc()).first())
     cv_name = (tailored.name if tailored else None) or app.cv_version_used or (job.best_cv if job else None)
     src = tailored
     if not src and cv_name:
-        src = scoped(db, Resume, firm_id).filter(Resume.name == cv_name,
-                                                Resume.candidate_id == app.candidate_id).first()
+        src = scoped(db, Resume, firm_id).filter(Resume.name == cv_name, Resume.candidate_id == app.candidate_id,
+                                                Resume.deleted_at.is_(None)).first()
     resume_text = ""
     if src:
         try:
@@ -1259,7 +1259,8 @@ def _application_responses(db, firm_id, apps):
         candidate_scope = candidate_scope | Resume.candidate_id.is_(None)
     tailored = {}
     for resume in (scoped(db, Resume, firm_id)
-                   .filter(Resume.job_id.in_(job_ids), candidate_scope, Resume.category == "TAILORED")
+                   .filter(Resume.job_id.in_(job_ids), candidate_scope, Resume.category == "TAILORED",
+                           Resume.deleted_at.is_(None))
                    .order_by(Resume.created_at.desc(), Resume.version.desc(), Resume.id).all()):
         tailored.setdefault((resume.candidate_id, resume.job_id), resume)
     # Cover letters have no candidate_id: their source resume supplies ownership.

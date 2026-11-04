@@ -150,7 +150,7 @@ def _build_ctx(rows: list[CoverLetter], db: Session, firm_id) -> dict:
                     .order_by(Application.updated_at.desc()).all()):
             stages.setdefault(a.job_id, a.status)      # newest wins
     if res_ids:
-        for r in scoped(db, Resume, firm_id).filter(Resume.id.in_(res_ids)).all():
+        for r in scoped(db, Resume, firm_id).filter(Resume.id.in_(res_ids), Resume.deleted_at.is_(None)).all():
             names[r.id] = r.name
     out = {}
     for cl in rows:
@@ -453,7 +453,7 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
             stored_resume_id = None
             letter_firm_id = firm_id or DEFAULT_FIRM_ID
         else:
-            resume = db.query(Resume).filter(Resume.id == resume_id).first()
+            resume = db.query(Resume).filter(Resume.id == resume_id, Resume.deleted_at.is_(None)).first()
             if not resume:
                 raise RuntimeError("resume missing at execution time")
             resume_data = {"header": letter_header(resume)}

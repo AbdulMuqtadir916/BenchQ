@@ -21,6 +21,7 @@ on 2026-10-31). Migration 0013.
 | Settings (shared) | `backend/api/routes_settings.py` | Imports `reset_tailoring_semaphore` from `render_shared.py`. | Moved with the other helpers. |
 | Ledger (Abdul) | `docs/integration/06-open-decisions.md`, `docs/integration/01-ledger.md` | D10 added: keeping deleted résumé versions for the ledger, **a suggestion by Zuhair Baig, chosen and built in this PR as a soft delete on `resumes` / `base_resumes` (Zuhair's tables); the ledger table is unchanged. Abdul is asked to confirm**; one line under the ledger's "Gaps" points to it. | Today a delete keeps who/what/when in the ledger but loses the version's content; the ledger is Abdul's to decide. |
 | Candidate Gmail migration test (Samad) | `backend/tests/test_migration_0012.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `'0012'`. | With PR 6's 0013 on top (PR 6 merged after #104, so it renumbered), a refused downgrade leaves the database at 0013; the test's point (nothing moved) is unchanged. |
+| Jobs, applications (Abdul's review of PR 6) | `backend/api/routes_jobs.py` (list, detail), `routes_applications.py` (interview prep, the tailored link), `routes_cover_letters.py`, `render_shared.py` | Each lookup of a résumé skips soft-deleted versions (`Resume.deleted_at IS NULL`). | A deleted version is invisible to the app; without it a job's "tailored résumé" could point at a deleted v2. One test (`test_r4_cov_routes_jobs.py`). |
 
 Not changed, left to the owner:
 

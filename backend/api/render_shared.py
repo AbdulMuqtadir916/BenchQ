@@ -185,7 +185,7 @@ def _rewrite_urls_with_tracers(json_data: dict, resume_id: str, db,
     if url_style in ("path_jobid", "param_jobid"):
         resolved_job_id = job_id
         if not resolved_job_id and not owner_is_cl:
-            resume_obj = db.query(Resume).filter(Resume.id == resume_id).first()
+            resume_obj = db.query(Resume).filter(Resume.id == resume_id, Resume.deleted_at.is_(None)).first()
             resolved_job_id = resume_obj.job_id if resume_obj else None
         if resolved_job_id:
             job_obj = db.query(Job).filter(Job.id == resolved_job_id).first()

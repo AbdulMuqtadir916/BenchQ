@@ -115,10 +115,10 @@ Each decision: what the frontend needs → what the backend has → options → 
 
 ---
 
-## D10 — Keeping deleted résumé versions for the ledger (decided: soft delete, built in résumé versioning PR 6)
+## D10 — Keeping deleted résumé versions for the ledger (DECIDED 2026-11-04: soft delete, built in résumé versioning PR 6)
 
-> **Suggested by Zuhair Baig, 2026-11-03; chosen and built 2026-11-04** (résumé versioning PR 6, migration 0013), in
-> `resumes`, Zuhair's table: the ledger itself is unchanged. Abdul, as the ledger's owner, is asked to confirm in the PR.
+> **Suggested by Zuhair Baig, 2026-11-03; decided and confirmed by Abdul 2026-11-04** (product-owner review of PR 6),
+> built in résumé versioning PR 6 (migration 0013) in `resumes` / `base_resumes`, Zuhair's tables: the ledger is unchanged.
 
 - **Need:** the owner and manager can see what each BDE worked on, including résumé versions a BDE later deleted.
 - **Before:** a delete removed the row. The ledger entry (who, what, when) stayed, the content was gone.
