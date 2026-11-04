@@ -69,9 +69,8 @@ def _clean(resp, *allowed):
 
 @pytest.mark.parametrize("path", [
     "/api/jobs/abc", "/api/jobs/1", "/api/jobs/%C3%A9%C3%A8",
-    "/api/monitor/run/abc", "/api/resumes/abc", "/api/cover-letters/abc",
-    "/api/jobs/abc/cached-page", "/api/resumes/abc/preview",
-    "/api/resumes/abc/tracer-stats", "/api/cover-letters/abc/tracer-stats",
+    "/api/monitor/run/abc", "/api/cover-letters/abc",
+    "/api/jobs/abc/cached-page", "/api/cover-letters/abc/tracer-stats",
 ])
 def test_malformed_uuid_in_a_path_is_404(live, path):
     _clean(live.get(path), 404)

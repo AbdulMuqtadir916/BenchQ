@@ -30,8 +30,8 @@ AI_MODULES: dict[str, AiModule] = {
     "email_classification": AiModule("candidate_email", {"instructions": "candidate_email_instructions"}),
     "scoring": AiModule("scoring", {"rubric": "scoring_rubric"}),
     "tailoring": AiModule("cv_tailor", {"tailor": "cv_tailor_prompt", "persona_tailor": "persona_tailor_prompt"}),
-    # Résumé building (PDF -> structured résumé) uses the primary model; its prompt is still in code
-    # (routes_resumes.parse_resume_pdf) and moves into the module's preset with the Candidates track.
+    # Résumé building: JobNavigator's PDF -> résumé parser, removed in résumé versioning PR 6. Nothing calls it; the
+    # résumé parser is `resume_parse` below. Kept so the AI presets' module list doesn't change.
     "resume_building": AiModule(""),
     "cover_letter": AiModule("cover_letter", {"letter": "cover_letter_prompt"}),
     # The new-candidate parser (docs/team/resume-versioning.md §2): its own model (resume_parse_llm_*, never the

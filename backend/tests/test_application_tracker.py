@@ -13,7 +13,8 @@ def test_latest_tailored_resume_stays_with_its_candidate_or_legacy_application(
         api_client, test_db, accounts, jobs_in_default_firm, with_legacy):
     from datetime import timedelta
     from backend.models.candidates import Candidate
-    from backend.models.db import Application, Resume, utcnow
+    from backend.models.db import Application, utcnow
+    from backend.tests.resume_support import make_version
 
     candidate, job, app, _, headers, _ = setup_application(test_db, accounts, jobs_in_default_firm)
     other = Candidate(firm_id=candidate.firm_id, manager_id=candidate.manager_id,
@@ -21,17 +22,13 @@ def test_latest_tailored_resume_stays_with_its_candidate_or_legacy_application(
     test_db.add(other)
     test_db.flush()
     now = utcnow()
-    own_newer = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, job_id=job.id,
-        name="Own latest tailored", is_base=False, updated_at=now - timedelta(hours=2))
-    legacy_resume = Resume(firm_id=candidate.firm_id, job_id=job.id,
-        name="Legacy tailored", is_base=False, updated_at=now - timedelta(hours=1))
-    test_db.add_all([
-        Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, job_id=job.id,
-            name="Own older tailored", is_base=False, updated_at=now - timedelta(hours=3)),
-        own_newer, legacy_resume,
-        Resume(firm_id=candidate.firm_id, candidate_id=other.id, job_id=job.id,
-            name="Other candidate newer tailored", is_base=False, updated_at=now),
-    ])
+    tailored = dict(category="TAILORED", job_id=job.id)
+    make_version(test_db, candidate.firm_id, candidate=candidate, name="Own older tailored", version=1,
+                 created_at=now - timedelta(hours=3), **tailored)
+    own_newer = make_version(test_db, candidate.firm_id, candidate=candidate, name="Own latest tailored", version=2,
+                             created_at=now - timedelta(hours=2), **tailored)
+    make_version(test_db, candidate.firm_id, candidate=other, name="Other candidate newer tailored",
+                 created_at=now, **tailored)
     legacy_app = None
     if with_legacy:
         legacy_app = Application(firm_id=candidate.firm_id, job_id=job.id, status="applied")
@@ -43,7 +40,8 @@ def test_latest_tailored_resume_stays_with_its_candidate_or_legacy_application(
     rows = {row["id"]: row for row in result.json()["applications"]}
     assert rows[str(app.id)]["tailored_resume_id"] == str(own_newer.id)
     if legacy_app is not None:
-        assert rows[str(legacy_app.id)]["tailored_resume_id"] == str(legacy_resume.id)
+        # A résumé always has a candidate since 0013, so an application from before candidates has none to show.
+        assert rows[str(legacy_app.id)]["tailored_resume_id"] is None
     candidate_only = api_client.get("/api/applications", headers=headers,
                                     params={"candidate_id": str(candidate.id), "tracked_only": True})
     assert candidate_only.status_code == 200

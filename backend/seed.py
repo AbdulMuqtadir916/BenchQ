@@ -423,7 +423,7 @@ INT_SETTING_KEYS = _int_setting_keys()
 _LLM_PROVIDERS = {"", "claude_api", "claude_code", "codex_cli", "antigravity_cli", "openai", "ollama", "lmstudio", "openrouter"}
 
 # Depth words. `tailor_auto_quick_score` also honours legacy boolean spellings
-# (see routes_resumes._resolve_chain_score_depth).
+# (read by the tailoring flow, rebuilt in the tailoring module).
 _DEPTHS = {"light", "full"}
 
 # Every effort any provider takes; llm_client drops a value the chosen provider lacks.
@@ -761,67 +761,6 @@ SEED_SEARCHES = [
 ]
 
 
-MOCK_RESUME_JSON = {
-    "header": {
-        "name": "Alex Johnson",
-        "contact_items": [
-            {"text": "San Francisco, CA", "url": ""},
-            {"text": "alex@example.com", "url": "mailto:alex@example.com"},
-            {"text": "linkedin.com/in/alexjohnson", "url": "https://linkedin.com/in/alexjohnson"},
-        ],
-    },
-    "summary": "Product manager with 8 years of experience building B2B SaaS products. Led cross-functional teams of 5-15 across 3 product lines, driving $12M ARR growth. Strong background in data-driven decision making, user research, and agile delivery.",
-    "experience": [
-        {
-            "company": "TechCorp",
-            "title": "Senior Product Manager",
-            "location": "San Francisco, CA",
-            "date": "2021 - Present",
-            "bullets": [
-                "Led product strategy for enterprise platform serving **2,000+ customers**, increasing NPS from 32 to 58",
-                "Shipped AI-powered search feature that reduced time-to-resolution by **40%** across support workflows",
-                "Managed $3M annual budget and prioritized roadmap across 3 engineering squads",
-                "Drove adoption of experimentation framework, running **50+ A/B tests** per quarter",
-            ],
-        },
-        {
-            "company": "StartupXYZ",
-            "title": "Product Manager",
-            "location": "New York, NY",
-            "date": "2018 - 2021",
-            "bullets": [
-                "Launched MVP marketplace product from 0 to **$2M ARR** in 18 months",
-                "Defined and executed migration from monolith to microservices architecture",
-                "Conducted **100+ user interviews** to inform product-market fit pivots",
-                "Collaborated with design team to reduce onboarding drop-off by **35%**",
-            ],
-        },
-        {
-            "company": "BigFinance Inc.",
-            "title": "Business Analyst",
-            "location": "Chicago, IL",
-            "date": "2016 - 2018",
-            "bullets": [
-                "Built dashboards and reporting tools for trading desk, saving **20 hours/week** of manual work",
-                "Translated business requirements into technical specs for engineering team",
-                "Led UAT for $5M regulatory compliance project delivered on schedule",
-            ],
-        },
-    ],
-    "skills": {
-        "Product": "Roadmapping, A/B Testing, User Research, PRDs, OKRs, Agile/Scrum",
-        "Technical": "SQL, Python, Jira, Amplitude, Mixpanel, Figma, REST APIs",
-        "Domain": "B2B SaaS, Fintech, Marketplace, Enterprise, AI/ML Products",
-    },
-    "education": [
-        {
-            "school": "University of California, Berkeley",
-            "location": "Berkeley, CA",
-            "degree": "B.S. Computer Science, Minor in Business Administration",
-        },
-    ],
-}
-
 def seed_searches(db):
     """Seed default searches if none exist (except LinkedIn Extension which is always ensured)."""
     existing_modes = {s.search_mode for s in db.query(Search).all()}
@@ -837,37 +776,6 @@ def seed_searches(db):
     if legacy:
         legacy.name = "Extension LI"
     db.commit()
-
-
-def seed_mock_resume(db):
-    """Seed a mock base Resume for demonstration and set it as default for all companies; bails if any base Resume already exists."""
-    if db.query(Resume).filter(Resume.is_base == True).count() > 0:
-        return  # User already has a base resume
-
-    resume = db.query(Resume).filter(Resume.name == "Sample PM", Resume.is_base == True).first()
-    if resume is None:
-        resume = Resume(
-            firm_id=DEFAULT_FIRM_ID,
-            name="Sample PM",
-            is_base=True,
-            template="garamond_alt",
-            page_format="letter",
-            json_data=MOCK_RESUME_JSON,
-        )
-        db.add(resume)
-        db.commit()
-        db.refresh(resume)
-
-    default_row = db.query(Setting).filter(Setting.key == "default_resume_id").first()
-    if default_row:
-        default_row.value = str(resume.id)
-    db.commit()
-
-    for company in db.query(Company).all():
-        company.selected_resume_ids = [str(resume.id)]
-    db.commit()
-
-    logger.info("Seeded mock resume 'Sample PM'")
 
 
 def seed_persona(db):
@@ -947,7 +855,6 @@ def run_seeds():
         seed_companies(db)
         seed_h1b_slugs(db)
         seed_searches(db)
-        seed_mock_resume(db)
         seed_persona(db)
         cleanup_removed_settings(db)
         migrate_llm_settings(db)

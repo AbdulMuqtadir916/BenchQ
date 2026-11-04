@@ -119,7 +119,7 @@ def test_empty_provider_accepted_it_means_inherit():
 
 
 def test_legacy_boolean_tailor_depth_still_accepted():
-    """routes_resumes._resolve_chain_score_depth still maps 'true'/'false'."""
+    """The old boolean spellings of the setting stay valid."""
     assert invalid_setting_values({"tailor_auto_quick_score": "true"}) == []
     assert invalid_setting_values({"tailor_auto_quick_score": "off"}) == []
 

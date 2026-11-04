@@ -1,24 +1,24 @@
 """Scoring reads only the résumés of the firm it scores for (docs/integration/07-auth-and-tenancy.md F2c, "known
 leak"). A résumé is firm data: another firm's must never reach the LLM or a job's scores, whether it comes in as
-an explicit id, the company's selection, the platform-wide `default_resume_id`, or the all-résumés fallback."""
+an explicit id, the company's selection, or the fallback (each candidate's active base)."""
 import pytest
 from sqlalchemy.orm import sessionmaker
 
 import backend.analyzer.cv_scorer as scorer
-from backend.models.db import Company, Job, Resume, Setting
+from backend.models.db import Company, Job, Setting
 from backend.models.tenancy import DEFAULT_FIRM_ID, FirmJob
 from backend.tests.auth_support import make_firm, make_plan
+from backend.tests.resume_support import make_version
 
-TEXT = {"summary": "Product manager with five years of experience shipping at scale."}
+TEXT = "Product manager with five years of experience shipping at scale."
 
 
 @pytest.fixture
 def two_firms(test_db, accounts):
     """The signed-in firm ("acme", which is the Default firm's id) and "globex", each with one base résumé."""
     globex = make_firm(test_db, make_plan(test_db, name="Other plan"), slug="globex").id
-    mine = Resume(firm_id=accounts.firm_id, name="Acme PM", is_base=True, json_data=TEXT)
-    theirs = Resume(firm_id=globex, name="Globex secret", is_base=True, json_data=TEXT)
-    test_db.add_all([mine, theirs])
+    mine = make_version(test_db, accounts.firm_id, full_name="Acme PM", summary=TEXT)
+    theirs = make_version(test_db, globex, full_name="Globex secret", summary=TEXT)
     test_db.commit()
     return {"acme": accounts.firm_id, "globex": globex, "mine": mine, "theirs": theirs}
 
@@ -28,11 +28,11 @@ def test_the_all_resumes_fallback_is_the_firms_own(test_db, two_firms):
     assert list(scorer._get_resume_texts(test_db, two_firms["globex"])) == ["Globex secret"]
 
 
-def test_a_default_resume_of_another_firm_is_ignored(test_db, two_firms):
+def test_the_platform_wide_default_resume_is_no_longer_read(test_db, two_firms):
+    """Résumé versioning PR 6: a firm is scored against its own candidates' active bases, whatever the setting says."""
     test_db.add(Setting(key="default_resume_id", value=str(two_firms["theirs"].id)))
     test_db.commit()
-    assert scorer._get_default_resume(test_db, two_firms["acme"]) == {}
-    assert list(scorer._get_default_resume(test_db, two_firms["globex"])) == ["Globex secret"]
+    assert list(scorer._get_resume_texts(test_db, two_firms["acme"])) == ["Acme PM"]
 
 
 def test_a_companys_selection_skips_another_firms_resume(test_db, two_firms):

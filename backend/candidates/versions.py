@@ -11,7 +11,8 @@ permission checked under the lock can't change before the commit. Nothing here c
 - **Use as base / pick:** a base's v1 makes that base active; any other version is copied as v1 of a new PROMOTED
   base, or the base already made from it is made active.
 - **Upload:** a new UPLOAD base, active, its v1 from the parse (`first_base()` without a form).
-- **Delete:** by who made it and by what uses it: deleted, hidden (`archived_at`), or refused (§4.7).
+- **Delete:** by who made it and by what uses it: deleted, hidden (`archived_at`), or refused (§4.7). Deleting is soft:
+  the row stays with `deleted_at`, out of every list and the workflow, so its text and its number are kept.
 """
 import copy
 import uuid
@@ -116,31 +117,32 @@ def _with_fields(content: dict):
 # ── Reading ──────────────────────────────────────────────────────────────────
 
 def base_numbers(db, candidate) -> dict:
-    """"Base 1, 2…" in the order they were made (hidden ones keep their number)."""
-    ids = scoped(db, BaseResume, candidate.firm_id, BaseResume.id).filter(BaseResume.candidate_id == candidate.id) \
+    """"Base 1, 2…" in the order they were made (hidden ones keep their number; deleted ones aren't counted)."""
+    ids = scoped(db, BaseResume, candidate.firm_id, BaseResume.id).filter(BaseResume.candidate_id == candidate.id,
+                                                                          BaseResume.deleted_at.is_(None)) \
         .order_by(BaseResume.created_at, BaseResume.id).all()
     return {row.id: n for n, row in enumerate(ids, start=1)}
 
 
 def candidate_base(db, candidate, base_id) -> BaseResume:
-    base = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.id == base_id,
-                                                            BaseResume.candidate_id == candidate.id).first()
+    base = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.id == base_id, BaseResume.candidate_id == candidate.id,
+                                                            BaseResume.deleted_at.is_(None)).first()
     if base is None:
         raise _not_found()
     return base
 
 
 def candidate_version(db, candidate, resume_id) -> Resume:
-    """One of the candidate's versioned rows (rows from before versioning have no base and aren't served here)."""
+    """One of the candidate's versions (a deleted one is gone, as a missing one)."""
     row = scoped(db, Resume, candidate.firm_id).filter(Resume.id == resume_id, Resume.candidate_id == candidate.id,
-                                                       Resume.base_resume_id.isnot(None)).first()
+                                                       Resume.deleted_at.is_(None)).first()
     if row is None:
         raise _not_found()
     return row
 
 
 def _group(db, row: Resume):
-    """The rows of one résumé: same base, category and job."""
+    """The rows of one résumé: same base, category and job. Deleted rows count: their numbers are never reused."""
     query = scoped(db, Resume, row.firm_id).filter(Resume.base_resume_id == row.base_resume_id,
                                                    Resume.category == row.category)
     return query.filter(Resume.job_id.is_(None) if row.job_id is None else Resume.job_id == row.job_id)
@@ -168,11 +170,12 @@ def listing(db, candidate) -> dict:
     base was promoted from carries that base's id (`promoted_to_base_id`): the dropdown leaves it out (§3.2), and so
     does it leave out a hidden base (`archived_at`); the history shows both."""
     numbers = base_numbers(db, candidate)
-    bases = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.candidate_id == candidate.id).all()
+    bases = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.candidate_id == candidate.id,
+                                                             BaseResume.deleted_at.is_(None)).all()
     promoted_to = {b.promoted_from_resume_id: b.id for b in bases if b.promoted_from_resume_id}
     # The list shows each version's details, never its content: only those columns are read.
     rows = scoped(db, Resume, candidate.firm_id).filter(Resume.candidate_id == candidate.id,
-                                                        Resume.base_resume_id.isnot(None)) \
+                                                        Resume.base_resume_id.isnot(None), Resume.deleted_at.is_(None)) \
         .options(load_only(Resume.id, Resume.base_resume_id, Resume.category, Resume.job_id, Resume.version,
                            Resume.name, Resume.template, Resume.page_format, Resume.created_by_user_id,
                            Resume.created_at)) \
@@ -230,8 +233,7 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
     latest = _group(db, source).with_entities(func.max(Resume.version)).scalar() or source.version
     row = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=source.base_resume_id,
                  category=source.category, job_id=source.job_id, version=latest + 1, name=source.name,
-                 template=source.template, page_format=source.page_format, is_base=source.category == "BASE",
-                 created_by_user_id=actor.id, json_data={}, **content)
+                 template=source.template, page_format=source.page_format, created_by_user_id=actor.id, **content)
     db.add(row)
     db.flush()
     number = base_numbers(db, candidate)[source.base_resume_id]
@@ -249,8 +251,10 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     numbers = base_numbers(db, candidate)
     if row.category == "BASE" and row.version == 1:
         target = candidate_base(db, candidate, row.base_resume_id)
-    else:
+    else:                                                       # (deleted ones included: they come back, see below)
         target = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.promoted_from_resume_id == row.id).first()
+    if target is not None and target.deleted_at is not None:
+        return restore_base(db, actor, candidate, target)       # promoted before, deleted since: it comes back
     if target is not None:
         if target.archived_at is not None:
             raise HTTPException(status_code=409, detail=f"Base {numbers[target.id]} is hidden. Show it again first.")
@@ -267,7 +271,7 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     _activate(db, candidate, base)
     db.add(Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
                   job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                  is_base=True, created_by_user_id=actor.id, json_data={}, **content_of(row)))
+                  created_by_user_id=actor.id, **content_of(row)))
     db.flush()
     number = len(numbers) + 1
     source = f"Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version}"
@@ -282,10 +286,34 @@ def kept_file(db, candidate, sha256: str) -> ResumeParse | None:
                                                              ResumeParse.content_sha256 == sha256).first()
 
 
+def deleted_base_for(db, candidate, parse_row: ResumeParse) -> BaseResume | None:
+    """The deleted base this kept upload made, if any: uploading the same file again brings it back (§4.7)."""
+    return scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.resume_parse_id == parse_row.id,
+                                                            BaseResume.deleted_at.isnot(None)).first()
+
+
+def restore_base(db, actor: User, candidate, base: BaseResume) -> BaseResume:
+    """A deleted base back, from what was stored: no new read of the file, no AI. Only its v1 (the file's own content)
+    comes back; later edits stay deleted. It becomes the base the workflow uses, as any upload does (§4.7)."""
+    base.deleted_at = None
+    base.archived_at = None
+    db.flush()
+    scoped(db, Resume, candidate.firm_id).filter(Resume.base_resume_id == base.id, Resume.category == "BASE",
+                                                 Resume.version == 1).update({Resume.deleted_at: None},
+                                                                              synchronize_session="fetch")
+    _activate(db, candidate, base)
+    db.flush()
+    number = base_numbers(db, candidate)[base.id]
+    _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number),
+            f"Restored Base {number} (its v1) from the same file; the workflow uses it")
+    return base
+
+
 def already_uploaded(db, candidate, parse_row: ResumeParse) -> HTTPException | None:
     """The answer for a file the candidate already has: its base, or an offer to show a hidden one. None when the
     upload has no base yet (a candidate created before bases existed), so it can still become one."""
-    base = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.resume_parse_id == parse_row.id).first()
+    base = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.resume_parse_id == parse_row.id,
+                                                            BaseResume.deleted_at.is_(None)).first()
     if base is None:
         return None
     number = base_numbers(db, candidate)[base.id]
@@ -367,15 +395,12 @@ def _uses(db, candidate, rows: list[Resume], base: BaseResume | None = None) -> 
         if base.resume_parse_id is not None:
             uses["evidence"] = scoped(db, Evidence, firm_id, func.count(Evidence.id)) \
                 .filter(Evidence.resume_parse_id == base.resume_parse_id).scalar()
-            # A row from before versioning that names the upload holds it too (resumes.resume_parse_id, 0007).
-            uses["evidence"] += scoped(db, Resume, firm_id, func.count(Resume.id)) \
-                .filter(Resume.resume_parse_id == base.resume_parse_id).scalar()
     # Claims are checked only when the candidate has any: otherwise no version's content needs reading.
     has_claims = scoped(db, Claim, firm_id, Claim.id).filter(Claim.candidate_id == candidate.id).first() is not None
     removed = set().union(*(item_ids(content_of(r)) for r in rows)) if rows and has_claims else set()
     if removed:
-        others = scoped(db, Resume, firm_id).filter(Resume.candidate_id == candidate.id,
-                                                    Resume.base_resume_id.isnot(None), Resume.id.notin_(ids)).all()
+        others = scoped(db, Resume, firm_id).filter(Resume.candidate_id == candidate.id, Resume.base_resume_id.isnot(None),
+                                                    Resume.deleted_at.is_(None), Resume.id.notin_(ids)).all()
         removed -= set().union(set(), *(item_ids(content_of(r)) for r in others))
     if removed:
         uses["claims"] = scoped(db, Claim, firm_id, func.count(Claim.id)) \
@@ -398,7 +423,7 @@ def version_removal(db, candidate, row: Resume) -> Removal:
     uses = _uses(db, candidate, [row])
     if any(uses.values()):
         return Removal("REFUSED", f"Can't delete v{row.version}: {_phrase(uses).lower()}.", uses)
-    return Removal("DELETE", f"Delete v{row.version}? This can't be undone.", uses)
+    return Removal("DELETE", f"Delete v{row.version}? It's removed from view; the ledger keeps the record.", uses)
 
 
 def base_removal(db, candidate, base: BaseResume, numbers: dict | None = None) -> Removal:
@@ -407,8 +432,8 @@ def base_removal(db, candidate, base: BaseResume, numbers: dict | None = None) -
         return Removal("REFUSED", f"Base {number} is the base the workflow uses. Pick another base first.")
     if base.archived_at is not None:
         return Removal("REFUSED", f"Base {number} is already hidden.")
-    rows = scoped(db, Resume, candidate.firm_id).filter(Resume.base_resume_id == base.id,
-                                                        Resume.category == "BASE").all()
+    rows = scoped(db, Resume, candidate.firm_id).filter(Resume.base_resume_id == base.id, Resume.category == "BASE",
+                                                        Resume.deleted_at.is_(None)).all()
     if _made_by_lead(db, [base.created_by_user_id, *(r.created_by_user_id for r in rows)]):
         return Removal("REFUSED", f"Base {number} holds what an owner or manager added, so it can't be deleted.")
     uses = _uses(db, candidate, rows, base)
@@ -416,7 +441,8 @@ def base_removal(db, candidate, base: BaseResume, numbers: dict | None = None) -
         return Removal("HIDE", f"{_phrase(uses)}. Base {number} will be hidden: out of the base list, kept in the "
                                "history and on everything that uses it.", uses)
     return Removal("DELETE", f"Delete Base {number} and its {len(rows)} version{'' if len(rows) == 1 else 's'}? "
-                             "This can't be undone.", uses)
+                             "They're removed from view; the ledger keeps the record. Uploading the same file again "
+                             "brings the base back.", uses)
 
 
 def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
@@ -426,7 +452,7 @@ def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
     number = base_numbers(db, candidate)[row.base_resume_id]
     _record(db, actor, candidate, "DELETE", row.id, _label(candidate, number, row),
             f"Deleted Base {number} v{row.version}")
-    db.delete(row)
+    row.deleted_at = utcnow()
     db.flush()
     return removal
 
@@ -441,14 +467,12 @@ def delete_base(db, actor: User, candidate, base: BaseResume) -> Removal:
         base.archived_at = utcnow()
         _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number), f"Hid Base {number}")
         return removal
+    # Soft delete: a base with version rows can't be removed from the table anyway (the versions point at it), and
+    # nothing is lost: its versions are marked with it, its upload stays (so the same file is recognised later).
+    now = utcnow()
     _record(db, actor, candidate, "DELETE", base.id, _label(candidate, number), f"Deleted Base {number}")
-    parse_id = base.resume_parse_id
-    scoped(db, Resume, candidate.firm_id).filter(Resume.base_resume_id == base.id) \
-        .delete(synchronize_session=False)
-    db.delete(base)
+    scoped(db, Resume, candidate.firm_id).filter(Resume.base_resume_id == base.id, Resume.deleted_at.is_(None)) \
+        .update({Resume.deleted_at: now}, synchronize_session="fetch")
+    base.deleted_at = now
     db.flush()
-    if parse_id is not None:
-        # The upload goes too, so the same file can be uploaded fresh later (§4.7).
-        scoped(db, ResumeParse, candidate.firm_id).filter(ResumeParse.id == parse_id) \
-            .delete(synchronize_session=False)
     return removal

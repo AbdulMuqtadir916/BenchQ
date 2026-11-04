@@ -1824,7 +1824,7 @@ Source: [Abdul’s written approval](https://github.com/AbdulMuqtadir916/BenchQ/
 This records the lean schema/API implementation submitted for code-owner review, not approval of every field name
 or activation of external processing/purge/automation. Exact legacy/UI status mapping sign-off remains separate.
 
-- One additive revision 0013 after current main head 0012, to be rechecked before publication. No application
+- One additive revision 0014 after main revision 0013 (résumé versioning), to be rechecked before publication. No application
   status/history backfill. Reuse existing inbox_messages, application_reviews and job_runs; adapt the local
   email_classifications table to versioned evidence rather than introduce a parallel result table.
 - email_classifications: scoped UUID email/application references, nullable application_revision, result_version,

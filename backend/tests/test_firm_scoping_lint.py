@@ -11,7 +11,8 @@ from pathlib import Path
 from backend.models.db import Base
 
 BACKEND = Path(__file__).resolve().parents[1]
-ROUTE_FILES = sorted((BACKEND / "api").glob("routes_*.py")) + [BACKEND / "main.py"]
+# render_shared.py: the helpers that left the old /api/resumes router (résumé versioning PR 6) stay linted.
+ROUTE_FILES = sorted((BACKEND / "api").glob("routes_*.py")) + [BACKEND / "api" / "render_shared.py", BACKEND / "main.py"]
 
 # (file, function) -> why it may query a firm-owned model without `scoped()`.
 ALLOWED = {
@@ -33,13 +34,8 @@ ALLOWED = {
     ("main.py", "trigger_auto_reject"): "platform job (Super Admin route) over every firm's applications",
     ("main.py", "_tracer_click_and_redirect"): "public link: found by its token, logs the click on the link's firm",
     # Tracer tokens are unique across firms, so the collision check must see every firm's links.
-    ("routes_resumes.py", "_rewrite_urls_with_tracers"): "a token is unique across firms",
-    # A job's scores sit on the shared job row until the Jobs track gives each firm its own (JobMark, Q36), so the
-    # "last tailored copy gone" check counts every firm's copies.
-    ("routes_resumes.py", "_clear_orphan_tailored_score"): "job scores are shared across firms for now",
+    ("render_shared.py", "_rewrite_urls_with_tracers"): "a token is unique across firms",
     # Background workers: the route that launched them already checked the ids against the user's firm.
-    ("routes_resumes.py", "_tailor_impl"): "worker; ids checked by tailor_resume",
-    ("routes_resumes.py", "_score_resume_impl"): "worker; ids checked by score_check",
     ("routes_cover_letters.py", "_generate_inner"): "worker; ids checked by generate_cover_letter",
     ("routes_admin.py", "list_audit"): "platform route: the ledger across the platform and every firm",
 }
@@ -152,12 +148,9 @@ JOBS_ALLOWED = {
     ("routes_applications.py", "_set_job_cache_error"): "worker; job id checked by its route",
     ("routes_applications.py", "_cache_job_page"): "worker; job id checked by its route",
     ("routes_applications.py", "_fetch_and_store_description"): "worker; job id checked by its route",
-    ("routes_resumes.py", "_persist_job_description"): "worker; job id checked by its route",
-    ("routes_resumes.py", "_tailor_impl"): "worker; ids checked by tailor_resume",
-    ("routes_resumes.py", "_score_resume_impl"): "worker; ids checked by score_check",
+    ("render_shared.py", "_persist_job_description"): "worker; job id checked by its route",
     ("routes_cover_letters.py", "_generate_inner"): "worker; ids checked by generate_cover_letter",
-    ("routes_resumes.py", "_rewrite_urls_with_tracers"): "reads the job's short id for a token; job checked by its route",
-    ("routes_resumes.py", "_clear_orphan_tailored_score"): "job scores are shared across firms for now",
+    ("render_shared.py", "_rewrite_urls_with_tracers"): "reads the job's short id for a token; job checked by its route",
 }
 
 

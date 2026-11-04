@@ -301,6 +301,14 @@ def test_a_bde_deletes_their_unused_version_but_never_v1_or_an_owners(anonymous_
         assert r.status_code == 409 and why in r.json()["detail"]
     assert anonymous_client.delete(_url(world, c, f"/{bdes_v3['id']}"), headers=as_bde).status_code == 200
     assert [v["version"] for v in _listing(anonymous_client, world, c)["bases"][0]["versions"]] == [1, 2]
+    # Soft delete: out of sight, still stored. Opening it is "not found"; its number is never reused.
+    from backend.models.db import Resume
+    row = test_db.get(Resume, uuid.UUID(bdes_v3["id"]))
+    assert row is not None and row.deleted_at is not None and row.summary == "The BDE's edit."
+    assert anonymous_client.get(_url(world, c, f"/{bdes_v3['id']}"), headers=as_bde).status_code == 404
+    again = _save(anonymous_client, world, c, owners_v2, "adnan", summary="Saved after the delete.").json()
+    assert again["version"] == 4
+    assert [v["version"] for v in _listing(anonymous_client, world, c)["bases"][0]["versions"]] == [1, 2, 4]
 
 
 def test_a_sent_version_is_refused_with_what_uses_it(anonymous_client, test_db, world):
@@ -318,10 +326,10 @@ def test_a_sent_version_is_refused_with_what_uses_it(anonymous_client, test_db, 
     assert (r.status_code, r.json()["detail"]) == (409, "Can't delete v2: sent to 1 job.")
 
 
-def test_a_bdes_unused_base_is_deleted_with_its_file_and_a_used_one_is_hidden(anonymous_client, test_db, world,
-                                                                             parser):
-    from backend.models.candidates import ResumeParse
-    from backend.models.db import Application, Job
+def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_used_one_is_hidden(
+        anonymous_client, test_db, world, parser):
+    from backend.models.candidates import BaseResume, ResumeParse
+    from backend.models.db import Application, Job, Resume
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     as_bde = world["as"]["adnan"]
     base2 = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=as_bde).json()
@@ -332,13 +340,29 @@ def test_a_bdes_unused_base_is_deleted_with_its_file_and_a_used_one_is_hidden(an
                                                           "an owner or manager added")):
         r = anonymous_client.delete(_url(world, c, f"/bases/{base['id']}"), headers=as_bde)
         assert r.status_code == 409 and why in r.json()["detail"]
-    # Base 2, unused: deleted, file and all, so the same file can come back as a new base.
+    # Base 2 has an edit of the BDE's (v2); it's unused, so deleting it is allowed.
+    base2_v1 = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base2["id"])["versions"][0]
+    v2_body = anonymous_client.get(_url(world, c, f"/{base2_v1['id']}"), headers=as_bde).json()
+    assert _save(anonymous_client, world, c, v2_body, "adnan", summary="An edit of Base 2.").status_code == 201
+    # Base 2, unused: soft deleted with its versions. Nothing is removed from the tables; the upload stays.
     assert anonymous_client.delete(_url(world, c, f"/bases/{base2['id']}"), headers=as_bde).json()["outcome"] == "DELETE"
-    assert test_db.query(ResumeParse).filter(ResumeParse.id == uuid.UUID(base2["resume_parse_id"])).count() == 0
+    assert test_db.get(BaseResume, uuid.UUID(base2["id"])).deleted_at is not None
+    assert test_db.query(ResumeParse).filter(ResumeParse.id == uuid.UUID(base2["resume_parse_id"])).count() == 1
+    gone = test_db.query(Resume).filter(Resume.base_resume_id == uuid.UUID(base2["id"])).all()
+    assert len(gone) == 2 and all(row.deleted_at is not None for row in gone)
+    assert base2["id"] not in [b["id"] for b in _listing(anonymous_client, world, c)["bases"]]
+    # The same file again: the base comes back from what was stored (no new read), v1 only, active, as any upload is.
+    calls = len(parser)
     again = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=as_bde)
-    assert again.status_code == 201
+    assert again.status_code == 201 and again.json()["restored"] is True and again.json()["id"] == base2["id"]
+    assert len(parser) == calls and again.json()["is_active"]
+    restored = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base2["id"])
+    assert [v["version"] for v in restored["versions"]] == [1]
+    # Later edits stay deleted, and their numbers aren't reused: the next save from v1 is v3.
+    v1_body = anonymous_client.get(_url(world, c, f"/{restored['versions'][0]['id']}"), headers=as_bde).json()
+    assert _save(anonymous_client, world, c, v1_body, "adnan", summary="After the restore.").json()["version"] == 3
     # A used base: hidden, still listed with archived_at; re-uploading its file offers to show it; show again.
-    # The third file's base, now inactive (numbers follow the bases that exist: it is Base 2 again after the delete).
+    # Base 3 (the third file), inactive after the restore made Base 2 active again.
     third = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base3["id"])
     v1 = third["versions"][0]
     job = Job(external_id="v-used", title="Java Dev", company="Acme", url="https://jobs.example.test/u", source="manual")
@@ -348,16 +372,31 @@ def test_a_bdes_unused_base_is_deleted_with_its_file_and_a_used_one_is_hidden(an
                             resume_id=uuid.UUID(v1["id"])))
     test_db.commit()
     r = anonymous_client.delete(_url(world, c, f"/bases/{base3['id']}"), headers=as_bde)
-    assert r.json()["outcome"] == "HIDE" and r.json()["message"].startswith("Sent to 1 job. Base 2 will be hidden")
+    assert r.json()["outcome"] == "HIDE" and r.json()["message"].startswith("Sent to 1 job. Base 3 will be hidden")
     hidden = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base3["id"])
     assert hidden["archived_at"] is not None
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(b"%PDF third"), headers=as_bde)
-    assert r.status_code == 409 and r.json()["detail"] == {"message": "This résumé is Base 2 (hidden). Show it again?",
+    assert r.status_code == 409 and r.json()["detail"] == {"message": "This résumé is Base 3 (hidden). Show it again?",
                                                            "base_resume_id": base3["id"], "hidden": True}
     shown = anonymous_client.post(_url(world, c, f"/bases/{base3['id']}/show"), headers=as_bde).json()
     assert (shown["archived_at"], shown["is_active"]) == (None, False)
     picked = anonymous_client.post(_url(world, c, f"/{v1['id']}/use-as-base"), headers=as_bde).json()
     assert picked["is_active"]
+
+
+def test_picking_a_version_whose_promoted_base_was_deleted_brings_that_base_back(anonymous_client, test_db, world):
+    from backend.models.candidates import BaseResume
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")
+    as_bde = world["as"]["adnan"]
+    v1 = _v(anonymous_client, world, c)
+    v2 = _save(anonymous_client, world, c, v1, "adnan", summary="A pitch worth a base.").json()
+    base2 = anonymous_client.post(_url(world, c, f"/{v2['id']}/use-as-base"), headers=as_bde).json()     # promoted, active
+    assert anonymous_client.post(_url(world, c, f"/{v1['id']}/use-as-base"), headers=as_bde).json()["number"] == 1
+    assert anonymous_client.delete(_url(world, c, f"/bases/{base2['id']}"), headers=as_bde).json()["outcome"] == "DELETE"
+    assert test_db.get(BaseResume, uuid.UUID(base2["id"])).deleted_at is not None
+    again = anonymous_client.post(_url(world, c, f"/{v2['id']}/use-as-base"), headers=as_bde)
+    assert again.status_code == 200 and again.json()["id"] == base2["id"] and again.json()["is_active"]
+    assert len(_listing(anonymous_client, world, c)["bases"]) == 2            # no third copy: the same base is back
 
 
 # ── Races: forced at the same time, with the candidate row held by another session ──────────────────────────

@@ -43,9 +43,13 @@ def resolve_voice_instruction(db, voice_id: str | None) -> tuple[str, str]:
 
 def build_cover_letter_prompt(resume_data: dict, preferences: dict, jd_text: str,
                               voice_instruction: str, length: str,
-                              prompt_template: str) -> tuple[str, str]:
-    """Return (cached_prefix, suffix_prompt): the prefix is resume + preferences + schema (stable per resume), the suffix is the editable prompt with JD/voice/length filled in."""
-    resume_text = _flatten_resume(resume_data or {})
+                              prompt_template: str, resume_text: str | None = None) -> tuple[str, str]:
+    """Return (cached_prefix, suffix_prompt): the prefix is resume + preferences + schema (stable per resume), the suffix is the editable prompt with JD/voice/length filled in.
+
+    `resume_text` is a résumé version's text (backend/candidates/resume_text.py); without it the Persona's
+    `resume_content` (`resume_data`) is flattened."""
+    if resume_text is None:
+        resume_text = _flatten_resume(resume_data or {})
     pref_text = ""
     if preferences:
         try:
@@ -84,10 +88,10 @@ def parse_cover_letter_response(raw: str) -> dict:
 
 async def generate_cover_letter_body(resume_data: dict, preferences: dict, jd_text: str,
                                      voice_instruction: str, length: str,
-                                     prompt_template: str) -> dict:
+                                     prompt_template: str, resume_text: str | None = None) -> dict:
     """Call the LLM and return the parsed body dict. Caching enabled via prefix."""
     cached_prefix, suffix = build_cover_letter_prompt(
-        resume_data, preferences, jd_text, voice_instruction, length, prompt_template
+        resume_data, preferences, jd_text, voice_instruction, length, prompt_template, resume_text
     )
     system = (
         "You are an expert cover-letter writer. Write a genuine, specific letter "

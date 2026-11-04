@@ -1,6 +1,6 @@
 # PR 3 — Email classification and review backend
 
-Problem: imported encrypted candidate mail has no durable category/match/review evidence. This slice classifies transiently decrypted/redacted input, records versioned results and scoped reviews, hides encrypted Other, and preserves readable pending/failed mail. It makes no automatic application-status writes. Current base: refreshed main 42dedb6 (#108), preserving #104.
+Problem: imported encrypted candidate mail has no durable category/match/review evidence. This slice classifies transiently decrypted/redacted input, records versioned results and scoped reviews, hides encrypted Other, and preserves readable pending/failed mail. It makes no automatic application-status writes. Current base: merged main c3f5c6b, preserving #104 and its résumé migration 0013.
 
 Authority: [Abdul’s written decision](https://github.com/AbdulMuqtadir916/BenchQ/issues/110#issuecomment-6624344616). Exact vocabulary/legacy mapping sign-off remains a PR 4 UI gate. The accepted direction does not itself enable production provider processing, automatic updates or purge.
 
@@ -26,7 +26,7 @@ Authority: [Abdul’s written decision](https://github.com/AbdulMuqtadir916/Benc
 | `backend/inbox/retention.py` | Central readability and gated 30-day Other cleanup, protected prior human/job evidence, derivative erasure and minimal dedup tombstones. |
 | `backend/inbox/safe_text.py` | Bounded redaction of common contact/credential/government/financial identifiers; not a claim of anonymization. |
 | `backend/inbox/sync_jobs.py` | Wake a bounded classifier after import commits; durable pending rows recover lost notifications. |
-| `backend/migrations/versions/0013_candidate_email_classification.py` | One additive schema revision: versioned results, normalized provenance, processing/retention fields, legacy-safe review versioning and immutable evidence protection; guarded downgrade. |
+| `backend/migrations/versions/0014_candidate_email_classification.py` | One additive schema revision: versioned results, normalized provenance, processing/retention fields, legacy-safe review versioning and immutable evidence protection; guarded downgrade. |
 | `backend/models/candidates.py` | Add lean processing/retry/lease, normalized authentication/time and hidden-Other retention fields and constraints. |
 | `backend/models/db.py` | Define versioned classifications and nullable/versioned review linkage while preserving application and immutable status history structures. |
 | `backend/scheduler.py` | Schedule bounded classification recovery and independently gated retention cleanup. |
@@ -39,7 +39,8 @@ Authority: [Abdul’s written decision](https://github.com/AbdulMuqtadir916/Benc
 | `backend/tests/test_candidate_application_status.py` | Remove Other from allowed new-stage expectations; explicit rejection tests cover it separately. |
 | `backend/tests/test_isolation.py` | Apply each route's explicit fixture preconditions equally to both tenants before isolation assertions. |
 | `backend/tests/test_migration_0012.py` | Compare protected rollback with the current migration head so the existing Gmail safety regression remains valid after a new additive revision. |
-| `backend/tests/test_migration_0013.py` | Verify empty classification migration roundtrip and current-head consistency. |
+| `backend/tests/test_migration_0013.py` | Preserve main’s résumé-versioning migration regression tests. |
+| `backend/tests/test_migration_0014.py` | Verify classification migration roundtrip and refuse downgrade when classification claims would be lost. |
 | `backend/tests/test_pr3_evaluation.py` | Ensure incomplete predictions and job-related Other outcomes cannot produce a false safe-purge report; not a real-model accuracy test. |
 | `backend/tests/test_pr3_matching.py` | Encrypted matching, wrong scope/source/deletion, unique/ambiguous threads/names, aliases, legacy drafts and quoted/signature evidence regressions. |
 | `backend/tests/test_pr3_pipeline.py` | Synthetic end-to-end no-status-write, auth/threshold/outcomes, visibility/erasure, retry/fencing, review versioning/idempotency and retention-gate regressions. |
@@ -66,7 +67,7 @@ Publish the current implementation plan, status checklist and operations boundar
 
 ## Schema and compatibility
 
-One proposed additive revision 0013 after 0012, recheck current main before publication. New-to-main email_classifications adapts the existing local concept; no parallel sender, job, history or attempt table. Existing JobRun stores minimal usage/command metadata. Existing application_reviews preserve legacy constraints and append classified result versions, including unmatched mail. Removing content cancels pending review without accepting an AI status; actor/audit and immutable historical events remain.
+One additive revision 0014 after main revision 0013 (résumé versioning). Main’s migration tests remain at 0013; PR 3 tests and downgrade target 0014/0013. New-to-main email_classifications adapts the existing local concept; no parallel sender, job, history or attempt table. Existing JobRun stores minimal usage/command metadata. Existing application_reviews preserve legacy constraints and append classified result versions, including unmatched mail. Removing content cancels pending review without accepting an AI status; actor/audit and immutable historical events remain.
 
 Other is no longer selectable for new candidate status commands, but identical historical Other command replays/reads remain valid. Existing Notes, applications.resume_id/submission facts and firm/candidate access remain. The only UI change here is processing-state/badge compatibility; PR 4 owns stages, review workflow integration, automatic execution and usable Undo.
 

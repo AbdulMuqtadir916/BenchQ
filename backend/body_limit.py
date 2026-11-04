@@ -19,8 +19,6 @@ UPLOAD_LIMIT = 11 * MB
 UPLOAD_ROUTES = frozenset({
     "POST /api/firms/{firm_id}/candidates/parse-resume",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload",      # a later résumé (résumé versioning PR 5)
-    "POST /api/resumes/import-pdf",
-    "POST /api/persona/import",
 })
 
 TOO_LARGE = "This request is too large."

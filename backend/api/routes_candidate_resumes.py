@@ -186,8 +186,9 @@ def use_resume_as_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: u
 async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, file: UploadFile = File(...),
                         principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
     """PDF or Word, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
-    with the base it is; otherwise the parser reads it and one transaction keeps the file and writes a new active
-    base with its v1. Nothing is saved if the parse fails (§4.6). The database work runs off the event loop
+    with the base it is; if that base was deleted, it comes back instead (its v1, `restored` true, no parser run).
+    Otherwise the parser reads it and one transaction keeps the file and writes a new active base with its v1.
+    Nothing is saved if the parse fails (§4.6). The database work runs off the event loop
     (`asyncio.to_thread`): waiting for the candidate lock would otherwise hold up every request on the worker."""
     await asyncio.to_thread(_may_upload, db, firm_id, principal, candidate_id)
     content = await file.read(MAX_BYTES + 1)
@@ -227,11 +228,16 @@ _SAME_FILE_RULES = ("uq_resume_parses_candidate_file", "uq_base_resumes_one_per_
 
 def _keep_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID, file_name: str,
                  kind: str, content: bytes, sha256: str, parse: dict | None) -> dict:
-    """The new active base, from `parse` (a new file) or from the kept upload `_is_new_file` found (`parse` None)."""
+    """The new active base, from `parse` (a new file) or from the kept upload `_is_new_file` found (`parse` None). A
+    file whose base was deleted brings that base back instead (its v1, no new read): `restored` is true."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
     kept = versions.kept_file(db, candidate, sha256)
     if parse is None:
         parse_row = kept                     # found above, under the same lock
+        if (deleted := versions.deleted_base_for(db, candidate, parse_row)) is not None:
+            base = versions.restore_base(db, actor, candidate, deleted)
+            db.commit()
+            return {**versions.base_json(base, versions.base_numbers(db, candidate)[base.id]), "restored": True}
     else:
         if kept is not None:                 # the same file, uploaded meanwhile
             raise versions.already_uploaded(db, candidate, kept) or HTTPException(status_code=409,
@@ -250,7 +256,7 @@ def _keep_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candid
         if not any(rule in str(e.orig) for rule in _SAME_FILE_RULES):
             raise
         raise HTTPException(status_code=409, detail="This résumé was just uploaded for this candidate. Reload to see it.")
-    return versions.base_json(base, versions.base_numbers(db, candidate)[base.id])
+    return {**versions.base_json(base, versions.base_numbers(db, candidate)[base.id]), "restored": False}
 
 
 @router.get("/bases/{base_id}/removal", summary="What deleting this base would do")

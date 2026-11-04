@@ -149,26 +149,6 @@ CASES: dict[str, Case] = {
     "PATCH /api/applications/interviews/{interview_id}": Case(body=lambda i: {"what": "Panel two"}),
     "DELETE /api/applications/interviews/{interview_id}": Case(),
 
-    # ── Résumés (track 04) ───────────────────────────────────────────────────
-    "GET /api/resumes": Case(shows_rows=True),
-    "GET /api/resumes/shelf": Case(shows_rows=True),
-    "POST /api/resumes": Case(body=lambda i: {"name": "New résumé", "parent_id": str(i["resume"]),
-                                              "job_id": str(i["job"])}, body_ids=True),
-    "POST /api/resumes/copy": Case(body=lambda i: {"base_resume_id": str(i["resume"]), "job_id": str(i["job"])},
-                                   body_ids=True),
-    "POST /api/resumes/tailor": Case(body=lambda i: {"base_resume_id": str(i["resume"]), "job_id": str(i["job"])},
-                                     body_ids=True),
-    "POST /api/resumes/import-pdf": Case(upload=True),
-    "GET /api/resumes/{resume_id}": Case(),
-    "PATCH /api/resumes/{resume_id}": Case(path={"resume_id": "tailored"},
-                                           body=lambda i: {"name": "Renamed", "parent_id": str(i["resume"]),
-                                                           "job_id": str(i["job"])}, body_ids=True),
-    "DELETE /api/resumes/{resume_id}": Case(path={"resume_id": "tailored"}),
-    "GET /api/resumes/{resume_id}/preview": Case(),
-    "GET /api/resumes/{resume_id}/pdf": Case(),
-    "POST /api/resumes/{resume_id}/score-check": Case(path={"resume_id": "tailored"}, body=lambda i: {"depth": "light"}),
-    "GET /api/resumes/{resume_id}/tracer-stats": Case(),
-
     # ── Cover letters (track 04) ─────────────────────────────────────────────
     "GET /api/cover-letters": Case(shows_rows=True),
     "POST /api/cover-letters": Case(body=lambda i: {"name": "New letter", "job_id": str(i["job"]),
@@ -206,7 +186,6 @@ _SHARED_JOB = Gap("A job's status and scores sit on the shared pool's row, so on
 KNOWN_GAPS: dict[str, Gap] = {
     "GET /api/persona": _PERSONA,
     "PATCH /api/persona": _PERSONA,
-    "POST /api/persona/import": _PERSONA,
     "POST /api/persona/qa-bank": _PERSONA,
     "GET /api/autofill/config": _PERSONA,
     "POST /api/autofill/answer": _PERSONA,
@@ -233,7 +212,6 @@ SIGNED_IN_REASONS: dict[str, str] = {
     "GET /api/searches/countries": "global reference data",
     "GET /api/llm/models": "global reference data",
     "GET /api/llm/efforts": "global reference data",
-    "GET /api/resumes/templates": "global reference data: the template files",
     "GET /api/cover-letters/templates": "global reference data: the template files",
     # 07 Q54: filtered to the caller as recipient (and their firm); another account's id is a 404
     # (test_password_reset.py, test_password_reset_approval.py).

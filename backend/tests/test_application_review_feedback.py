@@ -8,6 +8,7 @@ from backend.models.candidates import Candidate, FavoriteJob
 from backend.models.db import Application, ApplicationStatusEvent, CoverLetter, Resume, utcnow
 from backend.models.tenancy import LedgerEntry
 from backend.tests.test_application_tracker import add_review
+from backend.tests.resume_support import make_version
 from backend.tests.test_candidate_application_status import _saved_candidate_application
 
 
@@ -88,12 +89,10 @@ def test_candidate_responses_share_scoped_resume_and_letter_metadata(api_client,
                       created_by_user_id=accounts.user_id, full_name='Other candidate', work_auth='H1B')
     test_db.add(other)
     test_db.flush()
-    own = Resume(firm_id=app.firm_id, candidate_id=candidate.id, job_id=job.id, is_base=False,
-                 name='Candidate tailored resume', updated_at=utcnow() - timedelta(hours=1))
-    foreign = Resume(firm_id=app.firm_id, candidate_id=other.id, job_id=job.id, is_base=False,
-                     name='Other candidate latest resume', updated_at=utcnow())
-    test_db.add_all([own, foreign])
-    test_db.flush()
+    own = make_version(test_db, app.firm_id, candidate=candidate, category='TAILORED', job_id=job.id,
+                       name='Candidate tailored resume', created_at=utcnow() - timedelta(hours=1))
+    foreign = make_version(test_db, app.firm_id, candidate=other, category='TAILORED', job_id=job.id,
+                           name='Other candidate latest resume', created_at=utcnow())
     test_db.add_all([
         CoverLetter(firm_id=app.firm_id, job_id=job.id, resume_id=foreign.id, name='Other letter'),
         CoverLetter(firm_id=app.firm_id, job_id=job.id, name='Unattributed legacy letter'),
@@ -120,17 +119,16 @@ def test_candidate_responses_share_scoped_resume_and_letter_metadata(api_client,
     }))
 
 
-@pytest.mark.parametrize('letter_source', ['resume', 'persona'])
-def test_legacy_detail_and_update_match_list_document_metadata(api_client, test_db, submission, letter_source):
+def test_legacy_detail_and_update_match_list_document_metadata(api_client, test_db, submission):
+    """An application from before candidates has no tailored résumé (every résumé has a candidate since 0013); an
+    unattributed letter still describes it."""
     _, job, app, _, headers, _ = submission
     legacy = Application(firm_id=app.firm_id, job_id=job.id, status='applied')
-    resume = Resume(firm_id=legacy.firm_id, job_id=job.id, name='Legacy tailored', is_base=False)
-    test_db.add_all([legacy, resume])
+    test_db.add(legacy)
     test_db.flush()
-    test_db.add(CoverLetter(firm_id=legacy.firm_id, job_id=job.id,
-                           resume_id=resume.id if letter_source == 'resume' else None, name='Legacy letter'))
+    test_db.add(CoverLetter(firm_id=legacy.firm_id, job_id=job.id, resume_id=None, name='Legacy letter'))
     test_db.commit()
-    expected = {'tailored_resume_id': str(resume.id), 'tailored_resume_name': resume.name, 'has_cover_letter': True}
+    expected = {'tailored_resume_id': None, 'tailored_resume_name': None, 'has_cover_letter': True}
     listed = api_client.get('/api/applications', headers=headers).json()['applications']
     row = next(row for row in listed if row['id'] == str(legacy.id))
     assert {key: row[key] for key in expected} == expected

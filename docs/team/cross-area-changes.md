@@ -3,6 +3,31 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé versioning PR 6 — the old résumé columns and JobNavigator's résumé code removed (`feat/drop-legacy-resume-columns`, Zuhair)
+
+Design: [resume-versioning.md](./resume-versioning.md) §3.3, §4.8, §8; decided 2026-11-02 (Abdul approved the drops
+on 2026-10-31). Migration 0013.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `backend/api/routes_applications.py` | Interview prep reads the tailored résumé's text from its columns (`resume_text`), newest by `created_at` and `version`; the documents lookup filters `category = 'TAILORED'` instead of `is_base`. Behaviour is the same. | `json_data`, `is_base` and `updated_at` are dropped. An application with no candidate (from before candidates) now shows no tailored résumé: every résumé has a candidate since 0012. **Left for Samad (Abdul's review of PR 6):** interview prep is a JobNavigator leftover that BenchQ's screens don't call; with no tailored résumés (the tailoring module comes later) it can print "[résumé content unavailable]". Whether to keep it, and to fall back to the candidate's active base v1, is Samad's call with the applications work. |
+| The same, tests | `test_application_tracker.py`, `test_application_review_feedback.py`, `test_application_foundation_regressions.py` | Résumés built as versions (`backend/tests/resume_support.py`); the legacy-application cases expect no tailored résumé. | As above. |
+| Upload size limits (Uzair, production layer 2a) | `backend/body_limit.py` | `resumes/import-pdf` and `persona/import` leave the 11 MB upload routes. | Both routes are removed (PR 5 added the candidate's résumé upload there). |
+| Uzair's notes | `docs/team/uzair.md` | The upload and slow-route lists no longer name the removed routes. | They name routes that no longer exist. |
+| Route access and isolation (Abdul, F7) | `backend/auth/access.py`, `backend/tests/isolation_cases.py`, `isolation_support.py`, `test_isolation.py`, `test_firm_scoping_lint.py` | The `/api/resumes` routes and `POST /api/persona/import` removed from the tables; the test world's résumés are versions; the lint also scans `backend/api/render_shared.py`. | The routes are gone; the helpers that moved keep their lint. |
+| Support views (Abdul) | `backend/tests/test_support_views.py` | The read and write checks use PR 5's candidate résumé routes instead of `/api/resumes`. | The old routes are gone. |
+| The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | The drops marked done; every résumé has a base and a candidate. | Facts only. |
+| Startup seed (shared) | `backend/seed.py` | The "Sample PM" résumé and its seed removed (`seed_mock_resume`). | Q1: a fake person scoring every firm's jobs; a résumé needs a candidate. |
+| Settings (shared) | `backend/api/routes_settings.py` | Imports `reset_tailoring_semaphore` from `render_shared.py`. | Moved with the other helpers. |
+| Ledger (Abdul) | `docs/integration/06-open-decisions.md`, `docs/integration/01-ledger.md` | D10 added: keeping deleted résumé versions for the ledger, **a suggestion by Zuhair Baig, chosen and built in this PR as a soft delete on `resumes` / `base_resumes` (Zuhair's tables); the ledger table is unchanged. Abdul is asked to confirm**; one line under the ledger's "Gaps" points to it. | Today a delete keeps who/what/when in the ledger but loses the version's content; the ledger is Abdul's to decide. |
+| Candidate Gmail migration test (Samad) | `backend/tests/test_migration_0012.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `'0012'`. | With PR 6's 0013 on top (PR 6 merged after #104, so it renumbered), a refused downgrade leaves the database at 0013; the test's point (nothing moved) is unchanged. |
+| Jobs, applications (Abdul's review of PR 6) | `backend/api/routes_jobs.py` (list, detail), `routes_applications.py` (interview prep, the tailored link), `routes_cover_letters.py`, `render_shared.py` | Each lookup of a résumé skips soft-deleted versions (`Resume.deleted_at IS NULL`). | A deleted version is invisible to the app; without it a job's "tailored résumé" could point at a deleted v2. One test (`test_r4_cov_routes_jobs.py`). |
+
+Not changed, left to the owner:
+
+- **Cover letters** stay (Zuhair, "maybe later"): they read the résumé from its columns now, nothing else changed.
+- **The shared persona** stays except its résumé import; the rest needs Samad (autofill reads it).
+
 ## Résumé versioning PR 5 — versions and bases through the API (`feat/resume-versions`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §3.1, §3.2, §4.3, §4.6, §4.7, §6; decided with Abdul

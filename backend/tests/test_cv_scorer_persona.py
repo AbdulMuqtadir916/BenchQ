@@ -3,6 +3,7 @@ import pytest
 from backend.models.db import Persona
 from backend.analyzer import cv_scorer
 from backend.models.tenancy import DEFAULT_FIRM_ID
+from backend.tests.resume_support import old_resume
 
 pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
@@ -45,9 +46,7 @@ def _seed_persona(db, summary="P-summary"):
 
 
 def _seed_resume(db, name="PM"):
-    r = Resume(firm_id=DEFAULT_FIRM_ID, id=uuid.uuid4(), name=name, is_base=True,
-               json_data={"summary": f"{name}-summary"})
-    db.add(r)
+    r = old_resume(db, DEFAULT_FIRM_ID, name, {"summary": f"{name}-summary"})
     db.commit()
     return r
 
@@ -67,13 +66,8 @@ def test_get_resume_texts_omits_persona_when_empty(test_db):
     assert "Persona" not in out
 
 
-def test_get_default_resume_persona_id(test_db):
-    _seed_resume(test_db, "PM")
-    _seed_persona(test_db)
-    test_db.add(Setting(key="default_resume_id", value="persona"))
-    test_db.commit()
-    out = cv_scorer._get_default_resume(test_db, DEFAULT_FIRM_ID)
-    assert list(out.keys()) == ["Persona"]
+# The platform-wide default_resume_id (persona included) is no longer read since résumé versioning PR 6; a company's
+# selection can still name the persona (below).
 
 
 def test_get_resume_texts_for_company_persona_in_selection(test_db):
