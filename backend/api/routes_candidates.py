@@ -30,7 +30,9 @@ from backend.auth.scoping import own_scope, scoped, team_scope
 from backend.auth.sessions import Principal
 from backend.candidates.first_base import first_base
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
+from backend.candidates.record import write_record
 from backend.candidates.serialize import candidate_json
+from backend.candidates.work_auth import needs_sponsorship, needs_transfer
 from backend.models.candidates import (EMPLOYMENT_TYPES, REMOTE_MODES, WORK_AUTHS, WORKING_STATUSES, Candidate,
                                        ResumeParse)
 from backend.models.db import get_db, utcnow
@@ -65,8 +67,8 @@ class CreateCandidateBody(BaseModel):
     years_experience: float | None = Field(default=None, ge=0, le=60)
     work_auth: WorkAuth
     work_auth_expiry: datetime | None = None
-    needs_sponsorship: bool = False
-    needs_transfer: bool = False
+    needs_sponsorship: bool | None = None     # entered: kept; left out (null): worked out from work_auth
+    needs_transfer: bool | None = None        # same
     employment_types: list[EmploymentType] = Field(default_factory=list)
     rate_target: float | None = Field(default=None, gt=0)
     rate_min: float | None = Field(default=None, gt=0)
@@ -97,6 +99,9 @@ class UpdateCandidateBody(BaseModel):
     notice_period_days: int | None = Field(default=None, ge=0, le=365)
     willing_to_relocate: bool | None = None
     employment_types: list[EmploymentType] | None = None
+    # Entered here they are kept; when work_auth changes without them, they are worked out again.
+    needs_sponsorship: bool | None = None
+    needs_transfer: bool | None = None
 
 
 class AssignBody(BaseModel):
@@ -221,8 +226,8 @@ def get_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
 def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
                      principal: Principal = Depends(require("candidate.create")), db: DbSession = Depends(get_db)):
     """One transaction: the candidate (ON_BENCH), the kept résumé parse with the candidate's first base résumé and its
-    version 1 (when a résumé was uploaded), and the CREATE and ASSIGN ledger entries. Skills and the summary are stored
-    UNVERIFIED with their source (07 Q49)."""
+    version 1 (a MANUAL base from the form alone when no file was given), their Record (one UNVERIFIED claim per item,
+    07 Q49), and the CREATE and ASSIGN ledger entries."""
     _member_of(firm_id, principal)
     email = body.email.strip().lower()
     if not EMAIL.match(email):
@@ -246,8 +251,11 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
         firm_id=firm_id, manager_id=manager.id, bde_id=bde.id if bde else None, created_by_user_id=principal.user_id,
         full_name=body.full_name.strip(), email=email, phone=_clean(body.phone), linkedin_url=_clean(body.linkedin_url),
         city=_clean(body.city), state=_clean(body.state), willing_to_relocate=body.willing_to_relocate,
-        work_auth=body.work_auth, work_auth_expiry=body.work_auth_expiry, needs_sponsorship=body.needs_sponsorship,
-        needs_transfer=body.needs_transfer, employment_types=list(dict.fromkeys(body.employment_types)),
+        work_auth=body.work_auth, work_auth_expiry=body.work_auth_expiry,
+        needs_sponsorship=(needs_sponsorship(body.work_auth) if body.needs_sponsorship is None
+                           else body.needs_sponsorship),
+        needs_transfer=needs_transfer(body.work_auth) if body.needs_transfer is None else body.needs_transfer,
+        employment_types=list(dict.fromkeys(body.employment_types)),
         rate_min=body.rate_min, rate_target=body.rate_target, status="ON_BENCH", bench_start_date=now,
         available_from=body.available_from, notice_period_days=body.notice_period_days,
         years_experience=body.years_experience, primary_role=body.primary_role.strip(),
@@ -255,22 +263,22 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
         work_settings=list(dict.fromkeys(body.work_settings)),
         preferred_locations=[p.strip() for p in body.preferred_locations if p.strip()],
         contact_notes=_clean(body.contact_notes),
-        persona={"summary": _clean(body.summary) or "", "tone_notes": None, "will_relocate": body.willing_to_relocate,
-                 "notice_period_days": body.notice_period_days, "preferred_industries": body.preferred_industries,
-                 "deal_breakers": body.deal_breakers},
-        skills=[{"name": s.name.strip(), "family": _clean(s.family), "source": s.source, "state": "UNVERIFIED"}
-                for s in body.skills],
-        summary_state="UNVERIFIED",
+        preferred_industries=[i.strip() for i in body.preferred_industries if i.strip()],
+        deal_breakers=[d.strip() for d in body.deal_breakers if d.strip()],
     )
     db.add(candidate)
     db.flush()
     if parse is not None:
         parse.candidate_id, parse.expires_at = candidate.id, None
-        # Their first base résumé and its version 1, in this same transaction (resume-versioning.md §4.2).
-        base, version = first_base(parse, candidate, body, principal.user_id)
-        db.add(base)
-        db.flush()
-        db.add(version)
+    # Their first base résumé and its version 1, in this same transaction (resume-versioning.md §4.2): from the file
+    # and the form, or from the form alone when no file was given (a MANUAL base, so every candidate has one). Then
+    # their Record: one UNVERIFIED claim per item of that version (docs/team/zuhair.md §1.3).
+    base, version = first_base(parse, candidate, body, principal.user_id)
+    db.add(base)
+    db.flush()
+    db.add(version)
+    db.flush()
+    write_record(db, candidate, version, parse, {s.name.strip(): s.source for s in body.skills})
     actor = db.get(User, principal.user_id)
     ledger.record(db, actor=actor, action="CREATE", entity_type="candidate", entity_id=candidate.id,
                   entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}")
@@ -290,7 +298,14 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     for field, value in changes.items():
         if value is None and field in ("work_auth", "willing_to_relocate", "employment_types"):
             raise _bad(f"{field} can't be empty.")
-        setattr(candidate, field, value)
+        if value is not None or field not in ("needs_sponsorship", "needs_transfer"):
+            setattr(candidate, field, value)
+    # A new work authorization works the two out again, unless the same edit entered them (a null counts as not entered).
+    if "work_auth" in changes:
+        if changes.get("needs_sponsorship") is None:
+            candidate.needs_sponsorship = needs_sponsorship(candidate.work_auth)
+        if changes.get("needs_transfer") is None:
+            candidate.needs_transfer = needs_transfer(candidate.work_auth)
     if candidate.rate_min is not None and candidate.rate_target is not None and candidate.rate_min > candidate.rate_target:
         raise _bad("The floor can't be above the target rate.")
     if changes:

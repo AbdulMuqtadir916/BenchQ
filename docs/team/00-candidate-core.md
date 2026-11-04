@@ -14,13 +14,13 @@ deleted, so nothing cascades from a candidate.
 
 | Sketch | Table | Today | 0007 |
 |---|---|---|---|
-| Candidate (set of info + its own status) | `candidates` | Built (onboarding 06): info, `status`, `manager_id`, `bde_id` | No change. Zuhair improves it later, with Abdul's OK |
+| Candidate (set of info + its own status) | `candidates` | Built (onboarding 06): info, `status`, `manager_id`, `bde_id` | No change in 0007. **0015 (Zuhair, Abdul reviews the PR):** `persona`, `skills`, `summary_state` removed, `preferred_industries` and `deal_breakers` added, the Q50 fields final |
 | Job scraping | `searches`, `jobs`, `candidate_jobs` | Searches are firm-wide; jobs a shared pool | `searches.candidate_id`; new `candidate_jobs` |
 | Favorite jobs | `favorite_jobs` | A single `jobs.saved` flag (shared by every firm) | New table |
 | Résumés (base + tailored) | `resumes` | `is_base`, `parent_id`, `job_id`, no candidate | `candidate_id`, `resume_parse_id`, the base/tailored rule |
 | Applications | `applications` | Job + status, no candidate | `candidate_id`, `resume_id`, `submitted_by_user_id` |
 | Inbox | `candidate_mailboxes`, `inbox_messages` | Nothing | New tables |
-| Record (Truth Guard) | `claims`, `evidence` | Nothing (skills sit UNVERIFIED in `candidates.skills`) | New tables |
+| Record (Truth Guard) | `claims`, `evidence` | Nothing in 0007; since 0015 create and a later upload write the candidate's UNVERIFIED claims | New tables |
 | Activity | `ledger_entries` | Firm ledger; candidate only in `entity_id` | `candidate_id` |
 
 ## 2. The tables

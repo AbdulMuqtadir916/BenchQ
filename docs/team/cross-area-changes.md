@@ -3,6 +3,19 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Candidates final schema and the Record — `persona`, `skills`, `summary_state` removed (`feat/candidates-final-schema`, Zuhair)
+
+Plan: [zuhair.md](./zuhair.md) §1.1 and §1.3. Migration 0015. **Abdul approves every `candidates` change: his review of
+this PR is that approval.**
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `backend/api/routes_applications.py` | An application's response shows the résumé it was sent with (`resume_id`) even when deleted, and says so (`tailored_resume_deleted`); without a `resume_id` the lookup is unchanged. | A closed application no longer keeps a résumé from being deleted (§4.7), so it must still show what was sent. `move_on` is a rejection (Zuhair, 2026-11-04), so it counts as closed. **Left for Samad:** setting `resume_id` when an application is made. |
+| Candidates table (Abdul) | `backend/models/candidates.py`, `backend/migrations/versions/0015_candidates_final_schema.py` | `persona`, `skills`, `summary_state` dropped; `preferred_industries` and `deal_breakers` added (copied out of `persona` first); the Q50 fields are final. | Nothing read `persona`; two of its values were stale copies of real columns, `tone_notes` was never filled, the summary is the base résumé's; skills and the summary are claims now. |
+| Candidate create and edit (Abdul) | `backend/api/routes_candidates.py`, `backend/candidates/serialize.py`, new `work_auth.py`, `record.py` | The two new columns written and returned flat. `needs_sponsorship` / `needs_transfer`: an entered value wins, else worked out from `work_auth` on create and edit. A create always makes a base (`MANUAL` when no file) and writes the Record. | The flow computed sponsorship in the frontend only and an edit left it stale. **Question for Abdul:** a "Needs sponsorship? Yes / No" question for work authorization `OTHER` (a small screen change); until then `OTHER` with no entered value is `null` (unknown), and `needs_sponsorship` is nullable. |
+| Frontend contract (onboarding) | `src/lib/schemas/candidate.ts`, `src/lib/api/dto/candidates.ts`, `src/mocks/candidates.ts`, `src/mocks/data/candidates.json`, `src/mocks/db.ts` (fixture fingerprint), the saved sample | `persona` replaced by `preferredIndustries` and `dealBreakers`. No screen changes. | The contract change above. |
+| Demo seed (shared) | `backend/scripts/seed_demo.py` | Fills the two columns; no `persona`. | Same. |
+
 ## Résumé versioning PR 6 — the old résumé columns and JobNavigator's résumé code removed (`feat/drop-legacy-resume-columns`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §3.3, §4.8, §8; decided 2026-11-02 (Abdul approved the drops

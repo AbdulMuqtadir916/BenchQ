@@ -105,11 +105,11 @@ match, show it under the group: "The résumé says: '{workAuthText}'".
 | Field | Maps to |
 |---|---|
 | Target roles (tag input; suggestions: "Marketed as" and the parsed title) — "Jobs are matched against every title here." | `targetRoles` |
-| Work setting: Remote, Hybrid, On-site (several) | `workSettings` (provisional) |
-| Preferred locations (tag input, "City, state"; suggestions from a constant list of US hubs) | `preferredLocations` (provisional) |
+| Work setting: Remote, Hybrid, On-site (several) | `workSettings` |
+| Preferred locations (tag input, "City, state"; suggestions from a constant list of US hubs) | `preferredLocations` |
 | Willing to relocate (switch) | `willingToRelocate` |
-| Preferred industries, deal breakers (tag inputs with suggestions) | `preferredIndustries`, `dealBreakers` (persona) |
-| Notes for the BDE ("How they like to be contacted, interview windows, anything personal.") | `contactNotes` (provisional) |
+| Preferred industries, deal breakers (tag inputs with suggestions) | `preferredIndustries`, `dealBreakers` (columns since 0015; were inside `persona`) |
+| Notes for the BDE ("How they like to be contacted, interview windows, anything personal.") | `contactNotes` |
 
 Suggestion lists (locations, industries, deal breakers) are constants in `src/lib/constants/candidate-intake.ts`,
 not inline in components.

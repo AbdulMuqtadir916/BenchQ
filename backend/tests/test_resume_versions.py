@@ -323,7 +323,7 @@ def test_a_sent_version_is_refused_with_what_uses_it(anonymous_client, test_db, 
                             resume_id=uuid.UUID(v2["id"])))
     test_db.commit()
     r = anonymous_client.delete(_url(world, c, f"/{v2['id']}"), headers=world["as"]["adnan"])
-    assert (r.status_code, r.json()["detail"]) == (409, "Can't delete v2: sent to 1 job.")
+    assert (r.status_code, r.json()["detail"]) == (409, "Can't delete v2: used by 1 live application.")
 
 
 def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_used_one_is_hidden(
@@ -372,7 +372,7 @@ def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_
                             resume_id=uuid.UUID(v1["id"])))
     test_db.commit()
     r = anonymous_client.delete(_url(world, c, f"/bases/{base3['id']}"), headers=as_bde)
-    assert r.json()["outcome"] == "HIDE" and r.json()["message"].startswith("Sent to 1 job. Base 3 will be hidden")
+    assert r.json()["outcome"] == "HIDE" and r.json()["message"].startswith("Used by 1 live application. Base 3 will be hidden")
     hidden = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base3["id"])
     assert hidden["archived_at"] is not None
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(b"%PDF third"), headers=as_bde)

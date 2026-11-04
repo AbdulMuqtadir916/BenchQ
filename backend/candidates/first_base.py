@@ -79,11 +79,15 @@ def _parse_header(candidate, parse, header) -> dict:
 def first_base(parse_row, candidate, body, created_by_user_id) -> tuple[BaseResume, Resume]:
     """The base and its version 1 for `candidate` from `parse_row` (a kept `resume_parses` row), active. Filled from
     the create form (`body`, as corrected) and the parse; with `body` None (a later upload, §4.6) from the parse
-    alone. Not added to the session: the caller does, in its transaction, after switching the previous base off."""
-    parse = parse_row.parse if isinstance(parse_row.parse, dict) else {}
+    alone. With `parse_row` None (a candidate created without a résumé file, migration 0015) the base is `MANUAL` and
+    its version 1 holds only what the form holds; the lists start empty. Not added to the session: the caller does, in
+    its transaction, after switching the previous base off."""
+    parse = parse_row.parse if parse_row is not None and isinstance(parse_row.parse, dict) else {}
     header = parse.get("header") if isinstance(parse.get("header"), dict) else {}
-    base = BaseResume(id=uuid.uuid4(), firm_id=candidate.firm_id, candidate_id=candidate.id, source="UPLOAD",
-                      resume_parse_id=parse_row.id, is_active=True, created_by_user_id=created_by_user_id)
+    base = BaseResume(id=uuid.uuid4(), firm_id=candidate.firm_id, candidate_id=candidate.id,
+                      source="UPLOAD" if parse_row is not None else "MANUAL",
+                      resume_parse_id=parse_row.id if parse_row is not None else None, is_active=True,
+                      created_by_user_id=created_by_user_id)
     version = Resume(
         firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, name=BASE_NAME,
         category="BASE", version=1, created_by_user_id=created_by_user_id,

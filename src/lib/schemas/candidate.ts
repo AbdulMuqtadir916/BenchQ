@@ -8,16 +8,6 @@ import {
   WorkAuth,
 } from "./enums";
 
-export const PersonaSchema = z.object({
-  summary: z.string(),
-  toneNotes: z.string().nullable(),
-  willRelocate: z.boolean(),
-  noticePeriodDays: z.number().int().nullable(),
-  preferredIndustries: z.array(z.string()),
-  dealBreakers: z.array(z.string()),
-});
-export type Persona = z.infer<typeof PersonaSchema>;
-
 export const QaBankEntrySchema = z.object({
   id: z.string(),
   question: z.string(),
@@ -51,7 +41,8 @@ export const CandidateSchema = z.object({
   willingToRelocate: z.boolean(),
   workAuth: WorkAuth,
   workAuthExpiry: z.string().datetime().nullable(),
-  needsSponsorship: z.boolean(),
+  /** null = unknown: work authorization "Other" has no rule and nobody entered a value (migration 0015). */
+  needsSponsorship: z.boolean().nullable(),
   needsTransfer: z.boolean(),
   employmentTypes: z.array(EmploymentType),
   rateMin: z.number().nullable(),
@@ -67,13 +58,15 @@ export const CandidateSchema = z.object({
   managerId: z.string(),
   /** The one BDE (Q42). null = "Needs a BDE". When set, that BDE's managerId equals `managerId`. */
   bdeId: z.string().nullable(),
-  /** Provisional (Q50): remote / hybrid / on-site, several allowed. */
+  /** Remote / hybrid / on-site, several allowed (Q50, final since migration 0015). */
   workSettings: z.array(RemoteMode),
-  /** Provisional (Q50): "City, ST". */
+  /** "City, ST". */
   preferredLocations: z.array(z.string()),
-  /** Provisional (Q50): how to reach them, interview windows — "Notes for the BDE". */
+  /** How to reach them, interview windows — "Notes for the BDE". */
   contactNotes: z.string().nullable(),
-  persona: PersonaSchema.nullable(),
+  /** What the candidate prefers and refuses (wizard step 4). The summary is the active base résumé's, not here. */
+  preferredIndustries: z.array(z.string()),
+  dealBreakers: z.array(z.string()),
   qaBank: z.array(QaBankEntrySchema),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

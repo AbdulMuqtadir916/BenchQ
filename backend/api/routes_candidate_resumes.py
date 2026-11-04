@@ -268,10 +268,12 @@ def base_removal(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID
 
 
 @router.delete("/bases/{base_id}", summary="Delete a base, or hide it if something uses it")
-def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID,
+def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID, keep_used: bool = False,
                 principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+    """`keep_used=true`: a base that is in use is hidden and what nothing uses is deleted with it (the `rest` of the
+    preview); without it the base is only hidden (docs/team/resume-versioning.md §4.7)."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
-    removal = versions.delete_base(db, actor, candidate, versions.candidate_base(db, candidate, base_id))
+    removal = versions.delete_base(db, actor, candidate, versions.candidate_base(db, candidate, base_id), keep_used)
     db.commit()
     return removal.json()
 

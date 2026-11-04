@@ -181,7 +181,7 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     yearsExperience: asNumber(values.yearsExperience),
     workAuth,
     workAuthExpiry: toIsoDate(values.workAuthExpiry),
-    needsSponsorship: NEEDS_SPONSOR.includes(workAuth),
+    needsSponsorship: workAuth === "OTHER" ? null : NEEDS_SPONSOR.includes(workAuth),
     needsTransfer: workAuth === "H1B",
     employmentTypes: values.employmentTypes,
     rateTarget: asNumber(values.rateTarget),

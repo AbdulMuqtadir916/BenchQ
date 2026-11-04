@@ -5,8 +5,9 @@ The Candidates track (decision D1, option 1): one row per consultant on a firm's
 the manager is checked in code, since a CHECK can't read another row. The values mirror the frontend's
 `CandidateSchema` (src/lib/schemas/candidate.ts) in snake_case; the API maps them (src/lib/api/dto/).
 
-Truth Guard (07 Q49): skills and the summary are claims, stored here UNVERIFIED with their source until Track 04 builds
-the candidate's Record (with evidence) from them and the kept résumé parse. Nothing here is ever VERIFIED.
+Truth Guard (07 Q49): skills, the summary and every other item of the résumé are claims (`claims`), written UNVERIFIED with
+their source when the candidate (or a later upload) is made; none lives on this table (migration 0015). Nothing is ever
+VERIFIED without evidence.
 
 Conventions as backend/models/tenancy.py (Q38): UUID keys, timestamps with time zone, CHECKs not enum types,
 foreign keys ON DELETE RESTRICT.
@@ -56,7 +57,7 @@ class Candidate(Base):
 
     work_auth = Column(String, nullable=False)
     work_auth_expiry = Column(DateTime(timezone=True), nullable=True)
-    needs_sponsorship = Column(Boolean, nullable=False, server_default=text("false"))
+    needs_sponsorship = Column(Boolean, nullable=True)       # NULL = unknown (work_auth OTHER; no default, 0015)
     needs_transfer = Column(Boolean, nullable=False, server_default=text("false"))
 
     employment_types = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
@@ -72,18 +73,16 @@ class Candidate(Base):
     primary_role = Column(String, nullable=True)                   # "Marketed as"
     target_roles = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
 
-    # Provisional fields (07 Q50).
+    # Preferences (07 Q50, final since migration 0015): what the candidate wants, as the new-candidate flow's step 4 asks.
     work_settings = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
     preferred_locations = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
     contact_notes = Column(Text, nullable=True)
+    preferred_industries = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
+    deal_breakers = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
 
-    # The persona (docs/02 §4 PersonaSchema: summary, tone_notes, will_relocate, notice_period_days,
-    # preferred_industries, deal_breakers) and the answer bank, as the frontend shapes them, in snake_case.
-    persona = Column(JSONB, nullable=True)
+    # The answer bank (documents tab, the extension's autofill), as the frontend shapes it, in snake_case. The summary
+    # and the skills are not here: they are the active base résumé's (`resumes`) and its claims (`claims`).
     qa_bank = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
-    # Claims until Track 04's Record: [{name, family, source, state: "UNVERIFIED"}] and the summary's state (Q49).
-    skills = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
-    summary_state = Column(String, nullable=False, server_default=text("'UNVERIFIED'"))
 
     created_at = _created_at()
     updated_at = _updated_at()
@@ -101,8 +100,6 @@ class Candidate(Base):
                         name="ck_candidates_notice_period"),
         CheckConstraint("years_experience IS NULL OR years_experience BETWEEN 0 AND 60",
                         name="ck_candidates_years_experience"),
-        # Onboarding never produces a VERIFIED claim (Q49); verification comes with evidence, in Track 04.
-        CheckConstraint("summary_state = 'UNVERIFIED'", name="ck_candidates_summary_unverified"),
         CheckConstraint("char_length(btrim(full_name)) > 0", name="ck_candidates_full_name_not_blank"),
         Index("ix_candidates_firm_manager", "firm_id", "manager_id"),
         Index("ix_candidates_firm_bde", "firm_id", "bde_id"),
@@ -147,14 +144,14 @@ def file_sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-BASE_RESUME_SOURCES = ("UPLOAD", "PROMOTED")
+BASE_RESUME_SOURCES = ("UPLOAD", "PROMOTED", "MANUAL")
 
 
 class BaseResume(Base):
     """One of a candidate's base résumés (docs/team/resume-versioning.md §3.2, migration 0008): an entry on their shelf
     of bases, holding no content. Its content is its `resumes` versions (category BASE); the active one is what
-    tailoring and job search use. Made from an upload (with the parse it came from) or promoted by a person from a
-    version. Owner: Zuhair."""
+    tailoring and job search use. Made from an upload (with the parse it came from), promoted by a person from a
+    version, or (MANUAL, 0015) made from the new-candidate form alone when no file was given. Owner: Zuhair."""
     __tablename__ = "base_resumes"
 
     id = _pk()
@@ -176,7 +173,8 @@ class BaseResume(Base):
 
     __table_args__ = (
         CheckConstraint(_in("source", BASE_RESUME_SOURCES), name="ck_base_resumes_source_values"),
-        CheckConstraint("source = 'PROMOTED' OR resume_parse_id IS NOT NULL", name="ck_base_resumes_source"),
+        # An upload has its parse; a promoted or manual base (the form alone, 0015) has none.
+        CheckConstraint("source IN ('PROMOTED', 'MANUAL') OR resume_parse_id IS NOT NULL", name="ck_base_resumes_source"),
         # For the composite foreign key from resumes: a version's base belongs to the same candidate.
         UniqueConstraint("id", "candidate_id", name="uq_base_resumes_id_candidate"),
         Index("uq_base_resumes_one_active", "candidate_id", unique=True, postgresql_where=text("is_active")),

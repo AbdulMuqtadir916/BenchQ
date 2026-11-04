@@ -30,7 +30,7 @@ firm → BDE → candidate hierarchy that JobNavigator has no concept of.
 | **Scoring record** — provider, depth (`light` \| `full`), keyword analysis, requirement mapping, ATS tips | `ScoringRecord` attached to a `Match` | The light/full split is a genuinely good cost control. Light for bulk ranking, full only when the BDE opens a job. |
 | **Dedup hash** — URL-based and content-based, tracking params stripped before hashing | `Job.dedupe.urlHash` + `contentHash` | Same requirement, same solution. Reposts across sources are constant. |
 | **H-1B sponsorship indicator**, LCA data per company | `Company.h1b` block | **The single most valuable borrow.** Work authorisation is the central filter in bench sales; JobNavigator already models it. |
-| **Persona** — profile grounding AI answers for autofill | `Candidate.persona` | Maps exactly onto the screening-question prefill panel. |
+| **Persona** — profile grounding AI answers for autofill | `Candidate.preferredIndustries`, `dealBreakers`, the base résumé's summary, `qaBank` (the `persona` field was dropped in migration 0015) | Maps onto the screening-question prefill panel. |
 | **Q&A Bank** — reusable question/answer pairs | `QaBankEntry[]` per candidate | This *is* the prefill panel. Reusing answers across applications is a real time saving. |
 | **Tracer links** — unique per resume/letter combo, open/click tracking | `ResumeVersion.tracer` | Lets a BDE see whether a submission was opened. Free signal. |
 | **Template selection + tailoring history per job** | `ResumeVersion.templateId` + `tailoring` | Same shape. |
@@ -657,7 +657,7 @@ followUpCadence: z.array(z.object({
 
 > **Status: approved by the product owner on 2026-10-26** (07 §0 Q40–Q50; Q51 on 2026-10-27). Plan and modules:
 > `docs/candidate-onboarding/`. **Schemas in onboarding module 01; the derivations (seats, limit, load) change in
-> module 02.** Fields marked *provisional* are on mocks only; Zuhair owns the production candidate contract (Q50).
+> module 02.** The Q50 fields (`workSettings`, `preferredLocations`, `contactNotes`) are final since migration 0015 (2026-11-04).
 
 The firm's layers are fixed: **OWNER → MANAGER → BDE → candidate** (Q40).
 
@@ -697,16 +697,6 @@ handoff note. Changing a BDE's manager logs `UPDATE` on the `user`.
 
 ```ts
 // src/lib/schemas/candidate.ts
-
-/** JobNavigator-aligned: persona grounds AI-generated answers to screening questions. */
-export const PersonaSchema = z.object({
-  summary: z.string(),
-  toneNotes: z.string().nullable(),
-  willRelocate: z.boolean(),
-  noticePeriodDays: z.number().int().nullable(),
-  preferredIndustries: z.array(z.string()),
-  dealBreakers: z.array(z.string()),
-});
 
 /** JobNavigator-aligned: reusable Q&A pairs — this is the prefill panel. */
 export const QaBankEntrySchema = z.object({
@@ -758,11 +748,12 @@ export const CandidateSchema = z.object({
   bdeId: z.string().nullable(),          // the one BDE (Q42); null = "Needs a BDE". When set, that BDE's
                                          // managerId equals managerId
 
-  workSettings: z.array(RemoteMode),     // provisional (Q50): remote / hybrid / on-site, several allowed
-  preferredLocations: z.array(z.string()), // provisional: "City, ST"
-  contactNotes: z.string().nullable(),   // provisional: how to reach them, interview windows ("Notes for the BDE")
+  workSettings: z.array(RemoteMode),     // remote / hybrid / on-site, several allowed (Q50, final)
+  preferredLocations: z.array(z.string()), // "City, ST"
+  contactNotes: z.string().nullable(),   // how to reach them, interview windows ("Notes for the BDE")
+  preferredIndustries: z.array(z.string()), // step 4 (was inside `persona`, dropped in 0015)
+  dealBreakers: z.array(z.string()),     // step 4 (same)
 
-  persona: PersonaSchema.nullable(),
   qaBank: z.array(QaBankEntrySchema),
 
   createdAt: z.string().datetime(),
@@ -833,6 +824,16 @@ export const ResumeDraftSchema = z.object({
   skills: z.array(z.object({ name: z.string(), family: z.string().nullable() })),
 });
 ```
+
+**Candidates final schema — 2026-11-04 (Zuhair; Abdul reviews with the PR), migration 0015.** `persona` is removed
+from the candidate: `preferredIndustries` and `dealBreakers` are flat lists, `will_relocate` and `notice_period_days`
+inside it were stale copies of `willingToRelocate` and `noticePeriodDays`, `toneNotes` was never filled, and the summary
+is the active base résumé's (`resumes.summary`). `candidates.skills` and `summary_state` are removed too: skills, the
+summary and every other item of the résumé are `claims` (one UNVERIFIED claim per item, pointing at the item's id,
+written when a candidate or a later upload is made; one evidence row per upload, no quote). `needsSponsorship` and
+`needsTransfer`: a value a person entered wins; one nobody entered is worked out from `workAuth` by the backend (H-1B,
+H4 EAD, OPT, CPT, TN need sponsorship; H-1B needs a transfer; `OTHER` has no rule, so `needsSponsorship` stays `null`
+(unknown) until a person enters it; a question for Abdul: should the flow ask). A candidate created without a résumé file gets a `MANUAL` base from the form alone, so every candidate has a base.
 
 Onboarding never produces a `VERIFIED` claim (Q49): skills and the summary land in the Record as `UNVERIFIED` with
 their `FieldSource`. `ResumeDraftSchema` gains `country` with the new parser (§8.1).
@@ -1290,7 +1291,7 @@ export const BaseResumeSchema = z.object({
   id: z.string(),
   firmId: z.string(),
   candidateId: z.string(),
-  source: z.enum(['UPLOAD', 'PROMOTED']),   // from an upload, or a version a person chose as the base
+  source: z.enum(['UPLOAD', 'PROMOTED', 'MANUAL']),   // an upload, a version a person chose, or the form alone (0015)
   isActive: z.boolean(),                    // exactly one per candidate
   createdByUserId: z.string(),
   createdAt: z.string().datetime(),

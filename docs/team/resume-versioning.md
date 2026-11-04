@@ -123,8 +123,8 @@ resume_parses ──(resume_parse_id)──▶ base_resumes ◀──(base_resum
 | `id` | uuid | PK, `gen_random_uuid()` | The base's id ("base 1, 2…") |
 | `firm_id` | uuid | FK → firms, NOT NULL | The firm that owns it |
 | `candidate_id` | uuid | FK → candidates, NOT NULL | The candidate it belongs to |
-| `source` | varchar | NOT NULL, `UPLOAD` / `PROMOTED` | Made from an upload, or promoted by a person from a `resumes` version |
-| `resume_parse_id` | uuid | FK → resume_parses, nullable | The upload it came from; required for `UPLOAD` |
+| `source` | varchar | NOT NULL, `UPLOAD` / `PROMOTED` / `MANUAL` | Made from an upload, promoted by a person from a `resumes` version, or (`MANUAL`, **0015**) made from the new-candidate form alone when no file was given |
+| `resume_parse_id` | uuid | FK → resume_parses, nullable | The upload it came from; required for `UPLOAD`, empty for `PROMOTED` and `MANUAL` |
 | `is_active` | boolean | NOT NULL, default false | The base the workflow uses (tailoring, job search) |
 | `created_by_user_id` | uuid | FK → users, NOT NULL | Who made it |
 | `created_at` | timestamptz | NOT NULL, `now()` | When it was made |
@@ -142,8 +142,8 @@ CREATE TABLE base_resumes (
   is_active          boolean NOT NULL DEFAULT false,
   created_by_user_id uuid NOT NULL REFERENCES users(id)         ON DELETE RESTRICT,
   created_at         timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT ck_base_resumes_source_values CHECK (source IN ('UPLOAD', 'PROMOTED')),
-  CONSTRAINT ck_base_resumes_source CHECK (source = 'PROMOTED' OR resume_parse_id IS NOT NULL),
+  CONSTRAINT ck_base_resumes_source_values CHECK (source IN ('UPLOAD', 'PROMOTED', 'MANUAL')),
+  CONSTRAINT ck_base_resumes_source CHECK (source IN ('PROMOTED', 'MANUAL') OR resume_parse_id IS NOT NULL),
   CONSTRAINT uq_base_resumes_id_candidate UNIQUE (id, candidate_id)
 );
 CREATE UNIQUE INDEX uq_base_resumes_one_active ON base_resumes (candidate_id) WHERE is_active;
@@ -324,7 +324,8 @@ Built in PR 4 (`backend/candidates/first_base.py`):
 
 | Action | `base_resumes` | `resumes` |
 |---|---|---|
-| Create a candidate | new `UPLOAD`, active | `BASE` v1 |
+| Create a candidate with a résumé file | new `UPLOAD`, active | `BASE` v1 |
+| Create a candidate with no file (**0015**) | new `MANUAL`, active, no parse | `BASE` v1 from the form alone (header, summary, skills; the lists start empty) |
 | Edit a base version or a tailored résumé, then save | — | the next version of that résumé (content copied, then changed) |
 | After the save, "Use this as the base?" → **Yes** | new `PROMOTED`, active (the previous one switched off) | the saved version copied as `BASE` v1 of the new base |
 | … → **No** | — | — (the version is history only) |
@@ -372,6 +373,8 @@ Built in PR 4 (`backend/candidates/first_base.py`):
   as it was keeps its id, so its claims follow it. **A version keeps its own checks:** editing B1 v3 leaves B1 v1,
   B1 v2 and every other base exactly as verified as they were (decided 2026-11-02, Zuhair; Abdul's review of PR 5
   found the earlier rule, which reset a changed item's claims, also un-verified the older versions sharing it).
+- A `MANUAL` base has no upload, so "upload the same file again" (§4.7) cannot bring it back if it is soft deleted; it can never be the only base (the active base can't be deleted).
+- The Record (**0015**): create and a BDE's later upload write one UNVERIFIED claim per item of the new v1 (`backend/candidates/record.py`), with one evidence row for the upload and no quote. For "in use" (§4.7) only evidence a person confirmed and claims past UNVERIFIED count: the ones written with the Record are nobody's work yet.
 - A `PROMOTED` base never backs evidence: only `resume_parses` rows (uploads) do.
 - Evidence excerpts quote the original file (`resume_parses.content`), never `parse`: the parser rewrites the
   résumé for ATS, so `parse` is the AI's wording, the draft the claims come from, not proof of them.
@@ -400,8 +403,8 @@ assign the BDE first, then send the file. The onboarding upload (§4.2) stays th
 
 ### 4.7 Deleting, hiding and showing again (decided 2026-11-02, Abdul and Zuhair; deleting made soft 2026-11-04, Zuhair)
 
-Only the assigned BDE deletes. A warning always comes first and names what uses it (*"Sent to 5 jobs, 2 tailored
-résumés made from it."*).
+Only the assigned BDE deletes. A warning always comes first and names what uses it (*"Used by 2 live applications, 1
+tailored résumé sent in a live application."*).
 
 **Deleting is a soft delete** (Zuhair, 2026-11-04; D10 in `docs/integration/06-open-decisions.md`): the row stays and
 gets `deleted_at` (`resumes` and `base_resumes`, migration 0013). It is out of every list, the base dropdown, the
@@ -410,9 +413,24 @@ what each BDE worked on, and its **version number is never reused**. A base can'
 while version rows point at it, so deleting a base marks it and its versions. The base's upload (`resume_parses`)
 stays: it holds the file and its fingerprint.
 
-**Used** means something points at it: an application or a cover letter (`resume_id`), a tracking link, a tailored
-résumé made from the base (`base_resume_id`), evidence on its upload (`evidence.resume_parse_id`), or a claim on an
-item that would exist in no other version of the candidate.
+**Used** (changed 2026-11-04, Zuhair) means something real points at it:
+- a **live application** (`applications.resume_id`): every status except `move_on` (the application tracker's word for a rejection) and the
+  old API's `rejected`, which are closed. A closed application doesn't keep anything in use;
+- a **tailored résumé of the base sent in a live application** (a tailoring nobody sent doesn't count);
+- **evidence a person confirmed** on its upload (`evidence.confirmed_at`), or a **claim past UNVERIFIED** on an item
+  that would exist in no other version. The UNVERIFIED claims and the one evidence row every upload gets when it is
+  made (`record.py`) are nobody's work and don't count.
+
+Cover letters and tracking links are **not** counted: they aren't planned for BenchQ yet.
+
+**"Keep what is in use and delete the rest"** (`DELETE …/bases/{id}?keep_used=true`; the removal preview's `rest`
+says what it would do). A base that is in use is only hidden; with `keep_used` it is also cleaned up, all soft
+deleted: its versions after v1 that nothing uses and were made by a BDE, and its tailored résumés no live application
+was sent with. A base nothing uses is deleted whole, with all its tailorings. The screen asks twice.
+
+**An application keeps showing the résumé it was sent with** (`resume_id`) after it is deleted: read-only, with
+`tailored_resume_deleted: true`. Only an application with no `resume_id` falls back to the newest tailored résumé of its
+candidate and job. Lists, dropdowns and scoring still skip deleted rows.
 
 | | Made by a BDE (this one or an earlier one) | Made by an owner or manager |
 |---|---|---|
@@ -473,7 +491,7 @@ from the columns. Job scoring and interview prep use it; nothing converts the co
 The DTO mapper (`src/lib/api/dto/`) groups rows into `Resume` objects. No backend shape leaves `src/lib/api/dto/`.
 
 **The docs/02 addition (approved; written in `docs/02-DATA-CONTRACTS.md` §8.1):**
-- **`BaseResume`**: `id`, `candidateId`, `firmId`, `source` (`UPLOAD` / `PROMOTED`), `isActive`, `createdAt`,
+- **`BaseResume`**: `id`, `candidateId`, `firmId`, `source` (`UPLOAD` / `PROMOTED` / `MANUAL`), `isActive`, `createdAt`,
   `createdByUserId` — for the base dropdown and showing which base is active.
 - **`baseResumeId`** on `Resume`.
 - **The new parser fields** in `ResumeDraftSchema` (`country`; city and state read directly, no `splitLocation`)

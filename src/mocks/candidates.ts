@@ -90,9 +90,8 @@ export const candidatesMock = firmScoped("candidates", {
       workSettings: input.workSettings,
       preferredLocations: input.preferredLocations,
       contactNotes: input.contactNotes,
-      persona: input.summary || input.preferredIndustries.length > 0 || input.dealBreakers.length > 0
-        ? { summary: input.summary ?? "", toneNotes: null, willRelocate: input.willingToRelocate, noticePeriodDays: input.noticePeriodDays, preferredIndustries: input.preferredIndustries, dealBreakers: input.dealBreakers }
-        : null,
+      preferredIndustries: input.preferredIndustries,
+      dealBreakers: input.dealBreakers,
       qaBank: [],
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),

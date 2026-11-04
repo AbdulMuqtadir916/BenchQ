@@ -94,10 +94,13 @@ def test_every_item_has_its_own_id(anonymous_client, test_db, world):
                                                                # 2 languages, 4 bullets
 
 
-def test_no_upload_no_base(anonymous_client, test_db, world):
+def test_no_upload_gets_a_manual_base_from_the_form(anonymous_client, test_db, world):
+    """Since 0015 every candidate has a base: with no file it is `MANUAL`, with a v1 from the form alone."""
     r = _create(anonymous_client, world)
     assert r.status_code == 201
-    assert _rows(test_db, r.json()["id"]) == ([], [])
+    (base,), (v1,) = _rows(test_db, r.json()["id"])
+    assert (base.source, base.resume_parse_id, base.is_active) == ("MANUAL", None, True)
+    assert (v1.category, v1.version, v1.experiences, v1.educations) == ("BASE", 1, [], [])
 
 
 def test_other_work_authorization_keeps_the_resumes_own_words(anonymous_client, test_db, world):
