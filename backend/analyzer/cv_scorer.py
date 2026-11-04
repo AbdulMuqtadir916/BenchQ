@@ -162,7 +162,7 @@ def _versions(db, firm_id, *filters) -> list:
     from backend.models.candidates import Candidate
     from backend.models.db import Resume
     return (db.query(Resume, Candidate.full_name).join(Candidate, Candidate.id == Resume.candidate_id)
-            .filter(Resume.firm_id == firm_id, *filters).order_by(Resume.id).all())
+            .filter(Resume.firm_id == firm_id, Resume.deleted_at.is_(None), *filters).order_by(Resume.id).all())
 
 
 def _label(row, name: str, taken: dict) -> str:

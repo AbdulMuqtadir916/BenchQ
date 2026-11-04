@@ -170,6 +170,9 @@ class BaseResume(Base):
     promoted_from_resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL", use_alter=True),
                                      nullable=True)
     archived_at = Column(DateTime(timezone=True), nullable=True)
+    # 0013 (PR 6): soft delete. A deleted base is out of every list and the workflow; its versions are marked with it,
+    # its upload stays, so the same file brings it back (docs/team/resume-versioning.md §4.7).
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(_in("source", BASE_RESUME_SOURCES), name="ck_base_resumes_source_values"),

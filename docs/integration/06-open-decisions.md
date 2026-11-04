@@ -115,24 +115,18 @@ Each decision: what the frontend needs → what the backend has → options → 
 
 ---
 
-## D10 — Keeping deleted résumé versions for the ledger (suggestion, not decided)
+## D10 — Keeping deleted résumé versions for the ledger (decided: soft delete, built in résumé versioning PR 6)
 
-> **Suggested by Zuhair Baig, 2026-11-03.** Not decided: the ledger is Abdul's (`docs/team/README.md` §3), so he
-> decides. Context: résumé versioning PR 5 (`docs/team/resume-versioning.md` §4.7).
+> **Suggested by Zuhair Baig, 2026-11-03; chosen and built 2026-11-04** (résumé versioning PR 6, migration 0013), in
+> `resumes`, Zuhair's table: the ledger itself is unchanged. Abdul, as the ledger's owner, is asked to confirm in the PR.
 
 - **Need:** the owner and manager can see what each BDE worked on, including résumé versions a BDE later deleted.
-- **Today:** every résumé action writes a ledger entry (who, what — "Saved Base 2 v3", "Deleted Base 2 v3" — the
-  version's id, when, the candidate), and ledger entries are never deleted. What a delete loses is the **content**
-  of the version. Only an unused version a BDE made can be deleted (never one sent, tailored from or verified).
-- **Options:**
-  1. A copy table: every version written to `resumes` is also copied into a never-deleted table the ledger reads.
-  2. **Soft delete:** deleting a version sets `resumes.deleted_at` instead of removing the row; it disappears from
-     the base list and the workflow, stays readable from the ledger, and the history can show it greyed out
-     ("v2 — deleted by the BDE, 2 Nov"). One table, no copying. A deleted version keeps its number, so numbers are
-     never reused after a delete (§4.7 today lets the latest number come back).
-  3. The ledger's "Deleted …" entry stores a copy of the deleted content (changes `ledger_entries`).
-  4. Keep as today: who, what and when are kept; a deleted unused version's text is gone.
-- **Zuhair's preference:** 2 (soft delete). `resumes` is Zuhair's table, so the ledger itself wouldn't change.
+- **Before:** a delete removed the row. The ledger entry (who, what, when) stayed, the content was gone.
+- **Decided: soft delete.** Deleting a version or a base sets `deleted_at` and keeps the row: out of every list and the
+  workflow, still stored, its version number never reused. The ledger and history can show it ("v2, deleted by the BDE,
+  2 Nov"). Uploading the same file again restores a deleted base (its v1) without reading the file again.
+- Other options considered: a copy table, the content inside the ledger entry, keeping as it was.
+  See `docs/team/resume-versioning.md` §4.7.
 
 ---
 

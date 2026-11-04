@@ -157,8 +157,8 @@ sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 - The screen renders `modelId · promptVersion`. A row with a model and no prompt version shows a dangling
   "·". Track 04 must always send both.
 - The page asks for the newest 100 entries. Paging past 100 comes with the screen's own filters.
-- **A deleted résumé version's content isn't kept** (only who deleted what, and when). Suggested by Zuhair Baig
-  (2026-11-03), not decided: soft delete, so the ledger can still show it. See
+- **A deleted résumé version's content is kept** (soft delete, `resumes.deleted_at`; résumé versioning PR 6, Zuhair
+  Baig's suggestion 2026-11-03, built 2026-11-04). The ledger can show it. See
   [06-open-decisions.md](./06-open-decisions.md) D10.
 
 ## Acceptance criteria

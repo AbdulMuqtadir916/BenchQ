@@ -582,6 +582,8 @@ class Resume(Base):
     linkedin = Column(String, nullable=True)
     summary = Column(Text, nullable=True)
     summary_id = Column(String, nullable=True)        # the summary's id (§3.4, 0011): new text, new id
+    # 0013 (PR 6): soft delete (§4.7): the row stays, out of every list and the workflow; its number is never reused.
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     skills = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     experiences = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     projects = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))

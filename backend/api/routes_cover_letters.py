@@ -355,7 +355,7 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_
         if not persona or not (persona.resume_content or {}):
             raise HTTPException(400, "Persona has no resume_content — fill it in /persona first")
     else:
-        resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id).first()
+        resume = scoped(db, Resume, firm_id).filter(Resume.id == resume_id, Resume.deleted_at.is_(None)).first()
         if not resume:
             raise HTTPException(404, "Resume not found")
         if not version_text(resume):
