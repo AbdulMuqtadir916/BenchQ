@@ -65,6 +65,8 @@ def run_import(firm_id, candidate_id, generation):
                 current.sync_job_id = None
                 current.sync_lease_until = None
             db.commit()
+            from backend.inbox.classification_worker import wake_worker
+            wake_worker()  # durable PENDING rows are recovery even if this notification is lost.
             return inserted
 
     count = 0

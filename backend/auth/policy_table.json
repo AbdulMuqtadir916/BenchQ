@@ -13,6 +13,8 @@
     "candidate.assign": "Y Y - - - -",
     "candidate.create": "Y Y - - - -",
     "candidate.edit": "Y Y Y - - -",
+    "email.reclassify": "Y Y - - - -",
+    "email.retry": "Y Y Y - - -",
     "firm.create": "- - - - Y Y",
     "firm.edit": "- - - - Y Y",
     "firm.suspend": "- - - - Y Y",
@@ -27,12 +29,12 @@
     "member.changeRole": "Y - - - - -",
     "member.deactivate": "Y - - - - -",
     "member.invite": "Y - - - - -",
-    "notification.approve": "Y Y - - - -",
     "member.remove": "Y - - - - -",
+    "notification.approve": "Y Y - - - -",
     "outreach.act": "Y Y Y - - -",
     "plan.edit": "- - - - Y Y",
-    "platformTeam.manage": "- - - - Y Y",
     "platform.notification.approve": "- - - - Y -",
+    "platformTeam.manage": "- - - - Y Y",
     "resume.edit": "Y Y Y - - -",
     "team.view": "Y Y - - - Y"
   }
