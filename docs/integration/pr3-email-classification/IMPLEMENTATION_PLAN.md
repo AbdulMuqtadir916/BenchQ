@@ -36,3 +36,8 @@ No manual sender allowlist, V1 quarantine-release UI, relevance prefilter, résu
 ## Prior evidence
 
 Existing isolated matching/status slice passed 79 affected tests before this approved implementation. It is baseline evidence only. HISTORY files preserve old proposals; do not implement their superseded 0.6/Offer/MoveOn/purge/sender-approval rules.
+
+
+## PR #111 review follow-up
+
+Switching on classifies only mail imported after that point. Existing and disabled-import mail is NOT_QUEUED; historical classification requires a separate future explicit action. Retry/reclassify cannot queue it. Dedicated email.retry (Owner/Manager/BDE) and email.reclassify (Owner/Manager) preserve current candidate scoping. Normalize source addresses; preserve existing application links; invalidated work does not consume retries. Low-confidence unmatched Other remains in BDE review. Confident Other retains the approved encrypted 30-day recovery policy and gated purge; Gmail is untouched. Item #2 (shared AI client/endpoint and Super Admin spend integration) is deferred to PR 4; real-mail AI remains gated. Item #9 stays unchanged.

@@ -89,3 +89,11 @@ Hidden Other stays encrypted 30 days. Purge needs evaluated zero job-related sha
 Sender header normalization is conservative: missing/duplicate/ARC/unproven evidence stays UNKNOWN; validate Gmail trust-boundary fixtures before PR 4 relies on PASS. Usage can be UNKNOWN after timeouts/crashes and needs reconciliation, never reported as free. Current single-process scheduler assumptions remain; no worker-platform redesign, manual sender approval or quarantine-release UI.
 
 User authorized PR publication after local review on 2026-11-04. No merge, real-mail AI activation or purge activation is authorized by publishing this PR.
+
+## Review fixes
+
+Migration 0014 and candidate model: NOT_QUEUED default and constraint, safe downgrade. gmail_sync: queue only enabled imports. classification_worker: normalized source comparisons, preserve linked email, refund invalidated claims. routes_inbox: dedicated permissions and no unqueued classification label. Backend/frontend policy and generated table: email.retry/email.reclassify. Inbox schema/read/list/meta: support unqueued mail without badge. Pipeline/migration tests: backlog safety, import gates, link visibility, normalization and retry budget. Plan/status/operations: document review decisions and PR 4 endpoint/spend follow-up.
+
+Additional review files: docs/07-ROUTES-AND-RBAC.md documents exact email action roles; src/lib/auth/policy-table.test.ts covers each principal; src/lib/api/dto/inbox.ts accepts NOT_QUEUED and defaults legacy responses to it; candidate overview/inbox-preview.tsx and applications/application-drawer.tsx also suppress unqueued classification badges.
+
+Review verification: 152 backend affected tests, 2 tenant-isolation checks, 4 schema/head checks; 592 frontend tests; typecheck, lint, build and diff checks passed. Existing deprecation/CSS highlight warnings remain.

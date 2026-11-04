@@ -25,3 +25,16 @@ def test_downgrade_refuses_live_classification_claim(scratch_db):
     with engine.connect() as conn:
         assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one()==head_revision()
         assert conn.execute(text("SELECT count(*) FROM inbox_messages WHERE classification_state='PROCESSING'")).scalar_one()>0
+
+
+def test_existing_mail_upgrades_unqueued_and_roundtrips(scratch_db):
+    from backend.tests.test_migration_0012 import populated
+    name, engine = scratch_db
+    populated(scratch_db)
+    _ok(_alembic(name, 'downgrade', '0013'))
+    _ok(_alembic(name, 'upgrade', 'head'))
+    with engine.connect() as conn:
+        states = conn.execute(text('SELECT classification_state FROM inbox_messages')).scalars().all()
+        assert states and set(states) == {'NOT_QUEUED'}
+    _ok(_alembic(name, 'downgrade', '0013'))
+    _ok(_alembic(name, 'upgrade', 'head'))

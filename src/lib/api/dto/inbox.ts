@@ -6,7 +6,7 @@ import { toIso, toIsoOrNull } from "./shared";
 export const BackendInboxMessageSchema = z.object({
   id: z.string(), firm_id: z.string(), candidate_id: z.string(), application_id: z.string().nullable(),
   from_name: z.string(), from_email: z.string(), subject: z.string(), snippet: z.string(), body: z.string(),
-  classification_state: z.enum(["PENDING", "PROCESSING", "DONE", "ERROR", "EXCLUDED"]).default("PENDING"),
+  classification_state: z.enum(["NOT_QUEUED", "PENDING", "PROCESSING", "DONE", "ERROR", "EXCLUDED"]).default("NOT_QUEUED"),
   received_at: z.string(), is_read: z.boolean(), source_address: z.string().default(""),
 });
 export const BackendInboxSchema = z.object({

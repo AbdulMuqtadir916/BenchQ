@@ -63,7 +63,7 @@ export function InboxPreview({ inbox, isLoading, firstName, canAct, onOpenMessag
                     <p className={cn("truncate text-sm text-[var(--color-text)]", !m.isRead && "font-[550]")}>{m.subject}</p>
                     <p className="truncate text-caption text-[var(--color-text-3)]">{m.fromName} · {formatRelative(m.receivedAt)}</p>
                   </div>
-                  <Tag tone={meta.tone} className="shrink-0"><meta.Icon size={11} aria-hidden />{meta.label}</Tag>
+                  {m.classificationState !== "NOT_QUEUED" ? <Tag tone={meta.tone} className="shrink-0"><meta.Icon size={11} aria-hidden />{meta.label}</Tag> : null}
                 </button>
               </li>
             );

@@ -134,7 +134,9 @@ def _store_message(db, mailbox: CandidateMailbox, token: str, message_id: str, c
     if any("\x00" in value for value in (from_name, from_email, subject, snippet, body, str(thread_id or ""))):
         logger.warning("Skipping Gmail message containing invalid text for candidate mailbox")
         return False
+    from backend.inbox.classification_worker import enabled
     imported_id = db.execute(insert(InboxMessage).values(
+        classification_state="PENDING" if enabled() else "NOT_QUEUED",
         firm_id=mailbox.firm_id,
         candidate_id=mailbox.candidate_id,
         mailbox_id=mailbox.id,

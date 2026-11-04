@@ -9,7 +9,7 @@ import threading
 from types import SimpleNamespace
 import uuid
 
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from backend.ai.config import ai_config
 from backend.auth.scoping import scoped
@@ -40,7 +40,7 @@ def _current(db, message):
     return (mailbox if mailbox and firm and firm.status != 'SUSPENDED'
             and mailbox.status == 'CONNECTED' and mailbox.refresh_token_ciphertext
             and message.deleted_at is None and message.hidden_at is None
-            and message.source_address == mailbox.address.strip().lower() else None)
+            and message.source_address.strip().lower() == mailbox.address.strip().lower() else None)
 
 
 def _add_review(db, message, app, result):
@@ -128,6 +128,9 @@ def process_one(message_id, *, provider=None):
                  and config_identity(ai_config('email_classification', db=db)) == fingerprint)
         if not valid:
             if row and row.classification_token == token:
+                row.classification_attempts = max(0, row.classification_attempts - 1)
+                row.classification_next_retry_at = None
+                row.classification_error = None
                 row.classification_state = 'PENDING' if row.deleted_at is None else 'EXCLUDED'
                 row.classification_token = None
                 row.classification_lease_until = None
@@ -136,6 +139,14 @@ def process_one(message_id, *, provider=None):
             return False
         row.classification_token = None
         row.classification_lease_until = None
+        if error and error.code == 'WORK_INVALIDATED':
+            row.classification_attempts = max(0, row.classification_attempts - 1)
+            row.classification_state = 'PENDING'
+            row.classification_next_retry_at = None
+            row.classification_error = None
+            job.meta = {**job.meta, 'discarded': True}
+            db.commit()
+            return False
         if error:
             retry = error.retryable and row.classification_attempts < MAX_ATTEMPTS
             row.classification_state = 'PENDING' if retry else 'ERROR'
@@ -145,6 +156,7 @@ def process_one(message_id, *, provider=None):
             db.commit()
             return False
         # Snapshot match/app revision after I/O; never trust a stale pre-call match.
+        had_application_link = row.application_id is not None
         app_id = row.application_id
         if app_id is None:
             app_id = matching_application_id(db, box, row, allow_thread=row.sender_auth_result == 'PASS')
@@ -169,7 +181,7 @@ def process_one(message_id, *, provider=None):
         db.flush()
         # An existing pending human business review must remain accessible until human resolution.
         pending = scoped(db, ApplicationReview, row.firm_id).filter_by(inbox_message_id=row.id, state='PENDING').first()
-        if confident_other and pending is None:
+        if confident_other and pending is None and not had_application_link:
             row.hidden_at = utcnow()
             row.other_purge_after = row.hidden_at + timedelta(days=30)
             for field in ('subject', 'from_name', 'from_email'):
@@ -194,7 +206,7 @@ def process_pending(*, limit=20):
             or_(InboxMessage.classification_lease_until.is_(None), InboxMessage.classification_lease_until <= utcnow()),
             or_(InboxMessage.classification_next_retry_at.is_(None), InboxMessage.classification_next_retry_at <= utcnow()),
         ).join(CandidateMailbox, InboxMessage.mailbox_id == CandidateMailbox.id).filter(
-            CandidateMailbox.status == 'CONNECTED', InboxMessage.source_address == CandidateMailbox.address,
+            CandidateMailbox.status == 'CONNECTED', func.lower(func.trim(InboxMessage.source_address)) == func.lower(func.trim(CandidateMailbox.address)),
         ).order_by(InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
     return sum(process_one(identity) for (identity,) in rows)
 

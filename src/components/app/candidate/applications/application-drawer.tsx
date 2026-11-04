@@ -150,7 +150,7 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
                         <span className="block truncate text-sm text-[var(--color-text)]">{m.subject}</span>
                         <span className="block text-caption text-[var(--color-text-3)]">{m.fromName} · {formatRelative(m.receivedAt)}</span>
                       </span>
-                      <Tag tone={meta.tone} className="shrink-0">{meta.label}</Tag>
+                      {m.classificationState !== "NOT_QUEUED" ? <Tag tone={meta.tone} className="shrink-0">{meta.label}</Tag> : null}
                     </button>
                   </li>
                 );

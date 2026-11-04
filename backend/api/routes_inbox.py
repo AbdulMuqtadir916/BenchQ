@@ -86,7 +86,7 @@ def _message_json(message: InboxMessage, *, hide_body: bool = False, include_bod
         "body": "" if hide_body or not include_body else decrypt_content(message.body or message.snippet),
         "received_at": message.received_at.isoformat(), "is_read": message.is_read,
         "classification_state": message.classification_state,
-        "classification_label": "Not classified" if message.classification_state != 'DONE' else "Classified",
+        "classification_label": None if message.classification_state == 'NOT_QUEUED' else "Not classified" if message.classification_state != 'DONE' else "Classified",
         "classification_error": None if hide_body else message.classification_error,
         "classification_retry_exhausted": message.classification_state == 'ERROR' and message.classification_attempts >= 3,
         "classification_category": classification.category if classification and not hide_body else None,
@@ -701,7 +701,7 @@ class ClassificationCommand(BaseModel):
 
 
 def _queue_classification(db, firm_id, candidate_id, message_id, principal, body, *, rerun):
-    permission = 'candidate.assign' if rerun else 'candidate.edit'
+    permission = 'email.reclassify' if rerun else 'email.retry'
     if not can(principal, permission):
         raise HTTPException(403, "You don't have permission for this classification action.")
     _candidate(db, firm_id, candidate_id, principal)

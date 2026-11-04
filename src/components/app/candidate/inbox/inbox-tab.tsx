@@ -170,7 +170,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
                     </span>
                     <span className="block truncate text-sm text-[var(--color-text-2)]">{m.subject}</span>
                     <span className="mt-1 flex items-center gap-1.5">
-                      <span data-tone={meta.tone} className="bq-tag"><meta.Icon size={11} aria-hidden />{meta.label}</span>
+                      {m.classificationState !== "NOT_QUEUED" ? <span data-tone={meta.tone} className="bq-tag"><meta.Icon size={11} aria-hidden />{meta.label}</span> : null}
                       {pendingIds.has(m.id) ? <span className="text-caption font-[550] text-[var(--color-violet-fg)]">Update suggested</span> : null}
                     </span>
                   </span>

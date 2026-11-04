@@ -14,7 +14,7 @@ depends_on = None
 
 def upgrade():
     columns = [
-        sa.Column('classification_state', sa.String(16), nullable=False, server_default='PENDING'),
+        sa.Column('classification_state', sa.String(16), nullable=False, server_default='NOT_QUEUED'),
         sa.Column('classification_attempts', sa.Integer(), nullable=False, server_default='0'),
         sa.Column('classification_version', sa.Integer(), nullable=False, server_default='0'),
         sa.Column('content_revision', sa.Integer(), nullable=False, server_default='0'),
@@ -29,7 +29,7 @@ def upgrade():
     ]
     for col in columns:
         op.add_column('inbox_messages', col)
-    op.create_check_constraint('ck_inbox_classification_state', 'inbox_messages', "classification_state IN ('PENDING','PROCESSING','DONE','ERROR','EXCLUDED')")
+    op.create_check_constraint('ck_inbox_classification_state', 'inbox_messages', "classification_state IN ('NOT_QUEUED','PENDING','PROCESSING','DONE','ERROR','EXCLUDED')")
     op.create_check_constraint('ck_inbox_sender_auth', 'inbox_messages', "sender_auth_result IN ('PASS','FAIL','UNKNOWN')")
     op.create_index('ix_inbox_classification_queue', 'inbox_messages', ['classification_state', 'classification_next_retry_at'])
     op.create_table('email_classifications',
@@ -90,7 +90,7 @@ def upgrade():
 def downgrade():
     connection = op.get_bind()
     # Preserve completed evidence, private retention and unmatched/human work.
-    unsafe = connection.execute(sa.text("SELECT EXISTS (SELECT 1 FROM email_classifications) OR EXISTS (SELECT 1 FROM application_reviews WHERE application_id IS NULL OR classification_id IS NOT NULL OR classification_version IS NOT NULL) OR EXISTS (SELECT 1 FROM inbox_messages WHERE classification_state != 'PENDING' OR classification_attempts != 0 OR hidden_at IS NOT NULL OR content_revision != 0 OR sender_auth_result != 'UNKNOWN')")).scalar()
+    unsafe = connection.execute(sa.text("SELECT EXISTS (SELECT 1 FROM email_classifications) OR EXISTS (SELECT 1 FROM application_reviews WHERE application_id IS NULL OR classification_id IS NOT NULL OR classification_version IS NOT NULL) OR EXISTS (SELECT 1 FROM inbox_messages WHERE classification_state != 'NOT_QUEUED' OR classification_attempts != 0 OR hidden_at IS NOT NULL OR content_revision != 0 OR sender_auth_result != 'UNKNOWN')")).scalar()
     if unsafe:
         raise RuntimeError('Refusing to discard email classification, retention or review evidence.')
     op.drop_index('uq_unmatched_review_email', table_name='application_reviews')

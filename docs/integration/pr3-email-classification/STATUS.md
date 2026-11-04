@@ -38,3 +38,14 @@ Updated 2026-11-04. [Plan](IMPLEMENTATION_PLAN.md). Authority: [Abdul’s writte
 2026-11-04 published: [PR #111](https://github.com/AbdulMuqtadir916/BenchQ/pull/111) opened against main from codex/pr3-local-review; AbdulMuqtadir916 review requested. Local checks above passed; GitHub checks/review still pending. No merge performed. Credentials remain ignored.
 
 2026-11-04 conflict resolution: merged origin/main c3f5c6b. Preserved main’s résumé migration/test 0013; moved PR 3 classification revision/test to 0014 after 0013. Migration tests 8 passed; model/migration parity plus classification pipeline/matching/status-policy tests 76 passed. Alembic reports a single head (0014). Conflict-free working tree pending merge commit and push.
+
+
+## PR #111 review follow-up
+
+Switching on classifies only mail imported after that point. Existing and disabled-import mail is NOT_QUEUED; historical classification requires a separate future explicit action. Retry/reclassify cannot queue it. Dedicated email.retry (Owner/Manager/BDE) and email.reclassify (Owner/Manager) preserve current candidate scoping. Normalize source addresses; preserve existing application links; invalidated work does not consume retries. Low-confidence unmatched Other remains in BDE review. Confident Other retains the approved encrypted 30-day recovery policy and gated purge; Gmail is untouched. Item #2 (shared AI client/endpoint and Super Admin spend integration) is deferred to PR 4; real-mail AI remains gated. Item #9 stays unchanged.
+
+- [x] Implement review fixes #1, #3, #5–8 and review-volume decision #4.
+- [x] Verify review regression suite and frontend checks.
+- [ ] Push fixes and post item #2 deferral on PR #111.
+
+Review verification: 152 affected backend tests, 2 classification tenant-isolation tests and 4 schema/head checks passed; frontend 592 tests, typecheck, lint and production build passed. Existing Starlette/httpx deprecation and CSS highlight build warnings remain. No live model or real candidate mail was used.

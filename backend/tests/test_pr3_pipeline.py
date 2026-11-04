@@ -27,6 +27,7 @@ def decision(category='assessment', confidence=.9):
 def pipeline(test_db, matching_case, monkeypatch):
     _, _, app, mailbox, row = matching_case
     mailbox.status = 'CONNECTED'
+    row.classification_state = 'PENDING'
     row.sender_auth_result = 'PASS'
     row.receive_time_verified = True
     row.received_at = utcnow()
@@ -381,3 +382,75 @@ def test_reclaimed_lease_fences_old_provider_completion(test_db,pipeline):
     test_db.expire_all()
     assert test_db.query(EmailClassification).one().category=='shortlisted'
     assert test_db.query(JobRun).filter_by(job_type='candidate_email_classification').count()==2
+
+
+def test_unqueued_mail_never_dispatches_after_enable(test_db, pipeline, api_client):
+    _, _, message_id = pipeline
+    row = test_db.get(InboxMessage, message_id)
+    row.classification_state = 'NOT_QUEUED'
+    test_db.commit()
+    def forbidden(*args): raise AssertionError('Historical mail must not be sent')
+    assert not worker.process_one(message_id, provider=forbidden)
+    assert worker.process_pending() == 0
+    path = f'/api/firms/{row.firm_id}/candidates/{row.candidate_id}/inbox-messages/{row.id}/classification'
+    for action in ('retry', 'reclassify'):
+        response = api_client.post(path+'/'+action, json={'command_id':str(uuid.uuid4()),
+            'expected_content_revision':0, 'expected_result_version':0})
+        assert response.status_code == 409
+
+
+def test_normalized_source_is_swept(test_db, pipeline, monkeypatch):
+    from backend.models.candidates import CandidateMailbox
+    _, mailbox_id, message_id = pipeline
+    row = test_db.get(InboxMessage, message_id)
+    box = test_db.get(CandidateMailbox, mailbox_id)
+    box.address = '  '+box.address.upper()+'  '
+    test_db.commit()
+    original = worker.process_one
+    monkeypatch.setattr(worker, 'process_one', lambda identity: original(identity, provider=lambda *a:decision()))
+    assert worker.process_pending() == 1
+    test_db.expire_all()
+    assert test_db.get(InboxMessage, message_id).classification_state == 'DONE'
+
+
+def test_existing_application_link_blocks_other_hiding(test_db, pipeline):
+    app_id, _, message_id = pipeline
+    row = test_db.get(InboxMessage, message_id)
+    row.application_id = app_id
+    test_db.commit()
+    assert worker.process_one(message_id, provider=lambda *a:decision('other'))
+    test_db.expire_all()
+    row = test_db.get(InboxMessage, message_id)
+    assert row.hidden_at is None and row.other_purge_after is None
+    assert row.application_id == app_id
+
+
+def test_invalidated_dispatch_preserves_retry_budget(test_db, pipeline):
+    _, _, message_id = pipeline
+    def invalid(*args): raise DeciderError('WORK_INVALIDATED')
+    for _ in range(4):
+        assert not worker.process_one(message_id, provider=invalid)
+        test_db.expire_all()
+        row = test_db.get(InboxMessage, message_id)
+        assert row.classification_state == 'PENDING'
+        assert row.classification_attempts == 0
+    assert worker.process_one(message_id, provider=lambda *a:decision())
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_import_only_queues_when_enabled(test_db, pipeline, monkeypatch, enabled):
+    from backend.inbox.gmail_sync import _store_message
+    from backend.models.candidates import CandidateMailbox
+    _, mailbox_id, _ = pipeline
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_CLASSIFICATION_ENABLED', enabled)
+    box = test_db.get(CandidateMailbox, mailbox_id)
+    data = {'id':'queue-gate', 'threadId':'queue-gate', 'labelIds':['INBOX'], 'internalDate':'1793786400000',
+        'snippet':'Synthetic message', 'payload':{'mimeType':'text/plain', 'body':{'data':'SGVsbG8='},
+        'headers':[{'name':'From','value':'sender@example.test'}, {'name':'Subject','value':'Synthetic'}]}}
+    assert _store_message(test_db, box, '', 'queue-gate', None, message_data=data)
+    test_db.commit()
+    row = test_db.query(InboxMessage).filter_by(provider_message_id='queue-gate').one()
+    assert row.classification_state == ('PENDING' if enabled else 'NOT_QUEUED')
+    if not enabled:
+        monkeypatch.setattr(config, 'CANDIDATE_EMAIL_CLASSIFICATION_ENABLED', True)
+        assert not worker.process_one(row.id, provider=lambda *a:pytest.fail('Backlog dispatched'))

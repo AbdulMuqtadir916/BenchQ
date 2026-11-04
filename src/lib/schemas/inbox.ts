@@ -32,7 +32,7 @@ export const InboxMessageSchema = z.object({
   body: z.string(),
   receivedAt: z.string().datetime(),
   signal: MailSignal.nullable(),
-  classificationState: z.enum(["PENDING", "PROCESSING", "DONE", "ERROR", "EXCLUDED"]).optional(),
+  classificationState: z.enum(["NOT_QUEUED", "PENDING", "PROCESSING", "DONE", "ERROR", "EXCLUDED"]).optional(),
   sourceAddress: z.string().optional(),
   isRead: z.boolean(),
   /** The stage this email implies. A suggestion is pending while the application is behind it. */

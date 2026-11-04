@@ -33,7 +33,7 @@ export function InboxReader({ message, application, suggestion, canAct, actions 
   return (
     <motion.article key={message.id} initial={reduce ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="flex h-full flex-col">
       <header className="border-b border-[var(--color-border)] p-5">
-        <Tag tone={meta.tone}><meta.Icon size={11} aria-hidden />{meta.label}</Tag>
+        {message.classificationState !== "NOT_QUEUED" ? <Tag tone={meta.tone}><meta.Icon size={11} aria-hidden />{meta.label}</Tag> : null}
         <h2 className="mt-2 text-h2 text-[var(--color-text)]">{message.subject}</h2>
         <p className="mt-1 text-sm text-[var(--color-text-2)]">
           <span className="font-[550]">{message.fromName}</span> <span className="text-[var(--color-text-3)]">&lt;{message.fromEmail}&gt;</span>
