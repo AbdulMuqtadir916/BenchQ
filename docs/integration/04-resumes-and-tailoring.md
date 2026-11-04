@@ -1,5 +1,12 @@
 # Module 04 — Resumes and AI tailoring
 
+> **Partly superseded (2026-11-02).** Résumé storage, versions, bases and their routes are now
+> [docs/team/resume-versioning.md](../team/resume-versioning.md): PR 5 added the routes under
+> `/api/firms/{firm}/candidates/{candidate}/resumes`, and PR 6 removed the old `/api/resumes` routes this file names
+> (list, detail, save, tailor, PDF, score-check) and `json_data`. Tailoring and the ATS score are rebuilt on the new
+> design in the tailoring module (`docs/team/zuhair.md` §3); the résumé designs are the studio's (resume-versioning
+> §8). Read the route tables below as history.
+
 **Difficulty:** Hard · **Depends on:** 02 live (tailoring needs backend job IDs)
 **Module names:** `resumes`, `agents` · **Product decision that shapes it:** D4 (claim evidence)
 

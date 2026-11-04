@@ -115,6 +115,21 @@ Each decision: what the frontend needs → what the backend has → options → 
 
 ---
 
+## D10 — Keeping deleted résumé versions for the ledger (DECIDED 2026-11-04: soft delete, built in résumé versioning PR 6)
+
+> **Suggested by Zuhair Baig, 2026-11-03; decided and confirmed by Abdul 2026-11-04** (product-owner review of PR 6),
+> built in résumé versioning PR 6 (migration 0013) in `resumes` / `base_resumes`, Zuhair's tables: the ledger is unchanged.
+
+- **Need:** the owner and manager can see what each BDE worked on, including résumé versions a BDE later deleted.
+- **Before:** a delete removed the row. The ledger entry (who, what, when) stayed, the content was gone.
+- **Decided: soft delete.** Deleting a version or a base sets `deleted_at` and keeps the row: out of every list and the
+  workflow, still stored, its version number never reused. The ledger and history can show it ("v2, deleted by the BDE,
+  2 Nov"). Uploading the same file again restores a deleted base (its v1) without reading the file again.
+- Other options considered: a copy table, the content inside the ledger entry, keeping as it was.
+  See `docs/team/resume-versioning.md` §4.7.
+
+---
+
 ## Decision log
 
 Record each decision here, with date and owner, then update the affected module files.

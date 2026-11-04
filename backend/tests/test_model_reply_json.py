@@ -63,11 +63,6 @@ def test_require_model_json_words_the_failure():
 
 # ── the old homes still answer ───────────────────────────────────────────────
 
-def test_routes_resumes_reexports_the_parser():
-    from backend.api.routes_resumes import _parse_model_json
-    assert _parse_model_json is parse_model_json
-
-
 def test_routes_autofill_reexports_the_scanner():
     from backend.api.routes_autofill import _first_json_object
     assert _first_json_object is first_json_object

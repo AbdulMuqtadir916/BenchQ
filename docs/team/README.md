@@ -97,5 +97,6 @@ it. Everyone else reads it.
 | 0009 | Samad | Applications foundation | Merged #100 |
 | 0010 | Mohammed Abdul Ahad Umamah | Notifications and password-reset approvals | Merged #105 |
 | 0011 | Zuhair | Résumé versioning and upload fingerprints | Merged #106 |
-| 0012 | Samad | Candidate Gmail OAuth/sync and provenance | PR #104; review pending |
-| 0013+ | — | Claim the next number here in your PR | — |
+| 0012 | Samad | Candidate Gmail OAuth/sync and provenance | Merged #104 |
+| 0013 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0012 (Samad's) | `feat/drop-legacy-resume-columns` |
+| 0014+ | — | Claim the next number here in your PR | — |

@@ -46,11 +46,10 @@ def _refused(test_db, row, constraint: str) -> None:
 
 
 def _version(world, **values) -> Resume:
-    """A versioned row of Asha's base: base v1 unless the test says otherwise. `is_base` follows the category while it
-    exists (PR 6 drops it), so code that still reads it isn't misled."""
-    row = {"firm_id": world["firm"].id, "candidate_id": world["asha"].id, "base_resume_id": world["base"].id,
-           "name": "Base", "category": "BASE", "version": 1, "created_by_user_id": world["owner"].id, **values}
-    return Resume(**row, is_base=row["category"] == "BASE")
+    """A versioned row of Asha's base: base v1 unless the test says otherwise."""
+    return Resume(**{"firm_id": world["firm"].id, "candidate_id": world["asha"].id, "base_resume_id": world["base"].id,
+                     "name": "Base", "category": "BASE", "version": 1, "created_by_user_id": world["owner"].id,
+                     **values})
 
 
 # ── base_resumes ─────────────────────────────────────────────────────────────
@@ -101,18 +100,12 @@ def test_a_base_has_no_job_and_a_tailored_resume_has_one(test_db, world):
 
 def test_a_version_belongs_to_its_bases_candidate(test_db, world):
     _refused(test_db, _version(world, candidate_id=world["ravi"].id), "fk_resumes_base_candidate")
-    _refused(test_db, _version(world, candidate_id=None), "ck_resumes_base_has_candidate")
+    _refused(test_db, _version(world, candidate_id=None), "candidate_id")       # NOT NULL since 0013
 
 
-def test_rows_from_before_versioning_are_left_alone(test_db, world):
-    """No base: the version rules don't apply until PR 6 converts these rows, and 0007's one-base rule still does."""
-    old = dict(firm_id=world["firm"].id, name="Old")
-    test_db.add_all([Resume(**old, category="BASE"), Resume(**old, category="BASE"),
-                     Resume(**old, category="TAILORED", is_base=False)])                     # tailored, no job
-    test_db.flush()
-    test_db.add(Resume(**old, candidate_id=world["ravi"].id))
-    test_db.flush()
-    _refused(test_db, Resume(**old, candidate_id=world["ravi"].id), "uq_resumes_one_base_per_candidate")
+def test_every_resume_has_a_base_since_0013(test_db, world):
+    """0013 (PR 6) converted or deleted the rows from before versioning; now the database refuses a row with no base."""
+    _refused(test_db, _version(world, base_resume_id=None), "base_resume_id")
 
 
 def test_a_versioned_candidate_has_many_base_versions_and_bases(test_db, world):
@@ -177,7 +170,7 @@ def test_old_resumes_upgrade_get_their_category_and_downgrade_runs(scratch_db): 
               (:a, :f, 'Base A', true, NULL), (:b, :f, 'Base B', true, NULL),
               (:t, :f, 'For the job', false, :j), (:o, :f, 'No job', false, NULL)
         """), {"a": base_a, "b": base_b, "t": tailored, "o": orphan, "f": DEFAULT_FIRM_ID, "j": job})
-    _ok(_alembic(name, "upgrade", "0008"))
+    _ok(_alembic(name, "upgrade", "0008"))      # 0008 only: 0013 converts or deletes these rows later
     with engine.connect() as conn:
         rows = dict(conn.execute(text("SELECT id, category FROM resumes")).all())
         assert rows == {base_a: "BASE", base_b: "BASE", tailored: "TAILORED", orphan: "TAILORED"}

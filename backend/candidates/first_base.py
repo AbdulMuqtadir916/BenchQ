@@ -7,8 +7,6 @@ id (§3.4) that later versions keep, so a claim follows its item from version to
 
 A BDE's later upload (§4.6, PR 5) builds its base the same way, without a form: then everything comes from the parse.
 
-`json_data` stays empty on purpose: the readers that still use it (scoring, the résumé list) skip an empty one, and
-PR 6 moves them to the new columns.
 """
 import uuid
 
@@ -88,7 +86,7 @@ def first_base(parse_row, candidate, body, created_by_user_id) -> tuple[BaseResu
                       resume_parse_id=parse_row.id, is_active=True, created_by_user_id=created_by_user_id)
     version = Resume(
         firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, name=BASE_NAME,
-        category="BASE", version=1, is_base=True, created_by_user_id=created_by_user_id, json_data={},
+        category="BASE", version=1, created_by_user_id=created_by_user_id,
         **(_form_header(candidate, body, header) if body is not None else _parse_header(candidate, parse, header)),
         # The parse, for what the form doesn't hold.
         country=_text(header.get("country")) or None, github=_text(header.get("github")) or None,

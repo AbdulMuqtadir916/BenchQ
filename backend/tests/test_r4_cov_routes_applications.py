@@ -86,6 +86,15 @@ def _break_commit(monkeypatch):
     return rolled
 
 
+def _own(db, app, resume):
+    """The application becomes the résumé's candidate's (every résumé has a candidate since résumé versioning PR 6);
+    returns that candidate."""
+    from backend.models.candidates import Candidate
+    app.candidate_id = resume.candidate_id
+    db.commit()
+    return db.get(Candidate, resume.candidate_id)
+
+
 def _make_app(db, **job_kw):
     from backend.models.db import Application
     job = make_job(db, **job_kw)
@@ -451,10 +460,11 @@ def test_create_application_back_dates_a_parseable_applied_at(client, test_db):
 def test_list_applications_reports_the_latest_tailored_resume(client, test_db):
     app, job = _make_app(test_db)
     older = make_resume(test_db, name="T1", is_base=False, job_id=job.id)
-    newer = make_resume(test_db, name="T2", is_base=False, job_id=job.id)
+    candidate = _own(test_db, app, older)
+    newer = make_resume(test_db, name="T2", is_base=False, job_id=job.id, version=2, candidate=candidate)
     now = datetime.now(timezone.utc)
-    older.updated_at = now - timedelta(hours=1)
-    newer.updated_at = now
+    older.created_at = now - timedelta(hours=1)
+    newer.created_at = now
     test_db.commit()
     row = assert_clean(client.get("/api/applications"), 200).json()["applications"][0]
     assert row["tailored_resume_name"] == "T2"
@@ -728,8 +738,8 @@ def test_prep_bundle_assembles_role_resume_posting_and_ask(client, test_db):
     app.notes = "referred   by   Dana"
     app.cv_version_used = "PM"
     test_db.commit()
-    make_resume(test_db, name="PM", json_data={
-        "header": {"name": "A Candidate"}, "summary": "Ten years of product."})
+    _own(test_db, app, make_resume(test_db, name="PM", json_data={
+        "header": {"name": "A Candidate"}, "summary": "Ten years of product."}))
     set_setting(test_db, "prep_ask", "Give me five questions.")
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert text.startswith("# Senior PM at Acme")
@@ -762,8 +772,8 @@ def test_prep_bundle_prefers_the_tailored_copy_over_the_base(client, test_db):
     app, job = _make_app(test_db)
     app.cv_version_used = "PM"
     test_db.commit()
-    make_resume(test_db, name="PM", json_data={"summary": "the base"})
-    make_resume(test_db, name="PM — Acme", is_base=False, job_id=job.id,
+    candidate = _own(test_db, app, make_resume(test_db, name="PM", json_data={"summary": "the base"}))
+    make_resume(test_db, name="PM — Acme", is_base=False, job_id=job.id, candidate=candidate,
                 json_data={"summary": "the tailored copy"})
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert "## My résumé — PM — Acme" in text
@@ -771,12 +781,12 @@ def test_prep_bundle_prefers_the_tailored_copy_over_the_base(client, test_db):
 
 
 def test_prep_bundle_demotes_the_resume_headings(client, test_db):
-    """`_flatten_resume` emits its own `## Summary`; inside the bundle it has to
+    """`resume_text` emits its own `## Summary`; inside the bundle it has to
     read as part of the résumé, not as a sibling of "The posting"."""
     app, _ = _make_app(test_db)
     app.cv_version_used = "PM"
     test_db.commit()
-    make_resume(test_db, name="PM", json_data={"summary": "Ten years."})
+    _own(test_db, app, make_resume(test_db, name="PM", json_data={"summary": "Ten years."}))
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert "### Summary" in text
     assert "\n## Summary" not in text
@@ -789,16 +799,16 @@ def test_prep_bundle_says_so_when_the_resume_is_unavailable(client, test_db):
 
 
 def test_prep_bundle_survives_a_resume_that_cannot_be_flattened(client, test_db, monkeypatch):
-    import backend.analyzer.cv_scorer as scorer
+    import backend.candidates.resume_text as scorer
     app, _ = _make_app(test_db)
     app.cv_version_used = "PM"
     test_db.commit()
-    make_resume(test_db, name="PM", json_data={"summary": "x"})
+    _own(test_db, app, make_resume(test_db, name="PM", json_data={"summary": "x"}))
 
     def _boom(data):
         raise ValueError("bad shape")
 
-    monkeypatch.setattr(scorer, "_flatten_resume", _boom)
+    monkeypatch.setattr(scorer, "resume_text", _boom)
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert "[résumé content unavailable]" in text
 
@@ -823,7 +833,7 @@ def test_prep_include_setting_drops_the_optional_sections(client, test_db):
     app.notes = "private note"
     app.cv_version_used = "PM"
     test_db.commit()
-    make_resume(test_db, name="PM", json_data={"summary": "x"})
+    _own(test_db, app, make_resume(test_db, name="PM", json_data={"summary": "x"}))
     # A blank value falls back to the default trio, so name a section that does
     # not exist to switch all three off.
     set_setting(test_db, "prep_include", "none")

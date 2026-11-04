@@ -115,18 +115,45 @@ def test_status_and_source_comma_lists_are_in_clauses(client, test_db):
 
 def test_only_the_most_recent_tailored_resume_is_reported_per_job(client, test_db):
     """Two tailored copies for one job: the list keeps the first row the
-    updated_at-desc query yields and ignores the rest."""
+    newest-first query yields and ignores the rest."""
     job = make_job(test_db)
     older = make_resume(test_db, name="Tailored old", is_base=False, job_id=job.id)
     newer = make_resume(test_db, name="Tailored new", is_base=False, job_id=job.id)
-    # updated_at is set by the model default; force a deterministic ordering.
+    # created_at is set by the model default; force a deterministic ordering.
     from datetime import datetime, timezone, timedelta
     now = datetime.now(timezone.utc)
-    older.updated_at = now - timedelta(hours=1)
-    newer.updated_at = now
+    older.created_at = now - timedelta(hours=1)
+    newer.created_at = now
     test_db.commit()
     row = assert_clean(client.get("/api/jobs"), 200).json()["jobs"][0]
     assert row["tailored_resume_id"] == str(newer.id)
+
+
+def test_a_deleted_tailored_version_stops_showing_on_the_job(client, test_db):
+    """Soft delete (resume-versioning.md §4.7): a deleted version is invisible. The job falls back to the newest
+    tailored version that still exists, and to none when all are deleted (list and detail alike)."""
+    from backend.models.db import Resume, utcnow
+    from backend.tests.resume_support import make_version
+    job = make_job(test_db)
+    v1 = make_resume(test_db, name="Tailored", is_base=False, job_id=job.id)
+    candidate = test_db.get(__import__("backend.models.candidates", fromlist=["Candidate"]).Candidate, v1.candidate_id)
+    v2 = make_version(test_db, v1.firm_id, candidate=candidate, category="TAILORED", job_id=job.id, version=2,
+                      name="Tailored")
+    test_db.commit()
+
+    def shown():
+        listed = assert_clean(client.get("/api/jobs"), 200).json()["jobs"][0]["tailored_resume_id"]
+        detail = assert_clean(client.get(f"/api/jobs/{job.id}"), 200).json()["tailored_resume_id"]
+        assert listed == detail
+        return listed
+
+    assert shown() == str(v2.id)
+    v2.deleted_at = utcnow()
+    test_db.commit()
+    assert shown() == str(v1.id)
+    v1.deleted_at = utcnow()
+    test_db.commit()
+    assert shown() is None
 
 
 def test_a_running_job_without_a_target_is_not_reported_in_flight(client, test_db):

@@ -64,7 +64,6 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/searches/countries": S,
     "GET /api/llm/models": S,
     "GET /api/llm/efforts": S,
-    "GET /api/resumes/templates": S,
     "GET /api/cover-letters/templates": S,
 
     # ── Firm users ────────────────────────────────────────────────────────────
@@ -150,21 +149,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/jobs/{job_id}/live-page": F,
     "GET /api/persona": F,
     "PATCH /api/persona": F,
-    "POST /api/persona/import": F,
     "POST /api/persona/qa-bank": F,
-    "GET /api/resumes": F,
-    "POST /api/resumes": F,
-    "POST /api/resumes/copy": F,
-    "POST /api/resumes/import-pdf": F,
-    "GET /api/resumes/shelf": F,
-    "POST /api/resumes/tailor": F,
-    "DELETE /api/resumes/{resume_id}": F,
-    "GET /api/resumes/{resume_id}": F,
-    "PATCH /api/resumes/{resume_id}": F,
-    "GET /api/resumes/{resume_id}/pdf": F,
-    "GET /api/resumes/{resume_id}/preview": F,
-    "POST /api/resumes/{resume_id}/score-check": F,
-    "GET /api/resumes/{resume_id}/tracer-stats": F,
     "GET /api/stats": F,
     "GET /api/stats/sankey": F,
     "GET /api/stats/score-distribution": F,
@@ -239,7 +224,6 @@ ROUTE_ACCESS: dict[str, Access] = {
 # FIRM GETs a support view may not use: they act rather than read. A view never exports a resume (07 §4).
 SUPPORT_VIEW_REFUSED: frozenset[str] = frozenset({
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}",
-    "GET /api/resumes/{resume_id}/pdf",
     "GET /api/cover-letters/{cl_id}/pdf",
 })
 SUPPORT_VIEW_READ_ONLY = "A support view is read-only."

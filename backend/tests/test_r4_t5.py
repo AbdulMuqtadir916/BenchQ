@@ -10,24 +10,17 @@ import uuid
 import pytest
 from fastapi import HTTPException
 
-from backend.api.routes_resumes import (
-    TEMPLATES_DIR,
-    _discover_templates,
-    _is_traceable_url,
-    _rewrite_urls_with_tracers,
-    validate_template_name,
-)
+from backend.api.render_shared import _is_traceable_url, _rewrite_urls_with_tracers, template_paths, validate_template_name
 from backend.api.routes_cover_letters import TEMPLATES_DIR as CL_TEMPLATES_DIR
-from backend.models.db import Resume, Setting, TracerLink
+from backend.models.db import Setting, TracerLink
 from backend.models.tenancy import DEFAULT_FIRM_ID
+from backend.tests.resume_support import make_version
 
 pytestmark = pytest.mark.usefixtures("default_firm")
 
 
-def _a_real_template() -> str:
-    names = [t["id"] for t in _discover_templates()]
-    assert names, "no résumé templates on disk"
-    return "inter" if "inter" in names else names[0]
+# The résumé's own backend templates went in résumé versioning PR 6 (the studio's designs are BenchQ's); the
+# whitelist still guards the cover-letter templates.
 
 
 # ── R4-T5-01 · template name whitelist ───────────────────────────────────────
@@ -55,29 +48,23 @@ TRAVERSALS = [
 
 @pytest.mark.parametrize("name", TRAVERSALS)
 def test_template_name_rejects_anything_that_is_not_a_folder(name):
-    for base in (TEMPLATES_DIR, CL_TEMPLATES_DIR):
-        with pytest.raises(HTTPException) as exc:
-            validate_template_name(name, base)
-        assert exc.value.status_code == 422
+    with pytest.raises(HTTPException) as exc:
+        validate_template_name(name, CL_TEMPLATES_DIR)
+    assert exc.value.status_code == 422
 
 
 @pytest.mark.parametrize("name", [None, 1, ["inter"], {"id": "inter"}])
 def test_template_name_rejects_non_strings(name):
     with pytest.raises(HTTPException) as exc:
-        validate_template_name(name, TEMPLATES_DIR)
+        validate_template_name(name, CL_TEMPLATES_DIR)
     assert exc.value.status_code == 422
 
 
 def test_template_name_accepts_every_discovered_template():
-    for t in _discover_templates():
-        assert validate_template_name(t["id"], TEMPLATES_DIR) == t["id"]
-
-
-def test_render_html_rejects_a_traversal(test_db):
-    from backend.api.routes_resumes import _render_html
-    with pytest.raises(HTTPException) as exc:
-        _render_html({}, "../cover_letter_templates/garamond", "letter")
-    assert exc.value.status_code == 422
+    names = list(template_paths(CL_TEMPLATES_DIR))
+    assert names
+    for name in names:
+        assert validate_template_name(name, CL_TEMPLATES_DIR) == name
 
 
 def test_cover_letter_render_rejects_a_traversal(test_db):
@@ -85,44 +72,6 @@ def test_cover_letter_render_rejects_a_traversal(test_db):
     with pytest.raises(HTTPException) as exc:
         cl_render({}, "../resume_templates/inter", "letter")
     assert exc.value.status_code == 422
-
-
-def _make_resume(test_db) -> Resume:
-    r = Resume(firm_id=DEFAULT_FIRM_ID, name="Base", is_base=True, template=_a_real_template(),
-               page_format="letter", json_data={"header": {"name": "V"}})
-    test_db.add(r)
-    test_db.commit()
-    return r
-
-
-@pytest.mark.parametrize("payload", [
-    "../cover_letter_templates/garamond",
-    "%2e%2e%2fcover_letter_templates%2fgaramond",
-    "/etc/passwd",
-])
-def test_pdf_template_query_param_cannot_escape_the_template_dir(api_client, test_db, payload):
-    r = _make_resume(test_db)
-    resp = api_client.get(f"/api/resumes/{r.id}/pdf?template={payload}")
-    assert resp.status_code == 422, resp.text
-
-
-def test_patch_resume_rejects_a_bad_template(api_client, test_db):
-    r = _make_resume(test_db)
-    resp = api_client.patch(f"/api/resumes/{r.id}", json={"template": "../cover_letter_templates/garamond"})
-    assert resp.status_code == 422
-    test_db.refresh(r)
-    assert r.template == _a_real_template()   # nothing was half-applied
-
-
-def test_patch_resume_accepts_a_real_template(api_client, test_db):
-    r = _make_resume(test_db)
-    resp = api_client.patch(f"/api/resumes/{r.id}", json={"template": _a_real_template()})
-    assert resp.status_code == 200
-
-
-def test_create_resume_rejects_a_bad_template(api_client, test_db):
-    resp = api_client.post("/api/resumes", json={"name": "X", "template": "../etc"})
-    assert resp.status_code == 422
 
 
 def test_patch_cover_letter_rejects_a_bad_template(api_client, test_db):
@@ -164,11 +113,9 @@ def tracer_on(test_db):
 
 
 def _rewrite(test_db, items):
-    r = Resume(firm_id=DEFAULT_FIRM_ID, name="R", is_base=True, template=_a_real_template(),
-               page_format="letter", json_data={"header": {"contact_items": items}})
-    test_db.add(r)
+    r = make_version(test_db, DEFAULT_FIRM_ID)
     test_db.commit()
-    out = _rewrite_urls_with_tracers(r.json_data, str(r.id), test_db)
+    out = _rewrite_urls_with_tracers({"header": {"contact_items": items}}, str(r.id), test_db)
     return out["header"]["contact_items"]
 
 

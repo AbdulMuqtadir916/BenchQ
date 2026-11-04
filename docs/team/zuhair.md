@@ -28,7 +28,8 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
    (`base_resumes`, one active) and its version 1 in `resumes`. Spec and PR plan: [resume-versioning.md](./resume-versioning.md).
    **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). **PR 5** (migration 0011):
    versions and bases through the API under the candidate's URL: save, use as base, pick, the BDE's later upload,
-   delete / hide / show again; once a BDE is assigned only that BDE changes résumés (07 Q55).
+   delete / hide / show again; once a BDE is assigned only that BDE changes résumés (07 Q55). **PR 6** (migration
+   0013): the old columns and JobNavigator's résumé code removed; its old rows deleted (resume-versioning §3.3, §4.8).
 5. **Frontend live:** the Record (`src/lib/api/records.ts`) behind `records`, with a DTO mapper and a real sample.
 
 ## 2. Job scraping — per candidate (Q53b)
@@ -41,6 +42,10 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
 2. A run writes the pool **and** `candidate_jobs` (with the search, and `match_score` when scored).
 3. The candidate's job list in the app reads `candidate_jobs`; the Jobs page shows a candidate's jobs.
 4. Frontend live (`docs/integration/02-jobs.md`, Track 02) behind `jobs`.
+   **Dated follow-up (2026-11-04, from Abdul's review of résumé versioning PR 6):** until the job module, a job is scored
+   against **every candidate's active base** in one prompt (`cv_scorer.py`: `_get_resume_texts`). That is a stopgap:
+   with many candidates it costs a lot and is less accurate (the short score reply is capped). Per-candidate scoring
+   comes with the job module; the stopgap is not for real firms until then.
 5. **Deleting a job** (Abdul, 2026-11-01): before a BDE deletes one, ask "Are you sure you want to delete this job?"
    and name the résumés tailored on it (they are deleted with it, `resumes.job_id` CASCADE). The per-candidate
    delete proposal is in [resume-versioning.md](./resume-versioning.md) §7.
@@ -55,7 +60,11 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
    (a candidate has several target roles but one active base).
 3. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
    or re-tailoring inserts the next version.
-4. **ATS score** for a tailored résumé against its job (`cv_score` / `score-check` today).
+4. **ATS score** for a tailored résumé against its job. The old `score-check` route and the old tailor route were
+   removed in résumé versioning PR 6; their pipeline is kept, unwired, in `backend/analyzer/legacy_tailoring.py`
+   (with the prompts in settings and `llm_client.call_cv_tailor_llm`) to port to the versions.
+   A PDF the server makes itself (extension, email, tracer links, the export gate on the backend) is built here
+   from the studio's designs (resume-versioning.md §8).
 5. Frontend live behind `resumes`.
 
 ## Rules for you

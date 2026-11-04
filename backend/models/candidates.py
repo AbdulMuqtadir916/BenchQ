@@ -131,7 +131,6 @@ class ResumeParse(Base):
     content_sha256 = Column(String, nullable=False,
                             default=lambda ctx: file_sha256(ctx.get_current_parameters()["content"]))
     created_at = _created_at()
-    updated_at = _updated_at()
 
     __table_args__ = (
         CheckConstraint("size_bytes BETWEEN 1 AND 10485760", name="ck_resume_parses_size"),   # 10 MB
@@ -171,6 +170,9 @@ class BaseResume(Base):
     promoted_from_resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL", use_alter=True),
                                      nullable=True)
     archived_at = Column(DateTime(timezone=True), nullable=True)
+    # 0013 (PR 6): soft delete. A deleted base is out of every list and the workflow; its versions are marked with it,
+    # its upload stays, so the same file brings it back (docs/team/resume-versioning.md §4.7).
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(_in("source", BASE_RESUME_SOURCES), name="ck_base_resumes_source_values"),

@@ -4,9 +4,10 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.auth import ledger
 from backend.models.candidates import Candidate, CandidateJob, CandidateMailbox, Claim, Evidence, FavoriteJob, InboxMessage
-from backend.models.db import Application, Job, Resume, Search, utcnow
+from backend.models.db import Application, Job, Search, utcnow
 from backend.models.tenancy import Firm, LedgerEntry, User
 from backend.tests.auth_support import make_user
+from backend.tests.resume_support import make_version
 
 
 @pytest.fixture
@@ -52,23 +53,13 @@ def test_a_verified_claim_needs_evidence(test_db, world):
     _refused(test_db, Claim(**{**claim, "entity_type": "hobby"}), "ck_claims_entity_type")
 
 
-def test_one_base_resume_per_candidate_and_many_tailored(test_db, world):
-    base = Resume(firm_id=world["firm"].id, candidate_id=world["candidate"].id, name="Base", is_base=True)
-    test_db.add(base)
-    test_db.flush()
-    for n in range(2):
-        test_db.add(Resume(firm_id=world["firm"].id, candidate_id=world["candidate"].id, name=f"Tailored {n}",
-                           is_base=False, parent_id=base.id, job_id=world["job"].id))
-    test_db.flush()
-    _refused(test_db, Resume(firm_id=world["firm"].id, candidate_id=world["candidate"].id, name="Second base",
-                             is_base=True), "uq_resumes_one_base_per_candidate")
+# 0007's one-base rule (uq_resumes_one_base_per_candidate) was replaced by versioning (0008) and dropped in 0013;
+# test_migration_0008.py holds the résumé rules now.
 
 
 def test_one_application_per_candidate_per_job_with_the_tailored_resume(test_db, world):
-    tailored = Resume(firm_id=world["firm"].id, candidate_id=world["candidate"].id, name="Tailored", is_base=False,
-                      job_id=world["job"].id)
-    test_db.add(tailored)
-    test_db.flush()
+    tailored = make_version(test_db, world["firm"].id, candidate=world["candidate"], category="TAILORED",
+                            job_id=world["job"].id, name="Tailored")
     app = dict(firm_id=world["firm"].id, job_id=world["job"].id, candidate_id=world["candidate"].id)
     test_db.add(Application(**app, resume_id=tailored.id, submitted_by_user_id=world["bde"].id))
     test_db.flush()

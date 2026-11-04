@@ -94,7 +94,7 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
 
     if "tailoring_max_concurrent" in updated:
         def _reset_tailoring():
-            from backend.api.routes_resumes import reset_tailoring_semaphore
+            from backend.api.render_shared import reset_tailoring_semaphore
             reset_tailoring_semaphore()
         _reconfigure("reset_tailoring_semaphore", _reset_tailoring)
 

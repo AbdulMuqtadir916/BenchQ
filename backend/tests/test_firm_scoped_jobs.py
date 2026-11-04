@@ -4,6 +4,7 @@ import pytest
 
 from backend.models.db import Job, Resume
 from backend.models.tenancy import FirmJob
+from backend.tests.resume_support import old_resume
 from backend.tests.auth_support import make_firm, make_plan
 
 
@@ -57,13 +58,8 @@ def test_bulk_update_reports_another_firms_job_as_not_found(api_client, jobs, te
 
 
 def test_documents_cannot_be_made_for_another_firms_job(api_client, jobs, test_db, accounts):
-    base = Resume(firm_id=accounts.firm_id, name="Base", is_base=True, json_data={"header": {"name": "A"}})
-    test_db.add(base)
+    base = old_resume(test_db, accounts.firm_id, "Base", {"header": {"name": "A"}})
     test_db.commit()
     theirs = str(jobs["theirs"].id)
-    assert api_client.post("/api/resumes/copy", json={"base_resume_id": str(base.id),
-                                                       "job_id": theirs}).status_code == 404
-    assert api_client.post("/api/resumes/tailor", json={"base_resume_id": str(base.id),
-                                                         "job_id": theirs}).status_code == 404
     assert api_client.post("/api/cover-letters/generate", json={"resume_id": str(base.id),
                                                                 "job_id": theirs}).status_code == 404
