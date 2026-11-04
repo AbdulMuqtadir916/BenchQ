@@ -46,6 +46,8 @@ Switching on classifies only mail imported after that point. Existing and disabl
 
 - [x] Implement review fixes #1, #3, #5–8 and review-volume decision #4.
 - [x] Verify review regression suite and frontend checks.
-- [ ] Push fixes and post item #2 deferral on PR #111.
+- [x] Push fixes and post item #2 deferral on PR #111.
 
 Review verification: 152 affected backend tests, 2 classification tenant-isolation tests and 4 schema/head checks passed; frontend 592 tests, typecheck, lint and production build passed. Existing Starlette/httpx deprecation and CSS highlight build warnings remain. No live model or real candidate mail was used.
+
+Published review fixes as 5aa6811 on PR #111. Posted review response: https://github.com/AbdulMuqtadir916/BenchQ/pull/111#issuecomment-6633326814 . Awaiting reviewer approval/CI; no merge performed.
