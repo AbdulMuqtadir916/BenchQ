@@ -154,14 +154,30 @@ Python's `logging` sends every module's records up to one root logger. Each file
   With the masking switched off, it fails on the database and validation errors; the other flows log no personal data
   in the first place.
 - **The rule** is in `CLAUDE.md` ("Things you must not do"): masking is the safety net, not permission.
-- **CI keeps it for new code** (added 2026-11-04), so nobody has to come back to logging for each new route:
-  - every route is logged by `RequestLog` with no per-route work, and `test_logging.py` fails if that breaks;
-  - `backend/tests/test_log_lint.py` reads every log call and fails on one that puts a person's data in its message
-    (`candidate.full_name`, `user.email`, a raw AI reply, Google's whole reply, a search's name), and on `print()` in
-    the server. Its `KNOWN` list holds the calls already reported to their owners; it only shrinks;
-  - `backend/tests/test_logging_coverage.py` lists every POST/PUT/PATCH route as `canary` (planted data goes
-    through it), `none` (no one's data) or `todo` (people's data, no canary case yet, owner named). A new route
-    fails CI until it is listed.
+- **CI keeps it for new code** (2026-11-04), so nobody has to come back to logging for each new route. Every route
+  is logged by `RequestLog` with no per-route work (`test_logging.py` fails if that breaks), and two checks fail a PR
+  that writes a person's data to the log:
+  - **`backend/tests/test_log_lint.py` reads the code.** It follows people's data from where it enters (a route's
+    body, URL values and uploads; a row of a people table, `PEOPLE_MODELS`; the AI's reply, any `call_*llm`; a reply
+    from Google or an AI provider, `PERSONAL_HOSTS`) through assignments, loops, f-strings, dicts, `model_dump()`,
+    helpers in the same file, background tasks and exceptions, to any logger. Ids, counts, statuses and `len()` pass.
+    It reads branches no request reaches. It fails on `print()` in the server too.
+  - **`backend/tests/test_log_every_route.py` runs every route.** Per route: a fresh database with a row in every
+    table (people's text columns planted), a request built from the route's OpenAPI description with planted values
+    in every string and a planted PDF for a file, and the AI's and Google's replies planted (`route_sweep.py`; no
+    request leaves the test). It fails if a planted value reaches the log, after masking. A new route is checked the
+    day it is added; nobody lists it. 135 of 182 routes run their normal path; `NOT_REACHED` lists the 47 the built
+    request doesn't get through (an OAuth flow, a valid invite token, the browser), with the route's own refusal.
+  - **Measured, not assumed:** `backend/tests/log_leak_cases.py` holds 30 leaks written the ways a teammate plausibly
+    would, before either check, and 10 safe routes. The lint catches 28 and the sweep 24; only a reply from a host
+    not in `PERSONAL_HOSTS`, logged whole, passes both. Neither flags a safe one. Both self-tests fail if that
+    changes. With a leak put into the real candidate-edit route (`who = candidate.full_name`, then logged), both
+    failed.
+  - **Not covered:** a reply from an outside service not in `PERSONAL_HOSTS`; data a helper in another file fetches,
+    logged only in a branch the sweep doesn't run; the normal path of the `NOT_REACHED` routes; scheduler jobs no
+    route starts (the lint reads them, the sweep doesn't). These need a reviewer's look.
+  - **Today's findings:** the lint's `KNOWN` and the sweep's `KNOWN_LEAKS` hold the calls already reported (below);
+    `NOT_PERSONAL` holds 19 matches that aren't personal data, each with why. All three only shrink.
 - **Fixed on the way:** the tracer redirect logged its link's token on a failed click write; it logs the link id.
 - **Left as they are:** the existing log calls. The masking covers what it recognises (database errors, emails, phone
   numbers, tokens), not free text: the calls that log an AI reply are listed for their owners below. The two backfill
@@ -171,10 +187,20 @@ Python's `logging` sends every module's records up to one root logger. Each file
 **For teammates (4a):**
 
 - **Everyone:** keep `logging.getLogger("jobnavigator.<area>")` and never call `logging.basicConfig` or add a handler.
-  A new program (the worker in step 3, a new script) calls `configure_logging()` first. Log ids, counts and timings.
-  A new route that takes a body goes in `LOG_REVIEW` (`backend/tests/test_logging_coverage.py`); if it handles
-  people's data, it gets a case in the canary test and is listed as `canary`. Your `todo` routes there are yours to
-  move to `canary` when you next work on them.
+  A new program (the worker in step 3, a new script) calls `configure_logging()` first.
+- **Everyone, logging in new code:**
+  - Log ids, counts, statuses and timings. Never a name, email, phone, résumé or email text, an AI or Google reply,
+    a request body, or an uploaded file's name.
+  - **A new route:** nothing to list. If the sweep says it "answered 4xx to the built request", make the seed or the
+    request fit (`route_sweep.py`: `FIELD_VALUES` for a value your code checks, `SEED_OVERRIDES` for a table rule),
+    or list it in `NOT_REACHED` with why.
+  - **"Wrote planted values to the log", or a lint failure:** fix the log call. `NOT_PERSONAL` is only for a match
+    that isn't personal data, with the reason; the reviewer checks it.
+  - **A new table that holds people:** add its model to `PEOPLE_MODELS` (`test_log_lint.py`). A rule across its
+    columns: a `SEED_OVERRIDES` line (`test_every_table_is_seeded` says when).
+  - **A new outside service that returns people's data** (a mailbox, a profile): add its host to `PERSONAL_HOSTS`.
+  - **Reviewers:** look at a new log call in an `except` branch or a scheduler job, and at any line added to
+    `NOT_PERSONAL`, `NOT_REACHED`, `KNOWN` or `KNOWN_LEAKS`.
 - **Samad:** `backend/email_monitor/gmail_client.py:36` logs Google's whole reply (`resp.text`) when a token refresh
   fails. The masking catches what it recognises, but logging the status code and Google's `error` field is safer.
   Your file, so not changed here.
@@ -191,6 +217,13 @@ Python's `logging` sends every module's records up to one root logger. Each file
   `levelsfyi.py`, `linkedin_personal.py`, and `backend/api/routes_searches.py:328`) log `search.name`, and JobSpy the
   search term. Searches are per candidate now (0007), and a BDE may name one after the candidate ("Ravi – Java"):
   log `search.id` instead.
+- **Found by the new lint (2026-11-04):**
+  - **Zuhair:** `backend/analyzer/cv_scorer.py:417` logs the first 200 characters of the scorer's reply when its shape
+    is wrong (like the replies above: log its length); `:725` logs `job.best_cv`, a résumé's name, which a BDE may type
+    as the candidate's name (log the résumé's id); `backend/api/routes_resumes.py:1218` logs the PDF renderer's error
+    about a résumé, which may quote its content: to check.
+  - **Samad:** `backend/api/routes_applications.py:1226` logs a résumé's name (`cv_name`) when it can't be flattened:
+    log the résumé's id.
 - **Samad and Zuhair, the calls above:** each is a one-line change (log a length, a status or an id instead of the
   text). Fix them in your own PR, or agree that Uzair fixes them in a small follow-up PR after #107, listed in
   `docs/team/cross-area-changes.md`. Found in Abdul's review of #107 and a search of every log call (2026-11-03).
