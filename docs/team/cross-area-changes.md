@@ -10,29 +10,8 @@ The `access.py` change: Abdul's review note 5 on PR #107, agreed with Abdul 2026
 | Area (owner) | File | What changed | Why |
 |---|---|---|---|
 | Candidate inbox (Samad) | `backend/inbox/classification_worker.py`, `backend/inbox/retention.py`, `backend/api/routes_inbox.py` | Log lines with ids, counts and error codes only: each classification's outcome or failure code, a summary per worker run with work, the purge count, the three caught Google failures (attempt id and the error's type), and queued retries, reclassifications and resolved reviews. Each provider call is written to `llm_call_log` with its firm (`_log_ai_call`). No behaviour changed; the exception text stays out, as the code intended. **Added on Uzair's decision (2026-11-05) before Samad agreed; for Samad to review in #107.** | The new email jobs and these routes wrote nothing to the log, so a stalled classifier, a failed Gmail connect or a grant left live at Google was invisible; the classifier's AI calls were missing from AI spend (Q33). |
-| The team plan (Abdul) | `docs/team/README.md` §4, §5 | Rule 9 (logs carry ids and counts, never a person's data; the two checks that fail a PR otherwise; what to do when they fail) and a §5 row pointing to uzair.md §1, step 4a. **Added on Uzair's decision (2026-11-05) before Abdul agreed; for Abdul to review in #107.** | Every teammate reads the README first; the rule was only in uzair.md, which they don't. |
+| The team plan (Abdul) | `docs/team/README.md` §4, §5 | Rule 9 (logs carry ids and counts, never a person's data; the two checks that fail a PR otherwise; what to do when they fail) and a §5 row pointing to uzair.md §1, step 4a. **Added on Uzair's decision (2026-11-05); approved by Abdul in his review of #107 (2026-11-05).** | Every teammate reads the README first; the rule was only in uzair.md, which they don't. |
 | Access control (Abdul) | `backend/auth/access.py` `enforce` | Uses the route the request log already matched (`SAVED_ROUTE` in the request's state) when it was matched for the same method and path, otherwise matches it again as before (`_request_route_key`). Classification, refusals, the Origin check and sessions are unchanged; `test_access.py` and the isolation suite pass unchanged. | `RequestLog` and `enforce` both walked all ~200 routes for every request. |
-
-## Résumé versioning PR 5 — versions and bases through the API (`feat/resume-versions`, Zuhair)
-
-Design: [resume-versioning.md](./resume-versioning.md) §3.1, §3.2, §4.3, §4.6, §4.7, §6; decided with Abdul
-2026-11-02, who asked for it to be written into the docs in this PR.
-
-| Area (owner) | File | What changed | Why |
-|---|---|---|---|
-| Routes and permissions (Abdul) | `docs/07-ROUTES-AND-RBAC.md` | Q55 added (who changes a candidate's résumés; numbered after #105's Q54, password recovery); a line under the §2.2 route map (résumé actions are per candidate); a Phase C row for the two helpers. The route map's access levels and the registry are unchanged. | Abdul's decision: once a BDE is assigned, only that BDE changes the candidate's résumés. |
-| The permission policy (Abdul) | `backend/auth/policy.py`, `src/lib/auth/policy.ts` | Two helpers, `can_change_resume` / `canChangeResume` and `can_manage_resume` / `canManageResume`, next to `can_assign_to`. The role table (and `policy_table.json`) is unchanged: `resume.edit` stays OWNER, MANAGER, BDE, and the helpers narrow it by the candidate's BDE. | Q55 depends on the candidate (has a BDE, and which), which a role table can't express; the project forbids inline role checks in routes. The screens switch to the helpers in PR 7. |
-| The frontend contract (Abdul approves) | `docs/02-DATA-CONTRACTS.md` §8.1 | `BaseResume` gains `promotedFromResumeId` and `archivedAt` (both nullable); the studio's content gains `summaryId`. Not built in `src/lib/schemas/` until PR 7. | The dropdown leaves out promoted versions and hidden bases (§3.2, §4.7). |
-| The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | One bullet in the résumé section: who changes résumés, and what PR 5 adds. | The section described the résumés without Q55. |
-| The team flows (team doc) | `docs/team/FLOWS.md` | A row for editing résumé versions (who, which tables); Q55 added to the rules under the table. | The same. |
-| Applications migration test (Samad) | `backend/tests/test_migration_0009.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `"0009"`. | With PR 5's migration (0011) on top, a refused downgrade leaves the database at 0010; the test's point (nothing moved) is unchanged. |
-| Upload size limits (Uzair, production layer 2a) | `backend/body_limit.py` | The candidate's résumé upload (`POST …/candidates/{candidate}/resumes/upload`) joins the 11 MB upload routes. | A résumé file over 1 MB was refused (413) before reaching the route; the route keeps its own 10 MB check, like parse-resume. |
-
-Not changed, left to the owner:
-
-- **Email required and unique per firm (Abdul, `candidates`):** decided 2026-11-02 (one candidate per person per
-  firm, never checked across firms). The create route already requires and lowercases it; the unique rule and its
-  migration are Abdul's.
 
 ## Résumé versioning PR 6 — the old résumé columns and JobNavigator's résumé code removed (`feat/drop-legacy-resume-columns`, Zuhair)
 
@@ -58,6 +37,27 @@ Not changed, left to the owner:
 
 - **Cover letters** stay (Zuhair, "maybe later"): they read the résumé from its columns now, nothing else changed.
 - **The shared persona** stays except its résumé import; the rest needs Samad (autofill reads it).
+
+## Résumé versioning PR 5 — versions and bases through the API (`feat/resume-versions`, Zuhair)
+
+Design: [resume-versioning.md](./resume-versioning.md) §3.1, §3.2, §4.3, §4.6, §4.7, §6; decided with Abdul
+2026-11-02, who asked for it to be written into the docs in this PR.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Routes and permissions (Abdul) | `docs/07-ROUTES-AND-RBAC.md` | Q55 added (who changes a candidate's résumés; numbered after #105's Q54, password recovery); a line under the §2.2 route map (résumé actions are per candidate); a Phase C row for the two helpers. The route map's access levels and the registry are unchanged. | Abdul's decision: once a BDE is assigned, only that BDE changes the candidate's résumés. |
+| The permission policy (Abdul) | `backend/auth/policy.py`, `src/lib/auth/policy.ts` | Two helpers, `can_change_resume` / `canChangeResume` and `can_manage_resume` / `canManageResume`, next to `can_assign_to`. The role table (and `policy_table.json`) is unchanged: `resume.edit` stays OWNER, MANAGER, BDE, and the helpers narrow it by the candidate's BDE. | Q55 depends on the candidate (has a BDE, and which), which a role table can't express; the project forbids inline role checks in routes. The screens switch to the helpers in PR 7. |
+| The frontend contract (Abdul approves) | `docs/02-DATA-CONTRACTS.md` §8.1 | `BaseResume` gains `promotedFromResumeId` and `archivedAt` (both nullable); the studio's content gains `summaryId`. Not built in `src/lib/schemas/` until PR 7. | The dropdown leaves out promoted versions and hidden bases (§3.2, §4.7). |
+| The candidate core doc (Abdul) | `docs/team/00-candidate-core.md` | One bullet in the résumé section: who changes résumés, and what PR 5 adds. | The section described the résumés without Q55. |
+| The team flows (team doc) | `docs/team/FLOWS.md` | A row for editing résumé versions (who, which tables); Q55 added to the rules under the table. | The same. |
+| Applications migration test (Samad) | `backend/tests/test_migration_0009.py` | The refused-downgrade test checks the database is still at **head** (`head_revision()`) instead of the literal `"0009"`. | With PR 5's migration (0011) on top, a refused downgrade leaves the database at 0010; the test's point (nothing moved) is unchanged. |
+| Upload size limits (Uzair, production layer 2a) | `backend/body_limit.py` | The candidate's résumé upload (`POST …/candidates/{candidate}/resumes/upload`) joins the 11 MB upload routes. | A résumé file over 1 MB was refused (413) before reaching the route; the route keeps its own 10 MB check, like parse-resume. |
+
+Not changed, left to the owner:
+
+- **Email required and unique per firm (Abdul, `candidates`):** decided 2026-11-02 (one candidate per person per
+  firm, never checked across firms). The create route already requires and lowercases it; the unique rule and its
+  migration are Abdul's.
 
 ## Password reset by approval (`feat/password-reset-notifications`, Mohammed Abdul Ahad Umamah)
 

@@ -13,7 +13,6 @@ from sqlalchemy import text
 
 import backend.main  # noqa: F401  configures logging, as the running app does
 import backend.models.db as db_mod
-from backend.logging_setup import installed_handler
 from backend.tests.auth_support import make_user
 from backend.tests.test_resume_parse import _pdf  # builds a one-page PDF; no parser setup from that file
 
@@ -26,23 +25,6 @@ TOKEN = "cAnArYtOkEn7Qx9Lp2Wm4Rt8Yb6Nv3Hj5Kd1Fs0Gz"
 # What must never appear, in any case: each marker, and the parts a masked or reformatted copy would keep.
 MARKERS = ("zorvath", "quillane", "canary-mail", "013-7799", "0137799", "xylophonic", "brigantine", "canarysmith",
            "wombat-lantern", TOKEN.lower())
-
-
-@pytest.fixture
-def log():
-    """Everything the app's handler writes during the test, at INFO."""
-    handler = installed_handler()
-    assert handler is not None, "backend.main did not configure logging"
-    buffer = io.StringIO()
-    previous_stream = handler.setStream(buffer)
-    root = logging.getLogger()
-    previous_level = root.level
-    root.setLevel(logging.INFO)
-    try:
-        yield buffer
-    finally:
-        handler.setStream(previous_stream)
-        root.setLevel(previous_level)
 
 
 def _assert_clean(buffer: io.StringIO) -> str:

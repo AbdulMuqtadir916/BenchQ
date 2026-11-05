@@ -23,7 +23,7 @@ from sqlalchemy import text as sql_text
 import backend.main  # noqa: F401  configures logging, as the running app does
 import backend.tests.log_leak_cases as leak_cases
 from backend.tests.route_sweep import build_request, seed_every_table, stub_outside
-from backend.tests.test_logging_canary import MARKERS, log  # noqa: F401  (log is a fixture)
+from backend.tests.test_logging_canary import MARKERS
 
 SKIPPED_METHODS = {"HEAD", "OPTIONS"}
 SECONDS = 60

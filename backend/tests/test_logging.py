@@ -16,21 +16,6 @@ from backend.logging_setup import REDACTED, installed_handler, redact
 
 
 @pytest.fixture
-def log():
-    handler = installed_handler()
-    buffer = io.StringIO()
-    previous_stream = handler.setStream(buffer)
-    root = logging.getLogger()
-    previous_level = root.level
-    root.setLevel(logging.INFO)
-    try:
-        yield buffer
-    finally:
-        handler.setStream(previous_stream)
-        root.setLevel(previous_level)
-
-
-@pytest.fixture
 def json_log(monkeypatch, log):
     monkeypatch.setenv("LOG_FORMAT", "json")
     handler = logging_setup.configure_logging()
