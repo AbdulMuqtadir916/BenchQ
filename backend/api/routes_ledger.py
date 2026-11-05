@@ -7,8 +7,9 @@ each plus the assignment entries about their candidates (07 Q52: "New assignment
 a VIEWER and a support view see the firm. Another firm's ledger is 404, the same as a missing firm (principle 4).
 Platform-only events (`firm_id` null) are the Super Admin's, in `/api/admin/audit`.
 
-Filters (all optional, combined with AND): `entity_type`, `entity_id` (one record's history, e.g. a candidate's
-handoff note), `action` (e.g. ASSIGN) and `candidate_id` (everything about a candidate: its activity, 07 Q53h).
+Filters (all optional, combined with AND, always inside what the reader may read): `entity_type`, `entity_id` (one
+record's history, e.g. a candidate's handoff note), `action` (e.g. ASSIGN) and `candidate_id` (a candidate's activity,
+07 Q53h: everything about it for the firm-wide readers).
 """
 import uuid
 

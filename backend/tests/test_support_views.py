@@ -352,6 +352,14 @@ def test_a_password_reset_ends_the_view(anonymous_client, world, test_db):
 
 # ── Expiry is settled once, wherever it is noticed ──────────────────────────
 
+def test_a_support_view_reads_the_whole_firms_ledger(anonymous_client, world):
+    """As the OWNER does (07 Q56): no role limit narrows it."""
+    assert _start(anonymous_client, world).status_code == 200
+    path = f"/api/firms/{world['acme']}/ledger"
+    ids = lambda headers: [entry["id"] for entry in anonymous_client.get(path, headers=headers).json()]
+    assert ids(world["admin"]) == ids(world["owner"]) != []
+
+
 def test_the_firms_own_ledger_read_settles_an_expired_view(anonymous_client, world, test_db):
     """The admin never comes back; the OWNER reading the ledger still sees the end."""
     view_id = _start(anonymous_client, world).json()["principal"]["support"]["id"]

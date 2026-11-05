@@ -255,8 +255,8 @@ def test_the_other_manager_sees_their_own_team(anonymous_client, accounts, teams
 
 @pytest.mark.parametrize("query", ["?entity_type=candidate&entity_id={ravi}", "?entity_id={ravi}", "?candidate_id={ravi}"])
 def test_a_managers_filters_stay_inside_their_team(anonymous_client, accounts, teams, query):
-    """Asking for another team's candidate by id shows nothing, whatever the filter (never confirm existence)."""
-    # Mira assigned Ravi before he moved to Zed: that entry is her own action, so it stays hers.
+    """Another team's candidate, whatever the filter: nothing of theirs, only what Mira did herself (she assigned
+    Ravi before he moved to Zed). "Zed moved Ravi" stays hidden."""
     resp = anonymous_client.get(_url(accounts.firm_id, query.format(ravi=teams["ravi"].id)), headers=teams["mira"])
     assert _summaries(resp) == ["Assigned Ravi to Ben"]
 

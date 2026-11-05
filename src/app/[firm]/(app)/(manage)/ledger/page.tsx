@@ -82,7 +82,7 @@ export default function LedgerPage() {
 
   return (
     <div className="bq-page">
-      <PageHeader title="Ledger" subtitle={hasOwnScope(principal) ? "Your actions in the audit trail. Append-only, immutable." : isTeamScope ? "Your team's actions and candidates in the audit trail. Append-only, immutable." : "Append-only audit trail. Every AI action, every state change, immutable."} />
+      <PageHeader title="Ledger" subtitle={hasOwnScope(principal) ? "Your actions in the audit trail. Append-only, immutable." : isTeamScope ? "Your team's actions in the audit trail. Append-only, immutable." : "Append-only audit trail. Every AI action, every state change, immutable."} />
 
       <div className="mt-4">
         <DataTable
