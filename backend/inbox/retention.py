@@ -1,9 +1,13 @@
 """Central readable-mail policy and independently gated hidden-Other erasure."""
+import logging
+
 from backend.inbox.decider_categories import CONFIDENCE_THRESHOLD
 
 from backend.auth.scoping import scoped
 from backend.models.candidates import InboxMessage
 from backend.models.db import ApplicationReview, EmailClassification, SessionLocal, utcnow
+
+logger = logging.getLogger("jobnavigator.inbox")
 
 
 def readable(query):
@@ -53,4 +57,6 @@ def purge_due(*, limit=100):
             clear_derived_results(db, message.firm_id, [message.id])
             count += 1
         db.commit()
+        if rows:
+            logger.info("Email retention: purged %d of %d due hidden emails", count, len(rows))
         return count
