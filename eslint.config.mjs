@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     ".claude-flow/**",
     ".agents/**",
     ".swarm/**",
+    // The extension's build output.
+    "extension/dist/**",
   ]),
 ]);
 
