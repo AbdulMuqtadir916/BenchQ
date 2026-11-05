@@ -5,10 +5,11 @@ listed here: what changed, in whose area, and why. Newest PR first.
 
 ## Logging, production layer 4a (`feat/logging`, Uzair)
 
-Abdul's review note 5 on PR #107; agreed with Abdul 2026-11-03.
+The `access.py` change: Abdul's review note 5 on PR #107, agreed with Abdul 2026-11-03.
 
 | Area (owner) | File | What changed | Why |
 |---|---|---|---|
+| The team plan (Abdul) | `docs/team/README.md` §4, §5 | Rule 9 (logs carry ids and counts, never a person's data; the two checks that fail a PR otherwise; what to do when they fail) and a §5 row pointing to uzair.md §1, step 4a. **Added on Uzair's decision (2026-11-05) before Abdul agreed; for Abdul to review in #107.** | Every teammate reads the README first; the rule was only in uzair.md, which they don't. |
 | Access control (Abdul) | `backend/auth/access.py` `enforce` | Uses the route the request log already matched (`SAVED_ROUTE` in the request's state) when it was matched for the same method and path, otherwise matches it again as before (`_request_route_key`). Classification, refusals, the Origin check and sessions are unchanged; `test_access.py` and the isolation suite pass unchanged. | `RequestLog` and `enforce` both walked all ~200 routes for every request. |
 
 ## Résumé versioning PR 5 — versions and bases through the API (`feat/resume-versions`, Zuhair)

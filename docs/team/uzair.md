@@ -188,17 +188,13 @@ Python's `logging` sends every module's records up to one root logger. Each file
 
 - **Everyone:** keep `logging.getLogger("jobnavigator.<area>")` and never call `logging.basicConfig` or add a handler.
   A new program (the worker in step 3, a new script) calls `configure_logging()` first.
-- **Everyone, logging in new code:**
-  - Log ids, counts, statuses and timings. Never a name, email, phone, résumé or email text, an AI or Google reply,
-    a request body, or an uploaded file's name.
-  - **A new route:** nothing to list. If the sweep says it "answered 4xx to the built request", make the seed or the
-    request fit (`route_sweep.py`: `FIELD_VALUES` for a value your code checks, `SEED_OVERRIDES` for a table rule),
-    or list it in `NOT_REACHED` with why.
-  - **"Wrote planted values to the log", or a lint failure:** fix the log call. `NOT_PERSONAL` is only for a match
-    that isn't personal data, with the reason; the reviewer checks it.
-  - **A new table that holds people:** add its model to `PEOPLE_MODELS` (`test_log_lint.py`). A rule across its
-    columns: a `SEED_OVERRIDES` line (`test_every_table_is_seeded` says when).
-  - **A new outside service that returns people's data** (a mailbox, a profile): add its host to `PERSONAL_HOSTS`.
+- **Everyone, logging in new code:** the rule is in the team README ([README.md](./README.md) §4, rule 9). The detail
+  behind it:
+  - **The sweep says a route "answered 4xx to the built request":** make the seed or the request fit
+    (`route_sweep.py`: `FIELD_VALUES` for a value your code checks, `SEED_OVERRIDES` for a table rule), or list it in
+    `NOT_REACHED` with why.
+  - **`NOT_PERSONAL`** is only for a lint match that isn't personal data, with the reason. A new table with a rule
+    across its columns needs a `SEED_OVERRIDES` line (`test_every_table_is_seeded` says when).
   - **Reviewers:** look at a new log call in an `except` branch or a scheduler job, and at any line added to
     `NOT_PERSONAL`, `NOT_REACHED`, `KNOWN` or `KNOWN_LEAKS`.
 - **Samad:** `backend/email_monitor/gmail_client.py:36` logs Google's whole reply (`resp.text`) when a token refresh
