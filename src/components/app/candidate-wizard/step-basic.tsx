@@ -38,7 +38,7 @@ export function StepBasic({ wizard, errors }: { wizard: Wizard; errors: Errors }
           <WizardField id="cw-role" label="Marketed as" required hint="The headline title BDEs submit under." error={errors.primaryRole} isDrafted={drafted.has("primaryRole")}>
             <Input {...fieldAria("cw-role", errors.primaryRole, true)} {...text("primaryRole")} placeholder="e.g. Senior Java Full Stack Developer" />
           </WizardField>
-          <WizardField id="cw-years" label="Years of experience" error={errors.yearsExperience} isDrafted={drafted.has("yearsExperience")}>
+          <WizardField id="cw-years" label="Years of experience" required error={errors.yearsExperience} isDrafted={drafted.has("yearsExperience")}>
             <Input {...fieldAria("cw-years", errors.yearsExperience)} {...text("yearsExperience")} inputMode="numeric" placeholder="e.g. 9" />
           </WizardField>
         </div>
@@ -49,8 +49,8 @@ export function StepBasic({ wizard, errors }: { wizard: Wizard; errors: Errors }
           <WizardField id="cw-email" label="Email" required error={errors.email} isDrafted={drafted.has("email")}>
             <PrefixedInput icon={Mail}><input {...fieldAria("cw-email", errors.email)} {...text("email")} type="email" placeholder="name@example.com" className="w-full bg-transparent outline-none" /></PrefixedInput>
           </WizardField>
-          <WizardField id="cw-phone" label="Phone" isDrafted={drafted.has("phone")}>
-            <PrefixedInput icon={Phone}><input {...fieldAria("cw-phone")} {...text("phone")} type="tel" placeholder="(469) 555-0182" className="w-full bg-transparent outline-none" /></PrefixedInput>
+          <WizardField id="cw-phone" label="Phone" required error={errors.phone} isDrafted={drafted.has("phone")}>
+            <PrefixedInput icon={Phone}><input {...fieldAria("cw-phone", errors.phone)} {...text("phone")} type="tel" placeholder="(469) 555-0182" className="w-full bg-transparent outline-none" /></PrefixedInput>
           </WizardField>
         </div>
         <WizardField id="cw-linkedin" label="LinkedIn" error={errors.linkedinUrl} isDrafted={drafted.has("linkedinUrl")}>

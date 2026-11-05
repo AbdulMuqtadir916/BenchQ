@@ -933,16 +933,18 @@ export const ResumeDraftSchema = z.object({
 **Candidates final schema — 2026-11-04 (Zuhair; Abdul reviews with the PR), migration 0015.** `persona` is removed
 from the candidate: `preferredIndustries` and `dealBreakers` are flat lists, `will_relocate` and `notice_period_days`
 inside it were stale copies of `willingToRelocate` and `noticePeriodDays`, `toneNotes` was never filled, and the summary
-is the active base résumé's (`resumes.summary`). `candidates.skills` and `summary_state` are removed too: skills, the
-summary and every other item of the résumé are `claims` (one UNVERIFIED claim per item, pointing at the item's id,
-written when a candidate or a later upload is made; one evidence row per upload, no quote). `needsSponsorship` and
-`needsTransfer`: a yes or no a person sent wins; one left out or sent as `null` is worked out from
-`workAuth` by the backend, on create, on an edit that really changes `workAuth`, and when an edit sends `null` (H-1B,
-H4 EAD, OPT, CPT, TN need sponsorship; H-1B needs a transfer; `OTHER` has no rule, so `needsSponsorship` stays `null`
-(unknown) until a person enters it; a question for Abdul: should the flow ask). A candidate created without a résumé file gets a `MANUAL` base from the form alone, so every candidate has a base.
+is the active base résumé's (`resumes.summary`). `candidates.skills` and `summary_state` are removed too (the skills are the
+active base résumé's). **BenchQ has no claim states (2026-11-05):** the `claims` and `evidence` tables are dropped in the
+same migration, and the frontend's claim, evidence and export-gate types go in PR 7. `needsSponsorship` and
+`needsTransfer` are required booleans: the new-candidate flow works them out from `workAuth` (H-1B, H4 EAD, OPT, CPT,
+TN need sponsorship; H-1B needs a transfer; anything else, `OTHER` included, sends `false`) and sends them; the backend
+works nothing out and only checks that they were sent (a missing one is a 422 naming the field). An edit that changes
+`workAuth` must carry both. Required on create, in the form and in the backend alike: `fullName`, `primaryRole`, `email`,
+`phone`, `yearsExperience`, `country` (the flow sends `US`), `workAuth`, `needsSponsorship`, `needsTransfer`,
+`employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. A candidate created without a résumé file gets a `MANUAL` base from the form alone, so every candidate has a base.
 
-Onboarding never produces a `VERIFIED` claim (Q49): skills and the summary land in the Record as `UNVERIFIED` with
-their `FieldSource`. `ResumeDraftSchema` gains `country` with the new parser (§8.1).
+`ResumeDraftSchema` gains `country` with the new parser (§8.1). The skills a new candidate is created with go into
+the first base résumé's version 1 (`resumes.skills`); they carry no source or state.
 
 ---
 

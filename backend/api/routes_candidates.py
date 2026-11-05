@@ -15,10 +15,10 @@ import asyncio
 import re
 import uuid
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
@@ -30,9 +30,7 @@ from backend.auth.scoping import own_scope, scoped, team_scope
 from backend.auth.sessions import Principal
 from backend.candidates.first_base import first_base
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
-from backend.candidates.record import write_record
 from backend.candidates.serialize import candidate_json
-from backend.candidates.work_auth import needs_sponsorship, needs_transfer
 from backend.models.candidates import (EMPLOYMENT_TYPES, REMOTE_MODES, WORK_AUTHS, WORKING_STATUSES, Candidate,
                                        ResumeParse)
 from backend.models.db import get_db, utcnow
@@ -47,34 +45,38 @@ WorkAuth = Literal[WORK_AUTHS]
 EmploymentType = Literal[EMPLOYMENT_TYPES]
 RemoteMode = Literal[REMOTE_MODES]
 Text200 = Field(default=None, max_length=200)
+# A required text: trimmed, then not blank. A missing field or a blank one is a 422 that names the field.
+Required200 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
 class SkillIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     family: str | None = Field(default=None, max_length=100)
-    source: Literal["RESUME_UPLOAD", "MANUAL"]
 
 
 class CreateCandidateBody(BaseModel):
-    """The frontend's CreateCandidateSchema (docs/02 §4) in snake_case."""
-    full_name: str = Field(min_length=1, max_length=200)
-    primary_role: str = Field(min_length=1, max_length=200)
-    email: str = Field(max_length=320)
-    phone: str | None = Text200
+    """The frontend's CreateCandidateSchema (docs/02 §4) in snake_case. The mandatory fields have no default: the
+    request is refused (422, naming the field) when one is missing. Nothing is worked out here: the new-candidate flow
+    sends `needs_sponsorship` and `needs_transfer` itself."""
+    full_name: Required200
+    primary_role: Required200
+    email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]
+    phone: Required200
     linkedin_url: str | None = Field(default=None, max_length=500)
     city: str | None = Text200
     state: str | None = Text200
-    years_experience: float | None = Field(default=None, ge=0, le=60)
+    country: Required200
+    years_experience: float = Field(ge=0, le=60)
     work_auth: WorkAuth
     work_auth_expiry: datetime | None = None
-    needs_sponsorship: bool | None = None     # yes or no; left out or null: worked out from work_auth
-    needs_transfer: bool | None = None        # yes or no; left out or null: worked out from work_auth
-    employment_types: list[EmploymentType] = Field(default_factory=list)
+    needs_sponsorship: bool
+    needs_transfer: bool
+    employment_types: list[EmploymentType] = Field(min_length=1)
     rate_target: float | None = Field(default=None, gt=0)
     rate_min: float | None = Field(default=None, gt=0)
     available_from: datetime | None = None
     notice_period_days: int | None = Field(default=None, ge=0, le=365)
-    target_roles: list[str] = Field(default_factory=list, max_length=50)
+    target_roles: list[Required200] = Field(min_length=1, max_length=50)
     willing_to_relocate: bool = False
     work_settings: list[RemoteMode] = Field(default_factory=list)
     preferred_locations: list[str] = Field(default_factory=list, max_length=50)
@@ -99,7 +101,7 @@ class UpdateCandidateBody(BaseModel):
     notice_period_days: int | None = Field(default=None, ge=0, le=365)
     willing_to_relocate: bool | None = None
     employment_types: list[EmploymentType] | None = None
-    # Sent (even as null = unknown) they are kept; when work_auth changes without them, they are worked out again.
+    # A changed work_auth must come with both (the flow sends all three together); nothing is worked out here.
     needs_sponsorship: bool | None = None
     needs_transfer: bool | None = None
 
@@ -229,7 +231,7 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     version 1 (a MANUAL base from the form alone when no file was given), their Record (one UNVERIFIED claim per item,
     07 Q49), and the CREATE and ASSIGN ledger entries."""
     _member_of(firm_id, principal)
-    email = body.email.strip().lower()
+    email = body.email.lower()
     if not EMAIL.match(email):
         raise _bad("Enter a valid email.")
     if body.rate_min is not None and body.rate_target is not None and body.rate_min > body.rate_target:
@@ -249,16 +251,15 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     now = utcnow()
     candidate = Candidate(
         firm_id=firm_id, manager_id=manager.id, bde_id=bde.id if bde else None, created_by_user_id=principal.user_id,
-        full_name=body.full_name.strip(), email=email, phone=_clean(body.phone), linkedin_url=_clean(body.linkedin_url),
-        city=_clean(body.city), state=_clean(body.state), willing_to_relocate=body.willing_to_relocate,
+        full_name=body.full_name, email=email, phone=body.phone, linkedin_url=_clean(body.linkedin_url),
+        city=_clean(body.city), state=_clean(body.state), country=body.country, willing_to_relocate=body.willing_to_relocate,
         work_auth=body.work_auth, work_auth_expiry=body.work_auth_expiry,
-        needs_sponsorship=(needs_sponsorship(body.work_auth) if body.needs_sponsorship is None else body.needs_sponsorship),
-        needs_transfer=(needs_transfer(body.work_auth) if body.needs_transfer is None else body.needs_transfer),
+        needs_sponsorship=body.needs_sponsorship, needs_transfer=body.needs_transfer,
         employment_types=list(dict.fromkeys(body.employment_types)),
         rate_min=body.rate_min, rate_target=body.rate_target, status="ON_BENCH", bench_start_date=now,
         available_from=body.available_from, notice_period_days=body.notice_period_days,
-        years_experience=body.years_experience, primary_role=body.primary_role.strip(),
-        target_roles=[r.strip() for r in body.target_roles if r.strip()] or [body.primary_role.strip()],
+        years_experience=body.years_experience, primary_role=body.primary_role,
+        target_roles=list(dict.fromkeys(body.target_roles)),
         work_settings=list(dict.fromkeys(body.work_settings)),
         preferred_locations=[p.strip() for p in body.preferred_locations if p.strip()],
         contact_notes=_clean(body.contact_notes),
@@ -277,7 +278,6 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     db.flush()
     db.add(version)
     db.flush()
-    write_record(db, candidate, version, parse, {s.name.strip(): s.source for s in body.skills})
     actor = db.get(User, principal.user_id)
     ledger.record(db, actor=actor, action="CREATE", entity_type="candidate", entity_id=candidate.id,
                   entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}")
@@ -294,20 +294,17 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     changes = body.model_dump(exclude_unset=True)
-    work_auth_before = candidate.work_auth
     for field, value in changes.items():
-        if value is None and field in ("work_auth", "willing_to_relocate", "employment_types"):
+        if value is None and field in ("work_auth", "willing_to_relocate", "employment_types", "needs_sponsorship",
+                                       "needs_transfer"):
             raise _bad(f"{field} can't be empty.")
-        if value is None and field in ("needs_sponsorship", "needs_transfer"):
-            continue                                   # null means "work it out": done below
-        setattr(candidate, field, value)               # a sent yes or no is kept as given
-    # Worked out from the work authorization (null counts as not sent) when it really changed, or when null was sent.
-    # A work authorization that stayed the same leaves what someone entered alone.
-    changed = candidate.work_auth != work_auth_before
-    if changes.get("needs_sponsorship") is None and (changed or "needs_sponsorship" in changes):
-        candidate.needs_sponsorship = needs_sponsorship(candidate.work_auth)
-    if changes.get("needs_transfer") is None and (changed or "needs_transfer" in changes):
-        candidate.needs_transfer = needs_transfer(candidate.work_auth)
+    # Nothing is worked out here: a changed work authorization comes with both values, or it is refused.
+    if "work_auth" in changes and changes["work_auth"] != candidate.work_auth:
+        missing = [f for f in ("needs_sponsorship", "needs_transfer") if f not in changes]
+        if missing:
+            raise _bad(f"A new work_auth needs {' and '.join(missing)} in the same request.")
+    for field, value in changes.items():
+        setattr(candidate, field, value)
     if candidate.rate_min is not None and candidate.rate_target is not None and candidate.rate_min > candidate.rate_target:
         raise _bad("The floor can't be above the target rate.")
     if changes:

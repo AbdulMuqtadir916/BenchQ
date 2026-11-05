@@ -42,7 +42,7 @@ export const CandidateSchema = z.object({
   workAuth: WorkAuth,
   workAuthExpiry: z.string().datetime().nullable(),
   /** null = unknown: work authorization "Other" has no rule and nobody entered a value (migration 0015). */
-  needsSponsorship: z.boolean().nullable(),
+  needsSponsorship: z.boolean(),
   needsTransfer: z.boolean(),
   employmentTypes: z.array(EmploymentType),
   rateMin: z.number().nullable(),
@@ -129,9 +129,14 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   preferredLocations: true,
   contactNotes: true,
 }).extend({
-  /** Left out, the backend works them out from `workAuth` (backend/candidates/work_auth.py); sent, they are kept. */
-  needsSponsorship: z.boolean().nullable().optional(),
-  needsTransfer: z.boolean().optional(),
+  /** Worked out by the flow from `workAuth` and sent; the backend only checks they are there. */
+  needsSponsorship: z.boolean(),
+  needsTransfer: z.boolean(),
+  phone: z.string().trim().min(1, "Enter their phone number."),
+  country: z.string().trim().min(1, "Enter the country."),
+  yearsExperience: z.number().min(0).max(60),
+  employmentTypes: z.array(EmploymentType).min(1, "Choose at least one engagement type."),
+  targetRoles: z.array(z.string().trim().min(1)).min(1, "Add at least one role they are looking for."),
   fullName: z.string().trim().min(1, "Enter the candidate's name."),
   primaryRole: z.string().trim().min(1, "Enter the title they're marketed as."),
   email: z.string().trim().email("Enter a valid email."),

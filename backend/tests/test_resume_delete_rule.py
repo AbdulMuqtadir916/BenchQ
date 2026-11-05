@@ -59,10 +59,10 @@ def _gone(db, *rows):
     return [db.get(Resume, r.id).deleted_at is not None for r in rows]
 
 
-def test_the_in_use_check_names_live_applications_tailorings_evidence_and_claims_only(test_db):
+def test_the_in_use_check_names_live_applications_and_tailorings_only(test_db):
     w = _world(test_db)
     removal = versions.base_removal(test_db, w["candidate"], w["base2"])
-    assert set(removal.uses) == {"applications", "tailored", "evidence", "claims"}          # no letters, no links
+    assert set(removal.uses) == {"applications", "tailored"}          # no letters, no links, no claims
 
 
 def test_a_base_nothing_uses_is_deleted_with_its_unused_tailorings(test_db):
@@ -139,57 +139,6 @@ def test_an_application_keeps_showing_the_resume_it_was_sent_with_after_it_is_de
         str(w["t1"].id), "Base 2", True)
 
 
-def _claims(db, candidate):
-    from backend.models.candidates import Claim
-    return db.query(Claim).filter(Claim.candidate_id == candidate.id).all()
-
-
-def test_deleting_a_base_drops_its_unverified_claims_and_restoring_it_writes_them_again(test_db):
-    from backend.candidates.record import write_record
-    w = _world(test_db)
-    write_record(test_db, w["candidate"], w["v1"])
-    write_record(test_db, w["candidate"], w["v2"])
-    test_db.commit()
-    before = len(_claims(test_db, w["candidate"]))
-    assert before >= 2
-    versions.delete_base(test_db, w["bde"], w["candidate"], w["base2"])
-    test_db.commit()
-    assert _claims(test_db, w["candidate"]) == []                       # nothing holds that content any more
-    versions.restore_base(test_db, w["bde"], w["candidate"], w["base2"])
-    test_db.commit()
-    texts = {k.text for k in _claims(test_db, w["candidate"])}
-    assert w["v1"].summary in texts and w["v2"].summary not in texts      # only v1 came back, with its claims
-
-
-def test_deleting_a_version_keeps_the_claims_of_text_other_versions_still_hold(test_db):
-    from backend.candidates.record import write_record
-    w = _world(test_db)
-    w["v2"].summary, w["v2"].summary_id = w["v1"].summary, w["v1"].summary_id          # the same summary item
-    write_record(test_db, w["candidate"], w["v1"])
-    test_db.commit()
-    versions.delete_version(test_db, w["bde"], w["candidate"], w["v2"])
-    test_db.commit()
-    assert {k.text for k in _claims(test_db, w["candidate"])} == {w["v1"].summary}
-
-
-def test_an_acted_on_claim_is_never_dropped(test_db):
-    from backend.candidates.record import write_record
-    w = _world(test_db)
-    write_record(test_db, w["candidate"], w["v1"])
-    claim = next(k for k in _claims(test_db, w["candidate"]) if k.entity_type == "summary")
-    claim.state = "CONTRADICTED"
-    test_db.commit()
-    assert versions.drop_orphan_claims(test_db, w["candidate"]) == 0
-    assert any(k.id == claim.id for k in _claims(test_db, w["candidate"]))
-
-
-def test_writing_the_record_twice_adds_no_second_claim(test_db):
-    from backend.candidates.record import write_record
-    w = _world(test_db)
-    first = write_record(test_db, w["candidate"], w["v1"])
-    assert first > 0 and write_record(test_db, w["candidate"], w["v1"]) == 0
-
-
 def test_an_application_sent_with_a_base_version_shows_that_version(test_db):
     from backend.api.routes_applications import _application_responses
     w = _world(test_db)
@@ -197,21 +146,3 @@ def test_an_application_sent_with_a_base_version_shows_that_version(test_db):
     (row,) = _application_responses(test_db, DEFAULT_FIRM_ID, [app])
     # A BDE can send any résumé, base or tailored: the application shows the one it was sent with.
     assert row["tailored_resume_id"] == str(w["v2"].id) and row["tailored_resume_deleted"] is False
-
-
-def test_a_skill_typed_on_the_form_keeps_its_claim_when_its_base_is_deleted_and_restored(test_db):
-    from backend.candidates.record import write_record
-    from backend.models.candidates import Claim
-    w = _world(test_db)
-    w["v1"].skills = [{"id": "skill-form", "category": "", "name": "Typed on the form"},
-                      {"id": "skill-file", "category": "", "name": "From the file"}]
-    write_record(test_db, w["candidate"], w["v1"], None, {"Typed on the form": "MANUAL", "From the file": "RESUME_UPLOAD"})
-    test_db.commit()
-    versions.delete_base(test_db, w["bde"], w["candidate"], w["base2"])
-    test_db.commit()
-    left = {k.entity_ref: k.source for k in _claims(test_db, w["candidate"]) if k.entity_type == "skill"}
-    assert left == {"skill-form": "MANUAL"}                              # the file's skill goes; the typed one stays
-    versions.restore_base(test_db, w["bde"], w["candidate"], w["base2"])
-    test_db.commit()
-    again = [k for k in _claims(test_db, w["candidate"]) if k.entity_ref == "skill-form"]
-    assert [k.source for k in again] == ["MANUAL"]                       # kept, and no second claim written

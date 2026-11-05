@@ -20,9 +20,10 @@ reads only (backend/auth/access.py).
 """
 import asyncio
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
@@ -97,12 +98,12 @@ class LanguageIn(BaseModel):
 
 class ContentIn(BaseModel):
     """A version's whole content, as the editor holds it (the shape of resumes' content columns, §3.3)."""
-    full_name: str | None = Field(default=None, max_length=300)
+    full_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]     # mandatory
     title: str | None = Field(default=None, max_length=300)
     city: str | None = Field(default=None, max_length=300)
     state: str | None = Field(default=None, max_length=300)
     country: str | None = Field(default=None, max_length=300)
-    email: str | None = Field(default=None, max_length=320)
+    email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]         # mandatory
     phone: str | None = Field(default=None, max_length=300)
     work_authorization: str | None = Field(default=None, max_length=300)
     github: str | None = Field(default=None, max_length=500)

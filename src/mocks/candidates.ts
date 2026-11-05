@@ -1,5 +1,4 @@
 import { ApiError, arrayOf } from "@/lib/api/client";
-import { NEEDS_SPONSOR } from "@/lib/constants/work-auth";
 import { canAssignTo } from "@/lib/auth/policy";
 import { isBde, isManager } from "@/lib/auth/roles";
 import { assignBlockReason } from "@/lib/derive/platform";
@@ -70,13 +69,12 @@ export const candidatesMock = firmScoped("candidates", {
       linkedinUrl: input.linkedinUrl,
       city: input.city,
       state: input.state,
-      country: "US",
+      country: input.country,
       willingToRelocate: input.willingToRelocate,
       workAuth: input.workAuth,
       workAuthExpiry: input.workAuthExpiry,
-      // The backend works these out from workAuth when they are left out; the mock does the same.
-      needsSponsorship: input.needsSponsorship ?? (input.workAuth === "OTHER" ? null : NEEDS_SPONSOR.includes(input.workAuth)),
-      needsTransfer: input.needsTransfer ?? input.workAuth === "H1B",
+      needsSponsorship: input.needsSponsorship,
+      needsTransfer: input.needsTransfer,
       employmentTypes: input.employmentTypes,
       rateMin: input.rateMin,
       rateTarget: input.rateTarget,
@@ -86,7 +84,7 @@ export const candidatesMock = firmScoped("candidates", {
       noticePeriodDays: input.noticePeriodDays,
       yearsExperience: input.yearsExperience,
       primaryRole: input.primaryRole,
-      targetRoles: input.targetRoles.length > 0 ? input.targetRoles : [input.primaryRole],
+      targetRoles: input.targetRoles,
       managerId: assignment.managerId,
       bdeId: assignment.bdeId,
       workSettings: input.workSettings,

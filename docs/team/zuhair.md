@@ -1,7 +1,7 @@
 # Zuhair — Candidate table improvement, then Job scraping, then Résumé tailoring (+ ATS score)
 
 Read first: [team README](./README.md), [00-candidate-core.md](./00-candidate-core.md) (your tables: `resume_parses`,
-`searches`, `candidate_jobs`, `jobs`, `resumes`, `claims`, `evidence`, and changes to `candidates` **with Abdul's
+`searches`, `candidate_jobs`, `jobs`, `resumes`, and changes to `candidates` **with Abdul's
 OK**), `docs/candidate-onboarding/06-backend.md` (what was built for onboarding), `docs/integration/README.md`.
 
 **Starts after** the candidate core PR (0007) is merged. One branch and one PR per numbered step, from `main`.
@@ -9,8 +9,7 @@ OK**), `docs/candidate-onboarding/06-backend.md` (what was built for onboarding)
 ## 1. Candidate table improvement — the profile from the résumé
 
 Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your response format), `resume_parses`
-(the file kept with its candidate), the new-candidate flow, `candidates` with skills stored UNVERIFIED in
-`candidates.skills` (Q49).
+(the file kept with its candidate), the new-candidate flow, `candidates` (its skills moved to the base résumé in 0015).
 
 1. **Fields — built in migration 0015 (`feat/candidates-final-schema`):** `persona` removed; `preferred_industries`, `deal_breakers` flat; the Q50 fields final; sponsorship follows `work_auth` unless entered; a candidate with no file gets a `MANUAL` base. What `candidates` still needed for a complete profile (your provisional fields in Q50: work settings,
    preferred locations, contact notes; anything else). Write the list with types and why, **confirm it with Abdul**,
@@ -18,12 +17,9 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
 2. **Parser quality:** the prompt (`resume_parse` AI module, `DEFAULT_PROMPT`), the fields it misses, tests on real
    résumés (anonymised fixtures). **Done in résumé versioning PR 2** ([resume-versioning.md](./resume-versioning.md)
    §2): the base-résumé parser on its own model, with the team's 14 test résumés and their recorded replies as fixtures.
-3. **The Record from the parse — built in 0015 (`backend/candidates/record.py`; `candidates.skills` and `summary_state` dropped):** on create, turn the kept parse into **claims** (experience bullets, skills,
-   education, certificates, summary), all `UNVERIFIED`, with `source`, and **evidence** pointing at the parse
-   (`evidence.resume_parse_id`, the excerpt). The excerpt quotes the original file (`resume_parses.content`), never
-   `parse`: the parser rewrites for ATS, so `parse` is the AI's wording, not proof. Move `candidates.skills` into
-   `claims` (then drop the column, with Abdul). Never VERIFIED here: the database refuses it without evidence, and
-   verification is a person's act.
+3. **The Record: removed (2026-11-05).** BenchQ has no claim or verified states; `claims` and `evidence` are dropped in 0015,
+   `candidates.skills` and `summary_state` with them. The summary and skills are the active base résumé's. The truth rules in
+   the parser's prompts and its strict format stay.
 4. **The base résumé:** made from the parse at candidate create, as the first of the candidate's bases
    (`base_resumes`, one active) and its version 1 in `resumes`. Spec and PR plan: [resume-versioning.md](./resume-versioning.md).
    **Done:** the tables (PR 3, migration 0008) and the first base on create (PR 4). **PR 5** (migration 0011):
@@ -54,7 +50,7 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
 
 1. Its Phase 0 design review first (no code).
 2. **Tailored résumés** from the active base's version 1 for one job (`category = 'TAILORED'`, `base_resume_id`,
-   `job_id`; [resume-versioning.md](./resume-versioning.md) §4), many per candidate. The claims a tailored résumé uses keep their state; an UNVERIFIED claim blocks export (CLAUDE.md).
+   `job_id`; [resume-versioning.md](./resume-versioning.md) §4), many per candidate.
    Tailoring creates them; editing one is résumé versioning PR 5's save (the next version), and only the
    candidate's BDE tailors (07 Q55, `can_manage_resume`). Decide here whether tailoring may choose the base per job
    (a candidate has several target roles but one active base).
@@ -70,5 +66,4 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
 ## Rules for you
 
 - `candidates` changes are confirmed with Abdul first, every time.
-- Never produce a VERIFIED claim without evidence, in code, fixtures or mappers.
 - Need a column on Samad's tables (e.g. on `applications`)? Ask him.

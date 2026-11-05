@@ -6,8 +6,7 @@ permission checked under the lock can't change before the commit. Nothing here c
 
 - **Save:** the next version of the résumé the edit came from, whatever was saved in between (two saves from v2 give
   v3 and v4, Abdul); the second is told. An id stands for one exact text (§3.4, §4.5): an item kept as it was keeps
-  its id, so its claims follow it; a changed or new item, bullet or summary gets a new id, so it starts unverified
-  while the versions that hold the old text keep their claims. No claim is ever reset.
+  its id; a changed or new item, bullet or summary gets a new id, while the versions that hold the old text keep theirs.
 - **Use as base / pick:** a base's v1 makes that base active; any other version is copied as v1 of a new PROMOTED
   base, or the base already made from it is made active.
 - **Upload:** a new UPLOAD base, active, its v1 from the parse (`first_base()` without a form).
@@ -26,8 +25,7 @@ from backend.auth import ledger
 from backend.auth.policy import is_lead_role
 from backend.auth.scoping import scoped
 from backend.candidates.first_base import first_base
-from backend.candidates.record import write_record
-from backend.models.candidates import BaseResume, Claim, Evidence, ResumeParse
+from backend.models.candidates import BaseResume, ResumeParse
 from backend.models.db import Application, Resume, utcnow
 from backend.models.tenancy import User
 
@@ -76,9 +74,8 @@ def item_ids(content: dict) -> set[str]:
 
 def _with_ids(source: dict, submitted: dict) -> dict:
     """The submitted content with every id settled (§3.4, §4.5): an item, bullet or summary kept exactly as it was in
-    the version edited keeps its id, so its claims follow it; a changed or new one gets a new id, so it starts
-    unverified and the versions holding the old text keep their claims. An id the version edited doesn't have is
-    refused, so a save can't take over another item's claim."""
+    the version edited keeps its id; a changed or new one gets a new id, and the versions holding the old text keep
+    theirs. An id the version edited doesn't have is refused, so a save can't take over another item's id."""
     before = dict(_items(source))
     content, seen = copy.deepcopy(submitted), set()
 
@@ -304,12 +301,6 @@ def restore_base(db, actor: User, candidate, base: BaseResume) -> BaseResume:
                                                                               synchronize_session="fetch")
     _activate(db, candidate, base)
     db.flush()
-    # Its claims were dropped when it was deleted (drop_orphan_claims): write them again for the v1 that came back.
-    v1 = scoped(db, Resume, candidate.firm_id).filter(Resume.base_resume_id == base.id, Resume.category == "BASE",
-                                                      Resume.version == 1).first()
-    parse_row = db.get(ResumeParse, base.resume_parse_id) if base.resume_parse_id else None
-    if v1 is not None:
-        write_record(db, candidate, v1, parse_row)
     number = base_numbers(db, candidate)[base.id]
     _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number),
             f"Restored Base {number} (its v1) from the same file; the workflow uses it")
@@ -341,7 +332,6 @@ def upload_base(db, actor: User, candidate, parse_row: ResumeParse) -> BaseResum
     _activate(db, candidate, base)
     db.add(version)
     db.flush()
-    write_record(db, candidate, version, parse_row)
     number = base_numbers(db, candidate)[base.id]
     _record(db, actor, candidate, "CREATE", base.id, _label(candidate, number),
             f"Uploaded a new résumé ({parse_row.file_name}) as Base {number}; the workflow uses it")
@@ -373,9 +363,7 @@ class Removal:
 
 
 _USE_WORDS = {"applications": ("used by {} live application", "used by {} live applications"),
-              "tailored": ("{} tailored résumé sent in a live application", "{} tailored résumés sent in live applications"),
-              "evidence": ("its file backs {} confirmed piece of evidence", "its file backs {} confirmed pieces of evidence"),
-              "claims": ("{} checked claim only it holds", "{} checked claims only it holds")}
+              "tailored": ("{} tailored résumé sent in a live application", "{} tailored résumés sent in live applications")}
 
 
 def _phrase(uses: dict) -> str:
@@ -408,33 +396,14 @@ def _tailored_of(db, candidate, base: BaseResume) -> list[Resume]:
 
 
 def _uses(db, candidate, rows: list[Resume], base: BaseResume | None = None, live: dict | None = None) -> dict:
-    """What keeps these rows (and, for a whole base, the base and its upload) in use: a live application sent with
-    them, a tailored résumé of the base sent in a live application, evidence a person confirmed on its upload, a claim
-    only it holds that a person has acted on. Cover letters and tracking links aren't counted (Zuhair, 2026-11-04: not
-    planned for BenchQ yet). Claims count only for items no other version of the candidate has, since a claim follows
-    its item from version to version."""
+    """What keeps these rows (and, for a whole base, the base) in use: a live application sent with them, or a
+    tailored résumé of the base sent in a live application. Cover letters and tracking links aren't counted (Zuhair,
+    2026-11-04: not planned for BenchQ yet)."""
     firm_id, ids = candidate.firm_id, [r.id for r in rows]
     live = _live_counts(db, firm_id) if live is None else live
-    uses = {"applications": sum(live.get(rid, 0) for rid in ids), "tailored": 0, "evidence": 0, "claims": 0}
+    uses = {"applications": sum(live.get(rid, 0) for rid in ids), "tailored": 0}
     if base is not None:
         uses["tailored"] = sum(1 for t in _tailored_of(db, candidate, base) if t.id in live)
-        if base.resume_parse_id is not None:
-            # Only evidence a person confirmed: the row every upload gets with its UNVERIFIED claims (record.py) is
-            # nobody's work, so it doesn't make the base "in use".
-            uses["evidence"] = scoped(db, Evidence, firm_id, func.count(Evidence.id)) \
-                .filter(Evidence.resume_parse_id == base.resume_parse_id, Evidence.confirmed_at.isnot(None)).scalar()
-    # Claims are checked only when the candidate has any: otherwise no version's content needs reading.
-    # Only claims a person has acted on (past UNVERIFIED): the ones written with the Record are nobody's work yet.
-    acted = (Claim.candidate_id == candidate.id, Claim.state != "UNVERIFIED")
-    has_claims = scoped(db, Claim, firm_id, Claim.id).filter(*acted).first() is not None
-    removed = set().union(*(item_ids(content_of(r)) for r in rows)) if rows and has_claims else set()
-    if removed:
-        others = scoped(db, Resume, firm_id).filter(Resume.candidate_id == candidate.id, Resume.base_resume_id.isnot(None),
-                                                    Resume.deleted_at.is_(None), Resume.id.notin_(ids)).all()
-        removed -= set().union(set(), *(item_ids(content_of(r)) for r in others))
-    if removed:
-        uses["claims"] = scoped(db, Claim, firm_id, func.count(Claim.id)) \
-            .filter(*acted, Claim.entity_ref.in_(removed)).scalar()
     return uses
 
 
@@ -495,23 +464,6 @@ def _rest_words(counts: dict) -> str:
     return ", ".join(parts) or "nothing else"
 
 
-def drop_orphan_claims(db, candidate) -> int:
-    """Delete the UNVERIFIED claims whose item is in no live version of the candidate any more: the Record shouldn't
-    keep claims for content nothing holds. A claim a person has acted on is never deleted (it keeps its version in
-    use, so that version isn't deleted at all). A skill typed on the form (`source` MANUAL) stays too: the file can't
-    give it back, so a restore couldn't tell it from a skill of the file."""
-    live_ids: set = set()
-    for row in scoped(db, Resume, candidate.firm_id).filter(
-            Resume.candidate_id == candidate.id, Resume.base_resume_id.isnot(None), Resume.deleted_at.is_(None)).all():
-        live_ids |= item_ids(content_of(row))
-    query = scoped(db, Claim, candidate.firm_id).filter(
-        Claim.candidate_id == candidate.id, Claim.state == "UNVERIFIED",
-        ~((Claim.entity_type == "skill") & (Claim.source == "MANUAL")))
-    if live_ids:
-        query = query.filter(Claim.entity_ref.notin_(live_ids))
-    return query.delete(synchronize_session=False)
-
-
 def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
     removal = version_removal(db, candidate, row)
     if removal.outcome == "REFUSED":
@@ -521,7 +473,6 @@ def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
             f"Deleted Base {number} v{row.version}")
     row.deleted_at = utcnow()
     db.flush()
-    drop_orphan_claims(db, candidate)
     return removal
 
 
@@ -545,7 +496,6 @@ def delete_base(db, actor: User, candidate, base: BaseResume, keep_used: bool = 
             summary += f" and deleted {_rest_words({'versions': len(versions), 'tailored': len(tailored)})}"
         _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number), summary)
         db.flush()
-        drop_orphan_claims(db, candidate)
         return removal
     # Soft delete: a base with version rows can't be removed from the table anyway (the versions point at it), and
     # nothing is lost: its versions are marked with it, its upload stays (so the same file is recognised later).
@@ -555,5 +505,4 @@ def delete_base(db, actor: User, candidate, base: BaseResume, keep_used: bool = 
         .update({Resume.deleted_at: now}, synchronize_session="fetch")
     base.deleted_at = now
     db.flush()
-    drop_orphan_claims(db, candidate)
     return removal

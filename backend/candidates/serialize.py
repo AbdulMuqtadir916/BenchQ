@@ -1,6 +1,6 @@
 """A candidate's wire shape: the frontend's `CandidateSchema` (src/lib/schemas/candidate.ts) in snake_case, mapped by
-src/lib/api/dto/candidates.ts (onboarding module 07). The skills and the summary are the Record's (`claims`) and the
-active base résumé's, not the candidate's (migration 0015)."""
+src/lib/api/dto/candidates.ts (onboarding module 07). The skills and the summary are the active base
+résumé's, not the candidate's (migration 0015)."""
 from datetime import datetime
 from decimal import Decimal
 

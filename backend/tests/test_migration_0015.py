@@ -58,9 +58,8 @@ def test_industries_and_deal_breakers_are_copied_out_and_the_old_columns_go(scra
 
     columns = {c["name"] for c in inspect(engine).get_columns("candidates")}
     assert not {"persona", "skills", "summary_state"} & columns and {"preferred_industries", "deal_breakers"} <= columns
-    assert next(c for c in inspect(engine).get_columns("candidates") if c["name"] == "needs_sponsorship")["nullable"]
-    with engine.begin() as conn:                                                  # unknown is allowed now
-        conn.execute(text("UPDATE candidates SET needs_sponsorship = NULL WHERE id = :id"), {"id": ids["plain"]})
+    assert not next(c for c in inspect(engine).get_columns("candidates") if c["name"] == "needs_sponsorship")["nullable"]
+    assert not {"claims", "evidence"} & set(inspect(engine).get_table_names())          # BenchQ has no claim states
     with engine.connect() as conn:
         row = conn.execute(text("SELECT preferred_industries, deal_breakers FROM candidates WHERE id = :id"),
                            {"id": ids["asha"]}).one()
@@ -84,26 +83,20 @@ def test_a_base_may_come_from_the_form_alone_but_an_upload_needs_its_parse(scrat
         _manual_base(engine, ids, source="WHATEVER", candidate="asha")
 
 
-def test_the_way_back_rebuilds_the_columns_from_the_claims_and_the_base_and_up_again_works(scratch_db):
+def test_the_way_back_rebuilds_the_columns_from_the_base_brings_the_empty_tables_back_and_up_again_works(scratch_db):
     name, engine = scratch_db
     _ok(_alembic(name, "upgrade", "0013"))
     ids = _world(engine)
     _ok(_alembic(name, "upgrade", "0015"))
     _manual_base(engine, ids)
-    with engine.begin() as conn:                                                  # the same skill from two uploads
-        for ref in ("s1", "s2"):
-            conn.execute(text("INSERT INTO claims (id, firm_id, candidate_id, entity_type, entity_ref, state, text, "
-                              "source) VALUES (gen_random_uuid(), :f, :c, 'skill', :r, 'UNVERIFIED', 'Java', "
-                              "'RESUME_UPLOAD')"), {"f": ids["firm"], "c": ids["asha"], "r": ref})
-    with engine.begin() as conn:
-        conn.execute(text("UPDATE candidates SET needs_sponsorship = NULL WHERE id = :id"), {"id": ids["plain"]})
+    with engine.begin() as conn:                                                  # the active base's v1 holds the skills
+        conn.execute(text("UPDATE resumes SET skills = CAST(:s AS jsonb) WHERE id = :id"),
+                     {"id": ids["v1"], "s": json.dumps([{"id": "s1", "category": "Core", "name": "Java"},
+                                                         {"id": "s2", "category": "", "name": "Go"}])})
     _ok(_alembic(name, "downgrade", "0013"))
 
     columns = {c["name"] for c in inspect(engine).get_columns("candidates")}
     assert not next(c for c in inspect(engine).get_columns("candidates") if c["name"] == "needs_sponsorship")["nullable"]
-    with engine.connect() as conn:                                                # unknown went back to false
-        assert conn.execute(text("SELECT needs_sponsorship FROM candidates WHERE id = :id"),
-                            {"id": ids["plain"]}).scalar_one() is False
     assert {"persona", "skills", "summary_state"} <= columns and not {"preferred_industries", "deal_breakers"} & columns
     with engine.connect() as conn:
         row = conn.execute(text("SELECT persona, skills, summary_state FROM candidates WHERE id = :id"),
@@ -111,8 +104,12 @@ def test_the_way_back_rebuilds_the_columns_from_the_claims_and_the_base_and_up_a
         assert row.persona == {"summary": "The base summary.", "tone_notes": None, "will_relocate": True,
                                "notice_period_days": 14, "preferred_industries": ["fintech", "healthcare"],
                                "deal_breakers": ["no travel"]}
-        assert row.skills == [{"name": "Java", "family": None, "source": "RESUME_UPLOAD", "state": "UNVERIFIED"}]
+        assert row.skills == [{"name": "Java", "family": "Core", "source": "MANUAL", "state": "UNVERIFIED"},
+                              {"name": "Go", "family": None, "source": "MANUAL", "state": "UNVERIFIED"}]
+        assert conn.execute(text("SELECT count(*) FROM claims")).scalar() == 0              # the tables are back, empty
+        assert conn.execute(text("SELECT count(*) FROM evidence")).scalar() == 0
         assert row.summary_state == "UNVERIFIED"
         assert {r.source for r in conn.execute(text("SELECT source FROM base_resumes"))} == {"PROMOTED"}
     _ok(_alembic(name, "upgrade", "0015"))
     assert "persona" not in {c["name"] for c in inspect(engine).get_columns("candidates")}
+    assert not {"claims", "evidence"} & set(inspect(engine).get_table_names())

@@ -9,8 +9,8 @@
 > - **The parser call is `candidatesMock.parseResume`** (a write that needs `candidate.create`), so the existing
 >   write-authorization and isolation tests cover it. The adapter is `src/lib/api/resume-parse.ts`.
 > - **The pure logic is in `model.ts`:** values, `applyDraft`, `validateStep`, `firstOpenStep` and
->   `toCreateCandidate`, which module 05's create calls with the assignment. The chip and the mock use `NEEDS_SPONSOR` from
->   `src/lib/constants/work-auth.ts` (the flow no longer sends sponsorship; the backend works it out).
+>   `toCreateCandidate`, which module 05's create calls with the assignment. The flow works `needsSponsorship` and `needsTransfer` out with the helpers in
+>   `src/lib/constants/work-auth.ts` and sends them; the backend only checks they were sent.
 > - **Step 5 is a placeholder.** Until module 05, the pop-up version of `/candidates/new` reloads into the full page
 >   when the flag is on.
 > - **New classes in `globals.css`, built from tokens:** `.bq-choice`, `.bq-dropzone`, `.bq-focus-target`, and focus
@@ -34,7 +34,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 
 | File | What |
 |---|---|
-| `wizard.tsx` | The frame: header (icon, "New candidate", stepper, ×), main column, summary aside, footer (Back · Skip for now · Continue). |
+| `wizard.tsx` | The frame: header (icon, "New candidate", stepper, ×), main column, summary aside, footer (Back · Continue). |
 | `stepper.tsx` | Five steps. Done steps show a check and are buttons (go back to them); later steps are not clickable. |
 | `summary-card.tsx` | Initials avatar, name ("New candidate" until set), "Marketed as" ("Role not set"), chips (work auth, engagement types, years), Location, Email, Résumé (file name), **Assigned BDE** (Q48). Below it, the step list with states. |
 | `use-wizard.ts` | State with `useReducer`, in memory only (no drafts, Q48): values, which fields were drafted from the résumé, current step, dirty flag. |
@@ -51,7 +51,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 ## 2. The frame
 
 - **Continue** validates the step (§3); errors show inline, focus moves to the first invalid field.
-- **Back** keeps values. **Skip for now** only on step 4 (all its fields are optional).
+- **Back** keeps values. Step 4 can't be skipped: it needs at least one target role.
 - **×** and `Esc`: if anything was entered, a confirm dialog "Discard this candidate? What you entered is lost." (Discard
   / Keep editing); else close straight away. Close goes back (`router.back()`), or to `/candidates` when there's no
   history.
@@ -81,9 +81,10 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 |---|---|---|
 | Full name | yes | `fullName` |
 | Marketed as ("The headline title BDEs submit under.") | yes | `primaryRole` |
-| Years of experience | no | `yearsExperience` (0–60) |
+| Years of experience | yes | `yearsExperience` (0–60) |
 | Email ("Shown to vendors only when a submission goes out.") | yes | `email` |
-| Phone, LinkedIn, City, State | no | `phone`, `linkedinUrl` (a URL), `city`, `state` |
+| Phone | yes | `phone` |
+| LinkedIn, City, State | no | `linkedinUrl` (a URL), `city`, `state` |
 | Skills (tag input; suggestions = parsed skills not yet added) | no | `skills[]` with `source` `RESUME_UPLOAD` or `MANUAL` |
 | Summary ("Two or three lines a BDE can paste into an intro email.") | no | `summary` |
 
@@ -104,7 +105,7 @@ match, show it under the group: "The résumé says: '{workAuthText}'".
 
 | Field | Maps to |
 |---|---|
-| Target roles (tag input; suggestions: "Marketed as" and the parsed title) — "Jobs are matched against every title here." | `targetRoles` |
+| Target roles (tag input; suggestions: "Marketed as" and the parsed title) — "Jobs are matched against every title here." **At least one is required** | `targetRoles` |
 | Work setting: Remote, Hybrid, On-site (several) | `workSettings` |
 | Preferred locations (tag input, "City, state"; suggestions from a constant list of US hubs) | `preferredLocations` |
 | Willing to relocate (switch) | `willingToRelocate` |

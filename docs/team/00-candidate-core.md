@@ -20,7 +20,7 @@ deleted, so nothing cascades from a candidate.
 | Résumés (base + tailored) | `resumes` | `is_base`, `parent_id`, `job_id`, no candidate | `candidate_id`, `resume_parse_id`, the base/tailored rule |
 | Applications | `applications` | Job + status, no candidate | `candidate_id`, `resume_id`, `submitted_by_user_id` |
 | Inbox | `candidate_mailboxes`, `inbox_messages` | Nothing | New tables |
-| Record (Truth Guard) | `claims`, `evidence` | Nothing in 0007; since 0015 create and a later upload write the candidate's UNVERIFIED claims | New tables |
+| ~~Record (Truth Guard)~~ | ~~`claims`, `evidence`~~ | Created in 0007, **dropped in 0015** (2026-11-05: BenchQ has no claim states) | — |
 | Activity | `ledger_entries` | Firm ledger; candidate only in `entity_id` | `candidate_id` |
 
 ## 2. The tables
@@ -122,35 +122,9 @@ so one application can have many (acknowledgement, screening, interview…).
 | `received_at`, `created_at` | timestamptz | |
 | `is_read` | bool, default false | |
 
-### Record: claims and evidence (Truth Guard, D4; Q53g)
+### Record: claims and evidence — removed
 
-**`evidence`**: what substantiates a claim.
-
-| Column | Type | |
-|---|---|---|
-| `id`, `firm_id`, `candidate_id` | UUID | |
-| `resume_parse_id` | UUID → `resume_parses`, nullable | The kept résumé it came from, if any |
-| `document_url` | text, nullable | A document's link until documents are on the backend |
-| `excerpt` | text, nullable | The quoted passage |
-| `page_number` | int, nullable | |
-| `source` | `MANUAL` / `RESUME_UPLOAD` / `LINKEDIN_EXPORT` / `INTAKE_CALL` / `AI_EXTRACTED` | The frontend's `FieldSource` |
-| `confirmed_by_user_id` (nullable), `confirmed_at` (nullable), `created_at` | | |
-
-**`claims`**: every statement about the candidate (a skill, a bullet, a certificate…).
-
-| Column | Type | |
-|---|---|---|
-| `id`, `firm_id`, `candidate_id` | UUID | |
-| `entity_type` | `summary` / `experience` / `skill` / `project` / `certificate` / `education` | |
-| `entity_ref` | text, nullable | Which experience/project it belongs to (the Record item's id) |
-| `text` | text | |
-| `state` | `VERIFIED` / `UNVERIFIED` / `CONTRADICTED`, default `UNVERIFIED` | |
-| `evidence_id` | UUID → `evidence`, nullable | |
-| `source` | as `evidence.source` | |
-| `created_at`, `updated_at` | timestamptz | |
-
-**`CHECK (state <> 'VERIFIED' OR evidence_id IS NOT NULL)`**: the database refuses a VERIFIED claim without
-evidence. Never relax it.
+`evidence` and `claims` were created here and **dropped in migration 0015** (decided 2026-11-05: BenchQ has no Verified, Unverified or Contradicted states and no export gate). The summary and the skills are the active base résumé's (`resumes`). The downgrade recreates both tables empty.
 
 ### Activity: the ledger, by candidate (Q53h)
 
@@ -164,7 +138,7 @@ is removed in Abdul's clean-up.
 
 - New columns on `candidates` (Zuhair's improvements, with Abdul's OK), application statuses (Samad), mailbox tokens
   (Samad), billing (Abdul): each owner's own migration.
-- Moving `candidates.skills` into `claims`: Zuhair's first task.
+- `candidates.skills`: dropped in 0015 (the skills are the active base résumé's).
 - Interviews, cover letters, tracer links keep their tables; they reach the candidate through their application or
   résumé.
 
@@ -174,7 +148,7 @@ is removed in Abdul's clean-up.
 - The scoping lint knows the new firm-owned tables; `isolation_support.build_firm` and `snapshot_of` get a row (with a
   canary) for each, so `test_isolation.py` proves they never cross firms.
 - `ledger.record(..., candidate_id=)`, passed by the candidate routes; `GET /ledger?candidate_id=`.
-- Migration tests: the constraints above (VERIFIED without evidence refused, one base per candidate, one application
+- Migration tests: the constraints above (one base per candidate, one application
   per candidate per job, one mailbox per candidate, unique favorites).
 - No routes for the new tables: each owner builds theirs.
 

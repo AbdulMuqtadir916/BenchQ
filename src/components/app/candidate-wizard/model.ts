@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { CreateCandidate } from "@/lib/schemas/candidate";
 import type { EmploymentType, FieldSource, RemoteMode, WorkAuth } from "@/lib/schemas/enums";
 import type { ResumeDraft } from "@/lib/schemas/resume-draft";
+import { needsSponsorship, needsTransfer } from "@/lib/constants/work-auth";
 
 /**
  * The new-candidate flow's state and rules (docs/candidate-onboarding/04-wizard-steps.md): the values as the form
@@ -124,9 +125,10 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
   if (step === "basic") {
     if (!values.fullName.trim()) errors.fullName = "Enter the candidate's name.";
     if (!values.primaryRole.trim()) errors.primaryRole = "Enter the title they're marketed as.";
+    if (!values.phone.trim()) errors.phone = "Enter their phone number.";
     if (!values.email.trim()) errors.email = "Enter their email.";
     else if (!z.string().email().safeParse(values.email.trim()).success) errors.email = "Enter a valid email, like name@example.com.";
-    if (!isWhole(asNumber(values.yearsExperience), 0, 60)) errors.yearsExperience = "Years of experience is a whole number from 0 to 60.";
+    if (asNumber(values.yearsExperience) === null || !isWhole(asNumber(values.yearsExperience), 0, 60)) errors.yearsExperience = "Years of experience is a whole number from 0 to 60.";
     if (values.linkedinUrl.trim() && !z.string().url().safeParse(values.linkedinUrl.trim()).success) errors.linkedinUrl = "Enter the full link, starting with https://.";
   }
   if (step === "work") {
@@ -138,6 +140,9 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
     if (floor !== null && !(floor > 0)) errors.rateMin = "Enter an hourly rate in US dollars.";
     else if (target !== null && floor !== null && floor > target) errors.rateMin = "The floor can't be above the target rate.";
     if (!isWhole(asNumber(values.noticePeriodDays), 0, 365)) errors.noticePeriodDays = "Notice is a whole number of days, 0 to 365.";
+  }
+  if (step === "preferences") {
+    if (values.targetRoles.length === 0) errors.targetRoles = "Add at least one role they are looking for.";
   }
   return errors;
 }
@@ -166,20 +171,23 @@ export function isDirty(values: WizardValues): boolean {
 const toIsoDate = (value: string): string | null => (value ? new Date(`${value}T00:00:00.000Z`).toISOString() : null);
 const orNull = (value: string): string | null => (value.trim() === "" ? null : value.trim());
 
-/** The create payload (docs/02 §4), once every step is valid. Sponsorship and transfer follow the work authorization (README A3). */
+/** The create payload (docs/02 §4), once every step is valid. Sponsorship and transfer are worked out here from the work authorization (README A3); the backend only checks they were sent. */
 export function toCreateCandidate(values: WizardValues): CreateCandidate {
   const workAuth = values.workAuth ?? "OTHER";
   return {
     fullName: values.fullName.trim(),
     primaryRole: values.primaryRole.trim(),
     email: values.email.trim(),
-    phone: orNull(values.phone),
+    phone: values.phone.trim(),
     linkedinUrl: orNull(values.linkedinUrl),
     city: orNull(values.city),
     state: orNull(values.state),
-    yearsExperience: asNumber(values.yearsExperience),
+    country: "US",
+    yearsExperience: asNumber(values.yearsExperience) ?? 0,
     workAuth,
     workAuthExpiry: toIsoDate(values.workAuthExpiry),
+    needsSponsorship: needsSponsorship(workAuth),
+    needsTransfer: needsTransfer(workAuth),
     employmentTypes: values.employmentTypes,
     rateTarget: asNumber(values.rateTarget),
     rateMin: asNumber(values.rateMin),

@@ -5,9 +5,8 @@ The Candidates track (decision D1, option 1): one row per consultant on a firm's
 the manager is checked in code, since a CHECK can't read another row. The values mirror the frontend's
 `CandidateSchema` (src/lib/schemas/candidate.ts) in snake_case; the API maps them (src/lib/api/dto/).
 
-Truth Guard (07 Q49): skills, the summary and every other item of the résumé are claims (`claims`), written UNVERIFIED with
-their source when the candidate (or a later upload) is made; none lives on this table (migration 0015). Nothing is ever
-VERIFIED without evidence.
+The summary and the skills are the active base résumé's (`resumes`), not this table's (migration 0015). The claims and
+evidence tables are gone too (0015): BenchQ has no claim states.
 
 Conventions as backend/models/tenancy.py (Q38): UUID keys, timestamps with time zone, CHECKs not enum types,
 foreign keys ON DELETE RESTRICT.
@@ -57,7 +56,7 @@ class Candidate(Base):
 
     work_auth = Column(String, nullable=False)
     work_auth_expiry = Column(DateTime(timezone=True), nullable=True)
-    needs_sponsorship = Column(Boolean, nullable=True)       # NULL = unknown (work_auth OTHER; no default, 0015)
+    needs_sponsorship = Column(Boolean, nullable=False, server_default=text("false"))
     needs_transfer = Column(Boolean, nullable=False, server_default=text("false"))
 
     employment_types = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
@@ -81,7 +80,7 @@ class Candidate(Base):
     deal_breakers = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
 
     # The answer bank (documents tab, the extension's autofill), as the frontend shapes it, in snake_case. The summary
-    # and the skills are not here: they are the active base résumé's (`resumes`) and its claims (`claims`).
+    # and the skills are not here: they are the active base résumé's (`resumes`).
     qa_bank = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
 
     created_at = _created_at()
@@ -191,9 +190,6 @@ class BaseResume(Base):
 # Everything a candidate has, fixed before the team splits up. Owners in docs/team/README.md §3: add columns to your
 # own tables only; renaming or removing one needs Abdul.
 
-FIELD_SOURCES = ("MANUAL", "RESUME_UPLOAD", "LINKEDIN_EXPORT", "INTAKE_CALL", "AI_EXTRACTED")   # FieldSource (enums.ts)
-CLAIM_STATES = ("VERIFIED", "UNVERIFIED", "CONTRADICTED")
-CLAIM_ENTITY_TYPES = ("summary", "experience", "skill", "project", "certificate", "education", "award")   # award: 0008
 MAILBOX_PROVIDERS = ("GOOGLE",)
 MAILBOX_STATUSES = ("CONNECTED", "DISCONNECTED", "ERROR")
 
@@ -321,49 +317,4 @@ class InboxMessage(Base):
         CheckConstraint("classification_state IN ('NOT_QUEUED','PENDING','PROCESSING','DONE','ERROR','EXCLUDED')", name="ck_inbox_classification_state"),
         CheckConstraint("sender_auth_result IN ('PASS','FAIL','UNKNOWN')", name="ck_inbox_sender_auth"),
         Index("ix_inbox_classification_queue", "classification_state", "classification_next_retry_at"),
-    )
-
-
-class Evidence(Base):
-    """What substantiates a claim (D4, Q53g). Owner: Zuhair."""
-    __tablename__ = "evidence"
-
-    id = _pk()
-    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
-    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False, index=True)
-    resume_parse_id = Column(UUID(as_uuid=True), _restrict("resume_parses.id"), nullable=True)
-    document_url = Column(String, nullable=True)
-    excerpt = Column(Text, nullable=True)
-    page_number = Column(Integer, nullable=True)
-    source = Column(String, nullable=False)
-    confirmed_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True)
-    confirmed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = _created_at()
-
-    __table_args__ = (CheckConstraint(_in("source", FIELD_SOURCES), name="ck_evidence_source"),)
-
-
-class Claim(Base):
-    """A statement about the candidate (Q53g). The database refuses a VERIFIED claim without evidence (Truth Guard,
-    D4): never relax `ck_claims_verified_has_evidence`. Owner: Zuhair."""
-    __tablename__ = "claims"
-
-    id = _pk()
-    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
-    candidate_id = Column(UUID(as_uuid=True), _restrict("candidates.id"), nullable=False, index=True)
-    entity_type = Column(String, nullable=False)
-    entity_ref = Column(String, nullable=True)
-    # Before `text` below, which shadows sqlalchemy's text() in this class body.
-    state = Column(String, nullable=False, server_default=text("'UNVERIFIED'"))
-    text = Column(Text, nullable=False)
-    evidence_id = Column(UUID(as_uuid=True), _restrict("evidence.id"), nullable=True)
-    source = Column(String, nullable=False)
-    created_at = _created_at()
-    updated_at = _updated_at()
-
-    __table_args__ = (
-        CheckConstraint(_in("entity_type", CLAIM_ENTITY_TYPES), name="ck_claims_entity_type"),
-        CheckConstraint(_in("state", CLAIM_STATES), name="ck_claims_state"),
-        CheckConstraint(_in("source", FIELD_SOURCES), name="ck_claims_source"),
-        CheckConstraint("state <> 'VERIFIED' OR evidence_id IS NOT NULL", name="ck_claims_verified_has_evidence"),
     )
