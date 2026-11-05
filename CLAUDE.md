@@ -28,7 +28,7 @@ by `docs/07-ROUTES-AND-RBAC.md`.
 **Backend integration.** The backend is JobNavigator (FastAPI, Python) in `backend/`: per-user cookie sessions, auth on
 every endpoint (`backend/auth/access.py`, 07 Q37–Q38), and `firm_id` on every firm-owned record. The foundation
 (F1–F7 in `docs/integration/07-auth-and-tenancy.md` §3) is done. The module tracks (Ledger, Jobs, Candidates, then
-Applications, Resumes, Analytics) are next; the backend has no candidates, evidence or claims yet. Start integration
+Applications, Resumes, Analytics) are next; the backend has no evidence or claims, by decision (2026-11-05). Start integration
 work at `docs/integration/README.md`. How the team works (branches, reviews, migrations) is in `CONTRIBUTING.md`.
 
 Each data module is served either by its mock (`src/mocks/`) or by the backend, decided **only** in
@@ -58,8 +58,8 @@ Two core features drive every design decision:
 2. **Total transparency.** The owner and manager can see exactly how many BDEs are working on how
    many applications, for how many candidates, at what stage, at any moment.
 
-**Truth Guard (the product thesis):** AI drafts, humans verify. No claim is `VERIFIED` without
-evidence, and nothing unverified is exported.
+**The product thesis:** AI drafts, a human decides. There are no claim states, no evidence tables and no
+export block (dropped 2026-11-05); the AI is told never to add facts the candidate's own résumé doesn't say.
 
 `product.md` has the full picture — the user, his night, the vocabulary, the constraints, the
 principles for judgment calls. **Read it once at the start of a session.** When a spec doesn't
@@ -136,16 +136,6 @@ Tailwind theme tokens. If a token you need doesn't exist, propose adding it — 
 Light renders first; dark is the option. Both must work, always — the product is used at night for
 six hours, so dark sees heavy use. Test every component in both before reporting done.
 
-### The three claim states
-`VERIFIED` / `UNVERIFIED` / `CONTRADICTED` are the product's core concept.
-
-- Always render **label + icon + colour**, never colour alone.
-- `VERIFIED` uses the brand colour — evidence-backed, cleared to send.
-- `UNVERIFIED` is grey with a dashed border — drafted, no evidence yet, needs review.
-- `CONTRADICTED` is red with a line-through — contradicts the evidence, never ships.
-- A resume with any `UNVERIFIED` claim **cannot be exported.** The export button is blocked with a
-  message naming the count and a jump-to-claim link.
-
 ### Every number is derived
 Dashboard and stat counters are computed from event arrays, never stored as literals. A fixture
 saying `applicationsSubmitted: 42` is a bug — it must be `applications.filter(...).length`. This
@@ -174,7 +164,7 @@ call an adapter, `fetch`, a mock or a JSON fixture from a component. The only `f
 in `src/lib/api/http.ts`.
 
 **Naming** — files `kebab-case.tsx`, components `PascalCase`, hooks `use-thing.ts`. Booleans read
-as assertions: `isActive`, `hasEvidence`, `canExport`.
+as assertions: `isActive`, `isHidden`, `canChange`.
 
 **Styling** — Tailwind v4 utilities. `cn()` from `src/lib/utils.ts` for conditional classes. No CSS
 modules, no styled-components, no inline `style` except computed dimensions.
@@ -221,8 +211,7 @@ Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the
 - Add a new entity, field or contract without product sign-off.
 - Call an LLM from the frontend, or hardcode AI-generated text in a component.
 - Hardcode a colour, font size, spacing value, route list or href.
-- Produce a `VERIFIED` claim — in mock data or a mapper — without an `evidenceId`.
-- Bypass the export gate on resumes with unverified claims.
+- Bring back claim states (Verified / Unverified / Contradicted), an evidence record or an export gate: they were dropped on purpose (2026-11-05).
 - Store a derived counter as a literal.
 - Bring back a mock sign-in, a client-side session store or a principal switcher (Q25: everyone signs in on
   `/sign-in`, and the session is the backend's cookie). The seeded demo accounts and the demo password are
@@ -239,7 +228,7 @@ Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the
 
 ## When you're unsure
 
-Stop and ask. Especially for: the claim-state model, data contracts, tenancy (firms, users, roles),
+Stop and ask. Especially for: data contracts, tenancy (firms, users, roles),
 anything in `docs/integration/06-open-decisions.md` or the open questions in
 `docs/07-ROUTES-AND-RBAC.md`, a backend change, or a contradiction between two docs.
 

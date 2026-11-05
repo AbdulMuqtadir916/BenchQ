@@ -1,6 +1,6 @@
 "use client";
 
-import { AlignLeft, Award, Briefcase, FolderGit2, GraduationCap, IdCard, Layers, MousePointerClick, Sparkles, TextCursorInput } from "lucide-react";
+import { AlignLeft, Award, BadgeCheck, Briefcase, FolderGit2, GraduationCap, IdCard, Layers, MousePointerClick, Sparkles, TextCursorInput } from "lucide-react";
 import type { ResumeDocument, ResumeSectionKey } from "@/lib/schemas/resume-document";
 import { isBlank } from "@/lib/resume-doc/rich-text";
 
@@ -10,7 +10,8 @@ const SECTIONS: Array<{ key: ResumeSectionKey; label: string; Icon: typeof IdCar
   { key: "experience", label: "Experience", Icon: Briefcase },
   { key: "skills", label: "Skills", Icon: Layers },
   { key: "education", label: "Education", Icon: GraduationCap },
-  { key: "certifications", label: "Certifications", Icon: Award },
+  { key: "certifications", label: "Certifications", Icon: BadgeCheck },
+  { key: "awards", label: "Awards", Icon: Award },
   { key: "projects", label: "Projects", Icon: FolderGit2 },
 ];
 

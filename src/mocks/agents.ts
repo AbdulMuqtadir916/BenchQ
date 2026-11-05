@@ -2,7 +2,7 @@ import { mockResult, wait } from "./_shared";
 import { firmScoped, requireAction } from "./membership";
 import { AgentDraftSchema, TailorResumeInputSchema, type AgentDraft, type TailorResumeInput } from "@/lib/schemas/agent";
 import { RewriteInputSchema, type RewriteInput, type RewriteResult, RewriteResultSchema } from "@/lib/schemas/resume-document";
-import { ResumeClaimSchema, type ResumeClaim } from "@/lib/schemas/resume";
+import { ResumeLineSchema, type ResumeLine } from "@/lib/schemas/resume";
 
 const STRONG_VERBS: Array<[RegExp, string]> = [
   [/^worked on\b/i, "Delivered"],
@@ -69,39 +69,27 @@ function rewriteText(input: RewriteInput): RewriteResult {
 const stages = [
   "Reading the candidate record",
   "Extracting job requirements",
-  "Matching evidence",
-  "Drafting tailored claims",
+  "Matching experience",
+  "Drafting tailored bullets",
 ];
 
-function draftClaims(resumeVersionId: string): ResumeClaim[] {
+function draftLines(resumeVersionId: string): ResumeLine[] {
   return [
-    ResumeClaimSchema.parse({
+    ResumeLineSchema.parse({
       id: `agent_${resumeVersionId}_summary`,
       resumeVersionId,
       section: "summary",
       entityId: null,
       bulletIndex: null,
       text: "Senior engineer focused on reliable delivery across cloud-native platforms.",
-      state: "UNVERIFIED",
-      evidenceId: null,
-      reason: "AI-drafted summary requires evidence review.",
-      overriddenByUserId: null,
-      overrideReason: null,
-      overriddenAt: null,
     }),
-    ResumeClaimSchema.parse({
+    ResumeLineSchema.parse({
       id: `agent_${resumeVersionId}_experience`,
       resumeVersionId,
       section: "experience",
       entityId: null,
       bulletIndex: 0,
       text: "Improved deployment reliability by standardising automated release workflows.",
-      state: "UNVERIFIED",
-      evidenceId: null,
-      reason: "The outcome is plausible but no supporting evidence is linked yet.",
-      overriddenByUserId: null,
-      overrideReason: null,
-      overriddenAt: null,
     }),
   ];
 }
@@ -126,7 +114,7 @@ export const agentsMock = {
         resumeVersionId: input.resumeVersionId,
         jobId: input.jobId,
         stages,
-        claims: draftClaims(input.resumeVersionId),
+        lines: draftLines(input.resumeVersionId),
         generatedAt: new Date().toISOString(),
       }), signal);
     },

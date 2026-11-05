@@ -346,6 +346,10 @@ Built in PR 4 (`backend/candidates/first_base.py`):
   - A save that changes nothing is refused: *"No changes to save."*
   - Ids follow §3.4: an item, bullet or summary kept as it was keeps its id; a changed or new one gets a new id.
     An id that isn't in the version edited is refused, so a save can't take over another item's id.
+- **Saving from the studio (PR 7, Zuhair 2026-11-05):** Save reads the version again just before saving, lays the
+  studio's edits over it and sends that: what the studio doesn't edit (languages; work authorization, shown read-only)
+  is carried over untouched, so no save drops it. The studio shows every field of the parser's strict format but
+  languages. The design (template) and the résumé's name aren't part of a save (the save copies them from the version).
 - **A tailored résumé becomes a base only through "Use this as the base?"**: its copy is `category = 'BASE'`,
   `job_id` NULL; the original stays `TAILORED`.
 - **Editing the active base does not change the workflow**: it stays on v1 until the person says Yes.
@@ -482,7 +486,14 @@ The DTO mapper (`src/lib/api/dto/`) groups rows into `Resume` objects. No backen
   (nullable), for leaving promoted versions and hidden bases out of the dropdown (§3.2). The studio's content gains
   `summaryId` (nullable), the summary's id (§3.4).
 
-Change `src/lib/schemas/` only after the docs/02 text is merged (PR 1); PR 7 does it.
+Change `src/lib/schemas/` only after the docs/02 text is merged (PR 1); PR 7 does it (`BaseResume`, `baseResumeId`, and the
+shelf and opened-version shapes are built; the studio content's `awards`, `languages` and `summaryId` come with saving).
+
+**PR 7's read routes** (`backend/api/routes_firm_resumes.py`): `GET /api/firms/{firm}/resumes` lists every base and
+résumé of the candidates in the principal's scope (07 Q47) in two queries, with no content; `GET
+/api/firms/{firm}/resumes/{id}` opens one version by its id alone (a link from an application or the studio's URL). A
+version outside the scope, of another firm, or deleted is the same 404 as a missing one. Every base and version in a
+listing names its `candidate_id`.
 
 ---
 
@@ -533,7 +544,7 @@ and contracts.
 | 4 | `feat/base-resume-from-parse` (**built**) | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
 | 5 | `feat/resume-versions` (**built**) | Routes under `/api/firms/{firm}/candidates/{candidate}/resumes`: list bases + versions, open a version, save the next version (§4.3), "use as base" and pick a base (v1 flips, v2+ promotes or reuses), the BDE's upload (§4.6), delete / hide / show again with the usage reads for the warning (§4.7). `can_change_resume` / `can_manage_resume` in both policies (§6), `access.py`, `isolation_cases.py`; races tested. Migration 0011: `promoted_from_resume_id`, `archived_at`, `content_sha256` and their unique rules (§3.1, §3.2), `summary_id` (§3.4). Saving gives changed text new ids instead of resetting claims (§4.5). Docs: 07 Q55, docs/02 §8.1. **Tailoring is not here**: the tailoring module creates tailored résumés; their edits use PR 5's save. | **0011** |
 | 6 | `feat/drop-legacy-resume-columns` (**built**) | **The approved drops** (§3.1, §3.3) and the old JobNavigator résumé code (decided 2026-11-02). Migration 0013: deletes JobNavigator's old résumé rows (§3.3), drops the approved columns and index, makes `base_resume_id` and `candidate_id` required. Removes the old `/api/resumes` router (its shared rendering helpers move to `backend/api/render_shared.py` for cover letters), the 8 backend templates, the old parser (`parse_resume_pdf`), `POST /api/persona/import` and the "Sample PM" seed. The other readers read the columns (§4.8): job scoring, interview prep, the jobs checks, cover letters. | **0013** |
-| 7 | `integrate/resumes` | Frontend live: the résumé adapter's live path, the DTO mapper (§5), the `BaseResume` schema, the base dropdown, the "Use this as the base?" prompt, version history. Both themes, keyboard, skeleton/empty/error states. | — |
+| 7 | `integrate/resumes` | **No claim states on the frontend** (chips, export gate, "Mark as reviewed", the claim types; `firms.truth_guard_mode` dropped, migration 0016). **Reading live:** two read-only routes (`GET /firms/{firm}/resumes`, the firm's list in the principal's scope; `GET /firms/{firm}/resumes/{id}`, a version by its id alone, `backend/api/routes_firm_resumes.py`); the résumé adapter's live path and DTO mapper (§5); `BaseResume`, `baseResumeId`; the studio opens the exact version from its own text; one résumé tree (base → versions, tailored by job) in the Resume Builder library and the candidate's Résumés tab. **Writing:** explicit Save with the notice, use as base and pick, upload, delete / hide / show again. Both themes, keyboard, skeleton/empty/error states. | **0016** |
 
 If someone else's 0008 merges first, renumber and fix `down_revision` before merging.
 

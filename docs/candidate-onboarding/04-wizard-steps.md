@@ -115,12 +115,13 @@ match, show it under the group: "The résumé says: '{workAuthText}'".
 Suggestion lists (locations, industries, deal breakers) are constants in `src/lib/constants/candidate-intake.ts`,
 not inline in components.
 
-## 4. Truth Guard on the form (Q49)
+## 4. Filled from the résumé (Q49)
 
-- A field filled by the parser carries the **"Drafted from résumé"** marker (icon + label, never colour alone). Editing
-  the field removes it; each step has **"Mark as reviewed"**, which removes the step's markers.
-- Nothing in the flow says or sets "verified". Skills go into the candidate's Record as `UNVERIFIED` with their
-  source; the summary too (`summaryState: UNVERIFIED`). That happens at create (05 on mocks, 06 on the backend).
+- A field filled by the parser carries the **"Filled from résumé"** marker (icon + label, never colour alone). Editing
+  the field removes it. A plain line on the step says how many fields were filled; there is no "Mark as reviewed"
+  (claim states were dropped 2026-11-05).
+- Nothing in the flow says or sets "verified". Skills and the summary go into the candidate's first base résumé
+  at create (05 on mocks, 06 on the backend).
 - The parse result is never written to a component as text: it flows adapter → hook → wizard state.
 
 ## 5. Parser to form mapping
@@ -149,7 +150,7 @@ mapper is tested before the backend exists. Mapper: `src/lib/api/dto/resume-pars
 
 - Mapper: each fixture maps as the table says; location split; work auth table hits and misses; years with overlaps,
   an ongoing job, a missing start; skills split and de-duplicated.
-- Wizard reducer: drafted markers set on parse, cleared on edit and on "Mark as reviewed"; dirty flag.
+- Wizard reducer: drafted markers set on parse, cleared on edit; dirty flag.
 - Steps: required fields block Continue with the right messages; floor > target; 0–60 years; file type and size.
 - Discard confirm appears only when dirty.
 - `axe` on each step in both themes.
@@ -158,7 +159,7 @@ mapper is tested before the backend exists. Mapper: `src/lib/api/dto/resume-pars
 
 - [ ] Steps 1–4 match the screens (with the copy changes above) behind the flag
 - [ ] Parser mapping as §5, tested on Zuhair's format
-- [ ] No `VERIFIED` anywhere in the flow; drafted markers work
+- [ ] Filled-from-résumé markers work
 - [ ] Keyboard: every control reachable; `⌘/Ctrl+Enter` = Continue; `Esc` = close (with the confirm); focus moves to
       the step heading on each step change; the drop zone opens with `Enter`/`Space`
 - [ ] Skeleton (team and firm loading), parse loading, parse error and page error states present

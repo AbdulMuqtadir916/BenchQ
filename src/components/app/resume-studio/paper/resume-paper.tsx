@@ -6,14 +6,12 @@ import { cn } from "@/lib/cn";
 import { templateById } from "../templates";
 import { useStudio } from "../studio-store";
 import { PaperContacts, PaperName } from "./paper-header";
-import { PaperCertifications, PaperEducation, PaperExperience, PaperProjects, PaperSkills, PaperSummary } from "./paper-sections";
+import { PaperAwards, PaperCertifications, PaperEducation, PaperExperience, PaperProjects, PaperSkills, PaperSummary } from "./paper-sections";
 
 interface ResumePaperProps {
   doc: ResumeDocument;
   /** Inline editing on the page (Viewer mode). */
   editable?: boolean;
-  /** Dashed underline on unverified claims — screen only, never in the export. */
-  annotate?: boolean;
   /** The main preview reports its page count to the toolbar; thumbnails don't. */
   reportPages?: boolean;
   templateId?: string;
@@ -21,7 +19,7 @@ interface ResumePaperProps {
 }
 
 /** A US Letter page rendered in the chosen template, with page-break guides. */
-export function ResumePaper({ doc, editable = false, annotate = false, reportPages = false, templateId, className }: ResumePaperProps) {
+export function ResumePaper({ doc, editable = false, reportPages = false, templateId, className }: ResumePaperProps) {
   const template = templateById(templateId ?? doc.templateId);
   const paperRef = useRef<HTMLElement>(null);
   const flowRef = useRef<HTMLDivElement>(null);
@@ -53,7 +51,6 @@ export function ResumePaper({ doc, editable = false, annotate = false, reportPag
     <article
       ref={paperRef}
       className={cn("rt", template.className, className)}
-      data-annotate={annotate}
       aria-label={`${doc.fullName || "Resume"} — ${template.name} template`}
       style={metrics.pageHeight ? { minHeight: metrics.pages * metrics.pageHeight } : undefined}
     >
@@ -67,6 +64,7 @@ export function ResumePaper({ doc, editable = false, annotate = false, reportPag
             <PaperSkills {...blocks} />
             <PaperEducation {...blocks} />
             <PaperCertifications {...blocks} />
+            <PaperAwards {...blocks} />
           </aside>
           <div>
             <PaperName {...blocks} />
@@ -85,6 +83,7 @@ export function ResumePaper({ doc, editable = false, annotate = false, reportPag
           <PaperSkills {...blocks} />
           <PaperEducation {...blocks} />
           <PaperCertifications {...blocks} />
+          <PaperAwards {...blocks} />
           <PaperProjects {...blocks} />
         </div>
       )}

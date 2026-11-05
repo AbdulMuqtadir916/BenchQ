@@ -71,12 +71,7 @@ export const CandidateStatus = z.enum([
   'ON_BENCH', 'INTERVIEWING', 'OFFER', 'PLACED', 'PAUSED', 'INACTIVE',
 ]);
 
-/** The three claim states. The product's core concept. */
-export const ClaimState = z.enum(['VERIFIED', 'UNVERIFIED', 'CONTRADICTED']);
-
-export const FieldSource = z.enum([
-  'MANUAL', 'RESUME_UPLOAD', 'LINKEDIN_EXPORT', 'INTAKE_CALL', 'AI_EXTRACTED',
-]);
+// No ClaimState or FieldSource (dropped 2026-11-05): BenchQ has no claim states, no evidence record and no export gate.
 
 export const JobSourceType = z.enum([
   'CONNECTOR', 'AGGREGATOR', 'USER_SUBMITTED', 'MANUAL',
@@ -235,7 +230,6 @@ export const FirmSchema = z.object({
   logoUrl: z.string().url().nullable(),
   primaryTimezone: z.string().default('Asia/Kolkata'),
   clientTimezone: z.string().default('America/New_York'),
-  truthGuardMode: z.enum(['STRICT', 'BALANCED', 'LENIENT']).default('BALANCED'),
   applicationExpiryDays: z.number().int().default(30),
 });
 
@@ -314,7 +308,7 @@ its `summary`).
 
 ```ts
 // existing fields unchanged: id, name, slug, logoUrl, primaryTimezone, clientTimezone,
-// truthGuardMode, applicationExpiryDays
+// applicationExpiryDays (truthGuardMode was dropped 2026-11-05, migration 0016)
 status: z.enum(['ONBOARDING', 'ACTIVE', 'SUSPENDED']),
   // ONBOARDING → ACTIVE automatically when the OWNER accepts their invite (A5).
   // Only Super Admin suspends or reactivates (A5). No TRIAL state until billing exists.
@@ -814,8 +808,6 @@ export const QaBankEntrySchema = z.object({
   ]),
   useCount: z.number().int(),
   lastUsedAt: z.string().datetime().nullable(),
-  state: ClaimState,                     // answers are claims too
-  evidenceId: z.string().nullable(),
 });
 
 export const CandidateSchema = z.object({
@@ -903,7 +895,7 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   primaryRole: z.string().trim().min(1),            // "Marketed as"
   email: z.string().trim().email(),                 // required in the flow (Q48)
   summary: z.string().trim().nullable(),
-  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable(), source: FieldSource })),
+  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable() })),
   preferredIndustries: z.array(z.string()),
   dealBreakers: z.array(z.string()),
   resumeParseId: z.string().nullable(),             // the parse to keep; null = no résumé
@@ -935,7 +927,7 @@ from the candidate: `preferredIndustries` and `dealBreakers` are flat lists, `wi
 inside it were stale copies of `willingToRelocate` and `noticePeriodDays`, `toneNotes` was never filled, and the summary
 is the active base résumé's (`resumes.summary`). `candidates.skills` and `summary_state` are removed too (the skills are the
 active base résumé's). **BenchQ has no claim states (2026-11-05):** the `claims` and `evidence` tables are dropped in the
-same migration, and the frontend's claim, evidence and export-gate types go in PR 7. `needsSponsorship` and
+same migration, and the frontend's claim, evidence and export-gate types went in PR 7. `needsSponsorship` and
 `needsTransfer` are required booleans: the new-candidate flow works them out from `workAuth` (H-1B, H4 EAD, OPT, CPT,
 TN need sponsorship; H-1B needs a transfer; anything else, `OTHER` included, sends `false`) and sends them; the backend
 works nothing out and only checks that they were sent (a missing one is a 422 naming the field). An edit that changes
@@ -953,25 +945,9 @@ the first base résumé's version 1 (`resumes.skills`); they carry no source or 
 ```ts
 // src/lib/schemas/record.ts
 
-/** Substantiation. A claim cannot be VERIFIED without one of these. */
-export const RecordEvidenceSchema = z.object({
-  id: z.string(),
-  recordId: z.string(),
-  entityType: z.enum(['experience', 'skill', 'project', 'certificate', 'summary']),
-  entityId: z.string(),
-  documentId: z.string().nullable(),
-  excerpt: z.string().nullable(),          // verbatim supporting text
-  pageNumber: z.number().int().nullable(),
-  confirmedByUserId: z.string().nullable(),
-  confirmedAt: z.string().datetime().nullable(),
-  source: FieldSource,
-});
-
 export const RecordBulletSchema = z.object({
   id: z.string(),
   text: z.string(),
-  state: ClaimState,
-  evidenceId: z.string().nullable(),
 });
 
 export const RecordExperienceSchema = z.object({
@@ -985,8 +961,6 @@ export const RecordExperienceSchema = z.object({
   bullets: z.array(RecordBulletSchema),
   technologies: z.array(z.string()),
   sortOrder: z.number().int(),
-  source: FieldSource,
-  state: ClaimState,
 });
 
 export const RecordSkillSchema = z.object({
@@ -997,8 +971,6 @@ export const RecordSkillSchema = z.object({
   yearsUsed: z.number().nullable(),
   lastUsedYear: z.number().int().nullable(),
   proficiency: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).nullable(),
-  source: FieldSource,
-  state: ClaimState,
 });
 
 export const RecordEducationSchema = z.object({
@@ -1008,8 +980,6 @@ export const RecordEducationSchema = z.object({
   field: z.string().nullable(),
   startDate: z.string().datetime().nullable(),
   endDate: z.string().datetime().nullable(),
-  source: FieldSource,
-  state: ClaimState,
 });
 
 export const RecordCertificateSchema = z.object({
@@ -1020,8 +990,6 @@ export const RecordCertificateSchema = z.object({
   expiryDate: z.string().datetime().nullable(),
   credentialId: z.string().nullable(),
   credentialUrl: z.string().url().nullable(),
-  source: FieldSource,
-  state: ClaimState,
 });
 
 export const RecordSchema = z.object({
@@ -1029,13 +997,10 @@ export const RecordSchema = z.object({
   candidateId: z.string(),
   headline: z.string().nullable(),
   summary: z.string().nullable(),
-  summaryState: ClaimState,
   experiences: z.array(RecordExperienceSchema),
   educations: z.array(RecordEducationSchema),
   skills: z.array(RecordSkillSchema),
   certificates: z.array(RecordCertificateSchema),
-  evidence: z.array(RecordEvidenceSchema),
-  lastVerifiedAt: z.string().datetime().nullable(),
 });
 
 /** DERIVED — computed, never stored. */
@@ -1306,19 +1271,14 @@ export const TailoringSchema = z.object({
   generatedAt: z.string().datetime().nullable(),
 });
 
-export const ResumeClaimSchema = z.object({
+/** One line of a version's text: the summary, or one bullet of a job or project. */
+export const ResumeLineSchema = z.object({
   id: z.string(),
   resumeVersionId: z.string(),
   section: z.enum(['summary', 'experience', 'project']),
   entityId: z.string().nullable(),
   bulletIndex: z.number().int().nullable(),
   text: z.string(),
-  state: ClaimState,
-  evidenceId: z.string().nullable(),
-  reason: z.string().nullable(),           // why unverified / why contradicted
-  overriddenByUserId: z.string().nullable(),
-  overrideReason: z.string().nullable(),
-  overriddenAt: z.string().datetime().nullable(),
 });
 
 export const AtsIssueSchema = z.object({
@@ -1349,7 +1309,7 @@ export const ResumeVersionSchema = z.object({
   keywordsMatched: z.array(z.string()),
   keywordsMissing: z.array(z.string()),
 
-  claims: z.array(ResumeClaimSchema),
+  lines: z.array(ResumeLineSchema),
   tailoring: TailoringSchema.nullable(),
   tracer: TracerSchema.nullable(),
 
@@ -1372,18 +1332,9 @@ export const ResumeSchema = z.object({
   versions: z.array(ResumeVersionSchema),
   latestVersionId: z.string(),
 });
-
-/** DERIVED — the export gate. Computed from claims. */
-export const ExportGateSchema = z.object({
-  canExport: z.boolean(),
-  unverifiedCount: z.number().int(),
-  contradictedCount: z.number().int(),
-  blockingClaimIds: z.array(z.string()),
-  message: z.string().nullable(),
-});
 ```
 
-### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2), the rest NOT BUILT
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off)
 
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
@@ -1407,23 +1358,51 @@ export const BaseResumeSchema = z.object({
   archivedAt: z.string().datetime().nullable(), // set while hidden (a used base the BDE deleted); null otherwise
 });
 
+// src/lib/schemas/resume.ts — what a résumé list reads (PR 7): the bases and their résumés
+export const ResumeShelfSchema = z.object({ bases: z.array(BaseResumeSchema), resumes: z.array(ResumeSchema) });
+
+// src/lib/schemas/resume-document.ts — one version opened in the studio (PR 7); the studio's URL names the version
+export const OpenedResumeSchema = z.object({ resume: ResumeSchema, versionId: z.string(), document: ResumeDocumentSchema });
+
 // ResumeSchema gains:
-  baseResumeId: z.string().nullable(),      // null only for résumés from before versioning
+  baseResumeId: z.string().nullable(),      // the base a version belongs to (a tailored résumé's base); null only for old ones
 
 // src/lib/schemas/resume-draft.ts — ResumeDraftSchema gains:
   country: z.string().nullable(),           // header.country as printed; null when not printed (never guessed)
 
-// src/lib/schemas/resume-document.ts — the studio's content gains:
-export const AwardEntrySchema = z.object({
-  id: z.string(), name: z.string(), issuer: z.string(), date: z.string(), detail: z.string(),
+// src/lib/schemas/resume-document.ts — the studio's document, field for field the parser's strict format (PR 7,
+// Zuhair 2026-11-05: "every field of the strict response format except languages is shown"; needs Abdul's sign-off).
+// Languages are never shown: a save carries them over from the version as the backend has it.
+export const ResumeHeaderSchema = z.object({
+  city: z.string(), state: z.string(), country: z.string(), email: z.string(), phone: z.string(),
+  linkedin: z.string(), github: z.string(),
+  workAuthorization: z.string(),           // shown read-only (the profile's fact); not printed; a save keeps the backend's
 });
-// ResumeDocumentSchema: awards: z.array(AwardEntrySchema), languages: z.array(z.string()) (kept, never printed);
-// summaryId: z.string().nullable() (versioning PR 5: the summary's id; an id names one exact text, a changed one
-// gets a new id, so claims follow only the text they were checked against);
-// ResumeSectionKey: + 'awards'
+export const ExperienceEntrySchema = z.object({
+  id: z.string(), company: z.string(), title: z.string(), location: z.string(),
+  dates: z.string(),                       // as printed
+  start: z.string(), end: z.string(), current: z.boolean(),   // for sorting and matching; not printed
+  bullets: z.array(RichTextSchema),
+});
+export const EducationEntrySchema = z.object({ id: z.string(), school: z.string(), degree: z.string(), graduationDate: z.string(), grade: z.string() });
+export const CredentialEntrySchema = z.object({ id: z.string(), name: z.string(), issuer: z.string(), date: z.string(), detail: z.string() });  // certifications and awards
+export const ProjectEntrySchema = z.object({ id: z.string(), name: z.string(), link: z.string(), dates: z.string(), technologies: z.string(), bullets: z.array(RichTextSchema) });
+// ResumeDocumentSchema: fullName, title, header, summary (RichText; its id is summary_id), experience, skills
+// ({id, category, items}: one row per category, skills comma-separated), education, certifications, awards, projects.
+// Removed (no backend column, so a save would lose them): contacts (now header), experience.description,
+// education.location, education.years (now graduationDate), certification.year (now date), project.description (now bullets).
+// ResumeSectionKey: + 'awards'.
 
-// src/lib/schemas/record.ts — RecordEvidenceSchema.entityType becomes, matching the backend's claims.entity_type:
-  entityType: z.enum(['experience', 'skill', 'project', 'certificate', 'summary', 'education', 'award']),
+// src/lib/schemas/resume.ts — what deleting a base or a version would do, or did (§4.7)
+export const ResumeRemovalSchema = z.object({
+  outcome: z.enum(['DELETE', 'HIDE', 'REFUSED']), message: z.string(),
+  uses: z.record(z.string(), z.number().int()),
+  rest: z.object({ versions: z.number().int().optional(), tailored: z.number().int().optional() }),
+});
+// src/lib/schemas/resume-document.ts — a save's answer: the new version opened, and the notice (§4.3)
+export const ResumeSaveResultSchema = z.object({ opened: OpenedResumeSchema, notice: z.string().nullable() });
+
+// No claim or evidence types (dropped 2026-11-05).
 ```
 
 - `ResumeDraftSchema.city` and `.state` are read straight from the parser's `header.city` / `header.state`
@@ -1587,8 +1566,6 @@ an `ApplicationEvent` — the same write the kanban makes.
 - `CandidateDocument` — `kind` (`WORK_AUTH | IDENTITY | RESUME | CERTIFICATION | EDUCATION |
   EMPLOYMENT | OTHER`), `title`, `fileName`, `mimeType`, `sizeKb`, `uploadedAt`, `uploadedByUserId`,
   `expiresAt` (nullable), `shareUrl`.
-- `RecordEvidence.documentId` points at a `CandidateDocument`; "evidence for N claims" is derived
-  from the Record's evidence, never stored.
 - Endpoints: `GET/POST /api/candidates/:id/documents` (POST takes metadata only in the mock),
   `DELETE /api/documents/:id`.
 
@@ -1689,7 +1666,7 @@ export const LedgerEntrySchema = z.object({
   modelId: z.string().nullable(),
   promptVersion: z.string().nullable(),
   evidenceIds: z.array(z.string()),
-  claimState: ClaimState.nullable(),
+  claimState: z.string().nullable(),   // left as the backend sends it; the ledger's owner decides whether it goes
   createdAt: z.string().datetime(),
 });
 
@@ -1719,8 +1696,7 @@ export const TimelineEventSchema = z.object({
 4. **Denormalised fields are deliberate.** `Match.job`, `Application.companyNameAtApply`,
    `FollowUpTask.candidateName` — these exist so list views render without N+1 lookups, and so
    history survives upstream edits.
-5. **`ClaimState` appears on Record fields, resume claims and Q&A answers.** That's intentional:
-   anything asserted on a candidate's behalf is a claim, wherever it lives.
+5. **No claim states (2026-11-05).** Nothing on a candidate, a résumé or an answer is Verified, Unverified or Contradicted.
 
 
 ### Candidate Gmail connection — PR 2 (Samad requested 2026-11-02; Abdul sign-off pending)

@@ -57,18 +57,17 @@ describe("New candidate", () => {
     expect(await later.candidates.byId(FIRM, created.id)).toMatchObject({ fullName: "Nisha Verma" });
   });
 
-  it("with it: a Record whose every claim is UNVERIFIED with no evidence, and the parsed résumé as a RESUME document (05 §2, Q49)", async () => {
+  it("with it: a Record with the form's skills and summary, and the parsed résumé as a RESUME document (05 §2, Q49)", async () => {
     const m = await load(EMAIL.imran);
     const [records, documents] = await Promise.all([import("./records"), import("./documents")]);
     const parse = await m.candidates.parseResume(FIRM, { fileName: "Nisha_Verma.pdf", sizeBytes: 204800, mimeType: "application/pdf" });
     const created = await m.candidates.create(FIRM, candidate({
       bdeId: "user_adnan", summary: "Eight years of data pipelines.", resumeParseId: parse.parse_id,
-      skills: [{ name: "Spark", family: "Data", source: "AI_EXTRACTED" }, { name: "Airflow", family: null, source: "MANUAL" }],
+      skills: [{ name: "Spark", family: "Data" }, { name: "Airflow", family: null }],
     }));
     const record = await records.recordsMock.byCandidate(FIRM, created.id);
-    expect(record).toMatchObject({ headline: "Data Engineer", summary: "Eight years of data pipelines.", summaryState: "UNVERIFIED", evidence: [], lastVerifiedAt: null });
-    expect(record.skills.map((skill) => [skill.name, skill.source, skill.state])).toEqual([["Spark", "AI_EXTRACTED", "UNVERIFIED"], ["Airflow", "MANUAL", "UNVERIFIED"]]);
-    expect(JSON.stringify(record)).not.toMatch(/"VERIFIED"/);
+    expect(record).toMatchObject({ headline: "Data Engineer", summary: "Eight years of data pipelines." });
+    expect(record.skills.map((skill) => skill.name)).toEqual(["Spark", "Airflow"]);
     expect(await documents.documentsMock.byCandidate(FIRM, created.id)).toEqual([expect.objectContaining({ kind: "RESUME", fileName: "Nisha_Verma.pdf", sizeKb: 200 })]);
 
     const noResume = await m.candidates.create(FIRM, candidate({ email: "other@example.com" }));

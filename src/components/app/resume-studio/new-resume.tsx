@@ -9,8 +9,7 @@ import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useRecord } from "@/lib/hooks/use-records";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { can, scopeCandidates } from "@/lib/auth/permissions";
-import { buildResumeDocument, newClaim, newId } from "@/lib/resume-doc/build";
-import { allClaims, setClaimState } from "@/lib/resume-doc/ops";
+import { buildResumeDocument, newText, newId } from "@/lib/resume-doc/build";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,14 +26,12 @@ type StartFrom = "record" | "blank";
 
 function composeDocument(id: string, start: StartFrom, candidate: Candidate, record: Record_ | undefined, templateId: string, upload: string | null): ResumeDocument {
   const name = upload ? upload.replace(/\.[a-z]+$/i, "").replace(/[_-]+/g, " ") : "Untitled resume";
-  const shell = { id, firmId: candidate.firmId, candidateId: candidate.id, name, isMaster: false, targetJobId: null, templateId, versions: [], latestVersionId: "" };
+  const shell = { id, firmId: candidate.firmId, candidateId: candidate.id, baseResumeId: null, name, isMaster: false, targetJobId: null, templateId, versions: [], latestVersionId: "" };
   const doc = buildResumeDocument(shell, candidate, start === "record" ? record : undefined);
   if (start === "blank") {
-    return { ...doc, summary: newClaim(), experience: [{ id: newId("exp"), company: "", title: "", location: "", dates: "", description: "", bullets: [newClaim()] }] };
+    return { ...doc, summary: newText(), experience: [{ id: newId("exp"), company: "", title: "", location: "", dates: "", start: "", end: "", current: false, bullets: [newText()] }] };
   }
-  if (!upload) return doc;
-  // Parsed text is never evidence — every line of an upload starts unverified.
-  return allClaims(doc).reduce((d, { claim }) => setClaimState(d, claim.id, "UNVERIFIED", `Parsed from ${upload} — confirm before it ships.`), doc);
+  return doc;
 }
 
 export function NewResume({ initialMode, upload }: { initialMode: StudioMode; upload: string | null }) {
@@ -75,7 +72,7 @@ export function NewResume({ initialMode, upload }: { initialMode: StudioMode; up
         </span>
         <h1 className="text-h1 text-[var(--color-text)]">{upload ? "Your upload is ready" : "Start a new resume"}</h1>
         <p className="mt-1 text-body text-[var(--color-text-3)]">
-          {upload ? `We read ${upload}. Choose the candidate it belongs to — every line comes in unverified until you confirm it.` : "Choose a candidate and a template. You can switch templates any time."}
+          {upload ? `We read ${upload}. Choose the candidate it belongs to. Read it over before you send it.` : "Choose a candidate and a template. You can switch templates any time."}
         </p>
 
         {candidatesQuery.error ? (

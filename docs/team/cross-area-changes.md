@@ -3,6 +3,24 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé screens live — no claim states, the tree (`integrate/resumes`, Zuhair)
+
+Design: [resume-versioning.md](./resume-versioning.md) §5 and §7. Decided 2026-11-05: BenchQ has no Verified / Unverified /
+Contradicted states, no evidence record and no export gate.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Ledger page (Umamah) | `src/app/[firm]/(app)/(manage)/ledger/page.tsx` | The "Claim" column and its chip import are removed. | There are no claim states. The ledger schema still carries `claimState` / `evidenceIds` as the backend sends them (`src/lib/schemas/analytics.ts`: `claimState` is now a plain string); whether the backend columns go is for the ledger's owner. |
+| BDE dashboard (candidate/dashboard owners) | `src/features/dashboard/bde-dashboard.tsx` | The "Unverified claims" card is a "Candidates" card (the BDE's own count, derived). | The unverified count has no meaning without claim states. |
+| Outreach page (Samad) | `src/app/[firm]/(app)/(workspace)/outreach/page.tsx` | The "No unverified claims in this message" banner and the subtitle wording are removed. | Same. |
+| HTTP client (foundation) | `src/lib/api/http.ts`, `src/lib/api/client.ts` | An error whose `detail` is an object (`{message, …}`) keeps its message, and the object as `ApiError.details`. | The résumé upload's 409 names the base the file already is (and whether it's hidden); the résumé adapter turns it into a frontend error. Before, the message was lost ("Request failed with status 409"). |
+| Work authorization labels (shared) | `src/lib/constants/work-auth.ts`, `src/components/app/work-auth-chip.tsx` | `WORK_AUTH_LABEL` moved to the constants (the chip re-exports it). | The mock résumé builder (`src/lib/resume-doc/build.ts`) needs it, and `lib` shouldn't import a component. |
+| Mock write tests (shared) | `src/mocks/write-authorization.test.ts`, `src/mocks/membership.test.ts` | The résumé writes are in the write inventory; a second control signs in as the candidate's BDE for what only they do (Q55). | The résumé mock has writes now. |
+| Mock layer (shared) | `src/mocks/membership.ts` | `shelf`, `shelfByCandidate` and `open` are read names, like `list` / `byId` / `byCandidate`. | The résumé mock's new reads (a firm's or a candidate's bases and résumés, one version's text). |
+| Candidates routes (Abdul) | `backend/api/routes_candidates.py` | Not changed: the new `routes_firm_resumes.py` reuses its `_visible` / `_candidate` / `_member_of`, so the résumé list has the candidates list's scope (Q47). | One rule for who sees which candidate. |
+| Job detail (Zuhair's jobs track) | `src/app/[firm]/(app)/(workspace)/jobs/[id]/page.tsx` | One caption: "AI draft — read it over before you rely on it". | Same. |
+| Firms table and the firm JSON (Abdul, tenancy) | `backend/models/tenancy.py`, `backend/migrations/versions/0016_drop_truth_guard_mode.py`, `backend/auth/serialize.py`, `backend/scripts/seed_demo.py`, `backend/tests/test_auth_sessions.py`; frontend `src/lib/schemas/session.ts`, `src/lib/api/dto/session.ts`, the firm mock, the create-firm comment, the plans mock ("Truth Guard" feature line) | `firms.truth_guard_mode` and its CHECK are dropped (migration 0016); `truth_guard_mode` / `truthGuardMode` leaves the firm JSON and the schema. | A claim-era setting (STRICT / BALANCED / LENIENT); nothing read it. Zuhair's call, 2026-11-05. **One-way for the stored value**; the downgrade restores the column on BALANCED. Needs Abdul's OK (his table). |
+
 ## Candidates final schema — `persona`, `skills`, `summary_state` removed, and no claims (`feat/candidates-final-schema`, Zuhair)
 
 Plan: [zuhair.md](./zuhair.md) §1.1 and §1.3. Migration 0015. **Abdul approves every `candidates` change: his review of

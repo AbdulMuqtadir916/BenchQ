@@ -1,14 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useResume } from "@/lib/hooks/use-resumes";
+import { useOpenedResume } from "@/lib/hooks/use-resumes";
 import { useCandidate } from "@/lib/hooks/use-candidates";
-import { useRecord } from "@/lib/hooks/use-records";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { can } from "@/lib/auth/permissions";
-import { buildResumeDocument } from "@/lib/resume-doc/build";
-import { deriveDocumentGate } from "@/lib/derive";
+import { canChangeResume } from "@/lib/auth/permissions";
 import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { isNotFoundError } from "@/lib/api/client";
@@ -18,6 +15,8 @@ import { useHref } from "@/lib/routes/use-href";
 import { ResumeStudio } from "./resume-studio";
 import { StudioFrame, StudioSkeleton } from "./studio-states";
 import { useStudio, type StudioMode } from "./studio-store";
+import { useStudioSave } from "./use-studio-save";
+import { UseAsBaseDialog } from "./use-as-base-dialog";
 
 /** Close = go back to wherever the user opened the resume from, or the library on a direct visit. */
 export function useCloseStudio() {
@@ -29,46 +28,43 @@ export function useCloseStudio() {
   }, [router, toHref]);
 }
 
-export function OpenResume({ id, initialMode, review = false }: { id: string; initialMode: StudioMode; review?: boolean }) {
+export function OpenResume({ id, initialMode }: { id: string; initialMode: StudioMode }) {
   const toHref = useHref();
   const principal = useSignedInPrincipal();
   const close = useCloseStudio();
-  const resumeQuery = useResume(id);
-  const candidateId = resumeQuery.data?.candidateId ?? "";
+  // `id` is the version's: the studio opens exactly that version (its text), not its résumé's newest.
+  const openedQuery = useOpenedResume(id);
+  const candidateId = openedQuery.data?.resume.candidateId ?? "";
   const candidateQuery = useCandidate(candidateId);
-  const recordQuery = useRecord(candidateId);
   const loadedId = useStudio((s) => s.doc?.resumeId);
   const load = useStudio((s) => s.load);
   const setMode = useStudio((s) => s.setMode);
   const { access } = useRouteAccess();
+  const { onSave, isSaving } = useStudioSave(id, initialMode);
   const inScope = !candidateQuery.data || isInScope(access, principal.userId, { bdeId: candidateQuery.data.bdeId, managerId: candidateQuery.data.managerId });
 
   useEffect(() => {
-    if (!inScope || !resumeQuery.data || !candidateQuery.data || !recordQuery.data || loadedId === id) return;
-    load(buildResumeDocument(resumeQuery.data, candidateQuery.data, recordQuery.data), initialMode);
-  }, [inScope, resumeQuery.data, candidateQuery.data, recordQuery.data, loadedId, id, initialMode, load]);
+    // The store, not this render's `loadedId`: an effect that runs twice (React's dev mode) must load once.
+    if (!inScope || !openedQuery.data || !candidateQuery.data || useStudio.getState().doc?.resumeId === id) return;
+    const { pendingNotice, notify, setPendingNotice } = useStudio.getState();
+    load(openedQuery.data.document, initialMode, !!pendingNotice); // after a save: same layout, the next version
+    if (pendingNotice) {
+      notify(pendingNotice.text, pendingNotice.tone);
+      setPendingNotice(null);
+    }
+  }, [inScope, openedQuery.data, candidateQuery.data, loadedId, id, initialMode, load]);
 
   // Reopening the same resume keeps this session's edits but honours how it was opened (View vs card).
-  useEffect(() => setMode(review ? "build" : initialMode), [id, initialMode, review, setMode]);
+  useEffect(() => setMode(initialMode), [id, initialMode, setMode]);
 
-  // "Review unverified claims" from the candidate page lands on the first one, once.
-  const reviewed = useRef(false);
-  useEffect(() => {
-    if (!review || reviewed.current || loadedId !== id) return;
-    reviewed.current = true;
-    const { doc, jumpToClaim } = useStudio.getState();
-    const first = doc ? deriveDocumentGate(doc).blockingClaimIds[0] : undefined;
-    if (first) jumpToClaim(first);
-  }, [review, loadedId, id]);
-
-  const error = resumeQuery.error ?? candidateQuery.error ?? recordQuery.error;
-  // A missing resume (or its candidate / record) and one outside the user's scope look the same: not-found (07 Q6).
+  const error = openedQuery.error ?? candidateQuery.error;
+  // A missing or deleted version (or its candidate) and one outside the user's scope look the same: not-found (07 Q6).
   const notFoundState = (
     <StudioFrame onClose={close}>
       <NotFoundState title="Resume not found" description="This resume doesn't exist or isn't available to you." backHref={toHref("resumes")} backLabel="Back to resumes" />
     </StudioFrame>
   );
-  if ([resumeQuery.error, candidateQuery.error, recordQuery.error].some(isNotFoundError)) return notFoundState;
+  if ([openedQuery.error, candidateQuery.error].some(isNotFoundError)) return notFoundState;
   if (error) {
     return (
       <StudioFrame onClose={close}>
@@ -76,9 +72,8 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
           variant="page"
           error={error}
           onRetry={() => {
-            void resumeQuery.refetch();
+            void openedQuery.refetch();
             void candidateQuery.refetch();
-            void recordQuery.refetch();
           }}
         />
       </StudioFrame>
@@ -97,10 +92,15 @@ export function OpenResume({ id, initialMode, review = false }: { id: string; in
 
   const candidate = candidateQuery.data;
   return (
-    <ResumeStudio
-      subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")}
-      canEdit={can(principal, "resume.edit")}
-      onClose={close}
-    />
+    <>
+      <ResumeStudio
+        subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")}
+        canEdit={!!candidate && canChangeResume(principal, candidate)}
+        onClose={close}
+        onSave={onSave}
+        isSaving={isSaving}
+      />
+      <UseAsBaseDialog />
+    </>
   );
 }

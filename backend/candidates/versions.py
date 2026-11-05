@@ -147,7 +147,8 @@ def _group(db, row: Resume):
 
 
 def version_json(row: Resume, *, with_content: bool = False) -> dict:
-    out = {"id": str(row.id), "base_resume_id": str(row.base_resume_id), "category": row.category,
+    out = {"id": str(row.id), "candidate_id": str(row.candidate_id), "base_resume_id": str(row.base_resume_id),
+           "category": row.category,
            "job_id": str(row.job_id) if row.job_id else None, "version": row.version, "name": row.name,
            "template": row.template, "page_format": row.page_format,
            "created_by_user_id": str(row.created_by_user_id) if row.created_by_user_id else None,
@@ -156,43 +157,62 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
 
 
 def base_json(base: BaseResume, number: int) -> dict:
-    return {"id": str(base.id), "number": number, "source": base.source, "is_active": base.is_active,
+    return {"id": str(base.id), "candidate_id": str(base.candidate_id), "number": number, "source": base.source,
+            "is_active": base.is_active,
             "resume_parse_id": str(base.resume_parse_id) if base.resume_parse_id else None,
             "promoted_from_resume_id": str(base.promoted_from_resume_id) if base.promoted_from_resume_id else None,
             "archived_at": base.archived_at.isoformat() if base.archived_at else None,
             "created_by_user_id": str(base.created_by_user_id), "created_at": base.created_at.isoformat()}
 
 
+_LISTED = (Resume.id, Resume.candidate_id, Resume.base_resume_id, Resume.category, Resume.job_id, Resume.version,
+           Resume.name, Resume.template, Resume.page_format, Resume.created_by_user_id, Resume.created_at)
+
+
 def listing(db, candidate) -> dict:
     """Every base with its versions, and the tailored résumés, for the base dropdown and the history. A version some
     base was promoted from carries that base's id (`promoted_to_base_id`): the dropdown leaves it out (§3.2), and so
     does it leave out a hidden base (`archived_at`); the history shows both."""
-    numbers = base_numbers(db, candidate)
-    bases = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.candidate_id == candidate.id,
-                                                             BaseResume.deleted_at.is_(None)).all()
-    promoted_to = {b.promoted_from_resume_id: b.id for b in bases if b.promoted_from_resume_id}
+    return listing_many(db, candidate.firm_id, [candidate.id])[candidate.id]
+
+
+def listing_many(db, firm_id, candidate_ids) -> dict:
+    """`listing()` for many candidates of one firm in two queries: {candidate_id: {"bases", "tailored"}}. Each base
+    and tailored résumé names its candidate. `candidate_ids` may be a list or a subquery of ids."""
+    bases = scoped(db, BaseResume, firm_id).filter(BaseResume.candidate_id.in_(candidate_ids),
+                                                    BaseResume.deleted_at.is_(None)) \
+        .order_by(BaseResume.created_at, BaseResume.id).all()
     # The list shows each version's details, never its content: only those columns are read.
-    rows = scoped(db, Resume, candidate.firm_id).filter(Resume.candidate_id == candidate.id,
-                                                        Resume.base_resume_id.isnot(None), Resume.deleted_at.is_(None)) \
-        .options(load_only(Resume.id, Resume.base_resume_id, Resume.category, Resume.job_id, Resume.version,
-                           Resume.name, Resume.template, Resume.page_format, Resume.created_by_user_id,
-                           Resume.created_at)) \
-        .order_by(Resume.version).all()
+    rows = scoped(db, Resume, firm_id).filter(Resume.candidate_id.in_(candidate_ids), Resume.base_resume_id.isnot(None),
+                                              Resume.deleted_at.is_(None)) \
+        .options(load_only(*_LISTED)).order_by(Resume.version).all()
+    promoted_to = {b.promoted_from_resume_id: b.id for b in bases if b.promoted_from_resume_id}
+    numbers, counted = {}, {}
+    for base in bases:  # "Base 1, 2…" in the order they were made, per candidate (as base_numbers)
+        counted[base.candidate_id] = counted.get(base.candidate_id, 0) + 1
+        numbers[base.id] = counted[base.candidate_id]
 
     def entry(row: Resume) -> dict:
         target = promoted_to.get(row.id)
         return {**version_json(row), "promoted_to_base_id": str(target) if target else None}
 
-    out_bases = []
-    for base in sorted(bases, key=lambda b: numbers[b.id]):
-        versions = [entry(r) for r in rows if r.base_resume_id == base.id and r.category == "BASE"]
-        out_bases.append({**base_json(base, numbers[base.id]), "versions": versions})
+    out = {cid: {"bases": [], "tailored": []} for cid in ({b.candidate_id for b in bases} | {r.candidate_id for r in rows})}
+    if isinstance(candidate_ids, (list, tuple, set)):
+        for cid in candidate_ids:
+            out.setdefault(cid, {"bases": [], "tailored": []})
+    by_base: dict = {}
     tailored: dict[tuple, list] = {}
     for row in rows:
-        if row.category == "TAILORED":
-            tailored.setdefault((row.base_resume_id, row.job_id), []).append(entry(row))
-    return {"bases": out_bases,
-            "tailored": [{"base_resume_id": str(b), "job_id": str(j), "versions": v} for (b, j), v in tailored.items()]}
+        if row.category == "BASE":
+            by_base.setdefault(row.base_resume_id, []).append(entry(row))
+        else:
+            tailored.setdefault((row.candidate_id, row.base_resume_id, row.job_id), []).append(entry(row))
+    for base in bases:
+        out[base.candidate_id]["bases"].append({**base_json(base, numbers[base.id]),
+                                                "versions": by_base.get(base.id, [])})
+    for (cid, b, j), v in tailored.items():
+        out[cid]["tailored"].append({"candidate_id": str(cid), "base_resume_id": str(b), "job_id": str(j), "versions": v})
+    return out
 
 
 # ── Writing ──────────────────────────────────────────────────────────────────

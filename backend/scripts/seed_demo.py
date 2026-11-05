@@ -135,7 +135,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             db, Firm, demo_id(f["id"]), name=f["name"], slug=f["slug"], status=f["status"],
             plan_id=demo_id(f["planId"]), seat_limit=f["seatLimit"], candidate_limit=f["candidateLimit"],
             contact_phone=f["contactPhone"], logo_url=f["logoUrl"], primary_timezone=f["primaryTimezone"],
-            client_timezone=f["clientTimezone"], truth_guard_mode=f["truthGuardMode"],
+            client_timezone=f["clientTimezone"],
             application_expiry_days=f["applicationExpiryDays"], bde_capacity=f.get("bdeCapacity", 10),
             created_at=_when(f["createdAt"]))
     # Managers before the BDEs who point at them (07 Q40).

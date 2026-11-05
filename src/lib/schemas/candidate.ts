@@ -1,9 +1,7 @@
 import { z } from "zod";
 import {
   CandidateStatus,
-  ClaimState,
   EmploymentType,
-  FieldSource,
   RemoteMode,
   WorkAuth,
 } from "./enums";
@@ -23,8 +21,6 @@ export const QaBankEntrySchema = z.object({
   ]),
   useCount: z.number().int(),
   lastUsedAt: z.string().datetime().nullable(),
-  state: ClaimState,
-  evidenceId: z.string().nullable(),
 });
 export type QaBankEntry = z.infer<typeof QaBankEntrySchema>;
 
@@ -141,7 +137,7 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   primaryRole: z.string().trim().min(1, "Enter the title they're marketed as."),
   email: z.string().trim().email("Enter a valid email."),
   summary: z.string().trim().nullable(),
-  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable(), source: FieldSource })),
+  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable() })),
   preferredIndustries: z.array(z.string()),
   dealBreakers: z.array(z.string()),
   /** The parse to keep: the backend holds the file until create (onboarding module 06). null = no résumé. */

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { CreateCandidate } from "@/lib/schemas/candidate";
-import type { EmploymentType, FieldSource, RemoteMode, WorkAuth } from "@/lib/schemas/enums";
+import type { EmploymentType, RemoteMode, WorkAuth } from "@/lib/schemas/enums";
 import type { ResumeDraft } from "@/lib/schemas/resume-draft";
 import { needsSponsorship, needsTransfer } from "@/lib/constants/work-auth";
 
@@ -23,8 +23,8 @@ export const StepIdSchema = z.enum(STEPS.map((step) => step.id) as [StepId, ...S
 export interface WizardSkill {
   name: string;
   family: string | null;
-  /** Where it came from: the résumé, or typed in (07 Q49: stored UNVERIFIED with this source). */
-  source: Extract<FieldSource, "RESUME_UPLOAD" | "MANUAL">;
+  /** Where it came from, for the "filled from the résumé" hint only; it is not sent. */
+  source: "RESUME_UPLOAD" | "MANUAL";
 }
 
 export interface WizardValues {
@@ -61,7 +61,7 @@ export interface WizardValues {
   handoffNote: string;
 }
 
-/** The fields the parser can fill, and so can carry the "Drafted from résumé" marker. */
+/** The fields the parser can fill, and so can carry the "Filled from résumé" marker. */
 export const DRAFTABLE = ["fullName", "primaryRole", "yearsExperience", "email", "phone", "linkedinUrl", "city", "state", "skills", "summary", "workAuth"] as const;
 export type DraftableField = (typeof DRAFTABLE)[number];
 
@@ -199,7 +199,7 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     preferredLocations: values.preferredLocations,
     contactNotes: orNull(values.contactNotes),
     summary: orNull(values.summary),
-    skills: values.skills,
+    skills: values.skills.map(({ name, family }) => ({ name, family })),
     preferredIndustries: values.preferredIndustries,
     dealBreakers: values.dealBreakers,
     resumeParseId: values.resume?.parseId ?? null,

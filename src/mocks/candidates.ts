@@ -48,7 +48,7 @@ export const candidatesMock = firmScoped("candidates", {
 
   /**
    * A new candidate starts ON_BENCH. Given a BDE, it counts toward the plan, so at the limit it is refused (07 Q45, A4).
-   * All or nothing (05 §2): the candidate, its Record with every claim UNVERIFIED and no evidence (Q49), and the kept
+   * All or nothing (05 §2): the candidate, its Record from the form (Q49), and the kept
    * résumé as a RESUME document. No ledger entries: the ledger is the backend's (F6); its create writes CREATE + ASSIGN.
    */
   create: (firmId: string, body: CreateCandidate): Promise<Candidate> => {
@@ -96,23 +96,19 @@ export const candidatesMock = firmScoped("candidates", {
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     });
-    // Nothing here is ever VERIFIED (Q49): verification needs evidence, which onboarding never has.
     const record = RecordSchema.parse({
       id: newId("rec", now),
       firmId,
       candidateId: candidate.id,
       headline: input.primaryRole,
       summary: input.summary,
-      summaryState: "UNVERIFIED",
       experiences: [],
       educations: [],
       skills: input.skills.map((skill) => ({
         id: newId("skill", now), name: skill.name, canonicalName: skill.name.toLowerCase(), family: skill.family,
-        yearsUsed: null, lastUsedYear: null, proficiency: null, source: skill.source, state: "UNVERIFIED",
+        yearsUsed: null, lastUsedYear: null, proficiency: null,
       })),
       certificates: [],
-      evidence: [],
-      lastVerifiedAt: null,
     });
     const file = input.resumeParseId ? parsedFiles.get(input.resumeParseId) ?? { fileName: "resume.pdf", mimeType: "application/pdf", sizeBytes: 1024 } : null;
     const documentId = newId("doc", now);

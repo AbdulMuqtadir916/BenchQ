@@ -20,7 +20,7 @@ import { CandidateTabs, isCandidateTab, type CandidateTabId } from "@/components
 import { CandidateToast } from "@/components/app/candidate/candidate-toast";
 import { useCandidateWorkspace, type Suggestion } from "@/components/app/candidate/use-candidate-workspace";
 import type { CandidateActions } from "@/components/app/candidate/candidate-actions";
-import { OverviewTab, masterReviewHref } from "@/components/app/candidate/overview/overview-tab";
+import { OverviewTab } from "@/components/app/candidate/overview/overview-tab";
 import { DocumentsTab } from "@/components/app/candidate/documents/documents-tab";
 import { ApplicationsTab } from "@/components/app/candidate/applications/applications-tab";
 import { ApplicationDrawer } from "@/components/app/candidate/applications/application-drawer";
@@ -93,11 +93,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
       setTab("jobs");
       requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
     },
-    reviewMasterResume: () => {
-      const href = masterReviewHref(ws.master, toHref);
-      if (href) router.push(href);
-    },
-  }), [setTab, moveApplication, reduce, router, ws.master, toHref]);
+  }), [setTab, moveApplication, reduce]);
 
   const closeDrawer = useCallback(() => setOpenApplicationId(null), []);
   const finishMatch = useCallback(() => setMatchDone(matchRun), [matchRun]);
@@ -113,7 +109,6 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   if (!isInScope(access, principal.userId, { bdeId: candidate.bdeId, managerId: candidate.managerId })) {
     return notFoundState;
   }
-  const resumes = ws.resumesQuery.data ?? [];
 
   return (
     <div className="bq-page">
@@ -123,7 +118,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         ownerName={ws.ownerName}
         showOwner={can(principal, "team.view")}
         canAct={canAct}
-        resumeHref={toHref("resumes.studio", { id: resumes[0]?.id ?? "new" })}
+        resumeHref={toHref("resumes.studio", { id: ws.base?.version.id ?? "new" })}
         onFindJobs={actions.findJobs}
         onOpenTab={setTab}
       />
@@ -132,7 +127,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         ref={tabsRef}
         value={tab}
         onChange={setTab}
-        counts={{ applications: ws.stats?.applicationsSubmitted, resumes: resumes.length, documents: ws.documentsQuery.data?.length }}
+        counts={{ applications: ws.stats?.applicationsSubmitted, resumes: ws.resumes.length, documents: ws.documentsQuery.data?.length }}
         alerts={{ overview: ws.suggestions.length + ws.upcoming.length > 0, inbox: ws.unread > 0, documents: ws.expiringDocuments.length > 0 }}
       />
 
@@ -161,7 +156,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
               onMatchDone={finishMatch}
             />
           ) : null}
-          {tab === "resumes" ? <ResumesTab candidate={candidate} resumes={resumes} isLoading={ws.resumesQuery.isLoading} error={ws.resumesQuery.error} onRetry={() => void ws.resumesQuery.refetch()} canAct={canAct} /> : null}
+          {tab === "resumes" ? <ResumesTab candidate={candidate} shelf={ws.shelfQuery.data} isLoading={ws.shelfQuery.isLoading} error={ws.shelfQuery.error} onRetry={() => void ws.shelfQuery.refetch()} canAct={canAct} /> : null}
           {tab === "documents" ? <DocumentsTab ws={ws} canAct={canAct} onNotify={setToast} /> : null}
           {tab === "activity" ? <ActivityTab applications={ws.applications} messages={ws.messages} teamName={ws.teamName} onOpenApplication={setOpenApplicationId} /> : null}
         </motion.div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Check, FileImage, FileText, Link2, ShieldCheck, Trash2 } from "lucide-react";
+import { Check, FileImage, FileText, Link2, Trash2 } from "lucide-react";
 import type { CandidateDocument, DocumentKind } from "@/lib/schemas/document";
 import { formatRelative } from "@/lib/format/timezone";
 import { EASE_OUT } from "@/lib/motion";
@@ -13,25 +13,23 @@ import { KIND_META, KIND_ORDER, expiryStatus, formatSize } from "./document-meta
 interface DocumentListProps {
   documents: CandidateDocument[];
   now: number;
-  /** How many verified claims each document backs (derived from the profile's evidence). */
-  evidenceCount: (documentId: string) => number;
   canAct: boolean;
   onRemove: (id: string) => void;
 }
 
 /** Documents grouped by type, visa first. Each row: expiry, what it backs, copy link, remove. */
-export function DocumentList({ documents, now, evidenceCount, canAct, onRemove }: DocumentListProps) {
+export function DocumentList({ documents, now, canAct, onRemove }: DocumentListProps) {
   const groups = KIND_ORDER.map((kind) => ({ kind, items: documents.filter((d) => d.kind === kind) })).filter((g) => g.items.length);
   return (
     <div className="space-y-4">
       {groups.map(({ kind, items }) => (
-        <DocumentGroup key={kind} kind={kind} items={items} now={now} evidenceCount={evidenceCount} canAct={canAct} onRemove={onRemove} />
+        <DocumentGroup key={kind} kind={kind} items={items} now={now} canAct={canAct} onRemove={onRemove} />
       ))}
     </div>
   );
 }
 
-function DocumentGroup({ kind, items, now, evidenceCount, canAct, onRemove }: { kind: DocumentKind; items: CandidateDocument[] } & Omit<DocumentListProps, "documents">) {
+function DocumentGroup({ kind, items, now, canAct, onRemove }: { kind: DocumentKind; items: CandidateDocument[] } & Omit<DocumentListProps, "documents">) {
   const reduce = useReducedMotion() ?? false;
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -52,7 +50,6 @@ function DocumentGroup({ kind, items, now, evidenceCount, canAct, onRemove }: { 
         <AnimatePresence initial={false}>
           {items.map((doc) => {
             const expiry = expiryStatus(doc, now);
-            const backs = evidenceCount(doc.id);
             const FileIcon = doc.mimeType.startsWith("image/") ? FileImage : FileText;
             return (
               <motion.li key={doc.id} layout={!reduce} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: reduce ? 0 : 20 }} transition={{ duration: 0.22, ease: EASE_OUT }} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
@@ -60,10 +57,9 @@ function DocumentGroup({ kind, items, now, evidenceCount, canAct, onRemove }: { 
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-body-strong text-[var(--color-text)]">{doc.title}</p>
                   <p className="truncate text-sm text-[var(--color-text-3)]">{doc.fileName} · {formatSize(doc.sizeKb)} · added {formatRelative(doc.uploadedAt)}</p>
-                  {expiry || backs ? (
+                  {expiry ? (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {expiry ? <Tag tone={expiry.tone}>{expiry.label}</Tag> : null}
-                      {backs ? <Tag tone="blue"><ShieldCheck size={11} aria-hidden />Evidence for {backs} {backs === 1 ? "claim" : "claims"}</Tag> : null}
                     </div>
                   ) : null}
                 </div>

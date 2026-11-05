@@ -61,7 +61,9 @@ are complete; it makes no application-status writes.
 - **Remaining sign-off:** Abdul confirms the exact vocabulary, legacy mapping/read policy and any adapter/schema
   details in docs/02 before PR 4. No code, migration or production data is changed by closing the old design options.
 
-## D4 — Claim evidence and verification (the core product rule)
+## D4 — Claim evidence and verification (the core product rule) — WITHDRAWN 2026-11-05
+
+> BenchQ dropped claim states, the evidence record and the export gate. D4 no longer applies. What follows is history.
 
 - **Frontend needs:** a per-candidate evidence record; claims marked VERIFIED only with an
   `evidenceId`; the export gate blocks while any claim is UNVERIFIED; verifications persist.

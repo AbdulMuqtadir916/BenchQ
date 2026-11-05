@@ -28,7 +28,7 @@ export function StepBasic({ wizard, errors }: { wizard: Wizard; errors: Errors }
 
   return (
     <div className="space-y-8">
-      <ReviewStrip count={drafts.length} onReviewed={() => wizard.markReviewed(drafts)} />
+      <ReviewStrip count={drafts.length} />
 
       <StepSection title="Identity">
         <WizardField id="cw-name" label="Full name" required error={errors.fullName} isDrafted={drafted.has("fullName")}>

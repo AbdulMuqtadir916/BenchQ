@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ClaimState } from "./enums";
 
 /** JobNavigator-aligned: tracer link per resume/letter, with open + click tracking. */
 export const TracerSchema = z.object({
@@ -28,21 +27,16 @@ export const TailoringSchema = z.object({
 });
 export type Tailoring = z.infer<typeof TailoringSchema>;
 
-export const ResumeClaimSchema = z.object({
+/** One line of a version's text: the summary, or one bullet of a job or project. */
+export const ResumeLineSchema = z.object({
   id: z.string(),
   resumeVersionId: z.string(),
   section: z.enum(["summary", "experience", "project"]),
   entityId: z.string().nullable(),
   bulletIndex: z.number().int().nullable(),
   text: z.string(),
-  state: ClaimState,
-  evidenceId: z.string().nullable(),
-  reason: z.string().nullable(),
-  overriddenByUserId: z.string().nullable(),
-  overrideReason: z.string().nullable(),
-  overriddenAt: z.string().datetime().nullable(),
 });
-export type ResumeClaim = z.infer<typeof ResumeClaimSchema>;
+export type ResumeLine = z.infer<typeof ResumeLineSchema>;
 
 export const AtsIssueSchema = z.object({
   check: z.string(),
@@ -73,7 +67,7 @@ export const ResumeVersionSchema = z.object({
   keywordsMatched: z.array(z.string()),
   keywordsMissing: z.array(z.string()),
 
-  claims: z.array(ResumeClaimSchema),
+  lines: z.array(ResumeLineSchema),
   tailoring: TailoringSchema.nullable(),
   tracer: TracerSchema.nullable(),
 
@@ -91,7 +85,10 @@ export const ResumeSchema = z.object({
   id: z.string(),
   firmId: z.string(),
   candidateId: z.string(),
+  /** The base this résumé belongs to: a base's own versions, or the base a tailored copy was made from (docs/02 §8.1). */
+  baseResumeId: z.string().nullable(),
   name: z.string(),
+  /** A base's own versions (`category = 'BASE'`); false for a copy tailored to a job. */
   isMaster: z.boolean(),
   targetJobId: z.string().nullable(),
   templateId: z.string(),
@@ -100,12 +97,39 @@ export const ResumeSchema = z.object({
 });
 export type Resume = z.infer<typeof ResumeSchema>;
 
-/** DERIVED — the export gate. Computed from claims. */
-export const ExportGateSchema = z.object({
-  canExport: z.boolean(),
-  unverifiedCount: z.number().int(),
-  contradictedCount: z.number().int(),
-  blockingClaimIds: z.array(z.string()),
-  message: z.string().nullable(),
+/** A base résumé: one per upload, promotion or form; exactly one active per candidate (docs/02 §8.1). */
+export const BaseResumeSchema = z.object({
+  id: z.string(),
+  firmId: z.string(),
+  candidateId: z.string(),
+  source: z.enum(["UPLOAD", "PROMOTED", "MANUAL"]),
+  isActive: z.boolean(),
+  createdByUserId: z.string(),
+  createdAt: z.string().datetime(),
+  /** PROMOTED: the version it was copied from. */
+  promotedFromResumeId: z.string().nullable(),
+  /** Set while hidden (a used base the BDE deleted); null otherwise. */
+  archivedAt: z.string().datetime().nullable(),
 });
-export type ExportGate = z.infer<typeof ExportGateSchema>;
+export type BaseResume = z.infer<typeof BaseResumeSchema>;
+
+/** What a résumé list reads: the bases and every résumé of them (a base's versions, the tailored copies). */
+export const ResumeShelfSchema = z.object({
+  bases: z.array(BaseResumeSchema),
+  resumes: z.array(ResumeSchema),
+});
+export type ResumeShelf = z.infer<typeof ResumeShelfSchema>;
+
+/**
+ * What deleting a base or a version would do, or did (resume-versioning.md §4.7): deleted, hidden (a base something
+ * uses), or refused. `uses` names what uses it; `rest` is what "also delete what nothing uses" would delete (a
+ * hidden base only).
+ */
+export const ResumeRemovalSchema = z.object({
+  outcome: z.enum(["DELETE", "HIDE", "REFUSED"]),
+  message: z.string(),
+  uses: z.record(z.string(), z.number().int()),
+  rest: z.object({ versions: z.number().int().optional(), tailored: z.number().int().optional() }),
+});
+export type ResumeRemoval = z.infer<typeof ResumeRemovalSchema>;
+

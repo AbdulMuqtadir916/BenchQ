@@ -31,9 +31,7 @@ client-local time primary, IST secondary. Never show a bare UTC string.
 render a disabled button as a hint that a feature exists. There are two exceptions, where the
 disabled state *is* the message:
 
-1. **The export gate:** a resume with unverified claims can't be exported; the button stays visible,
-   disabled, naming the count with a jump-to-claim link.
-2. **The over-limit block** (docs/07 Q17, Q29): an action the role *may* take but the firm's plan limit
+1. **The over-limit block** (docs/07 Q17, Q29): an action the role *may* take but the firm's plan limit
    blocks (add a member at the seat limit, add a candidate at the candidate limit) stays visible,
    disabled, with the reason inline (e.g. "Your plan allows 4 seats; 4 are in use.", §14.11). A role
    that may not take the action at all still sees nothing.
@@ -71,7 +69,7 @@ shows who is signed in — name, role, firm — and holds **Sign out**. In the a
 shows the Super Admin, and the topbar has no notifications and no shift clock.
 
 Sidebar: 208px expanded, 60px collapsed, 48px mobile icon rail, state in `localStorage`. Items carry live badge counts
-(follow-ups due today, unreviewed unverified claims). Badges are derived, and a badge of zero is
+(follow-ups due today). Badges are derived, and a badge of zero is
 hidden, not rendered as "0".
 
 **Shift clock** in the topbar is not decoration. It shows current US Eastern time alongside IST and
@@ -176,12 +174,11 @@ Four steps, progress rail on the left, back/next, resumable (step index in `loca
 2. **Invite team** — email rows with role selects; skippable. **Waits for Phase M** (the firm-side
    invite flow, docs/07): until then the wizard skips this step
 3. **First candidate** — name, title, work authorisation, resume upload (drop zone simulates a
-   parse with a 3s progress state, then shows extracted fields as `UNVERIFIED` claims for review)
+   parse with a 3s progress state, then shows the extracted fields for review)
 4. **Done** — three suggested next actions, routes to dashboard
 
-The resume-parse simulation in step 3 is the first time the user meets the unverified/verified model. Make
-it legible: the extracted fields arrive visibly drafted, and confirming one flips it to verified with
-the transition described in `design.md`.
+The resume-parse simulation in step 3 shows the extracted fields as "Filled from résumé" until the person edits
+them. Nothing is verified or unverified: the person reads them over and creates the candidate.
 
 ---
 
@@ -197,8 +194,8 @@ The BDE's dashboard answers one question: *what do I do next?*
 ┌─────────────────────────────────────────────────────────────┐
 │ Tonight · 4h 12m left in shift          [Start a run ▸]     │
 ├──────────────┬──────────────┬──────────────┬────────────────┤
-│ Applications │ Follow-ups   │ Responses    │ Unverified claims  │
-│ 23 / 40      │ 7 due        │ 3 new        │ 5 to review    │
+│ Applications │ Follow-ups   │ Responses    │ Candidates         │
+│ 23 / 40      │ 7 due        │ 3 new        │ 6 assigned     │
 │ ████████░░   │              │              │                │
 ├──────────────┴──────────────┴──────────────┴────────────────┤
 │ My candidates (6)                                            │
@@ -276,9 +273,8 @@ assign, then a done screen. The specification, the designs and the build plan ar
 [`docs/candidate-onboarding/`](./candidate-onboarding/README.md) (modules 04 and 05). Until module 05 lands, the
 single form described here before stays in place.
 
-Truth Guard (Q49): the backend parses the résumé and saves nothing until the candidate is created; parsed fields show
-"Drafted from résumé" until edited or reviewed, and **nothing in onboarding is `VERIFIED`** (this section used to say
-typed fields were; that is withdrawn).
+Q49: the backend parses the résumé and saves nothing until the candidate is created; parsed fields show
+"Filled from résumé" until edited. There are no claim states (dropped 2026-11-05), so there is no "Mark as reviewed".
 
 ### 4.3 `/candidates/[id]` — detail
 
@@ -302,24 +298,21 @@ show on Applications and Resumes; a dot marks Overview and Inbox when something 
 | 2 | **Applications** | Where every submission stands — the working board |
 | 3 | **Inbox** | What recruiters said, matched to applications, with suggested status updates |
 | 4 | **Jobs** | Where to submit next, ranked for this profile |
-| 5 | **Resumes** | What to submit — the master resume is the verified source |
+| 5 | **Resumes** | What to submit — the base résumés, their versions and the copies tailored from each |
 | 6 | **Documents** | What vendors ask for: visa papers, ID, certificates, screening answers |
 | 7 | **Activity** | The audit trail a manager opens |
 
-There is no separate Profile/Record tab: it duplicated the master resume and left the BDE unsure
-where to fix a claim. The Record stays as the data model behind the master resume.
+There is no separate Profile/Record tab: it duplicated the base résumé and left the BDE unsure where to fix a line.
 
 #### Overview
 Left: **Needs your attention** — upcoming recruiter calls and interviews, recruiter emails whose
 stage the pipeline hasn't caught up with (one-click *Move to …*), follow-ups due within a day,
-"connect the inbox" when it isn't, visa / ID / certificate files expiring within 60 days, and
-unverified claims in the master resume (*Review* opens the builder on the first one). Five show, the rest behind
+"connect the inbox" when it isn't, and visa / ID / certificate files expiring within 60 days. Five show, the rest behind
 *Show more*; resolving one animates it out. Then **Pipeline** (current count per stage, animated
 bars, each row opens the board) and **Latest from recruiters** (four newest emails, or the connect
 prompt). Right: **Submission facts** (work authorization + validity, rate and floor, availability
 and notice, employment types, relocation, target roles — editable in place, the rate floor can't
-exceed the target), **Resume readiness** (verified share of the master resume's claims, with *Review
-unverified claims* → `/resumes/[id]?review=1`), **Best new matches**.
+exceed the target), **Base résumé** (its name, newest version and how many tailored copies hang off it, with *Open*), **Best new matches**.
 
 #### Applications
 Toolbar: *Active / All* and *Board / List*, plus a one-line summary. When emails suggest updates, a
@@ -351,17 +344,20 @@ The profile-locked job explorer. `Find jobs` plays the matching sequence (read p
 work authorization → score → rank) with real counts, then the ranked list staggers in.
 
 #### Resumes
-The same cards as the Resume Builder library, master first, plus a *New resume* tile. A note explains
-that the master resume is the verified source every tailored copy reuses. The export lock shows on
-the card itself. Claims are verified in the builder (*Verify with evidence*); a claim cannot be
-verified without an attached evidence id.
+This candidate's résumés as a collapsible tree (the same component as the Resume Builder library): each **base**
+is a folder showing its versions, and the **tailored** copies made from it grouped by job. The active base starts
+open and the others closed; a hidden base sits in a "Hidden" row for the assigned BDE only. Clicking a version or a
+tailored copy opens that exact one in the studio. Above the tree, the assigned BDE has **Upload résumé** (a later
+résumé becomes a new base, the one in use; the same file again names the base it already is, offers a hidden one
+back, or brings a deleted one back). Row actions, by who may (07 Q55): **Use this base** (pick), **Use as base** on a
+version after v1, **Delete** on a base or a version (the backend's warning first; a base in use is hidden, and "also
+delete what nothing uses" asks a second time), **Show again** on a hidden base.
 
 #### Documents
 Left: an upload area (drop or browse; the type is detected from the file name and can be changed;
 expiry is asked for visa, ID and certificates), then files grouped by type — work authorization,
 identity, resumes, certifications, education, employment letters. Each row: title, file, size,
-added, an expiry badge (expired / expires in N days / valid to), "Evidence for N claims" when the
-file backs verified claims, *Copy link*, and remove with an inline confirm. An amber banner lists
+added, an expiry badge (expired / expires in N days / valid to), *Copy link*, and remove with an inline confirm. An amber banner lists
 anything expired or expiring within 60 days. Right (sticky): **Screening answers** — the
 candidate's saved answers to standard vendor questions, each with *Copy*, plus *Copy all*.
 
@@ -397,7 +393,7 @@ Filtered to nothing → clear-filters state.
 Three tabs.
 
 **Paste** — a textarea that accepts a URL or a raw job description. On submit, a 2–4s parse
-simulation, then a review form with every extracted field as `UNVERIFIED`, side by side with the
+simulation, then a review form with the extracted fields, side by side with the
 source text so the BDE can check the parse. Confirm to save.
 
 **Bulk paste** — multiple URLs, one per line. A progress list with per-row status (queued →
@@ -420,57 +416,57 @@ card (H-1B / LCA data, client type, prior applications from this firm), and the 
 
 If the match is `LIGHT` depth, the panel shows a `Run full analysis` action that upgrades it —
 matching the JobNavigator cost-control split. The upgrade is an AI simulation per
-`03-MOCK-DATA.md §5`: staged progress, 2–5s, output arrives `UNVERIFIED`.
+`03-MOCK-DATA.md §5`: staged progress, 2–5s.
 
 ---
 
 ## 6. Resume builder — `/resumes` and `/resumes/[id]`
 
-**Library — `/resumes`.** Every resume as a card: file icon (master vs tailored), resume name,
-candidate, role, and monospace tags for type, version, ATS score and template. The footer shows
-"Ready to export" or the unverified-claim count. Search, a type filter and a candidate filter sit
-above the grid. **New resume** and **Upload resume** are the page actions. Clicking a card opens it in
-Builder mode; the card's **View** button opens it in Viewer mode.
+**Library — `/resumes`.** Every résumé in the firm as a collapsible tree: candidate → **base** → its versions, and the
+**tailored** copies made from that base, grouped by job. A row carries the version number, who saved it and when;
+a base's folder line says how many versions and tailored copies it holds. Bases start closed. Search, a candidate filter and a "show
+tailored" toggle sit above the tree, and the same row actions as a candidate's tab. There is no page action: a later
+résumé is uploaded on the candidate's page. Clicking a version or a tailored copy opens that exact one in Builder
+mode; **View** opens it in Viewer mode. The studio's URL names the version.
 
 **The studio — `/resumes/[id]`.** Opens full screen, outside the app shell: no sidebar, no top nav.
 A close button (and `Esc`) returns to wherever it was opened from. `?mode=view` opens in Viewer mode;
 `/resumes/new` starts a new resume from a candidate's record or blank, and
-`/resumes/new?upload=<file>` opens a parsed upload in which every line starts unverified.
+`/resumes/new?upload=<file>` opens a parsed upload.
 
 ```
-┌ ✕ │ Master Resume [Master]        [ Builder | Viewer ]      Saved  [Tailor with AI] [Export PDF] ┐
+┌ ✕ │ Base [Base]     [ Builder | Viewer ]    Unsaved changes [Save]  [Tailor with AI] [Export PDF] ┐
 ├──────────────────────────────┬─────────────────────────────────────────────────────────────────┤
 │ ▸ Header                     │ Template ‹ Classic Serif ▾ ›   − Fit · 91% +   2 pages · Letter  │
-│ ▸ Summary        1 to verify │ ┌─────────────────────────────┐                                 │
+│ ▸ Summary                    │ ┌─────────────────────────────┐                                 │
 │ ▾ Experience (4)             │ │  live page, chosen template │                                 │
 │    ▸ Sr. Java Dev · Acme …   │ │  page-break guides          │                                 │
 │ ▸ Skills (7)                 │ └─────────────────────────────┘                                 │
 ├──────────────────────────────┴─────────────────────────────────────────────────────────────────┤
-│ 🔒 3 unverified claims need evidence before export.  Review next →   7 of 10 verified · 92 words │
+│ 92 words                                                                                        │
 └────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Builder mode** — collapsible section forms on the left (Header, Summary, Experience, Skills,
-  Education, Certifications, Projects), live page on the right. Rows reorder and remove in place.
-  Every claim shows its state chip and a **Verify with evidence** action. Enter in a bullet starts
+  Education, Certifications, Awards, Projects), live page on the right: every field of the parser's strict format
+  but languages (kept, never shown). The header has the name, title, email, phone, city, state, country, LinkedIn
+  and GitHub; work authorization is shown read-only (the profile's fact). A job has its printed dates and its start,
+  end and "current role"; projects and jobs have bullets. Rows reorder and remove in place. Enter in a bullet starts
   the next one.
+- **Save** — explicit (no autosave; `⌘S`). It makes the résumé's next version and the studio moves to it; if another
+  version was saved meanwhile, the notice says so. Saving v2 or later of a base asks **"Use this as the base?"**.
+  The header's name and email are required. Closing with unsaved edits asks "Discard unsaved changes?". The design
+  (template) is a view choice and isn't saved; the résumé's name isn't edited here.
 - **Viewer mode** — the page itself, centered, with a slim outline rail. Click any text to edit it
-  where it sits. Selecting text in a claim raises a floating toolbar: bold, italic, underline and
+  where it sits. Selecting text raises a floating toolbar: bold, italic, underline and
   **Ask AI** (improve wording, make concise, add measurable impact, fix grammar; `⌘J` opens it).
 - **Templates** — six styles (Classic Serif, Modern, Minimal, Executive, Compact, Two Column). The
   ‹ › arrows (or `[` `]`) step through them; the name opens a strip of live thumbnails rendered from
   this resume's own content. The page is always white in both themes — it is the printed document.
-- **AI output always lands unverified** — a rewrite from the selection toolbar or a **Tailor with
-  AI** run marks the affected claims unverified and flashes them.
+- **AI output** — a rewrite from the selection toolbar or a **Tailor with AI** run flashes the text it changed.
 - **Export PDF** prints a clean copy of the page through the browser's print dialog.
 
-**The export gate.** The export button is disabled whenever any claim in the resume is `UNVERIFIED`.
-The disabled state carries the reason: *"3 claims need review before export"* with a link that
-focuses the first one. This is the one place a disabled control is correct — the block is the
-product's point, and hiding it would teach the wrong model.
-
-`CONTRADICTED` claims are excluded from the page and the export entirely, and shown in Builder mode
-with a line-through.
+**Export.** Any résumé that is not deleted can be exported (no claim states, no export block).
 
 ---
 
@@ -505,9 +501,8 @@ Status changes happen here or on the kanban; both write the same ledger event.
 ## 8. Outreach, follow-ups, analytics, ledger
 
 ### 8.1 `/outreach`
-Left: contact list per application, with verification state. Right: composer with template
-selection, merge-field preview, and a claim check that refuses to send if the message body contains
-a unverified claim pulled from the record. Sent items show channel, timestamp, and result.
+Left: contact list per application. Right: composer with template
+selection and merge-field preview. Sent items show channel, timestamp, and result.
 
 There is no sending in this repo. "Send" logs the outreach locally and advances the mock thread.
 
@@ -601,7 +596,6 @@ cramped builder nobody can use.
 - Slow AI simulation → staged progress with a cancel action after 8 seconds
 - Empty after filtering → distinct from empty because nothing exists
 - Optimistic update rejected → revert with a toast naming the reason
-- Resume export blocked → gate message with a jump-to-claim link
 - Duplicate job on capture → comparison card, merge or keep
 - Principal changes mid-flight (sign-out, another account signed in, another tab) → the query cache is
   cleared and the app remounts, so no data from the previous account stays on screen
@@ -737,7 +731,7 @@ plus "Clear filters".
 | Owner name | required |
 | Owner email | required, valid email |
 
-Not on this form: Truth Guard mode and application expiry days. They take their defaults; the firm's OWNER
+Not on this form: application expiry days. It takes its default; the firm's OWNER
 changes them in `settings/firm`.
 
 **Submit:** creates the firm (`ONBOARDING`), copies the plan's limits, creates the OWNER invite (7 days,
@@ -885,7 +879,7 @@ view (A12).
 5. **Stalled onboarding** shows in Needs attention after 7 days.
 7. **Over-limit block:** the second §0 exception. The action (Reactivate user here; Invite and New candidate
    on firm pages in Phase M) stays visible but disabled, with the reason inline: "Your plan allows 4 seats; 4
-   are in use." Like the export gate, the block is the message.
+   are in use." The block is the message.
 8. **Defaults accepted:** the OWNER can't be deactivated; you can't deactivate yourself or the last active
    admin; a slug change needs the new slug typed to confirm; the `g`-shortcuts in 14.1; the 5-minute warning
    on the support banner.
