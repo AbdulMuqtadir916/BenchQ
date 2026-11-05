@@ -24,7 +24,7 @@ export default function LedgerPage() {
   const [actorFilter, setActorFilter] = useState<"ALL" | LedgerEntry["actorType"]>("ALL");
 
   const rows = useMemo(() => {
-    // The backend already scopes a BDE's ledger to their own entries (07 §2.2); the page applies the same rule.
+    // The backend already scopes a BDE's and a MANAGER's ledger (07 §2.2, Q52, Q56); the page applies the same rule.
     const entries = scopeLedger(principal, ledgerQuery.data ?? [], { users: teamQuery.data ?? [], candidates: candidatesQuery.data ?? [] });
     return entries.filter((e) => actorFilter === "ALL" || e.actorType === actorFilter);
   }, [ledgerQuery.data, teamQuery.data, candidatesQuery.data, actorFilter, principal]);
