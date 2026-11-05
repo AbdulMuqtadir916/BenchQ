@@ -234,6 +234,9 @@ Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the
 - Run anything against the development database other than the standard commands (the app, the test suite as
   `python -m pytest`, read-only checks) without asking first. Starting pytest from a wrapper that imports the app
   first emptied the development database once (2026-11-01); `backend/tests/conftest.py` now refuses such a run.
+- Log a name, email, phone number, résumé or email text, password, token or API key. Log ids, route patterns, counts
+  and timings instead. `backend/logging_setup.py` masks what it recognises, and a canary test fails on what it
+  doesn't (`docs/team/uzair.md` §1, step 4a).
 
 ---
 
