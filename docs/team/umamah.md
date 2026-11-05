@@ -9,6 +9,11 @@ contract changes and the migration number with Abdul.
 
 ## Status
 
+**Activity logs (from 2026-11-05):** the ledger plan, agreed with Abdul, runs as one branch per PR named `activity/…`.
+PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q56).
+Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
+Next: PR 2, the ledger rules as tests.
+
 Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/password-reset-approval`), PR #105 to
 `main` (open, awaiting Abdul's review; backend suite 3705 passed). Change document: [pr-changes/feat-password-reset-notifications.md](./pr-changes/feat-password-reset-notifications.md).
 

@@ -1,5 +1,6 @@
 """A firm's ledger (backend/api/routes_ledger.py; docs/integration/01-ledger.md): the firm's own entries, newest
-first; a BDE's own entries only; another firm's ledger and a Super Admin get no answer."""
+first; a MANAGER's team only (07 Q56); a BDE's own entries only; another firm's ledger and a Super Admin get no
+answer."""
 from datetime import timedelta
 
 import pytest
@@ -64,9 +65,8 @@ def test_the_owner_sees_the_firms_entries_newest_first(api_client, accounts, led
     assert _summaries(api_client.get(_url(accounts.firm_id))) == ["Ben edit", "Bea edit", "Owner edit"]
 
 
-@pytest.mark.parametrize("role", ["manager", "viewer"])
-def test_a_manager_and_a_viewer_see_the_whole_firm(anonymous_client, accounts, ledger, role):
-    resp = anonymous_client.get(_url(accounts.firm_id), headers=ledger[role])
+def test_a_viewer_sees_the_whole_firm(anonymous_client, accounts, ledger):
+    resp = anonymous_client.get(_url(accounts.firm_id), headers=ledger["viewer"])
     assert _summaries(resp) == ["Ben edit", "Bea edit", "Owner edit"]
 
 
@@ -162,7 +162,7 @@ def assignments(test_db, accounts, ledger):
         update,
     ])
     test_db.commit()
-    return {"asha": asha, "ravi": ravi}
+    return {"asha": asha, "ravi": ravi, "manager": manager}
 
 
 def test_a_bde_also_sees_who_assigned_them_their_candidates(anonymous_client, accounts, ledger, assignments):
@@ -204,3 +204,81 @@ def test_filters_by_candidate_their_whole_activity(api_client, accounts, ledger,
     test_db.commit()
     assert _summaries(api_client.get(_url(accounts.firm_id, f"?candidate_id={asha.id}"))) == \
         ["Applied for Asha", "Mira edited Asha", "Assigned Asha to Bea"]
+
+
+# 07 Q56: a MANAGER reads their own team, not the firm.
+
+@pytest.fixture
+def teams(test_db, accounts, ledger, assignments):
+    """Mira manages Bea and Cara, and the candidates Asha and Kiran. Zed manages Ben and the candidate Ravi."""
+    from backend.models.tenancy import User
+    acme = test_db.get(Firm, accounts.firm_id)
+    owner = test_db.get(User, accounts.user_id)
+    mira, bea, asha, ravi = assignments["manager"], ledger["bde_user"], assignments["asha"], assignments["ravi"]
+    ben = test_db.query(User).filter(User.email == "bde2@acme.test").one()
+    cara = make_user(test_db, acme, email="cara@acme.test", role="BDE", name="Cara")
+    zed = make_user(test_db, acme, email="zed@acme.test", role="MANAGER", name="Zed")
+    bea.manager_id = cara.manager_id = mira.id
+    ben.manager_id = ravi.manager_id = zed.id
+    owner_edit = _entry(acme.id, owner, "Owner edited Asha", 9)
+    owner_edit.entity_id, owner_edit.candidate_id = str(asha.id), asha.id
+    zed_assign = _assign(acme.id, zed, ravi, "Zed moved Ravi", 10)
+    test_db.add_all([
+        _entry(acme.id, cara, "Cara edit", 1.5),
+        _entry(acme.id, zed, "Zed edit", 0),
+        _assign(acme.id, owner, asha, "Owner moved Asha", 8),
+        owner_edit, zed_assign,
+        _entry(acme.id, None, "System sync", 0.5),
+    ])
+    test_db.commit()
+    return {"mira": _session_for(test_db, mira), "zed": _session_for(test_db, zed), "cara": _session_for(test_db, cara),
+            "asha": asha, "ravi": ravi}
+
+
+MIRAS_LEDGER = ["Cara edit", "Bea edit", "Mira edited Asha", "Assigned Ravi to Ben", "Assigned Asha to Bea",
+                "Kiran to Mira's queue", "Owner moved Asha"]
+
+
+def test_a_manager_sees_their_team_and_the_assignments_of_their_candidates(anonymous_client, accounts, teams):
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["mira"])) == MIRAS_LEDGER
+
+
+def test_a_manager_sees_nothing_of_another_team_or_the_firm(anonymous_client, accounts, teams):
+    seen = _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["mira"]))
+    for hidden in ("Zed edit", "Ben edit", "Zed moved Ravi", "Owner edit", "Owner edited Asha", "System sync"):
+        assert hidden not in seen
+
+
+def test_the_other_manager_sees_their_own_team(anonymous_client, accounts, teams):
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["zed"])) ==         ["Zed edit", "Ben edit", "Assigned Ravi to Ben", "Zed moved Ravi"]
+
+
+@pytest.mark.parametrize("query", ["?entity_type=candidate&entity_id={ravi}", "?entity_id={ravi}", "?candidate_id={ravi}"])
+def test_a_managers_filters_stay_inside_their_team(anonymous_client, accounts, teams, query):
+    """Another team's candidate, whatever the filter: nothing of theirs, only what Mira did herself (she assigned
+    Ravi before he moved to Zed). "Zed moved Ravi" stays hidden."""
+    resp = anonymous_client.get(_url(accounts.firm_id, query.format(ravi=teams["ravi"].id)), headers=teams["mira"])
+    assert _summaries(resp) == ["Assigned Ravi to Ben"]
+
+
+def test_a_managers_action_filter_stays_inside_their_team(anonymous_client, accounts, teams):
+    resp = anonymous_client.get(_url(accounts.firm_id, "?action=ASSIGN"), headers=teams["mira"])
+    assert _summaries(resp) == [s for s in MIRAS_LEDGER if "edit" not in s]
+
+
+def test_a_manager_reads_the_handoff_note_on_their_candidate(anonymous_client, accounts, teams):
+    """The Owner's assignment shows on the candidate page, as the frontend's handoff note asks for it."""
+    query = f"?entity_type=candidate&entity_id={teams['asha'].id}&action=ASSIGN&limit=1"
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id, query), headers=teams["mira"])) == ["Assigned Asha to Bea"]
+
+
+def test_a_bde_never_sees_a_teammates_work(anonymous_client, accounts, ledger, teams):
+    seen = _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["cara"]))
+    assert seen == ["Cara edit"]
+    assert "Cara edit" not in _summaries(anonymous_client.get(_url(accounts.firm_id), headers=ledger["bde"]))
+
+
+def test_the_owner_and_a_viewer_still_see_every_team(anonymous_client, api_client, accounts, ledger, teams):
+    owner = _summaries(api_client.get(_url(accounts.firm_id)))
+    assert "Zed edit" in owner and "Cara edit" in owner and "System sync" in owner
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=ledger["viewer"])) == owner
