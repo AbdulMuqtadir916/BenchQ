@@ -32,7 +32,7 @@ def reset_scoring_semaphore():
 
 
 def _flatten_resume(json_data: dict) -> str:
-    """Render a Resume.json_data dict (or Persona.resume_content) to plaintext with '## Section' headers for LLM scoring; empty sections are omitted."""
+    """Render the shared Persona's resume_content (JobNavigator's résumé shape) to plaintext with '## Section' headers for LLM scoring; empty sections are omitted."""
     if not json_data:
         return ""
     parts = []
@@ -155,86 +155,90 @@ def _get_persona_text(db) -> dict:
     return {_PERSONA_DISPLAY: text}
 
 
-def _get_resume_texts(db, firm_id) -> dict:
-    """Return {Resume.name: flattened_text} for every base Resume of the firm + Persona (if populated, always last), ordered by Resume.id for stable cache keys.
-
-    Every résumé lookup here takes the firm the run scores for (07 F2c, "known leak"): a résumé is firm data, so
-    another firm's never reaches the LLM or the job's scores. The Persona is still one shared row (D1)."""
+def _versions(db, firm_id, *filters) -> list:
+    """(version, candidate name) for the firm's résumé versions matching `filters`, ordered by id for stable cache keys.
+    Every lookup takes the firm the run scores for (07 F2c): a résumé is firm data, so another firm's never reaches the
+    LLM or the job's scores."""
+    from backend.models.candidates import Candidate
     from backend.models.db import Resume
+    return (db.query(Resume, Candidate.full_name).join(Candidate, Candidate.id == Resume.candidate_id)
+            .filter(Resume.firm_id == firm_id, Resume.deleted_at.is_(None), *filters).order_by(Resume.id).all())
+
+
+def _label(row, name: str, taken: dict) -> str:
+    """A candidate's active base is labelled with their name; any other version also names itself. Two candidates with
+    one name get a number, so neither's score overwrites the other's."""
+    label = first = name if row.category == "BASE" and row.version == 1 else f"{name} ({row.name} v{row.version})"
+    n = 2
+    while label in taken:
+        label, n = f"{first} #{n}", n + 1
+    return label
+
+
+def _texts(rows) -> dict:
+    from backend.candidates.resume_text import resume_text
     out = {}
-    for r in db.query(Resume).filter(Resume.is_base == True, Resume.firm_id == firm_id).order_by(Resume.id).all():
-        text = _flatten_resume(r.json_data or {})
+    for row, name in rows:
+        text = resume_text(row)
         if text:
-            out[r.name] = text
+            out[_label(row, name, out)] = text
+    return out
+
+
+def _get_resume_texts(db, firm_id) -> dict:
+    """{candidate name: text} for every candidate's active base v1 in the firm, plus the Persona (if populated, always
+    last). Until the job module scores each candidate's own jobs, a job is scored against the firm's candidates
+    (docs/team/resume-versioning.md §4.8). The platform-wide `default_resume_id` setting is no longer read."""
+    from backend.models.candidates import BaseResume
+    from backend.models.db import Resume
+    active = (db.query(BaseResume.id).filter(BaseResume.firm_id == firm_id, BaseResume.is_active))
+    out = _texts(_versions(db, firm_id, Resume.base_resume_id.in_(active), Resume.category == "BASE",
+                           Resume.version == 1))
     out.update(_get_persona_text(db))
     return out
 
 
-def _get_default_resume(db, firm_id) -> dict:
-    """Return {Resume.name: flat_text} for the default Resume (special id 'persona' returns persona text); empty dict if not set, not found, or another firm's (`default_resume_id` is one platform-wide setting until the Resumes track)."""
-    from backend.models.db import Resume
-    row = db.query(Setting).filter(Setting.key == "default_resume_id").first()
-    if not row or not row.value:
-        return {}
-    if row.value == _PERSONA_KEY:
-        return _get_persona_text(db)
-    r = db.query(Resume).filter(Resume.id == row.value, Resume.is_base == True, Resume.firm_id == firm_id).first()
-    if not r:
-        return {}
-    text = _flatten_resume(r.json_data or {})
-    if not text:
-        return {}
-    return {r.name: text}
-
-
 def _get_resume_texts_for_company(db, company, firm_id) -> dict:
-    """Return resume texts for a company from company.selected_resume_ids (which can mix Resume UUIDs with 'persona'), falling back to the default, then all base resumes."""
+    """Résumé texts for a company from company.selected_resume_ids (base versions, and/or 'persona'), falling back to
+    every candidate's active base. A company is global; its selection may name another firm's versions, or ones
+    deleted since, which are skipped."""
     from backend.models.db import Resume
     selected = getattr(company, "selected_resume_ids", None) or []
     if selected:
-        out = {}
-        resume_ids = [s for s in selected if s != _PERSONA_KEY]
-        if resume_ids:
-            # A company is global; its selection may name another firm's résumés, which are skipped.
-            for r in (db.query(Resume).filter(Resume.is_base == True, Resume.id.in_(resume_ids), Resume.firm_id == firm_id)
-                      .order_by(Resume.id).all()):
-                text = _flatten_resume(r.json_data or {})
-                if text:
-                    out[r.name] = text
+        resume_ids = [s for s in selected if s != _PERSONA_KEY and _is_uuid(s)]
+        out = _texts(_versions(db, firm_id, Resume.id.in_(resume_ids), Resume.category == "BASE")) if resume_ids else {}
         if _PERSONA_KEY in selected:
             out.update(_get_persona_text(db))
         if out:
             return out
-    default = _get_default_resume(db, firm_id)
-    if default:
-        return default
     return _get_resume_texts(db, firm_id)
 
 
-def _cv_texts_for_ids(db, cv_ids: list, firm_id) -> dict:
-    """Return {display label: flattened_text} for explicit cv ids.
+def _is_uuid(value) -> bool:
+    import uuid
+    try:
+        uuid.UUID(str(value))
+        return True
+    except ValueError:
+        return False
 
-    cv_ids may reference base Resumes, tailored Resumes, or the reserved
-    'persona' id; no is_base filter. Ids of another firm's résumés are skipped, as if missing.
-    """
+
+def _cv_texts_for_ids(db, cv_ids: list, firm_id) -> dict:
+    """{label: text} for explicit cv ids: base or tailored versions, or the reserved 'persona' id. Ids of another firm's
+    versions are skipped, as if missing. A single tailored version is labelled "Tailored" so the frontend's
+    tailored-link handler picks it up."""
+    from backend.candidates.resume_text import resume_text
     from backend.models.db import Resume
     cv_texts = {}
-    resume_ids = [c for c in cv_ids if c != _PERSONA_KEY]
+    resume_ids = [c for c in cv_ids if c != _PERSONA_KEY and _is_uuid(c)]
     if resume_ids:
-        resumes = db.query(Resume).filter(Resume.id.in_(resume_ids), Resume.firm_id == firm_id).order_by(Resume.id).all()
-        # A single tailored resume is labeled "Tailored" so the frontend's tailored-link
-        # handler picks it up; multiple in one batch fall back to Resume.name to avoid a dict-key collision.
-        tailored_count = sum(1 for r in resumes if not r.is_base)
-        for r in resumes:
-            text = _flatten_resume(r.json_data or {})
+        rows = _versions(db, firm_id, Resume.id.in_(resume_ids))
+        tailored_count = sum(1 for row, _ in rows if row.category == "TAILORED")
+        for row, name in rows:
+            text = resume_text(row)
             if not text:
                 continue
-            if r.is_base:
-                label = r.name
-            elif tailored_count == 1:
-                label = "Tailored"
-            else:
-                label = r.name  # disambiguate; loses the short-chip nicety, but no data loss
+            label = "Tailored" if row.category == "TAILORED" and tailored_count == 1 else _label(row, name, cv_texts)
             cv_texts[label] = text
     if _PERSONA_KEY in cv_ids:
         cv_texts.update(_get_persona_text(db))
@@ -251,7 +255,7 @@ def resolve_score_resume_names(db, job=None, cv_ids: list | None = None, *, firm
         return list(_cv_texts_for_ids(db, cv_ids, firm_id))
     company = _find_company_for_job(db, job) if job is not None else None
     texts = (_get_resume_texts_for_company(db, company, firm_id) if company
-             else (_get_default_resume(db, firm_id) or _get_resume_texts(db, firm_id)))
+             else _get_resume_texts(db, firm_id))
     return list(texts)
 
 
@@ -531,7 +535,7 @@ async def analyze_unscored_jobs(status: str = "saved"):
     # -- Phase 0: per-run constants (short session, no network) --------------
     db = SessionLocal()
     try:
-        default_cv_texts = _get_default_resume(db, PIPELINE_FIRM_ID) or _get_resume_texts(db, PIPELINE_FIRM_ID)
+        default_cv_texts = _get_resume_texts(db, PIPELINE_FIRM_ID)
         if not default_cv_texts:
             logger.warning("No CVs uploaded yet, skipping analysis pipeline")
             return
@@ -789,7 +793,7 @@ async def score_single_job(job_id: str, cv_ids: list = None, depth: str = "full"
         else:
             company = _find_company_for_job(db, job)
             cv_texts = (_get_resume_texts_for_company(db, company, firm_id) if company
-                        else (_get_default_resume(db, firm_id) or _get_resume_texts(db, firm_id)))
+                        else _get_resume_texts(db, firm_id))
         if not cv_texts:
             logger.warning(
                 "score_single_job: empty cv_texts (job=%s, cv_ids=%r) — nothing to score against",

@@ -90,6 +90,12 @@ def configure_scheduler():
             replace_existing=True,
         )
 
+    from backend.inbox.classification_worker import process_pending
+    from backend.inbox.retention import purge_due
+    scheduler.add_job(process_pending, IntervalTrigger(minutes=1), id="candidate_email_classification",
+                      replace_existing=True, max_instances=1, coalesce=True)
+    scheduler.add_job(purge_due, IntervalTrigger(hours=1), id="candidate_email_other_retention",
+                      replace_existing=True, max_instances=1, coalesce=True)
     if candidate_inbox_interval > 0:
         scheduler.add_job(run_candidate_inbox_sync, IntervalTrigger(minutes=candidate_inbox_interval),
                           id="candidate_inbox_sync", replace_existing=True, max_instances=1, coalesce=True)

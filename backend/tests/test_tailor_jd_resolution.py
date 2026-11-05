@@ -12,7 +12,7 @@ def _job(description=None, url=None, cached=None):
 
 
 def test_description_used_first_no_fetch(monkeypatch):
-    from backend.api.routes_resumes import _resolve_tailoring_jd
+    from backend.api.render_shared import _resolve_tailoring_jd
     calls = {"n": 0}
 
     async def fake_fetch(url):
@@ -30,7 +30,7 @@ def test_description_used_first_no_fetch(monkeypatch):
 
 def test_live_fetch_preferred_over_cached_and_persisted(monkeypatch):
     """description empty → live fetch wins over cached page text, and is persisted."""
-    from backend.api.routes_resumes import _resolve_tailoring_jd
+    from backend.api.render_shared import _resolve_tailoring_jd
 
     async def fake_fetch(url):
         return "Freshly fetched clean JD"
@@ -45,7 +45,7 @@ def test_live_fetch_preferred_over_cached_and_persisted(monkeypatch):
 
 
 def test_cached_fallback_when_fetch_fails_not_persisted(monkeypatch):
-    from backend.api.routes_resumes import _resolve_tailoring_jd
+    from backend.api.render_shared import _resolve_tailoring_jd
 
     async def fake_fetch(url):
         return None
@@ -60,7 +60,7 @@ def test_cached_fallback_when_fetch_fails_not_persisted(monkeypatch):
 
 
 def test_no_url_skips_fetch_uses_cached(monkeypatch):
-    from backend.api.routes_resumes import _resolve_tailoring_jd
+    from backend.api.render_shared import _resolve_tailoring_jd
     calls = {"n": 0}
 
     async def fake_fetch(url):
@@ -75,7 +75,7 @@ def test_no_url_skips_fetch_uses_cached(monkeypatch):
 
 
 def test_all_empty_returns_empty(monkeypatch):
-    from backend.api.routes_resumes import _resolve_tailoring_jd
+    from backend.api.render_shared import _resolve_tailoring_jd
 
     async def fake_fetch(url):
         return None

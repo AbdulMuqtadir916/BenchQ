@@ -2,7 +2,8 @@
 
 Design agreed 2026-10-31 by Zuhair, with the approvals in §1 from Abdul. **Built so far: the parser (§2–§2.2, PR 2), the tables
 (§3, PR 3, migration 0008), the first base on candidate create (§4.2, PR 4) and versions and bases through the API
-(§4.3, §4.6, §4.7, §6, PR 5, migration 0011).** The clean-up of old rows and the screens (PRs 6–7) are not built yet. This file is
+(§4.3, §4.6, §4.7, §6, PR 5, migration 0011) and the clean-up of the old columns and JobNavigator's résumé code
+(§3.3, §4.8, §8, PR 6, migration 0013).** The screens (PR 7) are not built yet. This file is
 the single reference for building it: the tables (§3), the workflow (§4), the frontend contract (§5), permissions
 (§6) and the PR plan (§7). Owner of all three tables: Zuhair (`docs/team/README.md` §3).
 
@@ -128,6 +129,7 @@ resume_parses ──(resume_parse_id)──▶ base_resumes ◀──(base_resum
 | `created_by_user_id` | uuid | FK → users, NOT NULL | Who made it |
 | `created_at` | timestamptz | NOT NULL, `now()` | When it was made |
 | `promoted_from_resume_id` | uuid | FK → resumes, nullable, `ON DELETE SET NULL` | For `PROMOTED`: the version it was copied from. **New in 0011 (PR 5)** |
+| `deleted_at` | timestamptz | nullable | Soft delete (§4.7): set when an unused base is deleted; NULL again when the same file restores it. **New in 0013 (PR 6)** |
 | `archived_at` | timestamptz | nullable | Set when a used base is deleted (hidden, §4.7); NULL again on "Show again". **New in 0011 (PR 5)** |
 
 ```sql
@@ -192,6 +194,7 @@ All reads, edits, tailoring, previews and downloads go through this table.
 | `linkedin` | varchar | | `header.linkedin` | **new** |
 | `summary` | text | | `professional_summary` | **new** |
 | `summary_id` | varchar | nullable | The summary's id, like an item's (§3.4); NULL without a summary | **new in 0011 (PR 5)** |
+| `deleted_at` | timestamptz | nullable | Soft delete (§4.7): set when the version (or its base) is deleted; the row stays, out of sight, its number never reused | **new in 0013 (PR 6)** |
 | `skills` | jsonb | | `[{id, category, name}]` | **new** |
 | `experiences` | jsonb | | `[{id, job_title, company, location, dates, start, end, current, bullets: [{id, text}]}]` | **new** |
 | `projects` | jsonb | | `[{id, name, url, dates, technologies, bullets: [{id, text}]}]` | **new** |
@@ -202,10 +205,15 @@ All reads, edits, tailoring, previews and downloads go through this table.
 | `created_by_user_id` | uuid | FK → users | Who saved this version | **new** |
 | `created_at` | timestamptz | `now()` | When this version was saved | exists |
 
-**Dropped (approved):** `is_base` (→ `category`), `parent_id` (not tracking which base version a tailored résumé came
-from; add a `base_version` integer later if that's ever needed), `json_data` (→ the content columns),
-`resume_parse_id` (→ `base_resumes`), `updated_at` (rows never change), and the index
+**Dropped (approved; done in PR 6, migration 0013):** `is_base` (→ `category`), `parent_id` (not tracking which base
+version a tailored résumé came from; add a `base_version` integer later if that's ever needed), `json_data` (→ the
+content columns), `resume_parse_id` (→ `base_resumes`), `updated_at` (rows never change), and the index
 `uq_resumes_one_base_per_candidate` (a candidate now has many base versions).
+
+**Required from 0013 (PR 6, decided 2026-11-02):** every row belongs to a base and a candidate. `base_resume_id` and
+`candidate_id` are `NOT NULL`, and the "rows with a base only" exceptions below are gone: `ck_resumes_category_job`
+holds for every row, `uq_resumes_version` has no `WHERE`, and `ck_resumes_base_has_candidate` is dropped (the
+`NOT NULL` does its job).
 
 **Rules**
 
@@ -229,8 +237,12 @@ ALTER TABLE resumes ADD CONSTRAINT fk_resumes_base_candidate
   `passive_deletes`, so the ORM leaves the cascade to the database. Before a BDE deletes a job, the app asks
   "Are you sure you want to delete this job?" and names the résumés tailored on it (built with the job module,
   `zuhair.md` §2; not in PR 5).
-- **Rows from before 0008 have no base.** `ck_resumes_category_job` and `uq_resumes_version` hold for rows with a
-  base only, until PR 6 converts the old rows; 0008 filled their `category` from `is_base`.
+- **Rows from before 0008 are deleted, not converted** (decided 2026-11-04, Zuhair: BenchQ keeps no JobNavigator
+  résumé data; supersedes the 2026-11-02 plan to convert a candidate's old rows). 0013 deletes every `resumes` row
+  without a base (the seeded "Sample PM", firm-level résumés, old tailored copies). What pointed at one lets go:
+  applications and cover letters lose the link (SET NULL); tracking links and their click history go with it
+  (CASCADE). Before running 0013 on a database with real customer data, check what it would delete (the migration's
+  header has the query).
 - **`ck_resumes_base_has_candidate`** (`base_resume_id IS NULL OR candidate_id IS NOT NULL`): Postgres skips a
   composite foreign key while one of its columns is null, so a versioned row must name its candidate.
 - **0007's `uq_resumes_one_base_per_candidate` covers old rows only** (`… AND base_resume_id IS NULL`): a versioned
@@ -303,12 +315,10 @@ the parse for the rest. `resume_parses.parse` keeps the AI's original untouched.
 No résumé uploaded (`resume_parse_id` null) → no base is created; one can be added later.
 
 Built in PR 4 (`backend/candidates/first_base.py`):
-- The first base's `name` is **"Base"**; `is_base` is true while that column exists (until PR 6).
+- The first base's `name` is **"Base"**. (`is_base` was set while the column existed; PR 6 dropped it.)
 - **Work authorization** is the form's code in the app's own label (`USC` → "US Citizen", `H1B` → "H-1B", as
   `work-auth-chip.tsx`); `OTHER` keeps the résumé's own wording.
-- **`json_data` stays empty** on new rows: the readers that still use it skip an empty one (scoring) or aren't live
-  yet (the résumé list), and PR 6 moves them to the new columns. Filling it would put every candidate's "Base" into
-  the firm's job scoring under one shared name.
+- **`json_data`** was left empty on new rows until PR 6 dropped it; its readers now read the columns (§4.8).
 
 ### 4.3 Every action
 
@@ -321,7 +331,7 @@ Built in PR 4 (`backend/candidates/first_base.py`):
 | Base dropdown → pick a base's **v1** | `is_active` moves to that base; **no new row** | — |
 | Base dropdown → pick a base's **v2 or later** | new `PROMOTED`, active (or the existing one, if that version was promoted before) | that version copied as `BASE` v1 of the new base |
 | Upload a new résumé on the candidate's page (BDE, §4.6) | new `UPLOAD`, active | `BASE` v1 from the parse |
-| Delete a version or a base (BDE, §4.7) | unused: deleted; used: hidden (`archived_at`) | unused version: deleted; used: refused |
+| Delete a version or a base (BDE, §4.7) | unused: soft deleted (`deleted_at`); used: hidden (`archived_at`) | unused version: deleted; used: refused |
 | "Show again" on a hidden base (BDE) | `archived_at` cleared; **not** made active | — |
 | Tailor for a job (the tailoring module, not PR 5) | — | `TAILORED` v1 from the active base's v1 (or the next version if this base + job already exists) |
 
@@ -366,6 +376,12 @@ Built in PR 4 (`backend/candidates/first_base.py`):
 - Evidence excerpts quote the original file (`resume_parses.content`), never `parse`: the parser rewrites the
   résumé for ATS, so `parse` is the AI's wording, the draft the claims come from, not proof of them.
 - Nothing here produces a `VERIFIED` claim. The export gate (unverified claims block export) is unchanged.
+- **For whoever builds the export gate on the backend** (the tailoring module or PR 7; Abdul's review of PR 5): since
+  changed text gets a new id with no claim yet, the gate must block any printed item, bullet or summary **without a
+  VERIFIED claim**, not only one whose claim is UNVERIFIED.
+- **The gate covers cover letters too** (Abdul's review of PR 6): a cover letter is written from a version's full
+  text, verified or not, so unverified text could leave through a letter. Whoever builds the gate applies it to cover
+  letters as well as résumés.
 
 ### 4.6 A later résumé (decided 2026-11-02, Abdul and Zuhair)
 
@@ -382,10 +398,17 @@ assign the BDE first, then send the file. The onboarding upload (§4.2) stays th
    fails, nothing is saved.
 4. The candidate's profile is not changed by an upload.
 
-### 4.7 Deleting, hiding and showing again (decided 2026-11-02, Abdul and Zuhair)
+### 4.7 Deleting, hiding and showing again (decided 2026-11-02, Abdul and Zuhair; deleting made soft 2026-11-04, Zuhair)
 
 Only the assigned BDE deletes. A warning always comes first and names what uses it (*"Sent to 5 jobs, 2 tailored
 résumés made from it."*).
+
+**Deleting is a soft delete** (Zuhair, 2026-11-04; D10 in `docs/integration/06-open-decisions.md`): the row stays and
+gets `deleted_at` (`resumes` and `base_resumes`, migration 0013). It is out of every list, the base dropdown, the
+workflow and scoring, and opening it is "not found"; its text stays stored, so the ledger and history can still show
+what each BDE worked on, and its **version number is never reused**. A base can't be removed from the table anyway
+while version rows point at it, so deleting a base marks it and its versions. The base's upload (`resume_parses`)
+stays: it holds the file and its fingerprint.
 
 **Used** means something points at it: an application or a cover letter (`resume_id`), a tracking link, a tailored
 résumé made from the base (`base_resume_id`), evidence on its upload (`evidence.resume_parse_id`), or a claim on an
@@ -393,9 +416,9 @@ item that would exist in no other version of the candidate.
 
 | | Made by a BDE (this one or an earlier one) | Made by an owner or manager |
 |---|---|---|
-| **A version, unused** | deleted | refused |
+| **A version, unused** | deleted (soft) | refused |
 | **A version, used** | refused: *"Can't delete v2: it was sent to 2 jobs."* | refused |
-| **A whole base, unused** | deleted with its versions, and its upload (`resume_parses` row) if it has one, so the same file can be uploaded fresh later | refused if any of its versions was made by an owner or manager |
+| **A whole base, unused** | deleted (soft) with its versions; its upload stays | refused if any of its versions was made by an owner or manager |
 | **A whole base, used** | **hidden** for everyone: `archived_at` set; out of the dropdown, kept in history and on the applications | refused |
 | **The active base** | refused: *"Pick another base first."* | refused |
 
@@ -405,11 +428,30 @@ item that would exist in no other version of the candidate.
   something invisible.
 - **A base's v1 is never deleted on its own**: it is the base (what the workflow uses when the base is picked).
   Delete the whole base instead.
-- **Version numbers can come back** (decided 2026-11-02, Zuhair): the next version is one more than the highest
-  that exists, so deleting the latest version (v3, unused) and saving again gives a new v3. History stays v1, v2, v3
-  with no gap; the ledger's two "v3" entries name different rows (`entity_id`).
+- **Version numbers are never reused** (soft delete): the next version is one more than the highest that ever
+  existed, deleted ones included. Delete v3 and save again: the new version is v4, and the history reads v1, v2, v4.
+  (This replaces the 2026-11-02 decision that the latest number could come back.)
+- **Version numbers never shift:** deleting v2 of v1, v2, v3 leaves v1, v3. A version's number is what applications,
+  the ledger and people refer to, so it never changes (only base numbers, "Base 1, 2…", shift; §4.3).
+- **Uploading the same file again restores a deleted base** (Zuhair, 2026-11-04): the file's fingerprint
+  (`resume_parses.content_sha256`, unique per candidate) finds the kept upload and its deleted base. No new read, no
+  AI: the base comes back with **only its v1** (the file's own content; later edits stay deleted), becomes the base
+  the workflow uses (as any upload does), and the answer says `restored: true`. Picking a version whose promoted base
+  was deleted brings that base back the same way. Base numbers ("Base 1, 2…") count the bases that exist.
 - **Show again** clears `archived_at`. The base comes back to the dropdown with all its versions, **not active**;
   the BDE picks it to use it. History lists hidden bases with "Show again"; re-uploading the file offers the same.
+
+### 4.8 Reading a résumé as text (PR 6)
+
+`backend/candidates/resume_text.py` `resume_text(version)` is a version's plain text with `## Section` headings, read
+from the columns. Job scoring and interview prep use it; nothing converts the columns back to JobNavigator's shape.
+
+- **Job scoring** (`backend/analyzer/cv_scorer.py`, until the job module scores per candidate): a job is scored
+  against each of the firm's candidates' active base v1, labelled with the candidate's name. The platform-wide
+  `default_resume_id` setting is no longer read; a company's `selected_resume_ids` still narrows the list to those
+  versions. The "persona" option still reads the shared persona.
+- **Interview prep** (`routes_applications.py`): the candidate's tailored résumé for the job, newest version.
+- **Cover letters:** the letter is written from the version's columns.
 
 ---
 
@@ -491,7 +533,7 @@ and contracts.
 | 3 | `feat/base-resumes-schema` (**built**, #99) | **Additive only**: `base_resumes`, the new `resumes` columns, CHECKs, indexes, composite FK; `award` in `ck_claims_entity_type`; SQLAlchemy models; constraint tests; claim **0008** in `docs/team/README.md` §6. No behaviour change. | **0008** |
 | 4 | `feat/base-resume-from-parse` (**built**) | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
 | 5 | `feat/resume-versions` (**built**) | Routes under `/api/firms/{firm}/candidates/{candidate}/resumes`: list bases + versions, open a version, save the next version (§4.3), "use as base" and pick a base (v1 flips, v2+ promotes or reuses), the BDE's upload (§4.6), delete / hide / show again with the usage reads for the warning (§4.7). `can_change_resume` / `can_manage_resume` in both policies (§6), `access.py`, `isolation_cases.py`; races tested. Migration 0011: `promoted_from_resume_id`, `archived_at`, `content_sha256` and their unique rules (§3.1, §3.2), `summary_id` (§3.4). Saving gives changed text new ids instead of resetting claims (§4.5). Docs: 07 Q55, docs/02 §8.1. **Tailoring is not here**: the tailoring module creates tailored résumés; their edits use PR 5's save. | **0011** |
-| 6 | `feat/drop-legacy-resume-columns` | **The approved drops** (§3.1, §3.3). First backfill old rows' content from `json_data` (the JobNavigator shape: `header.contact_items`, `experience`, `skills` dict, `education.school`…) into the new columns, so old rows stay readable (team rule 5). Port everything still reading the dropped columns: render/preview/PDF, copy, tailor, import-pdf, score-check, the seed. Claim the next free number (`docs/team/README.md` §6; `0012` or later). | the next free (`0012`+) |
+| 6 | `feat/drop-legacy-resume-columns` (**built**) | **The approved drops** (§3.1, §3.3) and the old JobNavigator résumé code (decided 2026-11-02). Migration 0013: deletes JobNavigator's old résumé rows (§3.3), drops the approved columns and index, makes `base_resume_id` and `candidate_id` required. Removes the old `/api/resumes` router (its shared rendering helpers move to `backend/api/render_shared.py` for cover letters), the 8 backend templates, the old parser (`parse_resume_pdf`), `POST /api/persona/import` and the "Sample PM" seed. The other readers read the columns (§4.8): job scoring, interview prep, the jobs checks, cover letters. | **0013** |
 | 7 | `integrate/resumes` | Frontend live: the résumé adapter's live path, the DTO mapper (§5), the `BaseResume` schema, the base dropdown, the "Use this as the base?" prompt, version history. Both themes, keyboard, skeleton/empty/error states. | — |
 
 If someone else's 0008 merges first, renumber and fix `down_revision` before merging.
@@ -523,14 +565,15 @@ base is named "Base" (§4.2).
 
 ## 8. Known issues and out of scope
 
-- **Two template systems**: the studio has 6 CSS designs (`src/components/app/resume-studio/templates.ts`, printed
-  by the browser, `@page { size: letter }`); the backend has 8 HTML designs (`backend/resume_templates/`, PDF via
-  Playwright). Names don't match and BenchQ never saves `template`. Pick one in §3 (tailoring) before
-  `resumes.template` means anything.
-- **The tailor route** writes `resumes` rows without `candidate_id` (fixed when the tailoring module rebuilds it,
-  `zuhair.md` §3).
-- **The old `/api/resumes` routes** take the firm from the session and don't check which candidates the person may
-  see. PR 5's routes don't use them; PR 6 ports them, and the screens (PR 7) call only the new routes.
+- **Résumé designs (decided 2026-11-02, Zuhair):** the studio's 6 designs (`src/components/app/resume-studio/
+  templates.ts`, printed by the browser) are BenchQ's résumé designs. JobNavigator's 8 backend designs
+  (`backend/resume_templates/`) are deleted in PR 6. A PDF the server makes itself (for the extension or email, with
+  tracer links and the export gate enforced by the backend) comes later, built from the studio's designs, in the
+  tailoring module or the extension.
+- **The old `/api/resumes` routes are removed in PR 6** (they took the firm from the session and didn't check the
+  candidate). PR 5's routes replace list, open, save and delete; tailoring and the ATS score (`score-check`) are
+  rebuilt in the tailoring module. JobNavigator's tailoring pipeline and score-check are kept, unwired, in
+  `backend/analyzer/legacy_tailoring.py` for it to port (they still read the dropped `json_data`).
 - **Tailoring prompts** allow content not in the base; Truth Guard keeps it `UNVERIFIED` (§4.5), but the prompts
   are worth tightening in §3.
 - **`personas`** (a singleton without `firm_id` on firm routes) is a firm-isolation gap, flagged to Abdul; not
@@ -538,3 +581,5 @@ base is named "Base" (§4.2).
 - **Word export**: none exists (PDF only). Not part of this design.
 - **File storage** (S3, `docs/integration/06-open-decisions.md` D7): would replace `resume_parses.content` with a
   storage key; nothing else here changes.
+- **Cover letters** (JobNavigator's `cover_letters`, `/api/cover-letters`) are not used by BenchQ. Kept for now
+  (Zuhair, 2026-11-02, "maybe later"); PR 6 only makes them read the résumé from the columns.

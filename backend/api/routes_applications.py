@@ -277,7 +277,7 @@ async def _fetch_and_store_description(job_id: str, url: str) -> None:
     """Write the ATS-quality JD onto a job that has none. `_resolve_tailoring_jd`
     owns the fetch, the SSRF gate and the write, so this adds no second cascade."""
     from types import SimpleNamespace
-    from backend.api.routes_resumes import _resolve_tailoring_jd
+    from backend.api.render_shared import _resolve_tailoring_jd
     try:
         await _resolve_tailoring_jd(
             SimpleNamespace(id=job_id, description="", url=url, cached_page_text="")
@@ -1209,25 +1209,25 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     tailored = None
     if app.job_id:
         tailored = (scoped(db, Resume, firm_id)
-                    .filter(Resume.job_id == app.job_id, Resume.is_base == False,  # noqa: E712
-                            Resume.candidate_id == app.candidate_id)
-                    .order_by(Resume.updated_at.desc()).first())
+                    .filter(Resume.job_id == app.job_id, Resume.category == "TAILORED",
+                            Resume.candidate_id == app.candidate_id, Resume.deleted_at.is_(None))
+                    .order_by(Resume.created_at.desc(), Resume.version.desc()).first())
     cv_name = (tailored.name if tailored else None) or app.cv_version_used or (job.best_cv if job else None)
     src = tailored
     if not src and cv_name:
-        src = scoped(db, Resume, firm_id).filter(Resume.name == cv_name,
-                                                Resume.candidate_id == app.candidate_id).first()
+        src = scoped(db, Resume, firm_id).filter(Resume.name == cv_name, Resume.candidate_id == app.candidate_id,
+                                                Resume.deleted_at.is_(None)).first()
     resume_text = ""
-    if src and src.json_data:
+    if src:
         try:
-            from backend.analyzer.cv_scorer import _flatten_resume
-            resume_text = _flatten_resume(src.json_data)
+            from backend.candidates.resume_text import resume_text as version_text
+            resume_text = version_text(src)
         except Exception as e:
             logger.info("prep: could not flatten résumé %s: %s", cv_name, e)
     if "resume" in inc:
         add("")
         add("## My résumé" + (" — " + cv_name if cv_name else ""))
-    # _flatten_resume emits its own "## Summary"/"## Experience" headings — demote
+    # resume_text emits its own "## Summary"/"## Experience" headings — demote
     # them so they read as parts of the résumé, not siblings of "The posting".
         body = resume_text.strip() or "[résumé content unavailable]"
         add("\n".join(("#" + ln) if ln.startswith("##") else ln for ln in body.splitlines()))
@@ -1259,8 +1259,9 @@ def _application_responses(db, firm_id, apps):
         candidate_scope = candidate_scope | Resume.candidate_id.is_(None)
     tailored = {}
     for resume in (scoped(db, Resume, firm_id)
-                   .filter(Resume.job_id.in_(job_ids), candidate_scope, Resume.is_base == False)  # noqa: E712
-                   .order_by(Resume.updated_at.desc(), Resume.created_at.desc(), Resume.id).all()):
+                   .filter(Resume.job_id.in_(job_ids), candidate_scope, Resume.category == "TAILORED",
+                           Resume.deleted_at.is_(None))
+                   .order_by(Resume.created_at.desc(), Resume.version.desc(), Resume.id).all()):
         tailored.setdefault((resume.candidate_id, resume.job_id), resume)
     # Cover letters have no candidate_id: their source resume supplies ownership.
     # Unattributed/persona letters can describe legacy rows, never a candidate's application.

@@ -12,10 +12,11 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import text
 
-from backend.models.db import Application, Job, Resume
+from backend.models.db import Application, Job
 from backend.models.tenancy import Firm, LedgerEntry, Session, SupportView
 from backend.tests.auth_support import TEST_PASSWORD, make_firm, make_plan, make_user
 from backend.tests.ledger_support import assert_logged
+from backend.tests.resume_support import make_version
 
 REASON = "Customer reported a missing application"
 READ_ONLY = {"detail": "A support view is read-only."}
@@ -42,11 +43,11 @@ def world(test_db, accounts):
     test_db.flush()
     acme_app = Application(firm_id=acme.id, job_id=job.id, status="applied")
     globex_app = Application(firm_id=globex.id, job_id=job.id, status="applied")
-    resume = Resume(firm_id=acme.id, name="Acme base", is_base=True, json_data={"header": {"name": "A"}})
-    test_db.add_all([acme_app, globex_app, resume])
+    test_db.add_all([acme_app, globex_app])
+    resume = make_version(test_db, acme.id, name="Acme base", full_name="A")
     test_db.commit()
     return {"acme": acme.id, "globex": globex.id, "suspended": suspended.id, "onboarding": onboarding.id,
-            "acme_app": acme_app.id, "globex_app": globex_app.id, "resume": resume.id,
+            "acme_app": acme_app.id, "globex_app": globex_app.id, "resume": resume.id, "candidate": resume.candidate_id,
             "admin": _cookie(accounts.admin_token), "owner": _cookie(accounts.firm_token)}
 
 
@@ -227,7 +228,8 @@ def test_the_view_lasts_across_requests(anonymous_client, world):
 
 @pytest.mark.parametrize("path", [
     "/api/firms/{acme}/ledger", "/api/firms/{acme}/members", "/api/firms/{acme}/invites", "/api/applications",
-    "/api/resumes", "/api/resumes/{resume}", "/api/jobs", "/api/cover-letters", "/api/stats", "/api/companies",
+    "/api/firms/{acme}/candidates/{candidate}/resumes", "/api/firms/{acme}/candidates/{candidate}/resumes/{resume}",
+    "/api/jobs", "/api/cover-letters", "/api/stats", "/api/companies",
 ])
 def test_the_viewed_firms_reads_answer(anonymous_client, world, path):
     _start(anonymous_client, world)
@@ -240,15 +242,14 @@ def test_the_viewed_firms_reads_answer(anonymous_client, world, path):
     ("DELETE", "/api/applications/{acme_app}"),
     ("POST", "/api/applications"),
     ("POST", "/api/applications/bulk-update"),
-    ("PATCH", "/api/resumes/{resume}"),
-    ("DELETE", "/api/resumes/{resume}"),
-    ("POST", "/api/resumes"),
+    ("POST", "/api/firms/{acme}/candidates/{candidate}/resumes/{resume}/save"),
+    ("POST", "/api/firms/{acme}/candidates/{candidate}/resumes/{resume}/use-as-base"),
+    ("DELETE", "/api/firms/{acme}/candidates/{candidate}/resumes/{resume}"),
     ("POST", "/api/jobs/manual"),
     ("POST", "/api/firms/{acme}/invites"),
     ("POST", "/api/auth/first-run-done"),
     ("PATCH", "/api/persona"),
-    ("GET", "/api/resumes/{resume}/pdf"),           # acts rather than reads: no exports in a view (07 §4)
-    ("GET", "/api/cover-letters/{resume}/pdf"),
+    ("GET", "/api/cover-letters/{resume}/pdf"),     # acts rather than reads: no exports in a view (07 §4)
 ])
 def test_every_write_and_every_export_is_refused_inside_a_view(anonymous_client, world, method, path):
     _start(anonymous_client, world)

@@ -30,6 +30,20 @@ class Case:
     upload: bool = False
     # Only the candidate's BDE takes it (07 Q55): firm B's own call is made as its BDE, not its OWNER.
     as_bde: bool = False
+    # Optional action preconditions, applied independently to each tenant before assertions.
+    prepare: Callable | None = None
+
+
+def _classification_ready(state):
+    def prepare(db, ids):
+        from backend.models.candidates import InboxMessage, CandidateMailbox
+        message = db.get(InboxMessage, ids['inbox_message'])
+        mailbox = db.get(CandidateMailbox, message.mailbox_id)
+        mailbox.refresh_token_ciphertext = b'synthetic-test-only'
+        message.source_address = mailbox.address
+        message.classification_state = state
+        db.commit()
+    return prepare
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
@@ -107,6 +121,10 @@ CASES: dict[str, Case] = {
 
     # ── Applications (track 03) ──────────────────────────────────────────────
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": Case(),
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": Case(path={"message_id":"review_message"}, body=lambda i: {"review_id": str(i["review"]), "command_id": "22222222-2222-4222-8222-222222222222", "expected_review_revision": 0, "expected_content_revision": 0, "application_id": str(i["review_app"]), "expected_application_revision":0, "action": "SET_STATUS", "status":"assessment"}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": Case(prepare=_classification_ready("ERROR"), body=lambda i: {"command_id": "22222222-2222-4222-8222-222222222222", "expected_content_revision": 0, "expected_result_version": 0}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify": Case(prepare=_classification_ready("DONE"), body=lambda i: {"command_id": "22222222-2222-4222-8222-222222222222", "expected_content_revision": 0, "expected_result_version": 0}),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
@@ -130,26 +148,6 @@ CASES: dict[str, Case] = {
     "POST /api/applications/{app_id}/interviews": Case(body=lambda i: {"what": "Panel"}),
     "PATCH /api/applications/interviews/{interview_id}": Case(body=lambda i: {"what": "Panel two"}),
     "DELETE /api/applications/interviews/{interview_id}": Case(),
-
-    # ── Résumés (track 04) ───────────────────────────────────────────────────
-    "GET /api/resumes": Case(shows_rows=True),
-    "GET /api/resumes/shelf": Case(shows_rows=True),
-    "POST /api/resumes": Case(body=lambda i: {"name": "New résumé", "parent_id": str(i["resume"]),
-                                              "job_id": str(i["job"])}, body_ids=True),
-    "POST /api/resumes/copy": Case(body=lambda i: {"base_resume_id": str(i["resume"]), "job_id": str(i["job"])},
-                                   body_ids=True),
-    "POST /api/resumes/tailor": Case(body=lambda i: {"base_resume_id": str(i["resume"]), "job_id": str(i["job"])},
-                                     body_ids=True),
-    "POST /api/resumes/import-pdf": Case(upload=True),
-    "GET /api/resumes/{resume_id}": Case(),
-    "PATCH /api/resumes/{resume_id}": Case(path={"resume_id": "tailored"},
-                                           body=lambda i: {"name": "Renamed", "parent_id": str(i["resume"]),
-                                                           "job_id": str(i["job"])}, body_ids=True),
-    "DELETE /api/resumes/{resume_id}": Case(path={"resume_id": "tailored"}),
-    "GET /api/resumes/{resume_id}/preview": Case(),
-    "GET /api/resumes/{resume_id}/pdf": Case(),
-    "POST /api/resumes/{resume_id}/score-check": Case(path={"resume_id": "tailored"}, body=lambda i: {"depth": "light"}),
-    "GET /api/resumes/{resume_id}/tracer-stats": Case(),
 
     # ── Cover letters (track 04) ─────────────────────────────────────────────
     "GET /api/cover-letters": Case(shows_rows=True),
@@ -188,7 +186,6 @@ _SHARED_JOB = Gap("A job's status and scores sit on the shared pool's row, so on
 KNOWN_GAPS: dict[str, Gap] = {
     "GET /api/persona": _PERSONA,
     "PATCH /api/persona": _PERSONA,
-    "POST /api/persona/import": _PERSONA,
     "POST /api/persona/qa-bank": _PERSONA,
     "GET /api/autofill/config": _PERSONA,
     "POST /api/autofill/answer": _PERSONA,
@@ -215,7 +212,6 @@ SIGNED_IN_REASONS: dict[str, str] = {
     "GET /api/searches/countries": "global reference data",
     "GET /api/llm/models": "global reference data",
     "GET /api/llm/efforts": "global reference data",
-    "GET /api/resumes/templates": "global reference data: the template files",
     "GET /api/cover-letters/templates": "global reference data: the template files",
     # 07 Q54: filtered to the caller as recipient (and their firm); another account's id is a 404
     # (test_password_reset.py, test_password_reset_approval.py).

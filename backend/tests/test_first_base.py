@@ -55,8 +55,8 @@ def test_a_create_from_an_upload_writes_its_active_base_and_version_1(anonymous_
     assert (base.source, base.resume_parse_id, base.is_active) == ("UPLOAD", upload.id, True)
     assert (base.firm_id, str(base.candidate_id)) == (world["firm"].id, r.json()["id"])
     assert base.created_by_user_id is not None and v1.created_by_user_id == base.created_by_user_id
-    assert (v1.base_resume_id, v1.firm_id, v1.category, v1.version, v1.name, v1.is_base, v1.job_id, v1.json_data) == \
-        (base.id, world["firm"].id, "BASE", 1, "Base", True, None, {})
+    assert (v1.base_resume_id, v1.firm_id, v1.category, v1.version, v1.name, v1.job_id) == \
+        (base.id, world["firm"].id, "BASE", 1, "Base", None)
 
 
 def test_version_1_takes_the_corrected_form_and_the_parse_for_the_rest(anonymous_client, test_db, world):

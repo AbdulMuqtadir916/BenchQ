@@ -1,31 +1,23 @@
-"""Resume scoring reads résumés from the Resume table."""
+"""Résumé scoring reads each candidate's active base from the versions (docs/team/resume-versioning.md §4.8)."""
 import pytest
-from backend.models.db import Resume, Setting
+
 from backend.models.tenancy import DEFAULT_FIRM_ID
+from backend.tests.resume_support import make_version
 
 pytestmark = pytest.mark.usefixtures("default_firm")
 
 
-def _seed_resume(test_db, name, summary):
-    """Create a base Resume with a minimal json_data containing summary + one job."""
-    r = Resume(firm_id=DEFAULT_FIRM_ID, 
-        name=name,
-        is_base=True,
-        template="inter",
-        json_data={
-            "summary": summary,
-            "experience": [
-                {"company": "Acme", "title": f"{name} Lead", "bullets": [f"shipped {name} platform"]}
-            ],
-            "skills": {"core": ["Python", "SQL"]},
-        },
-    )
-    test_db.add(r)
+def _seed_resume(test_db, name, summary, **over):
+    """A candidate called `name` whose active base v1 has `summary` and one role."""
+    row = make_version(test_db, DEFAULT_FIRM_ID, full_name=name, summary=summary,
+                       experiences=[{"id": f"{name}-e", "company": "Acme", "job_title": f"{name} Lead",
+                                     "bullets": [{"id": f"{name}-b", "text": f"shipped {name} platform"}]}],
+                       skills=[{"id": f"{name}-s", "category": "core", "name": "Python"}], **over)
     test_db.commit()
-    return r
+    return row
 
 
-def test_get_resume_texts_returns_dict_keyed_by_name(test_db):
+def test_get_resume_texts_returns_dict_keyed_by_candidate(test_db):
     from backend.analyzer.cv_scorer import _get_resume_texts
     _seed_resume(test_db, "PM", "Product manager focused on fintech")
     _seed_resume(test_db, "TPgM", "Technical program manager")
@@ -36,28 +28,20 @@ def test_get_resume_texts_returns_dict_keyed_by_name(test_db):
     assert "Technical program" in texts["TPgM"]
 
 
-def test_get_resume_texts_skips_tailored_resumes(test_db):
-    """is_base=False rows must NOT show up in scoring."""
+def test_get_resume_texts_skips_tailored_and_later_versions(test_db):
+    """Only the workflow résumé (the active base's v1) is scored: not a tailored résumé, not an unpicked edit."""
     from backend.analyzer.cv_scorer import _get_resume_texts
+    from backend.models.candidates import Candidate
+    from backend.models.db import Job
     base = _seed_resume(test_db, "PM", "summary")
-    test_db.add(Resume(firm_id=DEFAULT_FIRM_ID, 
-        name="PM → Acme tailored",
-        is_base=False,
-        parent_id=base.id,
-        template="inter",
-        json_data={"summary": "tailored", "experience": [], "skills": {}},
-    ))
+    job = Job(external_id="t1", title="PM", company="Acme", url="https://jobs.example.test/t1", source="manual")
+    test_db.add(job)
+    test_db.flush()
+    candidate = test_db.get(Candidate, base.candidate_id)
+    make_version(test_db, DEFAULT_FIRM_ID, candidate=candidate, category="TAILORED", job_id=job.id, summary="tailored")
+    make_version(test_db, DEFAULT_FIRM_ID, candidate=candidate, version=2, summary="an edit")
     test_db.commit()
 
     texts = _get_resume_texts(test_db, DEFAULT_FIRM_ID)
     assert list(texts.keys()) == ["PM"]
-
-
-def test_get_default_resume_reads_from_setting(test_db):
-    from backend.analyzer.cv_scorer import _get_default_resume
-    pm = _seed_resume(test_db, "PM", "summary")
-    test_db.add(Setting(key="default_resume_id", value=str(pm.id)))
-    test_db.commit()
-
-    default = _get_default_resume(test_db, DEFAULT_FIRM_ID)
-    assert list(default.keys()) == ["PM"]
+    assert "tailored" not in texts["PM"] and "an edit" not in texts["PM"]

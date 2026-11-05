@@ -27,7 +27,9 @@ export type FirmAction =
   | "application.move"
   | "resume.edit"
   | "outreach.act"
-  | "followup.act";
+  | "followup.act"
+  | "email.retry"
+  | "email.reclassify";
 
 /**
  * Managing the firm and its team (07 Q15). `candidate.assign` also covers reassigning (07 Q43); who may be given which
@@ -61,7 +63,7 @@ export type PlatformAction =
 
 export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
 
-export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act"];
+export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act", "email.retry", "email.reclassify"];
 export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "firmSettings.edit", "notification.approve"];
 export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
 export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
@@ -75,6 +77,8 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   /** 07 Q41: only the OWNER and MANAGERs add candidates; a BDE no longer does. */
   "candidate.create": OWNER_AND_MANAGER,
   "candidate.edit": ALL_ACTING,
+  "email.retry": ALL_ACTING,
+  "email.reclassify": OWNER_AND_MANAGER,
   "job.capture": ALL_ACTING,
   "job.apply": ALL_ACTING,
   "application.move": ALL_ACTING,

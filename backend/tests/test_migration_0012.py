@@ -3,6 +3,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.db_schema import head_revision
 from backend.tests.auth_support import seed_accounts
 from backend.tests.isolation_support import make_world
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401
@@ -59,5 +60,6 @@ def test_downgrade_refuses_to_discard_credentials_or_account_provenance(scratch_
     expected = {'credential':'Disconnect candidate mailboxes', 'retained-account':'preserve retained mailbox account provenance', 'active-oauth':'active OAuth attempts'}
     assert expected[protected] in result.stderr
     with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0012'
+        # Nothing moved: still at head (0012 when this was written; later revisions sit on top of it).
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision()
         assert conn.execute(text('SELECT count(*) FROM inbox_messages')).scalar_one() > 0

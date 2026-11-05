@@ -26,7 +26,7 @@ from backend.tests.isolation_cases import (CASES, DEV_ONLY_REASONS, KNOWN_GAPS, 
 from backend.tests.isolation_support import CANARY, add_firm_b, make_world, offline, snapshot_of  # noqa: F401
 
 READ_ONLY = {"detail": "A support view is read-only."}
-SUPPORT_REFUSED_GETS = {"GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}", "GET /api/resumes/{resume_id}/pdf", "GET /api/cover-letters/{cl_id}/pdf"}
+SUPPORT_REFUSED_GETS = {"GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}", "GET /api/cover-letters/{cl_id}/pdf"}
 
 
 def _app_routes() -> set[str]:
@@ -117,11 +117,15 @@ def test_no_case_reason_or_known_gap_names_a_route_that_is_gone():
 def test_firm_data_never_crosses_firms(key, anonymous_client, world):
     case, client, method = CASES[key], anonymous_client, key.split(" ", 1)[0]
     has_ids = _has_ids(key, case)
+    if case.prepare:
+        case.prepare(world.db, world.a.ids)
 
     # A GET answers firm A the same before and after firm B's rows exist: a leak into a count or a chart shows here.
     if method == "GET":
         before = _call(client, key, case, world.a.ids, world.a.cookie)
     b = add_firm_b(world)
+    if case.prepare:
+        case.prepare(world.db, b.ids)
     if method == "GET":
         after = _call(client, key, case, world.a.ids, world.a.cookie)
         assert (after.status_code, after.text) == (before.status_code, before.text), \

@@ -3,6 +3,7 @@ import pytest
 from backend.models.candidates import Candidate, CandidateMailbox
 from backend.models.db import Application, ApplicationStatusEvent, Resume, utcnow
 from backend.models.tenancy import User, LedgerEntry
+from backend.tests.resume_support import make_version
 from backend.tests.test_candidate_application_status import _saved_candidate_application
 
 @pytest.fixture
@@ -52,8 +53,8 @@ def test_prep_never_uses_another_candidates_resume(api_client, test_db, accounts
         created_by_user_id=accounts.user_id, full_name='Other synthetic', work_auth='H1B')
     test_db.add(other)
     test_db.flush()
-    test_db.add(Resume(firm_id=candidate.firm_id, candidate_id=other.id, job_id=job.id,
-        name='Other private resume', is_base=False, json_data={'summary': 'PRIVATE OTHER CANDIDATE'}))
+    make_version(test_db, candidate.firm_id, candidate=other, category='TAILORED', job_id=job.id,
+                 name='Other private resume', summary='PRIVATE OTHER CANDIDATE')
     test_db.commit()
     response = api_client.get(f'/api/applications/{app.id}/prep')
     assert response.status_code == 200

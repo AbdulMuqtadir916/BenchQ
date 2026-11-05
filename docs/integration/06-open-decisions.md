@@ -39,17 +39,27 @@ Each decision: what the frontend needs → what the backend has → options → 
 - **Recommendation:** 3 for the demo/pilot; decide 1 vs 2 before any second firm uses it.
 - **Mock stays:** `src/mocks/team.ts`, `session.ts`, `firm.json`, `src/lib/stores/session-store.ts`.
 
-## D3 — Application statuses
+## D3 — Application statuses — decision recorded, mapping sign-off pending
 
-- **Frontend has 10:** SAVED, APPLIED, RESPONSE, SCREENING, INTERVIEW, OFFER, PLACED, REJECTED,
-  WITHDRAWN, EXPIRED.
-- **Backend has 4:** applied, interview, offer, rejected (`VALID_STATUSES` in
-  `backend/api/routes_applications.py`). Its email monitor and auto-reject scheduler
-  (`backend/email_monitor/`, `backend/scheduler.py`) write these values.
-- **Options:** (1) extend the backend to the 10 (the column is a free string; audit the email
-  monitor, auto-reject and `/api/stats` for assumptions); (2) collapse the frontend board to 4;
-  (3) interim: the frontend refuses moves to unsupported statuses (Module 03 does this).
-- **Recommendation:** 1. The 10 stages are bench-sales vocabulary. Until then, 3.
+**Design decision recorded 2026-11-04; the old four-vs-ten options are superseded.**
+The target list and explicit mapping are in [docs/02 §2.1](../02-DATA-CONTRACTS.md#21-application-status-vocabulary-and-legacy-mapping--d3).
+[Abdul’s issue #110 reply](https://github.com/AbdulMuqtadir916/BenchQ/issues/110#issuecomment-6624344616)
+requires this mapping and will sign off there before PR 4 UI work. **Do not label the mapping approved or change
+schemas/data based on this decision record alone.** PR 3 may proceed once the requested documentation updates
+are complete; it makes no application-status writes.
+
+- Target selectable statuses: `saved`, `applied`, `screening_call`, `shortlisted`, `interview_schedule_request`,
+  `interview_scheduled`, `assessment`, `offer`, `move_on`, `incomplete_application`.
+- `other` is an email category, not a new selectable application status. `saved` is not an email category.
+  BDE review is a separate queue/indicator. There is no new Response stage.
+- Retain and display legacy stored values/history. Exact modern spelling mappings and the proposed
+  `rejected` -> Move On display alias are documented in §2.1. Ambiguous Response/Screening/Interview values are
+  not guessed into a modern stage; Placed/Withdrawn/Expired preserve their distinct closed meanings.
+  Unknown/null values never default to Applied. This is a compatibility design, not a backfill authorization.
+- PR 4 automatic forward moves use the five explicitly approved targets at >=0.8 with trusted authentication,
+  unique matching and freshness. Offer/Move On always require review. Display order is not permission logic.
+- **Remaining sign-off:** Abdul confirms the exact vocabulary, legacy mapping/read policy and any adapter/schema
+  details in docs/02 before PR 4. No code, migration or production data is changed by closing the old design options.
 
 ## D4 — Claim evidence and verification (the core product rule)
 
@@ -115,6 +125,21 @@ Each decision: what the frontend needs → what the backend has → options → 
 
 ---
 
+## D10 — Keeping deleted résumé versions for the ledger (DECIDED 2026-11-04: soft delete, built in résumé versioning PR 6)
+
+> **Suggested by Zuhair Baig, 2026-11-03; decided and confirmed by Abdul 2026-11-04** (product-owner review of PR 6),
+> built in résumé versioning PR 6 (migration 0013) in `resumes` / `base_resumes`, Zuhair's tables: the ledger is unchanged.
+
+- **Need:** the owner and manager can see what each BDE worked on, including résumé versions a BDE later deleted.
+- **Before:** a delete removed the row. The ledger entry (who, what, when) stayed, the content was gone.
+- **Decided: soft delete.** Deleting a version or a base sets `deleted_at` and keeps the row: out of every list and the
+  workflow, still stored, its version number never reused. The ledger and history can show it ("v2, deleted by the BDE,
+  2 Nov"). Uploading the same file again restores a deleted base (its v1) without reading the file again.
+- Other options considered: a copy table, the content inside the ledger entry, keeping as it was.
+  See `docs/team/resume-versioning.md` §4.7.
+
+---
+
 ## Decision log
 
 Record each decision here, with date and owner, then update the affected module files.
@@ -123,7 +148,7 @@ Record each decision here, with date and owner, then update the affected module 
 |---|---|---|---|
 | D1 | | | |
 | D2 | | | |
-| D3 | | | |
+| D3 | Target vocabulary and no-loss legacy mapping recorded in docs/02 §2.1; old four-vs-ten options resolved. Exact mapping awaits Abdul’s sign-off before PR 4 UI; not yet approved. | 2026-11-04 | Samad documented; Abdul mapping sign-off pending |
 | D4 | | | |
 | D5 | | | |
 | D6 | | | |

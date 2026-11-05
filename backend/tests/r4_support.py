@@ -175,10 +175,13 @@ def make_search(db, name="S1", **kw):
 
 
 def make_resume(db, name="Base", is_base=True, **kw):
-    from backend.models.db import Resume
-    r = Resume(firm_id=default_firm_id(db), name=name, is_base=is_base,
-               json_data=kw.pop("json_data", {"header": {"name": "A"}}), **kw)
-    db.add(r)
+    """A résumé version of a new candidate named `name` (a base's v1, or a tailored résumé when `is_base` is False and
+    a `job_id` is given); `json_data` in the old shape is converted to the columns (résumé versioning PR 6)."""
+    from backend.tests.resume_support import columns_from_json, make_version
+    content = columns_from_json(kw.pop("json_data", {"header": {"name": "A"}}))
+    kw.pop("parent_id", None)                                  # no lineage since PR 6
+    r = make_version(db, default_firm_id(db), name=name, candidate_name=name,
+                     category="BASE" if is_base else "TAILORED", **content, **kw)
     db.commit()
     db.refresh(r)
     return r

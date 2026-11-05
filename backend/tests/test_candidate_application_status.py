@@ -188,7 +188,7 @@ def test_candidate_application_status_refuses_viewer(
 
 @pytest.mark.parametrize('target', [
     'screening_call', 'interview_schedule_request', 'interview_scheduled',
-    'offer', 'shortlisted', 'move_on', 'incomplete_application', 'assessment', 'other',
+    'offer', 'shortlisted', 'move_on', 'incomplete_application', 'assessment',
 ])
 def test_candidate_category_status_preserves_submission_and_records_actor(
     api_client, test_db, accounts, jobs_in_default_firm, target
