@@ -449,7 +449,7 @@ from the columns. Job scoring and interview prep use it; nothing converts the co
 - **Job scoring** (`backend/analyzer/cv_scorer.py`, until the job module scores per candidate): a job is scored
   against each of the firm's candidates' active base v1, labelled with the candidate's name. The platform-wide
   `default_resume_id` setting is no longer read; a company's `selected_resume_ids` still narrows the list to those
-  versions. The "persona" option still reads the shared persona.
+  versions. The "persona" option still reads the shared persona, until it moves ([persona-to-candidates.md](./persona-to-candidates.md) §7).
 - **Interview prep** (`routes_applications.py`): the candidate's tailored résumé for the job, newest version.
 - **Cover letters:** the letter is written from the version's columns.
 
@@ -576,7 +576,8 @@ base is named "Base" (§4.2).
 - **Tailoring prompts** allow content not in the base; there is no claim state to hold it (§4.5), so the prompts
   are worth tightening in §3.
 - **`personas`** (a singleton without `firm_id` on firm routes) is a firm-isolation gap, flagged to Abdul; not
-  touched here.
+  touched here. Kept for now (Abdul, 2026-11-05); its readers move to the candidate first
+  ([persona-to-candidates.md](./persona-to-candidates.md)).
 - **Word export**: none exists (PDF only). Not part of this design.
 - **File storage** (S3, `docs/integration/06-open-decisions.md` D7): would replace `resume_parses.content` with a
   storage key; nothing else here changes.

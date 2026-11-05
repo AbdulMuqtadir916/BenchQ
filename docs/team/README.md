@@ -82,6 +82,7 @@ it. Everyone else reads it.
 | Applications (D3, 10 statuses) | `docs/integration/03-applications.md` |
 | Jobs, scraping | `docs/integration/02-jobs.md` |
 | Résumés, tailoring | `docs/integration/04-resumes-and-tailoring.md` |
+| `personas` is to be dropped: what `candidates` and `resumes` hold instead, and a suggested mapping | [persona-to-candidates.md](./persona-to-candidates.md) |
 | Connecting a module to the frontend | `docs/integration/README.md` "The workflow for one module" |
 | Password recovery approvals and Notifications inbox | [umamah.md](./umamah.md) |
 | Decisions | `docs/07-ROUTES-AND-RBAC.md` §0 (Q53 is this plan) |

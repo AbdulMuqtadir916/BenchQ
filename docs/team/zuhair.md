@@ -54,14 +54,16 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
    Tailoring creates them; editing one is résumé versioning PR 5's save (the next version), and only the
    candidate's BDE tailors (07 Q55, `can_manage_resume`). Decide here whether tailoring may choose the base per job
    (a candidate has several target roles but one active base).
-3. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
+3. **No persona** (decided 2026-11-05, Abdul): cover letters, job scoring and tailoring stop reading the shared
+   `personas` row; what each read moves to the candidate and their résumé ([persona-to-candidates.md](./persona-to-candidates.md) §6–§7).
+4. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
    or re-tailoring inserts the next version.
-4. **ATS score** for a tailored résumé against its job. The old `score-check` route and the old tailor route were
+5. **ATS score** for a tailored résumé against its job. The old `score-check` route and the old tailor route were
    removed in résumé versioning PR 6; their pipeline is kept, unwired, in `backend/analyzer/legacy_tailoring.py`
    (with the prompts in settings and `llm_client.call_cv_tailor_llm`) to port to the versions.
    A PDF the server makes itself (extension, email, tracer links, the export gate on the backend) is built here
    from the studio's designs (resume-versioning.md §8).
-5. Frontend live behind `resumes`.
+6. Frontend live behind `resumes`.
 
 ## Rules for you
 

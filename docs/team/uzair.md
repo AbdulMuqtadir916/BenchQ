@@ -42,7 +42,7 @@ All answer 429 with `Retry-After` and `{"detail": "Too many attempts. Try again 
 - **The Super Admin is never limited per user,** including inside a support view.
 - **The frontend never retries a 429** (`src/lib/query/retry.ts`).
 - **The per-user limit is a safety ceiling,** not a pace. A BDE applies job by job, BenchQ has no bulk actions against the backend, and nothing polls it.
-- **Cover letters, persona and autofill have no rate limit.** Cover letters and persona are being dropped, and Samad is reworking autofill.
+- **Cover letters, persona and autofill have no rate limit.** The persona stays for now but its readers move to the candidate ([persona-to-candidates.md](./persona-to-candidates.md)), and Samad is reworking autofill.
 
 **Assumptions the limits rest on:**
 
