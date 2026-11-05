@@ -197,3 +197,21 @@ def test_an_application_sent_with_a_base_version_shows_that_version(test_db):
     (row,) = _application_responses(test_db, DEFAULT_FIRM_ID, [app])
     # A BDE can send any résumé, base or tailored: the application shows the one it was sent with.
     assert row["tailored_resume_id"] == str(w["v2"].id) and row["tailored_resume_deleted"] is False
+
+
+def test_a_skill_typed_on_the_form_keeps_its_claim_when_its_base_is_deleted_and_restored(test_db):
+    from backend.candidates.record import write_record
+    from backend.models.candidates import Claim
+    w = _world(test_db)
+    w["v1"].skills = [{"id": "skill-form", "category": "", "name": "Typed on the form"},
+                      {"id": "skill-file", "category": "", "name": "From the file"}]
+    write_record(test_db, w["candidate"], w["v1"], None, {"Typed on the form": "MANUAL", "From the file": "RESUME_UPLOAD"})
+    test_db.commit()
+    versions.delete_base(test_db, w["bde"], w["candidate"], w["base2"])
+    test_db.commit()
+    left = {k.entity_ref: k.source for k in _claims(test_db, w["candidate"]) if k.entity_type == "skill"}
+    assert left == {"skill-form": "MANUAL"}                              # the file's skill goes; the typed one stays
+    versions.restore_base(test_db, w["bde"], w["candidate"], w["base2"])
+    test_db.commit()
+    again = [k for k in _claims(test_db, w["candidate"]) if k.entity_ref == "skill-form"]
+    assert [k.source for k in again] == ["MANUAL"]                       # kept, and no second claim written

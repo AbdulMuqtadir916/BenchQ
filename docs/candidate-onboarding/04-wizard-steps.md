@@ -9,8 +9,8 @@
 > - **The parser call is `candidatesMock.parseResume`** (a write that needs `candidate.create`), so the existing
 >   write-authorization and isolation tests cover it. The adapter is `src/lib/api/resume-parse.ts`.
 > - **The pure logic is in `model.ts`:** values, `applyDraft`, `validateStep`, `firstOpenStep` and
->   `toCreateCandidate`, which module 05's create calls with the assignment. A3 uses `NEEDS_SPONSOR` from
->   `work-auth-chip.tsx`.
+>   `toCreateCandidate`, which module 05's create calls with the assignment. The chip and the mock use `NEEDS_SPONSOR` from
+>   `src/lib/constants/work-auth.ts` (the flow no longer sends sponsorship; the backend works it out).
 > - **Step 5 is a placeholder.** Until module 05, the pop-up version of `/candidates/new` reloads into the full page
 >   when the flag is on.
 > - **New classes in `globals.css`, built from tokens:** `.bq-choice`, `.bq-dropzone`, `.bq-focus-target`, and focus

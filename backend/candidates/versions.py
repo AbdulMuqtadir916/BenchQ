@@ -498,13 +498,15 @@ def _rest_words(counts: dict) -> str:
 def drop_orphan_claims(db, candidate) -> int:
     """Delete the UNVERIFIED claims whose item is in no live version of the candidate any more: the Record shouldn't
     keep claims for content nothing holds. A claim a person has acted on is never deleted (it keeps its version in
-    use, so that version isn't deleted at all)."""
+    use, so that version isn't deleted at all). A skill typed on the form (`source` MANUAL) stays too: the file can't
+    give it back, so a restore couldn't tell it from a skill of the file."""
     live_ids: set = set()
     for row in scoped(db, Resume, candidate.firm_id).filter(
             Resume.candidate_id == candidate.id, Resume.base_resume_id.isnot(None), Resume.deleted_at.is_(None)).all():
         live_ids |= item_ids(content_of(row))
-    query = scoped(db, Claim, candidate.firm_id).filter(Claim.candidate_id == candidate.id,
-                                                        Claim.state == "UNVERIFIED")
+    query = scoped(db, Claim, candidate.firm_id).filter(
+        Claim.candidate_id == candidate.id, Claim.state == "UNVERIFIED",
+        ~((Claim.entity_type == "skill") & (Claim.source == "MANUAL")))
     if live_ids:
         query = query.filter(Claim.entity_ref.notin_(live_ids))
     return query.delete(synchronize_session=False)

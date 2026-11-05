@@ -1,5 +1,5 @@
 import { ApiError, arrayOf } from "@/lib/api/client";
-import { NEEDS_SPONSOR } from "@/components/app/work-auth-chip";
+import { NEEDS_SPONSOR } from "@/lib/constants/work-auth";
 import { canAssignTo } from "@/lib/auth/policy";
 import { isBde, isManager } from "@/lib/auth/roles";
 import { assignBlockReason } from "@/lib/derive/platform";
