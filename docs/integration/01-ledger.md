@@ -72,7 +72,8 @@ Each track logs its own writes. Nothing is backfilled:
 
 ```python
 ledger.record(db, actor=actor, action="CREATE", entity_type="candidate", entity_id=candidate.id,
-              entity_label=candidate.name, summary=f"Added {candidate.name}", firm_id=firm_id)
+              entity_label=candidate.name, summary=f"Added {candidate.name}", firm_id=firm_id,
+              candidate_id=candidate.id)
 db.commit()                                                           # the change and its entry together
 ```
 
@@ -80,6 +81,10 @@ db.commit()                                                           # the chan
   is a contract change: ask first.
 - `entity_type` is lowercase (`candidate`, `application`, `resume`; 07 Q30).
 - `summary` is the sentence the ledger screen shows: who and what, never a raw id.
+- `candidate_id` is required: the candidate the entry is about, or `None` for one about no candidate.
+- `backend/tests/test_ledger_rules.py` fails a PR with a route that changes data and logs nothing, a write without
+  `candidate_id`, or a read of the ledger outside the listed routes. A route that truly has nothing to log goes in
+  its `NOT_LOGGED` list with the reason.
 - AI runs log `AI_GENERATE` with `actor_type` `AGENT`, `model_id` and `prompt_version` (track 04).
 
 Every write test checks its entry:

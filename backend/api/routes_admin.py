@@ -114,7 +114,7 @@ def create_firm(body: CreateFirmBody, principal: Principal = Depends(require("fi
         raise bad_request("Another firm already uses this slug.")
     ledger.record(db, actor=admin, action="FIRM_CREATED", entity_type="firm", entity_id=firm.id, entity_label=name,
                   summary=f"Created firm on {plan.name} ({plan.seat_limit} BDE seats, {plan.candidate_limit} candidates)",
-                  firm_id=firm.id)
+                  firm_id=firm.id, candidate_id=None)
     invite, token = send_invite(db, inviter=admin, firm=firm, email=email, role="OWNER", invitee_name=owner_name,
                                 summary=f"Invited {owner_name} ({email}) as OWNER", now=now)
     try:

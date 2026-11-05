@@ -61,6 +61,11 @@ duplicate adapter, the reset pages on hooks, and one token-based count badge. Ne
 **Known local issue:** `src/mocks/db.test.ts` (fixture fingerprint) fails on this Windows checkout only, because Git
 checks the fixture JSON out with CRLF. CI (Linux) is unaffected; `.gitattributes` would fix it for Windows.
 
+**Activity logs PR 2 (2026-11-05):** `activity/pr2-ledger-rules-as-tests`. CI now fails a route that changes data and
+writes no ledger entry (unless listed in `NOT_LOGGED` with a reason), a ledger write without `candidate_id`, and a ledger
+read outside the role-limited routes. No behaviour change. Change document:
+[pr-changes/activity-pr2-ledger-rules-as-tests.md](./pr-changes/activity-pr2-ledger-rules-as-tests.md).
+
 ## 1. Notifications inbox
 
 The main sidebar's **Preferences** section gets a **Notifications** page for firm users and the Super Admin.

@@ -117,7 +117,7 @@ def reissue_reset_link(notification_id: uuid.UUID, response: Response,
     ledger.record(db, actor=actor, action="UPDATE", entity_type=LEDGER_ENTITY, entity_id=row.id,
                   entity_label=requester.name, firm_id=row.firm_id,
                   summary=f"{actor.name} created a new password reset link for {requester.name}; the previous one no "
-                          "longer works")
+                          "longer works", candidate_id=None)
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     db.commit()
