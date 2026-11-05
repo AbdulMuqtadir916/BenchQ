@@ -5,7 +5,9 @@ PENDING rows are the queue, so import/enqueue crashes are recovered by the sweep
 """
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+import logging
 import threading
+import time
 from types import SimpleNamespace
 import uuid
 
@@ -22,6 +24,7 @@ from backend.models.candidates import CandidateMailbox, InboxMessage
 from backend.models.db import Application, ApplicationReview, EmailClassification, JobRun, SessionLocal, utcnow
 from backend.models.tenancy import Firm
 
+logger = logging.getLogger("jobnavigator.inbox")
 MAX_ATTEMPTS = 3
 _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix='candidate-email')
 _WAKE_LOCK = threading.Lock()
@@ -57,6 +60,16 @@ def _add_review(db, message, app, result):
     return row
 
 
+def _log_ai_call(cfg, result, error, snapshot, duration_ms):
+    """One llm_call_log row per provider call, with the firm, as every other AI feature writes (Q33)."""
+    from backend.analyzer.llm_logger import log_llm_call
+    usage = (result.usage if result else error.usage) or {}
+    log_llm_call('email_classification', cfg.provider, cfg.model,
+                 {'input_tokens': int(usage.get('prompt_tokens', 0)), 'output_tokens': int(usage.get('completion_tokens', 0))},
+                 duration_ms=duration_ms, success=error is None,   # job_id is a job posting's: none here
+                 error=error.code if error else None, firm_id=snapshot.firm_id)
+
+
 def process_one(message_id, *, provider=None):
     if not enabled():
         return False
@@ -76,6 +89,7 @@ def process_one(message_id, *, provider=None):
             message.classification_state = 'ERROR'
             message.classification_error = 'RETRY_EXHAUSTED'
             db.commit()
+            logger.warning("Email %s classification gave up after %d attempts", message.id, message.classification_attempts)
             return False
         mailbox = _current(db, message)
         cfg = ai_config('email_classification', db=db)
@@ -99,6 +113,7 @@ def process_one(message_id, *, provider=None):
         db.commit()
     result = None
     error = None
+    called_at = None
     try:
         with SessionLocal() as db:
             # Immediate dispatch check after claim: no stale provider send after disconnect/erase/off.
@@ -109,12 +124,16 @@ def process_one(message_id, *, provider=None):
                     or config_identity(ai_config('email_classification', db=db)) != fingerprint):
                 raise DeciderError('WORK_INVALIDATED')
             subject, body = classification_text(row)
+        called_at = time.monotonic()
         result = (provider or classify)(subject, body, cfg)
     except DeciderError as exc:
         error = exc
     except Exception:
         # No exception text: it may include a key, decrypted data or provider request.
         error = DeciderError('PROCESSING_FAILED')
+    # The provider was called: count it in AI spend (Q33). A classifier that isn't set up refuses before sending.
+    if called_at is not None and not (error and error.code == 'CLASSIFIER_NOT_CONFIGURED'):
+        _log_ai_call(cfg, result, error, snapshot, int((time.monotonic() - called_at) * 1000))
     with SessionLocal() as db:
         row = scoped(db, InboxMessage, snapshot.firm_id).filter_by(id=message_id).with_for_update().first()
         job = scoped(db, JobRun, snapshot.firm_id).filter_by(id=snapshot.job_id).one()
@@ -154,6 +173,8 @@ def process_one(message_id, *, provider=None):
             row.classification_error = error.code
             job.meta = {**job.meta, 'retry_exhausted': not retry}
             db.commit()
+            logger.warning("Email %s classification failed: %s (attempt %d, %s)", message_id, error.code,
+                           row.classification_attempts, 'will retry' if retry else 'gave up')
             return False
         # Snapshot match/app revision after I/O; never trust a stale pre-call match.
         had_application_link = row.application_id is not None
@@ -193,6 +214,7 @@ def process_one(message_id, *, provider=None):
         row.classification_error = None
         row.classification_next_retry_at = None
         db.commit()
+        logger.info("Email %s classified: %s", message_id, record.outcome)
     return True
 
 
@@ -208,7 +230,10 @@ def process_pending(*, limit=20):
         ).join(CandidateMailbox, InboxMessage.mailbox_id == CandidateMailbox.id).filter(
             CandidateMailbox.status == 'CONNECTED', func.lower(func.trim(InboxMessage.source_address)) == func.lower(func.trim(CandidateMailbox.address)),
         ).order_by(InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
-    return sum(process_one(identity) for (identity,) in rows)
+    done = sum(process_one(identity) for (identity,) in rows)
+    if rows:
+        logger.info("Email classification: %d of %d pending emails classified", done, len(rows))
+    return done
 
 
 def wake_worker():

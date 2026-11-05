@@ -22,6 +22,7 @@ whose owners were told (uzair.md "For teammates (4a)"); delete an entry when its
 makes sure.
 """
 import ast
+import re
 from functools import cache
 from pathlib import Path
 
@@ -100,10 +101,7 @@ KNOWN = {
     ("analyzer/cover_letter_generator.py", "generate_cover_letter_body"): "Zuhair: raw AI reply",
     ("analyzer/cv_scorer.py", "_score_job_inner"): "Zuhair: raw AI reply",
     ("analyzer/cv_scorer.py", "analyze_unscored_jobs"): "Zuhair: a résumé's name",
-    ("api/routes_persona.py", "import_persona"): "Zuhair: an uploaded file's name",
-    ("api/routes_resumes.py", "_tailor_impl"): "Zuhair: raw AI reply",
-    ("api/routes_resumes.py", "parse_resume_pdf"): "Zuhair: raw AI reply",
-    ("api/routes_resumes.py", "export_pdf"): "Zuhair: to check, the PDF renderer's error about a résumé",
+    ("analyzer/legacy_tailoring.py", "_tailor_impl"): "Zuhair: raw AI reply (moved from routes_resumes.py)",
     ("api/routes_searches.py", "test_search"): "Zuhair: search name",
     ("scraper/orchestrator.py", "run_all"): "Zuhair: search name",
     ("scraper/orchestrator.py", "_run_search_by_id"): "Zuhair: search name",
@@ -117,6 +115,14 @@ KNOWN = {
     ("email_monitor/gmail_client.py", "check_emails"): "Samad: Google's whole reply, a sender's domain",
     ("email_monitor/response_parser.py", "classify_email_llm"): "Samad: raw AI reply",
 }
+
+
+def _fixed_values(value: ast.AST | None) -> bool:
+    """`Field(pattern='^(A|B|C)$')`: a field that can only hold one of a few words, never a name."""
+    if not (isinstance(value, ast.Call) and ast.unparse(value.func).endswith("Field")):
+        return False
+    pattern = next((k.value.value for k in value.keywords if k.arg == "pattern" and isinstance(k.value, ast.Constant)), "")
+    return bool(re.fullmatch(r"\^\([A-Z0-9_|]+\)\$", pattern))
 
 
 def _safe_attr(name: str) -> bool:
@@ -178,7 +184,7 @@ class _File:
         # Fields this file declares as a number, a flag, an id or a date (`years: int` on a body): never a name.
         self.typed_safe = {n.target.id for n in ast.walk(self.tree)
                            if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
-                           and _annotation(n.annotation) in SAFE_PARAM_TYPES}
+                           and (_annotation(n.annotation) in SAFE_PARAM_TYPES or _fixed_values(n.value))}
         self.functions = [n for n in ast.walk(self.tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
         self.by_name: dict[str, list[ast.AST]] = {}
         for fn in self.functions:
@@ -476,7 +482,11 @@ def test_the_server_never_prints():
         relative = path.relative_to(BACKEND)
         if relative.parts[0] in PRINTING_PROGRAMS | {"tests"}:
             continue
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "print":
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        # `if __name__ == "__main__":` is a command-line tool's report to whoever runs it, not the server's log.
+        main = [n for n in tree.body if isinstance(n, ast.If) and "__main__" in ast.unparse(n.test)]
+        in_main = {id(sub) for block in main for sub in ast.walk(block)}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "print"                     and id(node) not in in_main:
                 found.append(f"{relative.as_posix()}:{node.lineno}")
     assert not found, f"use logging.getLogger('jobnavigator.<area>') instead of print(): {found}"

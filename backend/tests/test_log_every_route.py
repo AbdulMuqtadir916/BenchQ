@@ -18,6 +18,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from sqlalchemy import text as sql_text
 
 import backend.main  # noqa: F401  configures logging, as the running app does
 import backend.tests.log_leak_cases as leak_cases
@@ -44,7 +45,6 @@ NOT_REACHED: dict[str, str] = {
     "POST /api/auth/sign-in": "401: Email or password is incorrect",
     "POST /api/companies/{company_id}/test-scrape": "400: No scrape URLs configured",
     "POST /api/cover-letters": "400: name is required",
-    "POST /api/cover-letters/generate": "400: Resume has no content",
     "GET /api/cover-letters/{cl_id}/pdf": "422: Unknown template: <planted>",
     "POST /api/firms/{firm_id}/candidates": "404: That résumé read has expired. Upload it again",
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": "400: Invalid email cursor",
@@ -73,13 +73,6 @@ NOT_REACHED: dict[str, str] = {
     "POST /api/notifications/{notification_id}/password-reset-link": "404: Notification not found",
     "GET /api/oauth/google/callback": "404: Not found",
     "POST /api/persona/qa-bank": "400: question and answer are required",
-    "POST /api/resumes": "400: name is required",
-    "POST /api/resumes/copy": "404: Base resume not found",
-    "POST /api/resumes/tailor": "404: Base resume not found",
-    "PATCH /api/resumes/{resume_id}": "404: Resume not found",
-    "GET /api/resumes/{resume_id}/pdf": "500: Internal Server Error",
-    "GET /api/resumes/{resume_id}/preview": "422: Unknown template: <planted>",
-    "POST /api/resumes/{resume_id}/score-check": "400: Resume has no linked job or saved job description",
     "GET /api/searches/test-result/{run_id}": "404: Test run not found",
     "POST /api/searches/{search_id}/test":
         "400: Test only supports keyword, levels_fyi, linkedin_personal, jobright, and freehire searches",
@@ -87,11 +80,17 @@ NOT_REACHED: dict[str, str] = {
     "GET /cv/{token}": "404: Link not found",
 }
 
+# "METHOD path" -> the state a seeded row needs for the route to do its work, set just before its request.
+ROUTE_STATE = {
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry":
+        {"inbox_messages": {"classification_state": "ERROR"}},
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify":
+        {"inbox_messages": {"classification_state": "DONE"}},
+}
+
 # "METHOD path" -> who was told: routes that do write planted values today (as test_log_lint.KNOWN for the code).
 # Delete an entry when its route is fixed; the test fails until then, and fails if it's fixed and still listed.
-KNOWN_LEAKS = {
-    "POST /api/persona/import": "Zuhair: the uploaded file's name (routes_persona.py import_persona)",
-}
+KNOWN_LEAKS: dict[str, str] = {}
 
 
 def _routes(app) -> list[str]:
@@ -115,6 +114,10 @@ def _send(client, app, route: str, ids: dict):
     worker.join(SECONDS)
     assert not worker.is_alive(), f"{route} didn't answer in {SECONDS}s"
     assert "error" not in result, f"{route}: {result['error']!r}"
+    # A route that wakes the email worker runs it on another thread: wait, so what it logs is checked with this route.
+    from backend.inbox import classification_worker
+    if classification_worker._FUTURE is not None:
+        classification_worker._FUTURE.result(timeout=SECONDS)
     return result["response"]
 
 
@@ -133,8 +136,11 @@ def swept(api_client, accounts, test_db, monkeypatch):
 
 
 @pytest.mark.parametrize("route", _routes(backend.main.app))
-def test_no_route_writes_planted_values_to_the_log(route, swept, api_client, log):
+def test_no_route_writes_planted_values_to_the_log(route, swept, api_client, test_db, log):
     ids, _ = swept
+    for table, values in ROUTE_STATE.get(route, {}).items():
+        test_db.execute(sql_text(f'UPDATE "{table}" SET ' + ", ".join(f"{k} = :{k}" for k in values)), values)
+    test_db.commit()
     response = _send(api_client, backend.main.app, route, ids)
     leaked = _leaked(log)
     if route in KNOWN_LEAKS:
@@ -157,8 +163,8 @@ def test_every_table_is_seeded(swept):
 
 
 def test_the_list_names_only_routes_that_exist():
-    stale = sorted(set(NOT_REACHED) - set(_routes(backend.main.app)))
-    assert not stale, f"remove these from NOT_REACHED: {stale}"
+    stale = sorted((set(NOT_REACHED) | set(KNOWN_LEAKS)) - set(_routes(backend.main.app)))
+    assert not stale, f"these routes no longer exist; remove them from NOT_REACHED or KNOWN_LEAKS: {stale}"
 
 
 # ── The check, measured against log_leak_cases.py ─────────────────────────

@@ -36,6 +36,9 @@ SEED_OVERRIDES = {
     "invites": {"invited_by_platform_user_id": None, "token_hash": "0" * 64, "email": "zorvath.invite@canary-mail.test",
                 "manager_id": None, "expires_at": LATER},
     "firm_jobs": {"origin": "CAPTURED"},
+    # An email is classified only when it came through its mailbox: the same address on both.
+    "candidate_mailboxes": {"address": "zorvath.quillane@canary-mail.test", "refresh_token_ciphertext": b"sealed"},
+    "inbox_messages": {"source_address": "zorvath.quillane@canary-mail.test"},
     "notifications": {"platform_user_id": None},
     "password_reset_requests": {"is_platform_approval": False, "approver_role": "OWNER", "decided_by_user_id": None,
                                 "decided_by_platform_user_id": None, "decided_at": None, "reset_token_hash": None,
@@ -48,7 +51,8 @@ SEED_OVERRIDES = {
 ID_ALIASES = {"app": "applications", "cl": "cover_letters", "base": "base_resumes", "message": "inbox_messages",
               "attempt": "candidate_google_oauth_attempts", "interview": "interviews", "manager": "users",
               "bde": "users", "user": "users", "owner": "users", "firm": "firms", "plan": "plans",
-              "resume": "resumes", "base_resume": "base_resumes", "notification": "notifications", "run": "job_runs"}
+              "resume": "resumes", "base_resume": "base_resumes", "notification": "notifications", "run": "job_runs",
+              "review": "application_reviews"}
 JOB_URL = "https://jobs.example.test/posting/1"
 # Values the routes check in code, not in their schema, by field name.
 FIELD_VALUES = {"role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",
@@ -439,6 +443,11 @@ def stub_outside(monkeypatch):
 
     def no_browser(*args, **kwargs):
         raise RuntimeError("the browser is off in this test")
+
+    # Features that stay off until approved (candidate email classification) are on here, so their path is checked.
+    from backend import config
+    for flag in ("CANDIDATE_EMAIL_CLASSIFICATION_ENABLED", "CANDIDATE_EMAIL_REAL_MAIL_APPROVED"):
+        monkeypatch.setattr(config, flag, True)
 
     import playwright.async_api
     monkeypatch.setattr(playwright.async_api, "async_playwright", no_browser)

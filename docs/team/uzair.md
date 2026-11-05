@@ -204,22 +204,25 @@ Python's `logging` sends every module's records up to one root logger. Each file
   about an email, which can quote the email itself. Log its length and the parse error instead. `gmail_client.py:224`
   logs Google's whole reply when listing messages fails, like `:36` above: log the status code and Google's `error`
   field.
-- **Zuhair:** three calls log up to 500 characters of the model's reply, which carries the candidate's name, phone and
-  résumé text: `backend/analyzer/cover_letter_generator.py:103` (cover letter), `backend/api/routes_resumes.py:979`
-  (tailoring) and `:1314` (PDF import). Log the reply's length and the parse error instead, as
-  `backend/candidates/parse.py:220` does. `backend/api/routes_persona.py:278` logs the uploaded file's name
-  (`pdf:{filename}`) and the résumé's name, which usually carry the person's name (`Ravi_Teja_Resume.pdf`): log the
-  kind and an id. The scrapers (`backend/scraper/orchestrator.py`, `sources/jobspy.py`, `freehire.py`, `jobright.py`,
+- **Zuhair:** two calls log up to 500 characters of the model's reply, which carries the candidate's name, phone and
+  résumé text: `backend/analyzer/cover_letter_generator.py:107` (cover letter) and
+  `backend/analyzer/legacy_tailoring.py:379` (tailoring, moved there from `routes_resumes.py`). Log the reply's length
+  and the parse error instead, as `backend/candidates/parse.py:220` does. (The PDF import and the persona import, which
+  logged a file name, were removed with `routes_resumes.py` and the persona import route, 2026-11-05.) The scrapers
+  (`backend/scraper/orchestrator.py`, `sources/jobspy.py`, `freehire.py`, `jobright.py`,
   `levelsfyi.py`, `linkedin_personal.py`, and `backend/api/routes_searches.py:328`) log `search.name`, and JobSpy the
   search term. Searches are per candidate now (0007), and a BDE may name one after the candidate ("Ravi – Java"):
   log `search.id` instead.
 - **Found by the new lint (2026-11-04):**
-  - **Zuhair:** `backend/analyzer/cv_scorer.py:417` logs the first 200 characters of the scorer's reply when its shape
-    is wrong (like the replies above: log its length); `:725` logs `job.best_cv`, a résumé's name, which a BDE may type
-    as the candidate's name (log the résumé's id); `backend/api/routes_resumes.py:1218` logs the PDF renderer's error
-    about a résumé, which may quote its content: to check.
+  - **Zuhair:** `backend/analyzer/cv_scorer.py:422` logs the first 200 characters of the scorer's reply when its shape
+    is wrong (like the replies above: log its length); `:731` logs `job.best_cv`, a résumé's name, which a BDE may type
+    as the candidate's name (log the résumé's id).
   - **Samad:** `backend/api/routes_applications.py:1226` logs a résumé's name (`cv_name`) when it can't be flattened:
     log the résumé's id.
+  - **Samad, the email classification (2026-11-05), added in #107 for your review:** `process_pending`, `purge_due`
+    and `routes_inbox.py` wrote no log line, and the classifier's AI calls weren't in `llm_call_log`. They now log ids,
+    counts and error codes (never the exception's text, as your code intended), and each provider call is in
+    `llm_call_log` with its firm. Listed in `cross-area-changes.md`; change or drop them as you see fit.
 - **Samad and Zuhair, the calls above:** each is a one-line change (log a length, a status or an id instead of the
   text). Fix them in your own PR, or agree that Uzair fixes them in a small follow-up PR after #107, listed in
   `docs/team/cross-area-changes.md`. Found in Abdul's review of #107 and a search of every log call (2026-11-03).
