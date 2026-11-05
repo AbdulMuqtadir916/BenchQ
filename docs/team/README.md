@@ -73,6 +73,12 @@ it. Everyone else reads it.
    with a contract change in `docs/02-DATA-CONTRACTS.md` that Abdul signed off.
 8. **The checks must pass:** `pnpm typecheck && pnpm lint && pnpm test`, and the backend suite (`docs/integration/
    README.md` "Commands").
+9. **Logs carry ids, counts, statuses and timings, never a person's data** (a name, email, phone, résumé or email
+   text, an AI or Google reply, a request body, a file name). Two backend checks fail the PR otherwise:
+   `test_log_lint.py` (reads the code) and `test_log_every_route.py` (runs every route with planted data). A new route
+   or job needs nothing listed; when a check fails, fix the log call, and follow the failure message for the rest. A
+   new table that holds people goes in `PEOPLE_MODELS`; a new outside service that returns people's data goes in
+   `PERSONAL_HOSTS`. Detail: [uzair.md](./uzair.md) §1, step 4a.
 
 ## 5. Where the detail lives
 
@@ -86,6 +92,7 @@ it. Everyone else reads it.
 | Résumés, tailoring, claims (D4) | `docs/integration/04-resumes-and-tailoring.md` |
 | Connecting a module to the frontend | `docs/integration/README.md` "The workflow for one module" |
 | Password recovery approvals and Notifications inbox | [umamah.md](./umamah.md) |
+| Logging, and the checks that keep it safe | [uzair.md](./uzair.md) §1, step 4a |
 | Decisions | `docs/07-ROUTES-AND-RBAC.md` §0 (Q53 is this plan) |
 
 ## 6. Migration numbers
