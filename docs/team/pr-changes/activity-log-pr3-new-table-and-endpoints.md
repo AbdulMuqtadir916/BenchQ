@@ -46,8 +46,8 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 
 ## Migration number
 
-0016, following 0014, because Zuhair's PR #112 holds 0015. If #112 merges first, set `down_revision = '0015'`;
-`test_migration_heads.py` fails until that is done. If this merges first, #112 does the same in reverse.
+0016, following Zuhair's 0015 (#112). 0015 dropped the ledger's `claim_state` and `evidence_ids`, so `activity_logs`
+doesn't have them either.
 
 ## Known limit
 

@@ -1,6 +1,6 @@
 import { FirmRole } from "./enums";
 import { z } from "zod";
-import { ApplicationStatus, CandidateStatus, ClaimState } from "./enums";
+import { ApplicationStatus, CandidateStatus } from "./enums";
 
 export const FunnelStageSchema = z.object({
   status: ApplicationStatus,
@@ -105,8 +105,6 @@ export const LedgerEntrySchema = z.object({
   note: z.string().nullable(),
   modelId: z.string().nullable(),
   promptVersion: z.string().nullable(),
-  evidenceIds: z.array(z.string()),
-  claimState: ClaimState.nullable(),
   createdAt: z.string().datetime(),
 });
 export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;

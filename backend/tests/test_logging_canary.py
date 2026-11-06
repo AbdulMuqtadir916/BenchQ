@@ -121,9 +121,11 @@ def test_creating_and_editing_a_candidate(anonymous_client, accounts, test_db, l
     manager = make_user(test_db, test_db.get(Firm, accounts.firm_id), email="manager@acme.test", role="MANAGER")
     test_db.commit()
     url = f"/api/firms/{accounts.firm_id}/candidates"
+    # Every field the create requires (the candidates final schema PR), so the create succeeds and its log is checked.
     body = {"full_name": NAME, "primary_role": "Java Developer", "email": EMAIL, "phone": PHONE, "work_auth": "H1B",
             "employment_types": ["C2C"], "manager_id": str(manager.id), "summary": RESUME,
-            "skills": [{"name": "Xylophonic", "source": "RESUME_UPLOAD"}]}
+            "country": "US", "years_experience": 8, "needs_sponsorship": True, "needs_transfer": True,
+            "target_roles": ["Java Developer"], "skills": [{"name": "Xylophonic", "family": "Canary"}]}
     created = anonymous_client.post(url, json=body, headers=_cookie(accounts.firm_token))
     assert created.status_code == 201, created.text
     cid = created.json()["id"]
