@@ -14,6 +14,7 @@ import { usePrintExport } from "./print-export";
 import { stepTemplate } from "./templates";
 import { useStudio } from "./studio-store";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { resumeFileName } from "@/lib/derive/resume-name";
 
 /** True when a key press belongs to a text field rather than to the studio. */
 function isTyping(target: EventTarget | null): boolean {
@@ -26,13 +27,13 @@ function isTyping(target: EventTarget | null): boolean {
  * gets all the room. Builder mode: section forms left, live page right.
  * Viewer mode: the page itself, editable in place.
  */
-export function ResumeStudio({ subtitle, canEdit, onClose, onSave, isSaving = false }: { subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
+export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false }: { name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
   const doc = useStudio((s) => s.doc);
   const mode = useStudio((s) => s.mode);
   const rootRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion() ?? false;
   const tailor = useTailorRun();
-  const exporter = usePrintExport(doc);
+  const exporter = usePrintExport(doc, resumeFileName(name));
   const [isConfirmingClose, setConfirmingClose] = useState(false);
   // Closing with unsaved edits asks first: a save is explicit (no autosave), so closing would lose them.
   const close = useCallback(() => (useStudio.getState().isDirty && onSave ? setConfirmingClose(true) : onClose()), [onClose, onSave]);
@@ -68,7 +69,7 @@ export function ResumeStudio({ subtitle, canEdit, onClose, onSave, isSaving = fa
       ref={rootRef}
       role="dialog"
       aria-modal="true"
-      aria-label={`${doc.name} — ${doc.fullName}`}
+      aria-label={name}
       initial={reduce ? false : { opacity: 0, scale: 0.985, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.26, ease: EASE_OUT }}
@@ -76,6 +77,7 @@ export function ResumeStudio({ subtitle, canEdit, onClose, onSave, isSaving = fa
     >
       <StudioTopbar
         doc={doc}
+        name={name}
         subtitle={subtitle}
         canEdit={canEdit}
         isTailoring={tailor.isRunning}

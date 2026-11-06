@@ -347,7 +347,11 @@ work authorization → score → rank) with real counts, then the ranked list st
 This candidate's résumés as a collapsible tree (the same component as the Resume Builder library): each **base**
 is a folder showing its versions, and the **tailored** copies made from it grouped by job. The active base starts
 open and the others closed; a hidden base sits in a "Hidden" row for the assigned BDE only. Clicking a version or a
-tailored copy opens that exact one in the studio. Above the tree, the assigned BDE has **Upload résumé** (a later
+tailored copy opens that exact one in the studio. **Names** (decided 2026-11-05, derived, never stored;
+`src/lib/derive/resume-name.ts`): a base is `<Candidate> · <Role> · Base 2` (the role is the base's newest headline up
+to its first "|", else the candidate's "Marketed as"), a version adds `· v3`, a tailored copy is
+`<Candidate> · <Company> – <Job title> · v2`, and the studio's title and its PDF file
+(`Candidate-Name_Role_Base2_v3`) use the same name. Deleting asks only "Do you want to delete <name>?". Above the tree, the assigned BDE has **Upload résumé** (a later
 résumé becomes a new base, the one in use; the same file again names the base it already is, offers a hidden one
 back, or brings a deleted one back). Row actions, by who may (07 Q55): **Use this base** (pick), **Use as base** on a
 version after v1, **Delete** on a base or a version (the backend's warning first; a base in use is hidden, and "also
@@ -447,8 +451,10 @@ A close button (and `Esc`) returns to wherever it was opened from. `?mode=view` 
 └────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Builder mode** — collapsible section forms on the left (Header, Summary, Experience, Skills,
-  Education, Certifications, Awards, Projects), live page on the right: every field of the parser's strict format
+- **Section order** (every template, the Builder form and the Viewer outline; decided 2026-11-06,
+  `src/lib/resume-doc/section-order.ts`): header, then Summary, Skills, Experience, Awards, Projects, Education,
+  Certifications. Two Column keeps contact and skills in its side column; the rest follow the order in the main one.
+- **Builder mode** — collapsible section forms on the left (Header, then the sections in that order), live page on the right: every field of the parser's strict format
   but languages (kept, never shown). The header has the name, title, email, phone, city, state, country, LinkedIn
   and GitHub; work authorization is shown read-only (the profile's fact). A job has its printed dates and its start,
   end and "current role"; projects and jobs have bullets. Rows reorder and remove in place. Enter in a bullet starts

@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useOpenedResume } from "@/lib/hooks/use-resumes";
+import { useOpenedResume, useResumeShelf } from "@/lib/hooks/use-resumes";
+import { baseNumber } from "@/lib/derive/resume-tree";
+import { baseName, roleOf, tailoredName, versionName } from "@/lib/derive/resume-name";
+import { useTreeLabels } from "@/components/app/resumes/use-tree-labels";
 import { useCandidate } from "@/lib/hooks/use-candidates";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { canChangeResume } from "@/lib/auth/permissions";
@@ -36,6 +39,9 @@ export function OpenResume({ id, initialMode }: { id: string; initialMode: Studi
   const openedQuery = useOpenedResume(id);
   const candidateId = openedQuery.data?.resume.candidateId ?? "";
   const candidateQuery = useCandidate(candidateId);
+  const shelfQuery = useResumeShelf(candidateId);
+  const shown = useMemo(() => (candidateQuery.data ? [candidateQuery.data] : []), [candidateQuery.data]);
+  const labels = useTreeLabels(shown);
   const loadedId = useStudio((s) => s.doc?.resumeId);
   const load = useStudio((s) => s.load);
   const setMode = useStudio((s) => s.setMode);
@@ -91,9 +97,17 @@ export function OpenResume({ id, initialMode }: { id: string; initialMode: Studi
   }
 
   const candidate = candidateQuery.data;
+  const opened = openedQuery.data;
+  const number = opened?.resume.baseResumeId && shelfQuery.data ? baseNumber(shelfQuery.data, opened.resume.baseResumeId) : null;
+  const versionNumber = opened?.resume.versions.find((v) => v.id === opened.versionId)?.versionNumber ?? 1;
+  // The convention (src/lib/derive/resume-name.ts); until the shelf has loaded, the document's own name.
+  const name = !opened ? "" : opened.resume.isMaster
+    ? (number ? versionName(baseName(candidate?.fullName, roleOf(opened.resume.name, candidate?.primaryRole), number), versionNumber) : opened.document.name)
+    : versionName(tailoredName(candidate?.fullName, opened.resume.targetJobId ? labels.job(opened.resume.targetJobId) : null), versionNumber);
   return (
     <>
       <ResumeStudio
+        name={name}
         subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")}
         canEdit={!!candidate && canChangeResume(principal, candidate)}
         onClose={close}

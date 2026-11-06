@@ -31,6 +31,10 @@ describe("the résumé listing", () => {
     expect(shelf.resumes.some((r) => r.baseResumeId === "5b0d8a0e-3333-4c1a-9a51-000000000003")).toBe(false);
     expect(shelf.resumes[0]!.versions[0]!.templateId).toBe("template_modern");
   });
+
+  it("names a résumé by its newest version's headline, or the backend's name when it has none", () => {
+    expect(shelf.resumes.filter((r) => r.isMaster).map((r) => r.name)).toEqual(["Java Developer", "Base"]);
+  });
 });
 
 describe("one version's text", () => {

@@ -150,6 +150,8 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
     out = {"id": str(row.id), "candidate_id": str(row.candidate_id), "base_resume_id": str(row.base_resume_id),
            "category": row.category,
            "job_id": str(row.job_id) if row.job_id else None, "version": row.version, "name": row.name,
+           # The headline, so a list can name a base by its role (`<Candidate> · <Role> · Base 2`, docs/04 §4.3).
+           "title": row.title,
            "template": row.template, "page_format": row.page_format,
            "created_by_user_id": str(row.created_by_user_id) if row.created_by_user_id else None,
            "created_at": row.created_at.isoformat() if row.created_at else None}
@@ -166,7 +168,7 @@ def base_json(base: BaseResume, number: int) -> dict:
 
 
 _LISTED = (Resume.id, Resume.candidate_id, Resume.base_resume_id, Resume.category, Resume.job_id, Resume.version,
-           Resume.name, Resume.template, Resume.page_format, Resume.created_by_user_id, Resume.created_at)
+           Resume.name, Resume.title, Resume.template, Resume.page_format, Resume.created_by_user_id, Resume.created_at)
 
 
 def listing(db, candidate) -> dict:

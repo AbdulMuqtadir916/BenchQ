@@ -35,7 +35,7 @@ export function OverviewTab({ ws, actions, canAct, onNotify }: { ws: CandidateWo
         <HandoffNote candidateId={candidate.id} />
         <TopMatches matches={matches} onFindJobs={actions.findJobs} />
         <SubmissionFacts candidate={candidate} canEdit={canAct} onSaved={() => onNotify("Submission facts updated")} />
-        <BaseResumeCard base={ws.base} />
+        <BaseResumeCard base={ws.base} onOpenResumes={() => actions.openTab("resumes")} />
       </div>
     </div>
   );

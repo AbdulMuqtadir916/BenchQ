@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ResumeRemoval } from "@/lib/schemas/resume";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { TreeBase, TreeVersion } from "@/lib/derive/resume-tree";
+import { versionName } from "@/lib/derive/resume-name";
 import { canChangeResume, canManageResume } from "@/lib/auth/permissions";
 import { useDeleteBase, useDeleteVersion, useRemovalPreview, useShowBase, useUseAsBase } from "@/lib/hooks/use-resumes";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
@@ -13,7 +14,7 @@ import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import type { TreeActions } from "./base-folder";
 
 type Pending =
-  | { kind: "base"; node: TreeBase; removal: ResumeRemoval; step: 1 | 2 }
+  | { kind: "base"; node: TreeBase; label: string; removal: ResumeRemoval; step: 1 | 2 }
   | { kind: "version"; candidateId: string; version: TreeVersion; label: string; removal: ResumeRemoval }
   | { kind: "useAsBase"; candidateId: string; version: TreeVersion; label: string };
 
@@ -45,7 +46,7 @@ export function useResumeActions(candidateById: (id: string) => Candidate | unde
       useAsBase.mutate({ candidateId: node.base.candidateId, versionId: v1.id }, { onSuccess: () => toast(`Base ${node.number} is now the base in use.`), onError: (e) => toast(failed(e)) });
     },
     onUseAsBase: (candidateId, version) => setPending({ kind: "useAsBase", candidateId, version, label: `v${version.number}` }),
-    onDeleteBase: (node) => preview.mutate({ candidateId: node.base.candidateId, baseId: node.base.id }, { onSuccess: (removal) => setPending({ kind: "base", node, removal, step: 1 }), onError: (e) => toast(failed(e)) }),
+    onDeleteBase: (node, label) => preview.mutate({ candidateId: node.base.candidateId, baseId: node.base.id }, { onSuccess: (removal) => setPending({ kind: "base", node, label, removal, step: 1 }), onError: (e) => toast(failed(e)) }),
     onDeleteVersion: (candidateId, version, label) => preview.mutate({ candidateId, versionId: version.id }, { onSuccess: (removal) => setPending({ kind: "version", candidateId, version, label, removal }), onError: (e) => toast(failed(e)) }),
     onShowBase: (node) => showBase.mutate({ candidateId: node.base.candidateId, baseId: node.base.id }, { onSuccess: () => toast(`Base ${node.number} is shown again. It isn't the base in use until you pick it.`), onError: (e) => toast(failed(e)) }),
   };
@@ -56,7 +57,7 @@ export function useResumeActions(candidateById: (id: string) => Candidate | unde
       useAsBase.mutate({ candidateId: pending.candidateId, versionId: pending.version.id }, { onSuccess: () => { close(); toast(`${pending.label} is now the base in use.`); }, onError: (e) => { close(); toast(failed(e)); } });
     } else if (pending.kind === "version") {
       if (pending.removal.outcome === "REFUSED") return close();
-      deleteVersion.mutate({ candidateId: pending.candidateId, versionId: pending.version.id }, { onSuccess: () => { close(); toast(`${pending.label} v${pending.version.number} deleted.`); }, onError: (e) => { close(); toast(failed(e)); } });
+      deleteVersion.mutate({ candidateId: pending.candidateId, versionId: pending.version.id }, { onSuccess: () => { close(); toast(`${versionName(pending.label, pending.version.number)} deleted.`); }, onError: (e) => { close(); toast(failed(e)); } });
     } else {
       const { node, removal } = pending;
       if (removal.outcome === "REFUSED") return close();
@@ -73,7 +74,8 @@ export function useResumeActions(candidateById: (id: string) => Candidate | unde
   const restWords = [rest.versions ? `${rest.versions} unused version${rest.versions === 1 ? "" : "s"}` : null, rest.tailored ? `${rest.tailored} tailored cop${rest.tailored === 1 ? "y" : "ies"} nobody sent` : null].filter(Boolean).join(" and ");
   const title = !pending ? "" : pending.kind === "useAsBase" ? `Use ${pending.label} as the base?`
     : removal?.outcome === "REFUSED" ? "Can't delete this" : pending.kind === "base" && pending.step === 2 ? "Delete them for good?"
-      : removal?.outcome === "HIDE" ? `Hide Base ${pending.kind === "base" ? pending.node.number : ""}?` : "Delete?";
+      : removal?.outcome === "HIDE" ? `Hide ${pending.kind === "base" ? pending.label : "it"}?`
+        : `Do you want to delete ${pending.kind === "base" ? pending.label : versionName(pending.label, pending.version.number)}?`;
 
   const dialogs = (
     <ConfirmDialog
@@ -87,7 +89,7 @@ export function useResumeActions(candidateById: (id: string) => Candidate | unde
       onConfirm={confirm}
     >
       {pending?.kind === "useAsBase" ? <p>It becomes a new base and the one the workflow uses: new tailoring starts from it. The current base stays as it is.</p> : null}
-      {pending?.kind === "base" && pending.step === 2 ? <p>{restWords} will be deleted. They&apos;re removed from view; the ledger keeps the record. What is in use stays.</p> : removal ? <p>{removal.message}</p> : null}
+      {pending?.kind === "base" && pending.step === 2 ? <p>{restWords} will be deleted. What is in use stays.</p> : removal && removal.outcome !== "DELETE" ? <p>{removal.message}</p> : null}
       {pending?.kind === "base" && pending.step === 1 && removal?.outcome === "HIDE" && restWords ? (
         <label className="flex items-start gap-2">
           <Checkbox checked={keepUsed} onChange={(e) => setKeepUsed(e.target.checked)} />

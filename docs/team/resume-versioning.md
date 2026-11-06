@@ -338,7 +338,8 @@ Built in PR 4 (`backend/candidates/first_base.py`):
 - **The base dropdown lists only bases** and their versions (it reads `base_resumes` and the `BASE` rows of
   `resumes`). Tailored résumés are not listed. Hidden bases and versions already promoted to a base are left out;
   history shows both. Bases are numbered in the order they were made ("Base 1, 2…"); deleting one renumbers the
-  later ones, and a hidden one keeps its place.
+  later ones, and a hidden one keeps its place. The screens name a base `<Candidate> · <Role> · Base 2` from its
+  headline (`title`, which the listing carries for that reason; docs/04 §4.3).
 - **Saving** (decided 2026-11-02):
   - The save names the version it was edited from. The new row is that résumé's next version, whatever was saved
     in between: two people saving from v2 at once get **v3 and v4**, both kept (Abdul). The second one is told:

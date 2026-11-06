@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
+import { isNotFoundError } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { RESUME_TEMPLATES } from "./templates";
 import { ResumeStudio } from "./resume-studio";
@@ -60,10 +61,11 @@ export function NewResume({ initialMode, upload }: { initialMode: StudioMode; up
   }, [start, candidate, recordQuery.data, loadedId, draftId, templateId, upload, initialMode, load]);
 
   if (loadedId === draftId) {
-    return <ResumeStudio subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")} canEdit={can(principal, "resume.edit")} onClose={close} />;
+    return <ResumeStudio name={[candidate?.fullName, "New résumé"].filter(Boolean).join(" · ")} subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")} canEdit={can(principal, "resume.edit")} onClose={close} />;
   }
 
-  const isBusy = start !== null;
+  // No Record (a candidate from the backend): the buttons open again, so "Start blank" still works.
+  const isBusy = start !== null && !(start === "record" && recordQuery.error);
   return (
     <StudioFrame onClose={close}>
       <div className="bq-card mx-auto my-6 w-[calc(100%-2rem)] max-w-2xl p-6 sm:my-10 sm:p-8">
@@ -99,15 +101,19 @@ export function NewResume({ initialMode, upload }: { initialMode: StudioMode; up
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-5">
-              <Button onClick={() => setStart("record")} disabled={isBusy}>
+              <Button onClick={() => setStart("record")} disabled={isBusy || (start === "record" && !!recordQuery.error)}>
                 <FileText size={14} aria-hidden />
-                {start === "record" ? "Reading the record…" : upload ? "Open parsed resume" : "Fill from candidate record"}
+                {start === "record" && !recordQuery.error ? "Reading the record…" : upload ? "Open parsed resume" : "Fill from candidate record"}
               </Button>
               {upload ? null : (
                 <Button variant="secondary" onClick={() => setStart("blank")} disabled={isBusy}>Start blank</Button>
               )}
             </div>
-            {recordQuery.error ? <ErrorState error={recordQuery.error} onRetry={() => void recordQuery.refetch()} /> : null}
+            {recordQuery.error && isNotFoundError(recordQuery.error) ? (
+              <p role="status" className="text-sm text-[var(--color-text-2)]">
+                There&apos;s no profile record to fill from for {candidate.fullName}. Start blank, or upload their résumé on the candidate&apos;s Résumés tab.
+              </p>
+            ) : recordQuery.error ? <ErrorState error={recordQuery.error} onRetry={() => void recordQuery.refetch()} /> : null}
           </div>
         )}
       </div>

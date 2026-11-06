@@ -395,7 +395,7 @@ button:disabled { cursor: not-allowed; }
 .rt-skill-row + .rt-skill-row { margin-top: 2px; }
 .rt-skill-cat { font-weight: 600; }
 .rt-break { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--color-paper-rule); pointer-events: none; }
-.rt-break span { position: absolute; right: 12px; top: -9px; padding: 0 6px; border-radius: var(--radius-full); background: var(--color-paper-desk); color: var(--color-paper-ink-3); font: 500 10px/16px var(--font-sans); }
+.rt-break span { position: absolute; right: 12px; top: -9px; padding: 0 6px; border-radius: var(--radius-full); background: var(--color-paper-desk); color: var(--color-text-2); font: 500 10px/16px var(--font-sans); }
 
 .rt-classic { --rt-font: var(--font-resume-garamond); --rt-size: 13.5px; --rt-size-name: 32px; --rt-name-weight: 500; --rt-align: center; --rt-contacts-justify: center; --rt-h-case: none; --rt-h-tracking: 0; --rt-size-h: 15px; --rt-size-title: 14px; --rt-size-small: 12px; }
 .rt-modern { --rt-accent: var(--color-resume-blue); --rt-h-color: var(--color-resume-blue); --rt-rule: 1.5px solid color-mix(in srgb, var(--color-resume-blue) 28%, transparent); --rt-size-name: 30px; --rt-name-weight: 700; --rt-name-tracking: -0.025em; }

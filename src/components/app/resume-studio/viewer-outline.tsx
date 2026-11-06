@@ -6,13 +6,14 @@ import { isBlank } from "@/lib/resume-doc/rich-text";
 
 const SECTIONS: Array<{ key: ResumeSectionKey; label: string; Icon: typeof IdCard }> = [
   { key: "header", label: "Header", Icon: IdCard },
+  // The page's order (src/lib/resume-doc/section-order.ts).
   { key: "summary", label: "Summary", Icon: AlignLeft },
-  { key: "experience", label: "Experience", Icon: Briefcase },
   { key: "skills", label: "Skills", Icon: Layers },
-  { key: "education", label: "Education", Icon: GraduationCap },
-  { key: "certifications", label: "Certifications", Icon: BadgeCheck },
+  { key: "experience", label: "Experience", Icon: Briefcase },
   { key: "awards", label: "Awards", Icon: Award },
   { key: "projects", label: "Projects", Icon: FolderGit2 },
+  { key: "education", label: "Education", Icon: GraduationCap },
+  { key: "certifications", label: "Certifications", Icon: BadgeCheck },
 ];
 
 function isPresent(doc: ResumeDocument, key: ResumeSectionKey): boolean {

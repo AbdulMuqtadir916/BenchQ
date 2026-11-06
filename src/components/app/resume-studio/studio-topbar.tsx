@@ -9,6 +9,8 @@ import { ModeSwitch } from "./mode-switch";
 
 interface StudioTopbarProps {
   doc: ResumeDocument;
+  /** The résumé's name by the convention (src/lib/derive/resume-name.ts). */
+  name: string;
   subtitle: string;
   canEdit: boolean;
   isTailoring: boolean;
@@ -20,7 +22,7 @@ interface StudioTopbarProps {
   onExport: () => void;
 }
 
-export function StudioTopbar({ doc, subtitle, canEdit, isTailoring, onSave, isSaving = false, onClose, onTailor, onExport }: StudioTopbarProps) {
+export function StudioTopbar({ doc, name, subtitle, canEdit, isTailoring, onSave, isSaving = false, onClose, onTailor, onExport }: StudioTopbarProps) {
   const Icon = doc.isMaster ? FileUser : FileCheck2;
 
   return (
@@ -36,10 +38,11 @@ export function StudioTopbar({ doc, subtitle, canEdit, isTailoring, onSave, isSa
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <input
-              value={doc.name}
+              value={name}
               readOnly
               aria-label="Resume name"
-              className="min-w-0 max-w-64 truncate rounded-[var(--radius-sm)] bg-transparent px-1 text-h3 text-[var(--color-text)] hover:bg-[var(--color-surface-2)] focus-visible:bg-[var(--color-surface-2)]"
+              title={name}
+              className="min-w-0 max-w-64 truncate lg:max-w-md rounded-[var(--radius-sm)] bg-transparent px-1 text-h3 text-[var(--color-text)] hover:bg-[var(--color-surface-2)] focus-visible:bg-[var(--color-surface-2)]"
             />
             <Tag tone={doc.isMaster ? "blue" : "teal"} className="hidden sm:inline-flex">{doc.isMaster ? "Base" : "Tailored"}</Tag>
           </div>

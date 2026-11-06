@@ -46,6 +46,13 @@ function versionsOf(resume: Resume): TreeVersion[] {
 
 const byCreated = (a: BaseResume, b: BaseResume) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 
+/** A base's number among its candidate's bases ("Base 2"), counted in the order they were made, hidden ones included. */
+export function baseNumber(shelf: ResumeShelf, baseId: string): number | null {
+  const base = shelf.bases.find((b) => b.id === baseId);
+  if (!base) return null;
+  return shelf.bases.filter((b) => b.candidateId === base.candidateId).sort(byCreated).findIndex((b) => b.id === baseId) + 1;
+}
+
 /** The shelf as a tree, one entry per candidate that has a base, in `candidateOrder` (others after, as found). */
 export function buildResumeTree(shelf: ResumeShelf, candidateOrder: readonly string[] = []): TreeCandidate[] {
   const own = new Map<string, Resume>();

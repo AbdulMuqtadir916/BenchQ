@@ -11,14 +11,14 @@ import type { CandidateWorkspace } from "../use-candidate-workspace";
 import { useHref } from "@/lib/routes/use-href";
 
 /** The base résumé the workflow uses: its name, newest version and how many tailored copies hang off it. */
-export function BaseResumeCard({ base }: { base: CandidateWorkspace["base"] }) {
+export function BaseResumeCard({ base, onOpenResumes }: { base: CandidateWorkspace["base"]; onOpenResumes: () => void }) {
   const toHref = useHref();
   if (!base) {
     return (
       <Card>
         <h2 className="mb-1 text-h3 text-[var(--color-text)]">Base résumé</h2>
-        <p className="text-sm text-[var(--color-text-2)]">No base résumé yet. Upload one to start.</p>
-        <Button asChild size="sm" className="mt-3"><Link href={toHref("resumes.studio", { id: "new" })}>Build résumé</Link></Button>
+        <p className="text-sm text-[var(--color-text-2)]">No base résumé yet. The candidate&apos;s BDE uploads one on the Résumés tab.</p>
+        <Button size="sm" variant="secondary" className="mt-3" onClick={onOpenResumes}>Open Résumés</Button>
       </Card>
     );
   }

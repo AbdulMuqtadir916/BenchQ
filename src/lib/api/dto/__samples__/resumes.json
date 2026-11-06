@@ -9,7 +9,7 @@
         "created_by_user_id": "dec7c04c-1552-5cb0-b081-cb4ddf9fa5dc", "created_at": "2026-11-01T10:00:00+00:00",
         "versions": [
           { "id": "6c1e9b1f-0001-4d2b-8b62-000000000001", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "category": "BASE", "job_id": null, "version": 1, "name": "Base", "template": null, "page_format": "letter", "created_by_user_id": "dec7c04c-1552-5cb0-b081-cb4ddf9fa5dc", "created_at": "2026-11-01T10:00:00+00:00", "promoted_to_base_id": null },
-          { "id": "6c1e9b1f-0002-4d2b-8b62-000000000002", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "category": "BASE", "job_id": null, "version": 2, "name": "Base", "template": "template_classic", "page_format": "letter", "created_by_user_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63", "created_at": "2026-11-02T10:00:00+00:00", "promoted_to_base_id": "5b0d8a0e-2222-4c1a-9a51-000000000002" }
+          { "id": "6c1e9b1f-0002-4d2b-8b62-000000000002", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "category": "BASE", "job_id": null, "version": 2, "name": "Base", "title": "Java Developer", "template": "template_classic", "page_format": "letter", "created_by_user_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63", "created_at": "2026-11-02T10:00:00+00:00", "promoted_to_base_id": "5b0d8a0e-2222-4c1a-9a51-000000000002" }
         ]
       },
       {

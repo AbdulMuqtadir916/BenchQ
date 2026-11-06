@@ -5,13 +5,15 @@ import { useState } from "react";
 import { ArrowUpFromLine, Briefcase, CircleCheck, ChevronRight, Eye, FileCheck2, FileUser, Trash2 } from "lucide-react";
 import type { BaseResume } from "@/lib/schemas/resume";
 import { baseSummary, type TreeBase, type TreeTailored, type TreeVersion } from "@/lib/derive/resume-tree";
+import { baseName, roleOf, tailoredName, versionName } from "@/lib/derive/resume-name";
 import { formatRelative } from "@/lib/format/timezone";
 import { useHref } from "@/lib/routes/use-href";
 import { cn } from "@/lib/cn";
 import { Tag } from "@/components/ui/tag";
 
 export interface TreeLabels {
-  jobLabel: (jobId: string) => string;
+  job: (jobId: string) => { company: string; title: string } | null;
+  candidate: (candidateId: string) => { name: string; role: string | null } | null;
   userName: (userId: string) => string | null;
 }
 
@@ -21,7 +23,7 @@ export interface TreeActions {
   canManage: (candidateId: string) => boolean;
   onPickBase: (node: TreeBase) => void;
   onUseAsBase: (candidateId: string, version: TreeVersion) => void;
-  onDeleteBase: (node: TreeBase) => void;
+  onDeleteBase: (node: TreeBase, label: string) => void;
   onDeleteVersion: (candidateId: string, version: TreeVersion, label: string) => void;
   onShowBase: (node: TreeBase) => void;
 }
@@ -57,9 +59,9 @@ function VersionRow({ version, label, labels, extra }: { version: TreeVersion; l
         <span className="tabular font-[550]">v{version.number}</span>
         {version.isLatest ? <Tag tone="green">Latest</Tag> : null}
         <span className="truncate text-caption text-[var(--color-text-2)]">{[by ? `by ${by}` : null, formatRelative(version.createdAt)].filter(Boolean).join(" · ")}</span>
-        <span className="sr-only">{label}</span>
+        <span className="sr-only">{versionName(label, version.number)}</span>
       </Link>
-      <Link href={toHref("resumes.studio", { id: version.id }, { mode: "view" })} aria-label={`View ${label} v${version.number}`}
+      <Link href={toHref("resumes.studio", { id: version.id }, { mode: "view" })} aria-label={`View ${versionName(label, version.number)}`}
         className="bq-secondary inline-flex h-7 shrink-0 items-center gap-1 rounded-[var(--radius-md)] px-2 text-caption">
         <Eye size={12} aria-hidden />View
       </Link>
@@ -70,7 +72,7 @@ function VersionRow({ version, label, labels, extra }: { version: TreeVersion; l
 
 function TailoredRow({ item, labels, actions, candidateId }: { item: TreeTailored; labels: TreeLabels; actions?: TreeActions; candidateId: string }) {
   const [isOpen, setOpen] = useState(false);
-  const job = labels.jobLabel(item.jobId);
+  const job = tailoredName(labels.candidate(candidateId)?.name, labels.job(item.jobId));
   const bodyId = `tailored-${item.resume.id}`;
   return (
     <li>
@@ -82,8 +84,8 @@ function TailoredRow({ item, labels, actions, candidateId }: { item: TreeTailore
       {isOpen ? (
         <ul id={bodyId} className="ml-6 border-l border-[var(--color-border)] pl-2">
           {item.versions.map((v) => (
-            <VersionRow key={v.id} version={v} label={`Tailored for ${job}`} labels={labels}
-              extra={actions?.canManage(candidateId) ? <IconAction label={`Delete tailored v${v.number}`} tone="danger" onClick={() => actions.onDeleteVersion(candidateId, v, `Tailored for ${job}`)}><Trash2 size={13} aria-hidden /></IconAction> : null} />
+            <VersionRow key={v.id} version={v} label={job} labels={labels}
+              extra={actions?.canManage(candidateId) ? <IconAction label={`Delete ${versionName(job, v.number)}`} tone="danger" onClick={() => actions.onDeleteVersion(candidateId, v, job)}><Trash2 size={13} aria-hidden /></IconAction> : null} />
           ))}
         </ul>
       ) : null}
@@ -95,9 +97,9 @@ function TailoredRow({ item, labels, actions, candidateId }: { item: TreeTailore
 export function BaseFolder({ node, labels, showTailored, defaultOpen = false, actions }: { node: TreeBase; labels: TreeLabels; showTailored: boolean; defaultOpen?: boolean; actions?: TreeActions }) {
   const [isOpen, setOpen] = useState(defaultOpen);
   const bodyId = `base-${node.base.id}`;
-  const name = node.resume?.name;
-  const title = `Base ${node.number}`;
   const cid = node.base.candidateId;
+  const who = labels.candidate(cid);
+  const title = baseName(who?.name, roleOf(node.resume?.name, who?.role), node.number);
   const canChange = !!actions?.canChange(cid);
   const canManage = !!actions?.canManage(cid);
   const isHidden = !!node.base.archivedAt;
@@ -108,8 +110,7 @@ export function BaseFolder({ node, labels, showTailored, defaultOpen = false, ac
         <FileUser size={15} aria-hidden className="shrink-0 text-[var(--color-primary-subtle-fg)]" />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-body-strong text-[var(--color-text)]">{title}</span>
-            {name && name !== "Base" ? <span className="truncate text-sm text-[var(--color-text-2)]">{name}</span> : null}
+            <span className="min-w-0 truncate text-body-strong text-[var(--color-text)]">{title}</span>
             {node.base.isActive ? <Tag tone="blue">Active</Tag> : null}
             {node.base.archivedAt ? <Tag>Hidden</Tag> : null}
             <Tag>{SOURCE[node.base.source]}</Tag>
@@ -119,7 +120,7 @@ export function BaseFolder({ node, labels, showTailored, defaultOpen = false, ac
       </Disclosure>
       {canChange && !node.base.isActive && !isHidden ? <IconAction label={`Use ${title} as the base in use`} onClick={() => actions!.onPickBase(node)}><CircleCheck size={14} aria-hidden /></IconAction> : null}
       {canManage && isHidden ? <IconAction label={`Show ${title} again`} onClick={() => actions!.onShowBase(node)}><Eye size={14} aria-hidden /></IconAction> : null}
-      {canManage && !node.base.isActive && !isHidden ? <IconAction label={`Delete ${title}`} tone="danger" onClick={() => actions!.onDeleteBase(node)}><Trash2 size={14} aria-hidden /></IconAction> : null}
+      {canManage && !node.base.isActive && !isHidden ? <IconAction label={`Delete ${title}`} tone="danger" onClick={() => actions!.onDeleteBase(node, title)}><Trash2 size={14} aria-hidden /></IconAction> : null}
       </div>
       {isOpen ? (
         <div id={bodyId} className="space-y-2 px-2 pb-2">
@@ -129,8 +130,8 @@ export function BaseFolder({ node, labels, showTailored, defaultOpen = false, ac
               <ul>{node.versions.map((v) => (
                 <VersionRow key={v.id} version={v} label={title} labels={labels} extra={
                   <>
-                    {canChange && v.number > 1 && !isHidden ? <IconAction label={`Use ${title} v${v.number} as the base`} onClick={() => actions!.onUseAsBase(cid, v)}><ArrowUpFromLine size={13} aria-hidden /></IconAction> : null}
-                    {canManage && v.number > 1 ? <IconAction label={`Delete ${title} v${v.number}`} tone="danger" onClick={() => actions!.onDeleteVersion(cid, v, title)}><Trash2 size={13} aria-hidden /></IconAction> : null}
+                    {canChange && v.number > 1 && !isHidden ? <IconAction label={`Use ${versionName(title, v.number)} as the base`} onClick={() => actions!.onUseAsBase(cid, v)}><ArrowUpFromLine size={13} aria-hidden /></IconAction> : null}
+                    {canManage && v.number > 1 ? <IconAction label={`Delete ${versionName(title, v.number)}`} tone="danger" onClick={() => actions!.onDeleteVersion(cid, v, title)}><Trash2 size={13} aria-hidden /></IconAction> : null}
                   </>
                 } />
               ))}</ul>

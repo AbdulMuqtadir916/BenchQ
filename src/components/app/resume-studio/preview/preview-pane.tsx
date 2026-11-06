@@ -80,7 +80,7 @@ export function PreviewPane({ doc, editable = false, aside }: { doc: ResumeDocum
 
       <AnimatePresence initial={false}>{galleryOpen ? <TemplateGallery doc={doc} /> : null}</AnimatePresence>
 
-      <div ref={deskRef} className="rs-desk min-h-0 flex-1 overflow-auto" data-studio-desk="">
+      <div ref={deskRef} className="rs-desk min-h-0 flex-1 overflow-auto" data-studio-desk="" role="region" aria-label="Résumé preview" tabIndex={0}>
         <div className="flex min-w-fit justify-center px-8 py-8">
           <div style={{ zoom: scale }}>
             <ResumePaper doc={doc} editable={editable} reportPages />

@@ -40,6 +40,7 @@ def test_the_list_holds_every_candidate_in_scope_with_their_bases_and_no_content
     [v1] = base["versions"]
     assert (v1["version"], v1["category"], v1["candidate_id"], v1["base_resume_id"]) == (1, "BASE", adnans["id"], base["id"])
     assert "summary" not in v1 and "experiences" not in v1                    # the list never carries content
+    assert "title" in v1                                                      # only the headline, to name the base
     assert shelf["tailored"] == []
 
 

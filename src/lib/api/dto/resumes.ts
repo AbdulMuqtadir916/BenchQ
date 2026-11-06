@@ -23,6 +23,8 @@ const VersionDto = z.object({
   job_id: z.string().nullable(),
   version: z.number().int(),
   name: z.string(),
+  /** The version's headline (the role it's written for). Older backends don't send it. */
+  title: z.string().nullable().optional(),
   template: z.string().nullable(),
   created_by_user_id: z.string().nullable(),
   created_at: z.string(),
@@ -94,7 +96,8 @@ function toResume(firmId: string, rows: VersionDto[], baseId: string, jobId: str
   const latest = [...rows].sort((a, b) => b.version - a.version)[0];
   return {
     id, firmId, candidateId: fromBackendId(rows[0]?.candidate_id ?? ""), baseResumeId: fromBackendId(baseId),
-    name: latest?.name ?? "Base", isMaster: !jobId, targetJobId: jobId ? fromBackendId(jobId) : null,
+    // The backend names every row "Base"; the newest version's headline is the role the résumé is named by.
+    name: latest?.title?.trim() || latest?.name || "Base", isMaster: !jobId, targetJobId: jobId ? fromBackendId(jobId) : null,
     templateId: latest?.template ?? DEFAULT_TEMPLATE, versions, latestVersionId: versions.at(-1)?.id ?? "",
   };
 }

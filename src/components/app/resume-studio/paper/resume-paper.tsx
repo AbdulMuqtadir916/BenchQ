@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { cn } from "@/lib/cn";
+import { SECTION_ORDER, type OrderedSection } from "@/lib/resume-doc/section-order";
 import { templateById } from "../templates";
 import { useStudio } from "../studio-store";
 import { PaperContacts, PaperName } from "./paper-header";
@@ -16,6 +17,24 @@ interface ResumePaperProps {
   reportPages?: boolean;
   templateId?: string;
   className?: string;
+}
+
+const PAPER_SECTION: Record<OrderedSection, (props: { doc: ResumeDocument; editable: boolean }) => React.ReactNode> = {
+  summary: PaperSummary,
+  skills: PaperSkills,
+  experience: PaperExperience,
+  awards: PaperAwards,
+  projects: PaperProjects,
+  education: PaperEducation,
+  certifications: PaperCertifications,
+};
+
+/** The sections in SECTION_ORDER, leaving out any the template places elsewhere. */
+function Sections({ doc, editable, skip = [] }: { doc: ResumeDocument; editable: boolean; skip?: readonly OrderedSection[] }) {
+  return SECTION_ORDER.filter((key) => !skip.includes(key)).map((key) => {
+    const Section = PAPER_SECTION[key];
+    return <Section key={key} doc={doc} editable={editable} />;
+  });
 }
 
 /** A US Letter page rendered in the chosen template, with page-break guides. */
@@ -61,16 +80,12 @@ export function ResumePaper({ doc, editable = false, reportPages = false, templa
               <h2 className="rt-h">Contact</h2>
               <PaperContacts {...blocks} />
             </section>
+            {/* Skills, second in the order, sits beside the summary; the rest follow the order in the main column. */}
             <PaperSkills {...blocks} />
-            <PaperEducation {...blocks} />
-            <PaperCertifications {...blocks} />
-            <PaperAwards {...blocks} />
           </aside>
           <div>
             <PaperName {...blocks} />
-            <PaperSummary {...blocks} />
-            <PaperExperience {...blocks} />
-            <PaperProjects {...blocks} />
+            <Sections {...blocks} skip={["skills"]} />
           </div>
         </div>
       ) : (
@@ -78,13 +93,7 @@ export function ResumePaper({ doc, editable = false, reportPages = false, templa
           <PaperName {...blocks}>
             <PaperContacts {...blocks} />
           </PaperName>
-          <PaperSummary {...blocks} />
-          <PaperExperience {...blocks} />
-          <PaperSkills {...blocks} />
-          <PaperEducation {...blocks} />
-          <PaperCertifications {...blocks} />
-          <PaperAwards {...blocks} />
-          <PaperProjects {...blocks} />
+          <Sections {...blocks} />
         </div>
       )}
       {Array.from({ length: metrics.pages - 1 }, (_, i) => (
