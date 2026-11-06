@@ -74,8 +74,11 @@ export const LedgerEntrySchema = z.object({
   /** The candidate the entry is about, and the name they have now. Absent on the Super Admin's audit. */
   candidateId: z.string().nullable().optional(),
   candidateName: z.string().nullable().optional(),
+  /** The actor's role when the entry was written; an AI agent has its person's, the system none. */
+  actorRole: z.enum([...FirmRole.options, "PLATFORM_ADMIN"]).nullable().optional(),
   /** The person an AI agent worked for: its action counts towards them. */
   onBehalfOfUserId: z.string().nullable().optional(),
+  onBehalfOfName: z.string().nullable().optional(),
   action: z.enum([
     "CREATE",
     "UPDATE",
