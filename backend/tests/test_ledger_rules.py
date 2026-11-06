@@ -33,14 +33,8 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_cover_letters.py", "update_cover_letter"): TO_LOG,
     ("api/routes_cover_letters.py", "delete_cover_letter"): TO_LOG,
     ("api/routes_cover_letters.py", "generate_cover_letter"): TO_LOG,
-    ("api/routes_jobs.py", "linkedin_import"): TO_LOG,
-    ("api/routes_jobs.py", "save_from_extension"): TO_LOG,
-    ("api/routes_jobs.py", "create_manual_job"): TO_LOG,
-    ("api/routes_jobs.py", "bulk_update_jobs"): TO_LOG,
-    ("api/routes_jobs.py", "update_job"): TO_LOG,
     ("api/routes_persona.py", "update_persona"): PERSONA_REMOVED,
     ("api/routes_persona.py", "append_qa_bank"): PERSONA_REMOVED,
-    ("main.py", "trigger_analysis"): TO_LOG,
 
     ("api/routes_inbox.py", "sync_candidate_inbox"): NO_READ_ENTRIES,
     ("api/routes_inbox.py", "mark_candidate_message_read"): NO_READ_ENTRIES,
@@ -63,6 +57,7 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_companies.py", "backfill_h1b_jobs"): REFERENCE_DATA,
     ("api/routes_companies.py", "test_scrape_company"): REFERENCE_DATA,
 
+    ("api/routes_jobs.py", "linkedin_import"): NOT_FIRM_ACTIVITY,
     ("api/routes_linkedin.py", "session_refresh"): NOT_FIRM_ACTIVITY,
     ("api/routes_linkedin.py", "session_pin"): NOT_FIRM_ACTIVITY,
     ("api/routes_searches.py", "create_search"): NOT_FIRM_ACTIVITY,
