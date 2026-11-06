@@ -22,12 +22,13 @@ export interface ManagerRow {
 
 export type Rail =
   | { level: "own"; me: LedgerPerson | null }
-  | { level: "firm"; managers: ManagerRow[]; you: LedgerPerson | null; unassigned: LedgerPerson[]; former: LedgerPerson[]; total: number }
+  | { level: "firm"; owner: LedgerPerson | null; managers: ManagerRow[]; you: LedgerPerson | null; unassigned: LedgerPerson[]; former: LedgerPerson[]; total: number }
   | { level: "team"; manager: LedgerPerson; bdes: LedgerPerson[]; former: LedgerPerson[]; actions: number; isOwnTeam: boolean };
 
 // These sort rows into the list's groups; they decide nothing about access, which the backend has already applied.
 const isManagerRow = (person: LedgerPerson) => person.role === "MANAGER";
 const isBdeRow = (person: LedgerPerson) => person.role === "BDE";
+const isOwnerRow = (person: LedgerPerson) => person.role === "OWNER";
 
 const firstName = (name: string) => name.split(" ")[0];
 const byActions = (a: ManagerRow, b: ManagerRow) => b.actions - a.actions || a.person.name.localeCompare(b.person.name);
@@ -69,10 +70,12 @@ export function buildRail(people: LedgerPerson[], viewer: Viewer, selection: Sel
       return { person, bdes: bdes.length, actions: person.actions + bdes.reduce((sum, bde) => sum + bde.actions, 0) };
     })
     .sort(byActions);
+  const owner = people.find((person) => isOwnerRow(person) && !person.isFormer) ?? null;
   return {
     level: "firm",
+    owner,
     managers,
-    you: people.find((person) => person.userId === viewer.userId) ?? null,
+    you: viewer.userId === owner?.userId ? null : people.find((person) => person.userId === viewer.userId) ?? null,
     unassigned: people.filter((person) => isBdeRow(person) && !person.isFormer && person.managerId === null),
     former: people.filter((person) => person.isFormer),
     total,
@@ -104,6 +107,11 @@ export function viewSubtitle(rail: Rail, viewer: Viewer, selection: Selection, p
   if (person) return `Every action ${person.name} took, by hand or through an AI agent they started. ${immutable}`;
   if (rail.level === "team") return `Every action by this team, as it was when each one happened. ${immutable}`;
   return `Every action across the firm, by people, AI agents and the system. Choose a manager to see their team. ${immutable}`;
+}
+
+/** What the owner's row says under their name. */
+export function ownerRowLabel(owner: LedgerPerson, viewer: Viewer): string {
+  return owner.userId === viewer.userId ? "Your actions" : "Owner";
 }
 
 /** What a manager's row says under their name: never "own", which reads as the owner's. */

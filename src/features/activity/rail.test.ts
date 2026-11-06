@@ -31,10 +31,17 @@ describe("the people list", () => {
   it("starts an owner at the firm: managers busiest first, with their team's actions", () => {
     const rail = firmRail(buildRail(people, owner, {}, 30));
     expect(rail.managers.map((row) => [row.person.userId, row.bdes, row.actions])).toEqual([["zed", 1, 10], ["mira", 2, 6]]);
-    expect(rail.you?.userId).toBe("owner");
+    expect(rail.owner?.userId).toBe("owner");
+    expect(rail.you).toBeNull();
     expect(rail.unassigned.map((row) => row.userId)).toEqual(["nia"]);
     expect(rail.former.map((row) => row.userId)).toEqual(["old"]);
     expect(rail.total).toBe(30);
+  });
+
+  it("shows a Viewer the owner at the top, and themself under You", () => {
+    const rail = firmRail(buildRail(people, { userId: "viewer", scope: "firm" }, {}, 30));
+    expect(rail.owner?.userId).toBe("owner");
+    expect(rail.you?.userId).toBe("viewer");
   });
 
   it("opening a manager hides the other managers", () => {

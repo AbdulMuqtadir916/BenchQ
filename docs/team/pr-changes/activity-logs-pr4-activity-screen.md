@@ -3,6 +3,11 @@
 Branch: `activity-logs/pr4-activity-screen` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 Built on PR 3 (`activity-log/pr3-new-table-and-endpoints`), which holds PR 1 and PR 2. Merge those first.
 
+## People list at the firm level
+
+The owner sits just under Whole firm, and the managers are indented under the owner, the same way BDEs sit under their
+manager. A Viewer or a support view sees the same order. A Viewer's own row stays under "You".
+
 ## Actor column
 
 The Actor column shows the person's name with their role below it in small, light text, such as "(Manager)". The
