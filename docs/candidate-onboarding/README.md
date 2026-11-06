@@ -119,7 +119,7 @@ tailored claim can point back to the original résumé text as evidence.
 |---|---|
 | A1 | The "Try a sample" résumés on step 1 appear only when the module runs on mocks (demo). |
 | A2 | A new candidate starts `ON_BENCH`, `benchStartDate` = creation time. |
-| A3 | `needsSponsorship` and `needsTransfer` are derived from the work authorization card (H-1B → transfer; H-1B, H4 EAD, OPT, CPT, TN → sponsorship). The screen has no separate checkboxes. Provisional (Q50). |
+| A3 | `needsSponsorship` and `needsTransfer` are derived from the work authorization card (H-1B → transfer; H-1B, H4 EAD, OPT, CPT, TN → sponsorship). The screen has no separate checkboxes. The flow works them out and sends them; the backend only checks they were sent (decided 2026-11-05). |
 | A4 | "Works N similar profiles" on step 5 = the BDE's candidates in a working status whose "Marketed as" matches, ignoring case. |
 | A5 | "New assignments" on the BDE dashboard = candidates whose latest `ASSIGN` entry names this BDE and is under 7 days old. |
 | A6 | The done screen's "Find jobs" opens `/[firm]/jobs` filtered to the new candidate (an existing URL filter). |

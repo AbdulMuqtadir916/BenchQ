@@ -1,6 +1,6 @@
 """A candidate's wire shape: the frontend's `CandidateSchema` (src/lib/schemas/candidate.ts) in snake_case, mapped by
-src/lib/api/dto/candidates.ts (onboarding module 07). Skills and the summary's state are sent for Track 04's Record;
-the frontend's candidate doesn't read them yet."""
+src/lib/api/dto/candidates.ts (onboarding module 07). The skills and the summary are the active base
+résumé's, not the candidate's (migration 0015)."""
 from datetime import datetime
 from decimal import Decimal
 
@@ -29,7 +29,7 @@ def candidate_json(c: Candidate) -> dict:
         "notice_period_days": c.notice_period_days, "years_experience": _number(c.years_experience),
         "primary_role": c.primary_role, "target_roles": list(c.target_roles or []),
         "work_settings": list(c.work_settings or []), "preferred_locations": list(c.preferred_locations or []),
-        "contact_notes": c.contact_notes, "persona": c.persona, "qa_bank": c.qa_bank or [],
-        "skills": c.skills or [], "summary_state": c.summary_state,
+        "contact_notes": c.contact_notes, "preferred_industries": list(c.preferred_industries or []),
+        "deal_breakers": list(c.deal_breakers or []), "qa_bank": c.qa_bank or [],
         "created_at": _iso(c.created_at), "updated_at": _iso(c.updated_at),
     }

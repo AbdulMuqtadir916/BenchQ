@@ -16,8 +16,8 @@ describe("the backend candidate → Candidate", () => {
     expect(assigned!.bdeId).toMatch(/^user_/);
   });
 
-  it("maps the nested persona and answers, and timestamps to UTC ISO", () => {
-    expect(assigned!.persona).toMatchObject({ willRelocate: false, preferredIndustries: ["any"], dealBreakers: [] });
+  it("maps the preferences and answers, and timestamps to UTC ISO", () => {
+    expect(assigned).toMatchObject({ preferredIndustries: ["any"], dealBreakers: [] });
     expect(assigned!.qaBank[0]).toMatchObject({ useCount: 3, state: "VERIFIED", evidenceId: "ev_cand_06_qa_0" });
     expect(assigned!.createdAt).toBe("2026-09-26T06:17:52.966Z");
   });

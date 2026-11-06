@@ -33,7 +33,7 @@ def test_audit_lists_platform_and_firm_entries_newest_first(api_client, accounts
     test_db.commit()
     entries = api_client.get("/api/admin/audit").json()
     assert [(e["action"], e["firm_id"]) for e in entries[:2]] == [("CREATE", None), ("LOGIN", str(accounts.firm_id))]
-    assert entries[0]["evidence_ids"] == [] and entries[0]["actor_user_id"] is None
+    assert "claim_state" not in entries[0] and entries[0]["actor_user_id"] is None
     assert len(api_client.get("/api/admin/audit", params={"limit": 1}).json()) == 1
 
 

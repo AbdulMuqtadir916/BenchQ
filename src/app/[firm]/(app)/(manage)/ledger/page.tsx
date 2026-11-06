@@ -12,7 +12,6 @@ import { PageHeader } from "@/components/app/page-header";
 import { DataTable } from "@/components/app/data-table";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { ActionTag, ActorTag } from "@/components/app/ledger-tags";
-import { ClaimChip } from "@/components/app/claim-chip";
 
 export default function LedgerPage() {
   const principal = useSignedInPrincipal();
@@ -68,13 +67,6 @@ export default function LedgerPage() {
             {row.original.modelId ? <span className="text-caption text-[var(--color-text-3)]">{row.original.modelId} · {row.original.promptVersion}</span> : null}
           </div>
         ),
-      },
-      {
-        id: "claim",
-        accessorFn: (e) => e.claimState ?? "",
-        header: "Claim",
-        enableSorting: false,
-        cell: ({ row }) => (row.original.claimState ? <ClaimChip state={row.original.claimState} /> : <span className="text-[var(--color-text-3)]">—</span>),
       },
     ],
     [],
