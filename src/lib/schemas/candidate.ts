@@ -89,9 +89,11 @@ export const CandidateStatsSchema = z.object({
 });
 export type CandidateStats = z.infer<typeof CandidateStatsSchema>;
 
-/** The submission facts a BDE edits from the candidate Overview. */
+/** The submission facts a BDE edits from the candidate Overview. A new `workAuth` comes with the sponsorship and transfer it implies. */
 export const UpdateCandidateSchema = CandidateSchema.pick({
   workAuth: true,
+  needsSponsorship: true,
+  needsTransfer: true,
   workAuthExpiry: true,
   rateTarget: true,
   rateMin: true,

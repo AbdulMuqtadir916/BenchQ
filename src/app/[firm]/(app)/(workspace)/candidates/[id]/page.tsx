@@ -44,6 +44,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const { access } = useRouteAccess();
   const updateStatus = useUpdateApplicationStatus();
   const canAct = can(principal, "candidate.edit");
+  const canEditProfile = can(principal, "candidate.editProfile");
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
@@ -128,10 +129,10 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         ref={tabsRef}
         value={tab}
         onChange={setTab}
-        counts={{ applications: ws.stats?.applicationsSubmitted, resumes: ws.resumes.length, documents: ws.documentsQuery.data?.length }}
+        counts={{ applications: ws.stats?.applicationsSubmitted, resumes: ws.realResumes.length, documents: ws.documentsQuery.data?.length }}
         alerts={{ overview: ws.suggestions.length + ws.upcoming.length > 0, inbox: ws.unread > 0, documents: ws.expiringDocuments.length > 0 }}
         // Upload sits on the tab bar's line; with no résumé yet, the tab's empty state offers it instead.
-        trailing={tab === "resumes" && canAct && canManageResume(principal, candidate) && (ws.shelfQuery.data?.bases.length ?? 0) > 0
+        trailing={tab === "resumes" && canAct && canManageResume(principal, candidate) && (ws.shelfQuery.data?.bases.some((b) => b.hasResume) ?? false)
           ? <UploadResume candidateId={candidate.id} /> : null}
       />
 
@@ -146,7 +147,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
           exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
           transition={{ duration: 0.18, ease: EASE_OUT }}
         >
-          {tab === "overview" ? <OverviewTab ws={ws} actions={actions} canAct={canAct} onNotify={setToast} /> : null}
+          {tab === "overview" ? <OverviewTab ws={ws} actions={actions} canAct={canAct} canEditProfile={canEditProfile} onNotify={setToast} /> : null}
           {tab === "applications" ? <ApplicationsTab ws={ws} actions={actions} canAct={canAct} onMove={moveApplication} /> : null}
           {tab === "inbox" ? <InboxTab ws={ws} actions={actions} canAct={canAct} selectedId={selectedMessageId} onSelect={setSelectedMessageId} /> : null}
           {tab === "jobs" ? (

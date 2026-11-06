@@ -28,6 +28,8 @@ def make_version(db, firm_id, *, candidate=None, candidate_name=None, category="
                           created_by_user_id=candidate.created_by_user_id)
         db.add(base)
         db.flush()
+    # The candidate's name lives in the résumé (07 Q57): a version without one carries the candidate's.
+    content = {**content, "full_name": content.get("full_name") or candidate_name or candidate.full_name}
     row = Resume(firm_id=firm_id, candidate_id=candidate.id, base_resume_id=base.id, category=category,
                  job_id=job_id, version=version, name=name, created_by_user_id=candidate.created_by_user_id,
                  **({"id": id} if id is not None else {}), **content)

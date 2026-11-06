@@ -39,7 +39,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 | `summary-card.tsx` | Initials avatar, name ("New candidate" until set), "Marketed as" ("Role not set"), chips (work auth, engagement types, years), Location, Email, Résumé (file name), **Assigned BDE** (Q48). Below it, the step list with states. |
 | `use-wizard.ts` | State with `useReducer`, in memory only (no drafts, Q48): values, which fields were drafted from the résumé, current step, dirty flag. |
 | `step-resume.tsx`, `step-basic.tsx`, `step-work-rate.tsx`, `step-preferences.tsx` | One per step (§3). |
-| `tag-input.tsx` | Chips with "Press Enter or comma to add", suggestion chips "+ Java", remove with Backspace or ×. Used for skills, target roles, locations, industries, deal breakers. |
+| `tag-input.tsx` | Chips: only Enter (or the Add button) adds, so a comma is text ("Columbus, OH" is one chip); click a chip, or Backspace in an empty box, to edit it; remove with ×; suggestion chips "+ Java". Used for skills, target roles, locations, industries, deal breakers. |
 | `drafted-marker.tsx` | "Drafted from résumé" marker on a field (§4). |
 
 - The current step is in the URL, `?step=resume|basic|work|preferences|assign`, parsed with Zod (CLAUDE.md: tabs live in

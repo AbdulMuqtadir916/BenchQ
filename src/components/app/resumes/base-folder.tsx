@@ -113,7 +113,7 @@ export function BaseFolder({ node, labels, showTailored, defaultOpen = false, ac
             <span className="min-w-0 truncate text-body-strong text-[var(--color-text)]">{title}</span>
             {node.base.isActive ? <Tag tone="blue">Active</Tag> : null}
             {node.base.archivedAt ? <Tag>Hidden</Tag> : null}
-            <Tag>{SOURCE[node.base.source]}</Tag>
+            <Tag>{(node.base.hasResume ? SOURCE[node.base.source] : "No résumé yet")}</Tag>
           </span>
           <span className="block text-caption text-[var(--color-text-2)]">{baseSummary(node)}</span>
         </span>

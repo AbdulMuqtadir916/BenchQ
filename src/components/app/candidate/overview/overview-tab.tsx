@@ -15,7 +15,7 @@ import { BaseResumeCard, TopMatches } from "./side-cards";
  * Overview: attention first (what to do now), then the pipeline and recruiter
  * news (where things stand), with the submission facts always to hand.
  */
-export function OverviewTab({ ws, actions, canAct, onNotify }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; onNotify: (message: string) => void }) {
+export function OverviewTab({ ws, actions, canAct, canEditProfile, onNotify }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; /** 07 Q56: the OWNER and MANAGER edit the profile. */ canEditProfile: boolean; onNotify: (message: string) => void }) {
   const candidate = ws.candidate!;
   const matches = useMemo(
     () => rankJobsForCandidate(candidate, ws.jobsQuery.data ?? [], new Set(ws.applications.map((a) => a.jobId)), 3),
@@ -34,7 +34,7 @@ export function OverviewTab({ ws, actions, canAct, onNotify }: { ws: CandidateWo
       <div className="space-y-5">
         <HandoffNote candidateId={candidate.id} />
         <TopMatches matches={matches} onFindJobs={actions.findJobs} />
-        <SubmissionFacts candidate={candidate} canEdit={canAct} onSaved={() => onNotify("Submission facts updated")} />
+        <SubmissionFacts candidate={candidate} canEdit={canEditProfile} onSaved={() => onNotify("Submission facts updated")} />
         <BaseResumeCard base={ws.base} onOpenResumes={() => actions.openTab("resumes")} />
       </div>
     </div>

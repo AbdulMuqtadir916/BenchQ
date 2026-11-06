@@ -180,7 +180,7 @@ export const candidatesMock = firmScoped("candidates", {
     if (moved.length > 0) changed("candidates");
     return mockResult(moved.length);
   },
-}, { create: "candidate.create", update: "candidate.edit", reassign: "candidate.assign", parseResume: "candidate.create", followBde: "member.changeManager" });
+}, { create: "candidate.create", update: "candidate.editProfile", reassign: "candidate.assign", parseResume: "candidate.create", followBde: "member.changeManager" });
 
 /** The sample résumés the mock parser knows, for step 1's "Try a sample" (README assumption A1: mocks only). */
 export const SAMPLE_RESUME_NAMES: readonly string[] = resumeParses.map((item) => item.file_name);

@@ -307,7 +307,7 @@ the parse for the rest. `resume_parses.parse` keeps the AI's original untouched.
 
 | From the form (corrected) | From the parse |
 |---|---|
-| name, title, email, phone, LinkedIn, city, state, work authorization, summary, skills | country, GitHub, work experience, projects, education, certifications, awards, languages |
+| name, title, email, phone, LinkedIn, city, state, country, work authorization, summary, skills | GitHub, work experience, projects, education, certifications, awards, languages |
 
 No résumé uploaded (`resume_parse_id` null) → no base is created; one can be added later.
 

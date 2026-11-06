@@ -30,6 +30,7 @@ from backend.auth.scoping import own_scope, scoped, team_scope
 from backend.auth.sessions import Principal
 from backend.candidates.first_base import first_base
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
+from backend.candidates import profile
 from backend.candidates.serialize import candidate_json
 from backend.models.candidates import (EMPLOYMENT_TYPES, REMOTE_MODES, WORK_AUTHS, WORKING_STATUSES, Candidate,
                                        ResumeParse)
@@ -214,7 +215,9 @@ async def parse_resume(firm_id: uuid.UUID, file: UploadFile = File(...),
 def list_candidates(firm_id: uuid.UUID, principal: Principal = Depends(current_principal),
                     db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
-    return [candidate_json(c) for c in _visible(db, firm_id, principal).order_by(Candidate.created_at.desc())]
+    rows = _visible(db, firm_id, principal).order_by(Candidate.created_at.desc()).all()
+    profile.prime(db, firm_id, rows)            # the résumé's fields for the whole list in one query (07 Q57)
+    return [candidate_json(c) for c in rows]
 
 
 @router.get("/{candidate_id}", summary="One candidate, if in the principal's scope")
@@ -290,7 +293,8 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
 
 @router.patch("/{candidate_id}", summary="Edit a candidate's submission facts")
 def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCandidateBody,
-                     principal: Principal = Depends(require("candidate.edit")), db: DbSession = Depends(get_db)):
+                     principal: Principal = Depends(require("candidate.editProfile")), db: DbSession = Depends(get_db)):
+    """07 Q56: the owner and the candidate's manager edit the profile; the BDE edits only the résumés (Q55)."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     changes = body.model_dump(exclude_unset=True)

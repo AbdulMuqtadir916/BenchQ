@@ -108,4 +108,5 @@ it. Everyone else reads it.
 | 0014 | Samad | Candidate email classification | Merged #111 |
 | 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, no `OTHER` work authorization, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
 | 0016 | Zuhair | `firms.truth_guard_mode` and its CHECK dropped (claim-era setting; no claim states) | `integrate/resumes` |
-| 0017+ | — | Claim the next number here in your PR | — |
+| 0017 | Zuhair | The résumé's fields leave `candidates` (`full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`; 07 Q57): a MANUAL base for every candidate without one, empty header fields filled, then the drop | `integrate/resumes` |
+| 0018+ | — | Claim the next number here in your PR | — |

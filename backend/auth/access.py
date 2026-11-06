@@ -80,7 +80,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates": F,                    # in the principal's scope (07 Q47)
     "POST /api/firms/{firm_id}/candidates": F,                   # OWNER, MANAGER: candidate.create + can_assign_to
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": F,
-    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": F,   # candidate.edit, in scope
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": F,   # candidate.editProfile (07 Q56), in scope
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": F,   # candidate.assign + can_assign_to (Q43)
     # A candidate's résumé versions and bases (résumé versioning PR 5): reads in the candidate's scope; writes by
     # can_change_resume / can_manage_resume (07 Q55)

@@ -36,6 +36,7 @@ const BaseDto = z.object({
   candidate_id: z.string(),
   number: z.number().int(),
   source: z.enum(["UPLOAD", "PROMOTED", "MANUAL"]),
+  has_resume: z.boolean().optional(),
   is_active: z.boolean(),
   promoted_from_resume_id: z.string().nullable(),
   archived_at: z.string().nullable(),
@@ -105,7 +106,7 @@ function toResume(firmId: string, rows: VersionDto[], baseId: string, jobId: str
 /** The listing → bases and résumé groups. A base with no versions left lists no résumé. */
 export function toResumeShelf(dto: ResumeShelfDto, firmId: string): ResumeShelf {
   const bases: BaseResume[] = dto.bases.map((b) => ({
-    id: fromBackendId(b.id), firmId, candidateId: fromBackendId(b.candidate_id), source: b.source, isActive: b.is_active,
+    id: fromBackendId(b.id), firmId, candidateId: fromBackendId(b.candidate_id), source: b.source, hasResume: b.has_resume ?? b.source !== "MANUAL", isActive: b.is_active,
     createdByUserId: fromBackendId(b.created_by_user_id), createdAt: toIso(b.created_at),
     promotedFromResumeId: b.promoted_from_resume_id ? fromBackendId(b.promoted_from_resume_id) : null,
     archivedAt: toIsoOrNull(b.archived_at),

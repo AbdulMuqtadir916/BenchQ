@@ -149,7 +149,8 @@ export function toBackendCreateCandidate(body: CreateCandidate) {
 /** `UpdateCandidate` → UpdateCandidateBody: only the fields being changed (the backend reads unset as "leave it"). */
 export function toBackendUpdateCandidate(patch: UpdateCandidate) {
   const names: Record<keyof UpdateCandidate, string> = {
-    workAuth: "work_auth", workAuthExpiry: "work_auth_expiry", rateTarget: "rate_target", rateMin: "rate_min",
+    workAuth: "work_auth", needsSponsorship: "needs_sponsorship", needsTransfer: "needs_transfer",
+    workAuthExpiry: "work_auth_expiry", rateTarget: "rate_target", rateMin: "rate_min",
     availableFrom: "available_from", noticePeriodDays: "notice_period_days", willingToRelocate: "willing_to_relocate",
     employmentTypes: "employment_types",
   };

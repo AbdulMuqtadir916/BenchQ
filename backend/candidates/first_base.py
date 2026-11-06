@@ -54,7 +54,7 @@ def _form_header(candidate, body, header) -> dict:
     """The form, as the person corrected it, for what it holds."""
     return dict(
         full_name=candidate.full_name, title=candidate.primary_role, email=candidate.email, phone=candidate.phone,
-        linkedin=candidate.linkedin_url, city=candidate.city, state=candidate.state,
+        linkedin=candidate.linkedin_url, city=candidate.city, state=candidate.state, country=candidate.country,
         work_authorization=WORK_AUTH_LABEL.get(body.work_auth) or _text(header.get("work_authorization")) or None,
         summary=(body.summary or "").strip() or None,
         skills=[{"id": _id(), "category": _text(s.family), "name": s.name.strip()} for s in body.skills if s.name.strip()],
@@ -67,7 +67,7 @@ def _parse_header(candidate, parse, header) -> dict:
         full_name=_text(header.get("name")) or candidate.full_name, title=_text(header.get("title")) or None,
         email=_text(header.get("email")) or None, phone=_text(header.get("phone")) or None,
         linkedin=_text(header.get("linkedin")) or None, city=_text(header.get("city")) or None,
-        state=_text(header.get("state")) or None,
+        state=_text(header.get("state")) or None, country=_text(header.get("country")) or None,
         work_authorization=_text(header.get("work_authorization")) or None,
         summary=_text(parse.get("professional_summary")) or None,
         skills=[{"id": _id(), "category": _text(group.get("category")), "name": name}
@@ -92,7 +92,7 @@ def first_base(parse_row, candidate, body, created_by_user_id) -> tuple[BaseResu
         category="BASE", version=1, created_by_user_id=created_by_user_id,
         **(_form_header(candidate, body, header) if body is not None else _parse_header(candidate, parse, header)),
         # The parse, for what the form doesn't hold.
-        country=_text(header.get("country")) or None, github=_text(header.get("github")) or None,
+        github=_text(header.get("github")) or None,
         experiences=[{"id": _id(), **{k: _text(r.get(k)) for k in ("job_title", "company", "location", "dates", "start",
                                                                     "end")},
                       "current": bool(r.get("current")), "bullets": _bullets(r.get("bullets"))}

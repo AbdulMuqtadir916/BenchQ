@@ -1358,6 +1358,8 @@ export const BaseResumeSchema = z.object({
   createdAt: z.string().datetime(),
   promotedFromResumeId: z.string().nullable(), // PROMOTED: the version it was copied from (left out of the dropdown)
   archivedAt: z.string().datetime().nullable(), // set while hidden (a used base the BDE deleted); null otherwise
+  hasResume: z.boolean(),   // a file or a version is a résumé; a base made from the form alone (MANUAL) isn't until a
+                            // later version adds experience, education, summary or skills (2026-11-06, PR 7; the backend's has_resume)
 });
 
 // src/lib/schemas/resume.ts — what a résumé list reads (PR 7): the bases and their résumés
@@ -1573,9 +1575,11 @@ an `ApplicationEvent` — the same write the kanban makes.
 
 ### 9.z Candidate submission facts
 
-`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — a partial of `workAuth`, `workAuthExpiry`,
-`rateTarget`, `rateMin`, `availableFrom`, `noticePeriodDays`, `willingToRelocate`,
-`employmentTypes`, sent to `PATCH /api/candidates/:id`.
+`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — a partial of `workAuth`, `needsSponsorship`, `needsTransfer`,
+`workAuthExpiry`, `rateTarget`, `rateMin`, `availableFrom`, `noticePeriodDays`, `willingToRelocate`,
+`employmentTypes`, sent to `PATCH /api/firms/{firm}/candidates/{id}`. A changed `workAuth` is sent with
+`needsSponsorship` and `needsTransfer` worked out by the same rule as the new-candidate flow (`workAuthChange` in
+`src/lib/constants/work-auth.ts`); the backend refuses a new `work_auth` without both.
 
 `CreateCandidate` (`src/lib/schemas/candidate.ts`, Phase B fix PR 1) — the New candidate form (docs/04 §4.2),
 sent to `POST /api/candidates`: `fullName`, `primaryRole`, `email`, `phone`, `workAuth`, `needsSponsorship`,

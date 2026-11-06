@@ -158,8 +158,12 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
     return {**out, **content_of(row)} if with_content else out
 
 
-def base_json(base: BaseResume, number: int) -> dict:
+def base_json(base: BaseResume, number: int, has_resume: bool | None = None) -> dict:
+    """`has_resume`: whether the base is a résumé yet. A file (UPLOAD) or a version (PROMOTED) is; a base made from the
+    New candidate form alone (MANUAL) becomes one when the BDE saves a version after v1 with résumé content
+    (`listing_many` works it out; elsewhere a MANUAL base counts as not yet)."""
     return {"id": str(base.id), "candidate_id": str(base.candidate_id), "number": number, "source": base.source,
+            "has_resume": (base.source != "MANUAL") if has_resume is None else has_resume,
             "is_active": base.is_active,
             "resume_parse_id": str(base.resume_parse_id) if base.resume_parse_id else None,
             "promoted_from_resume_id": str(base.promoted_from_resume_id) if base.promoted_from_resume_id else None,
@@ -209,8 +213,19 @@ def listing_many(db, firm_id, candidate_ids) -> dict:
             by_base.setdefault(row.base_resume_id, []).append(entry(row))
         else:
             tailored.setdefault((row.candidate_id, row.base_resume_id, row.job_id), []).append(entry(row))
+    # A form-only base is a résumé once a later version holds résumé content (experience, education, summary, skills).
+    manual = [b.id for b in bases if b.source == "MANUAL"]
+    with_content: set = set()
+    if manual:
+        later = scoped(db, Resume, firm_id).filter(Resume.base_resume_id.in_(manual), Resume.category == "BASE",
+                                                   Resume.version > 1, Resume.deleted_at.is_(None)) \
+            .options(load_only(Resume.base_resume_id, Resume.summary, Resume.skills, Resume.experiences,
+                               Resume.educations)).all()
+        with_content = {r.base_resume_id for r in later
+                        if (r.summary or "").strip() or r.skills or r.experiences or r.educations}
     for base in bases:
-        out[base.candidate_id]["bases"].append({**base_json(base, numbers[base.id]),
+        out[base.candidate_id]["bases"].append({**base_json(base, numbers[base.id],
+                                                            base.source != "MANUAL" or base.id in with_content),
                                                 "versions": by_base.get(base.id, [])})
     for (cid, b, j), v in tailored.items():
         out[cid]["tailored"].append({"candidate_id": str(cid), "base_resume_id": str(b), "job_id": str(j), "versions": v})
@@ -274,7 +289,9 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     else:                                                       # (deleted ones included: they come back, see below)
         target = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.promoted_from_resume_id == row.id).first()
     if target is not None and target.deleted_at is not None:
-        return restore_base(db, actor, candidate, target)       # promoted before, deleted since: it comes back
+        # Promoted before, deleted since: it comes back, named by the version it was made from.
+        how = f"by using Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version} again"
+        return restore_base(db, actor, candidate, target, how=how)
     if target is not None:
         if target.archived_at is not None:
             raise HTTPException(status_code=409, detail=f"Base {numbers[target.id]} is hidden. Show it again first.")
@@ -312,9 +329,10 @@ def deleted_base_for(db, candidate, parse_row: ResumeParse) -> BaseResume | None
                                                             BaseResume.deleted_at.isnot(None)).first()
 
 
-def restore_base(db, actor: User, candidate, base: BaseResume) -> BaseResume:
+def restore_base(db, actor: User, candidate, base: BaseResume, how: str = "from the same file") -> BaseResume:
     """A deleted base back, from what was stored: no new read of the file, no AI. Only its v1 (the file's own content)
-    comes back; later edits stay deleted. It becomes the base the workflow uses, as any upload does (§4.7)."""
+    comes back; later edits stay deleted. It becomes the base the workflow uses, as any upload does (§4.7). `how` says
+    what brought it back for the ledger: the same file uploaded again, or the version it was promoted from used again."""
     base.deleted_at = None
     base.archived_at = None
     db.flush()
@@ -325,7 +343,7 @@ def restore_base(db, actor: User, candidate, base: BaseResume) -> BaseResume:
     db.flush()
     number = base_numbers(db, candidate)[base.id]
     _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number),
-            f"Restored Base {number} (its v1) from the same file; the workflow uses it")
+            f"Restored Base {number} (its v1) {how}; the workflow uses it")
     return base
 
 

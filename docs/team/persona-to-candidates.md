@@ -19,7 +19,7 @@ For everyone on the team. Decided 2026-11-05 (Abdul).
 
 | Kind | Columns |
 |---|---|
-| Who and where | `full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`, `willing_to_relocate` |
+| Who and where | `willing_to_relocate`. Name, email, phone, LinkedIn, city, state and country are the résumé's since 0017 (07 Q57): read from the active base's newest version (`backend/candidates/profile.py`, or `candidate.full_name` and the others in Python) |
 | Work authorization | `work_auth` (`H1B`, `H4_EAD`, `OPT`, `CPT`, `GC`, `GC_EAD`, `USC`, `TN`; no `OTHER` since 0015), `work_auth_expiry`, `needs_sponsorship`, `needs_transfer` |
 | Work and pay | `employment_types` (C2C, W2, 1099, FTE), `rate_min`, `rate_target` |
 | Availability | `status`, `bench_start_date`, `available_from`, `notice_period_days` |
@@ -42,8 +42,8 @@ résumé, and a row's content is never updated: an edit inserts the next `versio
 **`base_resumes`** (Zuhair's table): a candidate's bases. `is_active` marks the one in use. `deleted_at` and
 `archived_at` mark one that is gone or hidden.
 
-**When a fact is in both** (contact details, work authorization), `candidates` is the truth. A résumé header can
-differ, and the studio shows the candidate's work authorization read-only.
+**Contact details and location are only in the résumé** (07 Q57). Work authorization is in both: `candidates.work_auth`
+(the code) is the truth, and the studio shows it read-only.
 
 ## 3. Suggested mapping
 
@@ -68,8 +68,8 @@ saved answer matches.
 
 | Answer key | New source |
 |---|---|
-| `first_name`, `last_name` | `candidates.full_name`, split at the first space (first word / the rest); `full_name` is the column itself |
-| `email`, `phone`, `city`, `state`, `country`, `linkedin` | `candidates.email`, `phone`, `city`, `state`, `country`, `linkedin_url` |
+| `first_name`, `last_name` | the résumé version's `full_name`, split at the first space (first word / the rest) |
+| `email`, `phone`, `city`, `state`, `country`, `linkedin` | the résumé version's `email`, `phone`, `city`, `state`, `country`, `linkedin` (07 Q57: not on `candidates` since 0017) |
 | `github` | the résumé version's `github` (`candidates` has none) |
 | `current_company` | the résumé version's `experiences`: the first entry with `current: true` |
 | `portfolio` | no source |

@@ -27,8 +27,8 @@ from sqlalchemy import or_
 from backend.auth.passwords import hash_password
 from backend.auth.tokens import hash_token, new_token
 from backend.config import IS_PRODUCTION
-from backend.models.db import SessionLocal, utcnow
-from backend.models.candidates import Candidate, ResumeParse
+from backend.models.db import SessionLocal, utcnow, Resume
+from backend.models.candidates import BaseResume, Candidate, ResumeParse
 from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, Session, User
 
 DEMO_PASSWORD = "benchq-demo-2026"                                     # docs/03 §3.2
@@ -76,6 +76,11 @@ def reset(db) -> None:
         .delete(synchronize_session=False)
     db.query(LedgerEntry).filter(or_(LedgerEntry.firm_id.in_(firm_ids), LedgerEntry.actor_user_id.in_(user_ids))) \
         .delete(synchronize_session=False)
+    # Their résumés first (a base's versions, then the bases): the candidates' names live there (07 Q57).
+    db.query(BaseResume).filter(BaseResume.firm_id.in_(firm_ids)).update({BaseResume.promoted_from_resume_id: None},
+                                                                          synchronize_session=False)
+    db.query(Resume).filter(Resume.firm_id.in_(firm_ids)).delete(synchronize_session=False)
+    db.query(BaseResume).filter(BaseResume.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(ResumeParse).filter(ResumeParse.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Candidate).filter(Candidate.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Invite).filter(or_(Invite.id.in_(fixture_ids["invites"]), Invite.firm_id.in_(firm_ids))) \
@@ -165,7 +170,9 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             accepted_at=created + timedelta(hours=1) if i["status"] == "ACCEPTED" else None,
             revoked_at=created + timedelta(hours=1) if i["status"] == "REVOKED" else None)
     for c in _load("candidates.json"):
-        added["candidates"] += _add_missing(db, Candidate, demo_id(c["id"]), **_candidate_fields(c))
+        if _add_missing(db, Candidate, demo_id(c["id"]), **_candidate_fields(c)):
+            added["candidates"] += 1
+            _form_base(db, db.get(Candidate, demo_id(c["id"])), c)
     return added
 
 
@@ -180,6 +187,19 @@ def _snake_keys(value):
     if isinstance(value, dict):
         return {_snake(k): _snake_keys(v) for k, v in value.items()}
     return value
+
+
+def _form_base(db, candidate, c: dict) -> None:
+    """The demo candidate's base, as for a candidate added without a file: a MANUAL base whose v1 holds the name,
+    contact details and location (07 Q57: those live in the résumé, not on `candidates`)."""
+    from types import SimpleNamespace
+    from backend.candidates.first_base import first_base
+    base, version = first_base(None, candidate, SimpleNamespace(work_auth=c["workAuth"], summary="", skills=[]),
+                               demo_id(c["managerId"]))
+    db.add(base)
+    db.flush()
+    db.add(version)
+    db.flush()
 
 
 def _candidate_fields(c: dict) -> dict:

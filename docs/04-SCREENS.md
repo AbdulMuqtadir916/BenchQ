@@ -311,8 +311,8 @@ stage the pipeline hasn't caught up with (one-click *Move to …*), follow-ups d
 *Show more*; resolving one animates it out. Then **Pipeline** (current count per stage, animated
 bars, each row opens the board) and **Latest from recruiters** (four newest emails, or the connect
 prompt). Right: **Submission facts** (work authorization + validity, rate and floor, availability
-and notice, employment types, relocation, target roles — editable in place, the rate floor can't
-exceed the target), **Base résumé** (its name, newest version and how many tailored copies hang off it, with *Open*), **Best new matches**.
+and notice, employment types, relocation, target roles — editable in place by the OWNER and the candidate's MANAGER,
+not the BDE (07 Q56); the rate floor can't exceed the target), **Base résumé** (its name, newest version and how many tailored copies hang off it, with *Open*), **Best new matches**.
 
 #### Applications
 Toolbar: *Active / All* and *Board / List*, plus a one-line summary. When emails suggest updates, a

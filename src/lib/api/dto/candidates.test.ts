@@ -42,6 +42,11 @@ describe("bodies sent to the backend", () => {
     expect(toBackendUpdateCandidate({ rateTarget: 90, employmentTypes: ["C2C"] })).toEqual({ rate_target: 90, employment_types: ["C2C"] });
   });
 
+  it("update: a new work authorization goes with its sponsorship and transfer (the backend refuses it alone)", () => {
+    expect(toBackendUpdateCandidate({ workAuth: "GC", needsSponsorship: false, needsTransfer: false })).toEqual({
+      work_auth: "GC", needs_sponsorship: false, needs_transfer: false });
+  });
+
   it("assign: the queue is a null BDE", () => {
     expect(toBackendAssign({ managerId: "user_priya", bdeId: null, note: null })).toEqual({ manager_id: toBackendId("user_priya"), bde_id: null, note: null });
   });

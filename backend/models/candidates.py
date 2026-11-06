@@ -46,13 +46,8 @@ class Candidate(Base):
     bde_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True)         # null = "Needs a BDE" (Q42)
     created_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
 
-    full_name = Column(String, nullable=False)
-    email = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
-    linkedin_url = Column(String, nullable=True)
-    city = Column(String, nullable=True)
-    state = Column(String, nullable=True)
-    country = Column(String, nullable=False, server_default=text("'US'"))
+    # 07 Q57 (migration 0017): name, email, phone, LinkedIn, city, state and country are the résumé's, read from the
+    # active base's newest version (backend/candidates/profile.py). See `_resume_field` below the class.
     willing_to_relocate = Column(Boolean, nullable=False, server_default=text("false"))
 
     work_auth = Column(String, nullable=False)
@@ -105,6 +100,28 @@ class Candidate(Base):
         Index("ix_candidates_firm_bde", "firm_id", "bde_id"),
     )
 
+
+
+def _resume_field(name: str) -> property:
+    """`Candidate.<name>` reads the résumé (07 Q57). Set on a new candidate (the create route, the seed), the value is
+    held on the object until its first base's v1 is written from it; it is never stored on `candidates`."""
+    def get(self):
+        pending = self.__dict__.get("_pending_header", {})
+        if name in pending:
+            return pending[name]
+        header = self.__dict__.get("_resume_header")
+        if header is None:
+            from backend.candidates.profile import load
+            header = self.__dict__["_resume_header"] = load(self)
+        return header.get(name)
+
+    def put(self, value):
+        self.__dict__.setdefault("_pending_header", {})[name] = value
+    return property(get, put)
+
+
+for _field in ("full_name", "email", "phone", "linkedin_url", "city", "state", "country"):
+    setattr(Candidate, _field, _resume_field(_field))
 
 class ResumeParse(Base):
     """A résumé read for a candidate: the file and the parser's answer. For a new candidate (06 §4, decided 2026-10-27)

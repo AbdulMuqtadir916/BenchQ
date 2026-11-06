@@ -48,7 +48,7 @@ export function shelfOf(resumes: readonly Resume[]): ResumeShelf {
   const ids = new Set(resumes.map((r) => r.baseResumeId).filter((id): id is string => !!id));
   const rows = [...ids].map((id) => bases.get(id)).filter((b): b is BaseRow => !!b && !b.deleted);
   return {
-    bases: rows.map((b) => ({ id: b.id, firmId: b.firmId, candidateId: b.candidateId, source: b.source, isActive: active.get(b.candidateId) === b.id, createdByUserId: b.createdByUserId, createdAt: b.createdAt, promotedFromResumeId: b.promotedFromResumeId, archivedAt: b.archivedAt })),
+    bases: rows.map((b) => ({ id: b.id, firmId: b.firmId, candidateId: b.candidateId, source: b.source, hasResume: b.source !== "MANUAL" || resumes.some((r) => r.baseResumeId === b.id && r.versions.length > 1), isActive: active.get(b.candidateId) === b.id, createdByUserId: b.createdByUserId, createdAt: b.createdAt, promotedFromResumeId: b.promotedFromResumeId, archivedAt: b.archivedAt })),
     resumes: shown,
   };
 }

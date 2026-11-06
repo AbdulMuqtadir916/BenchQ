@@ -1,5 +1,7 @@
 "use client";
 
+import { Info } from "lucide-react";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { EASE_OUT } from "@/lib/motion";
@@ -27,7 +29,7 @@ function isTyping(target: EventTarget | null): boolean {
  * gets all the room. Builder mode: section forms left, live page right.
  * Viewer mode: the page itself, editable in place.
  */
-export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false }: { name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
+export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false, notice }: { name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean; /** One line under the top bar (e.g. a base made without a résumé file). */ notice?: string | null }) {
   const doc = useStudio((s) => s.doc);
   const mode = useStudio((s) => s.mode);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -87,6 +89,12 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
         onTailor={tailor.start}
         onExport={exporter.print}
       />
+      {notice ? (
+        <p role="note" className="flex items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-info-bg)] px-4 py-2 text-sm text-[var(--color-info-fg)]">
+          <Info size={14} aria-hidden className="shrink-0" />
+          {notice}
+        </p>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         {mode === "build" ? (

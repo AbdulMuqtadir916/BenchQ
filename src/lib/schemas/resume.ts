@@ -103,6 +103,9 @@ export const BaseResumeSchema = z.object({
   firmId: z.string(),
   candidateId: z.string(),
   source: z.enum(["UPLOAD", "PROMOTED", "MANUAL"]),
+  /** Whether the base is a résumé yet: a file or a version is; a base made from the New candidate form alone isn't until
+   *  a later version adds résumé content (the backend's `has_resume`). */
+  hasResume: z.boolean().default(true),
   isActive: z.boolean(),
   createdByUserId: z.string(),
   createdAt: z.string().datetime(),

@@ -369,6 +369,24 @@ def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_
     assert picked["is_active"]
 
 
+def test_a_base_made_from_the_form_is_not_a_resume_until_a_later_version_adds_resume_content(anonymous_client, world):
+    """No file → a MANUAL base from the form, which isn't a résumé yet; a saved version with content makes it one."""
+    c = _create(anonymous_client, world, bde="adnan", summary="", skills=[]).json()      # no résumé file
+    [base] = _listing(anonymous_client, world, c)["bases"]
+    assert (base["source"], base["has_resume"]) == ("MANUAL", False)
+    v1 = _v(anonymous_client, world, c)
+    assert _save(anonymous_client, world, c, v1, "adnan", phone="+1 555 0199").status_code == 201
+    assert _listing(anonymous_client, world, c)["bases"][0]["has_resume"] is False     # a header fix isn't a résumé
+    v2 = _v(anonymous_client, world, c, version=2, who="adnan")
+    assert _save(anonymous_client, world, c, v2, "adnan", summary="Nine years of Java.").status_code == 201
+    assert _listing(anonymous_client, world, c)["bases"][0]["has_resume"] is True
+
+
+def test_an_uploaded_base_is_a_resume(anonymous_client, test_db, world):
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")
+    assert _listing(anonymous_client, world, c)["bases"][0]["has_resume"] is True
+
+
 def test_picking_a_version_whose_promoted_base_was_deleted_brings_that_base_back(anonymous_client, test_db, world):
     from backend.models.candidates import BaseResume
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
@@ -382,6 +400,9 @@ def test_picking_a_version_whose_promoted_base_was_deleted_brings_that_base_back
     again = anonymous_client.post(_url(world, c, f"/{v2['id']}/use-as-base"), headers=as_bde)
     assert again.status_code == 200 and again.json()["id"] == base2["id"] and again.json()["is_active"]
     assert len(_listing(anonymous_client, world, c)["bases"]) == 2            # no third copy: the same base is back
+    from backend.models.tenancy import LedgerEntry
+    last = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == base2["id"]).order_by(LedgerEntry.created_at.desc()).first()
+    assert last.summary == "Restored Base 2 (its v1) by using Base 1 v2 again; the workflow uses it"   # not "the same file"
 
 
 # ── Races: forced at the same time, with the candidate row held by another session ──────────────────────────

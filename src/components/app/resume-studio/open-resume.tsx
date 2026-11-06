@@ -104,9 +104,12 @@ export function OpenResume({ id, initialMode }: { id: string; initialMode: Studi
   const name = !opened ? "" : opened.resume.isMaster
     ? (number ? versionName(baseName(candidate?.fullName, roleOf(opened.resume.name, candidate?.primaryRole), number), versionNumber) : opened.document.name)
     : versionName(tailoredName(candidate?.fullName, opened.resume.targetJobId ? labels.job(opened.resume.targetJobId) : null), versionNumber);
+  // A base made from the New candidate form alone (no file): say so, or the near-empty page reads as broken.
+  const isFromForm = !!opened?.resume.isMaster && shelfQuery.data?.bases.find((b) => b.id === opened.resume.baseResumeId)?.hasResume === false;
   return (
     <>
       <ResumeStudio
+        notice={isFromForm ? "No résumé file was uploaded for this candidate. This base holds what the New candidate form had." : null}
         name={name}
         subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")}
         canEdit={!!candidate && canChangeResume(principal, candidate)}

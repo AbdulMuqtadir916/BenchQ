@@ -115,7 +115,7 @@ def test_a_candidate_without_a_resume_file_gets_a_manual_base_from_the_form(anon
     (v1,) = test_db.query(Resume).filter(Resume.base_resume_id == base.id).all()
     assert (v1.category, v1.version, v1.full_name, v1.title, v1.email) == ("BASE", 1, "Ravi Teja", "Java Developer",
                                                                             "ravi@example.com")
-    assert (v1.summary, v1.city, v1.state, v1.country, v1.github) == ("Nine years of Java.", "Dallas", "TX", None, None)
+    assert (v1.summary, v1.city, v1.state, v1.country, v1.github) == ("Nine years of Java.", "Dallas", "TX", "US", None)
     assert v1.summary_id and [s["name"] for s in v1.skills] == ["Java"] and v1.skills[0]["id"]
     assert v1.experiences == [] and v1.educations == [] and v1.projects == []
 
@@ -179,7 +179,7 @@ def test_sponsorship_and_transfer_are_stored_as_sent_whatever_the_work_authoriza
 def test_a_new_work_authorization_in_an_edit_must_carry_both_values(anonymous_client, world):
     c = _create(anonymous_client, world, work_auth="GC", needs_sponsorship=False, needs_transfer=False, bde="adnan").json()
     url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
-    mine = world["as"]["adnan"]
+    mine = world["as"]["fatima"]                 # the candidate's manager (07 Q56: the profile isn't the BDE's)
     r = anonymous_client.patch(url, json={"work_auth": "H1B"}, headers=mine)
     assert r.status_code == 400 and "needs_sponsorship and needs_transfer" in r.json()["detail"]
     r = anonymous_client.patch(url, json={"work_auth": "H1B", "needs_sponsorship": True}, headers=mine)
@@ -286,15 +286,19 @@ def test_an_unchanged_assignment_writes_nothing(anonymous_client, test_db, world
 
 # ── Editing ──────────────────────────────────────────────────────────────────
 
-def test_a_bde_edits_the_facts_of_their_own_candidate(anonymous_client, world):
+def test_the_owner_and_manager_edit_the_profile_and_the_bde_does_not(anonymous_client, world):
+    """07 Q56: the profile (submission facts) is the owner's and the candidate's manager's; the BDE edits résumés."""
     mine = _create(anonymous_client, world, bde="adnan").json()
     theirs = _create(anonymous_client, world, manager="priya", bde="vikram").json()
     url = f"/api/firms/{world['firm'].id}/candidates"
-    r = anonymous_client.patch(f"{url}/{mine['id']}", json={"rate_target": 85, "rate_min": 70}, headers=world["as"]["adnan"])
+    r = anonymous_client.patch(f"{url}/{mine['id']}", json={"rate_target": 85, "rate_min": 70}, headers=world["as"]["fatima"])
     assert (r.status_code, r.json()["rate_target"]) == (200, 85.0)
     assert anonymous_client.patch(f"{url}/{mine['id']}", json={"rate_min": 90},
-                                  headers=world["as"]["adnan"]).status_code == 400
+                                  headers=world["as"]["fatima"]).status_code == 400
     assert anonymous_client.patch(f"{url}/{theirs['id']}", json={"rate_target": 85},
-                                  headers=world["as"]["adnan"]).status_code == 404
-    assert anonymous_client.patch(f"{url}/{mine['id']}", json={"rate_target": 85},
-                                  headers=world["as"]["rohan"]).status_code == 403
+                                  headers=world["as"]["fatima"]).status_code == 404     # another manager's candidate
+    assert anonymous_client.patch(f"{url}/{theirs['id']}", json={"rate_target": 86},
+                                  headers=world["as"]["owner"]).status_code == 200      # the owner: every candidate
+    for who in ("adnan", "rohan"):                                                     # the BDE, the viewer
+        assert anonymous_client.patch(f"{url}/{mine['id']}", json={"rate_target": 85},
+                                      headers=world["as"][who]).status_code == 403

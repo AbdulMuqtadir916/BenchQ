@@ -26,7 +26,7 @@ describe("buildResumeTree", () => {
 
   it("orders candidates as asked, and an empty shelf is no tree", () => {
     const mock = arrayOf(ResumeSchema).parse(resumesSeed);
-    const bases = mock.filter((r) => r.isMaster).map((r) => ({ id: r.baseResumeId!, firmId: r.firmId, candidateId: r.candidateId, source: "UPLOAD" as const, isActive: true, createdByUserId: "u", createdAt: "2026-01-01T00:00:00.000Z", promotedFromResumeId: null, archivedAt: null }));
+    const bases = mock.filter((r) => r.isMaster).map((r) => ({ id: r.baseResumeId!, firmId: r.firmId, candidateId: r.candidateId, source: "UPLOAD" as const, hasResume: true, isActive: true, createdByUserId: "u", createdAt: "2026-01-01T00:00:00.000Z", promotedFromResumeId: null, archivedAt: null }));
     const tree = buildResumeTree({ bases, resumes: mock }, ["cand_02", "cand_01"]);
     expect(tree.slice(0, 2).map((t) => t.candidateId)).toEqual(["cand_02", "cand_01"]);
     expect(tree.every((t) => t.bases.length === 1 && t.hidden.length === 0)).toBe(true);
