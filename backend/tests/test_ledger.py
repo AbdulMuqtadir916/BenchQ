@@ -237,6 +237,7 @@ def teams(test_db, accounts, ledger, assignments):
 
 MIRAS_LEDGER = ["Cara edit", "Bea edit", "Mira edited Asha", "Assigned Ravi to Ben", "Assigned Asha to Bea",
                 "Kiran to Mira's queue", "Owner moved Asha"]
+ZEDS_LEDGER = ["Zed edit", "Ben edit", "Assigned Ravi to Ben", "Zed moved Ravi"]
 
 
 def test_a_manager_sees_their_team_and_the_assignments_of_their_candidates(anonymous_client, accounts, teams):
@@ -250,7 +251,7 @@ def test_a_manager_sees_nothing_of_another_team_or_the_firm(anonymous_client, ac
 
 
 def test_the_other_manager_sees_their_own_team(anonymous_client, accounts, teams):
-    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["zed"])) ==         ["Zed edit", "Ben edit", "Assigned Ravi to Ben", "Zed moved Ravi"]
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["zed"])) == ZEDS_LEDGER
 
 
 @pytest.mark.parametrize("query", ["?entity_type=candidate&entity_id={ravi}", "?entity_id={ravi}", "?candidate_id={ravi}"])
