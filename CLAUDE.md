@@ -257,5 +257,5 @@ a five-step new-candidate flow). Modules 01–07 in `docs/candidate-onboarding/`
 backend Candidates track (Zuhair).
 
 **Decisions** (Q1–Q56: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
-rules, the firm hierarchy, password recovery by approval, who changes a candidate's résumés) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
+rules, the firm hierarchy, password recovery by approval, who changes a candidate's résumés, what a Manager reads in the ledger) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
 The system contracts in `docs/02` §3.2 are approved and not built.
