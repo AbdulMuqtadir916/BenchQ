@@ -60,6 +60,30 @@ def test_a_bulk_delete_writes_one_entry_each(api_client, test_db):
         "Deleted the application for First.", "Deleted the application for Second."}
 
 
+def test_a_hand_logged_status_change_says_what_moved(api_client, test_db):
+    app_id = _legacy(api_client)
+    assert api_client.patch(f"/api/applications/{app_id}", json={"status": "interview"}).status_code == 200
+    entry = _entries(test_db, entity_id=app_id, action="UPDATE")[0]
+    assert entry.summary == "Moved Backend Engineer: applied → interview."
+    assert entry.changes == {"status": {"before": "applied", "after": "interview"}}
+
+
+def test_a_bulk_hand_logged_status_change_says_what_moved(api_client, test_db):
+    ids = [_legacy(api_client, "First"), _legacy(api_client, "Second")]
+    response = api_client.post("/api/applications/bulk-update", json={"ids": ids, "status": "rejected"})
+    assert response.status_code == 200, response.text
+    assert {e.summary for e in _entries(test_db, action="UPDATE", entity_type="application")} == {
+        "Moved First: applied → rejected.", "Moved Second: applied → rejected."}
+
+
+def test_a_hand_logged_edit_with_no_status_change_stays_a_details_entry(api_client, test_db):
+    app_id = _legacy(api_client)
+    assert api_client.patch(f"/api/applications/{app_id}", json={"status": "applied", "notes": "Private note."}).status_code == 200
+    entry = _entries(test_db, entity_id=app_id, action="UPDATE")[0]
+    assert entry.summary == "Updated application details."
+    assert entry.changes is None
+
+
 def test_a_refused_delete_writes_nothing(api_client, test_db, tracked):
     assert api_client.delete(f"/api/applications/{tracked.id}").status_code == 409
     assert _entries(test_db, action="DELETE") == []
