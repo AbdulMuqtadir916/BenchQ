@@ -30,3 +30,16 @@ Reads only: no table, migration, contract or dependency changes. The Super Admin
 - AI agent and system rows have no user on them, so a MANAGER and a BDE don't see them yet.
 - Picking a candidate to see everything on it comes with the same stamps. Until then a BDE's rule stays Q52 and
   `test_reassignment_preserves_inbox_access_without_broadening_q52_ledger` still holds.
+
+## Not closed by this work
+
+The frontend and the backend count a team slightly differently. `teamMemberIds` also takes the BDE of any candidate
+the MANAGER manages; the backend takes only the BDEs whose `manager_id` is that MANAGER. Normal assignments keep these
+equal, because `can_assign_to` needs the BDE to report to the candidate's manager. A BDE from before the hierarchy
+(Q51) with no manager can differ. Nothing leaks, since the page filters what the server sends. Removing the
+candidate-based line is a separate change: `teamMemberIds` is shared with follow-ups and the team page.
+
+## Release note
+
+A MANAGER's candidate activity no longer shows the OWNER's edits or the AI and system rows on the candidates they
+manage. This is intended under Q56, and it is a visible change for MANAGERs on the live backend.
