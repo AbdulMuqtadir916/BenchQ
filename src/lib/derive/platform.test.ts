@@ -13,7 +13,7 @@ const later = (days: number) => new Date(NOW.getTime() + days * DAY);
 
 const entry = (over: Partial<LedgerEntry>): LedgerEntry => ({
   id: "e", firmId: "firm_stl", actorUserId: "padm_sana", actorType: "PLATFORM_ADMIN", actorName: "Sana Mirza", entityType: "firm", entityId: "firm_stl",
-  entityLabel: "STL", action: "PLAN_CHANGED", summary: "", note: null, modelId: null, promptVersion: null, evidenceIds: [], claimState: null, createdAt: NOW.toISOString(), ...over,
+  entityLabel: "STL", action: "PLAN_CHANGED", summary: "", note: null, modelId: null, promptVersion: null, createdAt: NOW.toISOString(), ...over,
 });
 
 /** What the backend's ledger holds for a firm that was created, moved to a smaller plan and then suspended. */

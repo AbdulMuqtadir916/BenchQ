@@ -39,7 +39,7 @@ const COPY: Record<StepId, { title: string; description: string }> = {
 
 /**
  * The new-candidate flow (docs/candidate-onboarding/04-wizard-steps.md): stepper, the step, the summary card, and
- * Back · Skip for now · Continue. ⌘/Ctrl+Enter continues; Esc closes, asking first when anything was entered (07 Q48).
+ * Back · Continue. ⌘/Ctrl+Enter continues; Esc closes, asking first when anything was entered (07 Q48).
  * Step 5 assigns and creates (05-assign.md §1–§2); then the done screen.
  */
 export function CandidateWizard() {
@@ -164,7 +164,7 @@ export function CandidateWizard() {
           {step === "resume" ? <StepResume wizard={wizard} /> : null}
           {step === "basic" ? <StepBasic wizard={wizard} errors={errors} /> : null}
           {step === "work" ? <StepWorkRate wizard={wizard} errors={errors} /> : null}
-          {step === "preferences" ? <StepPreferences wizard={wizard} /> : null}
+          {step === "preferences" ? <StepPreferences wizard={wizard} errors={errors} /> : null}
           {step === "assign" ? <StepAssign wizard={wizard} errors={errors} /> : null}
         </section>
         <aside className="space-y-4 border-t border-[var(--color-border)] bg-[var(--color-surface-2)] p-4 lg:border-t-0 lg:border-l">
@@ -183,7 +183,6 @@ export function CandidateWizard() {
           {isLast && (createBlock || create.isError) ? (
             <p id="cw-create-problem" role={create.isError ? "alert" : undefined} className="text-caption text-[var(--color-danger-fg)]">{createBlock ?? errorMessage(create.error)}</p>
           ) : null}
-          {step === "preferences" ? <Button variant="ghost" onClick={() => wizard.goTo("assign")}>Skip for now</Button> : null}
           {isLast ? (
             <Button onClick={goNext} disabled={createBlock !== null || create.isPending} aria-describedby={createBlock || create.isError ? "cw-create-problem" : undefined} aria-keyshortcuts="Control+Enter Meta+Enter">
               <Check size={14} aria-hidden />{create.isPending ? "Creating…" : "Create candidate"}
