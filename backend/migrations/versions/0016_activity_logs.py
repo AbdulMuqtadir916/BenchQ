@@ -7,14 +7,14 @@
 - A trigger refuses UPDATE and DELETE, so no code path can rewrite history.
 
 Revision ID: 0016
-Revises: 0014
+Revises: 0015
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = '0016'
-down_revision = '0014'
+down_revision = '0015'
 branch_labels = None
 depends_on = None
 
@@ -24,7 +24,7 @@ ACTIONS = ("'CREATE', 'UPDATE', 'DELETE', 'STATE_CHANGE', 'AI_GENERATE', 'AI_BLO
            "'ADMIN_ACCESS', 'ADMIN_ACCESS_END', 'FIRM_CREATED', 'FIRM_SUSPENDED', 'FIRM_REACTIVATED', 'PLAN_CHANGED', "
            "'INVITE_SENT', 'INVITE_ACCEPTED', 'INVITE_REVOKED', 'ASSIGN'")
 SHARED = ("id, firm_id, actor_type, actor_user_id, actor_name, entity_type, entity_id, entity_label, action, summary, "
-          "note, model_id, prompt_version, evidence_ids, claim_state, candidate_id, created_at")
+          "note, model_id, prompt_version, candidate_id, created_at")
 
 
 def upgrade():
@@ -48,9 +48,6 @@ def upgrade():
         sa.Column('request_id', sa.String(), nullable=True),
         sa.Column('model_id', sa.String(), nullable=True),
         sa.Column('prompt_version', sa.String(), nullable=True),
-        sa.Column('evidence_ids', sa.ARRAY(sa.String()), server_default=sa.text("'{}'::character varying[]"),
-                  nullable=False),
-        sa.Column('claim_state', sa.String(), nullable=True),
         sa.Column('candidate_id', sa.UUID(), nullable=True),
         sa.Column('candidate_manager_id', sa.UUID(), nullable=True),
         sa.Column('candidate_bde_id', sa.UUID(), nullable=True),
@@ -58,8 +55,6 @@ def upgrade():
         sa.CheckConstraint(f"actor_type IN ({ACTOR_TYPES})", name='ck_activity_logs_actor_type'),
         sa.CheckConstraint(f"actor_role IS NULL OR actor_role IN ({ACTOR_ROLES})", name='ck_activity_logs_actor_role'),
         sa.CheckConstraint(f"action IN ({ACTIONS})", name='ck_activity_logs_action'),
-        sa.CheckConstraint("claim_state IS NULL OR claim_state IN ('VERIFIED', 'UNVERIFIED', 'CONTRADICTED')",
-                           name='ck_activity_logs_claim_state'),
         sa.ForeignKeyConstraint(['firm_id'], ['firms.id'], ondelete='RESTRICT'),
         sa.PrimaryKeyConstraint('id'),
     )

@@ -75,6 +75,8 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/candidates": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/candidates": Case(body=lambda i: {
         "full_name": "New candidate", "primary_role": "Data Engineer", "email": "new@example.test", "work_auth": "GC",
+        "phone": "+1 555 0100", "country": "US", "years_experience": 5, "needs_sponsorship": False,
+        "needs_transfer": False, "target_roles": ["Data Engineer"], "employment_types": ["W2"],
         "manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": Case(),
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(body=lambda i: {"rate_target": 90}),
@@ -84,7 +86,7 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": Case(path={"resume_id": "version"}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": Case(path={"resume_id": "version"}, as_bde=True,
-                                       body=lambda i: {"full_name": "Edited", "summary": "An edited summary"}),
+                                       body=lambda i: {"full_name": "Edited", "email": "edited@example.test", "summary": "An edited summary"}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": Case(path={"resume_id": "version"}, as_bde=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload": Case(upload=True, as_bde=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/removal": Case(path={"resume_id": "version"}),

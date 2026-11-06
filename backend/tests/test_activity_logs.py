@@ -416,14 +416,14 @@ def test_another_firms_people_and_candidates_are_not_found(anonymous_client, tes
 
 
 @pytest.fixture
-def at_0014():
+def at_0015():
     name = f"jn_activity_{uuid.uuid4().hex[:8]}_test"
     admin = _admin_engine()
     with admin.connect() as conn:
         conn.execute(text(f'CREATE DATABASE "{name}"'))
     url = _url_for(name)
     engine = create_engine(url, poolclass=NullPool)
-    _alembic(url, "upgrade", "0014")
+    _alembic(url, "upgrade", "0015")
     try:
         yield url, engine
     finally:
@@ -439,8 +439,8 @@ def _alembic(url, *arguments):
     assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
 
 
-def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0014):
-    url, engine = at_0014
+def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0015):
+    url, engine = at_0015
     with Session(engine) as db:
         firm = make_firm(db, make_plan(db, name="Plan"), slug="copied")
         manager = make_user(db, firm, email="m@copied.test", role="MANAGER", name="Mira")
@@ -471,7 +471,7 @@ def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0014)
                              entity_label="y", action="CREATE", summary="Written after"))
         db.commit()
 
-    _alembic(url, "downgrade", "0014")
+    _alembic(url, "downgrade", "0015")
     with Session(engine) as db:
         assert db.execute(text("SELECT to_regclass('activity_logs')")).scalar() is None
         assert db.query(LedgerEntry).count() == 3
