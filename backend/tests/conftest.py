@@ -165,6 +165,30 @@ def test_db():
 
 
 @pytest.fixture
+def log():
+    """Everything the app's one log handler (backend/logging_setup.py) writes during the test, at INFO, as production
+    writes it. Shared by the logging tests: test_logging.py, the canary and the route sweep (docs/team/uzair.md §1, 4a)."""
+    import io
+    import logging
+
+    import backend.main  # noqa: F401  configures logging, as the running app does
+    from backend.logging_setup import installed_handler
+
+    handler = installed_handler()
+    assert handler is not None, "backend.main did not configure logging"
+    buffer = io.StringIO()
+    previous_stream = handler.setStream(buffer)
+    root = logging.getLogger()
+    previous_level = root.level
+    root.setLevel(logging.INFO)
+    try:
+        yield buffer
+    finally:
+        handler.setStream(previous_stream)
+        root.setLevel(previous_level)
+
+
+@pytest.fixture
 def accounts(test_db):
     """An ACTIVE firm with an OWNER, and a Super Admin, each signed in (tests/auth_support.py)."""
     from backend.tests.auth_support import seed_accounts

@@ -30,7 +30,7 @@ firm → BDE → candidate hierarchy that JobNavigator has no concept of.
 | **Scoring record** — provider, depth (`light` \| `full`), keyword analysis, requirement mapping, ATS tips | `ScoringRecord` attached to a `Match` | The light/full split is a genuinely good cost control. Light for bulk ranking, full only when the BDE opens a job. |
 | **Dedup hash** — URL-based and content-based, tracking params stripped before hashing | `Job.dedupe.urlHash` + `contentHash` | Same requirement, same solution. Reposts across sources are constant. |
 | **H-1B sponsorship indicator**, LCA data per company | `Company.h1b` block | **The single most valuable borrow.** Work authorisation is the central filter in bench sales; JobNavigator already models it. |
-| **Persona** — profile grounding AI answers for autofill | `Candidate.persona` | Maps exactly onto the screening-question prefill panel. |
+| **Persona** — profile grounding AI answers for autofill | `Candidate.preferredIndustries`, `dealBreakers`, the base résumé's summary, `qaBank` (the `persona` field was dropped in migration 0016) | Maps onto the screening-question prefill panel. |
 | **Q&A Bank** — reusable question/answer pairs | `QaBankEntry[]` per candidate | This *is* the prefill panel. Reusing answers across applications is a real time saving. |
 | **Tracer links** — unique per resume/letter combo, open/click tracking | `ResumeVersion.tracer` | Lets a BDE see whether a submission was opened. Free signal. |
 | **Template selection + tailoring history per job** | `ResumeVersion.templateId` + `tailoring` | Same shape. |
@@ -62,7 +62,7 @@ import { z } from 'zod';
 export const FirmRole = z.enum(['OWNER', 'MANAGER', 'BDE', 'VIEWER']);
 
 export const WorkAuth = z.enum([
-  'H1B', 'H4_EAD', 'OPT', 'CPT', 'GC', 'GC_EAD', 'USC', 'TN', 'OTHER',
+  'H1B', 'H4_EAD', 'OPT', 'CPT', 'GC', 'GC_EAD', 'USC', 'TN',   // no 'OTHER' since 0015 (Abdul, 2026-11-06)
 ]);
 
 export const EmploymentType = z.enum(['C2C', 'W2', 'TEEN99', 'FTE']);
@@ -71,12 +71,7 @@ export const CandidateStatus = z.enum([
   'ON_BENCH', 'INTERVIEWING', 'OFFER', 'PLACED', 'PAUSED', 'INACTIVE',
 ]);
 
-/** The three claim states. The product's core concept. */
-export const ClaimState = z.enum(['VERIFIED', 'UNVERIFIED', 'CONTRADICTED']);
-
-export const FieldSource = z.enum([
-  'MANUAL', 'RESUME_UPLOAD', 'LINKEDIN_EXPORT', 'INTAKE_CALL', 'AI_EXTRACTED',
-]);
+// No ClaimState or FieldSource (dropped 2026-11-05): BenchQ has no claim states, no evidence record and no export gate.
 
 export const JobSourceType = z.enum([
   'CONNECTOR', 'AGGREGATOR', 'USER_SUBMITTED', 'MANUAL',
@@ -243,7 +238,7 @@ New/changed fields and endpoints:
 | `GET …/candidates/{id}/email-reviews` | `{reviews[], next_cursor, total_count}`; review adds `subject`, `from_name`, `received_at`, `created_at` | newest first; cursor `"<created_at>|<id>"`; support view: count only |
 | `PATCH …/inbox-messages/{id}/review` | unchanged body | Dismiss never links or checks an application; `SET_STATUS` accepts every stage except `saved` |
 | Inbox message JSON | adds `content_revision`, `classification_version` | echoed by review/retry commands |
-| `email_classifications.outcome` | adds `AUTO_APPLIED` | migration 0015; guarded downgrade |
+| `email_classifications.outcome` | adds `AUTO_APPLIED` | migration 0016; guarded downgrade |
 | Review reasons | adds `FORWARDED_EMAIL`, `INSUFFICIENT_CONTENT`, `CONFIDENCE_DISAGREEMENT`, `EMAIL_ALREADY_APPLIED`, `AUTOMATIC_CHANGE_UNDONE` | frontend labels in `review-reason.ts` |
 | `GET /api/stats/llm-costs` | adds `candidate_email_classification.{unpriced_calls, unconfirmed_calls}` | unknown cost is never summed as 0 |
 
@@ -264,7 +259,7 @@ export const FirmSchema = z.object({
   logoUrl: z.string().url().nullable(),
   primaryTimezone: z.string().default('Asia/Kolkata'),
   clientTimezone: z.string().default('America/New_York'),
-  truthGuardMode: z.enum(['STRICT', 'BALANCED', 'LENIENT']).default('BALANCED'),
+  truthGuardMode: z.enum(['STRICT', 'BALANCED', 'LENIENT']).default('BALANCED'),   // goes in résumé versioning PR 7 (0016)
   applicationExpiryDays: z.number().int().default(30),
 });
 
@@ -791,7 +786,7 @@ followUpCadence: z.array(z.object({
 
 > **Status: approved by the product owner on 2026-10-26** (07 §0 Q40–Q50; Q51 on 2026-10-27). Plan and modules:
 > `docs/candidate-onboarding/`. **Schemas in onboarding module 01; the derivations (seats, limit, load) change in
-> module 02.** Fields marked *provisional* are on mocks only; Zuhair owns the production candidate contract (Q50).
+> module 02.** The Q50 fields (`workSettings`, `preferredLocations`, `contactNotes`) are final since migration 0016 (2026-11-04).
 
 The firm's layers are fixed: **OWNER → MANAGER → BDE → candidate** (Q40).
 
@@ -832,16 +827,6 @@ handoff note. Changing a BDE's manager logs `UPDATE` on the `user`.
 ```ts
 // src/lib/schemas/candidate.ts
 
-/** JobNavigator-aligned: persona grounds AI-generated answers to screening questions. */
-export const PersonaSchema = z.object({
-  summary: z.string(),
-  toneNotes: z.string().nullable(),
-  willRelocate: z.boolean(),
-  noticePeriodDays: z.number().int().nullable(),
-  preferredIndustries: z.array(z.string()),
-  dealBreakers: z.array(z.string()),
-});
-
 /** JobNavigator-aligned: reusable Q&A pairs — this is the prefill panel. */
 export const QaBankEntrySchema = z.object({
   id: z.string(),
@@ -853,8 +838,6 @@ export const QaBankEntrySchema = z.object({
   ]),
   useCount: z.number().int(),
   lastUsedAt: z.string().datetime().nullable(),
-  state: ClaimState,                     // answers are claims too
-  evidenceId: z.string().nullable(),
 });
 
 export const CandidateSchema = z.object({
@@ -892,11 +875,12 @@ export const CandidateSchema = z.object({
   bdeId: z.string().nullable(),          // the one BDE (Q42); null = "Needs a BDE". When set, that BDE's
                                          // managerId equals managerId
 
-  workSettings: z.array(RemoteMode),     // provisional (Q50): remote / hybrid / on-site, several allowed
-  preferredLocations: z.array(z.string()), // provisional: "City, ST"
-  contactNotes: z.string().nullable(),   // provisional: how to reach them, interview windows ("Notes for the BDE")
+  workSettings: z.array(RemoteMode),     // remote / hybrid / on-site, several allowed (Q50, final)
+  preferredLocations: z.array(z.string()), // "City, ST"
+  contactNotes: z.string().nullable(),   // how to reach them, interview windows ("Notes for the BDE")
+  preferredIndustries: z.array(z.string()), // step 4 (was inside `persona`, dropped in 0015)
+  dealBreakers: z.array(z.string()),     // step 4 (same)
 
-  persona: PersonaSchema.nullable(),
   qaBank: z.array(QaBankEntrySchema),
 
   createdAt: z.string().datetime(),
@@ -941,7 +925,7 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   primaryRole: z.string().trim().min(1),            // "Marketed as"
   email: z.string().trim().email(),                 // required in the flow (Q48)
   summary: z.string().trim().nullable(),
-  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable(), source: FieldSource })),
+  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable() })),
   preferredIndustries: z.array(z.string()),
   dealBreakers: z.array(z.string()),
   resumeParseId: z.string().nullable(),             // the parse to keep; null = no résumé
@@ -968,8 +952,23 @@ export const ResumeDraftSchema = z.object({
 });
 ```
 
-Onboarding never produces a `VERIFIED` claim (Q49): skills and the summary land in the Record as `UNVERIFIED` with
-their `FieldSource`. `ResumeDraftSchema` gains `country` with the new parser (§8.1).
+**Candidates final schema — 2026-11-04 (Zuhair; Abdul reviews with the PR), migration 0016.** `persona` is removed
+from the candidate: `preferredIndustries` and `dealBreakers` are flat lists, `will_relocate` and `notice_period_days`
+inside it were stale copies of `willingToRelocate` and `noticePeriodDays`, `toneNotes` was never filled, and the summary
+is the active base résumé's (`resumes.summary`). `candidates.skills` and `summary_state` are removed too (the skills are the
+active base résumé's). **BenchQ has no claim states (2026-11-05):** the `claims` and `evidence` tables are dropped in the
+same migration, and the frontend's claim, evidence and export-gate types went in PR 7. `needsSponsorship` and
+`needsTransfer` are required booleans: the new-candidate flow works them out from `workAuth` (H-1B, H4 EAD, OPT, CPT,
+TN need sponsorship; H-1B needs a transfer; GC, GC EAD and US citizen send `false`; there is no `OTHER`, so both are
+always known) and sends them; the backend
+works nothing out and only checks that they were sent (a missing one is a 422 naming the field). An edit that changes
+`workAuth` must carry both. Required on create, in the form and in the backend alike: `fullName`, `primaryRole`, `email`,
+`phone`, `yearsExperience`, `country` (any country; the flow's Country box starts at `US` and takes the parsed résumé's
+country, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
+`employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. A candidate created without a résumé file gets a `MANUAL` base from the form alone, so every candidate has a base.
+
+`ResumeDraftSchema` gains `country` with the new parser (§8.1). The skills a new candidate is created with go into
+the first base résumé's version 1 (`resumes.skills`); they carry no source or state.
 
 ---
 
@@ -978,25 +977,9 @@ their `FieldSource`. `ResumeDraftSchema` gains `country` with the new parser (§
 ```ts
 // src/lib/schemas/record.ts
 
-/** Substantiation. A claim cannot be VERIFIED without one of these. */
-export const RecordEvidenceSchema = z.object({
-  id: z.string(),
-  recordId: z.string(),
-  entityType: z.enum(['experience', 'skill', 'project', 'certificate', 'summary']),
-  entityId: z.string(),
-  documentId: z.string().nullable(),
-  excerpt: z.string().nullable(),          // verbatim supporting text
-  pageNumber: z.number().int().nullable(),
-  confirmedByUserId: z.string().nullable(),
-  confirmedAt: z.string().datetime().nullable(),
-  source: FieldSource,
-});
-
 export const RecordBulletSchema = z.object({
   id: z.string(),
   text: z.string(),
-  state: ClaimState,
-  evidenceId: z.string().nullable(),
 });
 
 export const RecordExperienceSchema = z.object({
@@ -1010,8 +993,6 @@ export const RecordExperienceSchema = z.object({
   bullets: z.array(RecordBulletSchema),
   technologies: z.array(z.string()),
   sortOrder: z.number().int(),
-  source: FieldSource,
-  state: ClaimState,
 });
 
 export const RecordSkillSchema = z.object({
@@ -1022,8 +1003,6 @@ export const RecordSkillSchema = z.object({
   yearsUsed: z.number().nullable(),
   lastUsedYear: z.number().int().nullable(),
   proficiency: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).nullable(),
-  source: FieldSource,
-  state: ClaimState,
 });
 
 export const RecordEducationSchema = z.object({
@@ -1033,8 +1012,6 @@ export const RecordEducationSchema = z.object({
   field: z.string().nullable(),
   startDate: z.string().datetime().nullable(),
   endDate: z.string().datetime().nullable(),
-  source: FieldSource,
-  state: ClaimState,
 });
 
 export const RecordCertificateSchema = z.object({
@@ -1045,8 +1022,6 @@ export const RecordCertificateSchema = z.object({
   expiryDate: z.string().datetime().nullable(),
   credentialId: z.string().nullable(),
   credentialUrl: z.string().url().nullable(),
-  source: FieldSource,
-  state: ClaimState,
 });
 
 export const RecordSchema = z.object({
@@ -1054,13 +1029,10 @@ export const RecordSchema = z.object({
   candidateId: z.string(),
   headline: z.string().nullable(),
   summary: z.string().nullable(),
-  summaryState: ClaimState,
   experiences: z.array(RecordExperienceSchema),
   educations: z.array(RecordEducationSchema),
   skills: z.array(RecordSkillSchema),
   certificates: z.array(RecordCertificateSchema),
-  evidence: z.array(RecordEvidenceSchema),
-  lastVerifiedAt: z.string().datetime().nullable(),
 });
 
 /** DERIVED — computed, never stored. */
@@ -1331,19 +1303,14 @@ export const TailoringSchema = z.object({
   generatedAt: z.string().datetime().nullable(),
 });
 
-export const ResumeClaimSchema = z.object({
+/** One line of a version's text: the summary, or one bullet of a job or project. */
+export const ResumeLineSchema = z.object({
   id: z.string(),
   resumeVersionId: z.string(),
   section: z.enum(['summary', 'experience', 'project']),
   entityId: z.string().nullable(),
   bulletIndex: z.number().int().nullable(),
   text: z.string(),
-  state: ClaimState,
-  evidenceId: z.string().nullable(),
-  reason: z.string().nullable(),           // why unverified / why contradicted
-  overriddenByUserId: z.string().nullable(),
-  overrideReason: z.string().nullable(),
-  overriddenAt: z.string().datetime().nullable(),
 });
 
 export const AtsIssueSchema = z.object({
@@ -1374,7 +1341,7 @@ export const ResumeVersionSchema = z.object({
   keywordsMatched: z.array(z.string()),
   keywordsMissing: z.array(z.string()),
 
-  claims: z.array(ResumeClaimSchema),
+  lines: z.array(ResumeLineSchema),
   tailoring: TailoringSchema.nullable(),
   tracer: TracerSchema.nullable(),
 
@@ -1397,15 +1364,6 @@ export const ResumeSchema = z.object({
   versions: z.array(ResumeVersionSchema),
   latestVersionId: z.string(),
 });
-
-/** DERIVED — the export gate. Computed from claims. */
-export const ExportGateSchema = z.object({
-  canExport: z.boolean(),
-  unverifiedCount: z.number().int(),
-  contradictedCount: z.number().int(),
-  blockingClaimIds: z.array(z.string()),
-  message: z.string().nullable(),
-});
 ```
 
 ### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2), the rest NOT BUILT
@@ -1424,7 +1382,7 @@ export const BaseResumeSchema = z.object({
   id: z.string(),
   firmId: z.string(),
   candidateId: z.string(),
-  source: z.enum(['UPLOAD', 'PROMOTED']),   // from an upload, or a version a person chose as the base
+  source: z.enum(['UPLOAD', 'PROMOTED', 'MANUAL']),   // an upload, a version a person chose, or the form alone (0015)
   isActive: z.boolean(),                    // exactly one per candidate
   createdByUserId: z.string(),
   createdAt: z.string().datetime(),
@@ -1444,11 +1402,10 @@ export const AwardEntrySchema = z.object({
 });
 // ResumeDocumentSchema: awards: z.array(AwardEntrySchema), languages: z.array(z.string()) (kept, never printed);
 // summaryId: z.string().nullable() (versioning PR 5: the summary's id; an id names one exact text, a changed one
-// gets a new id, so claims follow only the text they were checked against);
+// gets a new id, so a changed text is told apart from the one before);
 // ResumeSectionKey: + 'awards'
 
-// src/lib/schemas/record.ts — RecordEvidenceSchema.entityType becomes, matching the backend's claims.entity_type:
-  entityType: z.enum(['experience', 'skill', 'project', 'certificate', 'summary', 'education', 'award']),
+// No claim or evidence types (dropped 2026-11-05).
 ```
 
 - `ResumeDraftSchema.city` and `.state` are read straight from the parser's `header.city` / `header.state`
@@ -1612,8 +1569,6 @@ an `ApplicationEvent` — the same write the kanban makes.
 - `CandidateDocument` — `kind` (`WORK_AUTH | IDENTITY | RESUME | CERTIFICATION | EDUCATION |
   EMPLOYMENT | OTHER`), `title`, `fileName`, `mimeType`, `sizeKb`, `uploadedAt`, `uploadedByUserId`,
   `expiresAt` (nullable), `shareUrl`.
-- `RecordEvidence.documentId` points at a `CandidateDocument`; "evidence for N claims" is derived
-  from the Record's evidence, never stored.
 - Endpoints: `GET/POST /api/candidates/:id/documents` (POST takes metadata only in the mock),
   `DELETE /api/documents/:id`.
 
@@ -1634,7 +1589,7 @@ field. Logged as `CREATE` on `candidate`.
 `POST /api/jobs`. The server builds the `Job`: provenance `USER_SUBMITTED` / `USER_SESSION` with the user as
 `capturedByUserId`; the company reused by normalised name, else added with nothing known (`clientType`
 `UNKNOWN`, no H-1B data, no verification); an hourly range fills `rateMin/Max`, a yearly one
-`salaryMin/Max`; "visa sponsorship available" allows every work authorization except `OTHER`, otherwise
+`salaryMin/Max`; "visa sponsorship available" allows every work authorization, otherwise
 `USC` and `GC`; skills and required experience become `MANDATORY` requirements (not blockers). The same
 canonical URL (no query or fragment, lowercase host, no trailing slash) twice in a firm is refused with
 409 `DUPLICATE_JOB` naming the existing job. Logged as `CREATE` on `job`.
@@ -1713,8 +1668,7 @@ export const LedgerEntrySchema = z.object({
   note: z.string().nullable(),            // the handoff note on an ASSIGN entry; null on every other entry (§3.4)
   modelId: z.string().nullable(),
   promptVersion: z.string().nullable(),
-  evidenceIds: z.array(z.string()),
-  claimState: ClaimState.nullable(),
+  // No evidenceIds or claimState: the ledger's columns are dropped in migration 0016 (Abdul, 2026-11-06).
   createdAt: z.string().datetime(),
 });
 
@@ -1738,14 +1692,13 @@ export const TimelineEventSchema = z.object({
    hand-written parallel interface.
 2. **Validate at the boundary.** Every adapter response is parsed through its schema. A shape
    mismatch fails loudly in development rather than rendering `undefined` in production.
-3. **Derived types are computed, not fetched.** `CandidateStats`, `RecordCompleteness` and
-   `ExportGate` have schemas so they can be typed — but they're produced by pure functions in
+3. **Derived types are computed, not fetched.** `CandidateStats` and `RecordCompleteness`
+   have schemas so they can be typed — but they're produced by pure functions in
    `src/lib/derive/`, which are unit-tested against fixtures.
 4. **Denormalised fields are deliberate.** `Match.job`, `Application.companyNameAtApply`,
    `FollowUpTask.candidateName` — these exist so list views render without N+1 lookups, and so
    history survives upstream edits.
-5. **`ClaimState` appears on Record fields, resume claims and Q&A answers.** That's intentional:
-   anything asserted on a candidate's behalf is a claim, wherever it lives.
+5. **No claim states (2026-11-05).** Nothing on a candidate, a résumé or an answer is Verified, Unverified or Contradicted.
 
 
 ### Candidate Gmail connection — PR 2 (Samad requested 2026-11-02; Abdul sign-off pending)

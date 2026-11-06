@@ -47,15 +47,16 @@ def test_priced_model_is_recorded_as_estimated(test_db, pipeline, monkeypatch):
     assert _job(test_db).meta['usage']['cost_quality'] == 'ESTIMATED'
 
 
-def test_unknown_cost_adds_no_false_zero_and_is_reported(test_db, pipeline):
+def test_unknown_cost_is_one_row_and_flagged_as_unpriced(test_db, pipeline):
+    """Every dispatched call is in AI spend (main's Q33 rule); an unknown charge is also reported as unpriced."""
     from backend.main import _llm_costs_stats
     _, _, message_id = pipeline
     assert worker.process_one(message_id, provider=lambda *a: answer({'prompt_tokens': 50}))
-    assert test_db.query(LlmCallLog).count() == 0
+    row = test_db.query(LlmCallLog).one()
+    assert (row.input_tokens, row.success) == (50, True)
     assert _job(test_db).meta['usage']['cost_quality'] == 'UNKNOWN'
     stats = _llm_costs_stats(days=7)
     assert stats['candidate_email_classification'] == {'unpriced_calls': 1, 'unconfirmed_calls': 0}
-    assert stats['total_cost_usd'] == 0
 
 
 def test_only_dispatched_calls_are_counted(test_db, pipeline):

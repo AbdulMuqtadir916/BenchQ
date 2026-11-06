@@ -13,7 +13,7 @@ Branch `codex/pr4-code-correction` · Folder `~/Documents/cloned` · Base main 3
 - **Next:** reconcile docs (done 2026-11-06), then T5.5 PR **only on Samad's instruction**; T6.1 production activation
   after merge.
 - **Approvals still needed (not obtained by implementing):** Abdul — G2 status mapping, G3 contracts, G4 Incomplete →
-  Applied, G6 migration 0015, G7 logger change, G8 endpoint decision. Samad's go-ahead to build them was given; their
+  Applied, G6 migration 0016, G7 logger change, G8 endpoint decision. Samad's go-ahead to build them was given; their
   sign-off happens at PR review.
 - **Local only (not for the PR):** automation, setup recovery and real-mail switches are on in `cloned/backend/.env`;
   `.claude/launch.json` pnpm path; `.env.local`.
@@ -26,7 +26,7 @@ Branch `codex/pr4-code-correction` · Folder `~/Documents/cloned` · Base main 3
 - [ ] G3 Contracts in docs/02 (`statusRevision`, counts endpoint, review list fields, Undo API, new review reasons)
 - [ ] G4 Abdul decides Incomplete → Applied
 - [x] G5 Dedicated test Gmail + test candidate; approval to write classifier settings in the dev DB (Samad, 2026-11-06)
-- [ ] G6 Abdul approves the `AUTO_APPLIED` migration
+- [ ] G6 Abdul approves the `AUTO_APPLIED` migration (0016)
 - [ ] G7 Logger owner informed (`cost_usd`, `db` arguments) — not yet; deferred by Samad until after testing
 - [ ] G8 Abdul accepts the endpoint decision — not yet; deferred by Samad until after testing
 
@@ -183,7 +183,7 @@ override of OPERATIONS.md switch-on condition 2 for this isolated test only):
 - Note: the backend container runs uvicorn without reload; it was restarted to load the Phase 2/3 code.
 
 2026-11-06, **Phase 4 (T4.1–T4.5) and Phase 5 (T5.1–T5.3) done**; T4.6 waits for one live email; T5.4 full suite running.
-- T4.1 Migration 0015 (`AUTO_APPLIED`, guarded downgrade; `test_migration_0015.py` 2 passed, 0014 still passes).
+- T4.1 Migration 0016 (`AUTO_APPLIED`, guarded downgrade; `test_migration_0016.py` 2 passed, 0014 still passes).
   Writer `apply_email_decision`: lookup by `(application, command)` first, savepoint around status + event + AGENT
   ledger entry, duplicate returns the existing decision. Classification rows are immutable (DB trigger), so the
   worker writes the status first and inserts the result once with outcome `AUTO_APPLIED`. Replay: same command ⇒
@@ -280,3 +280,10 @@ count-only `hidden_count` to the inbox response and an Inbox note. Checks: front
 backend inbox/review/pipeline suites 73 passed (new hidden-count test). Browser: note shows "27 emails were hidden…".
 
 2026-11-06, decision (Samad): keep the 3-day first import window (PR 2 behaviour unchanged).
+
+2026-11-06, **merged origin/main 09eb35b** (candidates final schema #112, logging #107) into the branch. Conflicts:
+`classification_worker.py` (kept PR 4 flow, kept main's log lines, AI-spend rows now follow main's one-row-per-call rule
+inside our transaction — DEBUG D-15 note), `src/mocks/db.ts` (fixture hash recomputed), `test_migration_0015.py` (main's
+0015 is the candidates schema; ours renumbered to **0016**, test `test_migration_0016.py`). Main's
+`test_inbox_ai_spend.py` updated for the T1.1 not-configured behaviour. Focused backend suites 363 passed; frontend
+lint and 616 tests passed.

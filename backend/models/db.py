@@ -32,7 +32,10 @@ from backend.countries import DEFAULT_COUNTRY
 #                       in 5 s instead of waiting on the operating system.
 #   statement_timeout   no query runs longer than 1 minute; a web request
 #                       tightens it to 15 s (backend/statement_timeout.py).
-_engine_kwargs = {"pool_pre_ping": True}
+#   hide_parameters     a database error's text names the statement, never the
+#                       values bound to it (an email, a name), so logging the
+#                       error can't leak them (backend/logging_setup.py).
+_engine_kwargs = {"pool_pre_ping": True, "hide_parameters": True}
 if not DATABASE_URL.startswith("sqlite"):
     _engine_kwargs.update(pool_size=20, max_overflow=10, pool_timeout=5, pool_recycle=1800,
                           connect_args={"connect_timeout": 5, "options": "-c statement_timeout=60s"})

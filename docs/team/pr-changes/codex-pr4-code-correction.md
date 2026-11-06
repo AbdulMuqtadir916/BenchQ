@@ -22,8 +22,8 @@ Base: main 3f8be61 (PR 3 merged). One migration (0015). Switches ship OFF.
 | `backend/analyzer/llm_logger.py` | Optional `cost_usd` and `db` (savepoint, never commits the caller's transaction) — owner: Abdul |
 | `backend/main.py` | `llm-costs` adds `candidate_email_classification.{unpriced_calls, unconfirmed_calls}` |
 | `backend/config.py`, `backend/.env.example` | Automation switches (default off) |
-| `backend/models/db.py`, `backend/migrations/versions/0015_email_outcome_auto_applied.py` | Outcome `AUTO_APPLIED`; guarded downgrade |
-| Tests (new) | `test_pr4_classifier_gate.py`, `test_pr4_confidence.py`, `test_pr4_email_parts.py`, `test_pr4_spend.py`, `test_pr4_match_eligibility.py`, `test_pr4_counts.py`, `test_pr4_review_api.py`, `test_pr4_automation.py`, `test_migration_0015.py` |
+| `backend/models/db.py`, `backend/migrations/versions/0016_email_outcome_auto_applied.py` | Outcome `AUTO_APPLIED`; guarded downgrade |
+| Tests (new) | `test_pr4_classifier_gate.py`, `test_pr4_confidence.py`, `test_pr4_email_parts.py`, `test_pr4_spend.py`, `test_pr4_match_eligibility.py`, `test_pr4_counts.py`, `test_pr4_review_api.py`, `test_pr4_automation.py`, `test_migration_0016.py` |
 | Tests (changed) | `test_pr3_provider.py` (mismatched confidence is no longer a failure; Gmail ARC cases), `isolation_cases.py`/`isolation_support.py` (counts and Undo routes, automatic-change fixture) |
 
 ## Frontend

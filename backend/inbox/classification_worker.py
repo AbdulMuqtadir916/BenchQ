@@ -6,7 +6,9 @@ PENDING rows are the queue, so import/enqueue crashes are recovered by the sweep
 from concurrent.futures import ThreadPoolExecutor
 import time
 from datetime import timedelta
+import logging
 import threading
+import time
 from types import SimpleNamespace
 import uuid
 
@@ -30,8 +32,7 @@ from backend.models.db import Application, ApplicationReview, EmailClassificatio
 from backend.models.tenancy import Firm
 import logging
 
-logger = logging.getLogger('jobnavigator.candidate_email')
-
+logger = logging.getLogger("jobnavigator.inbox")
 MAX_ATTEMPTS = 3
 _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix='candidate-email')
 _WAKE_LOCK = threading.Lock()
@@ -68,10 +69,11 @@ def _add_review(db, message, app, result):
 
 
 def _account(db, cfg, job, firm_id, *, success, duration_ms):
-    """Record what one dispatched call cost, in the caller's result transaction (DEBUG D-15).
+    """Record one dispatched call in AI spend, in the caller's result transaction, exactly once (DEBUG D-15, Q33).
 
-    ACTUAL (provider charge) or ESTIMATED (OpenRouter price x tokens) adds one llm_call_log row; UNKNOWN adds none,
-    so no false zero reaches the totals; it is reported as unpriced from job_runs instead.
+    Every dispatched call gets one llm_call_log row for its firm, failures included (main's AI-spend rule). Its cost is
+    the provider's charge (ACTUAL) or OpenRouter price x tokens (ESTIMATED); when neither is known the row's cost is the
+    price table's result and the call is also counted as unpriced from job_runs, so it is never silently free.
     """
     meta = dict(job.meta or {})
     if not meta.get('dispatch_started'):
@@ -86,11 +88,10 @@ def _account(db, cfg, job, firm_id, *, success, duration_ms):
     else:
         quality, cost = 'UNKNOWN', None
     meta['usage'] = {**usage, 'cost_quality': quality}
-    if quality != 'UNKNOWN':
-        row_id = log_llm_call('email_classification', 'openrouter', cfg.model, tokens, duration_ms=duration_ms,
-                              success=success, error=meta.get('error_code'), firm_id=firm_id, cost_usd=cost, db=db)
-        if row_id:
-            meta['llm_call_log_id'] = str(row_id)
+    row_id = log_llm_call('email_classification', 'openrouter', cfg.model, tokens, duration_ms=duration_ms,
+                          success=success, error=meta.get('error_code'), firm_id=firm_id, cost_usd=cost, db=db)
+    if row_id:
+        meta['llm_call_log_id'] = str(row_id)
     job.meta = meta
 
 
@@ -139,6 +140,7 @@ def process_one(message_id, *, provider=None, aliases=None):
             message.classification_state = 'ERROR'
             message.classification_error = 'RETRY_EXHAUSTED'
             db.commit()
+            logger.warning("Email %s classification gave up after %d attempts", message.id, message.classification_attempts)
             return False
         mailbox = _current(db, message)
         fingerprint = config_identity(cfg)
@@ -245,6 +247,8 @@ def process_one(message_id, *, provider=None, aliases=None):
             row.classification_error = error.code
             job.meta = {**job.meta, 'retry_exhausted': not retry}
             db.commit()
+            logger.warning("Email %s classification failed: %s (attempt %d, %s)", message_id, error.code,
+                           row.classification_attempts, 'will retry' if retry else 'gave up')
             return False
         # Snapshot match/app revision after I/O; never trust a stale pre-call match.
         had_application_link = row.application_id is not None
@@ -308,6 +312,7 @@ def process_one(message_id, *, provider=None, aliases=None):
         row.classification_error = None
         row.classification_next_retry_at = None
         db.commit()
+        logger.info("Email %s classified: %s", message_id, record.outcome)
     return True
 
 
@@ -334,7 +339,10 @@ def process_pending(*, limit=20):
             CandidateMailbox.status == 'CONNECTED', func.lower(func.trim(InboxMessage.source_address)) == func.lower(func.trim(CandidateMailbox.address)),
         ).order_by(InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
         aliases = company_aliases(db) if rows else {}
-    return sum(process_one(identity, aliases=aliases) for (identity,) in rows)
+    done = sum(process_one(identity, aliases=aliases) for (identity,) in rows)
+    if rows:
+        logger.info("Email classification: %d of %d pending emails classified", done, len(rows))
+    return done
 
 
 def wake_worker():

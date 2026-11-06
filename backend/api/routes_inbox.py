@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 import base64
+import logging
 import json
 from contextlib import contextmanager
 from datetime import datetime
@@ -34,6 +35,7 @@ from backend.models.db import ApplicationReview, EmailClassification, Applicatio
 
 
 router = APIRouter(tags=["candidate-inbox"])
+logger = logging.getLogger("jobnavigator.inbox")
 
 
 def _audit(db, principal, *, firm_id, candidate_id, entity_id, summary):
@@ -211,7 +213,9 @@ def _retire_attempt(db, attempt, *, invalidate_pending=False):
             attempt.pending_token_ciphertext = None
             db.commit()
             return True  # Google already invalidated this grant.
-        except Exception:
+        except Exception as exc:
+            logger.warning("Mailbox attempt %s: Google identity lookup failed (%s); kept for retry", attempt.id,
+                           type(exc).__name__)
             return False  # Identity/provider outage: keep encrypted for scheduled retry.
         attempt.pending_address = address
     with account_lock(address), revoke_barrier():
@@ -230,7 +234,9 @@ def _retire_attempt(db, attempt, *, invalidate_pending=False):
         db.commit()  # Never hold row locks while calling Google.
         try:
             done = bool(live or newer_pending) or revoke_token(decrypt_secret(token))
-        except (RuntimeError, HTTPException):
+        except (RuntimeError, HTTPException) as exc:
+            logger.warning("Mailbox attempt %s: revoking the Google grant failed (%s); it stays live until the retry",
+                           attempt.id, type(exc).__name__)
             done = False
         attempt = db.get(CandidateGoogleOAuthAttempt, attempt.id)
         if done:
@@ -355,7 +361,8 @@ def candidate_google_oauth_callback(request: Request,
             if refresh_token and attempt.pending_token_ciphertext:
                 _retire_attempt(db, attempt)
             raise
-        except Exception:
+        except Exception as exc:
+            logger.warning("Mailbox attempt %s: connecting Gmail failed (%s)", attempt.id, type(exc).__name__)
             db.rollback()
             if refresh_token and attempt.pending_token_ciphertext:
                 _retire_attempt(db, attempt)
@@ -723,6 +730,7 @@ def review_candidate_email(candidate_id: uuid.UUID, message_id: uuid.UUID, body:
             _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=review.id,
                    summary='Reviewed candidate email linkage/disposition; no automatic status change.')
         db.commit()
+        logger.info("Review %s on email %s: %s by user %s", review.id, message.id, body.action, principal.user_id)
         return _load_inbox(db, firm_id, candidate_id, message_id=message.id)
     except Exception:
         db.rollback()
@@ -768,6 +776,7 @@ def _queue_classification(db, firm_id, candidate_id, message_id, principal, body
     _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=row.id,
            summary='Requested versioned email reclassification.' if rerun else 'Requested failed email classification retry.')
     db.commit()
+    logger.info("Email %s queued for %s by user %s", row.id, 'reclassification' if rerun else 'retry', principal.user_id)
 
 
 @router.post('/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry')

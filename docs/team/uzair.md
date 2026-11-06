@@ -13,6 +13,7 @@ config, logging. Changing a route's behaviour for its owner (Samad, Zuhair, Abdu
 What exists today: a sign-in throttle and an invite-acceptance limit, per IP and per email, and a per-user limit on
 every signed-in request, all in memory (`backend/auth/throttle.py`; the table below); a request body size cap
 (`backend/body_limit.py`); database statement and connect timeouts (`backend/statement_timeout.py`, step 2b below);
+one logging setup with request ids and masking (`backend/logging_setup.py`, `backend/request_log.py`, step 4a below);
 per-scraper throttles
 (`backend/scraper/sources/*`); one uvicorn worker with the scheduler inside it.
 
@@ -42,7 +43,7 @@ All answer 429 with `Retry-After` and `{"detail": "Too many attempts. Try again 
 - **The Super Admin is never limited per user,** including inside a support view.
 - **The frontend never retries a 429** (`src/lib/query/retry.ts`).
 - **The per-user limit is a safety ceiling,** not a pace. A BDE applies job by job, BenchQ has no bulk actions against the backend, and nothing polls it.
-- **Cover letters, persona and autofill have no rate limit.** Cover letters and persona are being dropped, and Samad is reworking autofill.
+- **Cover letters, persona and autofill have no rate limit.** The persona stays for now but its readers move to the candidate ([persona-to-candidates.md](./persona-to-candidates.md)), and Samad is reworking autofill.
 
 **Assumptions the limits rest on:**
 
@@ -121,11 +122,118 @@ Three PRs, in order:
 - **Abdul:** the production proxy needs per-path timeouts (2c above), and a migration or backfill that must run one
   long statement should do it through Alembic or its own connection, not the app's pool.
 
-### Step 4, errors: one error shape (planned)
+### Step 4a, logging (done; plan agreed 2026-11-03)
+
+Python's `logging` sends every module's records up to one root logger. Each file keeps its
+`logger = logging.getLogger("jobnavigator.…")`; what changed is the one place that decides how a line looks.
+
+- **One setup:** `configure_logging()` in `backend/logging_setup.py`, called once by `backend/main.py` and
+  `backend/scripts/db_upgrade.py`. It replaces `logging.basicConfig`. Lines go to stdout (Docker keeps them: json-file,
+  20 MB × 5): JSON in production, readable text otherwise; `LOG_FORMAT` and `LOG_LEVEL` override
+  (`backend/.env.example`). uvicorn's and the other libraries' lines go through the same handler.
+- **A request id on every line:** `backend/request_log.py`, the outermost middleware. It keeps a safe incoming
+  `X-Request-ID` (up to 64 letters, digits, `_`, `-`) or makes one, sends it back in the response, and writes one line
+  per request: method, **route pattern** (never the raw path: invite links carry their token there), status, time
+  taken, and the user and firm ids (for a Super Admin in a support view, the firm it reads). `/health` is logged at
+  DEBUG. uvicorn's own access log is off (`--no-access-log` in `start.sh`).
+- **A run id in background work:** lines from `launch_background()` and `tracked_run()` carry `run=` (the `job_runs`
+  id). A run started from a request keeps that request's id too; a scheduled run has none.
+- **Masked in every line:** emails (first letter kept), phone numbers (10 to 15 digits; dates, times and addresses are
+  left alone), Bearer tokens, JWTs, `sk-` keys, `password=` / `token=` / `secret=` style fields, the value Postgres
+  quotes in a bad-value error (`invalid input syntax for type integer: "…"`, which ~120 calls log as `f"...{e}"`) and
+  the statement line it quotes with it (`LINE 1: …`, where psycopg2 has already put the values), and long strings of letters and digits (tokens, hashes); UUIDs are kept. Database errors are
+  written as their type, SQLSTATE and statement, without the values Postgres repeats (`DETAIL: Key (email)=(…)`);
+  `hide_parameters` in `backend/models/db.py` keeps bound values out of their text. Validation errors keep where and
+  why, not the input. SQLAlchemy is held at WARNING, so `LOG_LEVEL=DEBUG` never prints rows.
+- **An unexpected error** is logged once, with its traceback and request id; the answer stays the plain
+  "Internal Server Error", plus `X-Request-ID`.
+- **The canary test** (`backend/tests/test_logging_canary.py`) plants a name, email, phone number, résumé text, password
+  and token in sign-in, invites, the password reset from request to new password, candidate create and edit, the
+  résumé parse (the model stubbed), database errors (uncaught, and caught then logged as `f"...{e}"`) and unexpected
+  errors, and fails if any of them reaches the log.
+  With the masking switched off, it fails on the database and validation errors; the other flows log no personal data
+  in the first place.
+- **The rule** is in `CLAUDE.md` ("Things you must not do"): masking is the safety net, not permission.
+- **CI keeps it for new code** (2026-11-04), so nobody has to come back to logging for each new route. Every route
+  is logged by `RequestLog` with no per-route work (`test_logging.py` fails if that breaks), and two checks fail a PR
+  that writes a person's data to the log:
+  - **`backend/tests/test_log_lint.py` reads the code.** It follows people's data from where it enters (a route's
+    body, URL values and uploads; a row of a people table, `PEOPLE_MODELS`; the AI's reply, any `call_*llm`; a reply
+    from Google or an AI provider, `PERSONAL_HOSTS`) through assignments, loops, f-strings, dicts, `model_dump()`,
+    helpers in the same file, background tasks and exceptions, to any logger. Ids, counts, statuses and `len()` pass.
+    It reads branches no request reaches. It fails on `print()` in the server too.
+  - **`backend/tests/test_log_every_route.py` runs every route.** Per route: a fresh database with a row in every
+    table (people's text columns planted), a request built from the route's OpenAPI description with planted values
+    in every string and a planted PDF for a file, and the AI's and Google's replies planted (`route_sweep.py`; no
+    request leaves the test). It fails if a planted value reaches the log, after masking. A new route is checked the
+    day it is added; nobody lists it. 135 of 182 routes run their normal path; `NOT_REACHED` lists the 47 the built
+    request doesn't get through (an OAuth flow, a valid invite token, the browser), with the route's own refusal.
+  - **Measured, not assumed:** `backend/tests/log_leak_cases.py` holds 30 leaks written the ways a teammate plausibly
+    would, before either check, and 10 safe routes. The lint catches 28 and the sweep 24; only a reply from a host
+    not in `PERSONAL_HOSTS`, logged whole, passes both. Neither flags a safe one. Both self-tests fail if that
+    changes. With a leak put into the real candidate-edit route (`who = candidate.full_name`, then logged), both
+    failed.
+  - **Not covered:** a reply from an outside service not in `PERSONAL_HOSTS`; data a helper in another file fetches,
+    logged only in a branch the sweep doesn't run; the normal path of the `NOT_REACHED` routes; scheduler jobs no
+    route starts (the lint reads them, the sweep doesn't). These need a reviewer's look.
+  - **Today's findings:** the lint's `KNOWN` and the sweep's `KNOWN_LEAKS` hold the calls already reported (below);
+    `NOT_PERSONAL` holds 19 matches that aren't personal data, each with why. All three only shrink.
+- **Fixed on the way:** the tracer redirect logged its link's token on a failed click write; it logs the link id.
+- **Left as they are:** the existing log calls. The masking covers what it recognises (database errors, emails, phone
+  numbers, tokens), not free text: the calls that log an AI reply are listed for their owners below. The two backfill
+  scripts print a report
+  in their own format; `backend/scripts/reset_password.py`, which prints the account's name to whoever runs it.
+
+**For teammates (4a):**
+
+- **Everyone:** keep `logging.getLogger("jobnavigator.<area>")` and never call `logging.basicConfig` or add a handler.
+  A new program (the worker in step 3, a new script) calls `configure_logging()` first.
+- **Everyone, logging in new code:** the rule is in the team README ([README.md](./README.md) §4, rule 9). The detail
+  behind it:
+  - **The sweep says a route "answered 4xx to the built request":** make the seed or the request fit
+    (`route_sweep.py`: `FIELD_VALUES` for a value your code checks, `SEED_OVERRIDES` for a table rule), or list it in
+    `NOT_REACHED` with why.
+  - **`NOT_PERSONAL`** is only for a lint match that isn't personal data, with the reason. A new table with a rule
+    across its columns needs a `SEED_OVERRIDES` line (`test_every_table_is_seeded` says when).
+  - **Reviewers:** look at a new log call in an `except` branch or a scheduler job, and at any line added to
+    `NOT_PERSONAL`, `NOT_REACHED`, `KNOWN` or `KNOWN_LEAKS`.
+- **Samad:** `backend/email_monitor/gmail_client.py:36` logs Google's whole reply (`resp.text`) when a token refresh
+  fails. The masking catches what it recognises, but logging the status code and Google's `error` field is safer.
+  Your file, so not changed here.
+- **Samad:** `backend/email_monitor/response_parser.py:171` and `:186` log 200–300 characters of the model's reply
+  about an email, which can quote the email itself. Log its length and the parse error instead. `gmail_client.py:224`
+  logs Google's whole reply when listing messages fails, like `:36` above: log the status code and Google's `error`
+  field.
+- **Zuhair:** two calls log up to 500 characters of the model's reply, which carries the candidate's name, phone and
+  résumé text: `backend/analyzer/cover_letter_generator.py:107` (cover letter) and
+  `backend/analyzer/legacy_tailoring.py:379` (tailoring, moved there from `routes_resumes.py`). Log the reply's length
+  and the parse error instead, as `backend/candidates/parse.py:220` does. (The PDF import and the persona import, which
+  logged a file name, were removed with `routes_resumes.py` and the persona import route, 2026-11-05.) The scrapers
+  (`backend/scraper/orchestrator.py`, `sources/jobspy.py`, `freehire.py`, `jobright.py`,
+  `levelsfyi.py`, `linkedin_personal.py`, and `backend/api/routes_searches.py:328`) log `search.name`, and JobSpy the
+  search term. Searches are per candidate now (0007), and a BDE may name one after the candidate ("Ravi – Java"):
+  log `search.id` instead.
+- **Found by the new lint (2026-11-04):**
+  - **Zuhair:** `backend/analyzer/cv_scorer.py:422` logs the first 200 characters of the scorer's reply when its shape
+    is wrong (like the replies above: log its length); `:731` logs `job.best_cv`, a résumé's name, which a BDE may type
+    as the candidate's name (log the résumé's id).
+  - **Samad:** `backend/api/routes_applications.py:1226` logs a résumé's name (`cv_name`) when it can't be flattened:
+    log the résumé's id.
+  - **Samad, the email classification (2026-11-05), added in #107 for your review:** `process_pending`, `purge_due`
+    and `routes_inbox.py` wrote no log line, and the classifier's AI calls weren't in `llm_call_log`. They now log ids,
+    counts and error codes (never the exception's text, as your code intended), and each provider call is in
+    `llm_call_log` with its firm. Listed in `cross-area-changes.md`; change or drop them as you see fit.
+- **Samad and Zuhair, the calls above:** each is a one-line change (log a length, a status or an id instead of the
+  text). Fix them in your own PR, or agree that Uzair fixes them in a small follow-up PR after #107, listed in
+  `docs/team/cross-area-changes.md`. Found in Abdul's review of #107 and a search of every log call (2026-11-03).
+- **Abdul (deployment):** the collector reads JSON lines from stdout. If the production proxy sets `X-Request-ID`, the
+  backend keeps it, so the proxy's lines and ours share one id. Log retention is the deployment's.
+
+### Step 4b, errors: one error shape (planned)
 
 The frontend shows the backend's `detail` text word for word (`src/components/app/error-state.tsx`), so backend wording reaches users. Step 4 gives every backend error a machine-readable code, RFC 9457 "Problem Details" style, next to the message. The frontend then shows its own plain-language message per code: busy, rate-limited, offline, unexpected. The wording is a product call (Abdul). Internal details (the database, a query) stay in the server logs (OWASP error handling).
 
-Also in step 4: the frontend retries a failed query after about 1 s and 2 s (TanStack Query's default delay;
+Also in 4b: the frontend retries a failed query after about 1 s and 2 s (TanStack Query's default delay;
 `src/lib/query/retry.ts`), while a 503 asks for `Retry-After: 5`. It should wait what the backend asks.
 
 ## 2. Production testing (second)

@@ -12,18 +12,9 @@ import { toIso, toIsoOrNull } from "./shared";
 /**
  * backend/candidates/serialize.py `candidate_json` (docs/candidate-onboarding/06-backend.md §5): the frontend's
  * `CandidateSchema` in snake_case. Seeded ids are UUIDv5 of the fixture ids and come back as `cand_01` etc., so the
- * modules still on mocks (applications, résumés…) keep finding their candidates. `skills` and `summary_state` are for
- * Track 04's Record; the candidate doesn't carry them.
+ * modules still on mocks (applications, résumés…) keep finding their candidates. The skills and the summary are the Record's
+ * claims and the base résumé's, not the candidate's (migration 0015).
  */
-const PersonaDto = z.object({
-  summary: z.string(),
-  tone_notes: z.string().nullable(),
-  will_relocate: z.boolean(),
-  notice_period_days: z.number().int().nullable(),
-  preferred_industries: z.array(z.string()),
-  deal_breakers: z.array(z.string()),
-});
-
 const QaEntryDto = z.object({
   id: z.string(),
   question: z.string(),
@@ -65,7 +56,8 @@ export const CandidateDto = z.object({
   work_settings: z.array(z.string()),
   preferred_locations: z.array(z.string()),
   contact_notes: z.string().nullable(),
-  persona: PersonaDto.nullable(),
+  preferred_industries: z.array(z.string()),
+  deal_breakers: z.array(z.string()),
   qa_bank: z.array(QaEntryDto),
   created_at: z.string(),
   updated_at: z.string(),
@@ -107,14 +99,8 @@ export function toCandidate(dto: CandidateDto): Candidate {
     workSettings: dto.work_settings,
     preferredLocations: dto.preferred_locations,
     contactNotes: dto.contact_notes,
-    persona: dto.persona && {
-      summary: dto.persona.summary,
-      toneNotes: dto.persona.tone_notes,
-      willRelocate: dto.persona.will_relocate,
-      noticePeriodDays: dto.persona.notice_period_days,
-      preferredIndustries: dto.persona.preferred_industries,
-      dealBreakers: dto.persona.deal_breakers,
-    },
+    preferredIndustries: dto.preferred_industries,
+    dealBreakers: dto.deal_breakers,
     qaBank: dto.qa_bank.map((entry) => ({
       id: entry.id,
       question: entry.question,
@@ -137,6 +123,7 @@ export function toBackendCreateCandidate(body: CreateCandidate) {
     primary_role: body.primaryRole,
     email: body.email,
     phone: body.phone,
+    country: body.country,
     linkedin_url: body.linkedinUrl,
     city: body.city,
     state: body.state,

@@ -13,7 +13,6 @@ Firm ─ Owner ─ Manager ─ BDE ─ Candidate
                                   ├─ Résumés: bases (one active), tailored, every edit a version
                                   ├─ Applications                     (job + tailored résumé + status)
                                   ├─ Mailbox + emails                 (the candidate's own inbox, linked to applications)
-                                  ├─ Record: claims + evidence        (Truth Guard: nothing VERIFIED without evidence)
                                   └─ Activity                         (the ledger, by candidate)
 ```
 
@@ -46,7 +45,6 @@ it. Everyone else reads it.
 | `favorite_jobs` | Samad | Written by the BDE in the app and read by the extension |
 | `resumes`, `cover_letters`, `tracer_links`, `tracer_click_events` | Zuhair | |
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
-| `claims`, `evidence` | Zuhair | Truth Guard is enforced in the database; never relax it |
 | `applications`, `interviews` | Samad | |
 | `candidate_mailboxes`, `inbox_messages`, `candidate_google_oauth_attempts` (0010) | Samad | Candidate connection, imported mail and one-use OAuth handoff state |
 | `ledger_entries` | Abdul | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table |
@@ -73,6 +71,12 @@ it. Everyone else reads it.
    with a contract change in `docs/02-DATA-CONTRACTS.md` that Abdul signed off.
 8. **The checks must pass:** `pnpm typecheck && pnpm lint && pnpm test`, and the backend suite (`docs/integration/
    README.md` "Commands").
+9. **Logs carry ids, counts, statuses and timings, never a person's data** (a name, email, phone, résumé or email
+   text, an AI or Google reply, a request body, a file name). Two backend checks fail the PR otherwise:
+   `test_log_lint.py` (reads the code) and `test_log_every_route.py` (runs every route with planted data). A new route
+   or job needs nothing listed; when a check fails, fix the log call, and follow the failure message for the rest. A
+   new table that holds people goes in `PEOPLE_MODELS`; a new outside service that returns people's data goes in
+   `PERSONAL_HOSTS`. Detail: [uzair.md](./uzair.md) §1, step 4a.
 
 ## 5. Where the detail lives
 
@@ -83,9 +87,11 @@ it. Everyone else reads it.
 | Inbox design (D8) | `docs/integration/06-open-decisions.md` D8, Samad's plan |
 | Applications (D3, 10 statuses) | `docs/integration/03-applications.md` |
 | Jobs, scraping | `docs/integration/02-jobs.md` |
-| Résumés, tailoring, claims (D4) | `docs/integration/04-resumes-and-tailoring.md` |
+| Résumés, tailoring | `docs/integration/04-resumes-and-tailoring.md` |
+| `personas` is to be dropped: what `candidates` and `resumes` hold instead, and a suggested mapping | [persona-to-candidates.md](./persona-to-candidates.md) |
 | Connecting a module to the frontend | `docs/integration/README.md` "The workflow for one module" |
 | Password recovery approvals and Notifications inbox | [umamah.md](./umamah.md) |
+| Logging, and the checks that keep it safe | [uzair.md](./uzair.md) §1, step 4a |
 | Decisions | `docs/07-ROUTES-AND-RBAC.md` §0 (Q53 is this plan) |
 
 ## 6. Migration numbers
@@ -99,4 +105,6 @@ it. Everyone else reads it.
 | 0011 | Zuhair | Résumé versioning and upload fingerprints | Merged #106 |
 | 0012 | Samad | Candidate Gmail OAuth/sync and provenance | Merged #104 |
 | 0013 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0012 (Samad's) | `feat/drop-legacy-resume-columns` |
-| 0014+ | — | Claim the next number here in your PR | — |
+| 0014 | Samad | Candidate email classification | Merged #111 |
+| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
+| 0016+ | — | Claim the next number here in your PR | — |

@@ -49,7 +49,7 @@ Turned on locally only for isolated tests (D-25); switched on in production only
 | Classification | Works live (T1.6): configured, tolerant confidence check, config guard and pause, spend counted |
 | Matching | Works; one eligibility rule (D-07); reply/forward rules (D-04) |
 | Reviews | Backend list/command fixed (T3.1–T3.3); review panel and BDE review column live (T3.4–T3.6) |
-| Automatic status updates and Undo | Built (migration 0015); live automatic move and Undo verified (T4.6) |
+| Automatic status updates and Undo | Built (migration 0016); live automatic move and Undo verified (T4.6) |
 | Frontend ten statuses | Built (T2.1); legacy values shown read-only |
 | Setup recovery, older mail | Built (Phase 7); recovery run on 25 emails; historical switch off (0 eligible) |
 | Checks | Full backend 3852 passed / 0 failed; frontend 613 tests, typecheck, lint, build passed; axe not run |

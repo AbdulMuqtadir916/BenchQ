@@ -6,6 +6,7 @@ import type { RemoteMode } from "@/lib/schemas/enums";
 import { ChoicePill, fieldAria, WizardField } from "./field";
 import { SwitchRow } from "./parts";
 import { TagInput } from "./tag-input";
+import type { Errors } from "./model";
 import type { Wizard } from "./use-wizard";
 
 const WORK_SETTINGS: { value: RemoteMode; label: string }[] = [
@@ -15,10 +16,10 @@ const WORK_SETTINGS: { value: RemoteMode; label: string }[] = [
 ];
 
 /**
- * Step 4 (04-wizard-steps.md §3): what the candidate wants. Every field is optional ("Skip for now"). Work setting,
+ * Step 4 (04-wizard-steps.md §3): what the candidate wants. Target roles are required; every other field is optional. Work setting,
  * preferred locations and the notes are provisional fields (07 Q50).
  */
-export function StepPreferences({ wizard }: { wizard: Wizard }) {
+export function StepPreferences({ wizard, errors }: { wizard: Wizard; errors: Errors }) {
   const { values, set } = wizard;
   const roleSuggestions = [values.primaryRole.trim()].filter(Boolean);
 
@@ -32,7 +33,7 @@ export function StepPreferences({ wizard }: { wizard: Wizard }) {
         </div>
       </div>
 
-      <WizardField id="cw-target-roles" label="Target roles" hint="Jobs are matched against every title here.">
+      <WizardField id="cw-target-roles" label="Target roles" required error={errors.targetRoles} hint="Jobs are matched against every title here.">
         <TagInput id="cw-target-roles" label="target roles" describedBy="cw-target-roles-hint" values={values.targetRoles} onChange={(next) => set("targetRoles", next)} suggestions={roleSuggestions} placeholder="Senior Java Developer…" />
       </WizardField>
 

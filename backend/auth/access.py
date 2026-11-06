@@ -245,6 +245,19 @@ def route_key(app: FastAPI, request: Request) -> str | None:
     return None
 
 
+# backend/request_log.py has already matched the route: (method, path, key) in the request's state.
+SAVED_ROUTE = "route_key"
+
+
+def _request_route_key(request: Request) -> str | None:
+    """The request log's lookup when it was made for this method and path, otherwise a fresh one: a middleware that
+    rewrote the path in between can never get another route's access class."""
+    saved = (request.scope.get("state") or {}).get(SAVED_ROUTE)
+    if saved is not None and saved[:2] == (request.method, request.scope["path"]):
+        return saved[2]
+    return route_key(request.app, request)
+
+
 # ── The middleware ────────────────────────────────────────────────────────────
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -261,7 +274,7 @@ async def enforce(request: Request, call_next):
     refuse what the route's class does not allow. Sets `request.state.principal` for signed-in routes."""
     if request.method == "OPTIONS":                 # CORS preflight: CORSMiddleware answers it
         return await call_next(request)
-    key = route_key(request.app, request)
+    key = _request_route_key(request)
     if key is None:                                 # no such route: the router's own 404/405
         return await call_next(request)
     access = ROUTE_ACCESS.get(key)

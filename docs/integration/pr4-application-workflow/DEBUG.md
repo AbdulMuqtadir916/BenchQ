@@ -227,7 +227,12 @@ foreign key to `jobs.id` (a job posting), **not** a worker attempt — it is not
 - First step: one isolated test call to learn whether Decisions returns `usage.cost` and whether the model is priced.
 **Why this one.** True totals with no change to another owner's table. A per-row quality column is possible through the
 owner (README §4) if Abdul prefers; not required for correctness.
-**Verify.** Recorded amount and tokens for ACTUAL and ESTIMATED; UNKNOWN ⇒ no row, in `unpriced_calls`; discarded claim
+**Merged with main (2026-11-06, PR #107 logging):** main's rule is one `llm_call_log` row for every dispatched call,
+failures included (Q33). Adopted: every dispatched call now gets exactly one row, written in the result transaction;
+cost is ACTUAL or ESTIMATED when known, otherwise the price table's value, and the call is also counted in
+`unpriced_calls` so an unknown charge is never silently free. Main's own out-of-transaction logger call was replaced by
+this one (no double row). Main's test for a classifier that isn't set up now expects the T1.1 behaviour (email waits).
+**Verify.** Recorded amount and tokens for ACTUAL and ESTIMATED; UNKNOWN ⇒ one row, also in `unpriced_calls`; discarded claim
 ⇒ not counted; finalize twice ⇒ one row; caller transaction untouched by the logger.
 ### D-16 — Alpha endpoint decision · Medium · moved to Phase 1
 **Selected.** Keep the Decisions endpoint (its per-category probabilities are what the policy needs; the shared chat
