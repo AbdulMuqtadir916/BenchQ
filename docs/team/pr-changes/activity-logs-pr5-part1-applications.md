@@ -3,6 +3,11 @@
 Branch: `activity-logs/pr5-part1-applications` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 Built on PR 4 (`activity-logs/pr4-activity-screen`), which holds PRs 1 to 3. Merge those first.
 
+## An AI agent's person
+
+An agent's entry stores its person's role in `actor_role`, and the API returns the person's name as `on_behalf_of_name`,
+so the Actor column can show them (PR 4). A system entry has neither.
+
 ## Status changes on hand-logged applications
 
 A status change on a hand-logged application used to read "Updated application details." or "Updated application

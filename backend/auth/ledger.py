@@ -96,13 +96,19 @@ def record_automated(db: DbSession, *, actor_type: str, actor_name: str, action:
     if actor_type not in {"SYSTEM", "AGENT"}:
         raise ValueError("Automated ledger actor must be SYSTEM or AGENT.")
     entry = ActivityEntry(firm_id=firm_id, candidate_id=candidate_id, actor_type=actor_type,
-        actor_user_id=None, actor_name=actor_name, action=action, entity_type=entity_type,
+        actor_user_id=None, actor_name=actor_name, actor_role=on_behalf_of.role if on_behalf_of else None,
+        action=action, entity_type=entity_type,
         entity_id=str(entity_id), entity_label=entity_label, summary=summary, model_id=model_id,
         on_behalf_of_user_id=on_behalf_of.id if on_behalf_of else None, **_stamps(db, candidate_id, on_behalf_of))
     if at is not None:
         entry.created_at = at
     db.add(entry)
     return entry
+
+
+def agent_person(actor_name: str) -> str:
+    """The person's name inside an agent's actor name, as it was when the entry was written (`record_agent`)."""
+    return actor_name.removeprefix("AI agent (").removesuffix(")")
 
 
 def record_agent(db: DbSession, *, person: User, action: str, entity_type: str, entity_id: uuid.UUID | str,

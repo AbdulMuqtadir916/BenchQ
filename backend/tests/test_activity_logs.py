@@ -101,7 +101,7 @@ def test_an_ai_agent_acts_for_a_person_without_being_them(test_db, world):
                                     firm_id=world.id, candidate_id=world.asha.id, on_behalf_of=world.bea)
     test_db.commit()
     assert (entry.actor_user_id, entry.on_behalf_of_user_id) == (None, world.bea.id)
-    assert (entry.actor_role, entry.team_manager_id) == (None, world.mira.id)
+    assert (entry.actor_role, entry.team_manager_id) == ("BDE", world.mira.id)
 
 
 def test_an_entry_carries_the_requests_id(test_db, world):
