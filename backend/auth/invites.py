@@ -152,7 +152,7 @@ def send_invite(db: DbSession, *, inviter: User | PlatformUser, firm: Firm | Non
     db.add(invite)
     db.flush()
     ledger.record(db, actor=inviter, action="INVITE_SENT", entity_type="invite", entity_id=invite.id,
-                  entity_label=email, summary=summary, firm_id=invite.firm_id)
+                  entity_label=email, summary=summary, firm_id=invite.firm_id, candidate_id=None)
     return invite, token
 
 
@@ -177,7 +177,7 @@ def resend_invite(db: DbSession, invite: Invite, *, actor: User | PlatformUser, 
     invite.token_hash = hash_token(token)
     invite.expires_at = now + INVITE_LIFETIME
     ledger.record(db, actor=actor, action="INVITE_SENT", entity_type="invite", entity_id=invite.id,
-                  entity_label=invite.email, summary=f"Invite resent to {invite.email}", firm_id=invite.firm_id)
+                  entity_label=invite.email, summary=f"Invite resent to {invite.email}", firm_id=invite.firm_id, candidate_id=None)
     return token
 
 
@@ -187,7 +187,7 @@ def revoke_invite(db: DbSession, invite: Invite, *, actor: User | PlatformUser, 
     invite.status = "REVOKED"
     invite.revoked_at = now
     ledger.record(db, actor=actor, action="INVITE_REVOKED", entity_type="invite", entity_id=invite.id,
-                  entity_label=invite.email, summary=f"Revoked the invite to {invite.email}", firm_id=invite.firm_id)
+                  entity_label=invite.email, summary=f"Revoked the invite to {invite.email}", firm_id=invite.firm_id, candidate_id=None)
 
 
 def invite_json(invite: Invite, now: datetime | None = None) -> dict:

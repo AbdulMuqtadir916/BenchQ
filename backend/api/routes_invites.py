@@ -106,7 +106,7 @@ def accept(token: str, body: AcceptBody, request: Request, response: Response, d
         db.rollback()
         raise HTTPException(status_code=409, detail="An account with this email already exists. Sign in instead.")
     ledger.record(db, actor=account, action="INVITE_ACCEPTED", entity_type="invite", entity_id=invite.id,
-                  entity_label=invite.email, summary=summary, firm_id=invite.firm_id)
+                  entity_label=invite.email, summary=summary, firm_id=invite.firm_id, candidate_id=None)
 
     end_session(db, request.cookies.get(COOKIE_NAME))
     session_token, row = start_session(db, account, now)

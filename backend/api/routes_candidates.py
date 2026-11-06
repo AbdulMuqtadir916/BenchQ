@@ -280,10 +280,10 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     db.flush()
     actor = db.get(User, principal.user_id)
     ledger.record(db, actor=actor, action="CREATE", entity_type="candidate", entity_id=candidate.id,
-                  entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}")
+                  entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}", candidate_id=candidate.id)
     ledger.record(db, actor=actor, action="ASSIGN", entity_type="candidate", entity_id=candidate.id,
                   entity_label=candidate.full_name, firm_id=firm_id, summary=_assign_summary(manager, bde, None),
-                  note=_clean(body.handoff_note))
+                  note=_clean(body.handoff_note), candidate_id=candidate.id)
     db.commit()
     return candidate_json(candidate)
 
@@ -310,7 +310,7 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     if changes:
         ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="candidate",
                       entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changes)}")
+                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changes)}", candidate_id=candidate.id)
         db.commit()
     return candidate_json(candidate)
 
@@ -333,6 +333,6 @@ def assign_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: AssignBo
     candidate.manager_id, candidate.bde_id = manager.id, new_bde_id
     ledger.record(db, actor=db.get(User, principal.user_id), action="ASSIGN", entity_type="candidate",
                   entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                  summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note))
+                  summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note), candidate_id=candidate.id)
     db.commit()
     return candidate_json(candidate)
