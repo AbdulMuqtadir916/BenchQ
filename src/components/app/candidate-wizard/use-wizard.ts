@@ -34,8 +34,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, values: { ...state.values, [action.field]: action.value }, drafted };
     }
     case "draft": {
+      // A second résumé replaces every résumé field, so only the new file's markers remain.
       const { values, drafted } = applyDraft(state.values, action.draft);
-      return { values, drafted: new Set([...state.drafted, ...drafted]), hasStarted: true };
+      const kept = state.values.resume === null ? [...state.drafted] : [];
+      return { values, drafted: new Set([...kept, ...drafted]), hasStarted: true };
     }
     case "start":
       return state.hasStarted ? state : { ...state, hasStarted: true };

@@ -81,11 +81,24 @@ const isUs = (country: string) => /^(u\.?s\.?a?\.?|united states( of america)?|a
 
 const isBlank = (value: unknown) => value === "" || value === null || (Array.isArray(value) && value.length === 0);
 
+/** The form with every résumé field back to empty (the next résumé fills them); the rest is kept. */
+function clearResumeFields(values: WizardValues): WizardValues {
+  const out: WizardValues = { ...values, workAuthText: EMPTY_VALUES.workAuthText };
+  for (const field of DRAFTABLE) Object.assign(out, { [field]: EMPTY_VALUES[field] });
+  return out;
+}
+
 /**
  * Fill the form from a résumé draft. Only empty fields are filled, so nothing typed is overwritten; the filled ones
  * are returned as drafted. Skills are merged (new names only).
+ *
+ * Another résumé uploaded after one (the first was the wrong file): every résumé field (`DRAFTABLE`: name, Marketed
+ * as, years, contact, location, summary, skills, work authorization) is cleared first, edited or not, so the new file
+ * fills them all; one it doesn't have stays empty (country back to US). Rates, availability, preferences and the
+ * assignment are the person's and stay.
  */
 export function applyDraft(values: WizardValues, draft: ResumeDraft): { values: WizardValues; drafted: DraftableField[] } {
+  if (values.resume !== null) values = clearResumeFields(values);
   const next: WizardValues = { ...values, resume: { parseId: draft.parseId, fileName: draft.fileName } };
   const drafted: DraftableField[] = [];
   const fill = <K extends Exclude<DraftableField, "skills">>(field: K, value: WizardValues[K] | null) => {

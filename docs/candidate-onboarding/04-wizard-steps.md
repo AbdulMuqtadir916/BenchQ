@@ -69,6 +69,10 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 - On a file: the zone shows the file name and "Reading the résumé…" with a skeleton of the next step; then step 2 opens
   with the drafted fields filled and a strip "{n} fields drafted from the résumé — review them before you create the
   candidate."
+- Another file after one (the first was the wrong résumé; back on step 1, upload again): every résumé field (name,
+  Marketed as, years, email, phone, LinkedIn, city, state, country, summary, skills, work authorization) is replaced by
+  the new file's, edited or not; one it lacks is left empty (country US). Rates, availability, preferences and the
+  assignment stay (`applyDraft`, 2026-11-06).
 - Parse error: "Couldn't read this résumé. Try another file, or enter the details yourself." with Try again and Skip.
 - "Try a sample" chips: only when the parse adapter runs on mocks (assumption A1).
 - "No résumé yet? … Skip, enter manually" → step 2, empty.

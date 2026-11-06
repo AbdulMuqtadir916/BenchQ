@@ -27,6 +27,17 @@ describe("applyDraft (07 Q49)", () => {
     expect(drafted).not.toContain("fullName");
   });
 
+  it("a second résumé replaces every résumé field, edited or not, and keeps the rest", () => {
+    const first = applyDraft(EMPTY_VALUES, { ...draft, country: "Canada" });
+    // The owner edits the city, adds a skill by hand and sets a rate; then uploads the right file.
+    const edited = { ...first.values, city: "Plano", rateTarget: "80", skills: [...first.values.skills, { name: "Kafka", family: null, source: "MANUAL" as const }] };
+    const second = applyDraft(edited, { ...draft, parseId: "parse_2", fileName: "Right.pdf", fullName: "Asha Rao", email: "asha@example.com",
+      city: "Dallas", country: null, summary: "", workAuth: "GC", skills: [{ name: "Python", family: "Languages" }] });
+    expect(second.values).toMatchObject({ resume: { parseId: "parse_2", fileName: "Right.pdf" }, fullName: "Asha Rao", email: "asha@example.com",
+      city: "Dallas", country: "US", summary: "", workAuth: "GC", rateTarget: "80" });
+    expect(second.values.skills.map((skill) => `${skill.name}:${skill.source}`)).toEqual(["Python:RESUME_UPLOAD"]);
+  });
+
   it("keeps the printed work authorization when it matched nothing", () => {
     expect(applyDraft(EMPTY_VALUES, { ...draft, workAuth: null, workAuthText: "Authorized to work" }).values).toMatchObject({ workAuth: null, workAuthText: "Authorized to work" });
   });
