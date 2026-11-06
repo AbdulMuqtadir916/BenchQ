@@ -19,7 +19,6 @@ const WORK_AUTH_DETAIL: Record<WorkAuth, string> = {
   GC_EAD: "Pending GC",
   USC: "No sponsorship",
   TN: "Canada / Mexico",
-  OTHER: "Explain in notes",
 };
 
 const digits = (value: string) => value.replace(/[^\d]/g, "");

@@ -23,7 +23,8 @@ from backend.models.db import Base
 from backend.models.tenancy import _created_at, _in, _pk, _restrict, _updated_at
 
 # The frontend's enums (src/lib/schemas/enums.ts).
-WORK_AUTHS = ("H1B", "H4_EAD", "OPT", "CPT", "GC", "GC_EAD", "USC", "TN", "OTHER")
+# No OTHER since 0015 (Abdul, 2026-11-06): every status has a sponsorship rule, so needs_sponsorship is always known.
+WORK_AUTHS = ("H1B", "H4_EAD", "OPT", "CPT", "GC", "GC_EAD", "USC", "TN")
 EMPLOYMENT_TYPES = ("C2C", "W2", "TEEN99", "FTE")
 CANDIDATE_STATUSES = ("ON_BENCH", "INTERVIEWING", "OFFER", "PLACED", "PAUSED", "INACTIVE")
 REMOTE_MODES = ("ONSITE", "HYBRID", "REMOTE")

@@ -314,7 +314,7 @@ No résumé uploaded (`resume_parse_id` null) → no base is created; one can be
 Built in PR 4 (`backend/candidates/first_base.py`):
 - The first base's `name` is **"Base"**. (`is_base` was set while the column existed; PR 6 dropped it.)
 - **Work authorization** is the form's code in the app's own label (`USC` → "US Citizen", `H1B` → "H-1B", as
-  `work-auth-chip.tsx`); `OTHER` keeps the résumé's own wording.
+  `work-auth-chip.tsx`). There is no `OTHER` since 0015.
 - **`json_data`** was left empty on new rows until PR 6 dropped it; its readers now read the columns (§4.8).
 
 ### 4.3 Every action

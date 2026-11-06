@@ -40,7 +40,15 @@ def _world(engine) -> dict:
                           "created_by_user_id, full_name, summary) "
                           "VALUES (:id, :f, :c, 'Base', :b, 'BASE', 1, :o, 'Asha', 'The base summary.')"),
                      {"id": ids["v1"], "f": ids["firm"], "c": ids["asha"], "b": ids["base"], "o": ids["owner"]})
+        conn.execute(text("INSERT INTO ledger_entries (firm_id, actor_type, actor_name, entity_type, entity_id, "
+                          "entity_label, action, summary, evidence_ids, claim_state) VALUES (:f, 'SYSTEM', 'test', "
+                          "'candidate', 'x', 'Asha', 'UPDATE', 's', ARRAY['e1'], 'UNVERIFIED')"), {"f": ids["firm"]})
     return ids
+
+
+_LEDGER_ENTRY = ("INSERT INTO ledger_entries (firm_id, actor_type, actor_name, entity_type, entity_id, entity_label, "
+                 "action, summary, claim_state) VALUES (:f, 'SYSTEM', 'test', 'candidate', 'x', 'Asha', 'UPDATE', 's', "
+                 ":state)")
 
 
 def _manual_base(engine, ids, source="MANUAL", candidate="plain") -> None:
@@ -60,7 +68,10 @@ def test_industries_and_deal_breakers_are_copied_out_and_the_old_columns_go(scra
     assert not {"persona", "skills", "summary_state"} & columns and {"preferred_industries", "deal_breakers"} <= columns
     assert not next(c for c in inspect(engine).get_columns("candidates") if c["name"] == "needs_sponsorship")["nullable"]
     assert not {"claims", "evidence"} & set(inspect(engine).get_table_names())          # BenchQ has no claim states
+    ledger = {c["name"] for c in inspect(engine).get_columns("ledger_entries")}
+    assert not {"claim_state", "evidence_ids"} & ledger                                 # nor does the ledger
     with engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM ledger_entries")).scalar() == 1     # the entry itself stays
         row = conn.execute(text("SELECT preferred_industries, deal_breakers FROM candidates WHERE id = :id"),
                            {"id": ids["asha"]}).one()
         assert (row.preferred_industries, row.deal_breakers) == (["fintech", "healthcare"], ["no travel"])
@@ -108,8 +119,33 @@ def test_the_way_back_rebuilds_the_columns_from_the_base_brings_the_empty_tables
                               {"name": "Go", "family": None, "source": "MANUAL", "state": "UNVERIFIED"}]
         assert conn.execute(text("SELECT count(*) FROM claims")).scalar() == 0              # the tables are back, empty
         assert conn.execute(text("SELECT count(*) FROM evidence")).scalar() == 0
+        ledger = conn.execute(text("SELECT evidence_ids, claim_state FROM ledger_entries")).one()
+        assert (ledger.evidence_ids, ledger.claim_state) == ([], None)                    # back, empty
         assert row.summary_state == "UNVERIFIED"
         assert {r.source for r in conn.execute(text("SELECT source FROM base_resumes"))} == {"PROMOTED"}
+    with pytest.raises(IntegrityError, match="ck_ledger_entries_claim_state"), engine.begin() as conn:
+        conn.execute(text(_LEDGER_ENTRY), {"f": ids["firm"], "state": "MAYBE"})          # and its CHECK is back
     _ok(_alembic(name, "upgrade", "0015"))
     assert "persona" not in {c["name"] for c in inspect(engine).get_columns("candidates")}
+    assert "claim_state" not in {c["name"] for c in inspect(engine).get_columns("ledger_entries")}
     assert not {"claims", "evidence"} & set(inspect(engine).get_table_names())
+
+
+def _set_work_auth(engine, candidate, work_auth) -> None:
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE candidates SET work_auth = :w WHERE id = :id"), {"w": work_auth, "id": candidate})
+
+
+def test_other_is_no_longer_a_work_authorization_and_a_candidate_with_it_stops_the_upgrade(scratch_db):
+    name, engine = scratch_db
+    _ok(_alembic(name, "upgrade", "0013"))
+    ids = _world(engine)
+    _set_work_auth(engine, ids["plain"], "OTHER")
+    stopped = _alembic(name, "upgrade", "0015")
+    assert stopped.returncode != 0 and "1 candidate(s) have work authorization OTHER" in stopped.stderr
+    _set_work_auth(engine, ids["plain"], "H1B")                                  # a person sets a real one
+    _ok(_alembic(name, "upgrade", "0015"))
+    with pytest.raises(IntegrityError, match="ck_candidates_work_auth"):
+        _set_work_auth(engine, ids["plain"], "OTHER")
+    _ok(_alembic(name, "downgrade", "0013"))
+    _set_work_auth(engine, ids["plain"], "OTHER")                                # the way back allows it again

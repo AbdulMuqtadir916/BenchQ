@@ -13,7 +13,6 @@ export const WORK_AUTH_LABEL: Record<WorkAuth, string> = {
   GC_EAD: "GC EAD",
   USC: "US Citizen",
   TN: "TN",
-  OTHER: "Other",
 };
 
 /** WorkAuthChip — work authorization with an amber warning when expiring soon. */

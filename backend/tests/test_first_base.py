@@ -103,11 +103,10 @@ def test_no_upload_gets_a_manual_base_from_the_form(anonymous_client, test_db, w
     assert (v1.category, v1.version, v1.experiences, v1.educations) == ("BASE", 1, [], [])
 
 
-def test_other_work_authorization_keeps_the_resumes_own_words(anonymous_client, test_db, world):
+def test_other_is_not_a_work_authorization(anonymous_client, test_db, world):
     upload = _upload(test_db, world)
     r = _create(anonymous_client, world, resume_parse_id=str(upload.id), work_auth="OTHER")
-    (_,), (v1,) = _rows(test_db, r.json()["id"])
-    assert v1.work_authorization == "H1B visa"
+    assert r.status_code == 422 and r.json()["detail"][0]["loc"][-1] == "work_auth"
 
 
 def test_two_candidates_each_get_their_own_base(anonymous_client, test_db, world):

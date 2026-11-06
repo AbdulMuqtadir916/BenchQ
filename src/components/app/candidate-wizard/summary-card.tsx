@@ -13,7 +13,7 @@ import type { WizardValues } from "./model";
  */
 export function SummaryCard({ values, assignedBdeName = null }: { values: WizardValues; assignedBdeName?: string | null }) {
   const name = values.fullName.trim() || "New candidate";
-  const location = [values.city.trim(), values.state.trim()].filter(Boolean).join(", ");
+  const location = [values.city.trim(), values.state.trim(), values.country.trim()].filter(Boolean).join(", ");
   const years = values.yearsExperience.trim();
 
   return (

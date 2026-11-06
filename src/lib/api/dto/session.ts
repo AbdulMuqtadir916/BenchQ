@@ -112,8 +112,6 @@ export const LedgerEntryDto = z.object({
   note: z.string().nullable().optional(),
   model_id: z.string().nullable(),
   prompt_version: z.string().nullable(),
-  evidence_ids: z.array(z.string()),
-  claim_state: z.string().nullable(),
   created_at: z.string(),
 });
 
@@ -258,8 +256,6 @@ export function toLedgerEntry(dto: z.infer<typeof LedgerEntryDto>): LedgerEntry 
     note: dto.note ?? null,
     modelId: dto.model_id,
     promptVersion: dto.prompt_version,
-    evidenceIds: dto.evidence_ids,
-    claimState: dto.claim_state,
     createdAt: toIso(dto.created_at),
   });
 }

@@ -20,7 +20,7 @@ For everyone on the team. Decided 2026-11-05 (Abdul).
 | Kind | Columns |
 |---|---|
 | Who and where | `full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`, `willing_to_relocate` |
-| Work authorization | `work_auth` (`H1B`, `H4_EAD`, `OPT`, `CPT`, `GC`, `GC_EAD`, `USC`, `TN`, `OTHER`), `work_auth_expiry`, `needs_sponsorship`, `needs_transfer` |
+| Work authorization | `work_auth` (`H1B`, `H4_EAD`, `OPT`, `CPT`, `GC`, `GC_EAD`, `USC`, `TN`; no `OTHER` since 0015), `work_auth_expiry`, `needs_sponsorship`, `needs_transfer` |
 | Work and pay | `employment_types` (C2C, W2, 1099, FTE), `rate_min`, `rate_target` |
 | Availability | `status`, `bench_start_date`, `available_from`, `notice_period_days` |
 | Role | `primary_role` ("Marketed as"), `target_roles`, `years_experience` |
@@ -78,8 +78,8 @@ saved answer matches.
 
 | Answer key | New source |
 |---|---|
-| `work_auth_type` | `candidates.work_auth`: `USC` → `citizen`; `GC` → `permanent_resident`; `H1B`, `H4_EAD`, `OPT`, `CPT`, `TN` → `visa`; `GC_EAD`, `OTHER` → `other` |
-| `authorized_us` | `true` for every `work_auth` except `OTHER`; `OTHER` → no source |
+| `work_auth_type` | `candidates.work_auth`: `USC` → `citizen`; `GC` → `permanent_resident`; `H1B`, `H4_EAD`, `OPT`, `CPT`, `TN` → `visa`; `GC_EAD` → `other` |
+| `authorized_us` | `true` for every `work_auth` (each one is a US work authorization) |
 | `requires_sponsorship_now`, `requires_sponsorship_future` | `candidates.needs_sponsorship` (it follows `work_auth` unless the BDE entered it). **Open for Samad:** whether `needs_transfer` (an H1B transfer) also answers "yes" here |
 | `over_18` | no source |
 

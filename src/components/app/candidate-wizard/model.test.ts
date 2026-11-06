@@ -30,6 +30,29 @@ describe("applyDraft (07 Q49)", () => {
   it("keeps the printed work authorization when it matched nothing", () => {
     expect(applyDraft(EMPTY_VALUES, { ...draft, workAuth: null, workAuthText: "Authorized to work" }).values).toMatchObject({ workAuth: null, workAuthText: "Authorized to work" });
   });
+
+  it("takes the résumé's country over the default US, but never over one that was typed", () => {
+    expect(EMPTY_VALUES.country).toBe("US");
+    const canada = applyDraft(EMPTY_VALUES, { ...draft, country: "Canada" });
+    expect(canada.values.country).toBe("Canada");
+    expect(canada.drafted).toContain("country");
+    expect(applyDraft(EMPTY_VALUES, { ...draft, country: "USA" }).values.country).toBe("US");
+    expect(applyDraft({ ...EMPTY_VALUES, country: "Mexico" }, { ...draft, country: "Canada" }).values.country).toBe("Mexico");
+  });
+});
+
+describe("the country sent", () => {
+  it("is what the person entered, any country; every way of writing the US is sent as US", () => {
+    const sent = (country: string) => toCreateCandidate({ ...valid, country, managerId: "m" }).country;
+    expect(sent("Canada")).toBe("Canada");
+    expect(sent(" Mexico ")).toBe("Mexico");
+    expect(sent("United States")).toBe("US");
+    expect(sent("U.S.A.")).toBe("US");
+  });
+
+  it("is required", () => {
+    expect(validateStep("basic", { ...valid, country: " " })).toEqual({ country: "Enter their country." });
+  });
 });
 
 describe("validateStep", () => {
@@ -103,6 +126,6 @@ describe("toCreateCandidate", () => {
     expect(sent("H1B")).toMatchObject({ needsSponsorship: true, needsTransfer: true });
     expect(sent("OPT")).toMatchObject({ needsSponsorship: true, needsTransfer: false });
     expect(sent("GC")).toMatchObject({ needsSponsorship: false, needsTransfer: false });
-    expect(sent("OTHER")).toMatchObject({ needsSponsorship: false, needsTransfer: false });
+    expect(sent("TN")).toMatchObject({ needsSponsorship: true, needsTransfer: false });
   });
 });
