@@ -13,7 +13,7 @@ These tables exist only through Alembic (migrations/versions/0003_auth_tenancy.p
 import uuid
 
 from sqlalchemy import (
-    ARRAY, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
+    Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
     text,
 )
 from sqlalchemy import event
@@ -34,7 +34,6 @@ LEDGER_ACTIONS = (
     "INVITE_SENT", "INVITE_ACCEPTED", "INVITE_REVOKED",
     "ASSIGN",   # a candidate's manager or BDE set or changed (docs/02 §3.4, 07 Q43)
 )
-CLAIM_STATES = ("VERIFIED", "UNVERIFIED", "CONTRADICTED")
 FIRM_JOB_ORIGINS = ("SCRAPED", "CAPTURED")
 # Job.source values a person captured by hand (migration 0005 backfills these as CAPTURED). Their routes link them.
 CAPTURED_SOURCES = ("manual", "extension")
@@ -280,8 +279,6 @@ class LedgerEntry(Base):
     note = Column(Text, nullable=True)                    # the handoff note on an ASSIGN entry (docs/02 §3.4)
     model_id = Column(String, nullable=True)
     prompt_version = Column(String, nullable=True)
-    evidence_ids = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
-    claim_state = Column(String, nullable=True)
     # The candidate the entry is about, if any (07 Q53h): the candidate's activity is one query. No foreign key: the
     # ledger outlives what it describes. Every write about a candidate passes it (ledger.record).
     candidate_id = Column(UUID(as_uuid=True), nullable=True)
@@ -290,8 +287,6 @@ class LedgerEntry(Base):
     __table_args__ = (
         CheckConstraint(_in("actor_type", LEDGER_ACTOR_TYPES), name="ck_ledger_entries_actor_type"),
         CheckConstraint(_in("action", LEDGER_ACTIONS), name="ck_ledger_entries_action"),
-        CheckConstraint(f"claim_state IS NULL OR {_in('claim_state', CLAIM_STATES)}",
-                        name="ck_ledger_entries_claim_state"),
         Index("ix_ledger_entries_firm_created", "firm_id", "created_at"),
         Index("ix_ledger_entries_firm_candidate_created", "firm_id", "candidate_id", "created_at"),
         Index("ix_ledger_entries_created", "created_at"),
@@ -326,8 +321,6 @@ class ActivityEntry(Base):
     request_id = Column(String, nullable=True)            # the request that wrote it, to find in the server logs
     model_id = Column(String, nullable=True)
     prompt_version = Column(String, nullable=True)
-    evidence_ids = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
-    claim_state = Column(String, nullable=True)
     candidate_id = Column(UUID(as_uuid=True), nullable=True)           # the candidate it is about, if any (07 Q53h)
     candidate_manager_id = Column(UUID(as_uuid=True), nullable=True)   # that candidate's manager at the time
     candidate_bde_id = Column(UUID(as_uuid=True), nullable=True)       # that candidate's BDE at the time
@@ -338,8 +331,6 @@ class ActivityEntry(Base):
         CheckConstraint(f"actor_role IS NULL OR {_in('actor_role', ACTIVITY_ACTOR_ROLES)}",
                         name="ck_activity_logs_actor_role"),
         CheckConstraint(_in("action", LEDGER_ACTIONS), name="ck_activity_logs_action"),
-        CheckConstraint(f"claim_state IS NULL OR {_in('claim_state', CLAIM_STATES)}",
-                        name="ck_activity_logs_claim_state"),
         Index("ix_activity_logs_created", "created_at"),
         Index("ix_activity_logs_firm_created", "firm_id", "created_at", "id"),
         Index("ix_activity_logs_firm_candidate_created", "firm_id", "candidate_id", "created_at"),

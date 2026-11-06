@@ -17,7 +17,7 @@ the single reference for building it: the tables (§3), the workflow (§4), the 
 | Rewrite the résumé section of `docs/team/00-candidate-core.md` ("Résumés: one base, many tailored (Q53e)") | Many bases per candidate, one active; `category` instead of `is_base`; no `parent_id`; `resume_parse_id` on `base_resumes` |
 | The `docs/02-DATA-CONTRACTS.md` addition | A `BaseResume` entity; `baseResumeId` on `Resume`; the new parser fields (§2) in `ResumeDraftSchema` and the studio content |
 | Migration numbers | `0008` (additive, PR 3), `0011` (additive, PR 5) and the next free number for the drops (PR 6; `0009` went to Applications), each claimed in `docs/team/README.md` §6 in the PR that adds it |
-| Awards are claims | `award` added to `claims.entity_type` (0007's `ck_claims_entity_type` widened in 0008), and to the frontend `entityType` enums in docs/02 |
+| Awards | awards are a section of the résumé like the others (`resumes.awards`); the `claims` table they were once added to is gone (0015, 2026-11-05) |
 
 Only what this table lists is approved. Any other rename, drop or `candidates` change still goes to Abdul first.
 
@@ -86,7 +86,7 @@ The parser gets its own rows in the `settings` table, each with its default in `
 
 ```
 resume_parses ──(resume_parse_id)──▶ base_resumes ◀──(base_resume_id)── resumes
-   uploads (the evidence)              the shelf of bases          every version of every résumé
+   uploads                             the shelf of bases          every version of every résumé
 ```
 
 ### 3.1 `resume_parses` — uploads (exists; one column dropped)
@@ -111,7 +111,7 @@ resume_parses ──(resume_parse_id)──▶ base_resumes ◀──(base_resum
   the same file twice (§4.6). Drafts (no candidate) are not checked. The model computes the fingerprint from
   `content` whenever a row is written, so the onboarding parse route is unchanged; 0011 fills it in for existing rows.
 - **Dropped:** `updated_at` (it only marked when the draft was kept, which is the candidate's `created_at`).
-- Holds uploads only. A BDE-made base never goes here: evidence (`evidence.resume_parse_id`) points at this table as
+- Holds uploads only. A BDE-made base never goes here: a base points at this table as
   "the document the candidate supplied".
 - `parse` is kept after create: the record of what the AI extracted (as opposed to what a person corrected) and the
   baseline for parser-quality work (1.2).
@@ -123,8 +123,8 @@ resume_parses ──(resume_parse_id)──▶ base_resumes ◀──(base_resum
 | `id` | uuid | PK, `gen_random_uuid()` | The base's id ("base 1, 2…") |
 | `firm_id` | uuid | FK → firms, NOT NULL | The firm that owns it |
 | `candidate_id` | uuid | FK → candidates, NOT NULL | The candidate it belongs to |
-| `source` | varchar | NOT NULL, `UPLOAD` / `PROMOTED` | Made from an upload, or promoted by a person from a `resumes` version |
-| `resume_parse_id` | uuid | FK → resume_parses, nullable | The upload it came from; required for `UPLOAD` |
+| `source` | varchar | NOT NULL, `UPLOAD` / `PROMOTED` / `MANUAL` | Made from an upload, promoted by a person from a `resumes` version, or (`MANUAL`, **0015**) made from the new-candidate form alone when no file was given |
+| `resume_parse_id` | uuid | FK → resume_parses, nullable | The upload it came from; required for `UPLOAD`, empty for `PROMOTED` and `MANUAL` |
 | `is_active` | boolean | NOT NULL, default false | The base the workflow uses (tailoring, job search) |
 | `created_by_user_id` | uuid | FK → users, NOT NULL | Who made it |
 | `created_at` | timestamptz | NOT NULL, `now()` | When it was made |
@@ -142,8 +142,8 @@ CREATE TABLE base_resumes (
   is_active          boolean NOT NULL DEFAULT false,
   created_by_user_id uuid NOT NULL REFERENCES users(id)         ON DELETE RESTRICT,
   created_at         timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT ck_base_resumes_source_values CHECK (source IN ('UPLOAD', 'PROMOTED')),
-  CONSTRAINT ck_base_resumes_source CHECK (source = 'PROMOTED' OR resume_parse_id IS NOT NULL),
+  CONSTRAINT ck_base_resumes_source_values CHECK (source IN ('UPLOAD', 'PROMOTED', 'MANUAL')),
+  CONSTRAINT ck_base_resumes_source CHECK (source IN ('PROMOTED', 'MANUAL') OR resume_parse_id IS NOT NULL),
   CONSTRAINT uq_base_resumes_id_candidate UNIQUE (id, candidate_id)
 );
 CREATE UNIQUE INDEX uq_base_resumes_one_active ON base_resumes (candidate_id) WHERE is_active;
@@ -270,12 +270,9 @@ Re-tailoring the same base for the same job is the next version of that résumé
   (the changed bullet gets one too; untouched bullets keep theirs).
 - **The summary is an item too** (`resumes.summary_id`, 0011): the same text keeps its id, a changed one gets a new
   id, no summary has none.
-- `claims.entity_ref` points at these ids, so a claim and its evidence follow the exact text they were checked
-  against, from version to version and base to base. Editing a version never touches another version's claims.
+- These ids stand for one exact text: the same text keeps its id from version to version, so a save can tell what changed. Editing a version never touches another version's ids.
 - Skills are stored one per item (`[{id, category, name}]`), split from the parser's comma-separated string at
-  bracket depth 0 only ("AWS (ECS, Lambda, S3)" stays one item), so each skill can carry its own claim.
-- Claims cover summary, experience, project, skill, education, certification and award items. Languages are never
-  printed, so they carry no claim.
+  bracket depth 0 only ("AWS (ECS, Lambda, S3)" stays one item).
 
 ---
 
@@ -317,14 +314,15 @@ No résumé uploaded (`resume_parse_id` null) → no base is created; one can be
 Built in PR 4 (`backend/candidates/first_base.py`):
 - The first base's `name` is **"Base"**. (`is_base` was set while the column existed; PR 6 dropped it.)
 - **Work authorization** is the form's code in the app's own label (`USC` → "US Citizen", `H1B` → "H-1B", as
-  `work-auth-chip.tsx`); `OTHER` keeps the résumé's own wording.
+  `work-auth-chip.tsx`). There is no `OTHER` since 0015.
 - **`json_data`** was left empty on new rows until PR 6 dropped it; its readers now read the columns (§4.8).
 
 ### 4.3 Every action
 
 | Action | `base_resumes` | `resumes` |
 |---|---|---|
-| Create a candidate | new `UPLOAD`, active | `BASE` v1 |
+| Create a candidate with a résumé file | new `UPLOAD`, active | `BASE` v1 |
+| Create a candidate with no file (**0015**) | new `MANUAL`, active, no parse | `BASE` v1 from the form alone (header, summary, skills; the lists start empty) |
 | Edit a base version or a tailored résumé, then save | — | the next version of that résumé (content copied, then changed) |
 | After the save, "Use this as the base?" → **Yes** | new `PROMOTED`, active (the previous one switched off) | the saved version copied as `BASE` v1 of the new base |
 | … → **No** | — | — (the version is history only) |
@@ -347,8 +345,7 @@ Built in PR 4 (`backend/candidates/first_base.py`):
     *"v3 was saved while you were editing; your v4 doesn't include those changes."* No lineage is stored (§3.3).
   - A save that changes nothing is refused: *"No changes to save."*
   - Ids follow §3.4: an item, bullet or summary kept as it was keeps its id; a changed or new one gets a new id.
-    An id that isn't in the version edited is refused, so a save can't take over another item's claim.
-  - No claim is ever changed by a save: the new text has new ids and so starts unverified (§4.5).
+    An id that isn't in the version edited is refused, so a save can't take over another item's id.
 - **A tailored résumé becomes a base only through "Use this as the base?"**: its copy is `category = 'BASE'`,
   `job_id` NULL; the original stays `TAILORED`.
 - **Editing the active base does not change the workflow**: it stays on v1 until the person says Yes.
@@ -366,22 +363,13 @@ Built in PR 4 (`backend/candidates/first_base.py`):
 | Edit B1 v3 → v4, "Yes" | resumes B1 v4 · Base 2 (PROMOTED, active) · resumes B2 v1 = copy of B1 v4 |
 | Dropdown → Base 1 · v1 | `is_active` back to Base 1, nothing copied |
 
-### 4.5 Truth Guard
+### 4.5 No claim states (decided 2026-11-05)
 
-- New text is unverified: a changed or new item, bullet or summary gets a new id with no claim yet (§3.4). Text kept
-  as it was keeps its id, so its claims follow it. **A version keeps its own checks:** editing B1 v3 leaves B1 v1,
-  B1 v2 and every other base exactly as verified as they were (decided 2026-11-02, Zuhair; Abdul's review of PR 5
-  found the earlier rule, which reset a changed item's claims, also un-verified the older versions sharing it).
-- A `PROMOTED` base never backs evidence: only `resume_parses` rows (uploads) do.
-- Evidence excerpts quote the original file (`resume_parses.content`), never `parse`: the parser rewrites the
-  résumé for ATS, so `parse` is the AI's wording, the draft the claims come from, not proof of them.
-- Nothing here produces a `VERIFIED` claim. The export gate (unverified claims block export) is unchanged.
-- **For whoever builds the export gate on the backend** (the tailoring module or PR 7; Abdul's review of PR 5): since
-  changed text gets a new id with no claim yet, the gate must block any printed item, bullet or summary **without a
-  VERIFIED claim**, not only one whose claim is UNVERIFIED.
-- **The gate covers cover letters too** (Abdul's review of PR 6): a cover letter is written from a version's full
-  text, verified or not, so unverified text could leave through a letter. Whoever builds the gate applies it to cover
-  letters as well as résumés.
+BenchQ has no Verified, Unverified or Contradicted states, no `claims` and `evidence` tables and no export gate (migration 0015
+drops the tables; the frontend removes the rest in PR 7). Any résumé that is not soft deleted can be exported. What stays:
+- the truth rules in the parser's prompts and its strict response format (§2): the parser must not invent content;
+- ids on every item (§3.4), which tell a save what changed;
+- a `MANUAL` base has no upload, so "upload the same file again" (§4.7) cannot bring it back if it is soft deleted; it can never be the only base (the active base can't be deleted).
 
 ### 4.6 A later résumé (decided 2026-11-02, Abdul and Zuhair)
 
@@ -400,8 +388,8 @@ assign the BDE first, then send the file. The onboarding upload (§4.2) stays th
 
 ### 4.7 Deleting, hiding and showing again (decided 2026-11-02, Abdul and Zuhair; deleting made soft 2026-11-04, Zuhair)
 
-Only the assigned BDE deletes. A warning always comes first and names what uses it (*"Sent to 5 jobs, 2 tailored
-résumés made from it."*).
+Only the assigned BDE deletes. A warning always comes first and names what uses it (*"Used by 2 live applications, 1
+tailored résumé sent in a live application."*).
 
 **Deleting is a soft delete** (Zuhair, 2026-11-04; D10 in `docs/integration/06-open-decisions.md`): the row stays and
 gets `deleted_at` (`resumes` and `base_resumes`, migration 0013). It is out of every list, the base dropdown, the
@@ -410,9 +398,21 @@ what each BDE worked on, and its **version number is never reused**. A base can'
 while version rows point at it, so deleting a base marks it and its versions. The base's upload (`resume_parses`)
 stays: it holds the file and its fingerprint.
 
-**Used** means something points at it: an application or a cover letter (`resume_id`), a tracking link, a tailored
-résumé made from the base (`base_resume_id`), evidence on its upload (`evidence.resume_parse_id`), or a claim on an
-item that would exist in no other version of the candidate.
+**Used** (changed 2026-11-04, Zuhair) means something real points at it:
+- a **live application** (`applications.resume_id`): every status except `move_on` (the application tracker's word for a rejection) and the
+  old API's `rejected`, which are closed. A closed application doesn't keep anything in use;
+- a **tailored résumé of the base sent in a live application** (a tailoring nobody sent doesn't count).
+
+Cover letters and tracking links are **not** counted: they aren't planned for BenchQ yet.
+
+**"Keep what is in use and delete the rest"** (`DELETE …/bases/{id}?keep_used=true`; the removal preview's `rest`
+says what it would do). A base that is in use is only hidden; with `keep_used` it is also cleaned up, all soft
+deleted: its versions after v1 that nothing uses and were made by a BDE, and its tailored résumés no live application
+was sent with. A base nothing uses is deleted whole, with all its tailorings. The screen asks twice.
+
+**An application keeps showing the résumé it was sent with** (`resume_id`) after it is deleted: read-only, with
+`tailored_resume_deleted: true` (any résumé a BDE sent, base version or tailored; the field names still say "tailored"). Only an application with no `resume_id` falls back to the newest tailored résumé of its
+candidate and job. Lists, dropdowns and scoring still skip deleted rows.
 
 | | Made by a BDE (this one or an earlier one) | Made by an owner or manager |
 |---|---|---|
@@ -449,7 +449,7 @@ from the columns. Job scoring and interview prep use it; nothing converts the co
 - **Job scoring** (`backend/analyzer/cv_scorer.py`, until the job module scores per candidate): a job is scored
   against each of the firm's candidates' active base v1, labelled with the candidate's name. The platform-wide
   `default_resume_id` setting is no longer read; a company's `selected_resume_ids` still narrows the list to those
-  versions. The "persona" option still reads the shared persona.
+  versions. The "persona" option still reads the shared persona, until it moves ([persona-to-candidates.md](./persona-to-candidates.md) §7).
 - **Interview prep** (`routes_applications.py`): the candidate's tailored résumé for the job, newest version.
 - **Cover letters:** the letter is written from the version's columns.
 
@@ -473,12 +473,11 @@ from the columns. Job scoring and interview prep use it; nothing converts the co
 The DTO mapper (`src/lib/api/dto/`) groups rows into `Resume` objects. No backend shape leaves `src/lib/api/dto/`.
 
 **The docs/02 addition (approved; written in `docs/02-DATA-CONTRACTS.md` §8.1):**
-- **`BaseResume`**: `id`, `candidateId`, `firmId`, `source` (`UPLOAD` / `PROMOTED`), `isActive`, `createdAt`,
+- **`BaseResume`**: `id`, `candidateId`, `firmId`, `source` (`UPLOAD` / `PROMOTED` / `MANUAL`), `isActive`, `createdAt`,
   `createdByUserId` — for the base dropdown and showing which base is active.
 - **`baseResumeId`** on `Resume`.
 - **The new parser fields** in `ResumeDraftSchema` (`country`; city and state read directly, no `splitLocation`)
   and in the studio's content (`awards`, `languages`).
-- **`RecordEvidenceSchema.entityType`** gains `education` and `award`, matching the backend's `claims.entity_type`.
 - **PR 5 (approved by Abdul, 2026-11-02):** `BaseResume` gains `promotedFromResumeId` (nullable) and `archivedAt`
   (nullable), for leaving promoted versions and hidden bases out of the dropdown (§3.2). The studio's content gains
   `summaryId` (nullable), the summary's id (§3.4).
@@ -574,10 +573,11 @@ base is named "Base" (§4.2).
   candidate). PR 5's routes replace list, open, save and delete; tailoring and the ATS score (`score-check`) are
   rebuilt in the tailoring module. JobNavigator's tailoring pipeline and score-check are kept, unwired, in
   `backend/analyzer/legacy_tailoring.py` for it to port (they still read the dropped `json_data`).
-- **Tailoring prompts** allow content not in the base; Truth Guard keeps it `UNVERIFIED` (§4.5), but the prompts
+- **Tailoring prompts** allow content not in the base; there is no claim state to hold it (§4.5), so the prompts
   are worth tightening in §3.
 - **`personas`** (a singleton without `firm_id` on firm routes) is a firm-isolation gap, flagged to Abdul; not
-  touched here.
+  touched here. Kept for now (Abdul, 2026-11-05); its readers move to the candidate first
+  ([persona-to-candidates.md](./persona-to-candidates.md)).
 - **Word export**: none exists (PDF only). Not part of this design.
 - **File storage** (S3, `docs/integration/06-open-decisions.md` D7): would replace `resume_parses.content` with a
   storage key; nothing else here changes.

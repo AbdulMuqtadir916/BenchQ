@@ -291,8 +291,8 @@ One firm, `Hyderabad Tech Staffing LLC`, IST primary / America/New_York client, 
 | Record completeness | 6 at 100% · 10 at 60–90% · 5 at 30–60% · 3 under 30% |
 | Days on bench | 3 to 180 |
 | At-risk | **3 with no activity in 7+ days** |
-| `persona` | present on 18, null on 6 |
-| `qaBank` | 4–12 entries on the 18 with personas |
+| `preferredIndustries`, `dealBreakers` | lists (empty on some; were inside `persona` before migration 0015) |
+| `qaBank` | 4–12 entries on the 18 that had one |
 
 Roles: Senior DevOps, Java Full Stack, Data Engineer, React Frontend, .NET Developer, QA
 Automation, Salesforce Developer, Cloud Architect, Python/Django, SAP ABAP, ServiceNow, Business

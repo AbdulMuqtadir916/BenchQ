@@ -59,7 +59,7 @@ _F2B_TABLES = {"searches", "applications", "interviews", "resumes", "cover_lette
                # The Candidates track (docs/candidate-onboarding/06-backend.md, migration 0006).
                "candidates", "resume_parses",
                # The candidate core (docs/team/00-candidate-core.md, migration 0007).
-               "candidate_jobs", "favorite_jobs", "candidate_mailboxes", "inbox_messages", "evidence", "claims",
+               "candidate_jobs", "favorite_jobs", "candidate_mailboxes", "inbox_messages",
                # Résumé versioning (docs/team/resume-versioning.md, migration 0008).
                "base_resumes", "candidate_google_oauth_attempts", "application_reviews", "application_status_events"}
 # Firm-owned although `firm_id` may be null: a ledger entry with no firm is a platform-only event (A13), and a
@@ -102,8 +102,7 @@ def test_the_firm_owned_models_are_known():
     assert _firm_owned_models() == {"Search", "Application", "Interview", "Resume", "CoverLetter", "TracerLink",
                                     "TracerClickEvent", "FirmJob", "ActivityEntry", "Candidate", "ResumeParse",
                                     # The candidate core (migration 0007).
-                                    "CandidateJob", "FavoriteJob", "CandidateMailbox", "InboxMessage", "Evidence",
-                                    "Claim",
+                                    "CandidateJob", "FavoriteJob", "CandidateMailbox", "InboxMessage",
                                     # Résumé versioning (migration 0008).
                                     "BaseResume", "CandidateGoogleOAuthAttempt", "ApplicationReview", "ApplicationStatusEvent"}
 

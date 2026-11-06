@@ -16,7 +16,7 @@ const entryDto = (over: Record<string, unknown> = {}) => ({
   id: "6f1c0000-0000-4000-8000-000000000001", firm_id: HTS, actor_user_id: demoIds.user_imran, actor_type: "USER",
   actor_name: "Imran", entity_type: "invite", entity_id: "6f1c0000-0000-4000-8000-000000000002", entity_label: "Bea",
   action: "INVITE_SENT", summary: "Invited Bea (bea@hts.test) as BDE", model_id: null, prompt_version: null,
-  evidence_ids: [], claim_state: null, created_at: "2026-10-23T10:00:00+00:00", ...over,
+  created_at: "2026-10-23T10:00:00+00:00", ...over,
 });
 
 let answer: { status: number; body: unknown };

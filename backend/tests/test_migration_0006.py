@@ -70,13 +70,12 @@ def test_a_candidate_keeps_to_the_contract(test_db, firm):
     row = _candidate(firm, manager, employment_types=["C2C", "W2"], work_settings=["REMOTE"], rate_min=70, rate_target=85)
     test_db.add(row)
     test_db.flush()
-    assert (row.status, row.bde_id, row.summary_state, row.skills) == ("ON_BENCH", None, "UNVERIFIED", [])
+    assert (row.status, row.bde_id, row.preferred_industries, row.deal_breakers) == ("ON_BENCH", None, [], [])
     for bad, constraint in (({"work_auth": "H1-B"}, "ck_candidates_work_auth"), ({"status": "BENCH"}, "ck_candidates_status"),
                             ({"employment_types": ["CONTRACT"]}, "ck_candidates_employment_types"),
                             ({"work_settings": ["ANYWHERE"]}, "ck_candidates_work_settings"),
                             ({"rate_min": 90, "rate_target": 85}, "ck_candidates_floor_not_above_target"),
                             ({"years_experience": 61}, "ck_candidates_years_experience"),
-                            ({"summary_state": "VERIFIED"}, "ck_candidates_summary_unverified"),
                             ({"full_name": "  "}, "ck_candidates_full_name_not_blank")):
         _refused(test_db, _candidate(firm, manager, **bad), constraint)
 

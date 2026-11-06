@@ -184,6 +184,10 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
 2. **Favorite jobs:** routes to mark/unmark a job for a candidate (in the app and for the extension). The frontend's
    `JobMark` is per user today: its contract change (per candidate) goes in `docs/02` with Abdul's sign-off.
 3. Then the extension itself.
+4. **Autofill reads the candidate, not the shared persona** (decided 2026-11-05, Abdul): fixed answers from
+   `candidates` and the candidate's résumé, drafted answers from `candidates.qa_bank`; the extension names the candidate.
+   Field-by-field mapping and the two open points (an H1B transfer and sponsorship; self-ID defaults):
+   [persona-to-candidates.md](./persona-to-candidates.md) §4–§5 (a suggestion; the facts are §1–§2).
 
 ## Rules for you
 
