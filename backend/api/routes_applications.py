@@ -454,6 +454,8 @@ def create_application(
     if applied_at:
         app.applied_at = applied_at
     db.add(app)
+    db.flush()
+    _audit_application_edit(db, app, principal, f"Logged an application for {job.title or 'a job'}.", action="CREATE")
     db.commit()
 
     # Auto-create company if it doesn't exist (only on application, not during scraping)
@@ -712,13 +714,23 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
     return _application_responses(db, firm_id, [app])[0]
 
 
-def _audit_application_edit(db, app, principal, summary):
+def _audit_application_edit(db, app, principal, summary, *, action="UPDATE"):
     from backend.auth.ledger import record
     from backend.models.tenancy import User
     actor = scoped(db, User, app.firm_id).filter_by(id=principal.user_id).one()
-    record(db, actor=actor, action="UPDATE", entity_type="application", entity_id=app.id,
+    record(db, actor=actor, action=action, entity_type="application", entity_id=app.id,
            entity_label=app.job.title or "Application", summary=summary,
            firm_id=app.firm_id, candidate_id=app.candidate_id)
+
+
+def _audit_interview(db, app, principal, interview, action, summary, changes=None):
+    from backend.auth.ledger import record
+    from backend.models.tenancy import User
+    actor = scoped(db, User, app.firm_id).filter_by(id=principal.user_id).one()
+    job_title = app.job.title if app.job else "a job"
+    record(db, actor=actor, action=action, entity_type="interview", entity_id=interview.id,
+           entity_label=f"{interview.what or 'Interview'} · {job_title}", summary=f"{summary} for {job_title}.",
+           firm_id=app.firm_id, candidate_id=app.candidate_id, changes=changes)
 
 
 def _guard_application_history(db, firm_id, app_id):
@@ -746,6 +758,7 @@ def delete_application(app_id: str, principal: Principal = Depends(current_princ
     job = app.job
     if job is not None and job.status == "applied":
         job.status = "saved"
+    _audit_application_edit(db, app, principal, f"Deleted the application for {job.title if job else 'a job'}.", action="DELETE")
     db.delete(app)
     db.commit()
     return {"deleted": True}
@@ -871,6 +884,7 @@ def bulk_delete_applications(body: dict, principal: Principal = Depends(current_
         job = app.job
         if job is not None and job.status == "applied":
             job.status = "saved"
+        _audit_application_edit(db, app, principal, f"Deleted the application for {job.title if job else 'a job'}.", action="DELETE")
         db.delete(app)
         deleted += 1
     db.commit()
@@ -1120,6 +1134,8 @@ def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_
                    when_at=_parse_dt(data.when_at), status=data.status or "scheduled", prep=data.prep)
     db.add(iv)
     app.updated_at = utcnow()
+    db.flush()
+    _audit_interview(db, app, principal, iv, "CREATE", f"Added interview: {iv.what or 'Interview'}")
     db.commit()
     return _interview_to_dict(iv)
 
@@ -1131,12 +1147,18 @@ def update_interview(interview_id: str, updates: dict, db: Session = Depends(get
     iv = scoped(db, Interview, firm_id).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
-    _scoped_application(db, firm_id, principal, iv.application_id, write=True)
+    app = _scoped_application(db, firm_id, principal, iv.application_id, write=True)
+    fields = ("what", "where_text", "status", "prep", "when_at")
+    before = {key: getattr(iv, key) for key in fields}
     for key in ("what", "where_text", "status", "prep"):
         if key in updates:
             setattr(iv, key, updates[key])
     if "when_at" in updates:
         iv.when_at = _parse_dt(updates["when_at"])
+    from backend.auth.ledger import diff
+    changes = diff(before, {key: getattr(iv, key) for key in fields})
+    if changes:
+        _audit_interview(db, app, principal, iv, "UPDATE", f"Updated interview: {iv.what or 'Interview'}", changes)
     db.commit()
     return _interview_to_dict(iv)
 
@@ -1148,7 +1170,8 @@ def delete_interview(interview_id: str, db: Session = Depends(get_db), firm_id=D
     iv = scoped(db, Interview, firm_id).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
-    _scoped_application(db, firm_id, principal, iv.application_id, write=True)
+    app = _scoped_application(db, firm_id, principal, iv.application_id, write=True)
+    _audit_interview(db, app, principal, iv, "DELETE", f"Removed interview: {iv.what or 'Interview'}")
     db.delete(iv)
     db.commit()
     return {"deleted": True}

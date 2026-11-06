@@ -88,17 +88,28 @@ def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_typ
 
 def record_automated(db: DbSession, *, actor_type: str, actor_name: str, action: str,
                      entity_type: str, entity_id: uuid.UUID | str, entity_label: str,
-                     summary: str, firm_id: uuid.UUID, candidate_id: uuid.UUID,
-                     at: datetime | None = None, on_behalf_of: User | None = None) -> ActivityEntry:
+                     summary: str, firm_id: uuid.UUID, candidate_id: uuid.UUID | None,
+                     at: datetime | None = None, on_behalf_of: User | None = None,
+                     model_id: str | None = None) -> ActivityEntry:
     """Internal worker audit; automated decisions never borrow a human identity. `on_behalf_of` is the person an AI
     agent worked for: the entry counts towards them and their team, but its actor stays the agent."""
     if actor_type not in {"SYSTEM", "AGENT"}:
         raise ValueError("Automated ledger actor must be SYSTEM or AGENT.")
     entry = ActivityEntry(firm_id=firm_id, candidate_id=candidate_id, actor_type=actor_type,
         actor_user_id=None, actor_name=actor_name, action=action, entity_type=entity_type,
-        entity_id=str(entity_id), entity_label=entity_label, summary=summary,
+        entity_id=str(entity_id), entity_label=entity_label, summary=summary, model_id=model_id,
         on_behalf_of_user_id=on_behalf_of.id if on_behalf_of else None, **_stamps(db, candidate_id, on_behalf_of))
     if at is not None:
         entry.created_at = at
     db.add(entry)
     return entry
+
+
+def record_agent(db: DbSession, *, person: User, action: str, entity_type: str, entity_id: uuid.UUID | str,
+                 entity_label: str, summary: str, candidate_id: uuid.UUID | None,
+                 model_id: str | None = None) -> ActivityEntry:
+    """What an AI agent did for `person`: the actor is the agent, named for them, and it counts towards them."""
+    return record_automated(db, actor_type="AGENT", actor_name=f"AI agent ({person.name})", action=action,
+                            entity_type=entity_type, entity_id=entity_id, entity_label=entity_label,
+                            summary=f"{summary} on behalf of {person.name}", firm_id=person.firm_id,
+                            candidate_id=candidate_id, on_behalf_of=person, model_id=model_id)
