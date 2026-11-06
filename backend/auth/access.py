@@ -97,6 +97,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/ledger": F,          # limited by role in routes_ledger
     "GET /api/firms/{firm_id}/ledger/people": F,
     "GET /api/firms/{firm_id}/ledger/candidates": F,
+    "GET /api/firms/{firm_id}/ledger/days": F,
     "POST /api/analyze/{job_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": F,

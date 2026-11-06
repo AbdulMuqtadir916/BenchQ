@@ -112,6 +112,12 @@ def test_an_entry_carries_the_requests_id(test_db, world):
         request_id.reset(token)
 
 
+def test_an_entry_with_no_changes_stores_a_real_null(test_db, world):
+    """Not a JSON `null`, which `changes IS NULL` and `count(changes)` would treat as a value."""
+    entry = _log(test_db, world.bea, "Bea")
+    assert test_db.execute(text("SELECT changes IS NULL FROM activity_logs WHERE id = :id"), {"id": entry.id}).scalar() is True
+
+
 def test_a_change_is_kept_with_contact_details_and_secrets_masked():
     changes = ledger.diff({"city": "Pune", "email": "a@x.test", "phone": "1", "api_key_hash": "h", "rate_min": 10},
                           {"city": "Delhi", "email": "b@x.test", "phone": "1", "api_key_hash": "i", "rate_min": 10})
@@ -410,6 +416,35 @@ def test_another_firms_people_and_candidates_are_not_found(anonymous_client, tes
     test_db.commit()
     response = anonymous_client.get(f"/api/firms/{other.id}/ledger{path}", headers=_as_session(world, world.owner))
     assert response.status_code == 404
+
+
+def test_a_row_shows_the_candidates_name(anonymous_client, test_db, world):
+    _log(test_db, world.bea, "Bea", world.asha)
+    assert _read(anonymous_client, world, world.owner)[0]["candidate_name"] == "Asha"
+
+
+def test_rows_sort_by_actor_and_action(anonymous_client, test_db, world):
+    _log(test_db, world.ben, "Ben", action="UPDATE")
+    _log(test_db, world.bea, "Bea", action="DELETE")
+    assert _summaries(anonymous_client, world, world.owner, "?sort=actor&dir=asc") == ["Bea", "Ben"]
+    assert _summaries(anonymous_client, world, world.owner, "?sort=action&dir=desc") == ["Ben", "Bea"]
+
+
+def test_matching_counts_the_rows_on_show_and_total_the_rows_beside_them(anonymous_client, test_db, world):
+    _log(test_db, world.bea, "Bea")
+    _log(test_db, world.ben, "Ben")
+    body, _ = _people(anonymous_client, world, world.owner, f"?actor_id={world.bea.id}")
+    assert (body["matching"], body["total"]) == (1, 2)
+
+
+def test_the_days_with_activity_are_the_firms_days_and_the_readers_own(anonymous_client, test_db, world):
+    moment = datetime(2026, 3, 3, 20, 0, tzinfo=timezone.utc)      # the 4th in Asia/Kolkata
+    ledger.record(test_db, actor=world.bea, action="UPDATE", entity_type="user", entity_id=world.bea.id,
+                  entity_label="Bea", summary="Late", firm_id=world.id, candidate_id=None, at=moment)
+    test_db.commit()
+    month = "?from_date=2026-03-01&to_date=2026-03-31"
+    assert _read(anonymous_client, world, world.owner, month, "/days") == ["2026-03-04"]
+    assert _read(anonymous_client, world, world.cara, month, "/days") == []
 
 
 # ── The migration ─────────────────────────────────────────────────────────────────────────────────────────────────

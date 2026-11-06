@@ -120,9 +120,13 @@ def _after_cursor(entries, cursor: str):
     return entries.filter(or_(ActivityEntry.created_at < at, and_(ActivityEntry.created_at == at, ActivityEntry.id < row_id)))
 
 
+SORTS = {"when": ActivityEntry.created_at, "actor": ActivityEntry.actor_name, "action": ActivityEntry.action}
+
+
 @router.get("/ledger", summary="The firm's activity log, newest first, limited by role")
 def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
-                cursor: str | None = Query(None, max_length=128), filters: Filters = Depends(),
+                cursor: str | None = Query(None, max_length=128), sort: str = Query("when", pattern="^(when|actor|action)$"),
+                direction: str = Query("desc", alias="dir", pattern="^(asc|desc)$"), filters: Filters = Depends(),
                 principal: Principal = Depends(current_principal), my_firm: uuid.UUID = Depends(reader_firm_id),
                 db: DbSession = Depends(get_db)):
     if firm_id != my_firm:
@@ -132,8 +136,14 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     entries = _visible(db, principal, my_firm, filters)
     if cursor is not None:
         entries = _after_cursor(entries, cursor)
-    entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id.desc()).offset(offset).limit(limit)
-    return [ledger_entry_json(e, hide_email=principal.support_view_id is not None) for e in entries]
+    column = SORTS[sort]
+    entries = entries.order_by(column.asc() if direction == "asc" else column.desc(), ActivityEntry.created_at.desc(),
+                               ActivityEntry.id.desc()).offset(offset).limit(limit).all()
+    # The log keeps the candidate's id; the name shown is the one they have now.
+    ids = {entry.candidate_id for entry in entries if entry.candidate_id is not None}
+    names = dict(scoped(db, Candidate, my_firm, Candidate.id, Candidate.full_name).filter(Candidate.id.in_(ids)).all())
+    return [ledger_entry_json(e, hide_email=principal.support_view_id is not None,
+                              candidate_name=names.get(e.candidate_id)) for e in entries]
 
 
 @router.get("/ledger/people", summary="Who the reader can see in the log, with each person's action count")
@@ -161,7 +171,18 @@ def ledger_people(firm_id: uuid.UUID, filters: Filters = Depends(), principal: P
                            "is_former": not in_view, "actions": counts[user.id]})
     types = [] if bde is not None else [t for t in LEDGER_ACTOR_TYPES if manager is None or t in ("USER", "AGENT")]
     return {"timezone": db.get(Firm, my_firm).primary_timezone, "actor_types": types, "total": entries.count(),
-            "people": people}
+            "matching": _visible(db, principal, my_firm, filters).count(), "people": people}
+
+
+@router.get("/ledger/days", summary="The days with activity the reader can see, in the firm's time zone")
+def ledger_days(firm_id: uuid.UUID, filters: Filters = Depends(), principal: Principal = Depends(current_principal),
+                my_firm: uuid.UUID = Depends(reader_firm_id), db: DbSession = Depends(get_db)):
+    """For the calendar's dots: `from_date` and `to_date` name the month on show."""
+    if firm_id != my_firm:
+        raise HTTPException(status_code=404, detail="Not found.")
+    zone = db.get(Firm, my_firm).primary_timezone
+    day = func.to_char(func.timezone(zone, ActivityEntry.created_at), "YYYY-MM-DD")
+    return sorted(row[0] for row in _visible(db, principal, my_firm, filters).with_entities(day).distinct())
 
 
 @router.get("/ledger/candidates", summary="The candidates the reader can pick in the log")

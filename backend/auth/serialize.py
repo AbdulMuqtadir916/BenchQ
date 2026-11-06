@@ -54,7 +54,7 @@ def _cursor(entry: ActivityEntry) -> str:
     return f"{(entry.created_at - EPOCH) // timedelta(microseconds=1)}_{entry.id}"
 
 
-def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False) -> dict:
+def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False, candidate_name: str | None = None) -> dict:
     """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case, with what the log adds to it."""
     hidden = hide_email and entry.entity_type == "email"
     return {
@@ -67,7 +67,7 @@ def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False) -> dict
         "note": None if hide_email and entry.entity_type == "email" else entry.note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
         "evidence_ids": list(entry.evidence_ids or []), "claim_state": entry.claim_state,
-        "created_at": _iso(entry.created_at), "cursor": _cursor(entry),
+        "created_at": _iso(entry.created_at), "cursor": _cursor(entry), "candidate_name": candidate_name,
         "actor_role": entry.actor_role,
         "on_behalf_of_user_id": str(entry.on_behalf_of_user_id) if entry.on_behalf_of_user_id else None,
         "team_manager_id": str(entry.team_manager_id) if entry.team_manager_id else None,

@@ -322,7 +322,7 @@ class ActivityEntry(Base):
     action = Column(String, nullable=False)
     summary = Column(Text, nullable=False)
     note = Column(Text, nullable=True)                    # the handoff note on an ASSIGN entry (docs/02 §3.4)
-    changes = Column(JSONB, nullable=True)                # {field: {before, after}}, masked (ledger.diff)
+    changes = Column(JSONB(none_as_null=True), nullable=True)                # {field: {before, after}}, masked (ledger.diff)
     request_id = Column(String, nullable=True)            # the request that wrote it, to find in the server logs
     model_id = Column(String, nullable=True)
     prompt_version = Column(String, nullable=True)

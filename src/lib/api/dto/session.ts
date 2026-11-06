@@ -115,6 +115,9 @@ export const LedgerEntryDto = z.object({
   evidence_ids: z.array(z.string()),
   claim_state: z.string().nullable(),
   created_at: z.string(),
+  candidate_id: nullableId.optional(),
+  candidate_name: z.string().nullable().optional(),
+  on_behalf_of_user_id: nullableId.optional(),
 });
 
 /** GET /api/invites/{token}: INVALID alone, or the state with what the link may show. */
@@ -253,6 +256,9 @@ export function toLedgerEntry(dto: z.infer<typeof LedgerEntryDto>): LedgerEntry 
     entityType: dto.entity_type,
     entityId: mapId(dto.entity_id),
     entityLabel: dto.entity_label,
+    candidateId: mapNullableId(dto.candidate_id ?? null),
+    candidateName: dto.candidate_name ?? null,
+    onBehalfOfUserId: mapNullableId(dto.on_behalf_of_user_id ?? null),
     action: dto.action,
     summary: dto.summary,
     note: dto.note ?? null,

@@ -57,7 +57,7 @@ export interface RouteDef {
   access: RouteAccess;
   /** What a role with "none" sees. Default: the Forbidden screen in place. */
   onDenied?: "forbidden" | "landing";
-  nav?: { section: "workspace" | "preferences" | "settings" | "notifications" | "admin"; order: number; icon?: LucideIcon };
+  nav?: { section: "workspace" | "preferences" | "settings" | "notifications" | "admin"; order: number; icon?: LucideIcon; /** The sidebar's name, when it isn't `title`. */ label?: string };
   /** Second key of a `g` shortcut, e.g. "c" for `g c`. */
   shortcut?: string;
   palette?: boolean;
@@ -97,7 +97,7 @@ const ROUTE_DEFS = [
   { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 6, icon: Mail }, palette: true },
   { id: "followups", path: "/[firm]/followups", title: "Follow-ups", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "none")), nav: { section: "workspace", order: 7, icon: Bell }, shortcut: "f", palette: true },
   { id: "analytics", path: "/[firm]/analytics", title: "Analytics", area: "firm", shell: "app", access: firm(roles("full", "team", "none", "read")), nav: { section: "workspace", order: 8, icon: BarChart3 }, palette: true },
-  { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 9, icon: ScrollText }, palette: true },
+  { id: "ledger", path: "/[firm]/ledger", title: "Activity logs", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 9, icon: ScrollText, label: "Activity" }, palette: true },
   { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", access: firm(roles("full", "full", "full", "none"), "none") },
 
   // Preferences

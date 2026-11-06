@@ -28,7 +28,7 @@ and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 | 9. DTO + mapper | `src/lib/api/dto/session.ts` `LedgerEntryDto`, `toLedgerEntry` | Parses the wire shape, maps ids (`fromBackendId`) and timestamps (`toIso`) |
 | 10. Adapter | `src/lib/api/analytics.ts` `ledgerApi` | The live branch behind `isLive("ledger")`; the firm id goes out through `toBackendId` |
 | 11. Adapter test | `src/lib/api/live-ledger.test.ts` | URL and query, mapping, empty, error |
-| 12. Screen | `src/app/[firm]/(app)/(manage)/ledger/page.tsx` | **Unchanged.** It already handled skeleton, empty and error |
+| 12. Screen | `src/features/activity/`, mounted by `src/app/[firm]/(app)/(manage)/ledger/page.tsx` | The Activity logs screen: people list, filters, paging and search on the server, everything in the URL |
 
 The ledger's DTO sits in `dto/session.ts` because `/admin/audit` uses it too. A new module creates
 `src/lib/api/dto/<module>.ts`.

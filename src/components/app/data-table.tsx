@@ -53,7 +53,11 @@ interface DataTableProps<TData, TValue> {
    * page index is the caller's.
    */
   search?: { value: string; onChange: (value: string) => void };
-  page?: { index: number; onChange: (index: number) => void };
+  page?: { index: number; onChange: (index: number) => void; /** The caller pages on the server: how many pages there are. */ count?: number };
+  /** The caller sorts on the server: `data` arrives sorted, and the headers only say which way. */
+  sort?: { value: SortingState; onChange: (value: SortingState) => void };
+  /** Replaces "n rows" in the toolbar, for a list whose `data` is one page of many. */
+  countLabel?: string;
   /** false: no search / columns toolbar (a short list whose filters would otherwise not be in the URL). */
   hasToolbar?: boolean;
   /** Accessible name of the table region. */
@@ -94,6 +98,8 @@ export function DataTable<TData, TValue>({
   pageSize = 10,
   search,
   page,
+  sort,
+  countLabel,
   hasToolbar = true,
   label = "Data table",
 }: DataTableProps<TData, TValue>) {
@@ -150,8 +156,12 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, globalFilter, rowSelection, columnVisibility, ...(pagination ? { pagination: paginationState } : {}) },
-    onSortingChange: setSorting,
+    state: { sorting: sort?.value ?? sorting, globalFilter, rowSelection, columnVisibility, ...(pagination ? { pagination: paginationState } : {}) },
+    onSortingChange: sort ? (updater) => sort.onChange(typeof updater === "function" ? updater(sort.value) : updater) : setSorting,
+    manualSorting: Boolean(sort),
+    manualPagination: page?.count !== undefined,
+    pageCount: page?.count,
+    autoResetPageIndex: page?.count === undefined,
     onGlobalFilterChange: (value: string) => setGlobalFilter(value),
     manualFiltering: Boolean(search),
     onRowSelectionChange: setRowSelection,
@@ -273,7 +283,7 @@ export function DataTable<TData, TValue>({
             className="pl-9"
           />
         </div>
-        <span className="ml-auto text-mono-sm text-[var(--color-text-3)]" aria-live="polite">{rows.length} rows · {table.getFilteredSelectedRowModel().rows.length} selected</span>
+        <span className="ml-auto text-mono-sm text-[var(--color-text-3)]" aria-live="polite">{countLabel ?? <>{rows.length} rows · {table.getFilteredSelectedRowModel().rows.length} selected</>}</span>
         <details className="relative">
           <summary className="bq-secondary inline-flex h-7 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm list-none">
                 <Columns3 size={16} aria-hidden="true" />

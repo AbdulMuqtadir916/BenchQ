@@ -76,6 +76,10 @@ The new `activity_logs` table with the old rows copied in, history that stays wi
 the reads the screen needs. Change document:
 [pr-changes/activity-log-pr3-new-table-and-endpoints.md](./pr-changes/activity-log-pr3-new-table-and-endpoints.md).
 
+**Activity Log PR 4 (2026-11-06):** `activity-logs/pr4-activity-screen`, built on PR 3, not pushed yet. The Activity
+screen: people list, searchable actor and candidate dropdowns, dates, and the sidebar name. Change document:
+[pr-changes/activity-logs-pr4-activity-screen.md](./pr-changes/activity-logs-pr4-activity-screen.md).
+
 ## 1. Notifications inbox
 
 The main sidebar's **Preferences** section gets a **Notifications** page for firm users and the Super Admin.
