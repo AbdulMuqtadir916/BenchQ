@@ -3,6 +3,13 @@
 Branch: `activity-logs/pr5-part1-applications` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 Built on PR 4 (`activity-logs/pr4-activity-screen`), which holds PRs 1 to 3. Merge those first.
 
+## Status changes on hand-logged applications
+
+A status change on a hand-logged application used to read "Updated application details." or "Updated application
+status." and kept no change. It now reads like a candidate application's, "Moved <job>: <before> → <after>.", and keeps
+the status change. Note text is never written to the log, and an edit with no status change stays "Updated application
+details.". This covers the single and the bulk route.
+
 ## Scope and dependencies
 
 Logs the application work that wrote nothing. No table, route or response changes.
