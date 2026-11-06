@@ -29,7 +29,7 @@ export const createCandidateBody = (overrides: Partial<CreateCandidate> = {}): C
   skills: [],
   preferredIndustries: [],
   dealBreakers: [],
-  resumeParseId: null,
+  resumeParseId: "parse_test",                 // 07 Q58: every create keeps a résumé read
   managerId: "user_fatima",
   bdeId: null,
   handoffNote: null,

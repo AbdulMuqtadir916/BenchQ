@@ -70,8 +70,8 @@ describe("New candidate", () => {
     expect(record.skills.map((skill) => skill.name)).toEqual(["Spark", "Airflow"]);
     expect(await documents.documentsMock.byCandidate(FIRM, created.id)).toEqual([expect.objectContaining({ kind: "RESUME", fileName: "Nisha_Verma.pdf", sizeKb: 200 })]);
 
-    const noResume = await m.candidates.create(FIRM, candidate({ email: "other@example.com" }));
-    expect(await documents.documentsMock.byCandidate(FIRM, noResume.id)).toEqual([]);
+    // 07 Q58: never without the résumé.
+    await expect(m.candidates.create(FIRM, candidate({ email: "other@example.com", resumeParseId: "" }))).rejects.toThrow();
   });
 
   it("an OWNER may hand it to a manager without a BDE, and may only name an active manager and a BDE under them", async () => {

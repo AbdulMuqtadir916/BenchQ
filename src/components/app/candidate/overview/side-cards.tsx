@@ -17,7 +17,7 @@ export function BaseResumeCard({ base, onOpenResumes }: { base: CandidateWorkspa
     return (
       <Card>
         <h2 className="mb-1 text-h3 text-[var(--color-text)]">Base résumé</h2>
-        <p className="text-sm text-[var(--color-text-2)]">No résumé uploaded yet. The candidate&apos;s BDE uploads one, or builds it, on the Résumés tab.</p>
+        <p className="text-sm text-[var(--color-text-2)]">No base résumé yet. The candidate&apos;s BDE uploads one on the Résumés tab.</p>
         <Button size="sm" variant="secondary" className="mt-3" onClick={onOpenResumes}>Open Résumés</Button>
       </Card>
     );

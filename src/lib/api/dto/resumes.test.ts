@@ -9,7 +9,7 @@ const candidate = fromBackendId("daea7708-33cf-52fe-9da5-44db9eb5b22c");
 
 describe("the résumé listing", () => {
   it("maps every base, hidden ones included, with its source and active flag", () => {
-    expect(shelf.bases.map((b) => [b.source, b.isActive, b.archivedAt !== null])).toEqual([["UPLOAD", false, false], ["PROMOTED", true, false], ["MANUAL", false, true]]);
+    expect(shelf.bases.map((b) => [b.source, b.isActive, b.archivedAt !== null])).toEqual([["UPLOAD", false, false], ["PROMOTED", true, false], ["UPLOAD", false, true]]);
     expect(shelf.bases.every((b) => b.candidateId === candidate && b.firmId === FIRM)).toBe(true);
     expect(shelf.bases[1]!.promotedFromResumeId).toBe("6c1e9b1f-0002-4d2b-8b62-000000000002");
     expect(shelf.bases[1]!.createdAt).toBe("2026-11-02T11:00:00.000Z"); // a zone-less time is UTC

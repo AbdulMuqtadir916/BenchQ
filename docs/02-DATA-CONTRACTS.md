@@ -935,7 +935,7 @@ works nothing out and only checks that they were sent (a missing one is a 422 na
 `workAuth` must carry both. Required on create, in the form and in the backend alike: `fullName`, `primaryRole`, `email`,
 `phone`, `yearsExperience`, `country` (any country; the flow's Country box starts at `US` and takes the parsed résumé's
 country, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
-`employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. A candidate created without a résumé file gets a `MANUAL` base from the form alone, so every candidate has a base.
+`employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. `resumeParseId` is required: no candidate without their résumé (07 Q58), whose file becomes their first base.
 
 `ResumeDraftSchema` gains `country` with the new parser (§8.1). The skills a new candidate is created with go into
 the first base résumé's version 1 (`resumes.skills`); they carry no source or state.
@@ -1352,14 +1352,12 @@ export const BaseResumeSchema = z.object({
   id: z.string(),
   firmId: z.string(),
   candidateId: z.string(),
-  source: z.enum(['UPLOAD', 'PROMOTED', 'MANUAL']),   // an upload, a version a person chose, or the form alone (0015)
+  source: z.enum(['UPLOAD', 'PROMOTED']),   // an upload or a version a person chose (no MANUAL since 07 Q58, 0018)
   isActive: z.boolean(),                    // exactly one per candidate
   createdByUserId: z.string(),
   createdAt: z.string().datetime(),
   promotedFromResumeId: z.string().nullable(), // PROMOTED: the version it was copied from (left out of the dropdown)
   archivedAt: z.string().datetime().nullable(), // set while hidden (a used base the BDE deleted); null otherwise
-  hasResume: z.boolean(),   // a file or a version is a résumé; a base made from the form alone (MANUAL) isn't until a
-                            // later version adds experience, education, summary or skills (2026-11-06, PR 7; the backend's has_resume)
 });
 
 // src/lib/schemas/resume.ts — what a résumé list reads (PR 7): the bases and their résumés

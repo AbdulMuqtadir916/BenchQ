@@ -53,6 +53,8 @@ export const ResumeVersionSchema = z.object({
   resumeId: z.string(),
   versionNumber: z.number().int(),
   parentVersionId: z.string().nullable(),
+  /** Saved by an OWNER or MANAGER: the BDE can't delete it (Q55). */
+  madeByLead: z.boolean().default(false),
 
   templateId: z.string(),
   includedSectionIds: z.array(z.string()),
@@ -102,10 +104,10 @@ export const BaseResumeSchema = z.object({
   id: z.string(),
   firmId: z.string(),
   candidateId: z.string(),
-  source: z.enum(["UPLOAD", "PROMOTED", "MANUAL"]),
-  /** Whether the base is a résumé yet: a file or a version is; a base made from the New candidate form alone isn't until
-   *  a later version adds résumé content (the backend's `has_resume`). */
-  hasResume: z.boolean().default(true),
+  /** An uploaded file or a version promoted to a base (no MANUAL since 07 Q58: no candidate without a résumé). */
+  source: z.enum(["UPLOAD", "PROMOTED"]),
+  /** Made by an OWNER or MANAGER, or holds a version one saved: the BDE can't delete it (Q55). */
+  madeByLead: z.boolean().default(false),
   isActive: z.boolean(),
   createdByUserId: z.string(),
   createdAt: z.string().datetime(),

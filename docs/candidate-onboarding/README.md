@@ -60,7 +60,7 @@ filled in; its "Owner" row becomes **"Assigned BDE"** (Q48).
 
 | # | Screen | What happens | Module |
 |---|---|---|---|
-| 1 | [Resume](./screens/1-resume.webp) | Drop a PDF or Word file (≤ 10 MB) or "Skip, enter manually". The parser fills steps 2–4. Sample resumes show only on mocks (§7 A1). | 04 |
+| 1 | [Resume](./screens/1-resume.webp) | Drop a PDF or Word file (≤ 10 MB); required (07 Q58). The parser fills steps 2–4. Sample resumes show only on mocks (§7 A1). | 04 |
 | 2 | [Basic details](./screens/2-basic-details.webp) | Identity (full name\*, "Marketed as"\*, years), contact (email\*, phone, LinkedIn, city, state), profile (skills, summary). | 04 |
 | 3 | [Work and rate](./screens/3-work-and-rate.webp) | Work authorization (one of nine), valid until, engagement types (C2C / W2 / 1099 / Full-time), target rate, walk-away floor, available from, notice period. | 04 |
 | 4 | [Preferences](./screens/4-preferences.webp) | Target roles, work setting, preferred locations, willing to relocate, industries, deal breakers, notes for the BDE. "Skip for now" allowed. | 04 |

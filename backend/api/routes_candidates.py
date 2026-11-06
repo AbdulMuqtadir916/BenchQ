@@ -231,7 +231,7 @@ def get_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
 def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
                      principal: Principal = Depends(require("candidate.create")), db: DbSession = Depends(get_db)):
     """One transaction: the candidate (ON_BENCH), the kept résumé parse with the candidate's first base résumé and its
-    version 1 (a MANUAL base from the form alone when no file was given), their Record (one UNVERIFIED claim per item,
+    version 1 (07 Q58: never without the résumé), their Record (one UNVERIFIED claim per item,
     07 Q49), and the CREATE and ASSIGN ledger entries."""
     _member_of(firm_id, principal)
     email = body.email.lower()
@@ -243,13 +243,14 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     manager, bde = _target(db, firm_id, principal, None, body.manager_id, body.bde_id)
     if bde is not None:
         _check_limit(db, firm)
-    parse = None
-    if body.resume_parse_id is not None:
-        parse = scoped(db, ResumeParse, firm_id).filter(
-            ResumeParse.id == body.resume_parse_id, ResumeParse.candidate_id.is_(None),
-            ResumeParse.expires_at > utcnow()).with_for_update().first()
-        if parse is None:
-            raise HTTPException(status_code=404, detail="That résumé read has expired. Upload it again.")
+    # 07 Q58 (Abdul, 2026-11-06): a candidate is onboarded only with their résumé.
+    if body.resume_parse_id is None:
+        raise _bad("Upload the candidate's résumé first: a candidate can't be added without one.")
+    parse = scoped(db, ResumeParse, firm_id).filter(
+        ResumeParse.id == body.resume_parse_id, ResumeParse.candidate_id.is_(None),
+        ResumeParse.expires_at > utcnow()).with_for_update().first()
+    if parse is None:
+        raise HTTPException(status_code=404, detail="That résumé read has expired. Upload it again.")
 
     now = utcnow()
     candidate = Candidate(
@@ -271,10 +272,9 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     )
     db.add(candidate)
     db.flush()
-    if parse is not None:
-        parse.candidate_id, parse.expires_at = candidate.id, None
+    parse.candidate_id, parse.expires_at = candidate.id, None
     # Their first base résumé and its version 1, in this same transaction (resume-versioning.md §4.2): from the file
-    # and the form, or from the form alone when no file was given (a MANUAL base, so every candidate has one). Then
+    # and the form. Then
     # their Record: one UNVERIFIED claim per item of that version (docs/team/zuhair.md §1.3).
     base, version = first_base(parse, candidate, body, principal.user_id)
     db.add(base)

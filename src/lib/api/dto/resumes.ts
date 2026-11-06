@@ -28,6 +28,7 @@ const VersionDto = z.object({
   template: z.string().nullable(),
   created_by_user_id: z.string().nullable(),
   created_at: z.string(),
+  made_by_lead: z.boolean().optional(),
 });
 type VersionDto = z.infer<typeof VersionDto>;
 
@@ -35,8 +36,8 @@ const BaseDto = z.object({
   id: z.string(),
   candidate_id: z.string(),
   number: z.number().int(),
-  source: z.enum(["UPLOAD", "PROMOTED", "MANUAL"]),
-  has_resume: z.boolean().optional(),
+  source: z.enum(["UPLOAD", "PROMOTED"]),
+  made_by_lead: z.boolean().optional(),
   is_active: z.boolean(),
   promoted_from_resume_id: z.string().nullable(),
   archived_at: z.string().nullable(),
@@ -83,7 +84,7 @@ function toVersions(rows: VersionDto[], resumeId: string): ResumeVersion[] {
   const sorted = [...rows].sort((a, b) => a.version - b.version);
   return sorted.map((row, i) => ({
     id: fromBackendId(row.id), resumeId, versionNumber: row.version,
-    parentVersionId: i > 0 ? fromBackendId(sorted[i - 1]!.id) : null,
+    parentVersionId: i > 0 ? fromBackendId(sorted[i - 1]!.id) : null, madeByLead: row.made_by_lead ?? false,
     templateId: row.template ?? DEFAULT_TEMPLATE, includedSectionIds: [], includedBulletIds: [], bulletOverrides: {},
     atsScore: null, atsGrade: null, atsIssues: [], keywordScore: null, keywordsMatched: [], keywordsMissing: [],
     lines: [], tailoring: null, tracer: null, pdfUrl: null, docxUrl: null, renderedAt: null, changeSummary: null,
@@ -106,7 +107,7 @@ function toResume(firmId: string, rows: VersionDto[], baseId: string, jobId: str
 /** The listing → bases and résumé groups. A base with no versions left lists no résumé. */
 export function toResumeShelf(dto: ResumeShelfDto, firmId: string): ResumeShelf {
   const bases: BaseResume[] = dto.bases.map((b) => ({
-    id: fromBackendId(b.id), firmId, candidateId: fromBackendId(b.candidate_id), source: b.source, hasResume: b.has_resume ?? b.source !== "MANUAL", isActive: b.is_active,
+    id: fromBackendId(b.id), firmId, candidateId: fromBackendId(b.candidate_id), source: b.source, madeByLead: b.made_by_lead ?? false, isActive: b.is_active,
     createdByUserId: fromBackendId(b.created_by_user_id), createdAt: toIso(b.created_at),
     promotedFromResumeId: b.promoted_from_resume_id ? fromBackendId(b.promoted_from_resume_id) : null,
     archivedAt: toIsoOrNull(b.archived_at),

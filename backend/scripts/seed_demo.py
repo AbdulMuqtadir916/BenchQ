@@ -190,11 +190,21 @@ def _snake_keys(value):
 
 
 def _form_base(db, candidate, c: dict) -> None:
-    """The demo candidate's base, as for a candidate added without a file: a MANUAL base whose v1 holds the name,
-    contact details and location (07 Q57: those live in the résumé, not on `candidates`)."""
+    """The demo candidate's résumé (07 Q58: no candidate without one): a file generated from their details, kept like
+    an upload, and its UPLOAD base, whose v1 holds the name, contact details and location (07 Q57)."""
     from types import SimpleNamespace
-    from backend.candidates.first_base import first_base
-    base, version = first_base(None, candidate, SimpleNamespace(work_auth=c["workAuth"], summary="", skills=[]),
+    from backend.candidates import generated_resume
+    from backend.candidates.first_base import WORK_AUTH_LABEL, first_base
+    content, parse = generated_resume.from_details(
+        name=c["fullName"], title=c["primaryRole"], email=c["email"], phone=c["phone"], linkedin=c["linkedinUrl"],
+        city=c["city"], state=c["state"], country=c["country"], work_authorization=WORK_AUTH_LABEL.get(c["workAuth"]))
+    upload = ResumeParse(firm_id=candidate.firm_id, uploaded_by_user_id=demo_id(c["managerId"]), candidate_id=candidate.id,
+                         file_name=f"{c['fullName']} - résumé.pdf", mime_type=generated_resume.PDF_MIME,
+                         size_bytes=len(content), content=content, content_sha256=generated_resume.sha256(content),
+                         parse=parse, expires_at=None)
+    db.add(upload)
+    db.flush()
+    base, version = first_base(upload, candidate, SimpleNamespace(work_auth=c["workAuth"], summary="", skills=[]),
                                demo_id(c["managerId"]))
     db.add(base)
     db.flush()

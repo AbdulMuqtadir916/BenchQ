@@ -11,6 +11,8 @@ export interface TreeVersion {
   createdAt: string;
   createdByUserId: string;
   isLatest: boolean;
+  /** Saved by an OWNER or MANAGER: no delete for the BDE. */
+  madeByLead: boolean;
 }
 
 export interface TreeTailored {
@@ -41,7 +43,7 @@ export interface TreeCandidate {
 function versionsOf(resume: Resume): TreeVersion[] {
   return [...resume.versions]
     .sort((a, b) => b.versionNumber - a.versionNumber)
-    .map((v: ResumeVersion) => ({ id: v.id, number: v.versionNumber, createdAt: v.createdAt, createdByUserId: v.createdByUserId, isLatest: v.id === resume.latestVersionId }));
+    .map((v: ResumeVersion) => ({ id: v.id, number: v.versionNumber, createdAt: v.createdAt, createdByUserId: v.createdByUserId, isLatest: v.id === resume.latestVersionId, madeByLead: v.madeByLead }));
 }
 
 const byCreated = (a: BaseResume, b: BaseResume) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);

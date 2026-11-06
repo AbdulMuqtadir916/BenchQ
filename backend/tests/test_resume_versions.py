@@ -369,22 +369,14 @@ def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_
     assert picked["is_active"]
 
 
-def test_a_base_made_from_the_form_is_not_a_resume_until_a_later_version_adds_resume_content(anonymous_client, world):
-    """No file → a MANUAL base from the form, which isn't a résumé yet; a saved version with content makes it one."""
-    c = _create(anonymous_client, world, bde="adnan", summary="", skills=[]).json()      # no résumé file
-    [base] = _listing(anonymous_client, world, c)["bases"]
-    assert (base["source"], base["has_resume"]) == ("MANUAL", False)
-    v1 = _v(anonymous_client, world, c)
-    assert _save(anonymous_client, world, c, v1, "adnan", phone="+1 555 0199").status_code == 201
-    assert _listing(anonymous_client, world, c)["bases"][0]["has_resume"] is False     # a header fix isn't a résumé
-    v2 = _v(anonymous_client, world, c, version=2, who="adnan")
-    assert _save(anonymous_client, world, c, v2, "adnan", summary="Nine years of Java.").status_code == 201
-    assert _listing(anonymous_client, world, c)["bases"][0]["has_resume"] is True
-
-
-def test_an_uploaded_base_is_a_resume(anonymous_client, test_db, world):
-    c = _candidate(anonymous_client, test_db, world, bde="adnan")
-    assert _listing(anonymous_client, world, c)["bases"][0]["has_resume"] is True
+def test_the_list_marks_what_an_owner_or_manager_made_so_the_bde_gets_no_delete_there(anonymous_client, test_db, world):
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")          # created by the owner: Base 1 v1 is theirs
+    v1 = _v(anonymous_client, world, c, who="adnan")
+    assert _save(anonymous_client, world, c, v1, "adnan", summary="The BDE's version.").status_code == 201
+    [base] = _listing(anonymous_client, world, c, "adnan")["bases"]
+    assert base["made_by_lead"] is True                                     # the same rule as base_removal
+    by_version = {v["version"]: v["made_by_lead"] for v in base["versions"]}
+    assert by_version == {1: True, 2: False}                               # the BDE's v2 stays deletable
 
 
 def test_picking_a_version_whose_promoted_base_was_deleted_brings_that_base_back(anonymous_client, test_db, world):

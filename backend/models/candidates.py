@@ -161,14 +161,15 @@ def file_sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-BASE_RESUME_SOURCES = ("UPLOAD", "PROMOTED", "MANUAL")
+BASE_RESUME_SOURCES = ("UPLOAD", "PROMOTED")          # no MANUAL since 0018 (07 Q58)
 
 
 class BaseResume(Base):
     """One of a candidate's base résumés (docs/team/resume-versioning.md §3.2, migration 0008): an entry on their shelf
     of bases, holding no content. Its content is its `resumes` versions (category BASE); the active one is what
     tailoring and job search use. Made from an upload (with the parse it came from), promoted by a person from a
-    version, or (MANUAL, 0015) made from the new-candidate form alone when no file was given. Owner: Zuhair."""
+    version. A candidate is onboarded only with their résumé (07 Q58, 0018: the form-only MANUAL base is gone). Owner:
+    Zuhair."""
     __tablename__ = "base_resumes"
 
     id = _pk()
@@ -191,7 +192,7 @@ class BaseResume(Base):
     __table_args__ = (
         CheckConstraint(_in("source", BASE_RESUME_SOURCES), name="ck_base_resumes_source_values"),
         # An upload has its parse; a promoted or manual base (the form alone, 0015) has none.
-        CheckConstraint("source IN ('PROMOTED', 'MANUAL') OR resume_parse_id IS NOT NULL", name="ck_base_resumes_source"),
+        CheckConstraint("source = 'PROMOTED' OR resume_parse_id IS NOT NULL", name="ck_base_resumes_source"),
         # For the composite foreign key from resumes: a version's base belongs to the same candidate.
         UniqueConstraint("id", "candidate_id", name="uq_base_resumes_id_candidate"),
         Index("uq_base_resumes_one_active", "candidate_id", unique=True, postgresql_where=text("is_active")),

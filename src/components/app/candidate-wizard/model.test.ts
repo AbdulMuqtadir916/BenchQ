@@ -9,7 +9,7 @@ const draft: ResumeDraft = {
   phone: null, linkedinUrl: null, city: "Irving", state: "TX", country: null, yearsExperience: 9, workAuth: "H1B", workAuthText: null,
   summary: "Nine years of Java.", skills: [{ name: "Java", family: "Languages" }, { name: "AWS", family: "Cloud" }],
 };
-const valid: WizardValues = { ...EMPTY_VALUES, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRoles: ["Java Developer"] };
+const valid: WizardValues = { ...EMPTY_VALUES, resume: { parseId: "parse_1", fileName: "Ravi.pdf" }, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRoles: ["Java Developer"] };
 
 describe("applyDraft (07 Q49)", () => {
   it("fills empty fields and marks them drafted; null fields stay empty", () => {
@@ -92,8 +92,9 @@ describe("validateStep", () => {
     expect(isDirty({ ...EMPTY_VALUES, managerId: "m", bdeId: "b" })).toBe(false);
   });
 
-  it("the résumé never blocks; preferences need one target role", () => {
-    expect(validateStep("resume", EMPTY_VALUES)).toEqual({});
+  it("the résumé is required (07 Q58); preferences need one target role", () => {
+    expect(validateStep("resume", EMPTY_VALUES)).toEqual({ resume: "Upload the candidate's résumé." });
+    expect(validateStep("resume", valid)).toEqual({});
     expect(validateStep("preferences", EMPTY_VALUES)).toEqual({ targetRoles: "Add at least one role they are looking for." });
     expect(validateStep("preferences", valid)).toEqual({});
   });
@@ -102,10 +103,10 @@ describe("validateStep", () => {
 describe("the flow", () => {
   it("a reload lands on the first step that can't be passed yet", () => {
     expect(firstOpenStep("preferences", EMPTY_VALUES, false)).toBe("resume");
-    // "Skip, enter manually": started, still empty, so the first step that can't be passed.
-    expect(firstOpenStep("basic", EMPTY_VALUES, true)).toBe("basic");
-    expect(firstOpenStep("preferences", EMPTY_VALUES)).toBe("basic");
-    expect(firstOpenStep("preferences", { ...EMPTY_VALUES, city: "Irving" })).toBe("basic");
+    // No résumé, no way past step 1 (07 Q58), whatever else was typed.
+    expect(firstOpenStep("basic", EMPTY_VALUES, true)).toBe("resume");
+    expect(firstOpenStep("preferences", { ...EMPTY_VALUES, city: "Irving" })).toBe("resume");
+    expect(firstOpenStep("preferences", { ...valid, fullName: "" })).toBe("basic");
     expect(firstOpenStep("preferences", { ...valid, workAuth: null })).toBe("work");
     expect(firstOpenStep("preferences", valid)).toBe("preferences");
     expect(firstOpenStep("resume", EMPTY_VALUES)).toBe("resume");
@@ -131,7 +132,7 @@ describe("toCreateCandidate", () => {
       resumeParseId: "parse_1", managerId: "user_fatima", bdeId: "user_adnan",
       handoffNote: "Push banking.",
     });
-    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ resumeParseId: null, bdeId: null, handoffNote: null });
+    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ resumeParseId: "parse_1", bdeId: null, handoffNote: null });
     // The flow works sponsorship and transfer out from the work authorization and sends them (A3); the backend only checks they are there.
     const sent = (workAuth: WorkAuth) => toCreateCandidate({ ...valid, workAuth, managerId: "m" });
     expect(sent("H1B")).toMatchObject({ needsSponsorship: true, needsTransfer: true });

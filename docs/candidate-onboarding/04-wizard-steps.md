@@ -75,7 +75,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
   assignment stay (`applyDraft`, 2026-11-06).
 - Parse error: "Couldn't read this résumé. Try another file, or enter the details yourself." with Try again and Skip.
 - "Try a sample" chips: only when the parse adapter runs on mocks (assumption A1).
-- "No résumé yet? … Skip, enter manually" → step 2, empty.
+- No way past step 1 without a résumé (07 Q58): no Skip, and the parse error offers only Try again or another file.
 - Copy under the heading: "Drop it in and BenchQ fills the profile for you. Everything it pulls out stays editable, and
   **nothing is saved until you create the candidate**." (Q49 — not "sent anywhere".)
 

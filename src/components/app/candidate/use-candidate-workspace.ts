@@ -77,14 +77,9 @@ export function useCandidateWorkspace(candidateId: string) {
   );
 
   const resumes = useMemo(() => shelfQuery.data?.resumes ?? [], [shelfQuery.data]);
-  /** The résumés that are résumés: a base made from the form alone isn't one until it holds résumé content. */
-  const realResumes = useMemo(() => {
-    const notYet = new Set((shelfQuery.data?.bases ?? []).filter((b) => !b.hasResume).map((b) => b.id));
-    return resumes.filter((r) => !(r.isMaster && r.baseResumeId && notYet.has(r.baseResumeId)));
-  }, [resumes, shelfQuery.data]);
   /** The active base (the one the workflow uses), its newest version, and how many copies were tailored from it. */
   const base = useMemo(() => {
-    const active = shelfQuery.data?.bases.find((b) => b.isActive && b.hasResume);
+    const active = shelfQuery.data?.bases.find((b) => b.isActive);
     const resume = active ? resumes.find((r) => r.isMaster && r.baseResumeId === active.id) : undefined;
     const version = resume?.versions.find((v) => v.id === resume.latestVersionId) ?? resume?.versions[0];
     if (!resume || !version) return null;
@@ -105,7 +100,6 @@ export function useCandidateWorkspace(candidateId: string) {
     recordQuery,
     shelfQuery,
     resumes,
-    realResumes,
     jobsQuery,
     inboxQuery,
     inbox: inboxQuery.data ?? null,

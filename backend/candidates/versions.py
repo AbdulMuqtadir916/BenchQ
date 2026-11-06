@@ -158,12 +158,8 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
     return {**out, **content_of(row)} if with_content else out
 
 
-def base_json(base: BaseResume, number: int, has_resume: bool | None = None) -> dict:
-    """`has_resume`: whether the base is a résumé yet. A file (UPLOAD) or a version (PROMOTED) is; a base made from the
-    New candidate form alone (MANUAL) becomes one when the BDE saves a version after v1 with résumé content
-    (`listing_many` works it out; elsewhere a MANUAL base counts as not yet)."""
+def base_json(base: BaseResume, number: int) -> dict:
     return {"id": str(base.id), "candidate_id": str(base.candidate_id), "number": number, "source": base.source,
-            "has_resume": (base.source != "MANUAL") if has_resume is None else has_resume,
             "is_active": base.is_active,
             "resume_parse_id": str(base.resume_parse_id) if base.resume_parse_id else None,
             "promoted_from_resume_id": str(base.promoted_from_resume_id) if base.promoted_from_resume_id else None,
@@ -198,9 +194,16 @@ def listing_many(db, firm_id, candidate_ids) -> dict:
         counted[base.candidate_id] = counted.get(base.candidate_id, 0) + 1
         numbers[base.id] = counted[base.candidate_id]
 
+    # Who made what: the BDE can't delete what an owner or manager made (version_removal, base_removal), so the list
+    # says so and the tree offers no delete there.
+    makers = {b.created_by_user_id for b in bases} | {r.created_by_user_id for r in rows}
+    leads = {uid for uid, role in db.query(User.id, User.role).filter(User.id.in_([m for m in makers if m])).all()
+             if is_lead_role(role)}
+
     def entry(row: Resume) -> dict:
         target = promoted_to.get(row.id)
-        return {**version_json(row), "promoted_to_base_id": str(target) if target else None}
+        return {**version_json(row), "promoted_to_base_id": str(target) if target else None,
+                "made_by_lead": row.created_by_user_id in leads}
 
     out = {cid: {"bases": [], "tailored": []} for cid in ({b.candidate_id for b in bases} | {r.candidate_id for r in rows})}
     if isinstance(candidate_ids, (list, tuple, set)):
@@ -213,20 +216,34 @@ def listing_many(db, firm_id, candidate_ids) -> dict:
             by_base.setdefault(row.base_resume_id, []).append(entry(row))
         else:
             tailored.setdefault((row.candidate_id, row.base_resume_id, row.job_id), []).append(entry(row))
-    # A form-only base is a résumé once a later version holds résumé content (experience, education, summary, skills).
-    manual = [b.id for b in bases if b.source == "MANUAL"]
-    with_content: set = set()
-    if manual:
-        later = scoped(db, Resume, firm_id).filter(Resume.base_resume_id.in_(manual), Resume.category == "BASE",
-                                                   Resume.version > 1, Resume.deleted_at.is_(None)) \
-            .options(load_only(Resume.base_resume_id, Resume.summary, Resume.skills, Resume.experiences,
-                               Resume.educations)).all()
-        with_content = {r.base_resume_id for r in later
-                        if (r.summary or "").strip() or r.skills or r.experiences or r.educations}
+    # Who made what: the BDE can't delete what an owner or manager made (version_removal, base_removal), so the list
+    # says so and the tree offers no delete there.
+    makers = {b.created_by_user_id for b in bases} | {r.created_by_user_id for r in rows}
+    leads = {uid for uid, role in db.query(User.id, User.role).filter(User.id.in_([m for m in makers if m])).all()
+             if is_lead_role(role)}
+
+    def entry(row: Resume) -> dict:
+        target = promoted_to.get(row.id)
+        return {**version_json(row), "promoted_to_base_id": str(target) if target else None,
+                "made_by_lead": row.created_by_user_id in leads}
+
+    out = {cid: {"bases": [], "tailored": []} for cid in ({b.candidate_id for b in bases} | {r.candidate_id for r in rows})}
+    if isinstance(candidate_ids, (list, tuple, set)):
+        for cid in candidate_ids:
+            out.setdefault(cid, {"bases": [], "tailored": []})
+    by_base: dict = {}
+    tailored: dict[tuple, list] = {}
+    for row in rows:
+        if row.category == "BASE":
+            by_base.setdefault(row.base_resume_id, []).append(entry(row))
+        else:
+            tailored.setdefault((row.candidate_id, row.base_resume_id, row.job_id), []).append(entry(row))
     for base in bases:
-        out[base.candidate_id]["bases"].append({**base_json(base, numbers[base.id],
-                                                            base.source != "MANUAL" or base.id in with_content),
-                                                "versions": by_base.get(base.id, [])})
+        versions = by_base.get(base.id, [])
+        out[base.candidate_id]["bases"].append({**base_json(base, numbers[base.id]),
+                                                "made_by_lead": base.created_by_user_id in leads
+                                                or any(v["made_by_lead"] for v in versions),
+                                                "versions": versions})
     for (cid, b, j), v in tailored.items():
         out[cid]["tailored"].append({"candidate_id": str(cid), "base_resume_id": str(b), "job_id": str(j), "versions": v})
     return out

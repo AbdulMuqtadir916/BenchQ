@@ -142,6 +142,8 @@ const isWhole = (value: number | null, min: number, max: number) => value === nu
  */
 export function validateStep(step: StepId, values: WizardValues, context: { requiresBde?: boolean } = {}): Errors {
   const errors: Errors = {};
+  // 07 Q58 (Abdul, 2026-11-06): no candidate without their résumé, so step 1 can't be passed without one.
+  if (step === "resume" && values.resume === null) errors.resume = "Upload the candidate's résumé.";
   if (step === "assign") {
     if (!values.managerId) errors.managerId = "Choose the manager.";
     else if (context.requiresBde && values.bdeId === null) errors.bdeId = "Choose the BDE who will work this candidate.";
@@ -174,7 +176,7 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
 
 /**
  * The first step that can't be passed yet, at or before `requested` (a reload starts empty: no drafts, Q48). A flow
- * not yet started (a reload, or just after creating one) starts on the résumé; "Skip, enter manually" starts it empty.
+ * not yet started (a reload, or just after creating one) starts on the résumé, and so does any flow without one (07 Q58).
  */
 export function firstOpenStep(requested: StepId, values: WizardValues, hasStarted = true): StepId {
   if (!hasStarted && !isDirty(values)) return "resume";
@@ -201,6 +203,7 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
   // Required on step 3 (validateStep), so it is always set here.
   const workAuth = values.workAuth;
   if (workAuth === null) throw new Error("toCreateCandidate needs a work authorization (step 3).");
+  if (values.resume === null) throw new Error("toCreateCandidate needs the résumé (step 1; 07 Q58).");
   return {
     fullName: values.fullName.trim(),
     primaryRole: values.primaryRole.trim(),
@@ -229,7 +232,7 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     skills: values.skills.map(({ name, family }) => ({ name, family })),
     preferredIndustries: values.preferredIndustries,
     dealBreakers: values.dealBreakers,
-    resumeParseId: values.resume?.parseId ?? null,
+    resumeParseId: values.resume.parseId,
     managerId: values.managerId,
     bdeId: values.bdeId,
     handoffNote: orNull(values.handoffNote),

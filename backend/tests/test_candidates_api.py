@@ -34,7 +34,7 @@ def world(test_db, accounts):
         token, _ = start_session(test_db, people[who])
         cookies[who] = _cookie(token)
     test_db.commit()
-    return {"firm": firm, "people": people, "as": cookies}
+    return {"firm": firm, "people": people, "as": cookies, "db": test_db}
 
 
 def _body(world, manager="fatima", bde=None, **over):
@@ -47,7 +47,27 @@ def _body(world, manager="fatima", bde=None, **over):
             "summary": "Nine years of Java.", **over}
 
 
+def _upload_for_create(world) -> str:
+    """A résumé read, as step 1 leaves it (07 Q58: no candidate without one). Its own bytes, so files never collide."""
+    from datetime import timedelta
+    import uuid
+    from backend.models.candidates import ResumeParse, file_sha256
+    from backend.models.db import utcnow
+    content = f"%PDF-1.7 test {uuid.uuid4()}".encode()
+    row = ResumeParse(firm_id=world["firm"].id, uploaded_by_user_id=world["people"]["fatima"].id, file_name="r.pdf",
+                      mime_type="application/pdf", size_bytes=len(content), content=content,
+                      content_sha256=file_sha256(content), parse={"header": {}}, expires_at=utcnow() + timedelta(minutes=30))
+    world["db"].add(row)
+    world["db"].commit()
+    return str(row.id)
+
+
 def _create(client, world, who="owner", **kwargs):
+    """A create as the wizard sends it: with a résumé read unless the test passes its own `resume_parse_id`."""
+    if "resume_parse_id" not in kwargs:
+        kwargs["resume_parse_id"] = _upload_for_create(world)
+    elif kwargs["resume_parse_id"] is None:
+        kwargs.pop("resume_parse_id")
     return client.post(f"/api/firms/{world['firm'].id}/candidates", json=_body(world, **kwargs), headers=world["as"][who])
 
 
@@ -105,19 +125,13 @@ def test_the_fields_are_checked(anonymous_client, world):
         assert _create(anonymous_client, world, **over).status_code == 422, over
 
 
-def test_a_candidate_without_a_resume_file_gets_a_manual_base_from_the_form(anonymous_client, test_db, world):
-    """Migration 0015: every candidate has a base; with no file its v1 holds what the form holds."""
-    from backend.models.candidates import BaseResume
-    from backend.models.db import Resume
-    c = _create(anonymous_client, world, city="Dallas", state="TX").json()
-    (base,) = test_db.query(BaseResume).filter(BaseResume.candidate_id == c["id"]).all()
-    assert (base.source, base.resume_parse_id, base.is_active) == ("MANUAL", None, True)
-    (v1,) = test_db.query(Resume).filter(Resume.base_resume_id == base.id).all()
-    assert (v1.category, v1.version, v1.full_name, v1.title, v1.email) == ("BASE", 1, "Ravi Teja", "Java Developer",
-                                                                            "ravi@example.com")
-    assert (v1.summary, v1.city, v1.state, v1.country, v1.github) == ("Nine years of Java.", "Dallas", "TX", "US", None)
-    assert v1.summary_id and [s["name"] for s in v1.skills] == ["Java"] and v1.skills[0]["id"]
-    assert v1.experiences == [] and v1.educations == [] and v1.projects == []
+def test_a_candidate_is_never_added_without_a_resume(anonymous_client, test_db, world):
+    """07 Q58 (Abdul, 2026-11-06): no résumé read, no candidate."""
+    from backend.models.candidates import Candidate
+    before = test_db.query(Candidate).count()
+    r = _create(anonymous_client, world, resume_parse_id=None)
+    assert r.status_code == 400 and "résumé" in r.json()["detail"]
+    assert test_db.query(Candidate).count() == before
 
 
 def test_a_candidate_with_a_resume_file_gets_an_upload_base(anonymous_client, test_db, world):

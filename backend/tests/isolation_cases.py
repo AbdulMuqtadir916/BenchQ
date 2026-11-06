@@ -77,7 +77,8 @@ CASES: dict[str, Case] = {
         "full_name": "New candidate", "primary_role": "Data Engineer", "email": "new@example.test", "work_auth": "GC",
         "phone": "+1 555 0100", "country": "US", "years_experience": 5, "needs_sponsorship": False,
         "needs_transfer": False, "target_roles": ["Data Engineer"], "employment_types": ["W2"],
-        "manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
+        "manager_id": str(i["manager"]), "bde_id": str(i["bde_user"]),
+        "resume_parse_id": str(i["pending_parse"])}, body_ids=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": Case(),
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(body=lambda i: {"rate_target": 90}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": Case(

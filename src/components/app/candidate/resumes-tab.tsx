@@ -5,10 +5,7 @@ import { FileText } from "lucide-react";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { ResumeShelf } from "@/lib/schemas/resume";
 import { buildResumeTree } from "@/lib/derive/resume-tree";
-import Link from "next/link";
-import { canChangeResume, canManageResume } from "@/lib/auth/permissions";
-import { useHref } from "@/lib/routes/use-href";
-import { Button } from "@/components/ui/button";
+import { canManageResume } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
@@ -26,12 +23,6 @@ export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct
   const tree = useMemo(() => (shelf ? buildResumeTree(shelf, [candidate.id]) : []), [shelf, candidate.id]);
   const { actions, dialogs } = useResumeActions((id) => (id === candidate.id ? candidate : undefined));
   const canUpload = canManageResume(principal, candidate);
-  const canBuild = canChangeResume(principal, candidate);
-  const toHref = useHref();
-  // No résumé yet: no base at all, or only the one made from the New candidate form (no file, no résumé content).
-  const formBase = shelf?.bases.find((b) => b.candidateId === candidate.id && !b.hasResume && b.isActive);
-  const formV1 = formBase ? shelf?.resumes.find((r) => r.isMaster && r.baseResumeId === formBase.id) : undefined;
-  const hasResume = !!shelf?.bases.some((b) => b.candidateId === candidate.id && b.hasResume);
 
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
   if (isLoading) {
@@ -41,15 +32,11 @@ export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct
       </div>
     );
   }
-  if (!hasResume) {
-    const build = canAct && canBuild && formV1 ? (
-      <Button asChild variant="secondary"><Link href={toHref("resumes.studio", { id: formV1.latestVersionId ?? formV1.versions[0]!.id })}>Build it from the form details</Link></Button>
-    ) : null;
-    const upload = canAct && canUpload ? <UploadResume candidateId={candidate.id} /> : null;
+  if (tree.length === 0) {
     return (
-      <EmptyState icon={FileText} title="No résumé uploaded yet"
-        description={upload || build ? "Upload the candidate's résumé, or build one in the studio from the details entered when the candidate was added." : "The candidate's BDE uploads or builds their résumé."}
-        action={upload || build ? <div className="flex flex-wrap justify-center gap-2">{upload}{build}</div> : undefined} />
+      <EmptyState icon={FileText} title="No résumés yet"
+        description={canAct && canUpload ? "Upload the candidate's résumé: it becomes their first base." : "The candidate's BDE uploads their résumé; it becomes their first base."}
+        action={canAct && canUpload ? <UploadResume candidateId={candidate.id} /> : undefined} />
     );
   }
   return (

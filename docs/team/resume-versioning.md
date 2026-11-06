@@ -123,8 +123,8 @@ resume_parses ──(resume_parse_id)──▶ base_resumes ◀──(base_resum
 | `id` | uuid | PK, `gen_random_uuid()` | The base's id ("base 1, 2…") |
 | `firm_id` | uuid | FK → firms, NOT NULL | The firm that owns it |
 | `candidate_id` | uuid | FK → candidates, NOT NULL | The candidate it belongs to |
-| `source` | varchar | NOT NULL, `UPLOAD` / `PROMOTED` / `MANUAL` | Made from an upload, promoted by a person from a `resumes` version, or (`MANUAL`, **0015**) made from the new-candidate form alone when no file was given |
-| `resume_parse_id` | uuid | FK → resume_parses, nullable | The upload it came from; required for `UPLOAD`, empty for `PROMOTED` and `MANUAL` |
+| `source` | varchar | NOT NULL, `UPLOAD` / `PROMOTED` | Made from an upload, or promoted by a person from a `resumes` version. (`MANUAL`, a base from the form alone, existed from 0015 to **0018**: 07 Q58, no candidate without a résumé) |
+| `resume_parse_id` | uuid | FK → resume_parses, nullable | The upload it came from; required for `UPLOAD`, empty for `PROMOTED` |
 | `is_active` | boolean | NOT NULL, default false | The base the workflow uses (tailoring, job search) |
 | `created_by_user_id` | uuid | FK → users, NOT NULL | Who made it |
 | `created_at` | timestamptz | NOT NULL, `now()` | When it was made |
@@ -142,8 +142,8 @@ CREATE TABLE base_resumes (
   is_active          boolean NOT NULL DEFAULT false,
   created_by_user_id uuid NOT NULL REFERENCES users(id)         ON DELETE RESTRICT,
   created_at         timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT ck_base_resumes_source_values CHECK (source IN ('UPLOAD', 'PROMOTED', 'MANUAL')),
-  CONSTRAINT ck_base_resumes_source CHECK (source IN ('PROMOTED', 'MANUAL') OR resume_parse_id IS NOT NULL),
+  CONSTRAINT ck_base_resumes_source_values CHECK (source IN ('UPLOAD', 'PROMOTED')),
+  CONSTRAINT ck_base_resumes_source CHECK (source = 'PROMOTED' OR resume_parse_id IS NOT NULL),
   CONSTRAINT uq_base_resumes_id_candidate UNIQUE (id, candidate_id)
 );
 CREATE UNIQUE INDEX uq_base_resumes_one_active ON base_resumes (candidate_id) WHERE is_active;
@@ -374,7 +374,6 @@ BenchQ has no Verified, Unverified or Contradicted states, no `claims` and `evid
 drops the tables; the frontend removes the rest in PR 7). Any résumé that is not soft deleted can be exported. What stays:
 - the truth rules in the parser's prompts and its strict response format (§2): the parser must not invent content;
 - ids on every item (§3.4), which tell a save what changed;
-- a `MANUAL` base has no upload, so "upload the same file again" (§4.7) cannot bring it back if it is soft deleted; it can never be the only base (the active base can't be deleted).
 
 ### 4.6 A later résumé (decided 2026-11-02, Abdul and Zuhair)
 
@@ -478,7 +477,7 @@ from the columns. Job scoring and interview prep use it; nothing converts the co
 The DTO mapper (`src/lib/api/dto/`) groups rows into `Resume` objects. No backend shape leaves `src/lib/api/dto/`.
 
 **The docs/02 addition (approved; written in `docs/02-DATA-CONTRACTS.md` §8.1):**
-- **`BaseResume`**: `id`, `candidateId`, `firmId`, `source` (`UPLOAD` / `PROMOTED` / `MANUAL`), `isActive`, `createdAt`,
+- **`BaseResume`**: `id`, `candidateId`, `firmId`, `source` (`UPLOAD` / `PROMOTED`), `isActive`, `createdAt`,
   `createdByUserId` — for the base dropdown and showing which base is active.
 - **`baseResumeId`** on `Resume`.
 - **The new parser fields** in `ResumeDraftSchema` (`country`; city and state read directly, no `splitLocation`)

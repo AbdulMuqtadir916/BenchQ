@@ -36,7 +36,7 @@ def test_the_list_holds_every_candidate_in_scope_with_their_bases_and_no_content
 
     shelf = _shelf(anonymous_client, world, "owner")
     base = next(b for b in shelf["bases"] if b["candidate_id"] == adnans["id"])
-    assert (base["number"], base["source"], base["is_active"]) == (1, "MANUAL", True)
+    assert (base["number"], base["source"], base["is_active"]) == (1, "UPLOAD", True)
     [v1] = base["versions"]
     assert (v1["version"], v1["category"], v1["candidate_id"], v1["base_resume_id"]) == (1, "BASE", adnans["id"], base["id"])
     assert "summary" not in v1 and "experiences" not in v1                    # the list never carries content

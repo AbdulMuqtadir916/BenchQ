@@ -142,8 +142,9 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable() })),
   preferredIndustries: z.array(z.string()),
   dealBreakers: z.array(z.string()),
-  /** The parse to keep: the backend holds the file until create (onboarding module 06). null = no résumé. */
-  resumeParseId: z.string().nullable(),
+  /** The parse to keep: the backend holds the file until create (onboarding module 06). Required: no candidate without
+   *  their résumé (07 Q58). */
+  resumeParseId: z.string().min(1),
   managerId: z.string().min(1, "Choose a manager."),
   bdeId: z.string().nullable(),
   handoffNote: z.string().trim().max(1000).nullable(),

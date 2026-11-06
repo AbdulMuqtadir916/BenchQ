@@ -37,7 +37,7 @@ function IconAction({ label, onClick, children, tone }: { label: string; onClick
   );
 }
 
-const SOURCE: Record<BaseResume["source"], string> = { UPLOAD: "Uploaded", PROMOTED: "From a version", MANUAL: "From the form" };
+const SOURCE: Record<BaseResume["source"], string> = { UPLOAD: "Uploaded", PROMOTED: "From a version" };
 
 function Disclosure({ isOpen, onToggle, controls, children }: { isOpen: boolean; onToggle: () => void; controls: string; children: React.ReactNode }) {
   return (
@@ -113,14 +113,14 @@ export function BaseFolder({ node, labels, showTailored, defaultOpen = false, ac
             <span className="min-w-0 truncate text-body-strong text-[var(--color-text)]">{title}</span>
             {node.base.isActive ? <Tag tone="blue">Active</Tag> : null}
             {node.base.archivedAt ? <Tag>Hidden</Tag> : null}
-            <Tag>{(node.base.hasResume ? SOURCE[node.base.source] : "No résumé yet")}</Tag>
+            <Tag>{SOURCE[node.base.source]}</Tag>
           </span>
           <span className="block text-caption text-[var(--color-text-2)]">{baseSummary(node)}</span>
         </span>
       </Disclosure>
       {canChange && !node.base.isActive && !isHidden ? <IconAction label={`Use ${title} as the base in use`} onClick={() => actions!.onPickBase(node)}><CircleCheck size={14} aria-hidden /></IconAction> : null}
       {canManage && isHidden ? <IconAction label={`Show ${title} again`} onClick={() => actions!.onShowBase(node)}><Eye size={14} aria-hidden /></IconAction> : null}
-      {canManage && !node.base.isActive && !isHidden ? <IconAction label={`Delete ${title}`} tone="danger" onClick={() => actions!.onDeleteBase(node, title)}><Trash2 size={14} aria-hidden /></IconAction> : null}
+      {canManage && !node.base.isActive && !isHidden && !node.base.madeByLead ? <IconAction label={`Delete ${title}`} tone="danger" onClick={() => actions!.onDeleteBase(node, title)}><Trash2 size={14} aria-hidden /></IconAction> : null}
       </div>
       {isOpen ? (
         <div id={bodyId} className="space-y-2 px-2 pb-2">
@@ -131,7 +131,7 @@ export function BaseFolder({ node, labels, showTailored, defaultOpen = false, ac
                 <VersionRow key={v.id} version={v} label={title} labels={labels} extra={
                   <>
                     {canChange && v.number > 1 && !isHidden ? <IconAction label={`Use ${versionName(title, v.number)} as the base`} onClick={() => actions!.onUseAsBase(cid, v)}><ArrowUpFromLine size={13} aria-hidden /></IconAction> : null}
-                    {canManage && v.number > 1 ? <IconAction label={`Delete ${versionName(title, v.number)}`} tone="danger" onClick={() => actions!.onDeleteVersion(cid, v, title)}><Trash2 size={13} aria-hidden /></IconAction> : null}
+                    {canManage && v.number > 1 && !v.madeByLead ? <IconAction label={`Delete ${versionName(title, v.number)}`} tone="danger" onClick={() => actions!.onDeleteVersion(cid, v, title)}><Trash2 size={13} aria-hidden /></IconAction> : null}
                   </>
                 } />
               ))}</ul>
