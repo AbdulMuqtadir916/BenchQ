@@ -248,7 +248,7 @@ def process_one(message_id, *, provider=None, aliases=None):
             job.meta = {**job.meta, 'retry_exhausted': not retry}
             db.commit()
             logger.warning("Email %s classification failed: %s (attempt %d, %s)", message_id, error.code,
-                           row.classification_attempts, 'will retry' if retry else 'gave up')
+                           row.classification_attempts, 'will retry' if row.classification_state == 'PENDING' else 'gave up')
             return False
         # Snapshot match/app revision after I/O; never trust a stale pre-call match.
         had_application_link = row.application_id is not None
@@ -312,7 +312,7 @@ def process_one(message_id, *, provider=None, aliases=None):
         row.classification_error = None
         row.classification_next_retry_at = None
         db.commit()
-        logger.info("Email %s classified: %s", message_id, record.outcome)
+        logger.info("Email %s classified: %s", message_id, row.classification_state)
     return True
 
 
