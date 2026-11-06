@@ -80,6 +80,11 @@ the reads the screen needs. Change document:
 screen: people list, searchable actor and candidate dropdowns, dates, and the sidebar name. Change document:
 [pr-changes/activity-logs-pr4-activity-screen.md](./pr-changes/activity-logs-pr4-activity-screen.md).
 
+**Activity Log PR 5 (2026-11-06), three parts, each built on the last, none pushed:**
+`activity-logs/pr5-part1-applications` (applications, interviews, autofill), `activity-logs/pr5-part2-jobs-and-analysis`,
+`activity-logs/pr5-part3-cover-letters`. Together they log every firm route that wrote nothing. Whether they go up as
+three PRs or one is for Abdul. Change documents in [pr-changes](./pr-changes/).
+
 ## 1. Notifications inbox
 
 The main sidebar's **Preferences** section gets a **Notifications** page for firm users and the Super Admin.

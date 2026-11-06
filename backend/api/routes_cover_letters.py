@@ -14,7 +14,10 @@ from sqlalchemy.orm.attributes import flag_modified
 from backend.models.db import get_db, CoverLetter, Resume, Job, Setting, Persona, TracerLink, TracerClickEvent, SessionLocal
 from backend.api._input import str_field, uuid_filter
 from backend.auth.scoping import firm_ref, reader_firm_id, scoped, scoped_jobs, writer_firm_id
-from backend.models.tenancy import DEFAULT_FIRM_ID
+from backend.api.routes_auth import current_principal
+from backend.auth import ledger
+from backend.auth.sessions import Principal
+from backend.models.tenancy import DEFAULT_FIRM_ID, User
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 from backend.api.render_shared import _get_browser, _rewrite_urls_with_tracers, _resolve_tailoring_jd
 from backend.candidates.resume_text import resume_text as version_text
@@ -166,6 +169,29 @@ def _build_ctx(rows: list[CoverLetter], db: Session, firm_id) -> dict:
     return out
 
 
+# What an edit records. The letter's text isn't among them: its entry says it changed, and the text stays in the letter.
+LOGGED_FIELDS = ("name", "template", "page_format", "voice", "length")
+
+
+def _letter_state(cl: CoverLetter) -> dict:
+    return {field: getattr(cl, field) for field in LOGGED_FIELDS}
+
+
+def _candidate_of(db: Session, cl: CoverLetter):
+    """The candidate a letter is for, through its résumé. A letter with no résumé is about no candidate."""
+    if cl.resume_id is None:
+        return None
+    resume = db.get(Resume, cl.resume_id)
+    return resume.candidate_id if resume else None
+
+
+def _audit_letter(db: Session, firm_id, principal: Principal, cl: CoverLetter, action: str, summary: str,
+                  changes: dict | None = None) -> None:
+    actor = scoped(db, User, firm_id).filter_by(id=principal.user_id).one()
+    ledger.record(db, actor=actor, action=action, entity_type="cover_letter", entity_id=cl.id, entity_label=cl.name,
+                  summary=summary, firm_id=firm_id, candidate_id=_candidate_of(db, cl), changes=changes)
+
+
 @router.get("")
 def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     q = scoped(db, CoverLetter, firm_id).order_by(CoverLetter.updated_at.desc())
@@ -181,7 +207,8 @@ def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_d
 
 
 @router.post("", status_code=201)
-def create_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
+def create_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id),
+                        principal: Principal = Depends(current_principal)):
     # See R4-T1-20: a non-string name used to raise AttributeError -> 500.
     name = str_field(body, "name", required=True)
     if "template" in body:
@@ -196,6 +223,8 @@ def create_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depen
         json_data=body.get("json_data", {}),
     )
     db.add(cl)
+    db.flush()
+    _audit_letter(db, firm_id, principal, cl, "CREATE", f"Created cover letter {cl.name}.")
     db.commit()
     db.refresh(cl)
     return _to_dict(cl, include_json_data=True, ctx=_build_ctx([cl], db, firm_id).get(cl.id))
@@ -210,7 +239,8 @@ def get_cover_letter(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(
 
 
 @router.patch("/{cl_id}")
-def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                        principal: Principal = Depends(current_principal)):
     cl = scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == cl_id).first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
@@ -223,9 +253,13 @@ def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db), f
         body["job_id"] = firm_ref(db, firm_id, Job, body["job_id"], "Job")
     if "resume_id" in body:
         body["resume_id"] = firm_ref(db, firm_id, Resume, body["resume_id"], "Resume")
+    before, text_before = _letter_state(cl), cl.json_data
     for k, v in body.items():
         if k in allowed:
             setattr(cl, k, v)
+    changes = ledger.diff(before, _letter_state(cl))
+    if changes or cl.json_data != text_before:
+        _audit_letter(db, firm_id, principal, cl, "UPDATE", f"Edited cover letter {cl.name}.", changes)
     db.commit()
     db.refresh(cl)
     return _to_dict(cl, include_json_data=True, ctx=_build_ctx([cl], db, firm_id).get(cl.id))
@@ -259,7 +293,8 @@ def get_tracer_stats(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(
 
 
 @router.delete("/{cl_id}")
-def delete_cover_letter(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+def delete_cover_letter(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                        principal: Principal = Depends(current_principal)):
     cl = scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == cl_id).first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
@@ -274,6 +309,7 @@ def delete_cover_letter(cl_id: str, db: Session = Depends(get_db), firm_id=Depen
     scoped(db, TracerLink, firm_id).filter(
         TracerLink.cover_letter_id == cl.id, TracerLink.resume_id.is_(None),
     ).delete(synchronize_session=False)
+    _audit_letter(db, firm_id, principal, cl, "DELETE", f"Deleted cover letter {cl.name}.")
     db.delete(cl)
     db.commit()
     return {"deleted": cl_id}
@@ -333,7 +369,8 @@ async def export_pdf(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(
 # ── AI generation ─────────────────────────────────────────────────────────────
 
 @router.post("/generate", status_code=202)
-async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
+async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id),
+                                principal: Principal = Depends(current_principal)):
     """Generate a cover letter for a (resume, job) pair in the background; returns 202 + run_id, and with cover_letter_id rewrites that existing letter in place instead of creating a new one."""
     resume_id = body.get("resume_id")
     job_id = body.get("job_id")
@@ -393,6 +430,7 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_
                 "page_format": body.get("page_format"),
                 "cover_letter_id": target_id,
                 "firm_id": str(firm_id),
+                "requested_by": str(principal.user_id),
             },
         )
         return {"run_id": run_id, "status": "running"}
@@ -402,7 +440,8 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_
 
 async def _generate_impl(resume_id: str, job_id: str, voice: str | None, length: str,
                          template: str | None, page_format: str | None,
-                         cover_letter_id: str | None = None, firm_id: str | None = None):
+                         cover_letter_id: str | None = None, firm_id: str | None = None,
+                         requested_by: str | None = None):
     """Background worker: generate the letter and persist a CoverLetter row; semaphore-guarded (shared with tailoring) so concurrent generations don't blow the LLM rate limit."""
     from backend.analyzer.cover_letter_generator import (
         resolve_voice_instruction, generate_cover_letter_body,
@@ -414,12 +453,12 @@ async def _generate_impl(resume_id: str, job_id: str, voice: str | None, length:
         # Returned string becomes JobRun.result_summary (Stats -> Run history).
         return await _generate_inner(resume_id, job_id, voice, length, template, page_format,
                                      resolve_voice_instruction, generate_cover_letter_body, track_llm_call,
-                                     cover_letter_id=cover_letter_id, firm_id=firm_id)
+                                     cover_letter_id=cover_letter_id, firm_id=firm_id, requested_by=requested_by)
 
 
 async def _generate_inner(resume_id, job_id, voice, length, template, page_format,
                           resolve_voice_instruction, generate_cover_letter_body, track_llm_call,
-                          cover_letter_id=None, firm_id=None):
+                          cover_letter_id=None, firm_id=None, requested_by=None):
     """Read -> LLM -> write, each with its own short session, so no pooled
     connection is held while the generation call is awaited. A new letter goes into `firm_id`, the firm of the
     user who asked for it; without one (a direct call), into the résumé's firm, or the Default firm for the
@@ -540,6 +579,13 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
             )
             db.add(cl)
             action = "generated"
+        db.flush()
+        # Only once the letter exists: a failed run writes nothing. A direct call has nobody to credit.
+        if requested_by is not None:
+            person = db.get(User, _uuid.UUID(requested_by))
+            ledger.record_agent(db, person=person, action="AI_GENERATE", entity_type="cover_letter", entity_id=cl.id,
+                                entity_label=cl.name, summary=f"AI agent {action} a cover letter for {job_label}",
+                                candidate_id=_candidate_of(db, cl))
         db.commit()
         db.refresh(cl)
         logger.info(f"Cover letter {cl.id} {action} for job {job_id} (voice={voice_id})")
