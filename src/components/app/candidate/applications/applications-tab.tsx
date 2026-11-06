@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
+import { ReviewQueue } from "./review-queue";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
 import { STATUS_LABEL, isClosed } from "@/components/app/applications/status-meta";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
@@ -69,8 +70,10 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
         </div>
       ) : null}
 
+      {view === "list" && (ws.reviewTotal > 0 || ws.reviewsQuery.error) ? <ReviewQueue ws={ws} actions={actions} /> : null}
+
       {view === "board" ? (
-        <ApplicationBoard apps={visible} onMove={onMove} canAct={canAct} signals={ws.signals} onOpen={actions.openApplication} showClosed={scope === "all"} />
+        <ApplicationBoard reviewCount={ws.reviewTotal} reviewColumn={<ReviewQueue ws={ws} actions={actions} inBoard />} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} signals={ws.signals} onOpen={actions.openApplication} showClosed={scope === "all"} />
       ) : (
         <ApplicationList apps={visible} signals={ws.signals} onOpen={actions.openApplication} />
       )}

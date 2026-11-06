@@ -15,13 +15,15 @@ export interface CardFaceProps {
   owner: string;
   followUpDue?: string;
   signal?: InboxMessage;
+  /** A move for this card is in flight: shown as "Saving…" until the server confirms it. */
+  isSaving?: boolean;
 }
 
 /** The content of one application card. Shared by the draggable card and its drag overlay. */
-export function ApplicationCardFace({ app, candidateName, owner, followUpDue, signal }: CardFaceProps) {
+export function ApplicationCardFace({ app, candidateName, owner, followUpDue, signal, isSaving = false }: CardFaceProps) {
   const days = daysBetween(stageEnteredAt(app), new Date());
   const Icon = STATUS_ICON[app.status];
-  const meta = signal ? mailSignalMeta(signal.signal) : null;
+  const meta = signal ? mailSignalMeta(signal.signal, signal.classificationState, signal.classificationCategory) : null;
   const ageTone = days >= 7 ? "text-[var(--color-danger-fg)]" : days >= 3 ? "text-[var(--color-warning-fg)]" : "text-[var(--color-text-3)]";
 
   return (
@@ -36,6 +38,8 @@ export function ApplicationCardFace({ app, candidateName, owner, followUpDue, si
         </div>
         <Icon size={14} aria-hidden className={cn("mt-0.5 shrink-0", STATUS_COLOR[app.status])} />
       </div>
+      {isSaving ? <p role="status" className="mt-2 text-caption text-[var(--color-text-3)]">Saving…</p> : null}
+      {app.pendingReviewCount > 0 ? <p className="mt-2 text-caption text-[var(--color-violet-fg)]">Email waiting for review: decide it in the Inbox before moving.</p> : null}
       {candidateName ? <p className="mt-2 truncate text-sm text-[var(--color-text-2)]">{candidateName}</p> : null}
       {meta && signal ? (
         <span data-tone={meta.tone} className={cn("bq-tag mt-2.5 max-w-full", !signal.isRead && "font-[550]")}>

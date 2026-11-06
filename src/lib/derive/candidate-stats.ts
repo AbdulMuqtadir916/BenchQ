@@ -1,8 +1,8 @@
+import { isActive } from "@/components/app/applications/status-meta";
 import type { Candidate, CandidateStats } from "@/lib/schemas/candidate";
 import type { Application } from "@/lib/schemas/application";
 import { daysBetween, maxDate, minDate, round1 } from "./dates";
 
-const OPEN_STATUSES = ["APPLIED", "RESPONSE", "SCREENING", "INTERVIEW", "OFFER"];
 
 /**
  * Derive per-candidate stats from the application + event arrays.
@@ -32,7 +32,8 @@ export function deriveCandidateStats(
     responsesReceived: submitted.filter((a) => a.firstResponseAt).length,
     interviewsScheduled: submitted.filter((a) => a.interviewAt).length,
     offersReceived: submitted.filter((a) => a.offerAt).length,
-    applicationsOpen: submitted.filter((a) => OPEN_STATUSES.includes(a.status)).length,
+    // Open = submitted and not closed, from the one vocabulary in status-meta (PR 4).
+    applicationsOpen: submitted.filter((a) => isActive(a.status)).length,
     responseRatePct: submitted.length
       ? round1((100 * submitted.filter((a) => a.firstResponseAt).length) / submitted.length)
       : 0,

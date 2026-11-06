@@ -1312,6 +1312,29 @@ def get_stats_sankey(firm_id=Depends(reader_firm_id)):
 
 # ── LLM cost stats ───────────────────────────────────────────────────────────
 
+def _classification_uncounted(db, since) -> dict:
+    """unpriced_calls: dispatched, finished, cost unknown (no llm_call_log row). unconfirmed_calls: dispatch started but
+    the attempt never finished (crash/abandoned), so it may have been charged. Calls refused for credentials are not
+    charged and not counted."""
+    from datetime import datetime, timedelta, timezone
+    from backend.models.db import JobRun
+
+    q = db.query(JobRun).filter(JobRun.job_type == "candidate_email_classification")
+    if since is not None:
+        q = q.filter(JobRun.started_at >= since)
+    stale = datetime.now(timezone.utc) - timedelta(minutes=5)
+    unpriced = unconfirmed = 0
+    for run in q.all():
+        meta = run.meta or {}
+        if not meta.get("dispatch_started"):
+            continue
+        if run.status == "running":
+            unconfirmed += bool(run.started_at and run.started_at < stale)
+        elif (meta.get("usage") or {}).get("cost_quality") == "UNKNOWN" and meta.get("error_code") != "PROVIDER_AUTH_REJECTED":
+            unpriced += 1
+    return {"unpriced_calls": unpriced, "unconfirmed_calls": unconfirmed}
+
+
 def _llm_costs_stats(days: int = 7) -> dict:
     """Aggregate llm_call_log rows within the last `days` days."""
     from datetime import datetime, timedelta, timezone
@@ -1368,6 +1391,8 @@ def _llm_costs_stats(days: int = 7) -> dict:
             "total_calls": total_calls,
             "total_cost_usd": round(total_cost, 6),
             "by_purpose": sorted(by_purpose, key=lambda x: -x["cost_usd"]),
+            # Classification calls whose charge is not in total_cost_usd (PR 4, DEBUG D-15).
+            "candidate_email_classification": _classification_uncounted(db, since if days and days > 0 else None),
         }
     finally:
         db.close()

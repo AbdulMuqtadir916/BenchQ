@@ -28,6 +28,7 @@ import { SkeletonCard } from "@/components/app/skeleton-card";
 import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 import { ResumeSent } from "@/components/app/applications/resume-sent";
 import { StatusTimeline } from "@/components/app/applications/status-timeline";
+import { AutomaticChangeNotice } from "@/components/app/applications/automatic-change";
 import { NEXT_STATUS, STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
 import { useHref } from "@/lib/routes/use-href";
 
@@ -104,6 +105,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
         <div className="min-w-0 space-y-5">
           <Card>
             <h2 className="mb-4 text-h3 text-[var(--color-text)]">Status history</h2>
+            <div className="mb-4"><AutomaticChangeNotice application={app} canAct={can(principal, "application.move")} /></div>
             <StatusTimeline application={app} actorName={actorName} />
           </Card>
           <Card className="p-0">

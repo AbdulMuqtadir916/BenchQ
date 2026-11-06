@@ -407,7 +407,7 @@ def test_normalized_source_is_swept(test_db, pipeline, monkeypatch):
     box.address = '  '+box.address.upper()+'  '
     test_db.commit()
     original = worker.process_one
-    monkeypatch.setattr(worker, 'process_one', lambda identity: original(identity, provider=lambda *a:decision()))
+    monkeypatch.setattr(worker, 'process_one', lambda identity, **_: original(identity, provider=lambda *a:decision()))
     assert worker.process_pending() == 1
     test_db.expire_all()
     assert test_db.get(InboxMessage, message_id).classification_state == 'DONE'

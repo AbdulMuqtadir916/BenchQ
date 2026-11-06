@@ -222,6 +222,35 @@ foundation wording that allowed new `other` stage selections, and any older modu
 status to Applied or map generic Interview to a confirmed booking. No such code/data conversion occurs in this
 change. UI vocabulary/read compatibility and any new DTO details await Abdul’s sign-off before PR 4.
 
+#### PR 4 as built (2026-11-06, branch `codex/pr4-code-correction`) — for Abdul's sign-off
+
+Frontend vocabulary (`src/lib/schemas/enums.ts`): `ApplicationStatus` = the ten target values above (selectable, the only
+values a command writes); `LegacyApplicationStatus` = `RESPONSE`, `SCREENING`, `INTERVIEW`, `PLACED`, `REJECTED`,
+`WITHDRAWN`, `EXPIRED`, `OTHER`, `PHONE_SCREEN`, `FINAL_ROUND`, `UNKNOWN` (read-only, labelled "(legacy)", never hidden,
+never guessed into a target); `StoredApplicationStatus` = either, used by `Application.status` and history events. The
+mapper converts the ten exactly (upper case), maps the legacy table above, and turns blank/unknown into `UNKNOWN`.
+
+New/changed fields and endpoints:
+
+| Contract | Shape | Notes |
+|---|---|---|
+| `Application.statusRevision` | int ≥ 0 | server `status_revision`; sent back as `expected_revision` on every move |
+| `Application.pendingReviewCount` | int ≥ 0 | length of server `pending_reviews`; a manual move is refused (409) while > 0 |
+| `ApplicationEvent.source` / `.revision` / `.emailId` | `ui \| bde_review \| email_classifier \| email_undo` / int / id | `isAutomated` is true only for `email_classifier` |
+| `GET /api/applications/counts?candidate_id=` | `{total, by_status}` | same scope as the list (firm, role, candidate) |
+| `GET /api/applications` (frontend use) | all pages, 500 per request, de-duplicated | board/counters never built from a truncated list |
+| `POST /api/applications/{id}/status-events/{event_id}/undo` | body `{expected_revision, command_id}` → application | only the latest `email_classifier` event; compensating `email_undo` event; idempotent by command id |
+| `GET …/candidates/{id}/email-reviews` | `{reviews[], next_cursor, total_count}`; review adds `subject`, `from_name`, `received_at`, `created_at` | newest first; cursor `"<created_at>|<id>"`; support view: count only |
+| `PATCH …/inbox-messages/{id}/review` | unchanged body | Dismiss never links or checks an application; `SET_STATUS` accepts every stage except `saved` |
+| Inbox message JSON | adds `content_revision`, `classification_version` | echoed by review/retry commands |
+| `email_classifications.outcome` | adds `AUTO_APPLIED` | migration 0015; guarded downgrade |
+| Review reasons | adds `FORWARDED_EMAIL`, `INSUFFICIENT_CONTENT`, `CONFIDENCE_DISAGREEMENT`, `EMAIL_ALREADY_APPLIED`, `AUTOMATIC_CHANGE_UNDONE` | frontend labels in `review-reason.ts` |
+| `GET /api/stats/llm-costs` | adds `candidate_email_classification.{unpriced_calls, unconfirmed_calls}` | unknown cost is never summed as 0 |
+
+Automatic writes (switches OFF by default): the five approved targets at ≥ 0.8 (decision value = the lower of the
+provider's two numbers), Gmail-verified sender, unique match, fresh email, plus one narrow rule pending sign-off
+(DEBUG D-14): an `applied` email on an `incomplete_application` returns it to Applied. Offer and Move On always review.
+
 ---
 
 ## 3. Session & tenancy

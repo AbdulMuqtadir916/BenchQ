@@ -73,8 +73,12 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const moveApplication = useCallback(
     (applicationId: string, to: ApplicationStatus, note: string | null = null) => {
       const app = ws.applications.find((a) => a.id === applicationId);
-      updateStatus.mutate({ id: applicationId, status: to, note });
+      if (!updateStatus.mutate({ id: applicationId, status: to, note })) {
+        setToast("Saving… wait for the current move of this application to finish.");
+        return false;
+      }
       setToast(`${app?.companyNameAtApply ?? "Application"} moved to ${STATUS_LABEL[to]}`);
+      return true;
     },
     [ws.applications, updateStatus],
   );

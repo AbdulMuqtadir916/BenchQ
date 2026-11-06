@@ -13,7 +13,7 @@ import { changed, table } from "./db";
 export const allApplications: Application[] = table("applications", ApplicationSchema, () => arrayOf(ApplicationSchema).parse(applicationsSeed));
 export const allFollowups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
 
-const CLOSED_STATUSES = ["PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
+const CLOSED_STATUSES = ["MOVE_ON", "PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
 
 export const applicationsMock = firmScoped("applications", {
   list: (firmId: string, params?: { candidateId?: string }): Promise<Application[]> => {
@@ -43,10 +43,14 @@ export const applicationsMock = firmScoped("applications", {
       actorUserId: currentUser().id,
       isAutomated: false,
       createdAt: now,
+      source: "ui",
+      revision: application.statusRevision + 1,
+      emailId: null,
     });
+    application.statusRevision += 1;
     application.status = update.status;
-    if (update.status === "RESPONSE" && !application.firstResponseAt) application.firstResponseAt = now;
-    if (update.status === "INTERVIEW" && !application.interviewAt) application.interviewAt = now;
+    if (update.status === "SCREENING_CALL" && !application.firstResponseAt) application.firstResponseAt = now;
+    if (update.status === "INTERVIEW_SCHEDULED" && !application.interviewAt) application.interviewAt = now;
     if (update.status === "OFFER") application.offerAt = now;
     if (CLOSED_STATUSES.includes(update.status)) application.closedAt = now;
     changed("applications");

@@ -36,6 +36,17 @@ CANDIDATE_GMAIL_ENABLED = os.getenv("CANDIDATE_GMAIL_ENABLED", "false").lower() 
 CANDIDATE_EMAIL_CLASSIFICATION_ENABLED = os.getenv("CANDIDATE_EMAIL_CLASSIFICATION_ENABLED", "false").lower() == "true"
 CANDIDATE_EMAIL_REAL_MAIL_APPROVED = os.getenv("CANDIDATE_EMAIL_REAL_MAIL_APPROVED", "false").lower() == "true"
 CANDIDATE_EMAIL_PURGE_ENABLED = os.getenv("CANDIDATE_EMAIL_PURGE_ENABLED", "false").lower() == "true"
+# PR 4 automatic status updates (OFF by default). All three must be set, and only mail received at or after the
+# start time (ISO 8601 with a time zone) is ever executed automatically. Switch on only after PR 4 is merged and
+# Undo is verified (OPERATIONS.md, activation checklist).
+CANDIDATE_EMAIL_AUTO_STATUS_ENABLED = os.getenv("CANDIDATE_EMAIL_AUTO_STATUS_ENABLED", "false").lower() == "true"
+CANDIDATE_EMAIL_AUTOMATION_APPROVED = os.getenv("CANDIDATE_EMAIL_AUTOMATION_APPROVED", "false").lower() == "true"
+CANDIDATE_EMAIL_AUTOMATION_START_AT = os.getenv("CANDIDATE_EMAIL_AUTOMATION_START_AT", "")
+# PR 4 backfills (OFF by default; switch on only after the eligible counts were reviewed, OPERATIONS.md):
+# setup recovery requeues emails that failed only because the classifier was not set up; historical classification
+# queues retained NOT_QUEUED mail, oldest first, review only.
+CANDIDATE_EMAIL_SETUP_RECOVERY_ENABLED = os.getenv("CANDIDATE_EMAIL_SETUP_RECOVERY_ENABLED", "false").lower() == "true"
+CANDIDATE_EMAIL_HISTORICAL_ENABLED = os.getenv("CANDIDATE_EMAIL_HISTORICAL_ENABLED", "false").lower() == "true"
 CANDIDATE_EMAIL_PURGE_EVALUATED = os.getenv("CANDIDATE_EMAIL_PURGE_EVALUATED", "false").lower() == "true"
 # Bind purge evaluation to the exact recorded model/prompt/taxonomy/policy fingerprint.
 CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID = os.getenv("CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID", "")

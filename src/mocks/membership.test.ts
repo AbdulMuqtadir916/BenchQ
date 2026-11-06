@@ -63,7 +63,7 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["jobs", "capture", (f) => jobsApi.capture(f, { sourceUrl: "https://example.com/jobs/1", title: "X", companyName: "Y", location: "", remoteMode: "REMOTE", employmentType: null, payPeriod: "HOUR", payMin: null, payMax: null, sponsorsVisa: false, excludesC2C: false, experience: "", skills: [], description: "Z" }), true],
   ["applications", "list", (f) => applicationsApi.list(f), false],
   ["applications", "byId", (f, i) => applicationsApi.byId(f, i.application), false],
-  ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "WITHDRAWN", note: null }), true],
+  ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "MOVE_ON", note: null }), true],
   ["followups", "list", (f) => followupsApi.list(f), false],
   ["resumes", "list", (f) => resumesApi.list(f), false],
   ["resumes", "byCandidate", (f, i) => resumesApi.byCandidate(f, i.candidate), false],
