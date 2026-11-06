@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { ActionTag, ActorTag } from "@/components/app/ledger-tags";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
+import { actorDisplay } from "./actor";
 
 /** With dates picked, "When" shows the exact time; otherwise how long ago. */
 export function activityColumns(isExactTime: boolean): ColumnDef<LedgerEntry, unknown>[] {
@@ -18,12 +19,18 @@ export function activityColumns(isExactTime: boolean): ColumnDef<LedgerEntry, un
       id: "actor",
       accessorFn: (entry) => entry.actorName,
       header: "Actor",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2 whitespace-nowrap">
-          <ActorTag type={row.original.actorType} />
-          <span className="text-[var(--color-text-2)]">{row.original.actorName}</span>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const actor = actorDisplay(row.original);
+        return (
+          <div className="flex items-start gap-2 whitespace-nowrap">
+            {actor.hasTag ? <ActorTag type={row.original.actorType} /> : null}
+            <div>
+              <span className="block text-[var(--color-text-2)]">{actor.name}</span>
+              {actor.role ? <span className="block text-caption text-[var(--color-text-3)]">({actor.role})</span> : null}
+            </div>
+          </div>
+        );
+      },
     },
     {
       id: "action",

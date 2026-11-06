@@ -38,5 +38,5 @@ export function ActionTag({ action }: { action: LedgerEntry["action"] }) {
 }
 
 export function ActorTag({ type }: { type: LedgerEntry["actorType"] }) {
-  return <Tag tone={ACTOR_TONE[type]}>{type.replaceAll("_", " ").toLowerCase()}</Tag>;
+  return <Tag tone={ACTOR_TONE[type]}>{type === "AGENT" ? "AI agent" : type.replaceAll("_", " ").toLowerCase()}</Tag>;
 }
