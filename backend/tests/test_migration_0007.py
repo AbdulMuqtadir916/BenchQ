@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from backend.auth import ledger
-from backend.models.candidates import Candidate, CandidateJob, CandidateMailbox, Claim, Evidence, FavoriteJob, InboxMessage
+from backend.models.candidates import Candidate, CandidateJob, CandidateMailbox, FavoriteJob, InboxMessage
 from backend.models.db import Application, Job, Search, utcnow
 from backend.models.tenancy import Firm, LedgerEntry, User
 from backend.tests.auth_support import make_user
@@ -36,21 +36,6 @@ def _refused(test_db, row, constraint: str) -> None:
 
 def _ids(world):
     return {"firm_id": world["firm"].id, "candidate_id": world["candidate"].id}
-
-
-def test_a_verified_claim_needs_evidence(test_db, world):
-    """Truth Guard (D4): the database refuses it, whoever writes."""
-    claim = dict(**_ids(world), entity_type="skill", text="Spark", source="RESUME_UPLOAD")
-    _refused(test_db, Claim(**claim, state="VERIFIED"), "ck_claims_verified_has_evidence")
-    evidence = Evidence(**_ids(world), excerpt="Built Spark pipelines at Acme", source="RESUME_UPLOAD")
-    test_db.add(evidence)
-    test_db.flush()
-    test_db.add_all([Claim(**claim), Claim(**claim, state="VERIFIED", evidence_id=evidence.id)])
-    test_db.flush()
-    assert {c.state for c in test_db.query(Claim).filter(Claim.candidate_id == world["candidate"].id)} == \
-        {"UNVERIFIED", "VERIFIED"}
-    _refused(test_db, Claim(**claim, state="MAYBE"), "ck_claims_state")
-    _refused(test_db, Claim(**{**claim, "entity_type": "hobby"}), "ck_claims_entity_type")
 
 
 # 0007's one-base rule (uq_resumes_one_base_per_candidate) was replaced by versioning (0008) and dropped in 0013;

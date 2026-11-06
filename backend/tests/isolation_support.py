@@ -154,21 +154,18 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.flush()
     db.add(TracerClickEvent(firm_id=firm.id, tracer_link_id=link.id))
     # The candidate core (migration 0007): one row of each candidate-owned kind, with `tag` in its text.
-    from backend.models.candidates import CandidateJob, CandidateMailbox, Claim, Evidence, FavoriteJob, InboxMessage
+    from backend.models.candidates import CandidateJob, CandidateMailbox, FavoriteJob, InboxMessage
     db.add_all([CandidateJob(firm_id=firm.id, candidate_id=candidate.id, job_id=job.id, match_score=80),
                 FavoriteJob(firm_id=firm.id, candidate_id=candidate.id, job_id=job.id, marked_by_user_id=bde.id)])
     mailbox = CandidateMailbox(firm_id=firm.id, candidate_id=candidate.id, address=f"{tag.lower()}@mail.test",
                                connected_by_user_id=bde.id)
-    evidence = Evidence(firm_id=firm.id, candidate_id=candidate.id, excerpt=f"{tag} evidence excerpt", source="MANUAL")
-    db.add_all([mailbox, evidence])
+    db.add(mailbox)
     db.flush()
     candidate_message = InboxMessage(firm_id=firm.id, candidate_id=candidate.id, mailbox_id=mailbox.id, application_id=app.id,
                              provider_message_id=f"{tag}-msg-1", from_name=f"{tag} recruiter",
                              from_email=f"recruiter@{tag.lower()}.test", subject=f"{tag} interview",
                              snippet=f"{tag} snippet", received_at=utcnow())
-    db.add_all([candidate_message,
-                Claim(firm_id=firm.id, candidate_id=candidate.id, entity_type="skill", text=f"{tag} Java",
-                      state="VERIFIED", evidence_id=evidence.id, source="MANUAL")])
+    db.add(candidate_message)
     app.candidate_id = candidate.id
     db.flush()
     invite, _ = send_invite(db, inviter=owner, firm=firm, email=f"bde@{tag.lower()}.test", role="BDE",

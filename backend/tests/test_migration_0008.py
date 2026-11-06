@@ -1,5 +1,5 @@
 """Migration 0008 (docs/team/resume-versioning.md §3; PR 3): base_resumes, the versioned resumes columns, the job
-cascade and award claims; the rules the database holds, and old rows left as they were."""
+cascade; the rules the database holds, and old rows left as they were."""
 import uuid
 from datetime import timedelta
 
@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.candidates import BaseResume, Candidate, Claim, ResumeParse
+from backend.models.candidates import BaseResume, Candidate, ResumeParse
 from backend.models.db import Application, Job, Resume, utcnow
 from backend.models.tenancy import DEFAULT_FIRM_ID, Firm, User
 from backend.tests.auth_support import make_user
@@ -145,14 +145,6 @@ def test_a_job_an_application_names_cannot_be_deleted(test_db, world):
         test_db.commit()
     test_db.rollback()
     assert test_db.get(Resume, tailored.id) is not None                # the résumé that was sent stays
-
-
-# ── Claims ───────────────────────────────────────────────────────────────────
-
-def test_an_award_can_be_a_claim(test_db, world):
-    test_db.add(Claim(firm_id=world["firm"].id, candidate_id=world["asha"].id, entity_type="award",
-                      entity_ref=str(uuid.uuid4()), text="Dean's List", source="RESUME_UPLOAD", state="UNVERIFIED"))
-    test_db.flush()
 
 
 # ── The migration on a database with old rows ────────────────────────────────
