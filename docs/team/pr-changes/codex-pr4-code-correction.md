@@ -39,7 +39,8 @@ One migration (**0016**, after main's 0015). Switches ship OFF.
 | Review loop | `schemas/inbox.ts`, `lib/api/inbox.ts`, `lib/api/dto/inbox.ts`, `lib/hooks/use-email-reviews.ts` (new), `email-review-panel.tsx` (new), `review-queue.tsx` (new), `review-reason.ts` (new), `inbox-reader.tsx`, `inbox-tab.tsx`, `applications-tab.tsx`, `use-candidate-workspace.ts` | Review contracts, panel, BDE review column, reasons |
 | Inbox badges and states | `components/app/inbox/signal-meta.ts`, `classification-status.tsx` (new), `activity-tab.tsx`, `attention-card.tsx`, `inbox-preview.tsx`, `inbox-tab.tsx` | Category badges; Not yet queued / Classifying… / Waiting for classifier setup / Classification failed with reason and Retry; hidden-count note; no "Email: Email" |
 | Mocks | `mocks/data/*.json`, `mocks/applications.ts`, `mocks/db.ts`, mock tests | Fixtures on the new values (legacy samples kept); fingerprint updated |
-| Tests (new) | `dto/applications.test.ts`, `utils.test.ts`, `review-reason.test.ts`, `signal-meta.test.ts`, `automatic-change.test.ts` | |
+| Jobs feed and heart (Phase 8) | `lib/api/jobs.ts`, `lib/api/dto/jobs.ts` (new), `lib/api/applications.ts`, `lib/hooks/use-applications.ts`, `lib/query/keys.ts`, `components/app/jobs/job-explorer.tsx`, `mocks/applications.ts`, mock inventory tests | Jobs from `GET /api/jobs` when `jobs` is live (empty feed = no jobs); heart and Open source save the job for the candidate in context (favourite + Saved draft), un-heart removes it; a saved job stays in the feed; without a candidate the heart is disabled. Hide stays a personal mark (mock) |
+| Tests (new) | `live-jobs.test.ts`, `dto/applications.test.ts`, `utils.test.ts`, `review-reason.test.ts`, `signal-meta.test.ts`, `automatic-change.test.ts` | |
 
 ## Docs
 
@@ -61,5 +62,7 @@ so main's 0015 and our 0016 both run (only the outcome CHECK differs between our
 ## Remaining limits
 
 Sign-offs needed at review: G2 status mapping, G3 contracts, G4 Incomplete → Applied, G6 migration, G7 logger, G8
-endpoint (all Abdul). Board column paging deferred (D-20 note). Classifying mail imported before switch-on is a later PR
+endpoint (all Abdul). Board column paging deferred (D-20 note). Jobs: the backend has no per-candidate job list yet (Zuhair), so saving a
+job that is not linked to the candidate is refused with a clear message; the job detail page's personal "Save" bookmark
+and Hide are still mock marks; hand capture is refused while `jobs` is live (no backend endpoint). Classifying mail imported before switch-on is a later PR
 (D-23).

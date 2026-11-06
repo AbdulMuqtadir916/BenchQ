@@ -16,6 +16,11 @@ const PAGE = 500;
 export type ApplicationCounts = { total: number; byStatus: Partial<Record<StoredApplicationStatus, number>> };
 const BackendCountsSchema = z.object({ total: z.number().int(), by_status: z.record(z.string(), z.number().int()) });
 
+/** What saving a feed job sends (`POST /api/applications` with status saved). */
+export type SaveJob = { candidateId: string; jobId: string; title: string; company: string; url: string };
+const BackendSavedSchema = z.object({ id: z.string() });
+const BackendUnsavedSchema = z.object({ favorite: z.literal(false) });
+
 /** The backend takes the firm from the session, so the live calls need no firm in the path. */
 const live = {
   /** Every page, in the server's stable order, so no board or counter is ever built from a truncated list. */
@@ -57,6 +62,19 @@ const live = {
     return undone;
   },
 
+  /** Save a feed job for a candidate: the backend adds the favourite and a Saved draft (one per candidate and job). */
+  saveJob: async (_firmId: string, body: SaveJob): Promise<string> => {
+    const saved = await http.post("/api/applications", BackendSavedSchema, {
+      body: { candidate_id: toBackendId(body.candidateId), job_id: toBackendId(body.jobId), status: "saved", title: body.title, company: body.company, url: body.url },
+    });
+    return saved.id;
+  },
+
+  /** Remove the favourite; the backend deletes the Saved draft only while nothing else has happened to it. */
+  unsaveJob: async (_firmId: string, id: string): Promise<void> => {
+    await http.patch(`/api/applications/${toBackendId(id)}`, BackendUnsavedSchema, { body: { unfavorite: true } });
+  },
+
   /** PATCH candidate-status with the server-confirmed revision the caller read from the cache. */
   updateStatus: async (firmId: string, id: string, body: UpdateApplicationStatus): Promise<Application> => {
     if (body.expectedRevision === undefined) {
@@ -91,6 +109,14 @@ export const applicationsApi = {
 
   updateStatus: async (firmId: string, id: string, body: UpdateApplicationStatus): Promise<Application> =>
     isLive("applications") ? live.updateStatus(firmId, id, body) : (await mock()).applicationsMock.updateStatus(firmId, id, body),
+
+  saveJob: async (firmId: string, body: SaveJob): Promise<void> => {
+    if (isLive("applications")) await live.saveJob(firmId, body);
+    else await (await mock()).applicationsMock.saveJob(firmId, body);
+  },
+
+  unsaveJob: async (firmId: string, id: string): Promise<void> =>
+    isLive("applications") ? live.unsaveJob(firmId, id) : (await mock()).applicationsMock.unsaveJob(firmId, id),
 
   /** Automatic changes exist only on the live backend; the mock has none to undo. */
   undoAutomatic: async (firmId: string, id: string, eventId: string, expectedRevision: number, commandId: string): Promise<Application> => {

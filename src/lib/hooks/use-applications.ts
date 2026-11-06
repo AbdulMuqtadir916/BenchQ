@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
-import { applicationsApi, followupsApi } from "@/lib/api/applications";
+import { applicationsApi, followupsApi, type SaveJob } from "@/lib/api/applications";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { queryKeys } from "@/lib/query/keys";
@@ -131,3 +131,41 @@ export function useUndoAutomaticChange() {
     onSettled: () => void queryClient.invalidateQueries({ queryKey: queryKeys.applications.all(firmId) }),
   });
 }
+
+/**
+ * Save a feed job for a candidate, or remove it again (the heart and "Open source" in the job explorer). The job
+ * becomes a Saved application and stays in the feed. One call per candidate and job at a time; the applications
+ * and the ledger reload afterwards so the Saved column and the counts show it at once.
+ */
+export function useToggleSavedJob() {
+  const firmId = useFirmId();
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { save: SaveJob } | { unsave: { applicationId: string; jobId: string; candidateId: string } }>({
+    mutationKey: queryKeys.applications.savedJobs(firmId),
+    mutationFn: (vars) => ("save" in vars ? applicationsApi.saveJob(firmId, vars.save) : applicationsApi.unsaveJob(firmId, vars.unsave.applicationId)),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.applications.all(firmId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
+    },
+  });
+}
+
+/** Candidate+job pairs with a save or unsave in flight, so the heart shows the coming state and ignores repeats. */
+export function usePendingSavedJobs(): Map<string, boolean> {
+  const firmId = useFirmId();
+  const pending = useMutationState({
+    filters: { mutationKey: queryKeys.applications.savedJobs(firmId), status: "pending" },
+    select: (mutation) => mutation.state.variables as { save: SaveJob } | { unsave: { jobId: string; candidateId: string } } | undefined,
+  });
+  return useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const vars of pending) {
+      if (!vars) continue;
+      if ("save" in vars) map.set(savedJobKey(vars.save.candidateId, vars.save.jobId), true);
+      else map.set(savedJobKey(vars.unsave.candidateId, vars.unsave.jobId), false);
+    }
+    return map;
+  }, [pending]);
+}
+
+export const savedJobKey = (candidateId: string, jobId: string) => `${candidateId}|${jobId}`;

@@ -64,6 +64,8 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["applications", "list", (f) => applicationsApi.list(f), false],
   ["applications", "byId", (f, i) => applicationsApi.byId(f, i.application), false],
   ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "MOVE_ON", note: null }), true],
+  ["applications", "saveJob", (f, i) => applicationsApi.saveJob(f, { candidateId: i.candidate, jobId: i.job, title: "QA", company: "Example", url: "" }), true],
+  ["applications", "unsaveJob", (f, i) => applicationsApi.unsaveJob(f, i.application), true],
   ["followups", "list", (f) => followupsApi.list(f), false],
   ["resumes", "list", (f) => resumesApi.list(f), false],
   ["resumes", "byCandidate", (f, i) => resumesApi.byCandidate(f, i.candidate), false],

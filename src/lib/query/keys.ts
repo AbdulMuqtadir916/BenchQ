@@ -29,6 +29,8 @@ export const queryKeys = {
     ...resource("applications"),
     /** Server counts per status; under `all` so a move invalidates them with the lists. */
     counts: (firmId: string, candidateId?: string | null) => [firmId, "applications", "counts", candidateId ?? null] as const,
+    /** Mutation key for saving / unsaving a feed job (the heart), so pending saves can be read back. */
+    savedJobs: (firmId: string) => [firmId, "applications", "savedJobs"] as const,
     /** Mutation key of status moves (the pending-move overlay reads it). */
     moves: (firmId: string) => [firmId, "applications", "move"] as const,
   },

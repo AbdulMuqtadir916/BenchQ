@@ -82,6 +82,15 @@ Branch `codex/pr4-code-correction` · Folder `~/Documents/cloned` · Base main 3
 - [x] T7.4 Tests control automation settings; PR 3 stub fixed
 - [x] T7.5 Live counts reported and approved before running
 
+## Phase 8 — Save a job from the Jobs feed (Samad, 2026-11-06)
+- [x] T8.1 Jobs feed from the database when `jobs` is live (`GET /api/jobs`); an empty feed shows no jobs. Ingestion
+  and scraping untouched (Zuhair, Track 02).
+- [x] T8.2 Heart and "Open source" save the job for the candidate in context through the existing backend save
+  (`POST /api/applications`, status saved: favourite + Saved draft); un-heart sends `{unfavorite: true}`. The job
+  stays in the feed.
+- [x] T8.3 Tested live on 6 seeded jobs for Manoj (dev DB only): heart → Saved card; Open source → Saved card;
+  un-heart → draft removed, job still listed.
+
 ## Phase 6 — Activation (after merge)
 - [ ] T6.1 Activation checklist signed off
 
@@ -90,6 +99,13 @@ Branch `codex/pr4-code-correction` · Folder `~/Documents/cloned` · Base main 3
 - Saved as a review choice? (Selected: no.)
 
 ## Evidence log
+2026-11-06, Phase 8. Frontend: typecheck, lint, 631 tests pass (new `live-jobs.test.ts`, 7). Dev DB: 6 jobs seeded
+(`external_id` `pr4-heart-seed-1..6`, linked to Manoj through `firm_jobs` and `candidate_jobs`). Live: heart on "Java
+Developer" and Open source on "Java Backend Developer" each made a `saved` application with its favourite; un-heart
+removed the untouched draft; both themes checked. Limit: a job not linked to the candidate in `candidate_jobs` is
+refused by the backend (404), shown as "This job is not in <candidate>'s job list"; the per-candidate job list is
+Zuhair's endpoint.
+
 2026-11-06: DEBUG.md revised through review rounds 2–4; plan and tracker synchronised (migration, Phase-1 spend and
 endpoint decision, dedicated test mailbox, counts endpoint, activation phase). No code changed.
 
