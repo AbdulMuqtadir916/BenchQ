@@ -71,6 +71,11 @@ writes no ledger entry (unless listed in `NOT_LOGGED` with a reason), a ledger w
 read outside the role-limited routes. No behaviour change. Change document:
 [pr-changes/activity-pr2-ledger-rules-as-tests.md](./pr-changes/activity-pr2-ledger-rules-as-tests.md).
 
+**Activity log PR 3 (2026-11-06):** `activity-log/pr3-new-table-and-endpoints`, built on PR 1 and PR 2, not pushed yet.
+The new `activity_logs` table with the old rows copied in, history that stays with the manager and BDE at the time, and
+the reads the screen needs. Change document:
+[pr-changes/activity-log-pr3-new-table-and-endpoints.md](./pr-changes/activity-log-pr3-new-table-and-endpoints.md).
+
 ## 1. Notifications inbox
 
 The main sidebar's **Preferences** section gets a **Notifications** page for firm users and the Super Admin.

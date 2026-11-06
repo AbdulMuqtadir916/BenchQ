@@ -287,6 +287,7 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     changes = body.model_dump(exclude_unset=True)
+    before = {field: getattr(candidate, field) for field in changes}
     for field, value in changes.items():
         if value is None and field in ("work_auth", "willing_to_relocate", "employment_types"):
             raise _bad(f"{field} can't be empty.")
@@ -296,7 +297,8 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     if changes:
         ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="candidate",
                       entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changes)}", candidate_id=candidate.id)
+                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changes)}", candidate_id=candidate.id,
+                      changes=ledger.diff(before, changes))
         db.commit()
     return candidate_json(candidate)
 
@@ -316,9 +318,11 @@ def assign_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: AssignBo
     if new_bde_id is not None and candidate.bde_id is None and candidate.status in WORKING_STATUSES:
         _check_limit(db, firm)                 # a queue candidate getting a BDE starts to count (Q45)
     previous = _firm_user(db, firm_id, candidate.bde_id) or _firm_user(db, firm_id, candidate.manager_id)
+    before = {"manager_id": candidate.manager_id, "bde_id": candidate.bde_id}
     candidate.manager_id, candidate.bde_id = manager.id, new_bde_id
     ledger.record(db, actor=db.get(User, principal.user_id), action="ASSIGN", entity_type="candidate",
                   entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                  summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note), candidate_id=candidate.id)
+                  summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note), candidate_id=candidate.id,
+                  changes=ledger.diff(before, {"manager_id": manager.id, "bde_id": new_bde_id}))
     db.commit()
     return candidate_json(candidate)

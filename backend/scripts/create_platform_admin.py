@@ -16,7 +16,7 @@ from fastapi import HTTPException
 from backend.auth.invites import account_exists, normal_email
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password
 from backend.models.db import SessionLocal
-from backend.models.tenancy import LedgerEntry, PlatformUser
+from backend.models.tenancy import ActivityEntry, PlatformUser
 
 
 class Refused(Exception):
@@ -39,7 +39,7 @@ def create_platform_admin(db, *, email: str, name: str, password: str) -> Platfo
     db.add(admin)
     db.flush()
     # A platform event (A13): no firm, and no person did it, so the actor is the system.
-    db.add(LedgerEntry(firm_id=None, actor_type="SYSTEM", actor_user_id=None, actor_name="create_platform_admin",
+    db.add(ActivityEntry(firm_id=None, actor_type="SYSTEM", actor_user_id=None, actor_name="create_platform_admin",
                        entity_type="platform_user", entity_id=str(admin.id), entity_label=name, action="CREATE",
                        summary=f"Created Super Admin {name} ({address}) from the command line"))
     db.commit()

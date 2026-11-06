@@ -106,4 +106,5 @@ it. Everyone else reads it.
 | 0011 | Zuhair | Résumé versioning and upload fingerprints | Merged #106 |
 | 0012 | Samad | Candidate Gmail OAuth/sync and provenance | Merged #104 |
 | 0013 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0012 (Samad's) | `feat/drop-legacy-resume-columns` |
-| 0014+ | — | Claim the next number here in your PR | — |
+| 0016 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows 0014 until Zuhair's 0015 (#112) lands, then 0015 | `activity-log/pr3-new-table-and-endpoints` |
+| 0017+ | — | Claim the next number here in your PR | — |

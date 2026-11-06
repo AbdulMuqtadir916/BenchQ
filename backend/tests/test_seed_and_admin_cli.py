@@ -19,13 +19,13 @@ def _sign_in(client, email, password):
 # ── create_platform_admin ────────────────────────────────────────────────────
 
 def test_the_command_creates_a_super_admin_who_can_sign_in(anonymous_client, test_db, monkeypatch, capsys):
-    from backend.models.tenancy import LedgerEntry, PlatformUser
+    from backend.models.tenancy import ActivityEntry, PlatformUser
     monkeypatch.setattr("sys.stdin", io.StringIO("first-admin-pass\n"))
     assert cli.main(["--email", " Root@Example.test ", "--name", "Root", "--password-stdin"]) == 0
     assert "Created Super Admin Root <root@example.test>" in capsys.readouterr().out
     admin = test_db.query(PlatformUser).filter(PlatformUser.email == "root@example.test").one()
     assert admin.password_hash.startswith("$argon2id$")
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == str(admin.id)).one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == str(admin.id)).one()
     assert (entry.actor_type, entry.action, entry.firm_id) == ("SYSTEM", "CREATE", None)
     assert _sign_in(anonymous_client, "root@example.test", "first-admin-pass").json()["principal"]["kind"] == "platform"
 
@@ -123,7 +123,7 @@ def test_a_seeded_invite_gets_a_link_by_resending(anonymous_client, test_db):
 
 @needs_mock_data
 def test_reset_removes_the_demo_rows_and_what_hangs_off_them(anonymous_client, test_db):
-    from backend.models.tenancy import Firm, LedgerEntry, Session, User
+    from backend.models.tenancy import Firm, ActivityEntry, Session, User
     seed_demo.seed(test_db)
     test_db.commit()
     _sign_in(anonymous_client, "imran@hyderabad-tech-staffing.benchq.test", seed_demo.DEMO_PASSWORD)  # a session + LOGIN
@@ -133,7 +133,7 @@ def test_reset_removes_the_demo_rows_and_what_hangs_off_them(anonymous_client, t
     assert test_db.query(Firm).filter(Firm.id == seed_demo.demo_id("firm_hts")).count() == 0
     assert test_db.query(User).filter(User.id == imran).count() == 0
     assert test_db.query(Session).filter(Session.user_id == imran).count() == 0
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.actor_user_id == imran).count() == 0
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.actor_user_id == imran).count() == 0
     # Everything that isn't demo data stays: the test fixture's firm and its sessions.
     assert test_db.query(Firm).filter(Firm.slug == "acme").count() == 1
     assert test_db.query(Session).count() == 2

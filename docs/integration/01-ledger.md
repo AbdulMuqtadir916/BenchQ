@@ -6,8 +6,9 @@ The ledger is the firm's record of who did what. It is the first module on the r
 built to be copied: every firm-scoped module takes the same steps, in the same files. Read this before
 you start your own track, and point to the step you're on in your PR.
 
-The ledger is the `ledger_entries` table (the contract's `LedgerEntry`, docs/02 §10). It is **not**
-`activity_log_v2`: that's the platform's system log (scrapes, scoring runs), with no actor, firm or action,
+The ledger is the `activity_logs` table (model `ActivityEntry`; the contract's `LedgerEntry`, docs/02 §10), which
+took over from `ledger_entries` in migration 0016. Every old row was copied, stamped from today's assignments, and
+`ledger_entries` is left as it was. It is **not** `activity_log_v2`: that's the platform's system log (scrapes, scoring runs), with no actor, firm or action,
 and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 
 ---
@@ -16,7 +17,7 @@ and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 
 | Step | File | What it does |
 |---|---|---|
-| 1. Table | `backend/models/tenancy.py` `LedgerEntry`, migration 0003 | `firm_id` (null only for platform events, A13), actor, entity, action, summary. CHECK constraints, not enums; RESTRICT foreign keys (Q38) |
+| 1. Table | `backend/models/tenancy.py` `ActivityEntry`, migration 0016 (a trigger refuses UPDATE and DELETE) | `firm_id` (null only for platform events, A13), actor, entity, action, summary. CHECK constraints, not enums; RESTRICT foreign keys (Q38) |
 | 2. Write | `backend/auth/ledger.py` `record()` | Every write a person makes calls it **in the same transaction** as the change; the caller commits |
 | 3. Read route | `backend/api/routes_ledger.py` | `GET /api/firms/{firm_id}/ledger?limit&offset` |
 | 4. Access class | `backend/auth/access.py` `ROUTE_ACCESS` | `F`: firm users, and a Super Admin inside a support view of the firm for GET only; a Super Admin without one and a suspended firm's users are refused before the route runs |
@@ -45,10 +46,10 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
                 db: DbSession = Depends(get_db)):
     if firm_id != my_firm:
         raise HTTPException(status_code=404, detail="Not found.")      # never confirm another firm exists
-    entries = scoped(db, LedgerEntry, my_firm)                         # firm_id = :firm, always
+    entries = scoped(db, ActivityEntry, my_firm)                         # firm_id = :firm, always
     if (actor := own_scope(principal)) is not None:                    # a BDE: only their own rows
-        entries = entries.filter(LedgerEntry.actor_user_id == actor)
-    entries = entries.order_by(LedgerEntry.created_at.desc(), LedgerEntry.id).offset(offset).limit(limit)
+        entries = entries.filter(ActivityEntry.actor_user_id == actor)
+    entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id.desc()).offset(offset).limit(limit)
     return [ledger_entry_json(e) for e in entries]
 ```
 

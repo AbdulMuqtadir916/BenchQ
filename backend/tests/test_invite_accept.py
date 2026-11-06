@@ -56,7 +56,7 @@ def test_lookup_of_a_suspended_firms_link(anonymous_client, owner_invite, test_d
 # ── Accept ───────────────────────────────────────────────────────────────────
 
 def test_the_owner_accepts_and_the_firm_becomes_active(anonymous_client, owner_invite, test_db):
-    from backend.models.tenancy import Firm, Invite, LedgerEntry, User
+    from backend.models.tenancy import Firm, Invite, ActivityEntry, User
     firm_id, invite_id, token = owner_invite
     r = _accept(anonymous_client, token)
     assert r.status_code == 200, r.text
@@ -69,7 +69,7 @@ def test_the_owner_accepts_and_the_firm_becomes_active(anonymous_client, owner_i
     assert test_db.get(Firm, firm_id).status == "ACTIVE"
     invite = test_db.get(Invite, invite_id)
     assert invite.status == "ACCEPTED" and invite.accepted_at is not None
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.action == "INVITE_ACCEPTED").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.action == "INVITE_ACCEPTED").one()
     assert entry.summary == "Nora North accepted the OWNER invite; firm is now active"
     assert entry.firm_id is not None and entry.actor_type == "USER"
     # Signed in: the cookie works, and the password works for the next sign-in.
@@ -193,7 +193,7 @@ def test_a_member_invite_into_an_active_firm_keeps_the_firm_as_it_is(anonymous_c
 def test_a_platform_team_invite_creates_a_super_admin(anonymous_client, accounts, test_db):
     from backend.auth.invites import send_invite
     from backend.models.db import utcnow
-    from backend.models.tenancy import LedgerEntry, PlatformUser
+    from backend.models.tenancy import ActivityEntry, PlatformUser
     admin = test_db.get(PlatformUser, accounts.admin_id)
     _, token = send_invite(test_db, inviter=admin, firm=None, email="pat@benchq.test", role="PLATFORM_ADMIN",
                            invitee_name=None, summary="Invited pat@benchq.test to the platform team", now=utcnow())
@@ -201,7 +201,7 @@ def test_a_platform_team_invite_creates_a_super_admin(anonymous_client, accounts
     assert anonymous_client.get(f"/api/invites/{token}").json()["firm_name"] is None
     session = _accept(anonymous_client, token, name="Pat").json()
     assert session["principal"]["kind"] == "platform"
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.action == "INVITE_ACCEPTED").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.action == "INVITE_ACCEPTED").one()
     assert entry.firm_id is None and entry.summary == "Pat joined the platform team"
 
 

@@ -12,12 +12,12 @@ def assert_logged(db, *, action: str, entity_type: str, entity_id, firm_id: uuid
                   actor_user_id: uuid.UUID | None = None):
     """The one entry for this action on this entity, in this firm (and by this actor, when given). Returns it, so
     a test can check its summary."""
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     db.expire_all()
-    query = db.query(LedgerEntry).filter(LedgerEntry.action == action, LedgerEntry.entity_type == entity_type,
-                                         LedgerEntry.entity_id == str(entity_id), LedgerEntry.firm_id == firm_id)
+    query = db.query(ActivityEntry).filter(ActivityEntry.action == action, ActivityEntry.entity_type == entity_type,
+                                         ActivityEntry.entity_id == str(entity_id), ActivityEntry.firm_id == firm_id)
     if actor_user_id is not None:
-        query = query.filter(LedgerEntry.actor_user_id == actor_user_id)
+        query = query.filter(ActivityEntry.actor_user_id == actor_user_id)
     entries = query.all()
     assert len(entries) == 1, f"expected one {action} entry for {entity_type} {entity_id}, found {len(entries)}"
     return entries[0]

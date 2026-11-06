@@ -2,7 +2,7 @@
 import pytest
 from backend.models.candidates import Candidate, CandidateMailbox
 from backend.models.db import Application, ApplicationStatusEvent, Resume, utcnow
-from backend.models.tenancy import User, LedgerEntry
+from backend.models.tenancy import User, ActivityEntry
 from backend.tests.resume_support import make_version
 from backend.tests.test_candidate_application_status import _saved_candidate_application
 
@@ -103,10 +103,10 @@ def test_legacy_detail_and_write_use_the_same_scope(api_client, test_db, account
 def test_changed_application_notes_are_audited_once(api_client,test_db,accounts,case):
     candidate,_,app,_=case
     path=f'/api/applications/{app.id}'
-    before=test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count()
+    before=test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).count()
     for _ in range(2):
         assert api_client.patch(path,json={'notes':'Synthetic private note'}).status_code==200
-    rows=test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).all()
+    rows=test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).all()
     assert len(rows)==before+1
     entry=rows[-1]
     assert entry.actor_user_id==accounts.user_id

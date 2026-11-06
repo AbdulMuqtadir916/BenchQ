@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.auth import ledger
 from backend.models.candidates import Candidate, CandidateJob, CandidateMailbox, Claim, Evidence, FavoriteJob, InboxMessage
 from backend.models.db import Application, Job, Search, utcnow
-from backend.models.tenancy import Firm, LedgerEntry, User
+from backend.models.tenancy import Firm, ActivityEntry, User
 from backend.tests.auth_support import make_user
 from backend.tests.resume_support import make_version
 
@@ -107,4 +107,4 @@ def test_the_ledger_knows_the_candidate_an_entry_is_about(test_db, world):
                             entity_label="Acme", summary="Settings", firm_id=world["firm"].id, candidate_id=None)
     test_db.flush()
     assert (about.candidate_id, passed.candidate_id, neither.candidate_id) == (candidate.id, candidate.id, None)
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == candidate.id).count() == 2
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.candidate_id == candidate.id).count() == 2

@@ -16,7 +16,7 @@ from backend.auth.policy import require
 from backend.auth.serialize import firm_json, ledger_entry_json, platform_user_json, user_json
 from backend.auth.sessions import Principal
 from backend.models.db import get_db, utcnow
-from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, User
+from backend.models.tenancy import Firm, Invite, ActivityEntry, Plan, PlatformUser, User
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -185,5 +185,5 @@ def list_audit(limit: int = Query(default=AUDIT_LIMIT, ge=1, le=2000), db: DbSes
     filters. A support view that ran out is settled first, so the overview never counts it as open."""
     support.settle_expired(db)
     db.commit()
-    entries = db.query(LedgerEntry).order_by(LedgerEntry.created_at.desc(), LedgerEntry.id).limit(limit)
+    entries = db.query(ActivityEntry).order_by(ActivityEntry.created_at.desc(), ActivityEntry.id).limit(limit)
     return [ledger_entry_json(e, hide_email=True) for e in entries]

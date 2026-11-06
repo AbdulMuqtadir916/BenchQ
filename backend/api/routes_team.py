@@ -180,7 +180,8 @@ def change_manager(firm_id: uuid.UUID, user_id: uuid.UUID, body: ChangeManagerBo
     ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="user", entity_id=bde.id,
                   entity_label=bde.name, firm_id=firm_id,
                   summary=f"{bde.name} now reports to {manager.name}{was}; "
-                          f"{moved} candidate{'' if moved == 1 else 's'} moved", candidate_id=None)
+                          f"{moved} candidate{'' if moved == 1 else 's'} moved", candidate_id=None,
+                  changes=ledger.diff({"manager_id": previous.id if previous else None}, {"manager_id": manager.id}))
     db.commit()
     return user_json(bde)
 
@@ -197,6 +198,7 @@ def update_settings(firm_id: uuid.UUID, body: FirmSettingsBody,
         before, firm.bde_capacity = firm.bde_capacity, body.bde_capacity
         ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="firm",
                       entity_id=firm.id, entity_label=firm.name, firm_id=firm.id,
-                      summary=f"BDE capacity {before} → {body.bde_capacity}", candidate_id=None)
+                      summary=f"BDE capacity {before} → {body.bde_capacity}", candidate_id=None,
+                      changes=ledger.diff({"bde_capacity": before}, {"bde_capacity": body.bde_capacity}))
         db.commit()
     return firm_json(db.get(Firm, firm_id))

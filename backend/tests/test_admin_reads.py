@@ -24,10 +24,10 @@ def test_team_lists_the_super_admins(api_client, accounts):
 
 def test_audit_lists_platform_and_firm_entries_newest_first(api_client, accounts, test_db):
     from backend.models.db import utcnow
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     now = utcnow()
     for minutes, firm_id, action in [(2, accounts.firm_id, "LOGIN"), (1, None, "CREATE")]:
-        test_db.add(LedgerEntry(firm_id=firm_id, actor_type="SYSTEM", actor_name="test", entity_type="firm",
+        test_db.add(ActivityEntry(firm_id=firm_id, actor_type="SYSTEM", actor_name="test", entity_type="firm",
                                 entity_id="x", entity_label="x", action=action, summary=action,
                                 created_at=now - timedelta(minutes=minutes)))
     test_db.commit()

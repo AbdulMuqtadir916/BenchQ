@@ -64,7 +64,7 @@ _F2B_TABLES = {"searches", "applications", "interviews", "resumes", "cover_lette
                "base_resumes", "candidate_google_oauth_attempts", "application_reviews", "application_status_events"}
 # Firm-owned although `firm_id` may be null: a ledger entry with no firm is a platform-only event (A13), and a
 # firm route must still read only its own firm's entries.
-_NULLABLE_FIRM_OWNED = {"LedgerEntry"}
+_NULLABLE_FIRM_OWNED = {"ActivityEntry"}
 
 
 def _root_name(node):
@@ -100,7 +100,7 @@ def _violations(path: Path, models: set[str], allowed: dict = ALLOWED) -> list[s
 
 def test_the_firm_owned_models_are_known():
     assert _firm_owned_models() == {"Search", "Application", "Interview", "Resume", "CoverLetter", "TracerLink",
-                                    "TracerClickEvent", "FirmJob", "LedgerEntry", "Candidate", "ResumeParse",
+                                    "TracerClickEvent", "FirmJob", "ActivityEntry", "Candidate", "ResumeParse",
                                     # The candidate core (migration 0007).
                                     "CandidateJob", "FavoriteJob", "CandidateMailbox", "InboxMessage", "Evidence",
                                     "Claim",

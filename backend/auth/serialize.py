@@ -1,11 +1,11 @@
 """The session's wire shape: the frontend's `SessionSchema` (src/lib/schemas/session.ts) in snake_case, mapped
 by src/lib/api/dto/session.ts (07-auth F3). Usage (seats, active candidates) is derived elsewhere, never here."""
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth.sessions import Principal
-from backend.models.tenancy import Firm, LedgerEntry, PlatformUser, SupportView, User
+from backend.models.tenancy import Firm, ActivityEntry, PlatformUser, SupportView, User
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -46,8 +46,17 @@ def support_view_json(view: SupportView) -> dict:
     }
 
 
-def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
-    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case."""
+EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def _cursor(entry: ActivityEntry) -> str:
+    """The page marker for reading on after this row (routes_ledger `cursor`)."""
+    return f"{(entry.created_at - EPOCH) // timedelta(microseconds=1)}_{entry.id}"
+
+
+def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False) -> dict:
+    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case, with what the log adds to it."""
+    hidden = hide_email and entry.entity_type == "email"
     return {
         "id": str(entry.id), "firm_id": str(entry.firm_id) if entry.firm_id else None,
         "candidate_id": str(entry.candidate_id) if entry.candidate_id else None,
@@ -58,7 +67,13 @@ def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
         "note": None if hide_email and entry.entity_type == "email" else entry.note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
         "evidence_ids": list(entry.evidence_ids or []), "claim_state": entry.claim_state,
-        "created_at": _iso(entry.created_at),
+        "created_at": _iso(entry.created_at), "cursor": _cursor(entry),
+        "actor_role": entry.actor_role,
+        "on_behalf_of_user_id": str(entry.on_behalf_of_user_id) if entry.on_behalf_of_user_id else None,
+        "team_manager_id": str(entry.team_manager_id) if entry.team_manager_id else None,
+        "candidate_manager_id": str(entry.candidate_manager_id) if entry.candidate_manager_id else None,
+        "candidate_bde_id": str(entry.candidate_bde_id) if entry.candidate_bde_id else None,
+        "changes": None if hidden else entry.changes,
     }
 
 

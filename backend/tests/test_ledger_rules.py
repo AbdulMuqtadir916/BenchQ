@@ -5,7 +5,7 @@ A grep-like check over the backend, as `test_firm_scoping_lint.py` does for firm
 1. Every route that changes data writes a ledger entry, directly or through a helper it calls. A route that doesn't
    is listed in `NOT_LOGGED` with the reason. A listed route that starts logging must leave the list, so it shrinks.
 2. Every ledger write states `candidate_id`, even as None, and goes through `backend/auth/ledger.py`.
-3. Only the listed routes read `LedgerEntry`, so no new endpoint skips the role limit in `routes_ledger.py`.
+3. Only the listed routes read `ActivityEntry`, so no new endpoint skips the role limit in `routes_ledger.py`.
 """
 import ast
 from functools import lru_cache
@@ -94,7 +94,7 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("main.py", "telegram_test"): NOT_FIRM_ACTIVITY,
 }
 
-# (file, function) -> why it builds a LedgerEntry itself instead of calling backend/auth/ledger.py.
+# (file, function) -> why it builds a ActivityEntry itself instead of calling backend/auth/ledger.py.
 DIRECT_WRITES = {
     ("auth/ledger.py", "record"): "the writer",
     ("auth/ledger.py", "record_automated"): "the writer",
@@ -103,9 +103,11 @@ DIRECT_WRITES = {
     ("scripts/reset_password.py", "reset_password"): "a staff script, no signed-in actor",
 }
 
-# (file, function) that may read LedgerEntry.
+# (file, function) that may read ActivityEntry.
 LEDGER_READERS = {
-    ("api/routes_ledger.py", "list_ledger"): "a firm's ledger, limited by role",
+    ("api/routes_ledger.py", "_visible"): "a firm's log, limited by role",
+    ("api/routes_ledger.py", "list_ledger"): "pages what `_visible` allows",
+    ("api/routes_ledger.py", "_after_cursor"): "pages what `_visible` allows",
     ("api/routes_admin.py", "list_audit"): "the Super Admin's audit across the platform",
     ("scripts/seed_demo.py", "reset"): "clears local demo data; serves no one",
 }
@@ -186,7 +188,7 @@ def _logging_functions() -> set[tuple[str, str]]:
             for node in ast.walk(function):
                 if isinstance(node, ast.Call):
                     calls.setdefault(key, set()).add(_callee(node, file, defined, functions, modules))
-                    if isinstance(node.func, ast.Name) and node.func.id == "LedgerEntry":
+                    if isinstance(node.func, ast.Name) and node.func.id == "ActivityEntry":
                         logging.add(key)
                 elif isinstance(node, ast.Name) and node.id in defined:   # passed by name, to a thread pool say
                     calls.setdefault(key, set()).add((file, node.id))
@@ -250,17 +252,24 @@ def _enclosing_calls(accept) -> set[tuple[str, str]]:
 
 
 def test_a_ledger_entry_is_built_only_by_the_writer():
-    built = _enclosing_calls(lambda call: isinstance(call.func, ast.Name) and call.func.id == "LedgerEntry")
+    built = _enclosing_calls(lambda call: isinstance(call.func, ast.Name) and call.func.id == "ActivityEntry")
     assert built <= set(DIRECT_WRITES), f"Write through backend/auth/ledger.py instead: {sorted(built - set(DIRECT_WRITES))}"
+
+
+def test_the_old_ledger_table_is_only_cleared_by_the_demo_reset():
+    """`activity_logs` replaced `ledger_entries` (migration 0016); an entry written there would never be seen."""
+    used = _enclosing_calls(lambda call: any(isinstance(node, ast.Name) and node.id == "LedgerEntry"
+                                             for node in ast.walk(call)))
+    assert used <= {("scripts/seed_demo.py", "reset")}, f"Use ActivityEntry instead: {sorted(used)}"
 
 
 def _reads_the_ledger(call: ast.Call) -> bool:
     name = call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
     return name in {"query", "scoped", "select", "get", "join", "outerjoin"} and any(
-        isinstance(node, ast.Name) and node.id == "LedgerEntry" for arg in call.args for node in ast.walk(arg))
+        isinstance(node, ast.Name) and node.id == "ActivityEntry" for arg in call.args for node in ast.walk(arg))
 
 
 def test_only_the_listed_routes_read_the_ledger():
     """A new read would skip the role limit in `routes_ledger.py`: add to that route instead."""
     reads = _enclosing_calls(_reads_the_ledger)
-    assert reads <= set(LEDGER_READERS), f"These read LedgerEntry outside the role limit: {sorted(reads - set(LEDGER_READERS))}"
+    assert reads <= set(LEDGER_READERS), f"These read ActivityEntry outside the role limit: {sorted(reads - set(LEDGER_READERS))}"
