@@ -9,10 +9,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/cn";
 import type { LedgerPerson } from "@/lib/schemas/analytics";
-import { managerRowLabel, type Rail, type Selection, type Viewer } from "./rail";
+import { managerRowLabel, ownerRowLabel, type Rail, type Selection, type Viewer } from "./rail";
 
 /** Past this many people, the list gets a search box. */
 const SEARCH_FROM = 6;
+
+/** Rows that sit under the person above them: managers under the owner, BDEs under a manager. */
+const Indented = ({ children }: { children: ReactNode }) => (
+  <div className="ml-5 border-l border-[var(--color-border-strong)] pl-2">{children}</div>
+);
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
@@ -96,9 +101,14 @@ export function ActivityRail({ rail, viewer, selection, back, rangeLabel, isLoad
         <>
           {rail.managers.length > SEARCH_FROM ? searchBox("Find a manager…") : null}
           <Row name="Whole firm" subtitle={plural(rail.managers.length, "manager")} count={rail.total} icon={<Building2 size={16} />} isSelected={!selection.person && !selection.team} onClick={() => onSelect({})} />
-          {managers.map((row) => (
-            <Row key={row.person.userId} name={row.person.name} avatar={row.person.name} subtitle={plural(row.bdes, "BDE")} count={row.actions} opens isSelected={false} onClick={() => onSelect({ team: row.person.userId })} />
-          ))}
+          {rail.owner ? person(rail.owner, ownerRowLabel(rail.owner, viewer)) : null}
+          {managers.length ? (
+            <Indented>
+              {managers.map((row) => (
+                <Row key={row.person.userId} name={row.person.name} avatar={row.person.name} subtitle={plural(row.bdes, "BDE")} count={row.actions} opens isSelected={false} onClick={() => onSelect({ team: row.person.userId })} />
+              ))}
+            </Indented>
+          ) : null}
           {query && managers.length === 0 ? noMatch : null}
           {rail.you ? <Group label="You">{person(rail.you, "Your actions")}</Group> : null}
           {unassigned.length ? <Group label="Unassigned BDEs">{unassigned.map((row) => person(row, "No manager yet"))}</Group> : null}
@@ -114,7 +124,7 @@ export function ActivityRail({ rail, viewer, selection, back, rangeLabel, isLoad
         <Group label={`BDEs · ${rail.bdes.length}`}>
           {rail.bdes.length > SEARCH_FROM ? searchBox("Find a BDE…") : null}
           {rail.bdes.length === 0 ? <p className="px-2 py-2 text-sm text-[var(--color-text-3)]">No BDEs report to {rail.manager.name} yet.</p> : null}
-          {bdes.length ? <div className="ml-5 border-l border-[var(--color-border-strong)] pl-2">{bdes.map((row) => person(row, "BDE"))}</div> : null}
+          {bdes.length ? <Indented>{bdes.map((row) => person(row, "BDE"))}</Indented> : null}
           {query && bdes.length === 0 ? noMatch : null}
         </Group>
         {rail.former.length ? <Group label="Former members">{rail.former.map((row) => person(row, "Left this team"))}</Group> : null}
