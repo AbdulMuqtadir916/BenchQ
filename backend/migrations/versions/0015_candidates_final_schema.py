@@ -15,7 +15,13 @@ résumé's version 1 (`resumes.summary`), not on the candidate.
 its skills only in its résumé version 1; BenchQ ships on a fresh database, so none exist.
 
 **`claims` and `evidence` are dropped** (decided 2026-11-05: BenchQ has no claim or verified states). Their rows are
-deleted for good. Nothing else points at either table (only `claims.evidence_id` points at `evidence`).
+deleted for good. Nothing else points at either table (only `claims.evidence_id` points at `evidence`). The ledger's
+**`claim_state`** (with its CHECK) and **`evidence_ids`** go too (Abdul, his table, 2026-11-06): nothing ever wrote
+them.
+
+**Work authorization loses `OTHER`** (Abdul, 2026-11-06): every status has a sponsorship rule, so `needs_sponsorship`
+is always true or false. There is no right status to turn an `OTHER` into, so the upgrade stops and names how many
+candidates to fix first; the downgrade allows `OTHER` again.
 
 `base_resumes.source` gains `MANUAL`: a candidate created without a résumé file gets a base made from the new-candidate
 form alone, so every candidate has a base. Such a base has no parse (`resume_parse_id` NULL), like a promoted one.
@@ -24,7 +30,8 @@ Follows 0014 (Samad's email classification, PR #111).
 
 The downgrade rebuilds `persona` from the columns (its summary from the active base's version 1; `tone_notes` empty),
 `skills` from the active base's version 1 (no family), `summary_state` as UNVERIFIED, recreates `evidence` and `claims`
-empty, and turns each `MANUAL` base into a `PROMOTED` one, the nearest source the old CHECK allows.
+empty, puts the ledger's `evidence_ids` (empty) and `claim_state` (NULL) back with their CHECK, and turns each
+`MANUAL` base into a `PROMOTED` one, the nearest source the old CHECK allows.
 """
 
 from alembic import op
@@ -40,8 +47,17 @@ depends_on = None
 _EMPTY = sa.text("'{}'::character varying[]")
 
 
+_WORK_AUTHS = "'H1B', 'H4_EAD', 'OPT', 'CPT', 'GC', 'GC_EAD', 'USC', 'TN'"
+
+
 def upgrade() -> None:
     conn = op.get_bind()
+    others = conn.execute(sa.text("SELECT count(*) FROM candidates WHERE work_auth = 'OTHER'")).scalar()
+    if others:
+        raise RuntimeError(f"{others} candidate(s) have work authorization OTHER, which 0015 removes. Set a real one "
+                           "(H1B, H4_EAD, OPT, CPT, GC, GC_EAD, USC or TN) first, then run the upgrade again.")
+    op.drop_constraint('ck_candidates_work_auth', 'candidates', type_='check')
+    op.create_check_constraint('ck_candidates_work_auth', 'candidates', f"work_auth IN ({_WORK_AUTHS})")
     for column in ('preferred_industries', 'deal_breakers'):
         op.add_column('candidates', sa.Column(column, postgresql.ARRAY(sa.String()), nullable=False, server_default=_EMPTY))
         conn.execute(sa.text(
@@ -62,8 +78,21 @@ def upgrade() -> None:
     op.drop_table('claims')                  # claims point at evidence, so they go first
     op.drop_table('evidence')
 
+    op.drop_constraint('ck_ledger_entries_claim_state', 'ledger_entries', type_='check')
+    op.drop_column('ledger_entries', 'claim_state')
+    op.drop_column('ledger_entries', 'evidence_ids')
+
 
 def downgrade() -> None:
+    op.drop_constraint('ck_candidates_work_auth', 'candidates', type_='check')
+    op.create_check_constraint('ck_candidates_work_auth', 'candidates', f"work_auth IN ({_WORK_AUTHS}, 'OTHER')")
+    # The ledger's two columns as 0003 made them: every row back to an empty list and no state.
+    op.add_column('ledger_entries', sa.Column('evidence_ids', postgresql.ARRAY(sa.String()), nullable=False,
+                                              server_default=_EMPTY))
+    op.add_column('ledger_entries', sa.Column('claim_state', sa.String(), nullable=True))
+    op.create_check_constraint('ck_ledger_entries_claim_state', 'ledger_entries',
+                               "claim_state IS NULL OR claim_state IN ('VERIFIED', 'UNVERIFIED', 'CONTRADICTED')")
+
     conn = op.get_bind()
     op.drop_constraint('ck_base_resumes_source', 'base_resumes', type_='check')
     op.drop_constraint('ck_base_resumes_source_values', 'base_resumes', type_='check')

@@ -200,7 +200,7 @@ describe("the team and /admin on the live backend", () => {
       on("GET", "/api/admin/audit", 200, [{
         id: "le1", firm_id: HTS, actor_user_id: demoIds.padm_sana, actor_type: "PLATFORM_ADMIN", actor_name: "Sana", entity_type: "firm",
         entity_id: HTS, entity_label: "HTS", action: "FIRM_CREATED", summary: "Created", model_id: null, prompt_version: null,
-        evidence_ids: [], claim_state: null, created_at: "2026-10-21T12:00:00+00:00",
+        created_at: "2026-10-21T12:00:00+00:00",
       }]),
     );
     expect((await platformApi.users.list("firm_hts"))[0].id).toBe("user_imran");

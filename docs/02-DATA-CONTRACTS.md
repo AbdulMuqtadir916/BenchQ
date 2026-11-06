@@ -62,7 +62,7 @@ import { z } from 'zod';
 export const FirmRole = z.enum(['OWNER', 'MANAGER', 'BDE', 'VIEWER']);
 
 export const WorkAuth = z.enum([
-  'H1B', 'H4_EAD', 'OPT', 'CPT', 'GC', 'GC_EAD', 'USC', 'TN', 'OTHER',
+  'H1B', 'H4_EAD', 'OPT', 'CPT', 'GC', 'GC_EAD', 'USC', 'TN',   // no 'OTHER' since 0015 (Abdul, 2026-11-06)
 ]);
 
 export const EmploymentType = z.enum(['C2C', 'W2', 'TEEN99', 'FTE']);
@@ -929,10 +929,12 @@ is the active base résumé's (`resumes.summary`). `candidates.skills` and `summ
 active base résumé's). **BenchQ has no claim states (2026-11-05):** the `claims` and `evidence` tables are dropped in the
 same migration, and the frontend's claim, evidence and export-gate types went in PR 7. `needsSponsorship` and
 `needsTransfer` are required booleans: the new-candidate flow works them out from `workAuth` (H-1B, H4 EAD, OPT, CPT,
-TN need sponsorship; H-1B needs a transfer; anything else, `OTHER` included, sends `false`) and sends them; the backend
+TN need sponsorship; H-1B needs a transfer; GC, GC EAD and US citizen send `false`; there is no `OTHER`, so both are
+always known) and sends them; the backend
 works nothing out and only checks that they were sent (a missing one is a 422 naming the field). An edit that changes
 `workAuth` must carry both. Required on create, in the form and in the backend alike: `fullName`, `primaryRole`, `email`,
-`phone`, `yearsExperience`, `country` (the flow sends `US`), `workAuth`, `needsSponsorship`, `needsTransfer`,
+`phone`, `yearsExperience`, `country` (any country; the flow's Country box starts at `US` and takes the parsed résumé's
+country, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
 `employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. A candidate created without a résumé file gets a `MANUAL` base from the form alone, so every candidate has a base.
 
 `ResumeDraftSchema` gains `country` with the new parser (§8.1). The skills a new candidate is created with go into
@@ -1586,7 +1588,7 @@ field. Logged as `CREATE` on `candidate`.
 `POST /api/jobs`. The server builds the `Job`: provenance `USER_SUBMITTED` / `USER_SESSION` with the user as
 `capturedByUserId`; the company reused by normalised name, else added with nothing known (`clientType`
 `UNKNOWN`, no H-1B data, no verification); an hourly range fills `rateMin/Max`, a yearly one
-`salaryMin/Max`; "visa sponsorship available" allows every work authorization except `OTHER`, otherwise
+`salaryMin/Max`; "visa sponsorship available" allows every work authorization, otherwise
 `USC` and `GC`; skills and required experience become `MANDATORY` requirements (not blockers). The same
 canonical URL (no query or fragment, lowercase host, no trailing slash) twice in a firm is refused with
 409 `DUPLICATE_JOB` naming the existing job. Logged as `CREATE` on `job`.
@@ -1665,8 +1667,7 @@ export const LedgerEntrySchema = z.object({
   note: z.string().nullable(),            // the handoff note on an ASSIGN entry; null on every other entry (§3.4)
   modelId: z.string().nullable(),
   promptVersion: z.string().nullable(),
-  evidenceIds: z.array(z.string()),
-  claimState: z.string().nullable(),   // left as the backend sends it; the ledger's owner decides whether it goes
+  // No evidenceIds or claimState: the ledger's columns are dropped in migration 0015 (Abdul, 2026-11-06).
   createdAt: z.string().datetime(),
 });
 
@@ -1690,8 +1691,8 @@ export const TimelineEventSchema = z.object({
    hand-written parallel interface.
 2. **Validate at the boundary.** Every adapter response is parsed through its schema. A shape
    mismatch fails loudly in development rather than rendering `undefined` in production.
-3. **Derived types are computed, not fetched.** `CandidateStats`, `RecordCompleteness` and
-   `ExportGate` have schemas so they can be typed — but they're produced by pure functions in
+3. **Derived types are computed, not fetched.** `CandidateStats` and `RecordCompleteness`
+   have schemas so they can be typed — but they're produced by pure functions in
    `src/lib/derive/`, which are unit-tested against fixtures.
 4. **Denormalised fields are deliberate.** `Match.job`, `Application.companyNameAtApply`,
    `FollowUpTask.candidateName` — these exist so list views render without N+1 lookups, and so

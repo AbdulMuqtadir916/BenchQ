@@ -17,8 +17,8 @@ export const WorkAuth = z.enum([
   "GC_EAD",
   "USC",
   "TN",
-  "OTHER",
 ]);
+// No "OTHER" (Abdul, 2026-11-06): every status has a sponsorship rule, so needsSponsorship is always true or false.
 export type WorkAuth = z.infer<typeof WorkAuth>;
 
 export const EmploymentType = z.enum(["C2C", "W2", "TEEN99", "FTE"]);

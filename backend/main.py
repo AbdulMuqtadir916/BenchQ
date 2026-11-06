@@ -11,9 +11,11 @@ from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun, engine
 from backend import statement_timeout
 from backend.seed import run_seeds
-from backend.auth.access import enforce as enforce_access
+from backend.auth.access import enforce as enforce_access, route_key
 from backend.auth import throttle
 from backend.body_limit import BodySizeLimit
+from backend.logging_setup import configure_logging
+from backend.request_log import HEADER as REQUEST_ID_HEADER, NO_ROUTE, RequestLog
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
@@ -40,14 +42,9 @@ from backend.api.routes_ledger import router as ledger_router
 from backend.api.routes_support import router as support_router
 from backend.api.routes_notifications import router as notifications_router
 
-logging.basicConfig(level=logging.INFO)
+# One logging setup for every module's logger (backend/logging_setup.py): format, request ids, masking.
+configure_logging()
 logger = logging.getLogger("jobnavigator")
-
-# httpx logs every request URL at INFO, and the Telegram API carries the bot token in
-# the path — so each alert wrote the token into the container log in cleartext
-# (R4-T5-03). The app logs its own outcomes for every outbound call it cares about.
-for _noisy in ("httpx", "httpcore"):
-    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 
 @asynccontextmanager
@@ -181,6 +178,12 @@ async def _oauth_browser_result(request: Request, call_next):
     return response
 
 
+# ── Request log (docs/team/uzair.md §1, step 4a) ─────────────────────────────
+# Added last, so it runs first: the request id covers every line of the request, and the access line times and
+# reports everything, a 413 or 401 from the middleware above included.
+app.add_middleware(RequestLog)
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
 app.include_router(routes_inbox.router, prefix="/api")
@@ -211,18 +214,27 @@ app.include_router(llm_router, prefix="/api")
 from sqlalchemy.exc import DataError as _SADataError
 
 
+def _route(request: Request) -> str:
+    """The route pattern for a log line, never the raw path: invite and tracer links carry their token there. It runs
+    inside error handlers, so it never raises: a failed lookup is logged as no route, not a second error."""
+    try:
+        return route_key(request.app, request) or NO_ROUTE
+    except Exception:
+        return NO_ROUTE
+
+
 @app.exception_handler(_SADataError)
 async def _bad_uuid_to_404(request: Request, exc: _SADataError):
     if "invalid input syntax for type uuid" in str(exc.orig or exc):
         return JSONResponse(status_code=404, content={"detail": "Not found"})
-    logger.exception("Database DataError on %s %s", request.method, request.url.path)
+    logger.exception("Database DataError on %s %s", request.method, _route(request))
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.exception_handler(_PoolTimeout)
 async def _pool_timeout_to_503(request: Request, exc: _PoolTimeout):
     """A handler that could not get a connection answers 503, not 500."""
-    logger.warning("DB pool exhausted on %s %s", request.method, request.url.path)
+    logger.warning("DB pool exhausted on %s %s", request.method, _route(request))
     return statement_timeout.busy_response()
 
 
@@ -231,8 +243,18 @@ async def _statement_timeout_to_503(request: Request, exc: _OperationalError):
     """A query cancelled at its statement timeout answers 503; any other OperationalError stays a 500."""
     if not statement_timeout.is_statement_timeout(exc):
         raise exc
-    logger.warning("Query timed out on %s %s: %s", request.method, request.url.path, exc.statement)
+    logger.warning("Query timed out on %s %s: %s", request.method, _route(request), exc.statement)
     return statement_timeout.busy_response()
+
+
+@app.exception_handler(Exception)
+async def _unexpected_error(request: Request, exc: Exception):
+    """An error nothing else handled: the plain 500 Starlette sends, plus the request id to find it in the log
+    (backend/request_log.py logged it with its traceback)."""
+    from fastapi.responses import PlainTextResponse
+    rid = getattr(request.state, "request_id", None)
+    return PlainTextResponse("Internal Server Error", status_code=500,
+                             headers={REQUEST_ID_HEADER: rid} if rid else None)
 
 
 @app.get("/health", tags=["system"], summary="Health check")
@@ -300,6 +322,7 @@ async def _tracer_click_and_redirect(token: str, request: Request):
         # Capture destination before the click-log write so redirect still happens
         # even if the click-log commit fails (best-effort logging).
         destination = link.destination_url
+        link_id = link.id
 
         try:
             event = TracerClickEvent(
@@ -314,8 +337,8 @@ async def _tracer_click_and_redirect(token: str, request: Request):
             )
             db.add(event)
             db.commit()
-        except Exception as e:
-            logger.exception("Tracer click log failed for token=%s: %s", token, e)
+        except Exception:
+            logger.exception("Tracer click log failed for link %s", link_id)
             # Rollback so the session isn't left in an error state.
             try:
                 db.rollback()

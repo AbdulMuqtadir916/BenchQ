@@ -13,7 +13,7 @@ let sequence = 0;
 const assign = (candidateId: string, at: string, note: string | null = null): LedgerEntry => ({
   id: `led_${sequence++}`, firmId: "firm_hts", actorUserId: "user_fatima", actorType: "USER", actorName: "Fatima Reddy", entityType: "candidate",
   entityId: candidateId, entityLabel: candidateId, action: "ASSIGN", summary: "Assigned", note, modelId: null, promptVersion: null,
-  evidenceIds: [], claimState: null, createdAt: at,
+  createdAt: at,
 });
 
 describe("the Needs a BDE queue (07 Q42)", () => {

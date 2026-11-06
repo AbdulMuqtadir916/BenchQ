@@ -37,6 +37,8 @@ export interface WizardValues {
   linkedinUrl: string;
   city: string;
   state: string;
+  /** Any country, "US" until the person or the résumé says otherwise (a TN candidate may be from Canada or Mexico). */
+  country: string;
   skills: WizardSkill[];
   summary: string;
   workAuth: WorkAuth | null;
@@ -62,16 +64,20 @@ export interface WizardValues {
 }
 
 /** The fields the parser can fill, and so can carry the "Filled from résumé" marker. */
-export const DRAFTABLE = ["fullName", "primaryRole", "yearsExperience", "email", "phone", "linkedinUrl", "city", "state", "skills", "summary", "workAuth"] as const;
+export const DRAFTABLE = ["fullName", "primaryRole", "yearsExperience", "email", "phone", "linkedinUrl", "city", "state", "country", "skills", "summary", "workAuth"] as const;
 export type DraftableField = (typeof DRAFTABLE)[number];
 
 export const EMPTY_VALUES: WizardValues = {
   resume: null, fullName: "", primaryRole: "", yearsExperience: "", email: "", phone: "", linkedinUrl: "", city: "", state: "",
-  skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
+  country: "US", skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
   rateMin: "", availableFrom: "", noticePeriodDays: "", targetRoles: [], workSettings: [], preferredLocations: [],
   willingToRelocate: false, preferredIndustries: [], dealBreakers: [], contactNotes: "", managerId: "", bdeId: null,
   handoffNote: "",
 };
+
+/** The default country, and the ways a résumé prints it ("USA", "United States"), which all mean the default. */
+const US = "US";
+const isUs = (country: string) => /^(u\.?s\.?a?\.?|united states( of america)?|america)$/i.test(country.trim());
 
 const isBlank = (value: unknown) => value === "" || value === null || (Array.isArray(value) && value.length === 0);
 
@@ -95,6 +101,11 @@ export function applyDraft(values: WizardValues, draft: ResumeDraft): { values: 
   fill("linkedinUrl", draft.linkedinUrl);
   fill("city", draft.city);
   fill("state", draft.state);
+  // The country starts as US, so "only empty fields" can't apply: the résumé's country replaces the untouched default.
+  if (draft.country && !isUs(draft.country) && isUs(values.country)) {
+    next.country = draft.country.trim();
+    drafted.push("country");
+  }
   fill("summary", draft.summary);
   fill("workAuth", draft.workAuth);
   if (values.workAuth === null) next.workAuthText = draft.workAuthText;
@@ -126,6 +137,7 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
     if (!values.fullName.trim()) errors.fullName = "Enter the candidate's name.";
     if (!values.primaryRole.trim()) errors.primaryRole = "Enter the title they're marketed as.";
     if (!values.phone.trim()) errors.phone = "Enter their phone number.";
+    if (!values.country.trim()) errors.country = "Enter their country.";
     if (!values.email.trim()) errors.email = "Enter their email.";
     else if (!z.string().email().safeParse(values.email.trim()).success) errors.email = "Enter a valid email, like name@example.com.";
     if (asNumber(values.yearsExperience) === null || !isWhole(asNumber(values.yearsExperience), 0, 60)) errors.yearsExperience = "Years of experience is a whole number from 0 to 60.";
@@ -173,7 +185,9 @@ const orNull = (value: string): string | null => (value.trim() === "" ? null : v
 
 /** The create payload (docs/02 §4), once every step is valid. Sponsorship and transfer are worked out here from the work authorization (README A3); the backend only checks they were sent. */
 export function toCreateCandidate(values: WizardValues): CreateCandidate {
-  const workAuth = values.workAuth ?? "OTHER";
+  // Required on step 3 (validateStep), so it is always set here.
+  const workAuth = values.workAuth;
+  if (workAuth === null) throw new Error("toCreateCandidate needs a work authorization (step 3).");
   return {
     fullName: values.fullName.trim(),
     primaryRole: values.primaryRole.trim(),
@@ -182,7 +196,7 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     linkedinUrl: orNull(values.linkedinUrl),
     city: orNull(values.city),
     state: orNull(values.state),
-    country: "US",
+    country: isUs(values.country) ? US : values.country.trim(),
     yearsExperience: asNumber(values.yearsExperience) ?? 0,
     workAuth,
     workAuthExpiry: toIsoDate(values.workAuthExpiry),

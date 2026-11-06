@@ -85,6 +85,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 | Email ("Shown to vendors only when a submission goes out.") | yes | `email` |
 | Phone | yes | `phone` |
 | LinkedIn, City, State | no | `linkedinUrl` (a URL), `city`, `state` |
+| Country (free text, starts at US; the parsed résumé's country replaces the untouched US) | yes | `country`; "USA", "United States" and the like are sent as `US` |
 | Skills (tag input; suggestions = parsed skills not yet added) | no | `skills[]` with `source` `RESUME_UPLOAD` or `MANUAL` |
 | Summary ("Two or three lines a BDE can paste into an intro email.") | no | `summary` |
 
@@ -92,7 +93,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 
 | Field | Required | Maps to |
 |---|---|---|
-| Work authorization: nine radio cards (H-1B "Transfer needed", H4 EAD, OPT, CPT, Green Card, GC EAD, US Citizen, TN, Other "Explain in notes") | yes | `workAuth` (`H1B`, `H4_EAD`, `OPT`, `CPT`, `GC`, `GC_EAD`, `USC`, `TN`, `OTHER`); `needsSponsorship` / `needsTransfer` derived (A3) |
+| Work authorization: eight radio cards (H-1B "Transfer needed", H4 EAD, OPT, CPT, Green Card, GC EAD, US Citizen, TN); no "Other" since 2026-11-06 (Abdul), and a résumé that matches none leaves it for the BDE to pick | yes | `workAuth` (`H1B`, `H4_EAD`, `OPT`, `CPT`, `GC`, `GC_EAD`, `USC`, `TN`); `needsSponsorship` / `needsTransfer` derived (A3) |
 | Authorization valid until ("BenchQ warns 90 days before it lapses.") | no | `workAuthExpiry` |
 | Engagement: C2C, W2, 1099, Full-time (checkboxes, at least one) | yes | `employmentTypes` (`C2C`, `W2`, `TEEN99`, `FTE`) |
 | Target rate, walk-away floor (USD per hour; "The floor is never shown to vendors.") | no | `rateTarget`, `rateMin`; floor ≤ target, else "The floor can't be above the target rate." |

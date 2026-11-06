@@ -15,8 +15,7 @@ from backend.models.candidates import BaseResume
 from backend.models.db import Resume
 
 BASE_NAME = "Base"
-# The app's own labels for the form's codes (src/components/app/work-auth-chip.tsx WORK_AUTH_LABEL). OTHER has no
-# printable label, so the résumé keeps its own wording then.
+# The app's own labels for the form's codes (src/components/app/work-auth-chip.tsx WORK_AUTH_LABEL).
 WORK_AUTH_LABEL = {"H1B": "H-1B", "H4_EAD": "H4 EAD", "OPT": "OPT", "CPT": "CPT", "GC": "Green Card",
                    "GC_EAD": "GC EAD", "USC": "US Citizen", "TN": "TN"}
 

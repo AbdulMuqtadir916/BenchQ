@@ -57,7 +57,6 @@ def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
         "summary": "Candidate inbox activity (content restricted)." if hide_email and entry.entity_type == "email" else entry.summary,
         "note": None if hide_email and entry.entity_type == "email" else entry.note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
-        "evidence_ids": list(entry.evidence_ids or []), "claim_state": entry.claim_state,
         "created_at": _iso(entry.created_at),
     }
 

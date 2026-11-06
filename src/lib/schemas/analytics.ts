@@ -99,8 +99,6 @@ export const LedgerEntrySchema = z.object({
   note: z.string().nullable(),
   modelId: z.string().nullable(),
   promptVersion: z.string().nullable(),
-  evidenceIds: z.array(z.string()),
-  claimState: z.string().nullable(),
   createdAt: z.string().datetime(),
 });
 export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
