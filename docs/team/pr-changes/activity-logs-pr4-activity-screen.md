@@ -3,6 +3,13 @@
 Branch: `activity-logs/pr4-activity-screen` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 Built on PR 3 (`activity-log/pr3-new-table-and-endpoints`), which holds PR 1 and PR 2. Merge those first.
 
+## Actor column
+
+The Actor column shows the person's name with their role below it in small, light text, such as "(Manager)". The
+"user" tag is gone. An AI agent's row has an amber "AI agent" tag, then the person it worked for and that person's role.
+A system row keeps its tag and has no role. An agent's entry now stores its person's role, and the API returns the
+person's name as `on_behalf_of_name`.
+
 ## Scope and dependencies
 
 The Activity logs screen, on the reads PR 3 added. It logs nothing new: which actions exist is PR 5's work. The route
