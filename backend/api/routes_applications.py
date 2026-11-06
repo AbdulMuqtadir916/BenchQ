@@ -691,6 +691,7 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
         raise HTTPException(status_code=400,
                             detail=f"status must be one of {sorted(VALID_STATUSES)}")
     changed = False
+    status_before = app.status
     undo = bool(updates.pop("undo", False))   # the toast's Undo: reverse the last move, do not log a new one
     if "status" in updates:
         if updates["status"] != app.status:
@@ -709,18 +710,29 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
             changed = True
     if changed:
         app.updated_at = utcnow()
-        _audit_application_edit(db, app, principal, "Updated application details.")
+        if app.status != status_before:
+            _audit_status_move(db, app, principal, status_before)
+        else:
+            _audit_application_edit(db, app, principal, "Updated application details.")
     db.commit()
     return _application_responses(db, firm_id, [app])[0]
 
 
-def _audit_application_edit(db, app, principal, summary, *, action="UPDATE"):
+def _audit_status_move(db, app, principal, before):
+    """A hand-logged application's status change, in the same words as a candidate application's (tracking.move)."""
+    from backend.auth.ledger import diff
+    title = app.job.title or "application"
+    _audit_application_edit(db, app, principal, f"Moved {title}: {before} → {app.status}.",
+                            changes=diff({"status": before}, {"status": app.status}))
+
+
+def _audit_application_edit(db, app, principal, summary, *, action="UPDATE", changes=None):
     from backend.auth.ledger import record
     from backend.models.tenancy import User
     actor = scoped(db, User, app.firm_id).filter_by(id=principal.user_id).one()
     record(db, actor=actor, action=action, entity_type="application", entity_id=app.id,
            entity_label=app.job.title or "Application", summary=summary,
-           firm_id=app.firm_id, candidate_id=app.candidate_id)
+           firm_id=app.firm_id, candidate_id=app.candidate_id, changes=changes)
 
 
 def _audit_interview(db, app, principal, interview, action, summary, changes=None):
@@ -837,12 +849,13 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=
         if app.status == status:
             skipped += 1
             continue
+        status_before = app.status
         if undo:
             revert_transition(app, status)
         else:
             record_transition(app, status, "ui")
         app.updated_at = utcnow()
-        _audit_application_edit(db, app, principal, "Updated application status.")
+        _audit_status_move(db, app, principal, status_before)
         updated += 1
     db.commit()
     return {"updated": updated, "skipped": skipped, "not_found": not_found}
