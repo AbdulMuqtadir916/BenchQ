@@ -107,6 +107,21 @@ def test_an_ai_answer_is_logged_as_the_agent_for_the_person(api_client, test_db,
     assert "Why this job" not in entry.summary
 
 
+def test_a_streamed_ai_answer_is_logged_once_it_finishes(api_client, test_db, accounts, monkeypatch):
+    from backend.seed import seed_persona
+    from backend.models.db import Setting
+    seed_persona(test_db)
+    test_db.add(Setting(key="autofill_prompt", value="{persona} {qa_bank} {question} {company} {position} {max_chars}"))
+    test_db.commit()
+
+    async def chunks(*args, **kwargs):
+        yield "I have five years."
+    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream", chunks, raising=False)
+    response = api_client.post("/api/autofill/answer/stream", json={"question": "Why?", "company": "Acme", "position": "PM"})
+    assert response.status_code == 200 and "[DONE]" in response.text
+    assert [e.entity_type for e in _entries(test_db, action="AI_GENERATE")] == ["autofill_answer"]
+
+
 def test_a_failed_ai_answer_writes_nothing(api_client, test_db, monkeypatch):
     from backend.seed import seed_persona
     from backend.models.db import Setting
