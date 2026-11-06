@@ -66,7 +66,6 @@ def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False, candida
         "summary": "Candidate inbox activity (content restricted)." if hide_email and entry.entity_type == "email" else entry.summary,
         "note": None if hide_email and entry.entity_type == "email" else entry.note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
-        "evidence_ids": list(entry.evidence_ids or []), "claim_state": entry.claim_state,
         "created_at": _iso(entry.created_at), "cursor": _cursor(entry), "candidate_name": candidate_name,
         "actor_role": entry.actor_role,
         "on_behalf_of_user_id": str(entry.on_behalf_of_user_id) if entry.on_behalf_of_user_id else None,
