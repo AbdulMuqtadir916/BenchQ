@@ -53,7 +53,7 @@ export function activityColumns(isExactTime: boolean): ColumnDef<LedgerEntry, un
       cell: ({ row }) => (
         <div className="min-w-0">
           <span className="block truncate text-[var(--color-text-2)]">{row.original.summary}</span>
-          {row.original.modelId ? <span className="text-caption text-[var(--color-text-3)]">{row.original.modelId} · {row.original.promptVersion}</span> : null}
+          {row.original.modelId ? <span className="text-caption text-[var(--color-text-3)]">{[row.original.modelId, row.original.promptVersion].filter(Boolean).join(" · ")}</span> : null}
         </div>
       ),
     },
