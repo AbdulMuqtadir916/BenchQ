@@ -40,8 +40,10 @@ def world(test_db, accounts):
 def _body(world, manager="fatima", bde=None, **over):
     people = world["people"]
     return {"full_name": "Ravi Teja", "primary_role": "Java Developer", "email": "Ravi@Example.com", "work_auth": "H1B",
+            "phone": "+1 555 0100", "country": "US", "years_experience": 9, "needs_sponsorship": True,
+            "needs_transfer": True, "target_roles": ["Java Developer"],
             "employment_types": ["C2C"], "manager_id": str(people[manager].id),
-            "bde_id": str(people[bde].id) if bde else None, "skills": [{"name": "Java", "source": "RESUME_UPLOAD"}],
+            "bde_id": str(people[bde].id) if bde else None, "skills": [{"name": "Java"}],
             "summary": "Nine years of Java.", **over}
 
 
@@ -55,15 +57,14 @@ def _list(client, world, who):
 
 # ── Creating ─────────────────────────────────────────────────────────────────
 
-def test_the_owner_hands_a_candidate_to_a_manager_and_nothing_is_verified(anonymous_client, test_db, world):
+def test_the_owner_hands_a_candidate_to_a_manager(anonymous_client, test_db, world):
     from backend.models.tenancy import LedgerEntry
     r = _create(anonymous_client, world, handoff_note="  Prefers banking.  ")
     assert r.status_code == 201, r.text
     c = r.json()
     assert (c["manager_id"], c["bde_id"], c["status"], c["email"]) == (str(world["people"]["fatima"].id), None,
                                                                        "ON_BENCH", "ravi@example.com")
-    assert c["skills"] == [{"name": "Java", "family": None, "source": "RESUME_UPLOAD", "state": "UNVERIFIED"}]
-    assert c["summary_state"] == "UNVERIFIED" and c["persona"]["summary"] == "Nine years of Java."
+    assert not {"persona", "skills", "summary_state"} & set(c)            # the active base's now (migration 0015)
     assert c["target_roles"] == ["Java Developer"]
     entries = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"]).order_by(LedgerEntry.created_at).all()
     assert [(e.action, e.summary, e.note) for e in entries] == [
@@ -102,6 +103,94 @@ def test_the_fields_are_checked(anonymous_client, world):
         assert _create(anonymous_client, world, **over).status_code == 400, over
     for over in ({"work_auth": "H1-B"}, {"years_experience": 212}, {"full_name": ""}):
         assert _create(anonymous_client, world, **over).status_code == 422, over
+
+
+def test_a_candidate_without_a_resume_file_gets_a_manual_base_from_the_form(anonymous_client, test_db, world):
+    """Migration 0015: every candidate has a base; with no file its v1 holds what the form holds."""
+    from backend.models.candidates import BaseResume
+    from backend.models.db import Resume
+    c = _create(anonymous_client, world, city="Dallas", state="TX").json()
+    (base,) = test_db.query(BaseResume).filter(BaseResume.candidate_id == c["id"]).all()
+    assert (base.source, base.resume_parse_id, base.is_active) == ("MANUAL", None, True)
+    (v1,) = test_db.query(Resume).filter(Resume.base_resume_id == base.id).all()
+    assert (v1.category, v1.version, v1.full_name, v1.title, v1.email) == ("BASE", 1, "Ravi Teja", "Java Developer",
+                                                                            "ravi@example.com")
+    assert (v1.summary, v1.city, v1.state, v1.country, v1.github) == ("Nine years of Java.", "Dallas", "TX", None, None)
+    assert v1.summary_id and [s["name"] for s in v1.skills] == ["Java"] and v1.skills[0]["id"]
+    assert v1.experiences == [] and v1.educations == [] and v1.projects == []
+
+
+def test_a_candidate_with_a_resume_file_gets_an_upload_base(anonymous_client, test_db, world):
+    from backend.models.candidates import BaseResume
+    row = _parse(test_db, world)
+    c = _create(anonymous_client, world, resume_parse_id=str(row.id)).json()
+    (base,) = test_db.query(BaseResume).filter(BaseResume.candidate_id == c["id"]).all()
+    assert (base.source, base.resume_parse_id) == ("UPLOAD", row.id)
+
+
+def test_industries_and_deal_breakers_are_flat_columns(anonymous_client, world):
+    c = _create(anonymous_client, world, preferred_industries=[" fintech ", ""], deal_breakers=["no travel"]).json()
+    assert (c["preferred_industries"], c["deal_breakers"]) == (["fintech"], ["no travel"])
+    plain = _create(anonymous_client, world).json()
+    assert (plain["preferred_industries"], plain["deal_breakers"]) == ([], [])
+
+
+# ── Mandatory fields: the backend checks they were sent and works nothing out ─
+
+MANDATORY = ["full_name", "primary_role", "email", "phone", "country", "years_experience", "work_auth",
+             "needs_sponsorship", "needs_transfer", "employment_types", "target_roles", "manager_id"]
+
+
+def _without(world, field):
+    body = _body(world)
+    body.pop(field)
+    return body
+
+
+@pytest.mark.parametrize("field", MANDATORY)
+def test_a_create_without_a_mandatory_field_is_refused_naming_the_field(anonymous_client, world, field):
+    r = anonymous_client.post(f"/api/firms/{world['firm'].id}/candidates", json=_without(world, field),
+                              headers=world["as"]["owner"])
+    assert r.status_code == 422
+    assert [e["loc"][-1] for e in r.json()["detail"]] == [field]
+
+
+@pytest.mark.parametrize("field,blank", [("full_name", "   "), ("primary_role", ""), ("phone", " "), ("country", ""),
+                                         ("employment_types", []), ("target_roles", []), ("target_roles", ["  "])])
+def test_a_blank_or_empty_mandatory_field_is_refused(anonymous_client, world, field, blank):
+    r = _create(anonymous_client, world, **{field: blank})
+    assert r.status_code == 422 and field in {part for e in r.json()["detail"] for part in e["loc"]}
+
+
+@pytest.mark.parametrize("field", ["needs_sponsorship", "needs_transfer", "years_experience"])
+def test_a_null_mandatory_field_is_refused(anonymous_client, world, field):
+    r = _create(anonymous_client, world, **{field: None})
+    assert r.status_code == 422
+
+
+def test_sponsorship_and_transfer_are_stored_as_sent_whatever_the_work_authorization(anonymous_client, world):
+    c = _create(anonymous_client, world, work_auth="H1B", needs_sponsorship=False, needs_transfer=False).json()
+    assert (c["needs_sponsorship"], c["needs_transfer"]) == (False, False)          # nothing is worked out or checked
+    c = _create(anonymous_client, world, work_auth="USC", needs_sponsorship=True, needs_transfer=True).json()
+    assert (c["needs_sponsorship"], c["needs_transfer"]) == (True, True)
+    assert c["country"] == "US" and c["phone"] == "+1 555 0100" and c["years_experience"] == 9
+
+
+def test_a_new_work_authorization_in_an_edit_must_carry_both_values(anonymous_client, world):
+    c = _create(anonymous_client, world, work_auth="GC", needs_sponsorship=False, needs_transfer=False, bde="adnan").json()
+    url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
+    mine = world["as"]["adnan"]
+    r = anonymous_client.patch(url, json={"work_auth": "H1B"}, headers=mine)
+    assert r.status_code == 400 and "needs_sponsorship and needs_transfer" in r.json()["detail"]
+    r = anonymous_client.patch(url, json={"work_auth": "H1B", "needs_sponsorship": True}, headers=mine)
+    assert r.status_code == 400 and "needs_transfer" in r.json()["detail"]
+    r = anonymous_client.patch(url, json={"work_auth": "H1B", "needs_sponsorship": True, "needs_transfer": True}, headers=mine)
+    assert r.status_code == 200 and (r.json()["needs_sponsorship"], r.json()["needs_transfer"]) == (True, True)
+    # The same work authorization again needs nothing; an entered value is kept; a null is refused.
+    assert anonymous_client.patch(url, json={"work_auth": "H1B", "rate_target": 80}, headers=mine).status_code == 200
+    assert anonymous_client.patch(url, json={"needs_sponsorship": False}, headers=mine).json()["needs_sponsorship"] is False
+    for field in ("needs_sponsorship", "needs_transfer"):
+        assert anonymous_client.patch(url, json={field: None}, headers=mine).status_code == 400
 
 
 # ── The résumé parse ─────────────────────────────────────────────────────────

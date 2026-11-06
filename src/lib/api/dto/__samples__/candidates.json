@@ -1,5 +1,5 @@
 {
-  "_source": "GET /api/firms/{firm_hts}/candidates on the demo seed, 2026-10-27 (two rows: one assigned, one in a queue)",
+  "_source": "GET /api/firms/{firm_hts}/candidates on the demo seed, 2026-10-27 (two rows: one assigned, one in a queue); persona replaced by preferred_industries and deal_breakers by hand after migration 0015",
   "list": [
     {
       "id": "daea7708-33cf-52fe-9da5-44db9eb5b22c",
@@ -37,16 +37,10 @@
       "work_settings": [],
       "preferred_locations": [],
       "contact_notes": null,
-      "persona": {
-        "summary": "Recently laid off, motivated. CPQ and Service Cloud experience.",
-        "tone_notes": null,
-        "deal_breakers": [],
-        "will_relocate": false,
-        "notice_period_days": null,
-        "preferred_industries": [
-          "any"
-        ]
-      },
+      "preferred_industries": [
+        "any"
+      ],
+      "deal_breakers": [],
       "qa_bank": [
         {
           "id": "qa_cand_06_0",
@@ -116,19 +110,13 @@
         "Austin, TX"
       ],
       "contact_notes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
-      "persona": {
-        "summary": "Methodical, prefers detailed JDs. Strong on Spring Boot microservices.",
-        "tone_notes": "Formal, prefers email over calls",
-        "deal_breakers": [
-          "no travel over 25%"
-        ],
-        "will_relocate": true,
-        "notice_period_days": null,
-        "preferred_industries": [
-          "fintech",
-          "healthcare"
-        ]
-      },
+      "preferred_industries": [
+        "fintech",
+        "healthcare"
+      ],
+      "deal_breakers": [
+        "no travel over 25%"
+      ],
       "qa_bank": [
         {
           "id": "qa_cand_01_0",

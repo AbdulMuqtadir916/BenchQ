@@ -100,42 +100,29 @@ tool; transparency is why the owner pays for it. Both must be visibly true in a 
 
 ---
 
-## 3. The verification model
+## 3. AI drafts, a human decides
 
-This is the product's distinguishing idea. It is not a feature bolted on — it's the thing that
-makes AI assistance safe in an industry where fabricated resumes are a known, endemic problem.
+AI assistance is only safe in this industry if a person stays in charge: fabricated resumes are a known,
+endemic problem. BenchQ's position is that **AI drafts and the BDE decides** what goes out.
 
-Every claim in a candidate's Record carries one of three states. The Record is the data model, not a
-screen: the BDE sees and verifies it through the candidate's **master resume**, which every tailored
-copy reuses — verify a claim once there and it is verified everywhere. The files that back claims
-(original resume, certificates, visa papers) live in the candidate's **Documents** tab.
+(Until 2026-11-05 the product also carried a Verified / Unverified / Contradicted state on every claim, an
+evidence record behind it, and an export gate. That was dropped: there are no claim states, no evidence
+tables and no export block. Any résumé that has not been deleted can be exported.)
 
-| State | Meaning | Behaviour |
-|---|---|---|
-| **VERIFIED** | Evidence-backed, cleared to send | Ships. Exports. Goes in front of a client. |
-| **UNVERIFIED** | Drafted — by AI, by import, by parse — not yet reviewed | Visible everywhere, but **blocks export** |
-| **CONTRADICTED** | Conflicts with the evidence | Never ships. Excluded from preview and export entirely. |
+What stays:
 
-**AI output always arrives as UNVERIFIED.** No exception, anywhere in the product. A model's confident
-sentence is not evidence.
-
-**A claim cannot be verified without an attached evidence id.** The UI must make this structurally
-impossible, not merely discouraged. If a user can click their way to a verified claim with no
-evidence, the feature is broken.
-
-**A resume with any unverified claim cannot be exported.** The export button is disabled with the count
-and a jump-to-claim link. This is the only disabled control in the product, and the block is the
-point — hiding it would teach the wrong mental model.
+- **AI never invents facts.** The parser's and the tailoring prompts forbid content that is not in the candidate's
+  own résumé, and the parser's strict response format enforces it. This lives in the backend, not in a state.
+- **A person sends.** BenchQ does not auto-apply. The BDE reads the résumé over and decides every submission.
+- **A sent résumé is frozen.** An application points at the exact version that went out; later edits make a new
+  version and never change it.
+- **The résumé the client received stays visible**, even after it is deleted, on the application it was sent with.
 
 ### Why this matters commercially
 
-Staffing firms get burned by inflated resumes. A candidate who can't answer for what's on their
-own resume damages the firm's relationship with the client permanently. BenchQ's position is that
-AI drafts and **a human verifies** — and the product enforces it rather than recommending it.
-
-When you design any surface that touches a claim, the question is: *does this make the human's
-review step feel like a one-second confirmation, or like homework?* Make it the former without ever
-making it skippable.
+Staffing firms get burned by inflated resumes. A candidate who can't answer for what's on their own resume
+damages the firm's relationship with the client permanently. The product keeps the human's read-over a
+one-second step, not homework.
 
 ---
 
@@ -210,8 +197,7 @@ basis on the row, not buried in a menu. It's a compliance feature and it stays v
 a deliberate position on the same terms-of-service ground, and it's also better product — the BDE's
 judgment about fit is the thing worth keeping.
 
-**No fabrication, structurally.** See §3. The product cannot be used to generate a claim that isn't
-backed by something.
+**No fabrication.** See §3. The AI is told never to add what the candidate's own résumé doesn't say.
 
 ---
 
@@ -269,7 +255,7 @@ design.
 ## 10. Scope reminder for this repo
 
 This repository is **frontend only.** No backend, no database, no auth, no LLM calls. AI-generated
-content is simulated from fixtures with realistic latency and always arrives `UNVERIFIED`.
+content is simulated from fixtures with realistic latency.
 
 Everything in this file is context for making good UI decisions — not a licence to build the
 systems behind them. When a task would need a real backend, stop and say so.

@@ -20,9 +20,10 @@ reads only (backend/auth/access.py).
 """
 import asyncio
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
@@ -97,12 +98,12 @@ class LanguageIn(BaseModel):
 
 class ContentIn(BaseModel):
     """A version's whole content, as the editor holds it (the shape of resumes' content columns, §3.3)."""
-    full_name: str | None = Field(default=None, max_length=300)
+    full_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]     # mandatory
     title: str | None = Field(default=None, max_length=300)
     city: str | None = Field(default=None, max_length=300)
     state: str | None = Field(default=None, max_length=300)
     country: str | None = Field(default=None, max_length=300)
-    email: str | None = Field(default=None, max_length=320)
+    email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]         # mandatory
     phone: str | None = Field(default=None, max_length=300)
     work_authorization: str | None = Field(default=None, max_length=300)
     github: str | None = Field(default=None, max_length=500)
@@ -268,10 +269,12 @@ def base_removal(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID
 
 
 @router.delete("/bases/{base_id}", summary="Delete a base, or hide it if something uses it")
-def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID,
+def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID, keep_used: bool = False,
                 principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+    """`keep_used=true`: a base that is in use is hidden and what nothing uses is deleted with it (the `rest` of the
+    preview); without it the base is only hidden (docs/team/resume-versioning.md §4.7)."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
-    removal = versions.delete_base(db, actor, candidate, versions.candidate_base(db, candidate, base_id))
+    removal = versions.delete_base(db, actor, candidate, versions.candidate_base(db, candidate, base_id), keep_used)
     db.commit()
     return removal.json()
 
