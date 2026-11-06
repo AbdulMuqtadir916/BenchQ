@@ -287,3 +287,9 @@ inside our transaction — DEBUG D-15 note), `src/mocks/db.ts` (fixture hash rec
 0015 is the candidates schema; ours renumbered to **0016**, test `test_migration_0016.py`). Main's
 `test_inbox_ai_spend.py` updated for the T1.1 not-configured behaviour. Focused backend suites 363 passed; frontend
 lint and 616 tests passed.
+
+2026-11-06 15:20 UTC, local dev database brought in line with the merged branch (Samad approved): backup
+`devdb-before-0015-20261106T151956Z.dump` (scratchpad); `alembic_version` 0015 (our pre-merge revision) → 0014;
+backend recreated ⇒ main's 0015 (candidates final schema) and our 0016 applied; now 0016. Candidate page works again
+(new candidate shape: `preferred_industries`, `deal_breakers`, `country`; no `persona`). Per-file change report updated
+for Phase 7 and the merge. Branch up to date with main 09eb35b (0 behind).
