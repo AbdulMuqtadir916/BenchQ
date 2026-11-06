@@ -115,6 +115,15 @@ def test_a_save_that_changes_nothing_or_names_an_unknown_item_is_refused(anonymo
     assert r.status_code == 400 and "doesn't have" in r.json()["detail"]
 
 
+@pytest.mark.parametrize("field", ["full_name", "email"])
+def test_a_save_without_the_name_or_email_in_the_header_is_refused_naming_it(anonymous_client, test_db, world, field):
+    c = _candidate(anonymous_client, test_db, world)
+    v1 = _v(anonymous_client, world, c)
+    for blank in ("", "   ", None):
+        r = _save(anonymous_client, world, c, v1, summary="A different summary.", **{field: blank})
+        assert r.status_code == 422 and field in {part for e in r.json()["detail"] for part in e["loc"]}
+
+
 def test_two_saves_from_the_same_version_are_both_kept_and_the_second_is_told(anonymous_client, test_db, world):
     c = _candidate(anonymous_client, test_db, world)
     v1 = _v(anonymous_client, world, c)
@@ -125,43 +134,25 @@ def test_two_saves_from_the_same_version_are_both_kept_and_the_second_is_told(an
     assert second["notice"] == "v2 was saved while you were editing; your v3 doesn't include those changes."
 
 
-def _verified(test_db, c, entity_type, ref, text="x"):
-    """A VERIFIED claim on `ref` (an item, bullet or summary id), with its evidence."""
-    from backend.models.candidates import Claim, Evidence
-    evidence = Evidence(firm_id=uuid.UUID(c["firm_id"]), candidate_id=uuid.UUID(c["id"]), excerpt="x", source="MANUAL")
-    test_db.add(evidence)
-    test_db.flush()
-    claim = Claim(firm_id=uuid.UUID(c["firm_id"]), candidate_id=uuid.UUID(c["id"]), entity_type=entity_type,
-                  entity_ref=ref, text=text, state="VERIFIED", evidence_id=evidence.id, source="RESUME_UPLOAD")
-    test_db.add(claim)
-    test_db.commit()
-    return claim
-
-
-def test_a_changed_item_gets_a_new_id_and_the_old_versions_keep_their_claims(anonymous_client, test_db, world):
-    """An id stands for one exact text (§3.4, §4.5): the edited job gets a new id, so v2 shows it unverified, while v1
-    still holds the old id and its VERIFIED claim. The job left as it was keeps its id and its claim. No claim moves."""
+def test_a_changed_item_gets_a_new_id_and_the_old_versions_keep_theirs(anonymous_client, test_db, world):
+    """An id stands for one exact text (§3.4, §4.5): the edited job gets a new id, while v1 still holds the old id.
+    The job left as it was keeps its id."""
     c = _candidate(anonymous_client, test_db, world)
     v1 = _v(anonymous_client, world, c)
     changed, kept = v1["experiences"]
-    claims = [_verified(test_db, c, "experience", item["id"]) for item in (changed, kept)]
     r = _save(anonymous_client, world, c, v1, experiences=[{**changed, "company": "Capital Payments Inc"}, kept])
     assert r.status_code == 201, r.text
     v2 = r.json()
     assert v2["experiences"][0]["id"] != changed["id"] and v2["experiences"][1]["id"] == kept["id"]
     assert _v(anonymous_client, world, c)["experiences"][0]["id"] == changed["id"]            # v1 untouched
-    for claim in claims:
-        test_db.refresh(claim)
-    assert [claim.state for claim in claims] == ["VERIFIED", "VERIFIED"]
 
 
 def test_a_changed_added_or_removed_bullet_gives_its_job_a_new_id(anonymous_client, test_db, world):
-    """A job's claim covers its bullets: any bullet change makes the job new text, so it gets a new id (only the
-    changed bullet gets one too); v1's job and its claim stay as they were."""
+    """A job's id covers its bullets: any bullet change makes the job new text, so it gets a new id (only the
+    changed bullet gets one too); v1's job stays as it was."""
     c = _candidate(anonymous_client, test_db, world)
     v1 = _v(anonymous_client, world, c)
     job = v1["experiences"][0]
-    claim = _verified(test_db, c, "experience", job["id"])
     bullet, *rest = job["bullets"]
     edits = [[{**bullet, "text": "Led a team of 40."}, *rest], [*job["bullets"], {"text": "A new bullet."}], rest]
     for bullets in edits:
@@ -170,24 +161,18 @@ def test_a_changed_added_or_removed_bullet_gives_its_job_a_new_id(anonymous_clie
         saved = r.json()["experiences"][0]
         assert saved["id"] != job["id"]
         assert [b["id"] for b in saved["bullets"] if b["text"] == rest[0]["text"]] == [rest[0]["id"]]   # unchanged
-        test_db.refresh(claim)
-        assert claim.state == "VERIFIED"
 
 
 def test_the_summary_is_an_item_too(anonymous_client, test_db, world):
-    """The summary has an id (0011): unchanged it's kept, so its claim follows; changed it's new, and only the new
-    version is unverified."""
+    """The summary has an id (0011): unchanged it's kept; changed it's new."""
     c = _candidate(anonymous_client, test_db, world)
     v1 = _v(anonymous_client, world, c)
     assert v1["summary_id"]
-    claim = _verified(test_db, c, "summary", v1["summary_id"])
     same = _save(anonymous_client, world, c, v1, title="A new headline").json()
     assert same["summary_id"] == v1["summary_id"]
     edited = _save(anonymous_client, world, c, v1, summary="A different pitch.").json()
     assert edited["summary_id"] not in (None, v1["summary_id"])
     assert _save(anonymous_client, world, c, v1, summary=None).json()["summary_id"] is None
-    test_db.refresh(claim)
-    assert claim.state == "VERIFIED"
 
 
 # ── Use as base, pick ────────────────────────────────────────────────────────
@@ -323,7 +308,7 @@ def test_a_sent_version_is_refused_with_what_uses_it(anonymous_client, test_db, 
                             resume_id=uuid.UUID(v2["id"])))
     test_db.commit()
     r = anonymous_client.delete(_url(world, c, f"/{v2['id']}"), headers=world["as"]["adnan"])
-    assert (r.status_code, r.json()["detail"]) == (409, "Can't delete v2: sent to 1 job.")
+    assert (r.status_code, r.json()["detail"]) == (409, "Can't delete v2: used by 1 live application.")
 
 
 def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_used_one_is_hidden(
@@ -372,7 +357,7 @@ def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_
                             resume_id=uuid.UUID(v1["id"])))
     test_db.commit()
     r = anonymous_client.delete(_url(world, c, f"/bases/{base3['id']}"), headers=as_bde)
-    assert r.json()["outcome"] == "HIDE" and r.json()["message"].startswith("Sent to 1 job. Base 3 will be hidden")
+    assert r.json()["outcome"] == "HIDE" and r.json()["message"].startswith("Used by 1 live application. Base 3 will be hidden")
     hidden = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base3["id"])
     assert hidden["archived_at"] is not None
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(b"%PDF third"), headers=as_bde)

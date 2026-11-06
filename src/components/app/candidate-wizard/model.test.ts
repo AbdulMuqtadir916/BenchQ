@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CreateCandidateSchema } from "@/lib/schemas/candidate";
+import type { WorkAuth } from "@/lib/schemas/enums";
 import type { ResumeDraft } from "@/lib/schemas/resume-draft";
 import { applyDraft, EMPTY_VALUES, firstOpenStep, isDirty, toCreateCandidate, validateStep, type WizardValues } from "./model";
 
@@ -8,7 +9,7 @@ const draft: ResumeDraft = {
   phone: null, linkedinUrl: null, city: "Irving", state: "TX", country: null, yearsExperience: 9, workAuth: "H1B", workAuthText: null,
   summary: "Nine years of Java.", skills: [{ name: "Java", family: "Languages" }, { name: "AWS", family: "Cloud" }],
 };
-const valid: WizardValues = { ...EMPTY_VALUES, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", workAuth: "H1B" };
+const valid: WizardValues = { ...EMPTY_VALUES, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRoles: ["Java Developer"] };
 
 describe("applyDraft (07 Q49)", () => {
   it("fills empty fields and marks them drafted; null fields stay empty", () => {
@@ -29,11 +30,34 @@ describe("applyDraft (07 Q49)", () => {
   it("keeps the printed work authorization when it matched nothing", () => {
     expect(applyDraft(EMPTY_VALUES, { ...draft, workAuth: null, workAuthText: "Authorized to work" }).values).toMatchObject({ workAuth: null, workAuthText: "Authorized to work" });
   });
+
+  it("takes the résumé's country over the default US, but never over one that was typed", () => {
+    expect(EMPTY_VALUES.country).toBe("US");
+    const canada = applyDraft(EMPTY_VALUES, { ...draft, country: "Canada" });
+    expect(canada.values.country).toBe("Canada");
+    expect(canada.drafted).toContain("country");
+    expect(applyDraft(EMPTY_VALUES, { ...draft, country: "USA" }).values.country).toBe("US");
+    expect(applyDraft({ ...EMPTY_VALUES, country: "Mexico" }, { ...draft, country: "Canada" }).values.country).toBe("Mexico");
+  });
+});
+
+describe("the country sent", () => {
+  it("is what the person entered, any country; every way of writing the US is sent as US", () => {
+    const sent = (country: string) => toCreateCandidate({ ...valid, country, managerId: "m" }).country;
+    expect(sent("Canada")).toBe("Canada");
+    expect(sent(" Mexico ")).toBe("Mexico");
+    expect(sent("United States")).toBe("US");
+    expect(sent("U.S.A.")).toBe("US");
+  });
+
+  it("is required", () => {
+    expect(validateStep("basic", { ...valid, country: " " })).toEqual({ country: "Enter their country." });
+  });
 });
 
 describe("validateStep", () => {
   it("basic: name, 'Marketed as' and a valid email are required (Q48); years 0–60; LinkedIn a full link", () => {
-    expect(Object.keys(validateStep("basic", EMPTY_VALUES)).sort()).toEqual(["email", "fullName", "primaryRole"]);
+    expect(Object.keys(validateStep("basic", EMPTY_VALUES)).sort()).toEqual(["email", "fullName", "phone", "primaryRole", "yearsExperience"]);
     expect(validateStep("basic", { ...valid, email: "ravi[at]example.com" }).email).toMatch(/valid email/);
     expect(validateStep("basic", { ...valid, yearsExperience: "212" }).yearsExperience).toMatch(/0 to 60/);
     expect(validateStep("basic", { ...valid, yearsExperience: "2.5" }).yearsExperience).toBeDefined();
@@ -57,9 +81,10 @@ describe("validateStep", () => {
     expect(isDirty({ ...EMPTY_VALUES, managerId: "m", bdeId: "b" })).toBe(false);
   });
 
-  it("résumé and preferences never block", () => {
+  it("the résumé never blocks; preferences need one target role", () => {
     expect(validateStep("resume", EMPTY_VALUES)).toEqual({});
-    expect(validateStep("preferences", EMPTY_VALUES)).toEqual({});
+    expect(validateStep("preferences", EMPTY_VALUES)).toEqual({ targetRoles: "Add at least one role they are looking for." });
+    expect(validateStep("preferences", valid)).toEqual({});
   });
 });
 
@@ -85,16 +110,22 @@ describe("the flow", () => {
 describe("toCreateCandidate", () => {
   it("builds a valid payload: trimmed text, numbers, ISO dates, sponsorship from the work authorization (A3)", () => {
     const values: WizardValues = {
-      ...applyDraft(EMPTY_VALUES, draft).values, phone: " ", rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
+      ...applyDraft(EMPTY_VALUES, draft).values, phone: " (469) 555-0182 ", targetRoles: ["Java Developer"], rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
       employmentTypes: ["C2C", "W2"], workSettings: ["REMOTE"], contactNotes: "Prefers WhatsApp.",
     };
     const body = toCreateCandidate({ ...values, managerId: "user_fatima", bdeId: "user_adnan", handoffNote: "  Push banking.  " });
     expect(CreateCandidateSchema.parse(body)).toEqual(body);
     expect(body).toMatchObject({
-      phone: null, yearsExperience: 9, rateTarget: 85, rateMin: 70, workAuthExpiry: "2027-03-01T00:00:00.000Z",
-      needsSponsorship: true, needsTransfer: true, resumeParseId: "parse_1", managerId: "user_fatima", bdeId: "user_adnan",
+      phone: "(469) 555-0182", country: "US", needsSponsorship: true, needsTransfer: true, yearsExperience: 9, rateTarget: 85, rateMin: 70, workAuthExpiry: "2027-03-01T00:00:00.000Z",
+      resumeParseId: "parse_1", managerId: "user_fatima", bdeId: "user_adnan",
       handoffNote: "Push banking.",
     });
-    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ needsSponsorship: false, needsTransfer: false, resumeParseId: null, bdeId: null, handoffNote: null });
+    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ resumeParseId: null, bdeId: null, handoffNote: null });
+    // The flow works sponsorship and transfer out from the work authorization and sends them (A3); the backend only checks they are there.
+    const sent = (workAuth: WorkAuth) => toCreateCandidate({ ...valid, workAuth, managerId: "m" });
+    expect(sent("H1B")).toMatchObject({ needsSponsorship: true, needsTransfer: true });
+    expect(sent("OPT")).toMatchObject({ needsSponsorship: true, needsTransfer: false });
+    expect(sent("GC")).toMatchObject({ needsSponsorship: false, needsTransfer: false });
+    expect(sent("TN")).toMatchObject({ needsSponsorship: true, needsTransfer: false });
   });
 });

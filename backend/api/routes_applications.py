@@ -1293,7 +1293,11 @@ def _application_responses(db, firm_id, apps):
                .filter(CoverLetter.job_id.in_(job_ids), candidate_scope,
                        CoverLetter.resume_id.is_(None) | (Resume.firm_id == firm_id)).all())
     with_letter = {(candidate_id, job_id) for job_id, candidate_id in letters}
-    return [_app_to_dict(app, lookup, tailored.get((app.candidate_id, app.job_id)),
+    # The résumé an application was sent with (`resume_id`) is shown even after it was deleted (marked); only an
+    # application without one falls back to the newest tailored résumé for its candidate and job (docs §4.7).
+    own_ids = {app.resume_id for app in apps if app.resume_id}
+    own = {r.id: r for r in scoped(db, Resume, firm_id).filter(Resume.id.in_(own_ids)).all()} if own_ids else {}
+    return [_app_to_dict(app, lookup, own.get(app.resume_id) or tailored.get((app.candidate_id, app.job_id)),
                          (app.candidate_id, app.job_id) in with_letter) for app in apps]
 
 
@@ -1338,6 +1342,7 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
         "discovered_at": job.discovered_at.isoformat() if (job and job.discovered_at) else None,
         "tailored_resume_id": str(tailored.id) if tailored else None,
         "tailored_resume_name": tailored.name if tailored else None,
+        "tailored_resume_deleted": bool(tailored and tailored.deleted_at),
         "has_cover_letter": has_cover_letter,
         "interviews": [_interview_to_dict(i) for i in (a.interviews or [])],
     }

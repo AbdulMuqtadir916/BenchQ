@@ -41,19 +41,13 @@
       "Austin, TX"
     ],
     "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
-    "persona": {
-      "summary": "Methodical, prefers detailed JDs. Strong on Spring Boot microservices.",
-      "toneNotes": "Formal, prefers email over calls",
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "fintech",
-        "healthcare"
-      ],
-      "dealBreakers": [
-        "no travel over 25%"
-      ]
-    },
+    "preferredIndustries": [
+      "fintech",
+      "healthcare"
+    ],
+    "dealBreakers": [
+      "no travel over 25%"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_01_0",
@@ -144,19 +138,13 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Very responsive, strong communicator. Snowflake + dbt expert.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "fintech",
-        "ecommerce"
-      ],
-      "dealBreakers": [
-        "no onsite-only roles"
-      ]
-    },
+    "preferredIndustries": [
+      "fintech",
+      "ecommerce"
+    ],
+    "dealBreakers": [
+      "no onsite-only roles"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_02_0",
@@ -243,19 +231,13 @@
       "New York, NY"
     ],
     "contactNotes": null,
-    "persona": {
-      "summary": "Quiet but skilled. Needs transfer, limits options.",
-      "toneNotes": "Prefers WhatsApp messages over calls",
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "insurance",
-        "healthcare"
-      ],
-      "dealBreakers": [
-        "no startups under 50 employees"
-      ]
-    },
+    "preferredIndustries": [
+      "insurance",
+      "healthcare"
+    ],
+    "dealBreakers": [
+      "no startups under 50 employees"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_03_0",
@@ -327,17 +309,11 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Eager, quick learner. Selenium + Cypress. Needs H1B sponsorship.",
-      "toneNotes": null,
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "tech",
-        "fintech"
-      ],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [
+      "tech",
+      "fintech"
+    ],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_04_0",
@@ -405,19 +381,13 @@
       "Bay Area, CA"
     ],
     "contactNotes": "Best reached by email after 7 PM IST.",
-    "persona": {
-      "summary": "Senior, selective about roles. AWS Solutions Architect Pro.",
-      "toneNotes": "Direct, appreciates concise emails",
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "enterprise",
-        "SaaS"
-      ],
-      "dealBreakers": [
-        "no roles under $80/hr"
-      ]
-    },
+    "preferredIndustries": [
+      "enterprise",
+      "SaaS"
+    ],
+    "dealBreakers": [
+      "no roles under $80/hr"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_05_0",
@@ -489,16 +459,10 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Recently laid off, motivated. CPQ and Service Cloud experience.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "any"
-      ],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [
+      "any"
+    ],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_06_0",
@@ -564,16 +528,10 @@
       "Charlotte, NC"
     ],
     "contactNotes": null,
-    "persona": {
-      "summary": "Niche skill set, strong demand. Visa expiring soon — urgent placement.",
-      "toneNotes": "Anxious about visa timeline, needs reassurance",
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [],
-      "dealBreakers": [
-        "must sponsor H1B extension"
-      ]
-    },
+    "preferredIndustries": [],
+    "dealBreakers": [
+      "must sponsor H1B extension"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_07_0",
@@ -634,17 +592,11 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Fresh STEM OPT grad. React + TypeScript, eager for first role.",
-      "toneNotes": null,
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "tech",
-        "ecommerce"
-      ],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [
+      "tech",
+      "ecommerce"
+    ],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_08_0",
@@ -711,17 +663,11 @@
       "Chicago, IL"
     ],
     "contactNotes": "Can interview any weekday; two weeks' notice to current vendor.",
-    "persona": {
-      "summary": "Very experienced, can lead teams. Angular + Spring Boot.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "banking",
-        "fintech"
-      ],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [
+      "banking",
+      "fintech"
+    ],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_09_0",
@@ -792,7 +738,8 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [],
     "createdAt": "2026-09-21T06:17:52.966Z",
     "updatedAt": "2026-09-24T06:17:52.966Z"
@@ -840,19 +787,13 @@
       "Austin, TX"
     ],
     "contactNotes": null,
-    "persona": {
-      "summary": "Strong Kubernetes and Terraform. Prefers hands-on IC roles over management.",
-      "toneNotes": null,
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "cloud",
-        "SaaS"
-      ],
-      "dealBreakers": [
-        "no Windows-only environments"
-      ]
-    },
+    "preferredIndustries": [
+      "cloud",
+      "SaaS"
+    ],
+    "dealBreakers": [
+      "no Windows-only environments"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_11_0",
@@ -934,14 +875,8 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Returning to work after gap year. Django + Flask, some FastAPI.",
-      "toneNotes": "Prefers detailed role descriptions before applying",
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_12_0",
@@ -1008,7 +943,8 @@
       "New York, NY"
     ],
     "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
-    "persona": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [],
     "createdAt": "2026-09-01T06:17:52.966Z",
     "updatedAt": "2026-09-17T06:17:52.966Z"
@@ -1050,17 +986,11 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Strong ServiceNow ITSM/ITOM. CSA and CAD certified.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "enterprise IT",
-        "consulting"
-      ],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [
+      "enterprise IT",
+      "consulting"
+    ],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_14_0",
@@ -1135,14 +1065,8 @@
       "Bay Area, CA"
     ],
     "contactNotes": null,
-    "persona": {
-      "summary": "Placed at JPMorgan. Solid performer, reliable for renewals.",
-      "toneNotes": null,
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_15_0",
@@ -1193,7 +1117,8 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [],
     "createdAt": "2026-09-23T06:17:52.966Z",
     "updatedAt": "2026-09-26T06:17:52.966Z"
@@ -1240,17 +1165,11 @@
       "Charlotte, NC"
     ],
     "contactNotes": "Best reached by email after 7 PM IST.",
-    "persona": {
-      "summary": "US citizen, competitive advantage. Spark + Databricks specialist.",
-      "toneNotes": null,
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "healthcare",
-        "insurance"
-      ],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [
+      "healthcare",
+      "insurance"
+    ],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_17_0",
@@ -1322,7 +1241,8 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [],
     "createdAt": "2026-09-06T06:17:52.966Z",
     "updatedAt": "2026-09-30T16:17:52.966Z"
@@ -1367,17 +1287,11 @@
       "Chicago, IL"
     ],
     "contactNotes": null,
-    "persona": {
-      "summary": "Very senior, high rate. Multi-cloud (AWS + Azure + GCP).",
-      "toneNotes": "Only responds to well-matched roles, ignores spray-and-pray",
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [],
-      "dealBreakers": [
-        "no roles under $85/hr",
-        "no pure hands-on IC"
-      ]
-    },
+    "preferredIndustries": [],
+    "dealBreakers": [
+      "no roles under $85/hr",
+      "no pure hands-on IC"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_19_0",
@@ -1438,7 +1352,8 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [],
     "createdAt": "2026-09-13T06:17:52.966Z",
     "updatedAt": "2026-09-24T06:17:52.966Z"
@@ -1485,17 +1400,11 @@
       "Austin, TX"
     ],
     "contactNotes": "Can interview any weekday; two weeks' notice to current vendor.",
-    "persona": {
-      "summary": "Terraform + AWS specialist. Strong CI/CD background.",
-      "toneNotes": null,
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "fintech",
-        "SaaS"
-      ],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [
+      "fintech",
+      "SaaS"
+    ],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_21_0",
@@ -1567,14 +1476,8 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Paused job search — personal reasons. Will resume in 30 days.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_22_0",
@@ -1631,7 +1534,8 @@
       "New York, NY"
     ],
     "contactNotes": null,
-    "persona": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [],
     "createdAt": "2026-09-23T06:17:52.966Z",
     "updatedAt": "2026-09-25T06:17:52.966Z"
@@ -1672,14 +1576,8 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Went inactive — found role independently. May return for next contract.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_24_0",
@@ -1735,19 +1633,13 @@
       "Bay Area, CA"
     ],
     "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
-    "persona": {
-      "summary": "Very responsive, strong communicator. Snowflake + dbt expert.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "fintech",
-        "ecommerce"
-      ],
-      "dealBreakers": [
-        "no onsite-only roles"
-      ]
-    },
+    "preferredIndustries": [
+      "fintech",
+      "ecommerce"
+    ],
+    "dealBreakers": [
+      "no onsite-only roles"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_stl02_0",
@@ -1828,19 +1720,13 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Quiet but skilled. Needs transfer, limits options.",
-      "toneNotes": "Prefers WhatsApp messages over calls",
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "insurance",
-        "healthcare"
-      ],
-      "dealBreakers": [
-        "no startups under 50 employees"
-      ]
-    },
+    "preferredIndustries": [
+      "insurance",
+      "healthcare"
+    ],
+    "dealBreakers": [
+      "no startups under 50 employees"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_stl03_0",
@@ -1918,19 +1804,13 @@
       "Charlotte, NC"
     ],
     "contactNotes": null,
-    "persona": {
-      "summary": "Senior, selective about roles. AWS Solutions Architect Pro.",
-      "toneNotes": "Direct, appreciates concise emails",
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "enterprise",
-        "SaaS"
-      ],
-      "dealBreakers": [
-        "no roles under $80/hr"
-      ]
-    },
+    "preferredIndustries": [
+      "enterprise",
+      "SaaS"
+    ],
+    "dealBreakers": [
+      "no roles under $80/hr"
+    ],
     "qaBank": [
       {
         "id": "qa_cand_stl05_0",
@@ -2000,14 +1880,8 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Placed at JPMorgan. Solid performer, reliable for renewals.",
-      "toneNotes": null,
-      "willRelocate": true,
-      "noticePeriodDays": null,
-      "preferredIndustries": [],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_stl15_0",
@@ -2064,14 +1938,8 @@
       "Chicago, IL"
     ],
     "contactNotes": "Best reached by email after 7 PM IST.",
-    "persona": {
-      "summary": "Paused job search — personal reasons. Will resume in 30 days.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_stl22_0",
@@ -2123,16 +1991,10 @@
     "workSettings": [],
     "preferredLocations": [],
     "contactNotes": null,
-    "persona": {
-      "summary": "Recently laid off, motivated. CPQ and Service Cloud experience.",
-      "toneNotes": null,
-      "willRelocate": false,
-      "noticePeriodDays": null,
-      "preferredIndustries": [
-        "any"
-      ],
-      "dealBreakers": []
-    },
+    "preferredIndustries": [
+      "any"
+    ],
+    "dealBreakers": [],
     "qaBank": [
       {
         "id": "qa_cand_cbw06_0",

@@ -6,8 +6,7 @@ permission checked under the lock can't change before the commit. Nothing here c
 
 - **Save:** the next version of the résumé the edit came from, whatever was saved in between (two saves from v2 give
   v3 and v4, Abdul); the second is told. An id stands for one exact text (§3.4, §4.5): an item kept as it was keeps
-  its id, so its claims follow it; a changed or new item, bullet or summary gets a new id, so it starts unverified
-  while the versions that hold the old text keep their claims. No claim is ever reset.
+  its id; a changed or new item, bullet or summary gets a new id, while the versions that hold the old text keep theirs.
 - **Use as base / pick:** a base's v1 makes that base active; any other version is copied as v1 of a new PROMOTED
   base, or the base already made from it is made active.
 - **Upload:** a new UPLOAD base, active, its v1 from the parse (`first_base()` without a form).
@@ -19,15 +18,15 @@ import uuid
 from dataclasses import dataclass, field
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import load_only
 
 from backend.auth import ledger
 from backend.auth.policy import is_lead_role
 from backend.auth.scoping import scoped
 from backend.candidates.first_base import first_base
-from backend.models.candidates import BaseResume, Claim, Evidence, ResumeParse
-from backend.models.db import Application, CoverLetter, Resume, TracerLink, utcnow
+from backend.models.candidates import BaseResume, ResumeParse
+from backend.models.db import Application, Resume, utcnow
 from backend.models.tenancy import User
 
 HEADER = ("full_name", "title", "city", "state", "country", "email", "phone", "work_authorization", "github",
@@ -75,9 +74,8 @@ def item_ids(content: dict) -> set[str]:
 
 def _with_ids(source: dict, submitted: dict) -> dict:
     """The submitted content with every id settled (§3.4, §4.5): an item, bullet or summary kept exactly as it was in
-    the version edited keeps its id, so its claims follow it; a changed or new one gets a new id, so it starts
-    unverified and the versions holding the old text keep their claims. An id the version edited doesn't have is
-    refused, so a save can't take over another item's claim."""
+    the version edited keeps its id; a changed or new one gets a new id, and the versions holding the old text keep
+    theirs. An id the version edited doesn't have is refused, so a save can't take over another item's id."""
     before = dict(_items(source))
     content, seen = copy.deepcopy(submitted), set()
 
@@ -357,17 +355,15 @@ class Removal:
     outcome: str
     message: str
     uses: dict = field(default_factory=dict)
+    rest: dict = field(default_factory=dict)      # HIDE: what "keep what is in use, delete the rest" would delete
+    plan: tuple = field(default=(), repr=False)   # HIDE: the (versions, tailored) rows `rest` counts; never sent
 
     def json(self) -> dict:
-        return {"outcome": self.outcome, "message": self.message, "uses": self.uses}
+        return {"outcome": self.outcome, "message": self.message, "uses": self.uses, "rest": self.rest}
 
 
-_USE_WORDS = {"applications": ("sent to {} job", "sent to {} jobs"),
-              "cover_letters": ("used by {} cover letter", "used by {} cover letters"),
-              "tracer_links": ("tracked by {} link", "tracked by {} links"),
-              "tailored": ("{} tailored résumé made from it", "{} tailored résumés made from it"),
-              "evidence": ("its file backs {} piece of evidence", "its file backs {} pieces of evidence"),
-              "claims": ("{} claim only it holds", "{} claims only it holds")}
+_USE_WORDS = {"applications": ("used by {} live application", "used by {} live applications"),
+              "tailored": ("{} tailored résumé sent in a live application", "{} tailored résumés sent in live applications")}
 
 
 def _phrase(uses: dict) -> str:
@@ -376,35 +372,38 @@ def _phrase(uses: dict) -> str:
     return text[:1].upper() + text[1:]
 
 
-def _uses(db, candidate, rows: list[Resume], base: BaseResume | None = None) -> dict:
-    """What points at these rows (and, for a whole base, at the base and its upload). Claims count only for items no
-    other version of the candidate has, since a claim follows its item from version to version."""
+# An application stops keeping a résumé in use when it is rejected: `move_on` in the application tracker, `rejected` in the
+# older API (docs/team/resume-versioning.md §4.7). Anything else, or no status, is live.
+NOT_LIVE = ("move_on", "rejected")
+
+
+def _live_applications(db, firm_id):
+    return scoped(db, Application, firm_id).filter(
+        or_(Application.status.is_(None), func.lower(Application.status).notin_(NOT_LIVE)))
+
+
+def _live_counts(db, firm_id) -> dict:
+    """{résumé id: how many live applications were sent with it}, in one query. Computed once per request and passed
+    on, so a preview or a cleanup over many versions doesn't scan the firm's applications for each."""
+    rows = _live_applications(db, firm_id).filter(Application.resume_id.isnot(None)) \
+        .with_entities(Application.resume_id, func.count(Application.id)).group_by(Application.resume_id).all()
+    return {rid: n for rid, n in rows}
+
+
+def _tailored_of(db, candidate, base: BaseResume) -> list[Resume]:
+    return scoped(db, Resume, candidate.firm_id).filter(
+        Resume.base_resume_id == base.id, Resume.category == "TAILORED", Resume.deleted_at.is_(None)).all()
+
+
+def _uses(db, candidate, rows: list[Resume], base: BaseResume | None = None, live: dict | None = None) -> dict:
+    """What keeps these rows (and, for a whole base, the base) in use: a live application sent with them, or a
+    tailored résumé of the base sent in a live application. Cover letters and tracking links aren't counted (Zuhair,
+    2026-11-04: not planned for BenchQ yet)."""
     firm_id, ids = candidate.firm_id, [r.id for r in rows]
-    uses = {
-        "applications": scoped(db, Application, firm_id, func.count(Application.id))
-        .filter(Application.resume_id.in_(ids)).scalar(),
-        "cover_letters": scoped(db, CoverLetter, firm_id, func.count(CoverLetter.id))
-        .filter(CoverLetter.resume_id.in_(ids)).scalar(),
-        "tracer_links": scoped(db, TracerLink, firm_id, func.count(TracerLink.id))
-        .filter(TracerLink.resume_id.in_(ids)).scalar(),
-        "tailored": 0, "evidence": 0, "claims": 0,
-    }
+    live = _live_counts(db, firm_id) if live is None else live
+    uses = {"applications": sum(live.get(rid, 0) for rid in ids), "tailored": 0}
     if base is not None:
-        uses["tailored"] = scoped(db, Resume, firm_id, func.count(Resume.id)) \
-            .filter(Resume.base_resume_id == base.id, Resume.category == "TAILORED").scalar()
-        if base.resume_parse_id is not None:
-            uses["evidence"] = scoped(db, Evidence, firm_id, func.count(Evidence.id)) \
-                .filter(Evidence.resume_parse_id == base.resume_parse_id).scalar()
-    # Claims are checked only when the candidate has any: otherwise no version's content needs reading.
-    has_claims = scoped(db, Claim, firm_id, Claim.id).filter(Claim.candidate_id == candidate.id).first() is not None
-    removed = set().union(*(item_ids(content_of(r)) for r in rows)) if rows and has_claims else set()
-    if removed:
-        others = scoped(db, Resume, firm_id).filter(Resume.candidate_id == candidate.id, Resume.base_resume_id.isnot(None),
-                                                    Resume.deleted_at.is_(None), Resume.id.notin_(ids)).all()
-        removed -= set().union(set(), *(item_ids(content_of(r)) for r in others))
-    if removed:
-        uses["claims"] = scoped(db, Claim, firm_id, func.count(Claim.id)) \
-            .filter(Claim.candidate_id == candidate.id, Claim.entity_ref.in_(removed)).scalar()
+        uses["tailored"] = sum(1 for t in _tailored_of(db, candidate, base) if t.id in live)
     return uses
 
 
@@ -436,13 +435,33 @@ def base_removal(db, candidate, base: BaseResume, numbers: dict | None = None) -
                                                         Resume.deleted_at.is_(None)).all()
     if _made_by_lead(db, [base.created_by_user_id, *(r.created_by_user_id for r in rows)]):
         return Removal("REFUSED", f"Base {number} holds what an owner or manager added, so it can't be deleted.")
-    uses = _uses(db, candidate, rows, base)
+    live = _live_counts(db, candidate.firm_id)
+    uses = _uses(db, candidate, rows, base, live)
+    tailored = _tailored_of(db, candidate, base)
     if any(uses.values()):
+        rest = _rest(db, candidate, base, rows, tailored, live)
+        counts = {"versions": len(rest[0]), "tailored": len(rest[1])}
         return Removal("HIDE", f"{_phrase(uses)}. Base {number} will be hidden: out of the base list, kept in the "
-                               "history and on everything that uses it.", uses)
-    return Removal("DELETE", f"Delete Base {number} and its {len(rows)} version{'' if len(rows) == 1 else 's'}? "
+                               "history and on everything that uses it. Keep what is in use and delete the rest "
+                               f"({_rest_words(counts)})?", uses, counts, rest)
+    extra = f" and {len(tailored)} tailored résumé{'' if len(tailored) == 1 else 's'} nobody sent" if tailored else ""
+    return Removal("DELETE", f"Delete Base {number} and its {len(rows)} version{'' if len(rows) == 1 else 's'}{extra}? "
                              "They're removed from view; the ledger keeps the record. Uploading the same file again "
-                             "brings the base back.", uses)
+                             "brings the base's version 1 back.", uses)
+
+
+def _rest(db, candidate, base: BaseResume, rows: list[Resume], tailored: list[Resume], live: dict):
+    """What "keep what is in use, delete the rest" deletes from a base that is in use: its versions after v1 that nothing
+    uses (v1 is the base itself and stays), and the tailored résumés no live application was sent with."""
+    versions = [r for r in rows if r.version > 1 and not _made_by_lead(db, [r.created_by_user_id])
+                and not any(_uses(db, candidate, [r], live=live).values())]
+    return versions, [t for t in tailored if t.id not in live]
+
+
+def _rest_words(counts: dict) -> str:
+    parts = [f"{n} unused version{'' if n == 1 else 's'}" if k == "versions" else
+             f"{n} tailored résumé{'' if n == 1 else 's'} nobody sent" for k, n in counts.items() if n]
+    return ", ".join(parts) or "nothing else"
 
 
 def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
@@ -457,7 +476,10 @@ def delete_version(db, actor: User, candidate, row: Resume) -> Removal:
     return removal
 
 
-def delete_base(db, actor: User, candidate, base: BaseResume) -> Removal:
+def delete_base(db, actor: User, candidate, base: BaseResume, keep_used: bool = False) -> Removal:
+    """Delete a base, or hide it when something uses it. With `keep_used`, a base that is in use is hidden and what
+    nothing uses is deleted with a soft delete: its versions after v1 and the tailored résumés no live application was
+    sent with (docs/team/resume-versioning.md §4.7)."""
     numbers = base_numbers(db, candidate)
     removal = base_removal(db, candidate, base, numbers)
     if removal.outcome == "REFUSED":
@@ -465,7 +487,15 @@ def delete_base(db, actor: User, candidate, base: BaseResume) -> Removal:
     number = numbers[base.id]
     if removal.outcome == "HIDE":
         base.archived_at = utcnow()
-        _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number), f"Hid Base {number}")
+        summary = f"Hid Base {number}"
+        if keep_used:
+            versions, tailored = removal.plan                  # worked out once, by the preview above
+            now = utcnow()
+            for row in (*versions, *tailored):
+                row.deleted_at = now
+            summary += f" and deleted {_rest_words({'versions': len(versions), 'tailored': len(tailored)})}"
+        _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number), summary)
+        db.flush()
         return removal
     # Soft delete: a base with version rows can't be removed from the table anyway (the versions point at it), and
     # nothing is lost: its versions are marked with it, its upload stays (so the same file is recognised later).

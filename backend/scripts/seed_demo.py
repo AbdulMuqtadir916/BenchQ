@@ -178,7 +178,7 @@ def _snake(key: str) -> str:
 
 
 def _snake_keys(value):
-    """The mocks' camelCase JSON (persona, answer bank) as the API sends it: snake_case keys, ids mapped."""
+    """The mocks' camelCase JSON (the answer bank) as the API sends it: snake_case keys, ids mapped."""
     if isinstance(value, list):
         return [_snake_keys(item) for item in value]
     if isinstance(value, dict):
@@ -199,7 +199,8 @@ def _candidate_fields(c: dict) -> dict:
         available_from=_when(c["availableFrom"]), notice_period_days=c["noticePeriodDays"],
         years_experience=c["yearsExperience"], primary_role=c["primaryRole"], target_roles=c["targetRoles"],
         work_settings=c["workSettings"], preferred_locations=c["preferredLocations"], contact_notes=c["contactNotes"],
-        persona=_snake_keys(c["persona"]), qa_bank=_snake_keys(c["qaBank"]),
+        preferred_industries=c["preferredIndustries"], deal_breakers=c["dealBreakers"],
+        qa_bank=_snake_keys(c["qaBank"]),
         created_at=_when(c["createdAt"]), updated_at=_when(c["updatedAt"]))
 
 
