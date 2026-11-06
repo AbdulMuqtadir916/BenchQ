@@ -181,6 +181,7 @@ export const hasTeamScope = (principal: Principal): boolean => scopeOf(principal
 /**
  * A MANAGER's team (Q40): themself, the BDEs who report to them, and the BDE of any candidate they manage. The last
  * keeps the team whole while the live team doesn't yet carry `managerId` (docs/candidate-onboarding/06-backend.md PR 1).
+ * The backend's ledger limit counts only the reports, so a BDE with no manager can differ there (07 Q56).
  */
 export function teamMemberIds(managerId: string, users: readonly Pick<User, "id" | "role" | "managerId">[], candidates: readonly { managerId: string; bdeId: string | null }[]): Set<string> {
   const ids = new Set([managerId]);
