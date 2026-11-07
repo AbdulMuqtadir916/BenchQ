@@ -31,7 +31,8 @@ const candidatePath = (firmId: string, candidateId: string) => `/api/firms/${toB
 /**
  * The versions this tab has read, by firm and id. A version never changes once saved (a save makes the next one), so
  * the save builds its body from the one `open` read instead of reading it again (Abdul's PR 7 review, #7); a version
- * not held here is read first. The oldest go past `KEPT`.
+ * not held here is read first. The oldest go past `KEPT`. Emptied when the signed-in person changes, with the query cache
+ * (`clearReadVersions`; Abdul's re-review).
  */
 const KEPT = 50;
 const versionsRead = new Map<string, ResumeVersionDto>();
@@ -41,6 +42,10 @@ function keep(firmId: string, version: ResumeVersionDto) {
   versionsRead.delete(key);
   versionsRead.set(key, version);
   if (versionsRead.size > KEPT) versionsRead.delete(versionsRead.keys().next().value as string);
+}
+/** Forget every version read (the principal changed: src/lib/query/principal-boundary.ts). */
+export function clearReadVersions(): void {
+  versionsRead.clear();
 }
 async function readVersion(firmId: string, versionId: string): Promise<ResumeVersionDto> {
   const held = versionsRead.get(versionKey(firmId, versionId));
