@@ -34,6 +34,30 @@ export function addBase(row: Omit<BaseRow, "archivedAt" | "deleted">): void {
   bases.set(row.id, { ...row, archivedAt: null, deleted: false });
 }
 
+/**
+ * A new candidate's first base (07 Q58: no candidate without a résumé), as the backend's create makes it: an UPLOAD
+ * base, active, holding v1. v1 has no lines of its own, so the studio shows the candidate and their Record (the form's
+ * name, contact, summary and skills; lib/resume-doc/build.ts). Nothing when the candidate already has a base.
+ */
+export function addFirstBase(candidate: { id: string; firmId: string; createdAt: string }, createdByUserId: string): void {
+  if ([...bases.values()].some((b) => b.candidateId === candidate.id)) return;
+  const baseId = `base_${candidate.id}`;
+  const resumeId = `resume_${candidate.id}_master`;
+  const versionId = `rv_${candidate.id}_1`;
+  addBase({ id: baseId, firmId: candidate.firmId, candidateId: candidate.id, source: "UPLOAD", createdAt: candidate.createdAt, createdByUserId, promotedFromResumeId: null });
+  allResumes.push(ResumeSchema.parse({
+    id: resumeId, firmId: candidate.firmId, candidateId: candidate.id, baseResumeId: baseId, name: "Master Resume", isMaster: true,
+    targetJobId: null, templateId: "template_minimal", latestVersionId: versionId,
+    versions: [{
+      id: versionId, resumeId, versionNumber: 1, parentVersionId: null, templateId: "template_minimal", includedSectionIds: [],
+      includedBulletIds: [], bulletOverrides: {}, atsScore: null, atsGrade: null, atsIssues: [], keywordScore: null,
+      keywordsMatched: [], keywordsMissing: [], lines: [], tailoring: null, tracer: null, pdfUrl: null, docxUrl: null,
+      renderedAt: null, changeSummary: "Initial version", createdByUserId, createdAt: candidate.createdAt,
+    }],
+  }));
+  setActive(candidate.id, baseId);
+}
+
 /** A group as readers see it: deleted versions left out (null when none is left or its base is gone). */
 export function visible(resume: Resume): Resume | null {
   if (resume.baseResumeId && bases.get(resume.baseResumeId)?.deleted) return null;

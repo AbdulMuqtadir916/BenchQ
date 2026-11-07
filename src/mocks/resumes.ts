@@ -6,14 +6,23 @@ import { canChangeResume, canManageResume } from "@/lib/auth/policy";
 import { inFirm, mockResult, notFound } from "./_shared";
 import { currentPrincipal, currentUser } from "./auth";
 import { allCandidates } from "./candidates";
+import candidatesSeed from "./data/candidates.json";
 import { allRecords } from "./records";
 import { firmScoped } from "./membership";
 import {
-  activeBase, addBase, allResumes, baseNumber, baseRemoval as removalOfBase, baseRow, deleteBaseRows, deletedVersions,
+  activeBase, addBase, addFirstBase, allResumes, baseNumber, baseRemoval as removalOfBase, baseRow, deleteBaseRows, deletedVersions,
   linesOf, savedDocs, setActive, shelfOf, showBaseRow, versionRemoval as removalOfVersion, visible,
 } from "./resume-state";
 
 export { allResumes };
+
+/**
+ * Candidates made in this browser persist across a reload (src/mocks/db.ts); the résumé state is in memory and starts
+ * from the fixtures. So each of them gets its first base again here (07 Q58), made by their manager (the creator
+ * isn't kept on the candidate). Seeded candidates are left as the fixtures have them.
+ */
+const seeded = new Set(candidatesSeed.map((c) => c.id));
+for (const candidate of allCandidates) if (!seeded.has(candidate.id)) addFirstBase(candidate, candidate.managerId);
 
 const forbidden = () => new ApiError("This candidate's BDE changes their résumés; you can view them.", "FORBIDDEN", 403);
 const refused = (message: string) => new ApiError(message, "CONFLICT", 409);

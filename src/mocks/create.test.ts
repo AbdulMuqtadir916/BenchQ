@@ -79,6 +79,28 @@ describe("New candidate", () => {
     await expect(m.candidates.create(FIRM, candidate({ email: "other@example.com", resumeParseId: "" }))).rejects.toThrow();
   });
 
+  it("with it: the first base résumé, active, holding v1, as the backend's create makes (07 Q58), still there after a reload", async () => {
+    const m = await load(EMAIL.imran);
+    await import("./resumes");                     // loaded before the create, so the create itself must make the base
+    const parse = await m.candidates.parseResume(FIRM, { fileName: "Nisha_Verma.pdf", sizeBytes: 204800, mimeType: "application/pdf" });
+    const created = await m.candidates.create(FIRM, candidate({ bdeId: "user_adnan", resumeParseId: parse.parse_id }));
+    const firstBase = async () => {
+      const { resumesMock } = await import("./resumes");
+      const shelf = await resumesMock.shelfByCandidate(FIRM, created.id);
+      expect(shelf.bases).toEqual([expect.objectContaining({ candidateId: created.id, source: "UPLOAD", isActive: true })]);
+      expect(shelf.resumes).toHaveLength(1);
+      expect(shelf.resumes[0]).toMatchObject({ isMaster: true, baseResumeId: shelf.bases[0]?.id });
+      expect(shelf.resumes[0]?.versions.map((v) => v.versionNumber)).toEqual([1]);
+      const opened = await resumesMock.open(FIRM, shelf.resumes[0]!.latestVersionId);
+      expect(opened.document).toMatchObject({ fullName: "Nisha Verma", title: "Data Engineer" });
+    };
+    await firstBase();
+    m.db.flush();
+
+    await load(EMAIL.imran);
+    await firstBase();
+  });
+
   it("an OWNER may hand it to a manager without a BDE, and may only name an active manager and a BDE under them", async () => {
     const m = await load(EMAIL.imran);
     expect(await m.candidates.create(FIRM, await uploadedCandidate(m))).toMatchObject({ managerId: "user_fatima", bdeId: null });
