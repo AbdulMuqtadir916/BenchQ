@@ -20,3 +20,75 @@ Initial evaluation labels are authored synthetic examples, independently from th
 ## PR #111 review follow-up
 
 Switching on classifies only mail imported after that point. Existing and disabled-import mail is NOT_QUEUED; historical classification requires a separate future explicit action. Retry/reclassify cannot queue it. Dedicated email.retry (Owner/Manager/BDE) and email.reclassify (Owner/Manager) preserve current candidate scoping. Normalize source addresses; preserve existing application links; invalidated work does not consume retries. Low-confidence unmatched Other remains in BDE review. Confident Other retains the approved encrypted 30-day recovery policy and gated purge; Gmail is untouched. Item #2 (shared AI client/endpoint and Super Admin spend integration) is deferred to PR 4; real-mail AI remains gated. Item #9 stays unchanged.
+
+**Updated 2026-11-06 (PR 4):** Samad confirmed with Abdul that older emails are also classified. Retained `NOT_QUEUED` mail of the current connected mailbox is processed in bounded batches, oldest first, behind `CANDIDATE_EMAIL_HISTORICAL_ENABLED` (default off); historical results can only create BDE reviews, never automatic status changes. See PR 4 DEBUG.md D-23.
+
+
+## PR 4 additions (2026-11-06, branch codex/pr4-code-correction)
+
+### Setup checklist (platform settings, AI preset scope)
+
+| Setting | Value |
+|---|---|
+| `candidate_email_llm_provider` | `openrouter` (the only accepted provider) |
+| `candidate_email_llm_model` | the Perplexity Decider model on OpenRouter Decisions (used in testing: `perplexity/pplx-decider-v1.2`; confirm the id in OpenRouter) |
+| `candidate_email_llm_api_key` | the OpenRouter key; never in code, logs or docs |
+| `candidate_email_llm_effort`, `candidate_email_instructions` | optional |
+
+- The classifier **never borrows the primary model's settings** (`llm_*`). If any of the three required settings is empty,
+  classification is "not configured": mail stays `PENDING`, no attempt is spent, and the log says so once per sweep.
+- A key the provider refuses (401/403) **pauses** this configuration: mail stays `PENDING`, no attempt is spent, retry and
+  reclassify answer 409 "Classifier paused". Changing the key or model resumes at once; otherwise one probe email is sent
+  after 15 minutes, then hourly while still refused (15 minutes after a 429/5xx/timeout). The pause is a `job_runs` row
+  (`job_type='candidate_email_classifier_pause'`) holding only a hash of the configuration.
+
+### Routing rules added by PR 4 (before any status or hiding decision)
+
+- **Forwarded email** (forward header or `Fwd:` subject): always BDE review (`FORWARDED_EMAIL`), never hidden as Other.
+  Forwarded history may identify the application; it is sent to the AI labelled as history, never as a current decision.
+- **Quoted reply history** is never matching evidence and never sent to the AI; replies are linked through the thread.
+- **Too little current text** (under 20 characters, not a forward): review (`INSUFFICIENT_CONTENT`).
+- **Two provider numbers**: the reply's `confidence` and the chosen category's probability are both stored; every
+  threshold uses the lower one. A gap larger than 0.10 routes to review (`CONFIDENCE_DISAGREEMENT`), never a failure.
+  Only structurally invalid replies fail.
+
+### AI spend
+
+Each dispatched call is counted once. A provider charge (ACTUAL) or OpenRouter price × tokens (ESTIMATED) is written to
+`llm_call_log` (`purpose='email_classification'`) in the same transaction as the result. An unknown charge writes no row
+(no false zero) and is reported by `GET /api/stats/llm-costs` as `candidate_email_classification.unpriced_calls`; an
+attempt that started dispatch but never finished is `unconfirmed_calls` (possibly charged). Credential refusals are not
+counted. The Super Admin AI-spend card stays hidden until its contract (07 Q29) is approved.
+
+### Endpoint decision (DEBUG D-16) — for Abdul's acceptance
+
+Keep OpenRouter **Decisions** (`/api/alpha/decisions`): it returns the per-category probabilities the policy needs; the
+shared chat client does not. Its alpha quirks are contained: structural validation only (the confidence/probability gap
+seen live is routed to review, not failed), one bounded attempt per claim with worker retries, a pause on refused
+credentials, and full spend counting. If Abdul prefers the shared `backend/analyzer/llm_client.py`, the decider seam
+(`decider.classify`) is the only place that changes.
+
+### Switch-on conditions — do not enable classification for real mail until all are true
+
+1. Provider/downstream retention and logging confirmed in writing; candidate consent updated; Google/delegated-access
+   requirements met (unchanged from PR 3).
+2. Abdul has accepted the endpoint decision above.
+3. Spend counting is live (this section) and checked on a test call.
+4. Local tests use a **dedicated test Gmail** connected to a synthetic test candidate, never a personal mailbox.
+5. Automatic status updates stay OFF until PR 4 is merged and Undo is verified (activation checklist, plan T6.1).
+
+### Automatic status updates (PR 4) and activation checklist
+
+Switches: `CANDIDATE_EMAIL_AUTO_STATUS_ENABLED`, `CANDIDATE_EMAIL_AUTOMATION_APPROVED` and
+`CANDIDATE_EMAIL_AUTOMATION_START_AT` (ISO 8601 with a time zone). All three are required; mail received before the
+start time is never executed automatically, so switching on cannot replay earlier mail. Every automatic change writes an
+`email_classifier` history event (with the source email), an AGENT ledger entry ("Email classifier") and a classification
+outcome `AUTO_APPLIED`. Undo (drawer and application page) writes an `email_undo` event; the same email is never applied
+again, and a reclassification after Undo goes to review (`AUTOMATIC_CHANGE_UNDONE`).
+
+Activation (plan T6.1), in order: PR 4 merged → Undo verified on a production-like environment → switch-on conditions
+above met → set the start time, the approval and the switch → review every automatic change and Undo use on the first day.
+Turn the switch off again to stop all automatic writes immediately; classification and reviews continue.
+
+Local note: the backend container runs uvicorn without auto-reload; after changing backend code or `backend/.env`,
+restart (code) or recreate (`docker compose -p benchq-pr4 up -d --no-deps --force-recreate backend`, env) the container.

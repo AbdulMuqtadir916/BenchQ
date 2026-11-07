@@ -5,7 +5,7 @@ import { Columns3, Calendar, Table2, type LucideIcon } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { useApplications, useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
+import { useApplications, useUpdateApplicationStatus, useWithPendingMoves } from "@/lib/hooks/use-applications";
 import { can, scopeApplications } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useCandidates } from "@/lib/hooks/use-candidates";
@@ -52,13 +52,15 @@ export default function ApplicationsPage() {
     return list;
   }, [applicationsQuery.data, candidatesQuery.data, principal]);
 
+  const { applications: shown, saving } = useWithPendingMoves(apps);
+
   function moveTo(id: string, to: ApplicationStatus) {
-    updateStatus.mutate({ id, status: to, note: null });
+    return updateStatus.mutate({ id, status: to, note: null });
   }
 
   return (
     <div className="bq-page bq-page-wide">
-      <PageHeader title="Applications" subtitle={can(principal, "application.move") ? "Drag a card into the next stage." : "Every application, by stage."} />
+      <PageHeader title="Applications" subtitle={can(principal, "application.move") ? "Drag a card to its current stage." : "Every application, by stage."} />
       <div className="mb-4 flex flex-wrap items-center gap-1" role="tablist" aria-label="View">
         {VIEWS.map(({ id, label, Icon }) => (
           <button key={id} type="button" role="tab" aria-selected={view === id} className="bq-view-tab" onClick={() => setView(id)}>
@@ -69,7 +71,7 @@ export default function ApplicationsPage() {
       </div>
 
       {loadError ? <ErrorState error={loadError} onRetry={retry} /> : applicationsQuery.isLoading ? <SkeletonCard /> : view === "kanban" ? (
-        <ApplicationBoard apps={apps} candidateName={candidateName} onMove={moveTo} canAct={can(principal, "application.move")} />
+        <ApplicationBoard apps={shown} saving={saving} candidateName={candidateName} onMove={moveTo} canAct={can(principal, "application.move")} />
       ) : view === "table" ? (
         <TableView apps={apps} candidateName={candidateName} />
       ) : (

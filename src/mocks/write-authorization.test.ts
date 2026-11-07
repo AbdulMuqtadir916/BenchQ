@@ -30,6 +30,8 @@ const FIRM = "firm_hts";
 /** Arguments that would make each write succeed for a member who may act (so a refusal can only be the policy). */
 const ARGS: Record<string, unknown[]> = {
   "applications.updateStatus": ["app_001", { status: "WITHDRAWN", note: null }],
+  "applications.saveJob": [{ candidateId: "cand_01", jobId: "job_001", title: "QA", company: "Example" }],
+  "applications.unsaveJob": ["app_001"],
   "candidates.update": ["cand_01", { headline: "Senior Java Developer" }],
   "candidates.create": [createCandidateBody({ fullName: "Policy Check", primaryRole: "QA", workAuth: "USC" })],
   "candidates.followBde": ["user_adnan", "user_fatima"],
@@ -65,7 +67,7 @@ describe("the write inventory", () => {
       }
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
-      "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture",
+      "agents.tailorResume", "applications.saveJob", "applications.unsaveJob", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture",
     ]);
   });
 

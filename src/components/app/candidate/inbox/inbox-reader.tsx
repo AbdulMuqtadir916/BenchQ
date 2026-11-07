@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowRight, CalendarClock, CheckCircle2, MailOpen } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, ClipboardCheck, MailOpen } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
-import type { InboxMessage } from "@/lib/schemas/inbox";
+import type { EmailReview, InboxMessage } from "@/lib/schemas/inbox";
+import { EmailReviewPanel } from "./email-review-panel";
+import { ClassificationStatus } from "./classification-status";
 import { formatIst, formatRelative } from "@/lib/format/timezone";
 import { EASE_OUT } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
@@ -22,19 +25,34 @@ interface ReaderProps {
   suggestion: Suggestion | undefined;
   canAct: boolean;
   actions: CandidateActions;
+  /** The pending review of this email, if any, and the candidate's applications to resolve it against. */
+  review?: EmailReview;
+  applications?: Application[];
 }
 
 /** One email, what it means, and the application it belongs to. */
-export function InboxReader({ message, application, suggestion, canAct, actions }: ReaderProps) {
+export function InboxReader({ message, application, suggestion, canAct, actions, review, applications = [] }: ReaderProps) {
   const reduce = useReducedMotion() ?? false;
+  // Which review is open. Keyed by review id and revision, so another email (or a new revision) starts closed.
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const reviewKey = review ? `${review.id}:${review.revision}` : null;
+  const isReviewOpen = reviewKey !== null && openKey === reviewKey;
   if (!message) return <EmptyState icon={MailOpen} title="Pick an email" description="Select an email on the left to read it here." />;
-  const meta = mailSignalMeta(message.signal, message.classificationState);
+  const meta = mailSignalMeta(message.signal, message.classificationState, message.classificationCategory, message.classificationError);
 
   return (
     <motion.article key={message.id} initial={reduce ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="flex h-full flex-col">
       <header className="border-b border-[var(--color-border)] p-5">
-        {message.classificationState !== "NOT_QUEUED" ? <Tag tone={meta.tone}><meta.Icon size={11} aria-hidden />{meta.label}</Tag> : null}
-        <h2 className="mt-2 text-h2 text-[var(--color-text)]">{message.subject}</h2>
+        {meta.isBadge ? <Tag tone={meta.tone}><meta.Icon size={11} aria-hidden />{meta.label}</Tag> : null}
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <h2 className="min-w-0 break-words text-h2 text-[var(--color-text)]">{message.subject}</h2>
+          {review && canAct ? (
+            <Button type="button" size="sm" className="self-start sm:shrink-0" aria-expanded={isReviewOpen} aria-controls="email-review"
+              onClick={() => setOpenKey(isReviewOpen ? null : reviewKey)}>
+              <ClipboardCheck size={14} aria-hidden />{isReviewOpen ? "Hide review" : "Review email"}
+            </Button>
+          ) : review ? <Tag tone="violet">Needs review</Tag> : null}
+        </div>
         <p className="mt-1 text-sm text-[var(--color-text-2)]">
           <span className="font-[550]">{message.fromName}</span> <span className="text-[var(--color-text-3)]">&lt;{message.fromEmail}&gt;</span>
         </p>
@@ -43,6 +61,10 @@ export function InboxReader({ message, application, suggestion, canAct, actions 
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-5">
+        <ClassificationStatus message={message} />
+        {review && isReviewOpen ? (
+          <div id="email-review"><EmailReviewPanel key={reviewKey} message={message} review={review} applications={applications} canAct={canAct} onHide={() => setOpenKey(null)} /></div>
+        ) : null}
         {message.scheduledFor ? (
           <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-warning-bg)] px-3 py-2.5 text-sm text-[var(--color-warning-fg)]">
             <CalendarClock size={16} aria-hidden className="shrink-0" />

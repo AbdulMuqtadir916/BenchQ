@@ -1,3 +1,4 @@
+import { reachedOffer } from "@/components/app/applications/status-meta";
 import type { Candidate } from "@/lib/schemas/candidate";
 import { isBde } from "@/lib/auth/roles";
 import type { Application } from "@/lib/schemas/application";
@@ -32,7 +33,7 @@ export function deriveBdePerformance(
         responses,
         responseRatePct: apps.length ? round1((100 * responses) / apps.length) : 0,
         interviews: apps.filter((a) => a.interviewAt).length,
-        placements: apps.filter((a) => a.status === "PLACED").length,
+        placements: apps.filter(reachedOffer).length, // D6
       };
     });
 }

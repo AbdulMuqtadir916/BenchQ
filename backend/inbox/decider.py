@@ -5,7 +5,8 @@ import math
 
 import httpx
 
-from backend.inbox.decider_categories import CATEGORIES, INSTRUCTIONS, QUESTION_KEY, CATEGORY_VERSION, CONFIDENCE_THRESHOLD
+from backend.inbox.decider_categories import (CATEGORIES, INSTRUCTIONS, QUESTION_KEY, CATEGORY_VERSION,
+                                              CONFIDENCE_THRESHOLD, DISAGREEMENT_LIMIT)
 from backend.inbox.safe_text import redact_sensitive_text
 
 ENDPOINT = 'https://openrouter.ai/api/alpha/decisions'
@@ -29,7 +30,7 @@ class Classification:
 
 def config_identity(cfg):
     return hashlib.sha256(repr((cfg.provider, cfg.model, cfg.prompts, cfg.preset_id, cfg.preset_version,
-                                INSTRUCTIONS, CATEGORIES, CATEGORY_VERSION, CONFIDENCE_THRESHOLD,
+                                INSTRUCTIONS, CATEGORIES, CATEGORY_VERSION, CONFIDENCE_THRESHOLD, DISAGREEMENT_LIMIT,
                                 "minimization-2026-11-04.1", "gmail-auth-2026-11-04.1")).encode()).hexdigest()
 
 
@@ -58,10 +59,12 @@ def parse_response(payload):
         raise DeciderError('INVALID_PROBABILITIES')
     if probabilities[choice] != max(probabilities.values()) or abs(sum(probabilities.values()) - 1) > 0.02:
         raise DeciderError('INCONSISTENT_PROBABILITIES')
+    # The provider's headline confidence is computed separately from the per-category probabilities, so the two
+    # differ slightly (seen live: 0.9650 vs 0.9685). Only a structurally invalid value fails; a disagreement is
+    # routed to review by the worker (DEBUG D-01).
     confidence = answer.get('confidence', probabilities[choice])
     if (isinstance(confidence, bool) or not isinstance(confidence, (int, float))
-            or not math.isfinite(confidence) or not 0 <= confidence <= 1
-            or abs(confidence - probabilities[choice]) > 1e-6):
+            or not math.isfinite(confidence) or not 0 <= confidence <= 1):
         raise DeciderError('INVALID_CONFIDENCE')
     usage = payload.get('usage') if isinstance(payload.get('usage'), dict) else {}
     safe = {}
@@ -73,8 +76,23 @@ def parse_response(payload):
     return Classification(choice, float(confidence), probabilities, safe)
 
 
+def decision_value(confidence, probabilities, category) -> float:
+    """The number every threshold uses: never more confident than either value the provider returned."""
+    return min(float(confidence), float(probabilities[category]))
+
+
+def values_disagree(confidence, probabilities, category) -> bool:
+    """The provider's two numbers differ by more than the routing limit: the email goes to review."""
+    return abs(float(confidence) - float(probabilities[category])) > DISAGREEMENT_LIMIT
+
+
+def is_configured(cfg) -> bool:
+    """The classifier runs only on OpenRouter Decisions with its own model and key (OPERATIONS.md)."""
+    return cfg.provider == 'openrouter' and bool(cfg.model) and bool(cfg.api_key)
+
+
 def classify(subject, body, cfg, *, post=None):
-    if cfg.provider != 'openrouter' or not cfg.model or not cfg.api_key:
+    if not is_configured(cfg):
         raise DeciderError('CLASSIFIER_NOT_CONFIGURED')
     send = post or httpx.post
     try:
@@ -82,6 +100,9 @@ def classify(subject, body, cfg, *, post=None):
                         json=build_request(subject, body, cfg), timeout=35, follow_redirects=False)
         if response.status_code == 429 or response.status_code >= 500:
             raise DeciderError('PROVIDER_UNAVAILABLE', retryable=True)
+        if response.status_code in (401, 403):
+            # The credentials themselves are refused: the worker pauses this configuration (classifier_pause).
+            raise DeciderError('PROVIDER_AUTH_REJECTED')
         if response.status_code >= 300:
             raise DeciderError('PROVIDER_REJECTED')
         if len(response.content) > 64000:

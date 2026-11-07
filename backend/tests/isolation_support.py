@@ -190,6 +190,20 @@ def build_firm(db, firm, owner, tag: str) -> dict:
         inbox_message_id=review_message.id, reason="LOW_CONFIDENCE", application_revision=0)
     db.add(review)
     db.flush()
+    # An application whose latest change was automatic (PR 4 Undo).
+    from backend.models.db import ApplicationStatusEvent
+    auto_job = Job(external_id=f"{tag}-auto", title=f"{tag} automatic role", company=f"{tag} Corp", source="manual")
+    db.add(auto_job)
+    db.flush()
+    auto_app = Application(firm_id=firm.id, candidate_id=candidate.id, job_id=auto_job.id, status="screening_call",
+        status_revision=1, applied_at=utcnow(), submitted_by_user_id=owner.id)
+    db.add(auto_app)
+    db.flush()
+    auto_event = ApplicationStatusEvent(firm_id=firm.id, candidate_id=candidate.id, application_id=auto_app.id,
+        from_status="applied", to_status="screening_call", actor_user_id=None, source="email_classifier",
+        occurred_at=utcnow(), revision=1, command_id=uuid.uuid4(), original_payload={"email_id": str(review_message.id)})
+    db.add(auto_event)
+    db.flush()
     from backend.models.candidates import CandidateGoogleOAuthAttempt
     from datetime import timedelta
     attempt = CandidateGoogleOAuthAttempt(firm_id=firm.id, candidate_id=candidate.id,
@@ -199,7 +213,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.add(attempt)
     db.flush()
 
-    return {"oauth_attempt": attempt.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
+    return {"oauth_attempt": attempt.id, "auto_app": auto_app.id, "auto_event": auto_event.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
             "version": v2.id, "base": second.id,
 
             "firm": firm.id, "slug": firm.slug, "job": job.id,

@@ -111,6 +111,8 @@ ROUTE_ACCESS: dict[str, Access] = {
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": F,
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/inbox-content": F,
     "GET /api/applications": F,
+    "GET /api/applications/counts": F,
+    "POST /api/applications/{app_id}/status-events/{event_id}/undo": F,
     "GET /api/applications/{app_id}": F,
     "PATCH /api/applications/{app_id}/candidate-status": F,
     "PATCH /api/applications/{app_id}/review": F,

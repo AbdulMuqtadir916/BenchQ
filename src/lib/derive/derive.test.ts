@@ -79,17 +79,38 @@ describe("deriveExportGate", () => {
   });
 });
 
+describe("deriveCandidateStats open applications (PR 4 vocabulary)", () => {
+  it("counts every submitted, not-closed stage as open, including new and incomplete stages", () => {
+    const candidate = candidatesFixture[0]!;
+    const base = applicationsFixture.find((a) => a.candidateId === candidate.id)!;
+    const apps = (["SCREENING_CALL", "INTERVIEW_SCHEDULED", "INCOMPLETE_APPLICATION", "MOVE_ON", "SAVED"] as const)
+      .map((status, i) => ({ ...base, id: `open_${i}`, status }));
+    expect(deriveCandidateStats(candidate, apps).applicationsOpen).toBe(3);
+  });
+});
+
 describe("deriveFunnel", () => {
+  it("counts a skipped stage as reached and a legacy placement as an offer (D1, D6)", () => {
+    const base = applicationsFixture[0]!;
+    const skipped = { ...base, id: "skip", status: "INTERVIEW_SCHEDULED" as const, events: [] };
+    const placed = { ...base, id: "placed", status: "PLACED" as const, events: [] };
+    const funnel = deriveFunnel([skipped, placed]);
+    expect(funnel.find((s) => s.status === "SCREENING_CALL")?.count).toBe(2);
+    expect(funnel.find((s) => s.status === "INTERVIEW_SCHEDULED")?.count).toBe(2);
+    expect(funnel.find((s) => s.status === "OFFER")?.count).toBe(1);
+  });
+
   it("counts every stage reached in the event history", () => {
     const funnel = deriveFunnel(applicationsFixture);
 
     expect(funnel.map((stage) => stage.label)).toEqual([
       "Applied",
-      "Response",
-      "Screening",
-      "Interview",
+      "Screening call",
+      "Shortlisted",
+      "Interview schedule request",
+      "Interview scheduled",
+      "Assessment",
       "Offer",
-      "Placed",
     ]);
     expect(funnel.every((stage, index) => index === 0 || stage.count <= funnel[index - 1]!.count)).toBe(true);
   });

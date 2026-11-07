@@ -1,9 +1,10 @@
 import { z } from "zod";
-import type { CandidateInbox, InboxMessage } from "@/lib/schemas/inbox";
+import type { CandidateInbox, EmailReviewPage, InboxMessage, ReviewEmailCommand } from "@/lib/schemas/inbox";
+import { newCommandId } from "@/lib/utils";
 import { http } from "./http";
 import { isLive } from "./config";
 import { toBackendId } from "./dto/demo-ids";
-import { BackendInboxSchema, BackendInboxMessageSchema, toCandidateInbox, toInboxMessage } from "./dto/inbox";
+import { BackendEmailReviewPageSchema, BackendInboxSchema, BackendInboxMessageSchema, toBackendReviewCommand, toCandidateInbox, toEmailReviewPage, toInboxMessage } from "./dto/inbox";
 const mock = () => import("@/mocks/inbox").then((m) => m.inboxMock);
 const base = (firm: string, candidate: string) => `/api/firms/${toBackendId(firm)}/candidates/${toBackendId(candidate)}`;
 const AuthorizationSchema = z.object({ authorization_url: z.string().url().refine((value) => {
@@ -31,4 +32,21 @@ export const inboxApi = {
   markRead: async (firmId: string, candidateId: string, messageId: string): Promise<InboxMessage> => isLive("inbox")
     ? toInboxMessage(await http.patch(base(firmId, candidateId) + `/inbox-messages/${toBackendId(messageId)}/read`, BackendInboxMessageSchema))
     : (await mock()).markRead(firmId, messageId, candidateId),
+  /** Pending BDE reviews, newest first. The mock inbox has no classifier, so it has no reviews. */
+  reviews: async (firmId: string, candidateId: string, cursor?: string | null): Promise<EmailReviewPage> => isLive("inbox")
+    ? toEmailReviewPage(await http.get(base(firmId, candidateId) + "/email-reviews", BackendEmailReviewPageSchema, { query: { limit: 50, after: cursor ?? undefined } }))
+    : { reviews: [], nextCursor: null, totalCount: 0 },
+  /** Retry a failed classification (roles with email.retry). The server checks the email has not changed. */
+  retryClassification: async (firmId: string, candidateId: string, messageId: string, expected: { contentRevision: number; resultVersion: number }, commandId = newCommandId()): Promise<void> => {
+    if (!isLive("inbox")) throw new Error("Retry needs the live inbox.");
+    await http.post(base(firmId, candidateId) + `/inbox-messages/${toBackendId(messageId)}/classification/retry`, z.object({ state: z.string() }), {
+      body: { command_id: commandId, expected_content_revision: expected.contentRevision, expected_result_version: expected.resultVersion },
+    });
+  },
+  /** One human decision on a review; returns the refreshed inbox. Retrying with the same command id is idempotent. */
+  review: async (firmId: string, candidateId: string, messageId: string, command: ReviewEmailCommand, commandId = newCommandId()): Promise<CandidateInbox> => {
+    if (!isLive("inbox")) throw new Error("Email review needs the live inbox.");
+    return toCandidateInbox(await http.patch(base(firmId, candidateId) + `/inbox-messages/${toBackendId(messageId)}/review`, BackendInboxSchema,
+      { body: toBackendReviewCommand(command, commandId, toBackendId) }));
+  },
 };

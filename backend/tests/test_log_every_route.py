@@ -40,6 +40,7 @@ NOT_REACHED: dict[str, str] = {
     "PATCH /api/applications/{app_id}": "400: Send only {unfavorite: true} to remove a favorite",
     "PATCH /api/applications/{app_id}/candidate-status": "400: Unsupported candidate application status",
     "PATCH /api/applications/{app_id}/review": "404: Review not found",
+    "POST /api/applications/{app_id}/status-events/{event_id}/undo": "404: Automatic change not found",
     "POST /api/auth/password-reset/complete":
         "400: This link has expired. Contact your manager or firm owner for a new one",
     "POST /api/auth/sign-in": "401: Email or password is incorrect",
@@ -48,6 +49,7 @@ NOT_REACHED: dict[str, str] = {
     "GET /api/cover-letters/{cl_id}/pdf": "422: Unknown template: <planted>",
     "POST /api/firms/{firm_id}/candidates": "404: That résumé read has expired. Upload it again",
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": "400: Invalid email cursor",
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": "400: Invalid review cursor",
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}":
         "404: Mailbox confirmation expired. Connect again",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}":

@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
+import { ReviewQueue } from "./review-queue";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
 import { STATUS_LABEL, isClosed } from "@/components/app/applications/status-meta";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
@@ -21,8 +22,11 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
   const [view, setView] = useState<View>("board");
   const [scope, setScope] = useState<Scope>("active");
   const all = ws.applications;
-  const visible = scope === "active" ? all.filter((a) => !isClosed(a.status)) : all;
-  const closedCount = all.filter((a) => isClosed(a.status)).length;
+  // Move On is a current stage with its own board column, so a confirmed Move On card is always shown;
+  // "Active" hides only the older closed values (Placed, Rejected, Withdrawn, Expired).
+  const visible = scope === "active" ? all.filter((a) => a.status === "MOVE_ON" || !isClosed(a.status)) : all;
+  const moveOnCount = all.filter((a) => a.status === "MOVE_ON").length;
+  const closedCount = all.filter((a) => isClosed(a.status) && a.status !== "MOVE_ON").length;
 
   if (ws.applicationsQuery.error) return <ErrorState error={ws.applicationsQuery.error} onRetry={() => void ws.applicationsQuery.refetch()} />;
   if (ws.applicationsQuery.isLoading) return <SkeletonList rows={6} />;
@@ -35,7 +39,7 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--color-text-3)]">
-          <span className="text-body-strong text-[var(--color-text)]">{all.length - closedCount} active</span> · {closedCount} closed · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
+          <span className="text-body-strong text-[var(--color-text)]">{all.length - closedCount - moveOnCount} active</span> · {moveOnCount} Move On · {closedCount} older closed · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
         </p>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">
@@ -69,8 +73,10 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
         </div>
       ) : null}
 
+      {view === "list" && (ws.reviewTotal > 0 || ws.reviewsQuery.error) ? <ReviewQueue ws={ws} actions={actions} /> : null}
+
       {view === "board" ? (
-        <ApplicationBoard apps={visible} onMove={onMove} canAct={canAct} signals={ws.signals} onOpen={actions.openApplication} showClosed={scope === "all"} />
+        <ApplicationBoard reviewCount={ws.reviewTotal} reviewColumn={<ReviewQueue ws={ws} actions={actions} inBoard />} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} signals={ws.signals} onOpen={actions.openApplication} showClosed={scope === "all"} />
       ) : (
         <ApplicationList apps={visible} signals={ws.signals} onOpen={actions.openApplication} />
       )}

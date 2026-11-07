@@ -1,15 +1,21 @@
 import { z } from "zod";
-import { ApplicationStatus, FollowUpKind, FollowUpState, OutreachChannel, OutreachResult } from "./enums";
+import { FollowUpKind, FollowUpState, OutreachChannel, OutreachResult, StoredApplicationStatus } from "./enums";
 
 export const ApplicationEventSchema = z.object({
   id: z.string(),
   applicationId: z.string(),
-  fromStatus: ApplicationStatus.nullable(),
-  toStatus: ApplicationStatus,
+  fromStatus: StoredApplicationStatus.nullable(),
+  toStatus: StoredApplicationStatus,
   note: z.string().nullable(),
   actorUserId: z.string().nullable(),
   isAutomated: z.boolean(),
   createdAt: z.string().datetime(),
+  /** Who or what made the change: ui | bde_review | email_classifier | email_undo (null on mock/legacy rows). */
+  source: z.string().nullable().default(null),
+  /** The application revision this change produced; Undo is offered only while it is still the latest. */
+  revision: z.number().int().nonnegative().nullable().default(null),
+  /** The email that caused or confirmed the change, when there is one. */
+  emailId: z.string().nullable().default(null),
 });
 export type ApplicationEvent = z.infer<typeof ApplicationEventSchema>;
 
@@ -21,7 +27,11 @@ export const ApplicationSchema = z.object({
   resumeVersionId: z.string().nullable(),
   submittedByUserId: z.string(),
 
-  status: ApplicationStatus,
+  status: StoredApplicationStatus,
+  /** Server-confirmed status revision; sent back as expected_revision with every move (docs/02, PR 4). */
+  statusRevision: z.number().int().nonnegative().default(0),
+  /** Email reviews waiting on this application; the backend refuses a manual move until they are decided. */
+  pendingReviewCount: z.number().int().nonnegative().default(0),
 
   companyNameAtApply: z.string(),
   jobTitleAtApply: z.string(),

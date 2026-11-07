@@ -47,7 +47,7 @@ def _classification_ready(state):
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt", "base_id": "base"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt", "base_id": "base", "event_id": "auto_event"}
 
 
 
@@ -136,10 +136,12 @@ CASES: dict[str, Case] = {
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox": Case(),
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/read": Case(),
     "GET /api/applications": Case(shows_rows=True),
+    "GET /api/applications/counts": Case(),
     "GET /api/applications/{app_id}": Case(),
     "PATCH /api/applications/{app_id}/review": Case(path={"app_id": "review_app"}, body=lambda i: {"review_id": str(i["review"]), "status": "assessment", "expected_revision": 0, "expected_review_revision": 0}),
     "POST /api/applications": Case(body=lambda i: {"title": "Logged role", "company": "Logged Co", "url": _new("logged")}),
     "POST /api/applications/extract": Case(body=lambda i: {"url": _new("posting")}),
+    "POST /api/applications/{app_id}/status-events/{event_id}/undo": Case(path={"app_id": "auto_app", "event_id": "auto_event"}, body=lambda i: {"expected_revision": 1, "command_id": str(uuid.uuid4())}),
     "PATCH /api/applications/{app_id}/candidate-status": Case(body=lambda i: {"status": "saved", "expected_revision": 0}),
     "PATCH /api/applications/{app_id}": Case(body=lambda i: {"notes": "Edited"}),
     "DELETE /api/applications/{app_id}": Case(path={"app_id": "legacy_app"}),

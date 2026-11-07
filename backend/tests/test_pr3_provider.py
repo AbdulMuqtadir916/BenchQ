@@ -13,7 +13,9 @@ def response(category='assessment', confidence=.9):
     return {'answers': {QUESTION_KEY: {'type':'choice','choice':category,'confidence':confidence,'probabilities':probabilities}}}
 
 
-@pytest.mark.parametrize('mutation', ['bool','nan','infinite','missing','unknown','wrong_choice','wrong_confidence','sum'])
+# A confidence that differs from the chosen probability is no longer a failure (PR 4, DEBUG D-01): see
+# test_pr4_confidence.py. Out-of-range or non-numeric confidence still is.
+@pytest.mark.parametrize('mutation', ['bool','nan','infinite','missing','unknown','wrong_choice','out_of_range_confidence','sum'])
 def test_strict_output_validation(mutation):
     payload = response()
     answer = payload['answers'][QUESTION_KEY]
@@ -23,7 +25,7 @@ def test_strict_output_validation(mutation):
     elif mutation == 'missing': del answer['probabilities']['offer']
     elif mutation == 'unknown': answer['choice'] = 'placed'
     elif mutation == 'wrong_choice': answer['choice'] = 'offer'
-    elif mutation == 'wrong_confidence': answer['confidence'] = .99
+    elif mutation == 'out_of_range_confidence': answer['confidence'] = 1.2
     else: answer['probabilities']['offer'] = .3
     with pytest.raises(DeciderError): parse_response(payload)
 
@@ -81,3 +83,25 @@ def test_one_network_attempt_and_safe_error():
     with pytest.raises(DeciderError, match='PROVIDER_UNAVAILABLE'):
         classify('subject','body',cfg,post=post)
     assert len(calls)==1
+
+
+# PR 4 (DEBUG D-26): Gmail's own ARC seals do not hide a valid verdict; a foreign ARC hop still does.
+def _gmail_arc(payload, *, foreign=False):
+    payload['headers'] = [
+        {'name': 'ARC-Seal', 'value': 'i=2; a=rsa-sha256; cv=pass'},
+        {'name': 'ARC-Authentication-Results', 'value': 'i=2; mx.google.com; dkim=pass header.i=@example.test'},
+        *payload['headers'],
+        {'name': 'ARC-Seal', 'value': 'i=1; a=rsa-sha256; cv=none'},
+        {'name': 'ARC-Authentication-Results',
+         'value': 'i=1; forwarder.example; arc=none' if foreign else 'i=1; mx.google.com; arc=none'},
+    ]
+    return payload
+
+
+def test_gmail_own_arc_keeps_the_verdict():
+    assert sender_authentication(_gmail_arc(headers())) == 'PASS'
+    assert sender_authentication(_gmail_arc(headers('dmarc=fail header.from=example.test'))) == 'FAIL'
+
+
+def test_foreign_arc_hop_is_unknown():
+    assert sender_authentication(_gmail_arc(headers(), foreign=True)) == 'UNKNOWN'

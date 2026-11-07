@@ -4,6 +4,7 @@ One HTTP attempt per lease; no session/row lock is held across provider I/O.
 PENDING rows are the queue, so import/enqueue crashes are recovered by the sweep.
 """
 from concurrent.futures import ThreadPoolExecutor
+import time
 from datetime import timedelta
 import logging
 import threading
@@ -14,15 +15,22 @@ import uuid
 from sqlalchemy import or_, func
 
 from backend.ai.config import ai_config
+from backend.analyzer.llm_cost import calc_cost, get_pricing
+from backend.analyzer.llm_logger import log_llm_call
 from backend.auth.scoping import scoped
-from backend.inbox.application_matching import classification_text, matching_application_id, submitted_applications
-from backend.inbox.decider import DeciderError, classify, config_identity
+from backend.inbox.application_matching import (ai_input, company_aliases, email_parts, has_too_little_text,
+                                                matching_application_id, submitted_applications)
+from backend.inbox.decider import (DeciderError, classify, config_identity, decision_value, is_configured,
+                                  values_disagree)
+from backend.inbox import backfill, classifier_pause
 from backend.inbox.decider_categories import CATEGORY_VERSION, CONFIDENCE_THRESHOLD
 from backend.inbox.policy import review_reason
+from backend.applications.tracking import apply_email_decision, automation_ready, email_history
 from backend.inbox.google_oauth import encrypt_content
 from backend.models.candidates import CandidateMailbox, InboxMessage
 from backend.models.db import Application, ApplicationReview, EmailClassification, JobRun, SessionLocal, utcnow
 from backend.models.tenancy import Firm
+import logging
 
 logger = logging.getLogger("jobnavigator.inbox")
 MAX_ATTEMPTS = 3
@@ -60,19 +68,62 @@ def _add_review(db, message, app, result):
     return row
 
 
-def _log_ai_call(cfg, result, error, snapshot, duration_ms):
-    """One llm_call_log row per provider call, with the firm, as every other AI feature writes (Q33)."""
-    from backend.analyzer.llm_logger import log_llm_call
-    usage = (result.usage if result else error.usage) or {}
-    log_llm_call('email_classification', cfg.provider, cfg.model,
-                 {'input_tokens': int(usage.get('prompt_tokens', 0)), 'output_tokens': int(usage.get('completion_tokens', 0))},
-                 duration_ms=duration_ms, success=error is None,   # job_id is a job posting's: none here
-                 error=error.code if error else None, firm_id=snapshot.firm_id)
+def _account(db, cfg, job, firm_id, *, success, duration_ms):
+    """Record one dispatched call in AI spend, in the caller's result transaction, exactly once (DEBUG D-15, Q33).
+
+    Every dispatched call gets one llm_call_log row for its firm, failures included (main's AI-spend rule). Its cost is
+    the provider's charge (ACTUAL) or OpenRouter price x tokens (ESTIMATED); when neither is known the row's cost is the
+    price table's result and the call is also counted as unpriced from job_runs, so it is never silently free.
+    """
+    meta = dict(job.meta or {})
+    if not meta.get('dispatch_started'):
+        return
+    usage = dict(meta.get('usage') or {})
+    tokens = {'input_tokens': int(usage.get('prompt_tokens') or 0),
+              'output_tokens': int(usage.get('completion_tokens') or 0)}
+    if isinstance(usage.get('cost'), (int, float)) and not isinstance(usage.get('cost'), bool):
+        quality, cost = 'ACTUAL', float(usage['cost'])
+    elif get_pricing('openrouter', cfg.model) and (tokens['input_tokens'] or tokens['output_tokens']):
+        quality, cost = 'ESTIMATED', calc_cost('openrouter', cfg.model, **tokens)
+    else:
+        quality, cost = 'UNKNOWN', None
+    meta['usage'] = {**usage, 'cost_quality': quality}
+    row_id = log_llm_call('email_classification', 'openrouter', cfg.model, tokens, duration_ms=duration_ms,
+                          success=success, error=meta.get('error_code'), firm_id=firm_id, cost_usd=cost, db=db)
+    if row_id:
+        meta['llm_call_log_id'] = str(row_id)
+    job.meta = meta
 
 
-def process_one(message_id, *, provider=None):
+def _settle_pause(cfg, outcome):
+    """Open the pause (outcome None) or finish a probe, in a separate short transaction."""
+    with SessionLocal() as db:
+        if outcome is None:
+            classifier_pause.record_pause(db, cfg, 'PROVIDER_AUTH_REJECTED')
+        else:
+            classifier_pause.finish_probe(db, cfg, outcome)
+
+
+def _gate(db, cfg):
+    """'go', 'probe' (this caller holds the probe lease) or None (do not claim anything)."""
+    if not is_configured(cfg):
+        return None
+    if classifier_pause.active_pause(db, cfg) is None:
+        return 'go'
+    return 'probe' if classifier_pause.claim_probe(db, cfg) else None
+
+
+def process_one(message_id, *, provider=None, aliases=None):
     if not enabled():
         return False
+    # Configuration and pause are checked before any claim: a missing setting or a rejected key leaves mail PENDING
+    # with its attempts untouched (DEBUG D-02, D-03).
+    with SessionLocal() as db:
+        cfg = ai_config('email_classification', db=db)
+        gate = _gate(db, cfg)
+    if gate is None:
+        return False
+    probing = gate == 'probe'
     with SessionLocal() as db:
         message = db.query(InboxMessage).filter_by(id=message_id).with_for_update(skip_locked=True).first()
         if not message or not _current(db, message):
@@ -92,7 +143,6 @@ def process_one(message_id, *, provider=None):
             logger.warning("Email %s classification gave up after %d attempts", message.id, message.classification_attempts)
             return False
         mailbox = _current(db, message)
-        cfg = ai_config('email_classification', db=db)
         fingerprint = config_identity(cfg)
         token = uuid.uuid4()
         message.classification_token = token
@@ -113,7 +163,7 @@ def process_one(message_id, *, provider=None):
         db.commit()
     result = None
     error = None
-    called_at = None
+    duration_ms = 0
     try:
         with SessionLocal() as db:
             # Immediate dispatch check after claim: no stale provider send after disconnect/erase/off.
@@ -121,26 +171,39 @@ def process_one(message_id, *, provider=None):
             box = _current(db, row) if row else None
             if (not enabled() or not box or box.connected_at != snapshot.generation
                     or row.classification_token != token or row.content_revision != snapshot.content_revision
-                    or config_identity(ai_config('email_classification', db=db)) != fingerprint):
+                    or config_identity(ai_config('email_classification', db=db)) != fingerprint
+                    or (not probing and classifier_pause.active_pause(db, cfg) is not None)):
                 raise DeciderError('WORK_INVALIDATED')
-            subject, body = classification_text(row)
-        called_at = time.monotonic()
-        result = (provider or classify)(subject, body, cfg)
+            parts = email_parts(row)
+            subject, body = parts.subject, parts.current
+            # Committed before the request: "dispatch started; charge unknown" (DEBUG D-15). A crash after this
+            # point is counted as possibly charged, never as free.
+            started = scoped(db, JobRun, snapshot.firm_id).filter_by(id=snapshot.job_id).one()
+            started.meta = {**started.meta, 'dispatch_started': True}
+            db.commit()
+        sent_at = time.monotonic()
+        try:
+            result = (provider or classify)(subject, ai_input(parts), cfg)
+        finally:
+            duration_ms = int((time.monotonic() - sent_at) * 1000)
     except DeciderError as exc:
         error = exc
     except Exception:
         # No exception text: it may include a key, decrypted data or provider request.
         error = DeciderError('PROCESSING_FAILED')
-    # The provider was called: count it in AI spend (Q33). A classifier that isn't set up refuses before sending.
-    if called_at is not None and not (error and error.code == 'CLASSIFIER_NOT_CONFIGURED'):
-        _log_ai_call(cfg, result, error, snapshot, int((time.monotonic() - called_at) * 1000))
     with SessionLocal() as db:
         row = scoped(db, InboxMessage, snapshot.firm_id).filter_by(id=message_id).with_for_update().first()
-        job = scoped(db, JobRun, snapshot.firm_id).filter_by(id=snapshot.job_id).one()
+        job = scoped(db, JobRun, snapshot.firm_id).filter_by(id=snapshot.job_id).with_for_update().one()
+        if job.status != 'running':
+            # Already finalized: never write a second result or cost row for one attempt.
+            db.rollback()
+            return False
         job.status = 'failed' if error else 'completed'
         job.finished_at = utcnow()
         job.meta = {**job.meta, 'usage': result.usage if result else error.usage,
                     'error_code': error.code if error else None}
+        _account(db, cfg, job, snapshot.firm_id, success=error is None,
+                 duration_ms=duration_ms)
         box = _current(db, row) if row else None
         valid = (enabled() and box and box.connected_at == snapshot.generation
                  and row.classification_token == token and row.content_revision == snapshot.content_revision
@@ -158,14 +221,25 @@ def process_one(message_id, *, provider=None):
             return False
         row.classification_token = None
         row.classification_lease_until = None
-        if error and error.code == 'WORK_INVALIDATED':
+        rejected = bool(error and error.code == 'PROVIDER_AUTH_REJECTED')
+        inconclusive_probe = bool(probing and error and error.retryable)
+        if error and (error.code == 'WORK_INVALIDATED' or rejected or inconclusive_probe):
+            # Not this email's fault: release it without spending an attempt.
             row.classification_attempts = max(0, row.classification_attempts - 1)
             row.classification_state = 'PENDING'
             row.classification_next_retry_at = None
             row.classification_error = None
-            job.meta = {**job.meta, 'discarded': True}
+            job.meta = {**job.meta, 'discarded': error.code == 'WORK_INVALIDATED', 'released': True}
             db.commit()
+            if rejected and not probing:
+                _settle_pause(cfg, None)
+                logger.warning('Candidate email classifier paused: provider rejected the credentials.')
+            elif probing:
+                _settle_pause(cfg, 'auth' if rejected else 'inconclusive')
             return False
+        if probing:
+            # Any other answer proves the credentials are accepted again (own session: the email stays locked here).
+            _settle_pause(cfg, 'cleared')
         if error:
             retry = error.retryable and row.classification_attempts < MAX_ATTEMPTS
             row.classification_state = 'PENDING' if retry else 'ERROR'
@@ -174,22 +248,45 @@ def process_one(message_id, *, provider=None):
             job.meta = {**job.meta, 'retry_exhausted': not retry}
             db.commit()
             logger.warning("Email %s classification failed: %s (attempt %d, %s)", message_id, error.code,
-                           row.classification_attempts, 'will retry' if retry else 'gave up')
+                           row.classification_attempts, 'will retry' if row.classification_state == 'PENDING' else 'gave up')
             return False
         # Snapshot match/app revision after I/O; never trust a stale pre-call match.
         had_application_link = row.application_id is not None
         app_id = row.application_id
         if app_id is None:
-            app_id = matching_application_id(db, box, row, allow_thread=row.sender_auth_result == 'PASS')
+            app_id = matching_application_id(db, box, row, allow_thread=row.sender_auth_result == 'PASS', aliases=aliases)
         app = submitted_applications(db, row.firm_id, row.candidate_id).filter_by(id=app_id).with_for_update().first() if app_id else None
-        if app and app.applied_at is None and app.submitted_by_user_id is None:
-            app = None
         # Existing human link is not overwritten by model-derived identity.
         if row.application_id is None and app:
             row.application_id = app.id
-        confident_other = result.category == 'other' and result.confidence >= CONFIDENCE_THRESHOLD
-        reason = 'OTHER' if confident_other else 'LOW_CONFIDENCE' if result.category == 'other' else review_reason(app, row, result, body)
-        record = EmailClassification(firm_id=row.firm_id, candidate_id=row.candidate_id,
+        # Signals that the answer itself is uncertain come first and are never hidden as Other (DEBUG D-01, D-04).
+        uncertain = ('FORWARDED_EMAIL' if parts.is_forward
+                     else 'INSUFFICIENT_CONTENT' if has_too_little_text(parts)
+                     else 'CONFIDENCE_DISAGREEMENT'
+                     if values_disagree(result.confidence, result.probabilities, result.category) else None)
+        value = decision_value(result.confidence, result.probabilities, result.category)
+        confident_other = uncertain is None and result.category == 'other' and value >= CONFIDENCE_THRESHOLD
+        reason = (uncertain or ('OTHER' if confident_other else 'LOW_CONFIDENCE' if result.category == 'other'
+                                else review_reason(app, row, result, body)))
+        if app is not None and uncertain is None and not confident_other and reason != 'SAME_STAGE':
+            # Reclassification never re-applies an email (DEBUG D-11 replay cases).
+            # Same category as the current stage: nothing to decide. Otherwise a person decides.
+            history = email_history(db, app, row)
+            if history and result.category == app.status:
+                reason = 'SAME_STAGE'
+            elif history == 'UNDONE':
+                reason = 'AUTOMATIC_CHANGE_UNDONE'
+            elif history == 'APPLIED':
+                reason = 'EMAIL_ALREADY_APPLIED'
+        # Every check passed and automation is switched on, approved and started: write the status first (PR 4);
+        # classification rows are immutable, so the row is inserted once with its final outcome.
+        record_id = uuid.uuid4()
+        # Historical mail (imported while classification was off) can only create a review (D-23).
+        if (reason == 'AUTO_STATUS_DISABLED' and app is not None and automation_ready(row)
+                and not backfill.is_historical(db, row.id)
+                and apply_email_decision(db, app, row, record_id, target=result.category)):
+            reason = 'AUTO_APPLIED'
+        record = EmailClassification(id=record_id, firm_id=row.firm_id, candidate_id=row.candidate_id,
             inbox_message_id=row.id, application_id=app.id if app else None,
             application_revision=app.status_revision if app else None,
             result_version=snapshot.result_version, content_revision=row.content_revision,
@@ -197,7 +294,8 @@ def process_one(message_id, *, provider=None):
             provider=cfg.provider, model=cfg.model, prompt_version=fingerprint,
             category_version=CATEGORY_VERSION, sender_auth_result=row.sender_auth_result,
             receive_time_verified=row.receive_time_verified,
-            outcome='OTHER' if confident_other else 'NO_CHANGE' if reason == 'SAME_STAGE' else 'REVIEW', reason=reason)
+            outcome=('OTHER' if confident_other else 'AUTO_APPLIED' if reason == 'AUTO_APPLIED'
+                     else 'NO_CHANGE' if reason == 'SAME_STAGE' else 'REVIEW'), reason=reason)
         db.add(record)
         db.flush()
         # An existing pending human business review must remain accessible until human resolution.
@@ -207,21 +305,47 @@ def process_one(message_id, *, provider=None):
             row.other_purge_after = row.hidden_at + timedelta(days=30)
             for field in ('subject', 'from_name', 'from_email'):
                 setattr(row, field, encrypt_content(getattr(row, field)))
-        elif not confident_other and reason != 'SAME_STAGE':
+        elif not confident_other and reason not in ('SAME_STAGE', 'AUTO_APPLIED'):
             _add_review(db, row, app, record)
         row.classification_state = 'DONE'
         row.classification_version = snapshot.result_version
         row.classification_error = None
         row.classification_next_retry_at = None
         db.commit()
-        logger.info("Email %s classified: %s", message_id, record.outcome)
+        logger.info("Email %s classified: %s", message_id, row.classification_state)
     return True
 
 
-def process_pending(*, limit=20):
+def classify_all(ids, aliases, concurrency) -> int:
+    """Classify the emails, up to `concurrency` at once; returns how many finished.
+
+    The AI call is the slow part and runs outside any database lock; process_one claims each email under its own row
+    lock (skip_locked), so two workers never take the same one, and an application's status is written under its own
+    row lock. concurrency 1 is the earlier one-at-a-time behaviour.
+    """
+    workers = min(concurrency, len(ids))
+    if workers <= 1:
+        return sum(process_one(identity, aliases=aliases) for identity in ids)
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix='candidate-email-call') as pool:
+        return sum(pool.map(lambda identity: process_one(identity, aliases=aliases), ids))
+
+
+def process_pending(*, limit=None):
+    from backend import config
+    limit = config.CANDIDATE_EMAIL_SWEEP_LIMIT if limit is None else limit
     if not enabled():
         return 0
     with SessionLocal() as db:
+        cfg = ai_config('email_classification', db=db)
+        if not is_configured(cfg):
+            logger.warning('Candidate email classification is switched on but not configured; mail stays queued.')
+            return 0
+        if classifier_pause.active_pause(db, cfg) is not None:
+            limit = 1  # a paused classifier sends at most one probe email
+        else:
+            # Earlier mail joins the normal queue in bounded, once-only batches (both switches default off).
+            backfill.recover_setup_failures(db)
+            backfill.queue_historical(db)
         rows = db.query(InboxMessage.id).filter(
             InboxMessage.deleted_at.is_(None), InboxMessage.hidden_at.is_(None),
             InboxMessage.classification_state.in_(['PENDING', 'PROCESSING']),
@@ -230,7 +354,8 @@ def process_pending(*, limit=20):
         ).join(CandidateMailbox, InboxMessage.mailbox_id == CandidateMailbox.id).filter(
             CandidateMailbox.status == 'CONNECTED', func.lower(func.trim(InboxMessage.source_address)) == func.lower(func.trim(CandidateMailbox.address)),
         ).order_by(InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
-    done = sum(process_one(identity) for (identity,) in rows)
+        aliases = company_aliases(db) if rows else {}
+    done = classify_all([identity for (identity,) in rows], aliases, config.CANDIDATE_EMAIL_CLASSIFY_CONCURRENCY)
     if rows:
         logger.info("Email classification: %d of %d pending emails classified", done, len(rows))
     return done

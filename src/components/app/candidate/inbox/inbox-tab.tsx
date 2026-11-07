@@ -66,8 +66,16 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
   const sync = useSyncMailbox(candidate.id);
   const connected = ws.inbox?.connection?.status === "CONNECTED";
   const pendingIds = new Set(ws.suggestions.map((s) => s.message.id));
+  const reviewIds = new Set(ws.reviews.map((r) => r.messageId));
+  // Live mail carries the classifier's category; mock mail carries a signal (PR 4).
+  const FILTER_CATEGORIES: Partial<Record<Filter, string[]>> = {
+    INTERVIEW_SCHEDULED: ["interview_scheduled", "interview_schedule_request"], SHORTLISTED: ["shortlisted", "assessment"],
+    CALL_REQUEST: ["screening_call"], OFFER: ["offer"], REJECTED: ["move_on"],
+  };
   const inFilter = (f: Filter, m: InboxMessage) =>
-    f === "ALL" || (f === "ACTION" ? pendingIds.has(m.id) : m.signal === f || (f === "SHORTLISTED" && m.signal === "ASSESSMENT"));
+    f === "ALL" || (f === "ACTION" ? pendingIds.has(m.id) || reviewIds.has(m.id)
+      : m.signal === f || (f === "SHORTLISTED" && m.signal === "ASSESSMENT")
+        || (!!m.classificationCategory && (FILTER_CATEGORIES[f] ?? []).includes(m.classificationCategory)));
   const filtered = ws.messages.filter((m) => inFilter(filter, m));
   const count = (f: Filter) => ws.messages.filter((m) => inFilter(f, m)).length;
   const selectedSummary = ws.messages.find((m) => m.id === selectedId) ?? filtered[0] ?? null;
@@ -115,6 +123,11 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
     <div className="space-y-3">
       {callbackMessage ? <p role="status">{callbackMessage}</p> : null}
       {["QUEUED", "IMPORTING"].includes(ws.inbox?.connection?.syncState ?? "") ? <p role="status">Importing emails… You can continue using BenchQ.</p> : null}
+      {ws.inbox?.hiddenCount ? (
+        <p className="text-caption text-[var(--color-text-3)]">
+          {ws.inbox.hiddenCount} {ws.inbox.hiddenCount === 1 ? "email was" : "emails were"} hidden as not about a job (newsletters, notifications). They are kept encrypted for 30 days and are never deleted from Gmail. When the inbox was connected, BenchQ imported the last 3 days of mail.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-sm text-[var(--color-text-3)]">
           <span aria-hidden className="inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-info-bg)] text-[var(--color-info-fg)]"><Mail size={13} /></span>
@@ -145,7 +158,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
         <ul className="max-h-[26rem] divide-y divide-[var(--color-border)] overflow-y-auto border-b border-[var(--color-border)] lg:max-h-none lg:border-b-0 lg:border-r" aria-label="Emails">
           {list.length === 0 ? <li className="px-4 py-8 text-center text-sm text-[var(--color-text-3)]">No emails in this view.</li> : null}
           {list.map((m, i) => {
-            const meta = mailSignalMeta(m.signal, m.classificationState);
+            const meta = mailSignalMeta(m.signal, m.classificationState, m.classificationCategory, m.classificationError);
             const isSelected = selected?.id === m.id;
             return (
               <li key={m.id}>
@@ -170,7 +183,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
                     </span>
                     <span className="block truncate text-sm text-[var(--color-text-2)]">{m.subject}</span>
                     <span className="mt-1 flex items-center gap-1.5">
-                      {m.classificationState !== "NOT_QUEUED" ? <span data-tone={meta.tone} className="bq-tag"><meta.Icon size={11} aria-hidden />{meta.label}</span> : null}
+                      {meta.isBadge ? <span data-tone={meta.tone} className="bq-tag"><meta.Icon size={11} aria-hidden />{meta.label}</span> : null}
                       {pendingIds.has(m.id) ? <span className="text-caption font-[550] text-[var(--color-violet-fg)]">Update suggested</span> : null}
                     </span>
                   </span>
@@ -188,6 +201,8 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
             suggestion={ws.suggestions.find((s) => s.message.id === selected?.id)}
             canAct={canAct}
             actions={actions}
+            review={ws.reviews.find((r) => r.messageId === selected?.id)}
+            applications={ws.applications}
           />
         </div>
       </div>

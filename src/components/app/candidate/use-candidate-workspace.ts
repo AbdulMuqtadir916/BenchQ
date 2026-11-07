@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import type { InboxMessage } from "@/lib/schemas/inbox";
 import { useCandidate } from "@/lib/hooks/use-candidates";
-import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
+import { useApplications, useFollowups, useWithPendingMoves } from "@/lib/hooks/use-applications";
+import { useEmailReviews } from "@/lib/hooks/use-email-reviews";
 import { useRecord } from "@/lib/hooks/use-records";
 import { useResumes } from "@/lib/hooks/use-resumes";
 import { useJobs } from "@/lib/hooks/use-jobs";
@@ -33,12 +34,15 @@ export function useCandidateWorkspace(candidateId: string) {
   const resumesQuery = useResumes(candidateId);
   const jobsQuery = useJobs({ limit: 300 });
   const inboxQuery = useCandidateInbox(candidateId);
+  const reviewsQuery = useEmailReviews(candidateId);
   const documentsQuery = useCandidateDocuments(candidateId);
   const followupsQuery = useFollowups();
   const teamQuery = useTeam();
 
   const candidate = candidateQuery.data;
-  const applications = useMemo(() => applicationsQuery.data ?? [], [applicationsQuery.data]);
+  const serverApplications = useMemo(() => applicationsQuery.data ?? [], [applicationsQuery.data]);
+  // A move in flight shows its target ("Saving…") without touching the cache (DEBUG D-06).
+  const { applications, saving } = useWithPendingMoves(serverApplications);
   const messages = useMemo(() => inboxQuery.data?.messages ?? [], [inboxQuery.data]);
 
   const derived = useMemo(() => {
@@ -89,6 +93,8 @@ export function useCandidateWorkspace(candidateId: string) {
     return (id: string | null) => (id ? (names.get(id) ?? null) : null);
   }, [teamQuery.data]);
   const ownerName = teamName(candidate?.bdeId ?? null);
+  const reviews = useMemo(() => reviewsQuery.data?.pages.flatMap((page) => page.reviews) ?? [], [reviewsQuery.data]);
+  const reviewTotal = reviewsQuery.data?.pages[0]?.totalCount ?? 0;
 
   return {
     now,
@@ -96,11 +102,15 @@ export function useCandidateWorkspace(candidateId: string) {
     candidate,
     applications,
     applicationsQuery,
+    saving,
     recordQuery,
     resumesQuery,
     jobsQuery,
     inboxQuery,
     inbox: inboxQuery.data ?? null,
+    reviewsQuery,
+    reviews,
+    reviewTotal,
     documentsQuery,
     expiringDocuments,
     master,

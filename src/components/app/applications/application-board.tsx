@@ -2,31 +2,40 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDndContext, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { Archive } from "lucide-react";
+import { Archive, Inbox } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
-import type { ApplicationStatus } from "@/lib/schemas/enums";
+import type { ApplicationStatus, StoredApplicationStatus } from "@/lib/schemas/enums";
 import type { InboxMessage } from "@/lib/schemas/inbox";
 import { useFollowups } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
 import { cn } from "@/lib/cn";
 import { ApplicationCardFace } from "./application-card";
-import { CLOSED, NEXT_STATUS, PIPELINE, STATUS_COLOR, STATUS_ICON, STATUS_LABEL } from "./status-meta";
+import { INCOMPLETE, PIPELINE, STATUS_COLOR, STATUS_ICON, STATUS_LABEL, isLegacy, isSelectable } from "./status-meta";
 
 interface ApplicationBoardProps {
   apps: Application[];
-  onMove: (id: string, to: ApplicationStatus) => void;
+  /** Candidate email review queue, rendered in its own read-only board column. */
+  reviewColumn?: ReactNode;
+  reviewCount?: number;
+  /** Returns false when the move is refused (another move for this card is still saving). */
+  onMove: (id: string, to: ApplicationStatus) => boolean | void;
+  /** Cards whose move is in flight. */
+  saving?: Set<string>;
   canAct: boolean;
   /** Show the candidate on each card (firm-wide board). Omit on a candidate's own page. */
   candidateName?: (candidateId: string) => string;
   /** Latest recruiter email per application, shown on the card. */
   signals?: Map<string, InboxMessage>;
   onOpen?: (applicationId: string) => void;
-  /** Add a read-only "Closed" column for rejected / withdrawn / expired. */
+  /** Always show the read-only "Older statuses" column (it also appears whenever a legacy value exists). */
   showClosed?: boolean;
 }
 
-/** The pipeline as columns. Drag a card one stage forward; anything else snaps back with the reason. */
-export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals, onOpen, showClosed = false }: ApplicationBoardProps) {
+/** The stages as columns. Drag a card to any stage (D1); legacy values sit in a read-only column, never hidden. */
+const LEGACY_COLUMN = "LEGACY";
+const REVIEW_COLUMN = "BDE_REVIEW";
+
+export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals, onOpen, showClosed = false, saving, reviewColumn, reviewCount }: ApplicationBoardProps) {
   const teamQuery = useTeam();
   const followupsQuery = useFollowups();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -50,11 +59,19 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
     return map;
   }, [followupsQuery.data]);
 
-  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), followUpDue: nextFollowup.get(app.id), signal: signals?.get(app.id) });
+  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), followUpDue: nextFollowup.get(app.id), signal: signals?.get(app.id), isSaving: saving?.has(app.id) });
   const active = apps.find((a) => a.id === activeId) ?? null;
-  const columns: Array<{ id: string; statuses: ApplicationStatus[] }> = [
-    ...PIPELINE.map((s) => ({ id: s, statuses: [s] })),
-    ...(showClosed ? [{ id: "CLOSED", statuses: CLOSED }] : []),
+  const hasLegacy = apps.some((a) => isLegacy(a.status));
+  const columns: Array<{ id: string; statuses: StoredApplicationStatus[] }> = [
+    ...PIPELINE.flatMap((s) => [
+      { id: s, statuses: [s] },
+      ...(s === "APPLIED" ? [
+        ...(apps.some((a) => a.status === INCOMPLETE) ? [{ id: INCOMPLETE, statuses: [INCOMPLETE] }] : []),
+        { id: REVIEW_COLUMN, statuses: [] },
+      ] : []),
+    ]),
+    { id: "MOVE_ON", statuses: ["MOVE_ON"] },
+    ...(showClosed || hasLegacy ? [{ id: LEGACY_COLUMN, statuses: apps.filter((a) => isLegacy(a.status)).map((a) => a.status) }] : []),
   ];
 
   function onDragEnd(event: DragEndEvent) {
@@ -62,14 +79,13 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
     if (!canAct) return; // nothing is draggable then; and the backend refuses a VIEWER's write anyway
     const app = apps.find((a) => a.id === String(event.active.id));
     const to = String(event.over?.id ?? "");
-    if (!app || !PIPELINE.includes(to as ApplicationStatus) || to === app.status) return;
-    const next = NEXT_STATUS[app.status];
-    if (next !== to) {
-      setRefusal(next ? `${STATUS_LABEL[app.status]} can only move to ${STATUS_LABEL[next]}.` : `A ${STATUS_LABEL[app.status].toLowerCase()} application can't move.`);
+    if (!app || to === app.status) return;
+    if (!isSelectable(to as StoredApplicationStatus)) {
+      setRefusal("Older statuses are read-only. Choose a current stage instead.");
       return;
     }
     setRefusal(null);
-    onMove(app.id, to as ApplicationStatus);
+    if (onMove(app.id, to as ApplicationStatus) === false) setRefusal("Saving… wait for the current move of this application to finish.");
   }
 
   return (
@@ -77,11 +93,21 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
       {refusal ? <p role="status" className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-warning-bg)] px-3 py-2 text-caption text-[var(--color-warning-fg)]">{refusal}</p> : null}
       <div className="bq-board" aria-label="Application pipeline">
         {columns.map((col) => {
-          const items = apps.filter((a) => col.statuses.includes(a.status));
+          if (col.id === REVIEW_COLUMN && reviewColumn) return (
+            <BoardColumn key={col.id} id={col.id} count={reviewCount ?? 0} hasCustomContent>
+              {reviewColumn}
+            </BoardColumn>
+          );
+          const items = apps.filter((a) => col.id === REVIEW_COLUMN ? a.pendingReviewCount > 0 : col.statuses.includes(a.status));
           return (
             <BoardColumn key={col.id} id={col.id} count={items.length}>
-              {items.map((app) => (
-                <BoardCard key={app.id} app={app} canDrag={canAct && !!NEXT_STATUS[app.status]} onOpen={onOpen}>
+              {items.map((app) => col.id === REVIEW_COLUMN ? (
+                <button key={app.id} type="button" onClick={() => onOpen?.(app.id)} className="bq-card w-full p-3.5 text-left">
+                  <p className="mb-2 text-caption text-[var(--color-text-3)]">Last confirmed: {STATUS_LABEL[app.status]}</p>
+                  <ApplicationCardFace {...face(app)} />
+                </button>
+              ) : (
+                <BoardCard key={app.id} app={app} canDrag={canAct && app.pendingReviewCount === 0} onOpen={onOpen}>
                   <ApplicationCardFace {...face(app)} />
                 </BoardCard>
               ))}
@@ -94,25 +120,28 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
   );
 }
 
-function BoardColumn({ id, count, children }: { id: string; count: number; children: ReactNode }) {
-  const isClosedColumn = id === "CLOSED";
-  const { setNodeRef } = useDroppable({ id, disabled: isClosedColumn });
+function BoardColumn({ id, count, children, hasCustomContent = false }: { id: string; count: number; children: ReactNode; hasCustomContent?: boolean }) {
+  const isLegacyColumn = id === LEGACY_COLUMN;
+  const isReviewColumn = id === REVIEW_COLUMN;
+  const isReadOnly = isLegacyColumn || isReviewColumn;
+  const { setNodeRef } = useDroppable({ id, disabled: isReadOnly });
   const { active, over } = useDndContext();
-  const from = active?.data.current?.status as ApplicationStatus | undefined;
-  const drop = over?.id !== id || !from || from === id ? undefined : NEXT_STATUS[from] === id ? "valid" : "invalid";
+  const from = active?.data.current?.status as StoredApplicationStatus | undefined;
+  const drop = over?.id !== id || !from || from === id ? undefined : isReadOnly ? "invalid" : "valid";
   const status = id as ApplicationStatus;
-  const Icon = isClosedColumn ? Archive : STATUS_ICON[status];
-  const label = isClosedColumn ? "Closed" : STATUS_LABEL[status];
+  const Icon = isReviewColumn ? Inbox : isLegacyColumn ? Archive : STATUS_ICON[status];
+  const label = isReviewColumn ? "BDE Review" : isLegacyColumn ? "Older statuses" : STATUS_LABEL[status];
 
   return (
     <section ref={setNodeRef} className="bq-board-col" data-drop={drop} aria-label={`${label}, ${count}`}>
       <div className="bq-board-head">
-        <Icon size={16} strokeWidth={1.9} aria-hidden className={cn("shrink-0", isClosedColumn ? "text-[var(--color-text-3)]" : STATUS_COLOR[status])} />
+        <Icon size={16} strokeWidth={1.9} aria-hidden className={cn("shrink-0", isReviewColumn ? "text-[var(--color-violet-fg)]" : isLegacyColumn ? "text-[var(--color-text-3)]" : STATUS_COLOR[status])} />
         <h2 className="text-body-strong">{label}</h2>
         <span className="bq-count">{count}</span>
       </div>
+      {isReviewColumn ? <p className="px-3 text-caption text-[var(--color-text-3)]">Applications keep their last confirmed status until review.</p> : null}
       <div className="bq-board-list">
-        {count === 0 ? <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] px-3 py-4 text-center text-caption text-[var(--color-text-3)]">Nothing here</p> : children}
+        {count === 0 && !hasCustomContent ? <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] px-3 py-4 text-center text-caption text-[var(--color-text-3)]">Nothing here</p> : children}
       </div>
     </section>
   );

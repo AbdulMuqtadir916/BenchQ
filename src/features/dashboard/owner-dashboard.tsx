@@ -1,5 +1,7 @@
 "use client";
 
+import { reachedOffer } from "@/components/app/applications/status-meta";
+
 import { isBde } from "@/lib/auth/roles";
 import { useMemo } from "react";
 import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
@@ -34,7 +36,7 @@ export function OwnerDashboard() {
   const invites = invitesQuery.data ?? EMPTY;
 
   const placements = useMemo(
-    () => applications.filter((a) => a.status === "PLACED"),
+    () => applications.filter(reachedOffer), // D6: selected = reached Offer, or a legacy placement
     [applications],
   );
 
