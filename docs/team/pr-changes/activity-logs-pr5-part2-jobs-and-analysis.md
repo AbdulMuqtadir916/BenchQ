@@ -16,6 +16,21 @@ Logs the firm's job feed. No table, route or response changes. Job entries are a
 `POST /api/jobs/linkedin-import` moves to `NOT_FIRM_ACTIVITY` in the rules test: only a Super Admin can reach it, like
 searches and settings, so it isn't a firm's activity.
 
+## Background work, for the Super Admin only
+
+Scrapes, scoring, Gmail and Telegram events, scheduled runs and AI calls write to `activity_logs`. Every one of these rows
+has no firm, so a firm reader never gets one.
+
+- `log_activity` writes a system row. Its 22 callers still say what happened. A scrape with no new jobs, nothing found and
+  no error writes nothing, and neither does a scoring or email check that handled nothing.
+- A scheduled run that did something or failed writes one system row, named Scheduler. Manual runs and empty ones don't.
+- Every LLM call writes an AI agent row saying what it did, such as "AI agent scored 80 jobs against the résumés", with
+  tokens and cost. A scheduled run writes one row for each kind of work, with the totals. These rows sit beside the
+  person's own AI agent row, which is unchanged.
+- The email check and the digest report their own counts for the run summary. They used to count rows in `activity_log_v2`.
+
+`llm_call_log`, `scrape_log` and `job_runs` keep their rows as before.
+
 ## Files changed
 
 | File | Changes and reason |

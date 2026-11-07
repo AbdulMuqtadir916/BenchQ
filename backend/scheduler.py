@@ -167,20 +167,12 @@ def _scrape_summary(since) -> str:
         db.close()
 
 
-def _activity_summary(since, log_type: str, noun: str, plural: str = None) -> str:
-    """Count the activity-log rows a run produced, e.g. "1 reply" / "3 replies"; pass an explicit
-    `plural` whenever it isn't just the noun plus an s."""
-    from backend.models.db import ActivityLog
-    db = SessionLocal()
-    try:
-        n = db.query(ActivityLog).filter(
-            ActivityLog.created_at >= since, ActivityLog.type == log_type
-        ).count()
-        if not n:
-            return ""
-        return f"{n} {noun}" if n == 1 else f"{n} {plural or noun + 's'}"
-    finally:
-        db.close()
+def _count_summary(count: int, noun: str, plural: str = None) -> str:
+    """What a run did, e.g. "1 reply" / "3 replies", or "" for nothing; pass an explicit `plural` whenever it isn't just
+    the noun plus an s."""
+    if not count:
+        return ""
+    return f"{count} {noun}" if count == 1 else f"{count} {plural or noun + 's'}"
 
 
 # ── Scheduled jobs ──────────────────────────────────────────────────────────
@@ -207,10 +199,9 @@ async def run_email_check():
     try:
         async with tracked_run("email_check", "scheduler") as run:
             logger.info("Running email check...")
-            started = datetime.now(timezone.utc)
             from backend.email_monitor.gmail_client import check_emails
-            await check_emails()
-            run.summary = _activity_summary(started, "email", "reply", "replies") or "No new replies"
+            replies = await check_emails()
+            run.summary = _count_summary(replies, "reply", "replies") or "No new replies"
     except JobAlreadyRunningError as e:
         logger.warning(f"Scheduler skipped: {e}")
 
@@ -250,10 +241,9 @@ async def send_daily_digest():
     try:
         async with tracked_run("daily_digest", "scheduler") as run:
             logger.info("Sending daily digest...")
-            started = datetime.now(timezone.utc)
             from backend.notifier.telegram import send_digest
-            await send_digest()
-            run.summary = _activity_summary(started, "telegram", "alert") or "Digest sent"
+            alerts = await send_digest()
+            run.summary = _count_summary(alerts, "alert") or "Digest sent"
     except JobAlreadyRunningError as e:
         logger.warning(f"Scheduler skipped: {e}")
 

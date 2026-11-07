@@ -200,12 +200,13 @@ def _apply_llm_result_to_app(db, matched_app, llm_result: dict, body: str, subje
     )
 
 
-async def check_emails():
-    """Poll Gmail for recruiter responses and update application statuses."""
+async def check_emails() -> int:
+    """Poll Gmail for recruiter responses and update application statuses. Returns the replies read."""
     access_token = await _get_access_token()
     if not access_token:
-        return
+        return 0
 
+    replies = 0
     db = SessionLocal()
     try:
         processed_ids = _load_processed_ids(db)
@@ -222,7 +223,7 @@ async def check_emails():
 
             if resp.status_code != 200:
                 logger.error(f"Gmail list messages failed: {resp.text}")
-                return
+                return replies
 
             messages = resp.json().get("messages", [])
             logger.info(f"Gmail: found {len(messages)} messages from known domains")
@@ -311,6 +312,7 @@ async def check_emails():
 
                         # Status + confidence only — a summary paraphrasing the recruiter's email
                         # body is not something we want persisted in activity_log.
+                        replies += 1
                         from backend.activity import log_activity
                         log_activity(
                             "email",
@@ -319,6 +321,7 @@ async def check_emails():
                             db=db,
                         )
                     else:
+                        replies += 1
                         from backend.activity import log_activity
                         log_activity(
                             "email",
@@ -331,8 +334,10 @@ async def check_emails():
         _save_processed_ids(db, processed_ids)
 
         from backend.activity import log_activity
-        log_activity("email", f"Email check: {len(messages)} messages found from known domains", db=db)
+        log_activity("email", f"Email check: {len(messages)} messages found from known domains", db=db,
+                     is_empty=not messages)
         db.commit()
+        return replies
 
     except Exception as e:
         logger.error(f"Email check failed: {e}")

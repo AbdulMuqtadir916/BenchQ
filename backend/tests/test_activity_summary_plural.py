@@ -1,64 +1,42 @@
-"""Run summaries must use a real plural, not noun + "s"; _activity_summary takes an explicit plural."""
-from datetime import datetime, timedelta, timezone
-
+"""Run summaries must use a real plural, not noun + "s"; _count_summary takes an explicit plural."""
 import pytest
 
 pytest.importorskip("apscheduler")   # scheduler.py imports it at module level
 
-from backend.models.db import ActivityLog
+from backend.scheduler import _count_summary
 
 
-def _rows(db, n, log_type="email"):
-    for i in range(n):
-        db.add(ActivityLog(type=log_type, message=f"m{i}"))
-    db.commit()
+def test_singular_reply():
+    assert _count_summary(1, "reply", "replies") == "1 reply"
 
 
-def _since():
-    return datetime.now(timezone.utc) - timedelta(minutes=5)
+def test_plural_replies():
+    assert _count_summary(3, "reply", "replies") == "3 replies"
 
 
-def test_singular_reply(test_db):
-    from backend.scheduler import _activity_summary
-    _rows(test_db, 1)
-    assert _activity_summary(_since(), "email", "reply", "replies") == "1 reply"
-
-
-def test_plural_replies(test_db):
-    from backend.scheduler import _activity_summary
-    _rows(test_db, 3)
-    assert _activity_summary(_since(), "email", "reply", "replies") == "3 replies"
-
-
-def test_zero_is_still_empty(test_db):
+def test_zero_is_still_empty():
     """An empty string is what makes the caller's `or "No new replies"` fire."""
-    from backend.scheduler import _activity_summary
-    assert _activity_summary(_since(), "email", "reply", "replies") == ""
+    assert _count_summary(0, "reply", "replies") == ""
 
 
-def test_regular_nouns_need_no_plural_argument(test_db):
+def test_regular_nouns_need_no_plural_argument():
     """The digest's "alert" / "alerts" caller keeps working unchanged."""
-    from backend.scheduler import _activity_summary
-    _rows(test_db, 1, log_type="telegram")
-    assert _activity_summary(_since(), "telegram", "alert") == "1 alert"
-    _rows(test_db, 1, log_type="telegram")
-    assert _activity_summary(_since(), "telegram", "alert") == "2 alerts"
+    assert _count_summary(1, "alert") == "1 alert"
+    assert _count_summary(2, "alert") == "2 alerts"
 
 
-@pytest.mark.asyncio
-async def test_email_check_run_summary_reads_reply(test_db, monkeypatch):
-    """The scheduled email check writes the pluralised string to JobRun.summary."""
-    import backend.scheduler as sched
+async def test_email_check_summary_uses_the_replies_it_read(monkeypatch):
+    from backend import job_monitor, scheduler
+    from backend.email_monitor import gmail_client as gmail
+    seen = []
 
     async def fake_check_emails():
-        test_db.add(ActivityLog(type="email", message="Email check: 2 messages found"))
-        test_db.commit()
+        return 2
 
-    import backend.email_monitor.gmail_client as gmail
+    real = job_monitor._finish_job_run
+    monkeypatch.setattr(job_monitor, "_finish_job_run", lambda run_id, status, summary, error: seen.append(summary))
     monkeypatch.setattr(gmail, "check_emails", fake_check_emails)
-
-    await sched.run_email_check()
-
-    from backend.models.db import JobRun
-    run = test_db.query(JobRun).filter(JobRun.job_type == "email_check").one()
-    assert run.result_summary == "1 reply"
+    monkeypatch.setattr(job_monitor, "_insert_job_run", lambda *a, **k: None)
+    await scheduler.run_email_check()
+    assert seen == ["2 replies"]
+    assert real is not None
