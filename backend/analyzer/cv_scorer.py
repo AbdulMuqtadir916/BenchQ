@@ -760,7 +760,7 @@ async def analyze_unscored_jobs(status: str = "saved"):
     db = SessionLocal()
     try:
         from backend.activity import log_activity
-        log_activity("cv_score", f"Resume scoring complete: {total_scored} jobs processed", db=db)
+        log_activity("cv_score", f"Resume scoring complete: {total_scored} jobs processed", db=db, is_empty=not total_scored)
         db.commit()
     finally:
         db.close()
