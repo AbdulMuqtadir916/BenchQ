@@ -59,6 +59,9 @@ export const candidatesMock = firmScoped("candidates", {
     const capacity = candidateCapacity(firm, allCandidates);
     if (assignment.bdeId !== null && !capacity.canAssignCandidate) throw new ApiError(assignBlockReason(capacity), "CANDIDATE_LIMIT", 409);
 
+    const file = parsedFiles.get(input.resumeParseId);
+    if (!file) throw new ApiError("Upload and read a résumé before creating a candidate.", "INVALID_RESUME_PARSE", 400);
+
     const now = new Date();
     const candidate = CandidateSchema.parse({
       id: newId("cand", now),
@@ -110,7 +113,6 @@ export const candidatesMock = firmScoped("candidates", {
       })),
       certificates: [],
     });
-    const file = input.resumeParseId ? parsedFiles.get(input.resumeParseId) ?? { fileName: "resume.pdf", mimeType: "application/pdf", sizeBytes: 1024 } : null;
     const documentId = newId("doc", now);
     const document = file ? CandidateDocumentSchema.parse({
       id: documentId, firmId, candidateId: candidate.id, kind: "RESUME", title: "Original resume", fileName: file.fileName, mimeType: file.mimeType,
