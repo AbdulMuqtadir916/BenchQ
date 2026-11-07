@@ -259,6 +259,33 @@ def test_the_bdes_upload_is_a_new_active_base_from_the_parse_and_the_profile_sta
     assert parser == [world["firm"].id]
 
 
+def test_the_ledger_and_the_profile_take_the_new_active_bases_name(anonymous_client, test_db, world, parser):
+    """Abdul's PR 7 review #3: the name read from the old base isn't reused once the active base changes (07 Q57)."""
+    from backend.models.tenancy import LedgerEntry
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")         # the form's name: Ravi Teja
+    assert anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"]).status_code == 201
+    profile_url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
+    assert anonymous_client.get(profile_url, headers=world["as"]["owner"]).json()["full_name"] == "Ravi T"   # the file's
+    upload = test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == uuid.UUID(c["id"]),
+                                               LedgerEntry.action == "CREATE", LedgerEntry.entity_type == "resume") \
+        .order_by(LedgerEntry.created_at.desc()).first()
+    assert upload.entity_label == "Ravi T · Base 2"
+    # A save on the active base that changes the name: its ledger entry carries the new one.
+    v1 = _v(anonymous_client, world, c, base_number=2, who="adnan")
+    assert _save(anonymous_client, world, c, v1, "adnan", full_name="Ravi Teja Kumar").status_code == 201
+    saved = test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == uuid.UUID(c["id"]),
+                                              LedgerEntry.action == "UPDATE").order_by(LedgerEntry.created_at.desc()).first()
+    assert saved.entity_label == "Ravi Teja Kumar · Base 2 v2"
+
+
+def test_a_profile_whose_active_resume_names_no_country_reads_none_never_us(anonymous_client, test_db, world):
+    """Abdul's PR 7 review #5: no country is invented; the profile shows what the active résumé says, or none."""
+    c = _candidate(anonymous_client, test_db, world)
+    assert _save(anonymous_client, world, c, _v(anonymous_client, world, c), country="").status_code == 201
+    profile = anonymous_client.get(f"/api/firms/{world['firm'].id}/candidates/{c['id']}", headers=world["as"]["owner"])
+    assert profile.json()["country"] is None
+
+
 def test_the_same_file_again_is_answered_with_its_base_without_reading_it(anonymous_client, test_db, world, parser):
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"])
@@ -369,6 +396,16 @@ def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_
     assert picked["is_active"]
 
 
+def test_the_list_marks_what_an_owner_or_manager_made_so_the_bde_gets_no_delete_there(anonymous_client, test_db, world):
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")          # created by the owner: Base 1 v1 is theirs
+    v1 = _v(anonymous_client, world, c, who="adnan")
+    assert _save(anonymous_client, world, c, v1, "adnan", summary="The BDE's version.").status_code == 201
+    [base] = _listing(anonymous_client, world, c, "adnan")["bases"]
+    assert base["made_by_lead"] is True                                     # the same rule as base_removal
+    by_version = {v["version"]: v["made_by_lead"] for v in base["versions"]}
+    assert by_version == {1: True, 2: False}                               # the BDE's v2 stays deletable
+
+
 def test_picking_a_version_whose_promoted_base_was_deleted_brings_that_base_back(anonymous_client, test_db, world):
     from backend.models.candidates import BaseResume
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
@@ -382,6 +419,9 @@ def test_picking_a_version_whose_promoted_base_was_deleted_brings_that_base_back
     again = anonymous_client.post(_url(world, c, f"/{v2['id']}/use-as-base"), headers=as_bde)
     assert again.status_code == 200 and again.json()["id"] == base2["id"] and again.json()["is_active"]
     assert len(_listing(anonymous_client, world, c)["bases"]) == 2            # no third copy: the same base is back
+    from backend.models.tenancy import LedgerEntry
+    last = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == base2["id"]).order_by(LedgerEntry.created_at.desc()).first()
+    assert last.summary == "Restored Base 2 (its v1) by using Base 1 v2 again; the workflow uses it"   # not "the same file"
 
 
 # ── Races: forced at the same time, with the candidate row held by another session ──────────────────────────

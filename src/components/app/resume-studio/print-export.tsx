@@ -10,20 +10,21 @@ import { ResumePaper } from "./paper/resume-paper";
  * non-editable copy of the page is portalled to <body> only while printing;
  * the print stylesheet in globals.css hides everything else.
  */
-export function usePrintExport(doc: ResumeDocument | null) {
+/** `fileName` is what "Save as PDF" offers (the page title while printing). */
+export function usePrintExport(doc: ResumeDocument | null, fileName: string) {
   const [isPrinting, setPrinting] = useState(false);
 
   useEffect(() => {
     if (!isPrinting || !doc) return;
     const previousTitle = document.title;
-    document.title = `${doc.fullName || "Resume"} — Resume`.replace(/\s+/g, "_");
+    document.title = fileName;
     const frame = requestAnimationFrame(() => {
       window.print();
       document.title = previousTitle;
       setPrinting(false);
     });
     return () => cancelAnimationFrame(frame);
-  }, [isPrinting, doc]);
+  }, [isPrinting, doc, fileName]);
 
   const portal =
     isPrinting && doc && typeof document !== "undefined"

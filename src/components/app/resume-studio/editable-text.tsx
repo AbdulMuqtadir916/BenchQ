@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, type ElementType } from "react";
-import type { ClaimState } from "@/lib/schemas/enums";
 import { sanitizeRichText } from "@/lib/resume-doc/rich-text";
 import { cn } from "@/lib/cn";
 import { useStudio } from "./studio-store";
@@ -16,8 +15,7 @@ interface EditableTextProps {
   label: string;
   placeholder?: string;
   className?: string;
-  claimId?: string;
-  claimState?: ClaimState;
+  fieldId?: string;
   /** Enter (without Shift) in a rich field — e.g. start the next bullet. */
   onEnter?: () => void;
   /** Backspace in an already-empty field — e.g. drop the bullet. */
@@ -38,13 +36,12 @@ export function EditableText({
   label,
   placeholder,
   className,
-  claimId,
-  claimState,
+  fieldId,
   onEnter,
   onBackspaceEmpty,
 }: EditableTextProps) {
   const ref = useRef<HTMLElement>(null);
-  const isFlashing = useStudio((s) => !!claimId && s.flashClaimId === claimId);
+  const isFlashing = useStudio((s) => !!fieldId && s.flashId === fieldId);
   const focusRequest = useStudio((s) => s.focusRequest);
 
   useLayoutEffect(() => {
@@ -58,17 +55,16 @@ export function EditableText({
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || !claimId || focusRequest?.claimId !== claimId) return;
+    if (!el || !fieldId || focusRequest?.fieldId !== fieldId) return;
     if (Date.now() - focusRequest.nonce > 1500) return;
     el.scrollIntoView({ block: "center", behavior: "smooth" });
     el.focus({ preventScroll: true });
-  }, [focusRequest, claimId]);
+  }, [focusRequest, fieldId]);
 
   const shared = {
     ref,
     className: cn(isFlashing && "bq-flash", className),
-    "data-claim-id": claimId,
-    "data-claim-state": claimState,
+    "data-field-id": fieldId,
   };
 
   if (!editable) return <Tag {...shared} />;

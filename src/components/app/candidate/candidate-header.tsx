@@ -32,7 +32,8 @@ interface CandidateHeaderProps {
   /** Ownership is a team-level concern — shown to managers and owners, not to the BDE on their own queue. */
   showOwner: boolean;
   canAct: boolean;
-  resumeHref: string;
+  /** The active base's newest version; null when the candidate has no base yet (the button then opens the Résumés tab). */
+  resumeHref: string | null;
   onFindJobs: () => void;
   onOpenTab: (tab: CandidateTabId) => void;
 }
@@ -91,7 +92,11 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
           {canAct ? (
             <>
               <Button variant="secondary" onClick={onFindJobs}><Sparkles size={14} aria-hidden />Find jobs</Button>
-              <Button asChild><Link href={resumeHref}><FileText size={14} aria-hidden />Build resume</Link></Button>
+              {resumeHref ? (
+                <Button asChild><Link href={resumeHref}><FileText size={14} aria-hidden />Build resume</Link></Button>
+              ) : (
+                <Button onClick={() => onOpenTab("resumes")}><FileText size={14} aria-hidden />Build resume</Button>
+              )}
             </>
           ) : null}
         </div>

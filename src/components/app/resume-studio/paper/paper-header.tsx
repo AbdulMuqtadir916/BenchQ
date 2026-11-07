@@ -18,15 +18,34 @@ export function PaperName({ doc, editable, children }: { doc: ResumeDocument; ed
   );
 }
 
+const PRINTED = [
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "github", label: "GitHub" },
+] as const;
+
+/** The contact line: the location (city, state, country), then phone, email, LinkedIn, GitHub. Work authorization is not printed. */
 export function PaperContacts({ doc, editable }: { doc: ResumeDocument; editable: boolean }) {
   const a = useDocActions();
-  const contacts = doc.contacts.filter((c) => editable || c.label.trim());
-  if (!contacts.length) return null;
+  const h = doc.header;
+  const place = [h.city, h.state, h.country].filter((p) => p.trim());
+  const shown = PRINTED.filter((f) => editable || h[f.key].trim());
+  if (!place.length && !shown.length && !editable) return null;
   return (
     <div className="rt-contacts">
-      {contacts.map((c) => (
-        <span key={c.id} className="rt-contact">
-          <EditableText value={c.label} onChange={(v) => a.patch("contacts", c.id, { label: v })} editable={editable} label="Contact item" />
+      {editable ? (
+        <span className="rt-contact">
+          <EditableText value={h.city} onChange={(v) => a.setHeader("city", v)} editable label="City" placeholder="City" />
+          {", "}
+          <EditableText value={h.state} onChange={(v) => a.setHeader("state", v)} editable label="State" placeholder="State" />
+          {", "}
+          <EditableText value={h.country} onChange={(v) => a.setHeader("country", v)} editable label="Country" placeholder="Country" />
+        </span>
+      ) : place.length ? <span className="rt-contact">{place.join(", ")}</span> : null}
+      {shown.map((f) => (
+        <span key={f.key} className="rt-contact">
+          <EditableText value={h[f.key]} onChange={(v) => a.setHeader(f.key, v)} editable={editable} label={f.label} placeholder={f.label} />
         </span>
       ))}
     </div>

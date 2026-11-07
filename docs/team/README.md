@@ -106,5 +106,8 @@ it. Everyone else reads it.
 | 0012 | Samad | Candidate Gmail OAuth/sync and provenance | Merged #104 |
 | 0013 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0012 (Samad's) | `feat/drop-legacy-resume-columns` |
 | 0014 | Samad | Candidate email classification | Merged #111 |
-| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
-| 0016+ | — | Claim the next number here in your PR | — |
+| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, no `OTHER` work authorization, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
+| 0016 | Zuhair | `firms.truth_guard_mode` and its CHECK dropped (claim-era setting; no claim states) | `integrate/resumes` |
+| 0017 | Zuhair | The résumé's fields leave `candidates` (`full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`; 07 Q57): a MANUAL base for every candidate without one, empty header fields filled, then the drop | `integrate/resumes` |
+| 0018 | Zuhair | No MANUAL bases (07 Q58): each becomes an UPLOAD base with a generated résumé file; a placeholder next to a real upload is removed; the checks allow UPLOAD and PROMOTED only | `integrate/resumes` |
+| 0019+ | — | Claim the next number here in your PR | — |

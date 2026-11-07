@@ -5,11 +5,14 @@ import { z, type ZodType } from "zod";
 export class ApiError extends Error {
   code: string;
   status: number;
-  constructor(message: string, code: string, status: number) {
+  /** An object `detail` the backend sent with its message (e.g. a 409 naming the row it clashed with). */
+  details: Record<string, unknown> | null;
+  constructor(message: string, code: string, status: number, details: Record<string, unknown> | null = null) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 

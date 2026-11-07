@@ -48,16 +48,21 @@ export const candidatesMock = firmScoped("candidates", {
 
   /**
    * A new candidate starts ON_BENCH. Given a BDE, it counts toward the plan, so at the limit it is refused (07 Q45, A4).
-   * All or nothing (05 §2): the candidate, its Record with every claim UNVERIFIED and no evidence (Q49), and the kept
-   * résumé as a RESUME document. No ledger entries: the ledger is the backend's (F6); its create writes CREATE + ASSIGN.
+   * All or nothing (05 §2): the candidate, its Record from the form (Q49), the kept résumé as a RESUME document, and
+   * its first base résumé, active, with v1 (07 Q58), as the backend's create makes. No ledger entries: the ledger is the backend's (F6); its create writes CREATE + ASSIGN.
    */
-  create: (firmId: string, body: CreateCandidate): Promise<Candidate> => {
+  create: async (firmId: string, body: CreateCandidate): Promise<Candidate> => {
     const input = CreateCandidateSchema.parse(body);
+    // Loaded here, not at the top: the résumé state parses the résumé fixtures, which every other import would pay for.
+    const { addFirstBase } = await import("./resume-state");
     const firm = firms.find((item) => item.id === firmId)!;
     const assignment = assignmentFor(firmId, input);
     // 07 Q45: only assigning a BDE counts toward the limit; a manager's queue is never blocked.
     const capacity = candidateCapacity(firm, allCandidates);
     if (assignment.bdeId !== null && !capacity.canAssignCandidate) throw new ApiError(assignBlockReason(capacity), "CANDIDATE_LIMIT", 409);
+
+    const file = parsedFiles.get(input.resumeParseId);
+    if (!file) throw new ApiError("Upload and read a résumé before creating a candidate.", "INVALID_RESUME_PARSE", 400);
 
     const now = new Date();
     const candidate = CandidateSchema.parse({
@@ -96,25 +101,20 @@ export const candidatesMock = firmScoped("candidates", {
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     });
-    // Nothing here is ever VERIFIED (Q49): verification needs evidence, which onboarding never has.
     const record = RecordSchema.parse({
       id: newId("rec", now),
       firmId,
       candidateId: candidate.id,
       headline: input.primaryRole,
       summary: input.summary,
-      summaryState: "UNVERIFIED",
       experiences: [],
       educations: [],
       skills: input.skills.map((skill) => ({
         id: newId("skill", now), name: skill.name, canonicalName: skill.name.toLowerCase(), family: skill.family,
-        yearsUsed: null, lastUsedYear: null, proficiency: null, source: skill.source, state: "UNVERIFIED",
+        yearsUsed: null, lastUsedYear: null, proficiency: null,
       })),
       certificates: [],
-      evidence: [],
-      lastVerifiedAt: null,
     });
-    const file = input.resumeParseId ? parsedFiles.get(input.resumeParseId) ?? { fileName: "resume.pdf", mimeType: "application/pdf", sizeBytes: 1024 } : null;
     const documentId = newId("doc", now);
     const document = file ? CandidateDocumentSchema.parse({
       id: documentId, firmId, candidateId: candidate.id, kind: "RESUME", title: "Original resume", fileName: file.fileName, mimeType: file.mimeType,
@@ -124,6 +124,7 @@ export const candidatesMock = firmScoped("candidates", {
 
     allCandidates.unshift(candidate);
     allRecords.unshift(record);
+    addFirstBase(candidate, currentUser().id);
     changed("candidates");
     changed("records");
     if (document) {
@@ -184,7 +185,7 @@ export const candidatesMock = firmScoped("candidates", {
     if (moved.length > 0) changed("candidates");
     return mockResult(moved.length);
   },
-}, { create: "candidate.create", update: "candidate.edit", reassign: "candidate.assign", parseResume: "candidate.create", followBde: "member.changeManager" });
+}, { create: "candidate.create", update: "candidate.editProfile", reassign: "candidate.assign", parseResume: "candidate.create", followBde: "member.changeManager" });
 
 /** The sample résumés the mock parser knows, for step 1's "Try a sample" (README assumption A1: mocks only). */
 export const SAMPLE_RESUME_NAMES: readonly string[] = resumeParses.map((item) => item.file_name);

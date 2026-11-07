@@ -121,16 +121,31 @@ def test_creating_and_editing_a_candidate(anonymous_client, accounts, test_db, l
     manager = make_user(test_db, test_db.get(Firm, accounts.firm_id), email="manager@acme.test", role="MANAGER")
     test_db.commit()
     url = f"/api/firms/{accounts.firm_id}/candidates"
+    import uuid
+    from datetime import timedelta
+    from backend.models.candidates import ResumeParse
+    from backend.models.db import utcnow
+
+    def upload() -> str:                     # 07 Q58: every create comes with a résumé read
+        row = ResumeParse(firm_id=accounts.firm_id, uploaded_by_user_id=manager.id, file_name="r.pdf",
+                          mime_type="application/pdf", size_bytes=5, content=f"{uuid.uuid4()}".encode(),
+                          parse={"header": {}}, expires_at=utcnow() + timedelta(minutes=30))
+        test_db.add(row)
+        test_db.commit()
+        return str(row.id)
     # Every field the create requires (the candidates final schema PR), so the create succeeds and its log is checked.
     body = {"full_name": NAME, "primary_role": "Java Developer", "email": EMAIL, "phone": PHONE, "work_auth": "H1B",
             "employment_types": ["C2C"], "manager_id": str(manager.id), "summary": RESUME,
             "country": "US", "years_experience": 8, "needs_sponsorship": True, "needs_transfer": True,
-            "target_roles": ["Java Developer"], "skills": [{"name": "Xylophonic", "family": "Canary"}]}
+            "target_roles": ["Java Developer"], "skills": [{"name": "Xylophonic", "family": "Canary"}],
+            "resume_parse_id": upload()}
     created = anonymous_client.post(url, json=body, headers=_cookie(accounts.firm_token))
     assert created.status_code == 201, created.text
     cid = created.json()["id"]
-    anonymous_client.post(url, json=body | {"email": "zorvath[at]canary-mail.test"}, headers=_cookie(accounts.firm_token))
-    anonymous_client.post(url, json=body | {"years_experience": 212}, headers=_cookie(accounts.firm_token))
+    anonymous_client.post(url, json=body | {"email": "zorvath[at]canary-mail.test", "resume_parse_id": upload()},
+                          headers=_cookie(accounts.firm_token))
+    anonymous_client.post(url, json=body | {"years_experience": 212, "resume_parse_id": upload()},
+                          headers=_cookie(accounts.firm_token))
     anonymous_client.patch(f"{url}/{cid}", json={"phone": PHONE, "full_name": NAME + " Jr"},
                            headers=_cookie(accounts.firm_token))
     _assert_clean(log)

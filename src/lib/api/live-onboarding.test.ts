@@ -23,7 +23,7 @@ const NEW_USER = "0b9c6c1e-2222-4000-8000-000000000002";
 
 const firmDto = (id: string, slug: string) => ({
   id, name: "Hyderabad Tech Staffing", slug, logo_url: null, primary_timezone: "Asia/Kolkata",
-  client_timezone: "America/New_York", truth_guard_mode: "BALANCED", application_expiry_days: 30, status: "ACTIVE",
+  client_timezone: "America/New_York", application_expiry_days: 30, status: "ACTIVE",
   plan_id: STARTER, seat_limit: 10, candidate_limit: 100, contact_phone: null, created_at: "2026-10-01T09:00:00+00:00",
 });
 const userDto = (id: string, firmId: string, role = "OWNER") => ({
