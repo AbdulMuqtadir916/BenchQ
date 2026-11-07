@@ -24,7 +24,7 @@ from sqlalchemy.orm import load_only
 from backend.auth import ledger
 from backend.auth.policy import is_lead_role
 from backend.auth.scoping import scoped
-from backend.candidates import profile
+from backend.candidates import autofill, profile
 from backend.candidates.first_base import first_base
 from backend.models.candidates import BaseResume, ResumeParse
 from backend.models.db import Application, Resume, utcnow
@@ -159,6 +159,13 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
     return {**out, **content_of(row)} if with_content else out
 
 
+def opened_json(row: Resume, candidate) -> dict:
+    """One version as it is opened: its content and its autofill, the years worked out for today. Only this answer
+    carries the autofill, not the list or a save (decided 2026-11-07)."""
+    return {**version_json(row, with_content=True),
+            "autofill": autofill.for_reading(row.autofill, candidate, row)}
+
+
 def base_json(base: BaseResume, number: int) -> dict:
     return {"id": str(base.id), "candidate_id": str(base.candidate_id), "number": number, "source": base.source,
             "is_active": base.is_active,
@@ -269,6 +276,7 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
     row = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=source.base_resume_id,
                  category=source.category, job_id=source.job_id, version=latest + 1, name=source.name,
                  template=source.template, page_format=source.page_format, created_by_user_id=actor.id, **content)
+    autofill.fill(candidate, row)
     db.add(row)
     db.flush()
     profile.refresh(candidate)              # a new newest version may change the name (07 Q57; review #3)
@@ -307,9 +315,11 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     db.add(base)
     db.flush()
     _activate(db, candidate, base)
-    db.add(Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
-                  job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                  created_by_user_id=actor.id, **content_of(row)))
+    copied = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
+                    job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
+                    created_by_user_id=actor.id, **content_of(row))
+    autofill.fill(candidate, copied)
+    db.add(copied)
     db.flush()
     number = len(numbers) + 1
     source = f"Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version}"

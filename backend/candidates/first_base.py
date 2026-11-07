@@ -10,6 +10,7 @@ A BDE's later upload (§4.6, PR 5) builds its base the same way, without a form:
 """
 import uuid
 
+from backend.candidates import autofill
 from backend.candidates.base_resume import split_skills
 from backend.models.candidates import BaseResume
 from backend.models.db import Resume
@@ -104,4 +105,5 @@ def first_base(parse_row, candidate, body, created_by_user_id) -> tuple[BaseResu
         languages=[{"id": _id(), "name": _text(lang)} for lang in _list(parse.get("languages")) if _text(lang)],
     )
     version.summary_id = _id() if version.summary else None     # the summary is an item too (§3.4)
+    autofill.fill(candidate, version)
     return base, version

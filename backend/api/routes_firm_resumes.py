@@ -44,5 +44,5 @@ def get_firm_resume(firm_id: uuid.UUID, resume_id: uuid.UUID, principal: Princip
                                              Resume.deleted_at.is_(None)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Not found.")
-    _candidate(db, firm_id, principal, row.candidate_id)  # outside the principal's scope: the same 404
-    return versions.version_json(row, with_content=True)
+    candidate = _candidate(db, firm_id, principal, row.candidate_id)  # outside the principal's scope: the same 404
+    return versions.opened_json(row, candidate)

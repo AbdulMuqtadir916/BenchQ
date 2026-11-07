@@ -851,7 +851,8 @@ export const CandidateSchema = z.object({
   preferredIndustries: z.array(z.string()), // step 4 (was inside `persona`, dropped in 0015)
   dealBreakers: z.array(z.string()),     // step 4 (same)
 
-  qaBank: z.array(QaBankEntrySchema),
+  qaBank: z.array(QaBankEntrySchema),     // always [] on the backend since 0019 (no `candidates.qa_bank`; each résumé
+                                         // version's `autofill` instead, §8.1); kept for the Documents tab until it goes
 
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -1352,6 +1353,16 @@ rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateI
 `versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
 `ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
 
+**`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK):** each `resumes` row
+holds every non-id fact about the candidate as `{question: answer}` (`backend/candidates/autofill.py`): this version's
+header, summary, skills, every job with its bullets, education, projects, awards, certifications and languages, and the
+profile facts (sponsorship, transfer, work authorization expiry, target rate, availability, notice, relocation,
+engagement types, work settings, preferred locations and industries, primary and target roles). Years of experience
+come from the version's own jobs (the New candidate form's rule), else `years_experience`. Never: ids, `rate_min`,
+`contact_notes`, `deal_breakers`, `status`, `bench_start_date`. A missing fact leaves its question out; answers keep
+their JSON type. Only `GET …/resumes/{id}` (one version) returns it, with the years worked out for today; not the list,
+not a save. The frontend doesn't map it (no screen shows it); the extension reads it (Samad).
+
 ```ts
 // src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker
 export const BaseResumeSchema = z.object({
@@ -1570,6 +1581,8 @@ Status changes go through `PATCH /api/applications/:id/status` (`{ status, note 
 an `ApplicationEvent` — the same write the kanban makes.
 
 ### 9.y Candidate documents (`src/lib/schemas/document.ts`)
+
+> **Planned to be dropped (Abdul, relayed by Zuhair 2026-11-07):** the candidate's Documents section — uploading visa copies, ID, certificates and other files, and the Screening answers panel. It may come back in a later version, not now. Nothing is removed yet: its owners remove it, with this contract (`docs/team/abdul.md` §3). Don't build on it.
 
 - `CandidateDocument` — `kind` (`WORK_AUTH | IDENTITY | RESUME | CERTIFICATION | EDUCATION |
   EMPLOYMENT | OTHER`), `title`, `fileName`, `mimeType`, `sizeKb`, `uploadedAt`, `uploadedByUserId`,

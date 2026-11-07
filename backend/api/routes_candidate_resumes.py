@@ -157,7 +157,7 @@ def get_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID
                principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
-    return versions.version_json(versions.candidate_version(db, candidate, resume_id), with_content=True)
+    return versions.opened_json(versions.candidate_version(db, candidate, resume_id), candidate)
 
 
 @router.post("/{resume_id}/save", status_code=201, summary="Save an edit as the résumé's next version")

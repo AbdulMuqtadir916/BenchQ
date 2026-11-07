@@ -636,6 +636,9 @@ class Resume(Base):
     certifications = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     awards = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     languages = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    # Every non-id fact about the candidate as {question: answer}, from this version and the profile
+    # (backend/candidates/autofill.py, migration 0019). Not content: a save never compares it.
+    autofill = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
 
     __table_args__ = (
         CheckConstraint("category IN ('BASE', 'TAILORED')", name="ck_resumes_category_values"),

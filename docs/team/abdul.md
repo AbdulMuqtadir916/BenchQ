@@ -28,6 +28,15 @@ Once the tracks are live: delete each module's mock and fixtures (`src/mocks/*`,
 `src/lib/api/config.ts` once everything is live), `activity_log_v2`, the JobNavigator leftovers no track uses, old
 docs (`docs/archive/`), and regenerate `docs/CURRENT_STATE.md`.
 
+**The candidate's Documents section** (Abdul, relayed by Zuhair 2026-11-07: planned to be dropped; may return in a later
+version, not now): the Documents tab on the candidate page (`src/components/app/candidate/documents/`, its tab entry
+in `src/app/[firm]/(app)/(workspace)/candidates/[id]/page.tsx`), uploads of visa copies, ID, certificates and other
+files, the Screening answers panel, `src/lib/api/documents.ts`, `src/lib/hooks/use-documents.ts`, the documents mock
+and fixtures, the `CandidateDocument` contract (`docs/02` §9.y) and the screen spec (`docs/04-SCREENS.md`
+"Documents"). Nothing is removed yet. Until then, Screening answers reads `candidate.qaBank`; the résumé autofill PR
+(Zuhair, next after PR 7) moves those answers to `resumes.autofill` and drops `candidates.qa_bank`, so the panel then
+shows its empty state.
+
 **The `personas` table** (decided 2026-11-05: kept for now): once autofill, cover letters and scoring read the candidate
 instead, one migration drops it with `cover_letters.from_persona`, and the persona routes go
 ([persona-to-candidates.md](./persona-to-candidates.md) §8).
