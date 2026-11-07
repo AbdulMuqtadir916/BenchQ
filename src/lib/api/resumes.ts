@@ -37,7 +37,11 @@ const candidatePath = (firmId: string, candidateId: string) => `/api/firms/${toB
 const KEPT = 50;
 const versionsRead = new Map<string, ResumeVersionDto>();
 const versionKey = (firmId: string, versionId: string) => `${firmId}:${versionId}`;
-function keep(firmId: string, version: ResumeVersionDto) {
+/** Bumped by `clearReadVersions`: a read started before the principal changed must not refill the map after it. */
+let generation = 0;
+/** Hold `version`, unless the principal changed since the read that returned it began (`startedIn`). */
+function keep(firmId: string, version: ResumeVersionDto, startedIn: number) {
+  if (startedIn !== generation) return;
   const key = versionKey(firmId, fromBackendId(version.id));
   versionsRead.delete(key);
   versionsRead.set(key, version);
@@ -45,13 +49,16 @@ function keep(firmId: string, version: ResumeVersionDto) {
 }
 /** Forget every version read (the principal changed: src/lib/query/principal-boundary.ts). */
 export function clearReadVersions(): void {
+  generation += 1;
   versionsRead.clear();
 }
+/** The version held for the save, or read from the backend when it isn't held. */
 async function readVersion(firmId: string, versionId: string): Promise<ResumeVersionDto> {
   const held = versionsRead.get(versionKey(firmId, versionId));
   if (held) return held;
+  const startedIn = generation;
   const version = await http.get(firmPath(firmId, versionId), ResumeVersionDto);
-  keep(firmId, version);
+  keep(firmId, version, startedIn);
   return version;
 }
 
@@ -63,8 +70,9 @@ const live = {
   shelfByCandidate: async (firmId: string, candidateId: string) =>
     toResumeShelf(await http.get(candidatePath(firmId, candidateId), ResumeShelfDto), firmId),
   open: async (firmId: string, versionId: string) => {
+    const startedIn = generation;
     const version = await http.get(firmPath(firmId, versionId), ResumeVersionDto);
-    keep(firmId, version);
+    keep(firmId, version, startedIn);
     return toOpenedResume(version, await live.shelfByCandidate(firmId, fromBackendId(version.candidate_id)));
   },
   /** Option 1 (2026-11-05): lay the studio's edits over the version opened, save that as the next version, then load
@@ -72,8 +80,9 @@ const live = {
   save: async (firmId: string, versionId: string, doc: ResumeDocument, loadShelf?: ShelfLoader): Promise<ResumeSaveResult> => {
     const source = await readVersion(firmId, versionId);
     const candidateId = fromBackendId(source.candidate_id);
+    const startedIn = generation;
     const { notice, ...saved } = await http.post(`${candidatePath(firmId, candidateId)}/${toBackendId(versionId)}/save`, SavedDto, { body: toBackendContent(doc, source) });
-    keep(firmId, saved);
+    keep(firmId, saved, startedIn);
     const shelf = await (loadShelf ?? ((id: string) => live.shelfByCandidate(firmId, id)))(candidateId);
     return { opened: toOpenedResume(saved, shelf), notice };
   },

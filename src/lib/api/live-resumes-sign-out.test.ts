@@ -57,4 +57,32 @@ describe("the versions the studio read, across a change of who is signed in", ()
     expect(versionReads).toHaveLength(2);                        // the previous person's copy is gone
     unsubscribe();
   });
+
+  it("a read answered after another person signs in doesn't put the previous person's version back", async () => {
+    const unsubscribe = clearCacheOnPrincipalChange(new QueryClient());
+    useSession.getState().setSession(await signInAs("user_imran"));
+
+    let answer = () => {};
+    const answered = new Promise<void>((resolve) => { answer = resolve; });
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
+      const method = init.method ?? "GET";
+      if (method === "POST") return new Response(JSON.stringify({ ...sample.version, notice: null }), { status: 201 });
+      if (url.endsWith(`/resumes/${sample.version.id}`)) {
+        versionReads.push(url);
+        await answered;                                          // held until after the change below
+        return new Response(JSON.stringify(sample.version), { status: 200 });
+      }
+      return new Response(JSON.stringify(sample.listing), { status: 200 });
+    });
+
+    const opening = resumesApi.open(FIRM, VERSION);               // started as the first person
+    await vi.waitFor(() => expect(versionReads).toHaveLength(1));
+    useSession.getState().setSession(await signInAs("user_adnan")); // another person, before the answer
+    answer();
+    const opened = await opening;
+
+    await resumesApi.save(FIRM, VERSION, opened.document);
+    expect(versionReads).toHaveLength(2);                        // read again: the late answer wasn't kept
+    unsubscribe();
+  });
 });
