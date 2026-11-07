@@ -820,7 +820,7 @@ export const CandidateSchema = z.object({
   linkedinUrl: z.string().url().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
-  country: z.string().default('US'),
+  country: z.string().nullable(),   // from the active base résumé (07 Q57); null when it names none; never defaulted
   willingToRelocate: z.boolean(),
 
   workAuth: WorkAuth,
@@ -933,9 +933,15 @@ TN need sponsorship; H-1B needs a transfer; GC, GC EAD and US citizen send `fals
 always known) and sends them; the backend
 works nothing out and only checks that they were sent (a missing one is a 422 naming the field). An edit that changes
 `workAuth` must carry both. Required on create, in the form and in the backend alike: `fullName`, `primaryRole`, `email`,
-`phone`, `yearsExperience`, `country` (any country; the flow's Country box starts at `US` and takes the parsed résumé's
-country, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
+`phone`, `yearsExperience`, `country` (any country; the flow's Country box starts empty, takes the parsed résumé's
+country, else the person types one, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
 `employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. `resumeParseId` is required: no candidate without their résumé (07 Q58), whose file becomes their first base.
+
+**No default country — 2026-11-07 (Zuhair; raised by Abdul in the PR 7 review, #5, and approved in his re-review).**
+BenchQ never invents a country. `Candidate.country` is the active base résumé's (07 Q57) and is `null` when that résumé
+names none; the API sends `null`, never `"US"`. On create the country is required: the form starts empty, takes the
+parsed résumé's country, else the person types it ("USA", "United States" and the like are sent as `US`). The Job
+schema's own `country` default (§6) is a separate contract and is unchanged.
 
 `ResumeDraftSchema` gains `country` with the new parser (§8.1). The skills a new candidate is created with go into
 the first base résumé's version 1 (`resumes.skills`); they carry no source or state.
