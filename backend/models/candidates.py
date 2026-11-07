@@ -113,7 +113,9 @@ def _resume_field(name: str) -> property:
         if header is None:
             from backend.candidates.profile import load
             header = self.__dict__["_resume_header"] = load(self)
-        return header.get(name)
+        value = header.get(name)
+        # No active résumé (shouldn't happen since 0017/0018): an empty name, never None, for labels and the ledger.
+        return (value or "") if name == "full_name" else value
 
     def put(self, value):
         self.__dict__.setdefault("_pending_header", {})[name] = value
