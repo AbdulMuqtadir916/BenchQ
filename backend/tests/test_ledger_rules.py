@@ -18,6 +18,9 @@ SOURCE_FILES = [path for path in sorted(BACKEND.rglob("*.py"))
 TEST_FILES = sorted((BACKEND / "tests").glob("*.py"))
 WRITE_METHODS = {"post", "put", "patch", "delete"}
 WRITERS = {("auth/ledger.py", "record"), ("auth/ledger.py", "record_automated")}
+# Background work's own rows, for the Super Admin. They say a run or an AI call happened, not that a person's change was
+# logged, so reaching one doesn't count as a route writing its entry.
+BACKGROUND_LOGGING = {("activity.py", "log_activity"), ("analyzer/llm_logger.py", "_log_work"), ("job_monitor.py", "_log_run")}
 
 # Why a route that changes something writes no entry. Firm work marked TO_LOG leaves this list as its Activity logs PR
 # lands; every other reason is a decision. A new route doesn't belong here unless a reason below is true of it.
@@ -182,7 +185,7 @@ def _logging_functions() -> set[tuple[str, str]]:
                     calls.setdefault(key, set()).add((file, node.id))
     grew = True
     while grew:
-        found = {key for key, called in calls.items() if called & logging} - logging
+        found = {key for key, called in calls.items() if (called - BACKGROUND_LOGGING) & logging} - logging
         logging |= found
         grew = bool(found)
     return logging

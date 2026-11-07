@@ -4,11 +4,13 @@ import contextvars
 import logging
 import re
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
+from backend.analyzer.llm_logger import one_row_per_run
+from backend.auth import ledger
 from backend.logging_setup import request_id as log_request_id, run_id as log_run_id
 from backend.models.db import SessionLocal, JobRun, Setting
 from backend.statement_timeout import leave_web_request
@@ -279,6 +281,26 @@ def _insert_job_run(
         db.close()
 
 
+def _did_nothing(summary: Optional[str]) -> bool:
+    """A run that only reports zero: "No new replies", "Synced 0 candidate inboxes."."""
+    return not summary or (not re.search(r"[1-9]", summary) and bool(re.search(r"^no\b|(^|\s)0\s", summary, re.IGNORECASE)))
+
+
+def _log_run(db, run: JobRun) -> None:
+    """A scheduled run that did something or failed: a system row, with no firm, so only the Super Admin reads it."""
+    if run.trigger != "scheduler" or (run.status != "failed" and _did_nothing(run.result_summary)):
+        return
+    label = run.job_type.replace("_", " ").capitalize()
+    summary = f"{label}: {run.result_summary}" if run.status != "failed" else f"{label} failed: {run.error or 'unknown error'}"
+    try:
+        ledger.record_automated(db, actor_type="SYSTEM", actor_name="Scheduler", action="CREATE", entity_type="job_run",
+                                entity_id=run.id, entity_label=label, summary=summary, firm_id=None, candidate_id=None)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Run not logged in activity (non-fatal): {e}")
+
+
 def _finish_job_run(run_id: uuid.UUID, status: str, result_summary: Optional[str], error: Optional[str]) -> None:
     db = SessionLocal()
     try:
@@ -293,6 +315,7 @@ def _finish_job_run(run_id: uuid.UUID, status: str, result_summary: Optional[str
             run.result_summary = result_summary
             run.error = sanitize_run_error(error)
             db.commit()
+            _log_run(db, run)
     finally:
         db.close()
 
@@ -361,7 +384,8 @@ async def tracked_run(
 
     try:
         _run_failure.set(None)
-        yield running_job
+        with one_row_per_run() if trigger == "scheduler" else nullcontext():
+            yield running_job
         reason = _take_run_failure()
         _finish_job_run(run_id, "failed" if reason else "completed",
                         running_job.summary, reason)
