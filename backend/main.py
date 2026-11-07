@@ -33,6 +33,7 @@ from backend.api.routes_autofill import router as autofill_router
 from backend.api.routes_llm import router as llm_router
 from backend.api.routes_auth import current_principal, router as auth_router
 from backend.api.routes_admin import router as admin_router
+from backend.api.routes_admin_activity import router as admin_activity_router
 from backend.api.routes_firms import router as firms_router
 from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
@@ -189,6 +190,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(routes_inbox.router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(admin_activity_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")
 app.include_router(team_router, prefix="/api")

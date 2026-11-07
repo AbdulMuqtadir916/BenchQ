@@ -68,7 +68,7 @@ def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False, candida
         "note": None if hide_email and entry.entity_type == "email" else entry.note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
         "created_at": _iso(entry.created_at), "cursor": _cursor(entry), "candidate_name": candidate_name,
-        "actor_role": entry.actor_role,
+        "actor_role": entry.actor_role, "attempt_count": entry.attempt_count,
         "on_behalf_of_user_id": str(entry.on_behalf_of_user_id) if entry.on_behalf_of_user_id else None,
         "on_behalf_of_name": agent_person(entry.actor_name) if entry.on_behalf_of_user_id else None,
         "team_manager_id": str(entry.team_manager_id) if entry.team_manager_id else None,

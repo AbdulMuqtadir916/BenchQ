@@ -42,6 +42,7 @@ NOT_REACHED: dict[str, str] = {
     "PATCH /api/applications/{app_id}/review": "404: Review not found",
     "POST /api/auth/password-reset/complete":
         "400: This link has expired. Contact your manager or firm owner for a new one",
+    "GET /api/admin/activity/{entry_id}/ip": "404: Not found",
     "POST /api/auth/sign-in": "401: Email or password is incorrect",
     "POST /api/companies/{company_id}/test-scrape": "400: No scrape URLs configured",
     "POST /api/cover-letters": "400: name is required",

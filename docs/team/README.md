@@ -108,4 +108,5 @@ it. Everyone else reads it.
 | 0014 | Samad | Candidate email classification | Merged #111 |
 | 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
 | 0016 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries` | `activity-log/pr3-new-table-and-endpoints` |
-| 0017+ | — | Claim the next number here in your PR | — |
+| 0017 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts | `activity-logs/pr6-signin-events-and-super-admin` |
+| 0018+ | — | Claim the next number here in your PR | — |

@@ -22,6 +22,12 @@ describe("actorDisplay", () => {
       .toEqual({ name: "Sana", role: "Super Admin", hasTag: false });
   });
 
+  it("counts the tries a failed sign-in row stands for", () => {
+    const entry = { actorType: "USER", actorName: "Karthik Reddy", actorRole: "BDE", onBehalfOfName: null } as const;
+    expect(actorDisplay({ ...entry, attemptCount: 3 }).name).toBe("Karthik Reddy (3)");
+    expect(actorDisplay({ ...entry, attemptCount: 1 }).name).toBe("Karthik Reddy");
+  });
+
   it("falls back to the actor name on an AI row with no person", () => {
     expect(actorDisplay({ actorType: "AGENT", actorName: "AI agent", actorRole: null, onBehalfOfName: null }))
       .toEqual({ name: "AI agent", role: null, hasTag: true });

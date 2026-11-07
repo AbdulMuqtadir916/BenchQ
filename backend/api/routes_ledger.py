@@ -1,6 +1,7 @@
 """A firm's activity log: who did what in the firm, newest first (docs/integration/01-ledger.md, 07-auth §4 track 01).
 
-The path stays `/ledger`; the rows are in `activity_logs`. The path names the firm, `reader_firm_id` says which firm the
+Failed sign-ins and lockouts are the Super Admin's alone: `_visible` leaves them out for everyone here, a support view
+included. The path stays `/ledger`; the rows are in `activity_logs`. The path names the firm, `reader_firm_id` says which firm the
 caller may read, `scoped()` adds the filter, and `_limit_to_reader` applies the role. Another firm's log is 404, the
 same as a missing firm (principle 4). Platform-only events (`firm_id` null) are the Super Admin's, in `/api/admin/audit`.
 
@@ -27,7 +28,7 @@ from backend.auth.serialize import EPOCH, ledger_entry_json
 from backend.auth.sessions import Principal
 from backend.models.candidates import Candidate
 from backend.models.db import get_db
-from backend.models.tenancy import LEDGER_ACTOR_TYPES, ActivityEntry, Firm, User
+from backend.models.tenancy import LEDGER_ACTOR_TYPES, SUPER_ADMIN_ONLY_ACTIONS, ActivityEntry, Firm, User
 
 router = APIRouter(prefix="/firms/{firm_id}", tags=["ledger"])
 
@@ -45,8 +46,7 @@ class Filters:
         self.candidate_id, self.actor_id, self.team_id, self.actor_type = candidate_id, actor_id, team_id, actor_type
         self.from_date, self.to_date, self.q = from_date, to_date, q
 
-    def apply(self, entries, db: DbSession, firm_id: uuid.UUID, *, hide_email: bool, person: bool = True,
-              candidate: bool = True):
+    def apply(self, entries, zone: str, *, hide_email: bool, person: bool = True, candidate: bool = True):
         """`person=False` leaves out who was picked, for the counts beside them; `candidate=False` the candidate, for
         the list to pick one from."""
         for column, value in ((ActivityEntry.entity_type, self.entity_type), (ActivityEntry.entity_id, self.entity_id),
@@ -60,12 +60,10 @@ class Filters:
                                          ActivityEntry.on_behalf_of_user_id == self.actor_id))
         if person and self.team_id is not None:
             entries = entries.filter(ActivityEntry.team_manager_id == self.team_id)
-        if self.from_date is not None or self.to_date is not None:
-            zone = db.get(Firm, firm_id).primary_timezone
-            if self.from_date is not None:
-                entries = entries.filter(ActivityEntry.created_at >= _start_of(self.from_date, zone))
-            if self.to_date is not None:
-                entries = entries.filter(ActivityEntry.created_at < _start_of(self.to_date + timedelta(days=1), zone))
+        if self.from_date is not None:
+            entries = entries.filter(ActivityEntry.created_at >= _start_of(self.from_date, zone))
+        if self.to_date is not None:
+            entries = entries.filter(ActivityEntry.created_at < _start_of(self.to_date + timedelta(days=1), zone))
         if self.q is not None:
             summary = ActivityEntry.summary.icontains(self.q, autoescape=True)
             if hide_email:      # what the support view can't read, it can't search for either
@@ -105,9 +103,10 @@ def _limit_to_reader(entries, db: DbSession, principal: Principal, firm_id: uuid
 def _visible(db: DbSession, principal: Principal, firm_id: uuid.UUID, filters: Filters, *, person: bool = True,
              candidate: bool = True):
     picked = candidate and filters.candidate_id is not None
-    entries = _limit_to_reader(scoped(db, ActivityEntry, firm_id), db, principal, firm_id, picked=picked)
-    return filters.apply(entries, db, firm_id, hide_email=principal.support_view_id is not None, person=person,
-                         candidate=candidate)
+    firm_rows = scoped(db, ActivityEntry, firm_id).filter(ActivityEntry.action.notin_(SUPER_ADMIN_ONLY_ACTIONS))
+    entries = _limit_to_reader(firm_rows, db, principal, firm_id, picked=picked)
+    return filters.apply(entries, db.get(Firm, firm_id).primary_timezone, hide_email=principal.support_view_id is not None,
+                         person=person, candidate=candidate)
 
 
 def _after_cursor(entries, cursor: str):
@@ -154,12 +153,21 @@ def ledger_people(firm_id: uuid.UUID, filters: Filters = Depends(), principal: P
     if firm_id != my_firm:
         raise HTTPException(status_code=404, detail="Not found.")
     entries = _visible(db, principal, my_firm, filters, person=False)
+    bde, manager = own_scope(principal), team_scope(principal)
+    types = [] if bde is not None else [t for t in LEDGER_ACTOR_TYPES if manager is None or t in ("USER", "AGENT")]
+    return {"timezone": db.get(Firm, my_firm).primary_timezone, "actor_types": types, "total": entries.count(),
+            "matching": _visible(db, principal, my_firm, filters).count(),
+            "people": people_in_view(db, my_firm, entries, bde=bde, manager=manager)}
+
+
+def people_in_view(db: DbSession, firm_id: uuid.UUID, entries, *, bde: uuid.UUID | None = None,
+                   manager: uuid.UUID | None = None) -> list[dict]:
+    """The firm's people a reader sees, counting `entries` towards each."""
     counts = Counter()
     for column in (ActivityEntry.actor_user_id, ActivityEntry.on_behalf_of_user_id):
         counts.update(dict(entries.filter(column.isnot(None)).with_entities(column, func.count()).group_by(column).all()))
-    bde, manager = own_scope(principal), team_scope(principal)
     people = []
-    for user in scoped(db, User, my_firm).order_by(User.name, User.id):
+    for user in scoped(db, User, firm_id).order_by(User.name, User.id):
         if bde is not None and user.id != bde:
             continue
         in_view = user.is_active and (manager is None or manager in (user.id, user.manager_id))
@@ -169,9 +177,7 @@ def ledger_people(firm_id: uuid.UUID, filters: Filters = Depends(), principal: P
             people.append({"user_id": str(user.id), "name": user.name, "role": user.role,
                            "manager_id": str(user.manager_id) if user.manager_id else None,
                            "is_former": not in_view, "actions": counts[user.id]})
-    types = [] if bde is not None else [t for t in LEDGER_ACTOR_TYPES if manager is None or t in ("USER", "AGENT")]
-    return {"timezone": db.get(Firm, my_firm).primary_timezone, "actor_types": types, "total": entries.count(),
-            "matching": _visible(db, principal, my_firm, filters).count(), "people": people}
+    return people
 
 
 @router.get("/ledger/days", summary="The days with activity the reader can see, in the firm's time zone")

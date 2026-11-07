@@ -671,14 +671,14 @@ Applies to every screen below, in addition to §0:
 
 ## 14.1 Admin nav and keyboard
 
-Nav order: Overview · Firms · Plans · Audit · System · Team.
+Nav order: Overview · Firms · Plans · Activity · System · Team.
 
 | Key | Action |
 |---|---|
 | `g o` | Overview|
 | `g f` | Firms|
 | `g p` | Plans|
-| `g a` | Audit|
+| `g a` | Activity|
 | `g s` | System|
 | `g t` | Team|
 | `n` | New firm (on Firms)|

@@ -80,6 +80,11 @@ the reads the screen needs. Change document:
 screen: people list, searchable actor and candidate dropdowns, dates, and the sidebar name. Change document:
 [pr-changes/activity-logs-pr4-activity-screen.md](./pr-changes/activity-logs-pr4-activity-screen.md).
 
+**Activity Log PR 6 (2026-11-07):** `activity-logs/pr6-signin-events-and-super-admin`, built on PR 5 part 3, not pushed
+yet. Sign-out, failed sign-ins and lockouts are logged (migration 0017), and the Super Admin has the full Activity page,
+with a Failed sign-ins view only they can see. Details in
+[pr-changes/activity-logs-pr6-signin-events-and-super-admin.md](./pr-changes/activity-logs-pr6-signin-events-and-super-admin.md).
+
 **Activity Log PR 5 (2026-11-06), three parts, each built on the last, none pushed:**
 `activity-logs/pr5-part1-applications` (applications, interviews, autofill), `activity-logs/pr5-part2-jobs-and-analysis`,
 `activity-logs/pr5-part3-cover-letters`. Together they log every firm route that wrote nothing. Whether they go up as

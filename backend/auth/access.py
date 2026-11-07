@@ -176,6 +176,12 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/admin/users": A,
     "GET /api/admin/team": A,
     "GET /api/admin/audit": A,
+    "GET /api/admin/activity": A,
+    "GET /api/admin/activity/overview": A,
+    "GET /api/admin/activity/people": A,
+    "GET /api/admin/activity/days": A,
+    "GET /api/admin/activity/candidates": A,
+    "GET /api/admin/activity/{entry_id}/ip": A,
     "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)
     "POST /api/auto-reject/run": A,
     "POST /api/companies": A,                      # companies are global reference data

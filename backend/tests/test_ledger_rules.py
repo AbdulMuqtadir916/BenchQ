@@ -17,7 +17,7 @@ SOURCE_FILES = [path for path in sorted(BACKEND.rglob("*.py"))
                 if not {"tests", "migrations", "__pycache__"} & set(path.relative_to(BACKEND).parts)]
 TEST_FILES = sorted((BACKEND / "tests").glob("*.py"))
 WRITE_METHODS = {"post", "put", "patch", "delete"}
-WRITERS = {("auth/ledger.py", "record"), ("auth/ledger.py", "record_automated")}
+WRITERS = {("auth/ledger.py", "record"), ("auth/ledger.py", "record_automated"), ("auth/ledger.py", "_sign_in_entry")}
 
 # Why a route that changes something writes no entry. Each reason is a decision. A new route doesn't belong here unless
 # a reason below is true of it.
@@ -81,6 +81,7 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
 DIRECT_WRITES = {
     ("auth/ledger.py", "record"): "the writer",
     ("auth/ledger.py", "record_automated"): "the writer",
+    ("auth/ledger.py", "_sign_in_entry"): "the writer, for an email with no account to act as",
     ("auth/password_reset.py", "system_entry"): "a SYSTEM entry with no acting user; `record` needs an actor",
     ("scripts/create_platform_admin.py", "create_platform_admin"): "a staff script, no signed-in actor",
     ("scripts/reset_password.py", "reset_password"): "a staff script, no signed-in actor",
@@ -92,6 +93,9 @@ LEDGER_READERS = {
     ("api/routes_ledger.py", "list_ledger"): "pages what `_visible` allows",
     ("api/routes_ledger.py", "_after_cursor"): "pages what `_visible` allows",
     ("api/routes_admin.py", "list_audit"): "the Super Admin's audit across the platform",
+    ("api/routes_admin_activity.py", "_rows"): "the Super Admin's log, which has no role limit",
+    ("api/routes_admin_activity.py", "entry_ip"): "one failed sign-in's IP, for the Super Admin",
+    ("auth/ledger.py", "record_sign_in_failure"): "finds the row a repeat try adds to; serves no one",
     ("scripts/seed_demo.py", "reset"): "clears local demo data; serves no one",
 }
 

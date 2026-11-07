@@ -34,6 +34,10 @@ LEDGER_ACTIONS = (
     "INVITE_SENT", "INVITE_ACCEPTED", "INVITE_REVOKED",
     "ASSIGN",   # a candidate's manager or BDE set or changed (docs/02 §3.4, 07 Q43)
 )
+# `activity_logs` also takes these; `ledger_entries` is frozen, so its list stays as it was.
+SUPER_ADMIN_ONLY_ACTIONS = ("SIGN_IN_FAILED", "LOCKED_OUT")    # never served to a firm reader
+ACTIVITY_ACTIONS = (*LEDGER_ACTIONS, "LOGOUT", *SUPER_ADMIN_ONLY_ACTIONS)
+ACTIVITY_ACTOR_TYPES = (*LEDGER_ACTOR_TYPES, "UNKNOWN")        # UNKNOWN: a sign-in for an email with no account
 FIRM_JOB_ORIGINS = ("SCRAPED", "CAPTURED")
 # Job.source values a person captured by hand (migration 0005 backfills these as CAPTURED). Their routes link them.
 CAPTURED_SOURCES = ("manual", "extension")
@@ -324,14 +328,18 @@ class ActivityEntry(Base):
     candidate_id = Column(UUID(as_uuid=True), nullable=True)           # the candidate it is about, if any (07 Q53h)
     candidate_manager_id = Column(UUID(as_uuid=True), nullable=True)   # that candidate's manager at the time
     candidate_bde_id = Column(UUID(as_uuid=True), nullable=True)       # that candidate's BDE at the time
+    ip_address = Column(String, nullable=True)            # failed sign-ins only; never in a list, see routes_admin_activity
+    attempt_count = Column(Integer, nullable=False, server_default=text("1"))   # tries this failed sign-in row stands for
     created_at = _created_at()
 
     __table_args__ = (
-        CheckConstraint(_in("actor_type", LEDGER_ACTOR_TYPES), name="ck_activity_logs_actor_type"),
+        CheckConstraint(_in("actor_type", ACTIVITY_ACTOR_TYPES), name="ck_activity_logs_actor_type"),
         CheckConstraint(f"actor_role IS NULL OR {_in('actor_role', ACTIVITY_ACTOR_ROLES)}",
                         name="ck_activity_logs_actor_role"),
-        CheckConstraint(_in("action", LEDGER_ACTIONS), name="ck_activity_logs_action"),
+        CheckConstraint(_in("action", ACTIVITY_ACTIONS), name="ck_activity_logs_action"),
+        CheckConstraint("attempt_count >= 1", name="ck_activity_logs_attempt_count"),
         Index("ix_activity_logs_created", "created_at"),
+        Index("ix_activity_logs_action_created", "action", "created_at"),
         Index("ix_activity_logs_firm_created", "firm_id", "created_at", "id"),
         Index("ix_activity_logs_firm_candidate_created", "firm_id", "candidate_id", "created_at"),
         Index("ix_activity_logs_firm_actor_created", "firm_id", "actor_user_id", "created_at"),

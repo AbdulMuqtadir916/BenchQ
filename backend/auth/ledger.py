@@ -4,7 +4,7 @@ The caller commits, so the entry lands in the same transaction as the change it 
 was responsible at that moment (the actor's role and team, the candidate's manager and BDE), so history stays with the
 people it happened under when a candidate or a BDE moves on.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import uuid
 
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.logging_setup import request_id
 from backend.models.candidates import Candidate
+from backend.models.db import utcnow
 from backend.models.tenancy import ActivityEntry, PlatformUser, User
 
 MASKED = "[masked]"
@@ -20,6 +21,7 @@ TOO_LONG = "[too long to show]"
 _MASKED_FIELDS = {"email", "phone"}
 _MASKED_WORDS = ("password", "token", "secret", "api_key", "hash")
 _LONGEST_VALUE = 500
+SAME_ATTEMPT_WINDOW = timedelta(seconds=10)
 
 
 def _shown(field: str, value):
@@ -84,6 +86,49 @@ def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_typ
         entry.created_at = at
     db.add(entry)
     return entry
+
+
+def mask_email(email: str) -> str:
+    """What the log keeps of an email nobody owns: anyone can type anything into the form."""
+    local, _, domain = email.partition("@")
+    return f"{local[:2]}***@{domain[:100]}" if local and domain else "***"
+
+
+def _sign_in_entry(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str, action: str,
+                   summary: str) -> ActivityEntry:
+    """A failed sign-in's entry: on the account it tried, or on nobody for an email with no account."""
+    if account is None:
+        entry = ActivityEntry(firm_id=None, actor_type="UNKNOWN", actor_name="Unknown account", entity_type="sign_in",
+                              entity_id=str(uuid.uuid4()), entity_label=mask_email(email), action=action,
+                              summary=f"{mask_email(email)}, {summary}", request_id=request_id.get())
+        db.add(entry)
+    else:
+        is_firm_user = isinstance(account, User)
+        entry = record(db, actor=account, action=action, entity_type="user" if is_firm_user else "platform_user",
+                       entity_id=account.id, entity_label=account.name, summary=summary,
+                       firm_id=account.firm_id if is_firm_user else None, candidate_id=None)
+    entry.ip_address = ip
+    return entry
+
+
+def record_sign_in_failure(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str,
+                           reason: str) -> ActivityEntry:
+    """Tries on one account from one IP within `SAME_ATTEMPT_WINDOW` of the first share a row, which counts them."""
+    same_account = ActivityEntry.actor_user_id == account.id if account else ActivityEntry.actor_type == "UNKNOWN"
+    row = db.query(ActivityEntry).filter(ActivityEntry.action == "SIGN_IN_FAILED", ActivityEntry.ip_address == ip,
+                                         same_account, ActivityEntry.created_at >= utcnow() - SAME_ATTEMPT_WINDOW) \
+        .order_by(ActivityEntry.created_at.desc()).with_for_update().first()
+    if row is None:
+        return _sign_in_entry(db, account=account, email=email, ip=ip, action="SIGN_IN_FAILED", summary=reason)
+    row.attempt_count += 1
+    return row
+
+
+def record_lockout(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str, attempts: int,
+                   minutes: int) -> ActivityEntry:
+    unit = "minute" if minutes == 1 else "minutes"
+    return _sign_in_entry(db, account=account, email=email, ip=ip, action="LOCKED_OUT",
+                          summary=f"Locked for {minutes} {unit} after {attempts} tries")
 
 
 def record_automated(db: DbSession, *, actor_type: str, actor_name: str, action: str,

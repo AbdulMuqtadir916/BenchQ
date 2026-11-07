@@ -1,7 +1,10 @@
 """Sign-in, sign-out and the current session (07-auth F3). The frontend's mock is the spec: src/mocks/auth.ts,
 src/mocks/session.ts. Access to each endpoint is set in backend/auth/access.py."""
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth import ledger, support, throttle
@@ -17,6 +20,7 @@ from backend.models.notifications import Notification, PasswordResetRequest
 from backend.models.tenancy import PlatformUser, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger("jobnavigator.auth")
 
 # The same answer for an unknown email, a wrong password and a deactivated account, so sign-in never tells
 # anyone which emails have accounts.
@@ -48,6 +52,24 @@ def current_principal(request: Request) -> Principal:
     return principal
 
 
+def _refuse_sign_in(db: DbSession, request: Request, email: str, account: User | PlatformUser | None,
+                    reason: str) -> HTTPException:
+    """Counts the failure and logs it for the Super Admin. The answer is the same whatever the reason, and a log that
+    can't be written doesn't change it."""
+    locked = throttle.record_failure(request, email)
+    ip = throttle.client_ip(request)
+    try:
+        ledger.record_sign_in_failure(db, account=account, email=email, ip=ip, reason=reason)
+        if locked is not None:
+            attempts, window = locked
+            ledger.record_lockout(db, account=account, email=email, ip=ip, attempts=attempts, minutes=int(window // 60))
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("failed sign-in not logged")
+    return HTTPException(status_code=401, detail=INVALID_CREDENTIALS)
+
+
 @router.post("/sign-in", summary="Sign in with email and password")
 def sign_in(body: SignInBody, request: Request, response: Response, db: DbSession = Depends(get_db)):
     """Sets the session cookie and returns the session. 401 for every failure, 429 when throttled."""
@@ -60,8 +82,8 @@ def sign_in(body: SignInBody, request: Request, response: Response, db: DbSessio
     # The password is checked even when the account is missing or inactive, so every failure takes as long.
     password_ok = verify_password(account.password_hash if account else None, body.password)
     if not password_ok or not account.is_active:
-        throttle.record_failure(request, email)
-        raise HTTPException(status_code=401, detail=INVALID_CREDENTIALS)
+        reason = "no such account" if account is None else "Wrong password" if not password_ok else "Account deactivated"
+        raise _refuse_sign_in(db, request, email, account, reason)
     if isinstance(account, User):
         # Serialize with reset requests so an old password cannot create a session after a request freezes it.
         # populate_existing: the lock must re-read the row, not return the object loaded above. If the hash changed
@@ -72,8 +94,9 @@ def sign_in(body: SignInBody, request: Request, response: Response, db: DbSessio
         still_valid = account.password_hash == verified_hash or verify_password(account.password_hash, body.password)
         if not account.is_active or not still_valid or password_frozen(db, account):
             db.commit()  # persist expiry cleanup if the request had already timed out
-            throttle.record_failure(request, email)
-            raise HTTPException(status_code=401, detail=INVALID_CREDENTIALS)
+            reason = ("Account deactivated" if not account.is_active else "Wrong password" if not still_valid
+                      else "Password reset in progress")
+            raise _refuse_sign_in(db, request, email, account, reason)
     throttle.clear(request, email)
 
     if needs_rehash(account.password_hash):
@@ -150,7 +173,13 @@ def password_reset_complete(body: PasswordResetCompleteBody, db: DbSession = Dep
 def sign_out(request: Request, db: DbSession = Depends(get_db)):
     """Deletes the session and clears the cookie; ends an open support view (logged in the firm's ledger,
     backend/auth/support.py). Answers 204 even when there was no session, so a stale tab can always sign out."""
-    end_session(db, request.cookies.get(COOKIE_NAME))
+    session = end_session(db, request.cookies.get(COOKIE_NAME))
+    account = session and (db.get(User, session.user_id) if session.user_id else db.get(PlatformUser, session.platform_user_id))
+    if account:
+        is_firm_user = isinstance(account, User)
+        ledger.record(db, actor=account, action="LOGOUT", entity_type="user" if is_firm_user else "platform_user",
+                      entity_id=account.id, entity_label=account.name, summary=f"{account.name} signed out",
+                      firm_id=account.firm_id if is_firm_user else None, candidate_id=None)
     db.commit()
     response = Response(status_code=204)
     response.delete_cookie(**clear_cookie_kwargs())
