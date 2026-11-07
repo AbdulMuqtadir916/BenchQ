@@ -27,10 +27,12 @@ interface Props {
   review: EmailReview;
   applications: Application[];
   canAct: boolean;
+  /** The reader mounts this panel only while the review is open; Hide asks it to close. */
+  onHide: () => void;
 }
 
 /** The BDE's decision on one email: confirm a stage, keep the current one, link only, or dismiss. */
-export function EmailReviewPanel({ message, review, applications, canAct }: Props) {
+export function EmailReviewPanel({ message, review, applications, canAct, onHide }: Props) {
   const mutation = useReviewEmail(message.candidateId);
   const suggested = categoryStatus(message.classificationCategory);
   const [chosenApp, setChosenApp] = useState("");
@@ -66,16 +68,19 @@ export function EmailReviewPanel({ message, review, applications, canAct }: Prop
 
   return (
     <section aria-label="Email review" className="space-y-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] p-3">
-      <div>
-        <h3 className="text-body-strong text-[var(--color-text)]">Needs your review</h3>
-        <p className="text-sm text-[var(--color-text-3)]">
-          {reviewReasonLabel(review.reason)}.
-          {message.classificationCategory ? <> The classifier read it as <span className="font-[550] text-[var(--color-text-2)]">{emailCategoryLabel(message.classificationCategory)}</span>.</> : null}
-          {" "}The application keeps its status until you decide.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-body-strong text-[var(--color-text)]">Needs your review</h3>
+          <p className="text-sm text-[var(--color-text-3)]">
+            {reviewReasonLabel(review.reason)}.
+            {message.classificationCategory ? <> The classifier read it as <span className="font-[550] text-[var(--color-text-2)]">{emailCategoryLabel(message.classificationCategory)}</span>.</> : null}
+            {" "}The application keeps its status until you decide.
+          </p>
+        </div>
+        <Button type="button" size="sm" variant="secondary" className="self-start" aria-expanded onClick={onHide}>Hide review</Button>
       </div>
       {canAct ? (
-        <>
+        <div className="space-y-3">
           <div>
             <span className="block text-caption text-[var(--color-text-3)]">Application</span>
             <Select aria-label="Application" className="mt-1" value={appId} disabled={!!lockedId || busy}
@@ -100,8 +105,8 @@ export function EmailReviewPanel({ message, review, applications, canAct }: Prop
           </div>
           {mutation.isSuccess ? <p role="status" className="text-sm text-[var(--color-text-2)]">Decision saved.</p> : null}
           {mutation.error ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{failure(mutation.error)}</p> : null}
-        </>
-      ) : <p className="text-sm text-[var(--color-text-3)]">You have read-only access to this review.</p>}
+        </div>
+      ) : !canAct ? <p className="text-sm text-[var(--color-text-3)]">You have read-only access to this review.</p> : null}
     </section>
   );
 }

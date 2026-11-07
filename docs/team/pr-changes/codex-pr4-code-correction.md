@@ -59,6 +59,15 @@ dispatched call — main's Q33 rule — written inside our result transaction, u
 branch before the merge has `alembic_version = 0015` meaning *our* old revision: set it to `0014` and restart the backend
 so main's 0015 and our 0016 both run (only the outcome CHECK differs between our old 0015 and 0016).
 
+## Phase 9 — classification speed, auto-refresh and review UI (2026-11-07)
+
+Added: `backend/tests/test_pr4_concurrency.py`, `src/lib/hooks/inbox-refetch.test.ts`.
+Modified: `backend/config.py`, `backend/.env.example`, `backend/inbox/classification_worker.py` (classify up to 4 emails at once, 60 per sweep),
+`src/lib/hooks/use-inbox.ts` (4 s poll while classifying; reload reviews and applications when it finishes),
+`src/components/app/candidate/inbox/{inbox-reader.tsx, email-review-panel.tsx}` ("Review email" button beside the subject; form hidden until opened),
+`src/components/app/candidate/applications/applications-tab.tsx` (Move On shown; counts split).
+Migration: none. API: none. Limits: a submitted review decision was not run live in this phase.
+
 ## Remaining limits
 
 Sign-offs needed at review: G2 status mapping, G3 contracts, G4 Incomplete → Applied, G6 migration, G7 logger, G8

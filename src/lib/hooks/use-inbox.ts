@@ -21,6 +21,17 @@ export function flattenInbox(data: Pages): CandidateInbox {
       return true;
     })};
 }
+/** How often a candidate's inbox reloads: quickly while importing or while any email is still being classified, else slowly. */
+export const IMPORT_POLL_MS = 2_000;
+export const CLASSIFY_POLL_MS = 4_000;
+export const IDLE_POLL_MS = 300_000;
+export function inboxRefetchInterval(data: Pages | undefined): number | false {
+  const connection = data?.pages[0]?.connection;
+  if (["QUEUED", "IMPORTING"].includes(connection?.syncState ?? "")) return IMPORT_POLL_MS;
+  const isClassifying = data?.pages.some(page => page.messages.some(message => ["PENDING", "PROCESSING"].includes(message.classificationState ?? "")));
+  if (isClassifying) return CLASSIFY_POLL_MS;
+  return connection?.status === "CONNECTED" ? IDLE_POLL_MS : false;
+}
 const initialPages = (inbox: CandidateInbox): Pages => ({pages: [inbox], pageParams: [null]});
 
 export function useCandidateInbox(candidateId: string) {
@@ -38,10 +49,19 @@ export function useCandidateInbox(candidateId: string) {
       return page;
     }, {signal, cycles: refreshCycles.current}),
     getNextPageParam: page => page.nextCursor ?? undefined, select: flattenInbox, enabled: !!candidateId,
-    refetchInterval: query => {
-      const connection = query.state.data?.pages[0]?.connection;
-      return ["QUEUED", "IMPORTING"].includes(connection?.syncState ?? "") ? 2_000 : connection?.status === "CONNECTED" ? 300_000 : false;
-    }});
+    refetchInterval: query => inboxRefetchInterval(query.state.data)});
+  // When emails finish classifying, a review (and possibly an automatic status change) was created on the server:
+  // reload the review list and the applications at that moment, not only on the next page load.
+  const classifying = query.data?.messages.filter(message => ["PENDING", "PROCESSING"].includes(message.classificationState ?? "")).length ?? null;
+  const lastClassifying = useRef<number | null>(null);
+  useEffect(() => {
+    if (classifying === null) return;
+    if (lastClassifying.current !== null && classifying < lastClassifying.current) {
+      void cache.invalidateQueries({queryKey: queryKeys.inbox.reviews(firm, candidateId)});
+      void cache.invalidateQueries({queryKey: queryKeys.applications.all(firm)});
+    }
+    lastClassifying.current = classifying;
+  }, [classifying, cache, firm, candidateId]);
   const forbidden = query.error && "status" in query.error && [403, 404].includes(Number(query.error.status));
   useEffect(() => {
     if (forbidden) cache.removeQueries({queryKey: queryKeys.inbox.body(firm, candidateId)});

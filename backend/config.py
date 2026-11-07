@@ -42,6 +42,11 @@ CANDIDATE_EMAIL_PURGE_ENABLED = os.getenv("CANDIDATE_EMAIL_PURGE_ENABLED", "fals
 CANDIDATE_EMAIL_AUTO_STATUS_ENABLED = os.getenv("CANDIDATE_EMAIL_AUTO_STATUS_ENABLED", "false").lower() == "true"
 CANDIDATE_EMAIL_AUTOMATION_APPROVED = os.getenv("CANDIDATE_EMAIL_AUTOMATION_APPROVED", "false").lower() == "true"
 CANDIDATE_EMAIL_AUTOMATION_START_AT = os.getenv("CANDIDATE_EMAIL_AUTOMATION_START_AT", "")
+# How many emails one sweep classifies at once, and how many it takes per sweep. Different emails never share a row
+# lock, and an application's status is written under its own row lock, so raising the first only speeds the AI calls.
+# CANDIDATE_EMAIL_CLASSIFY_CONCURRENCY=1 restores one-at-a-time.
+CANDIDATE_EMAIL_CLASSIFY_CONCURRENCY = max(1, min(8, int(os.getenv("CANDIDATE_EMAIL_CLASSIFY_CONCURRENCY", "4") or 4)))
+CANDIDATE_EMAIL_SWEEP_LIMIT = max(1, min(100, int(os.getenv("CANDIDATE_EMAIL_SWEEP_LIMIT", "60") or 60)))
 # PR 4 backfills (OFF by default; switch on only after the eligible counts were reviewed, OPERATIONS.md):
 # setup recovery requeues emails that failed only because the classifier was not set up; historical classification
 # queues retained NOT_QUEUED mail, oldest first, review only.

@@ -316,7 +316,23 @@ def process_one(message_id, *, provider=None, aliases=None):
     return True
 
 
-def process_pending(*, limit=20):
+def classify_all(ids, aliases, concurrency) -> int:
+    """Classify the emails, up to `concurrency` at once; returns how many finished.
+
+    The AI call is the slow part and runs outside any database lock; process_one claims each email under its own row
+    lock (skip_locked), so two workers never take the same one, and an application's status is written under its own
+    row lock. concurrency 1 is the earlier one-at-a-time behaviour.
+    """
+    workers = min(concurrency, len(ids))
+    if workers <= 1:
+        return sum(process_one(identity, aliases=aliases) for identity in ids)
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix='candidate-email-call') as pool:
+        return sum(pool.map(lambda identity: process_one(identity, aliases=aliases), ids))
+
+
+def process_pending(*, limit=None):
+    from backend import config
+    limit = config.CANDIDATE_EMAIL_SWEEP_LIMIT if limit is None else limit
     if not enabled():
         return 0
     with SessionLocal() as db:
@@ -339,7 +355,7 @@ def process_pending(*, limit=20):
             CandidateMailbox.status == 'CONNECTED', func.lower(func.trim(InboxMessage.source_address)) == func.lower(func.trim(CandidateMailbox.address)),
         ).order_by(InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
         aliases = company_aliases(db) if rows else {}
-    done = sum(process_one(identity, aliases=aliases) for (identity,) in rows)
+    done = classify_all([identity for (identity,) in rows], aliases, config.CANDIDATE_EMAIL_CLASSIFY_CONCURRENCY)
     if rows:
         logger.info("Email classification: %d of %d pending emails classified", done, len(rows))
     return done

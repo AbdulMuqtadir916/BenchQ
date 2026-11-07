@@ -309,3 +309,13 @@ lint and 616 tests passed.
 backend recreated ⇒ main's 0015 (candidates final schema) and our 0016 applied; now 0016. Candidate page works again
 (new candidate shape: `preferred_industries`, `deal_breakers`, `country`; no `persona`). Per-file change report updated
 for Phase 7 and the merge. Branch up to date with main 09eb35b (0 behind).
+
+2026-11-07, **Phase 9 (UI follow-ups from Samad's testing)**: (1) classification is faster: `CANDIDATE_EMAIL_CLASSIFY_CONCURRENCY`
+(default 4) and `CANDIDATE_EMAIL_SWEEP_LIMIT` (default 60), tested in `test_pr4_concurrency.py` (4 tests); (2) the inbox polls every 4 s while
+emails classify, and when classification finishes the review list and applications reload (no page reload needed; `use-inbox.ts`,
+`inbox-refetch.test.ts` 5 tests); (3) the review form is hidden behind a "Review email" button beside the email subject and opens above
+the email body, closed again for every other email (`inbox-reader.tsx`, `email-review-panel.tsx`); (4) a confirmed Move On card is shown on the
+board: the "Active" filter hides only older closed values and counts Move On separately (`applications-tab.tsx`). Checked live in the browser
+(button, open/hide, switching emails); a submitted decision was not run live. Not done, by decision: optional link / "reviewed without link" action and the
+thread-link matching fix (found in testing, need Abdul's contract sign-off first; see the investigation notes).
+
