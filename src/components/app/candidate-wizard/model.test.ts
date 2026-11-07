@@ -9,7 +9,7 @@ const draft: ResumeDraft = {
   phone: null, linkedinUrl: null, city: "Irving", state: "TX", country: null, yearsExperience: 9, workAuth: "H1B", workAuthText: null,
   summary: "Nine years of Java.", skills: [{ name: "Java", family: "Languages" }, { name: "AWS", family: "Cloud" }],
 };
-const valid: WizardValues = { ...EMPTY_VALUES, resume: { parseId: "parse_1", fileName: "Ravi.pdf" }, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRoles: ["Java Developer"] };
+const valid: WizardValues = { ...EMPTY_VALUES, resume: { parseId: "parse_1", fileName: "Ravi.pdf" }, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", country: "US", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRoles: ["Java Developer"] };
 
 describe("applyDraft (07 Q49)", () => {
   it("fills empty fields and marks them drafted; null fields stay empty", () => {
@@ -34,7 +34,7 @@ describe("applyDraft (07 Q49)", () => {
     const second = applyDraft(edited, { ...draft, parseId: "parse_2", fileName: "Right.pdf", fullName: "Asha Rao", email: "asha@example.com",
       city: "Dallas", country: null, summary: "", workAuth: "GC", skills: [{ name: "Python", family: "Languages" }] });
     expect(second.values).toMatchObject({ resume: { parseId: "parse_2", fileName: "Right.pdf" }, fullName: "Asha Rao", email: "asha@example.com",
-      city: "Dallas", country: "US", summary: "", workAuth: "GC", rateTarget: "80" });
+      city: "Dallas", country: "", summary: "", workAuth: "GC", rateTarget: "80" });
     expect(second.values.skills.map((skill) => `${skill.name}:${skill.source}`)).toEqual(["Python:RESUME_UPLOAD"]);
   });
 
@@ -42,8 +42,9 @@ describe("applyDraft (07 Q49)", () => {
     expect(applyDraft(EMPTY_VALUES, { ...draft, workAuth: null, workAuthText: "Authorized to work" }).values).toMatchObject({ workAuth: null, workAuthText: "Authorized to work" });
   });
 
-  it("takes the résumé's country over the default US, but never over one that was typed", () => {
-    expect(EMPTY_VALUES.country).toBe("US");
+  it("never invents a country: it starts empty, the résumé fills it, one that was typed is kept (review #5)", () => {
+    expect(EMPTY_VALUES.country).toBe("");
+    expect(applyDraft(EMPTY_VALUES, { ...draft, country: null }).values.country).toBe("");
     const canada = applyDraft(EMPTY_VALUES, { ...draft, country: "Canada" });
     expect(canada.values.country).toBe("Canada");
     expect(canada.drafted).toContain("country");
@@ -68,7 +69,7 @@ describe("the country sent", () => {
 
 describe("validateStep", () => {
   it("basic: name, 'Marketed as' and a valid email are required (Q48); years 0–60; LinkedIn a full link", () => {
-    expect(Object.keys(validateStep("basic", EMPTY_VALUES)).sort()).toEqual(["email", "fullName", "phone", "primaryRole", "yearsExperience"]);
+    expect(Object.keys(validateStep("basic", EMPTY_VALUES)).sort()).toEqual(["country", "email", "fullName", "phone", "primaryRole", "yearsExperience"]);
     expect(validateStep("basic", { ...valid, email: "ravi[at]example.com" }).email).toMatch(/valid email/);
     expect(validateStep("basic", { ...valid, yearsExperience: "212" }).yearsExperience).toMatch(/0 to 60/);
     expect(validateStep("basic", { ...valid, yearsExperience: "2.5" }).yearsExperience).toBeDefined();
@@ -122,7 +123,7 @@ describe("the flow", () => {
 describe("toCreateCandidate", () => {
   it("builds a valid payload: trimmed text, numbers, ISO dates, sponsorship from the work authorization (A3)", () => {
     const values: WizardValues = {
-      ...applyDraft(EMPTY_VALUES, draft).values, phone: " (469) 555-0182 ", targetRoles: ["Java Developer"], rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
+      ...applyDraft(EMPTY_VALUES, draft).values, phone: " (469) 555-0182 ", country: "USA", targetRoles: ["Java Developer"], rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
       employmentTypes: ["C2C", "W2"], workSettings: ["REMOTE"], contactNotes: "Prefers WhatsApp.",
     };
     const body = toCreateCandidate({ ...values, managerId: "user_fatima", bdeId: "user_adnan", handoffNote: "  Push banking.  " });

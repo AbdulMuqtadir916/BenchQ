@@ -24,6 +24,7 @@ from sqlalchemy.orm import load_only
 from backend.auth import ledger
 from backend.auth.policy import is_lead_role
 from backend.auth.scoping import scoped
+from backend.candidates import profile
 from backend.candidates.first_base import first_base
 from backend.models.candidates import BaseResume, ResumeParse
 from backend.models.db import Application, Resume, utcnow
@@ -216,28 +217,6 @@ def listing_many(db, firm_id, candidate_ids) -> dict:
             by_base.setdefault(row.base_resume_id, []).append(entry(row))
         else:
             tailored.setdefault((row.candidate_id, row.base_resume_id, row.job_id), []).append(entry(row))
-    # Who made what: the BDE can't delete what an owner or manager made (version_removal, base_removal), so the list
-    # says so and the tree offers no delete there.
-    makers = {b.created_by_user_id for b in bases} | {r.created_by_user_id for r in rows}
-    leads = {uid for uid, role in db.query(User.id, User.role).filter(User.id.in_([m for m in makers if m])).all()
-             if is_lead_role(role)}
-
-    def entry(row: Resume) -> dict:
-        target = promoted_to.get(row.id)
-        return {**version_json(row), "promoted_to_base_id": str(target) if target else None,
-                "made_by_lead": row.created_by_user_id in leads}
-
-    out = {cid: {"bases": [], "tailored": []} for cid in ({b.candidate_id for b in bases} | {r.candidate_id for r in rows})}
-    if isinstance(candidate_ids, (list, tuple, set)):
-        for cid in candidate_ids:
-            out.setdefault(cid, {"bases": [], "tailored": []})
-    by_base: dict = {}
-    tailored: dict[tuple, list] = {}
-    for row in rows:
-        if row.category == "BASE":
-            by_base.setdefault(row.base_resume_id, []).append(entry(row))
-        else:
-            tailored.setdefault((row.candidate_id, row.base_resume_id, row.job_id), []).append(entry(row))
     for base in bases:
         versions = by_base.get(base.id, [])
         out[base.candidate_id]["bases"].append({**base_json(base, numbers[base.id]),
@@ -268,6 +247,10 @@ def _activate(db, candidate, base: BaseResume) -> None:
         .update({BaseResume.is_active: False}, synchronize_session="fetch")
     db.flush()
     base.is_active = True
+    db.flush()
+    # The candidate's name and contact are the active base's (07 Q57): forget the ones read from the old base, so the
+    # ledger entry written next and the response carry the new ones (Abdul's PR 7 review, #3).
+    profile.refresh(candidate)
 
 
 @dataclass
@@ -288,6 +271,7 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
                  template=source.template, page_format=source.page_format, created_by_user_id=actor.id, **content)
     db.add(row)
     db.flush()
+    profile.refresh(candidate)              # a new newest version may change the name (07 Q57; review #3)
     number = base_numbers(db, candidate)[source.base_resume_id]
     kind = "" if source.category == "BASE" else " (tailored)"
     _record(db, actor, candidate, "UPDATE", row.id, _label(candidate, number, row),

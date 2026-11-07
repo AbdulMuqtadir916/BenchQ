@@ -33,7 +33,8 @@ export const CandidateSchema = z.object({
   linkedinUrl: z.string().url().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
-  country: z.string().default("US"),
+  /** From the active base résumé (07 Q57); null when it names none. Never defaulted. */
+  country: z.string().nullable(),
   willingToRelocate: z.boolean(),
   workAuth: WorkAuth,
   workAuthExpiry: z.string().datetime().nullable(),
@@ -89,7 +90,7 @@ export const CandidateStatsSchema = z.object({
 });
 export type CandidateStats = z.infer<typeof CandidateStatsSchema>;
 
-/** The submission facts a BDE edits from the candidate Overview. A new `workAuth` comes with the sponsorship and transfer it implies. */
+/** The submission facts the owner or the candidate's manager edits from the candidate Overview (07 Q56). A new `workAuth` comes with the sponsorship and transfer it implies. */
 export const UpdateCandidateSchema = CandidateSchema.pick({
   workAuth: true,
   needsSponsorship: true,

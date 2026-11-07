@@ -35,7 +35,7 @@ export const CandidateDto = z.object({
   linkedin_url: z.string().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
-  country: z.string(),
+  country: z.string().nullable(),
   willing_to_relocate: z.boolean(),
   work_auth: z.string(),
   work_auth_expiry: z.string().nullable(),

@@ -28,20 +28,49 @@ const mock = () => import("@/mocks/resumes").then((m) => m.resumesMock);
 const firmPath = (firmId: string, versionId?: string) => `/api/firms/${toBackendId(firmId)}/resumes${versionId ? `/${toBackendId(versionId)}` : ""}`;
 const candidatePath = (firmId: string, candidateId: string) => `/api/firms/${toBackendId(firmId)}/candidates/${toBackendId(candidateId)}/resumes`;
 
+/**
+ * The versions this tab has read, by firm and id. A version never changes once saved (a save makes the next one), so
+ * the save builds its body from the one `open` read instead of reading it again (Abdul's PR 7 review, #7); a version
+ * not held here is read first. The oldest go past `KEPT`.
+ */
+const KEPT = 50;
+const versionsRead = new Map<string, ResumeVersionDto>();
+const versionKey = (firmId: string, versionId: string) => `${firmId}:${versionId}`;
+function keep(firmId: string, version: ResumeVersionDto) {
+  const key = versionKey(firmId, fromBackendId(version.id));
+  versionsRead.delete(key);
+  versionsRead.set(key, version);
+  if (versionsRead.size > KEPT) versionsRead.delete(versionsRead.keys().next().value as string);
+}
+async function readVersion(firmId: string, versionId: string): Promise<ResumeVersionDto> {
+  const held = versionsRead.get(versionKey(firmId, versionId));
+  if (held) return held;
+  const version = await http.get(firmPath(firmId, versionId), ResumeVersionDto);
+  keep(firmId, version);
+  return version;
+}
+
+/** Loads a candidate's list; the hook passes one that fills the query cache, so a save loads the list once. */
+export type ShelfLoader = (candidateId: string) => Promise<ResumeShelf>;
+
 const live = {
   shelf: async (firmId: string) => toResumeShelf(await http.get(firmPath(firmId), ResumeShelfDto), firmId),
   shelfByCandidate: async (firmId: string, candidateId: string) =>
     toResumeShelf(await http.get(candidatePath(firmId, candidateId), ResumeShelfDto), firmId),
   open: async (firmId: string, versionId: string) => {
     const version = await http.get(firmPath(firmId, versionId), ResumeVersionDto);
+    keep(firmId, version);
     return toOpenedResume(version, await live.shelfByCandidate(firmId, fromBackendId(version.candidate_id)));
   },
-  /** Option 1 (2026-11-05): read the version again, lay the studio's edits over it, save that as the next version. */
-  save: async (firmId: string, versionId: string, doc: ResumeDocument): Promise<ResumeSaveResult> => {
-    const source = await http.get(firmPath(firmId, versionId), ResumeVersionDto);
+  /** Option 1 (2026-11-05): lay the studio's edits over the version opened, save that as the next version, then load
+   *  the list once (the new version's place in it). */
+  save: async (firmId: string, versionId: string, doc: ResumeDocument, loadShelf?: ShelfLoader): Promise<ResumeSaveResult> => {
+    const source = await readVersion(firmId, versionId);
     const candidateId = fromBackendId(source.candidate_id);
-    const saved = await http.post(`${candidatePath(firmId, candidateId)}/${toBackendId(versionId)}/save`, SavedDto, { body: toBackendContent(doc, source) });
-    return { opened: toOpenedResume(saved, await live.shelfByCandidate(firmId, candidateId)), notice: saved.notice };
+    const { notice, ...saved } = await http.post(`${candidatePath(firmId, candidateId)}/${toBackendId(versionId)}/save`, SavedDto, { body: toBackendContent(doc, source) });
+    keep(firmId, saved);
+    const shelf = await (loadShelf ?? ((id: string) => live.shelfByCandidate(firmId, id)))(candidateId);
+    return { opened: toOpenedResume(saved, shelf), notice };
   },
   useAsBase: async (firmId: string, candidateId: string, versionId: string) => {
     await http.post(`${candidatePath(firmId, candidateId)}/${toBackendId(versionId)}/use-as-base`, Ack);
@@ -89,9 +118,10 @@ export const resumesApi = {
   open: async (firmId: string, versionId: string): Promise<OpenedResume> =>
     isLive("resumes") ? live.open(firmId, versionId) : (await mock()).open(firmId, versionId),
 
-  /** Save the studio's edit of `versionId` as its résumé's next version (§4.3); a `notice` when another came first. */
-  save: async (firmId: string, versionId: string, doc: ResumeDocument): Promise<ResumeSaveResult> =>
-    isLive("resumes") ? live.save(firmId, versionId, doc) : (await mock()).save(firmId, versionId, doc),
+  /** Save the studio's edit of `versionId` as its résumé's next version (§4.3); a `notice` when another came first.
+   *  `loadShelf` loads the candidate's list afterwards (default: a plain read). */
+  save: async (firmId: string, versionId: string, doc: ResumeDocument, loadShelf?: ShelfLoader): Promise<ResumeSaveResult> =>
+    isLive("resumes") ? live.save(firmId, versionId, doc, loadShelf) : (await mock()).save(firmId, versionId, doc),
 
   /** "Use this as the base?" Yes, and picking a base: a base's v1 makes it active; any other version promotes. */
   useAsBase: async (firmId: string, candidateId: string, versionId: string): Promise<void> =>

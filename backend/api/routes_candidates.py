@@ -93,7 +93,7 @@ class CreateCandidateBody(BaseModel):
 
 
 class UpdateCandidateBody(BaseModel):
-    """The frontend's UpdateCandidateSchema: the submission facts a BDE edits."""
+    """The frontend's UpdateCandidateSchema: the submission facts the owner or the candidate's manager edits (07 Q56)."""
     work_auth: WorkAuth | None = None
     work_auth_expiry: datetime | None = None
     rate_target: float | None = Field(default=None, gt=0)

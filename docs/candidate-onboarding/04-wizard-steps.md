@@ -71,7 +71,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
   candidate."
 - Another file after one (the first was the wrong résumé; back on step 1, upload again): every résumé field (name,
   Marketed as, years, email, phone, LinkedIn, city, state, country, summary, skills, work authorization) is replaced by
-  the new file's, edited or not; one it lacks is left empty (country US). Rates, availability, preferences and the
+  the new file's, edited or not; one it lacks is left empty. Rates, availability, preferences and the
   assignment stay (`applyDraft`, 2026-11-06).
 - Parse error: "Couldn't read this résumé. Try another file, or enter the details yourself." with Try again and Skip.
 - "Try a sample" chips: only when the parse adapter runs on mocks (assumption A1).
@@ -89,7 +89,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 | Email ("Shown to vendors only when a submission goes out.") | yes | `email` |
 | Phone | yes | `phone` |
 | LinkedIn, City, State | no | `linkedinUrl` (a URL), `city`, `state` |
-| Country (free text, starts at US; the parsed résumé's country replaces the untouched US) | yes | `country`; "USA", "United States" and the like are sent as `US` |
+| Country (free text, starts empty; filled from the parsed résumé, else typed; never defaulted) | yes | `country`; "USA", "United States" and the like are sent as `US` |
 | Skills (tag input; suggestions = parsed skills not yet added) | no | `skills[]` with `source` `RESUME_UPLOAD` or `MANUAL` |
 | Summary ("Two or three lines a BDE can paste into an intro email.") | no | `summary` |
 

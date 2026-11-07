@@ -259,6 +259,33 @@ def test_the_bdes_upload_is_a_new_active_base_from_the_parse_and_the_profile_sta
     assert parser == [world["firm"].id]
 
 
+def test_the_ledger_and_the_profile_take_the_new_active_bases_name(anonymous_client, test_db, world, parser):
+    """Abdul's PR 7 review #3: the name read from the old base isn't reused once the active base changes (07 Q57)."""
+    from backend.models.tenancy import LedgerEntry
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")         # the form's name: Ravi Teja
+    assert anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"]).status_code == 201
+    profile_url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
+    assert anonymous_client.get(profile_url, headers=world["as"]["owner"]).json()["full_name"] == "Ravi T"   # the file's
+    upload = test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == uuid.UUID(c["id"]),
+                                               LedgerEntry.action == "CREATE", LedgerEntry.entity_type == "resume") \
+        .order_by(LedgerEntry.created_at.desc()).first()
+    assert upload.entity_label == "Ravi T · Base 2"
+    # A save on the active base that changes the name: its ledger entry carries the new one.
+    v1 = _v(anonymous_client, world, c, base_number=2, who="adnan")
+    assert _save(anonymous_client, world, c, v1, "adnan", full_name="Ravi Teja Kumar").status_code == 201
+    saved = test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == uuid.UUID(c["id"]),
+                                              LedgerEntry.action == "UPDATE").order_by(LedgerEntry.created_at.desc()).first()
+    assert saved.entity_label == "Ravi Teja Kumar · Base 2 v2"
+
+
+def test_a_profile_whose_active_resume_names_no_country_reads_none_never_us(anonymous_client, test_db, world):
+    """Abdul's PR 7 review #5: no country is invented; the profile shows what the active résumé says, or none."""
+    c = _candidate(anonymous_client, test_db, world)
+    assert _save(anonymous_client, world, c, _v(anonymous_client, world, c), country="").status_code == 201
+    profile = anonymous_client.get(f"/api/firms/{world['firm'].id}/candidates/{c['id']}", headers=world["as"]["owner"])
+    assert profile.json()["country"] is None
+
+
 def test_the_same_file_again_is_answered_with_its_base_without_reading_it(anonymous_client, test_db, world, parser):
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"])

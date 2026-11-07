@@ -3,8 +3,8 @@ src/lib/api/dto/candidates.ts (onboarding module 07). The skills and the summary
 résumé's, not the candidate's (migration 0015); so are the name, contact details and location (07 Q57, migration 0017:
 read from the active base's newest version through the `Candidate` properties).
 
-A résumé's text isn't checked like the old columns were, so: no name reads as "" and no country as "US" (the column's old
-default), and an email that isn't one reads as none (the frontend's schema requires a valid one)."""
+A résumé's text isn't checked like the old columns were, so: no name reads as "", no country is invented (none reads as
+none; the old column's "US" default is gone, Abdul's PR 7 review #5), and an email that isn't one reads as none (the frontend's schema requires a valid one)."""
 import re
 from datetime import datetime
 from decimal import Decimal
@@ -29,7 +29,7 @@ def candidate_json(c: Candidate) -> dict:
         "id": str(c.id), "firm_id": str(c.firm_id),
         "manager_id": str(c.manager_id), "bde_id": str(c.bde_id) if c.bde_id else None,
         "full_name": c.full_name or "", "email": email if _EMAIL.match(email) else None, "phone": c.phone,
-        "linkedin_url": c.linkedin_url, "city": c.city, "state": c.state, "country": c.country or "US", "willing_to_relocate": c.willing_to_relocate,
+        "linkedin_url": c.linkedin_url, "city": c.city, "state": c.state, "country": c.country, "willing_to_relocate": c.willing_to_relocate,
         "work_auth": c.work_auth, "work_auth_expiry": _iso(c.work_auth_expiry),
         "needs_sponsorship": c.needs_sponsorship, "needs_transfer": c.needs_transfer,
         "employment_types": list(c.employment_types or []),

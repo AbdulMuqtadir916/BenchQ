@@ -37,7 +37,7 @@ export interface WizardValues {
   linkedinUrl: string;
   city: string;
   state: string;
-  /** Any country, "US" until the person or the résumé says otherwise (a TN candidate may be from Canada or Mexico). */
+  /** Any country (a TN candidate may be from Canada or Mexico). Starts empty: filled from the résumé, else typed. */
   country: string;
   skills: WizardSkill[];
   summary: string;
@@ -69,13 +69,13 @@ export type DraftableField = (typeof DRAFTABLE)[number];
 
 export const EMPTY_VALUES: WizardValues = {
   resume: null, fullName: "", primaryRole: "", yearsExperience: "", email: "", phone: "", linkedinUrl: "", city: "", state: "",
-  country: "US", skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
+  country: "", skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
   rateMin: "", availableFrom: "", noticePeriodDays: "", targetRoles: [], workSettings: [], preferredLocations: [],
   willingToRelocate: false, preferredIndustries: [], dealBreakers: [], contactNotes: "", managerId: "", bdeId: null,
   handoffNote: "",
 };
 
-/** The default country, and the ways a résumé prints it ("USA", "United States"), which all mean the default. */
+/** The ways a résumé prints the US ("USA", "United States"), all sent as "US". */
 const US = "US";
 const isUs = (country: string) => /^(u\.?s\.?a?\.?|united states( of america)?|america)$/i.test(country.trim());
 
@@ -94,7 +94,7 @@ function clearResumeFields(values: WizardValues): WizardValues {
  *
  * Another résumé uploaded after one (the first was the wrong file): every résumé field (`DRAFTABLE`: name, Marketed
  * as, years, contact, location, summary, skills, work authorization) is cleared first, edited or not, so the new file
- * fills them all; one it doesn't have stays empty (country back to US). Rates, availability, preferences and the
+ * fills them all; one it doesn't have stays empty. Rates, availability, preferences and the
  * assignment are the person's and stay.
  */
 export function applyDraft(values: WizardValues, draft: ResumeDraft): { values: WizardValues; drafted: DraftableField[] } {
@@ -114,11 +114,7 @@ export function applyDraft(values: WizardValues, draft: ResumeDraft): { values: 
   fill("linkedinUrl", draft.linkedinUrl);
   fill("city", draft.city);
   fill("state", draft.state);
-  // The country starts as US, so "only empty fields" can't apply: the résumé's country replaces the untouched default.
-  if (draft.country && !isUs(draft.country) && isUs(values.country)) {
-    next.country = draft.country.trim();
-    drafted.push("country");
-  }
+  fill("country", draft.country === null ? null : isUs(draft.country) ? US : draft.country.trim());
   fill("summary", draft.summary);
   fill("workAuth", draft.workAuth);
   if (values.workAuth === null) next.workAuthText = draft.workAuthText;
