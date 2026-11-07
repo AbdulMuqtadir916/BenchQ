@@ -39,7 +39,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 | `summary-card.tsx` | Initials avatar, name ("New candidate" until set), "Marketed as" ("Role not set"), chips (work auth, engagement types, years), Location, Email, Résumé (file name), **Assigned BDE** (Q48). Below it, the step list with states. |
 | `use-wizard.ts` | State with `useReducer`, in memory only (no drafts, Q48): values, which fields were drafted from the résumé, current step, dirty flag. |
 | `step-resume.tsx`, `step-basic.tsx`, `step-work-rate.tsx`, `step-preferences.tsx` | One per step (§3). |
-| `tag-input.tsx` | Chips with "Press Enter or comma to add", suggestion chips "+ Java", remove with Backspace or ×. Used for skills, target roles, locations, industries, deal breakers. |
+| `tag-input.tsx` | Chips: only Enter (or the Add button) adds, so a comma is text ("Columbus, OH" is one chip); click a chip, or Backspace in an empty box, to edit it; remove with ×; suggestion chips "+ Java". Used for skills, target roles, locations, industries, deal breakers. |
 | `drafted-marker.tsx` | "Drafted from résumé" marker on a field (§4). |
 
 - The current step is in the URL, `?step=resume|basic|work|preferences|assign`, parsed with Zod (CLAUDE.md: tabs live in
@@ -69,9 +69,13 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 - On a file: the zone shows the file name and "Reading the résumé…" with a skeleton of the next step; then step 2 opens
   with the drafted fields filled and a strip "{n} fields drafted from the résumé — review them before you create the
   candidate."
+- Another file after one (the first was the wrong résumé; back on step 1, upload again): every résumé field (name,
+  Marketed as, years, email, phone, LinkedIn, city, state, country, summary, skills, work authorization) is replaced by
+  the new file's, edited or not; one it lacks is left empty. Rates, availability, preferences and the
+  assignment stay (`applyDraft`, 2026-11-06).
 - Parse error: "Couldn't read this résumé. Try another file, or enter the details yourself." with Try again and Skip.
 - "Try a sample" chips: only when the parse adapter runs on mocks (assumption A1).
-- "No résumé yet? … Skip, enter manually" → step 2, empty.
+- No way past step 1 without a résumé (07 Q58): no Skip, and the parse error offers only Try again or another file.
 - Copy under the heading: "Drop it in and BenchQ fills the profile for you. Everything it pulls out stays editable, and
   **nothing is saved until you create the candidate**." (Q49 — not "sent anywhere".)
 
@@ -85,7 +89,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 | Email ("Shown to vendors only when a submission goes out.") | yes | `email` |
 | Phone | yes | `phone` |
 | LinkedIn, City, State | no | `linkedinUrl` (a URL), `city`, `state` |
-| Country (free text, starts at US; the parsed résumé's country replaces the untouched US) | yes | `country`; "USA", "United States" and the like are sent as `US` |
+| Country (free text, starts empty; filled from the parsed résumé, else typed; never defaulted) | yes | `country`; "USA", "United States" and the like are sent as `US` |
 | Skills (tag input; suggestions = parsed skills not yet added) | no | `skills[]` with `source` `RESUME_UPLOAD` or `MANUAL` |
 | Summary ("Two or three lines a BDE can paste into an intro email.") | no | `summary` |
 
@@ -116,12 +120,13 @@ match, show it under the group: "The résumé says: '{workAuthText}'".
 Suggestion lists (locations, industries, deal breakers) are constants in `src/lib/constants/candidate-intake.ts`,
 not inline in components.
 
-## 4. Truth Guard on the form (Q49)
+## 4. Filled from the résumé (Q49)
 
-- A field filled by the parser carries the **"Drafted from résumé"** marker (icon + label, never colour alone). Editing
-  the field removes it; each step has **"Mark as reviewed"**, which removes the step's markers.
-- Nothing in the flow says or sets "verified". Skills go into the candidate's Record as `UNVERIFIED` with their
-  source; the summary too (`summaryState: UNVERIFIED`). That happens at create (05 on mocks, 06 on the backend).
+- A field filled by the parser carries the **"Filled from résumé"** marker (icon + label, never colour alone). Editing
+  the field removes it. A plain line on the step says how many fields were filled; there is no "Mark as reviewed"
+  (claim states were dropped 2026-11-05).
+- Nothing in the flow says or sets "verified". Skills and the summary go into the candidate's first base résumé
+  at create (05 on mocks, 06 on the backend).
 - The parse result is never written to a component as text: it flows adapter → hook → wizard state.
 
 ## 5. Parser to form mapping
@@ -150,7 +155,7 @@ mapper is tested before the backend exists. Mapper: `src/lib/api/dto/resume-pars
 
 - Mapper: each fixture maps as the table says; location split; work auth table hits and misses; years with overlaps,
   an ongoing job, a missing start; skills split and de-duplicated.
-- Wizard reducer: drafted markers set on parse, cleared on edit and on "Mark as reviewed"; dirty flag.
+- Wizard reducer: drafted markers set on parse, cleared on edit; dirty flag.
 - Steps: required fields block Continue with the right messages; floor > target; 0–60 years; file type and size.
 - Discard confirm appears only when dirty.
 - `axe` on each step in both themes.
@@ -159,7 +164,7 @@ mapper is tested before the backend exists. Mapper: `src/lib/api/dto/resume-pars
 
 - [ ] Steps 1–4 match the screens (with the copy changes above) behind the flag
 - [ ] Parser mapping as §5, tested on Zuhair's format
-- [ ] No `VERIFIED` anywhere in the flow; drafted markers work
+- [ ] Filled-from-résumé markers work
 - [ ] Keyboard: every control reachable; `⌘/Ctrl+Enter` = Continue; `Esc` = close (with the confirm); focus moves to
       the step heading on each step change; the drop zone opens with `Enter`/`Space`
 - [ ] Skeleton (team and firm loading), parse loading, parse error and page error states present

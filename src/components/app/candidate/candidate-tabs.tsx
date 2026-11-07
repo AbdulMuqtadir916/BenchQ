@@ -33,10 +33,12 @@ interface CandidateTabsProps {
   counts: Partial<Record<CandidateTabId, number>>;
   /** Tabs with something new — a dot, not a number. */
   alerts: Partial<Record<CandidateTabId, boolean>>;
+  /** The open tab's own action, on the tab bar's line at the right (e.g. Upload résumé on Résumés). */
+  trailing?: React.ReactNode;
 }
 
 /** Sticky tab bar with a sliding selection and counts. Arrow keys move between tabs. */
-export const CandidateTabs = forwardRef<HTMLDivElement, CandidateTabsProps>(function CandidateTabs({ value, onChange, counts, alerts }, ref) {
+export const CandidateTabs = forwardRef<HTMLDivElement, CandidateTabsProps>(function CandidateTabs({ value, onChange, counts, alerts, trailing }, ref) {
   const reduce = useReducedMotion() ?? false;
 
   function move(dir: 1 | -1) {
@@ -47,7 +49,8 @@ export const CandidateTabs = forwardRef<HTMLDivElement, CandidateTabsProps>(func
   }
 
   return (
-    <div ref={ref} className="sticky top-[var(--topbar-height)] z-20 -mx-1 mb-5 scroll-mt-16 overflow-x-auto bg-[var(--color-surface)] px-1 py-2 [scrollbar-width:none]">
+    <div ref={ref} className="sticky top-[var(--topbar-height)] z-20 -mx-1 mb-5 flex scroll-mt-16 items-center gap-3 bg-[var(--color-surface)] px-1 py-2">
+      <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
       <div
         role="tablist"
         aria-label="Candidate sections"
@@ -72,7 +75,7 @@ export const CandidateTabs = forwardRef<HTMLDivElement, CandidateTabsProps>(func
               aria-controls="candidate-tabpanel"
               tabIndex={isActive ? 0 : -1}
               onClick={() => onChange(id)}
-              className={cn("relative inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-sm)] px-3 text-sm transition-colors", isActive ? "font-[550] text-[var(--color-text)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}
+              className={cn("relative inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-sm)] px-3 text-sm transition-colors", isActive ? "font-[550] text-[var(--color-text)]" : "text-[var(--color-text-2)] hover:text-[var(--color-text)]")}
             >
               {isActive ? (
                 <motion.span layoutId="candidate-tab-pill" transition={reduce ? { duration: 0 } : SPRING_LAYOUT} aria-hidden className="absolute inset-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-control)]" />
@@ -85,6 +88,8 @@ export const CandidateTabs = forwardRef<HTMLDivElement, CandidateTabsProps>(func
           );
         })}
       </div>
+      </div>
+      {trailing ? <div className="shrink-0">{trailing}</div> : null}
     </div>
   );
 });

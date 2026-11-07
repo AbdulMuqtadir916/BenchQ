@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { Play, Sparkles, Send, Mail, ArrowRight, BellRing, MailCheck, CircleHelp } from "lucide-react";
+import { Play, Sparkles, Send, Mail, ArrowRight, BellRing, MailCheck } from "lucide-react";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { scopeCandidates } from "@/lib/auth/permissions";
 import { useCandidates } from "@/lib/hooks/use-candidates";
@@ -59,15 +59,6 @@ export function BdeDashboard() {
     [userId, candidates, applications, followups],
   );
 
-  const unverifiedToReview = useMemo(
-    () =>
-      myCandidates.reduce(
-        (sum, c) => sum + c.qaBank.filter((q) => q.state === "UNVERIFIED").length,
-        0,
-      ),
-    [myCandidates],
-  );
-
   const topCandidate = useMemo(
     () => myCandidates.find((c) => c.status === "ON_BENCH") ?? myCandidates[0],
     [myCandidates],
@@ -121,7 +112,7 @@ export function BdeDashboard() {
             <StatCard icon={Send} label="Applications" value={`${dash.applicationsThisWeek}`} delta={`of ${NIGHTLY_TARGET} target`} trend="neutral" window="this week" />
             <StatCard icon={BellRing} iconTone={dash.followUpsOverdue ? "danger" : "success"} label="Follow-ups" value={`${dash.followUpsDueToday + dash.followUpsOverdue}`} delta={dash.followUpsOverdue ? `${dash.followUpsOverdue} overdue` : "on track"} trend={dash.followUpsOverdue ? "down" : "up"} window="due" />
             <StatCard icon={MailCheck} iconTone="success" label="Responses" value={`${dash.responsesThisWeek}`} trend="up" window="this week" />
-            <StatCard icon={CircleHelp} iconTone="warning" label="Unverified claims" value={`${unverifiedToReview}`} delta="to review" trend="neutral" window="needs evidence" />
+            <StatCard icon={Users} label="Candidates" value={`${myCandidates.length}`} trend="neutral" window="assigned to you" />
           </>
         )}
       </section>

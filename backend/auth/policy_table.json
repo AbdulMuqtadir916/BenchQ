@@ -13,6 +13,7 @@
     "candidate.assign": "Y Y - - - -",
     "candidate.create": "Y Y - - - -",
     "candidate.edit": "Y Y Y - - -",
+    "candidate.editProfile": "Y Y - - - -",
     "email.reclassify": "Y Y - - - -",
     "email.retry": "Y Y Y - - -",
     "firm.create": "- - - - Y Y",

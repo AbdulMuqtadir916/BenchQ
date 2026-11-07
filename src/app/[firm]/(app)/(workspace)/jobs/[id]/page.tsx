@@ -130,8 +130,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
             {analysisReady && context ? (
               <div className="mt-3 space-y-1.5">
-                <div className="mb-1 flex items-center gap-2 text-caption text-[var(--color-unverified-fg)]">
-                  <Sparkles size={12} aria-hidden /> AI draft — verified once you confirm evidence
+                <div className="mb-1 flex items-center gap-2 text-caption text-[var(--color-text-3)]">
+                  <Sparkles size={12} aria-hidden /> AI draft — read it over before you rely on it
                 </div>
                 {job.requirements.map((r) => {
                   const m = matchRequirement(r, context);

@@ -27,8 +27,8 @@ from sqlalchemy import or_
 from backend.auth.passwords import hash_password
 from backend.auth.tokens import hash_token, new_token
 from backend.config import IS_PRODUCTION
-from backend.models.db import SessionLocal, utcnow
-from backend.models.candidates import Candidate, ResumeParse
+from backend.models.db import SessionLocal, utcnow, Resume
+from backend.models.candidates import BaseResume, Candidate, ResumeParse
 from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, Session, User
 
 DEMO_PASSWORD = "benchq-demo-2026"                                     # docs/03 §3.2
@@ -76,6 +76,11 @@ def reset(db) -> None:
         .delete(synchronize_session=False)
     db.query(LedgerEntry).filter(or_(LedgerEntry.firm_id.in_(firm_ids), LedgerEntry.actor_user_id.in_(user_ids))) \
         .delete(synchronize_session=False)
+    # Their résumés first (a base's versions, then the bases): the candidates' names live there (07 Q57).
+    db.query(BaseResume).filter(BaseResume.firm_id.in_(firm_ids)).update({BaseResume.promoted_from_resume_id: None},
+                                                                          synchronize_session=False)
+    db.query(Resume).filter(Resume.firm_id.in_(firm_ids)).delete(synchronize_session=False)
+    db.query(BaseResume).filter(BaseResume.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(ResumeParse).filter(ResumeParse.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Candidate).filter(Candidate.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Invite).filter(or_(Invite.id.in_(fixture_ids["invites"]), Invite.firm_id.in_(firm_ids))) \
@@ -135,7 +140,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             db, Firm, demo_id(f["id"]), name=f["name"], slug=f["slug"], status=f["status"],
             plan_id=demo_id(f["planId"]), seat_limit=f["seatLimit"], candidate_limit=f["candidateLimit"],
             contact_phone=f["contactPhone"], logo_url=f["logoUrl"], primary_timezone=f["primaryTimezone"],
-            client_timezone=f["clientTimezone"], truth_guard_mode=f["truthGuardMode"],
+            client_timezone=f["clientTimezone"],
             application_expiry_days=f["applicationExpiryDays"], bde_capacity=f.get("bdeCapacity", 10),
             created_at=_when(f["createdAt"]))
     # Managers before the BDEs who point at them (07 Q40).
@@ -165,7 +170,9 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             accepted_at=created + timedelta(hours=1) if i["status"] == "ACCEPTED" else None,
             revoked_at=created + timedelta(hours=1) if i["status"] == "REVOKED" else None)
     for c in _load("candidates.json"):
-        added["candidates"] += _add_missing(db, Candidate, demo_id(c["id"]), **_candidate_fields(c))
+        if _add_missing(db, Candidate, demo_id(c["id"]), **_candidate_fields(c)):
+            added["candidates"] += 1
+            _form_base(db, db.get(Candidate, demo_id(c["id"])), c)
     return added
 
 
@@ -180,6 +187,29 @@ def _snake_keys(value):
     if isinstance(value, dict):
         return {_snake(k): _snake_keys(v) for k, v in value.items()}
     return value
+
+
+def _form_base(db, candidate, c: dict) -> None:
+    """The demo candidate's résumé (07 Q58: no candidate without one): a file generated from their details, kept like
+    an upload, and its UPLOAD base, whose v1 holds the name, contact details and location (07 Q57)."""
+    from types import SimpleNamespace
+    from backend.candidates import generated_resume
+    from backend.candidates.first_base import WORK_AUTH_LABEL, first_base
+    content, parse = generated_resume.from_details(
+        name=c["fullName"], title=c["primaryRole"], email=c["email"], phone=c["phone"], linkedin=c["linkedinUrl"],
+        city=c["city"], state=c["state"], country=c["country"], work_authorization=WORK_AUTH_LABEL.get(c["workAuth"]))
+    upload = ResumeParse(firm_id=candidate.firm_id, uploaded_by_user_id=demo_id(c["managerId"]), candidate_id=candidate.id,
+                         file_name=f"{c['fullName']} - résumé.pdf", mime_type=generated_resume.PDF_MIME,
+                         size_bytes=len(content), content=content, content_sha256=generated_resume.sha256(content),
+                         parse=parse, expires_at=None)
+    db.add(upload)
+    db.flush()
+    base, version = first_base(upload, candidate, SimpleNamespace(work_auth=c["workAuth"], summary="", skills=[]),
+                               demo_id(c["managerId"]))
+    db.add(base)
+    db.flush()
+    db.add(version)
+    db.flush()
 
 
 def _candidate_fields(c: dict) -> dict:

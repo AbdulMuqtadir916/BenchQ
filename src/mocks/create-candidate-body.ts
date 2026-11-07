@@ -1,6 +1,6 @@
 import type { CreateCandidate } from "@/lib/schemas/candidate";
 
-/** TESTS ONLY: a valid new-candidate body (docs/02 §4) for firm_hts, handed to its first MANAGER's queue. */
+/** TESTS ONLY: a new-candidate body for firm_hts. Successful creates must supply an ID returned by parseResume. */
 export const createCandidateBody = (overrides: Partial<CreateCandidate> = {}): CreateCandidate => ({
   fullName: "Nisha Verma",
   primaryRole: "Data Engineer",
@@ -29,7 +29,7 @@ export const createCandidateBody = (overrides: Partial<CreateCandidate> = {}): C
   skills: [],
   preferredIndustries: [],
   dealBreakers: [],
-  resumeParseId: null,
+  resumeParseId: "", // 07 Q58: callers must upload and read a résumé first
   managerId: "user_fatima",
   bdeId: null,
   handoffNote: null,

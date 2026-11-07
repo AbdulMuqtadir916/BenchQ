@@ -1,5 +1,7 @@
 # Phase B — UI completion audit
 
+> **Claim states dropped (2026-11-05).** BenchQ no longer has Verified / Unverified / Contradicted states, an evidence record or an export gate. Where this document describes them, read it as history.
+
 Step 1 of 07 Phase B: the audit only. Nothing here is fixed yet. Each finding has an ID, and the fix PRs
 at the end refer to those IDs.
 

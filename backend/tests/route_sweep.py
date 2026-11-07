@@ -44,7 +44,9 @@ SEED_OVERRIDES = {
                                 "decided_by_platform_user_id": None, "decided_at": None, "reset_token_hash": None,
                                 "reset_token_expires_at": None, "expires_at": LATER},
     "resume_parses": {"expires_at": None},
-    "resumes": {"category": "BASE", "job_id": None},
+    # 07 Q57: a candidate's name lives in its active base's newest version, so the seeded base is that one.
+    "base_resumes": {"is_active": True, "deleted_at": None, "archived_at": None},
+    "resumes": {"category": "BASE", "job_id": None, "deleted_at": None},
     "support_views": {"ended_at": None},
 }
 # Path and body ids by name, when the name isn't `<table, singular>_id`.

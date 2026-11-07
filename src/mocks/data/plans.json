@@ -5,7 +5,6 @@
     "seatLimit": 4,
     "candidateLimit": 25,
     "features": [
-      "Truth Guard",
       "Resume Builder",
       "Application tracking"
     ],

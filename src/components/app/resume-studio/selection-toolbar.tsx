@@ -9,7 +9,6 @@ import { useRewrite } from "@/lib/hooks/use-agents";
 import { cn } from "@/lib/cn";
 import { POPOVER_TRANSITION } from "@/lib/motion";
 import { useStudio } from "./studio-store";
-import { useDocActions } from "./use-doc-actions";
 
 const AI_ACTIONS: Array<{ action: RewriteAction; label: string; hint: string }> = [
   { action: "improve", label: "Improve wording", hint: "Stronger verbs, clearer outcome" },
@@ -31,7 +30,7 @@ function place(rect: DOMRect): Anchor {
 /**
  * Floats over a text selection inside any rich field in `scopeRef`: bold,
  * italic, underline and AI rewrite. ⌘J opens the AI menu from the keyboard.
- * Rewrites are simulated (mock adapter) and always land UNVERIFIED.
+ * Rewrites are simulated (mock adapter).
  */
 export function SelectionToolbar({ scopeRef }: { scopeRef: RefObject<HTMLElement | null> }) {
   const [anchor, setAnchor] = useState<Anchor | null>(null);
@@ -44,7 +43,6 @@ export function SelectionToolbar({ scopeRef }: { scopeRef: RefObject<HTMLElement
   const menuRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion() ?? false;
   const { flash, notify } = useStudio.getState();
-  const actions = useDocActions();
 
   const track = useCallback(() => {
     if (busy) return;
@@ -122,12 +120,9 @@ export function SelectionToolbar({ scopeRef }: { scopeRef: RefObject<HTMLElement
     try {
       const result = await rewriteMutation.mutateAsync({ text: r.toString(), action });
       if (restoreSelection()) document.execCommand("insertText", false, result.text);
-      const claimId = target.dataset.claimId;
-      if (claimId) {
-        actions.setClaimState(claimId, "UNVERIFIED", result.note);
-        flash(claimId);
-      }
-      notify("AI rewrite applied. It stays unverified until you confirm it.", "ai");
+      const fieldId = target.dataset.fieldId;
+      if (fieldId) flash(fieldId);
+      notify("AI rewrite applied. Read it over before you send.", "ai");
     } catch (error) {
       notify(error instanceof Error ? error.message : "AI rewrite is unavailable. Edit the text manually.", "danger");
     } finally {
@@ -199,7 +194,7 @@ export function SelectionToolbar({ scopeRef }: { scopeRef: RefObject<HTMLElement
                   <span className="text-caption text-[var(--color-text-3)]">{a.hint}</span>
                 </button>
               ))}
-              <p className="mt-1 border-t border-[var(--color-border)] px-2.5 pb-1 pt-1.5 text-caption text-[var(--color-text-3)]">AI edits stay unverified until you confirm them.</p>
+              <p className="mt-1 border-t border-[var(--color-border)] px-2.5 pb-1 pt-1.5 text-caption text-[var(--color-text-3)]">Read AI edits over before you send.</p>
             </div>
           ) : null}
         </motion.div>

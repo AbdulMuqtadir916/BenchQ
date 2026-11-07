@@ -1,5 +1,4 @@
 export { deriveCandidateStats } from "./candidate-stats";
-export { deriveExportGate, deriveDocumentGate, deriveGateFromClaims } from "./export-gate";
 export { deriveRecordCompleteness } from "./record-completeness";
 export { deriveFunnel } from "./funnel";
 export { deriveBdePerformance } from "./bde-performance";

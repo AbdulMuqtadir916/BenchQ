@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { ResumeDocument, ResumeSectionKey, RichClaim } from "@/lib/schemas/resume-document";
-import { newClaim } from "@/lib/resume-doc/build";
+import type { BulletSection, ResumeDocument, ResumeSectionKey, RichText } from "@/lib/schemas/resume-document";
+import { newText } from "@/lib/resume-doc/build";
 import { isBlank } from "@/lib/resume-doc/rich-text";
 import { EditableText } from "../editable-text";
 import { useDocActions } from "../use-doc-actions";
@@ -10,8 +10,8 @@ import { useStudio } from "../studio-store";
 
 type BlockProps = { doc: ResumeDocument; editable: boolean };
 
-/** Contradicted claims never reach the page; blank ones only show while editing. */
-const shows = (c: RichClaim, editable: boolean) => c.state !== "CONTRADICTED" && (editable || !isBlank(c.html));
+/** Blank text only shows while editing. */
+const shows = (t: RichText, editable: boolean) => editable || !isBlank(t.html);
 
 function Section({ id, title, children }: { id: ResumeSectionKey; title: string; children: ReactNode }) {
   return (
@@ -27,14 +27,44 @@ export function PaperSummary({ doc, editable }: BlockProps) {
   if (!shows(doc.summary, editable)) return null;
   return (
     <Section id="summary" title="Summary">
-      <EditableText as="p" rich value={doc.summary.html} onChange={(v) => a.setClaimHtml(doc.summary.id, v)} editable={editable} label="Summary" claimId={doc.summary.id} claimState={doc.summary.state} />
+      <EditableText as="p" rich value={doc.summary.html} onChange={(v) => a.setTextHtml(doc.summary.id, v)} editable={editable} label="Summary" fieldId={doc.summary.id} />
     </Section>
+  );
+}
+
+/** The bullets of one job or project, editable in place: Enter starts the next, Backspace in an empty one drops it. */
+function PaperBullets({ section, entryId, bullets, editable }: { section: BulletSection; entryId: string; bullets: RichText[]; editable: boolean }) {
+  const a = useDocActions();
+  const requestFocus = useStudio((s) => s.requestFocus);
+  const visible = bullets.filter((b) => shows(b, editable));
+  if (!visible.length) return null;
+  return (
+    <ul className="rt-bullets">
+      {visible.map((b) => (
+        <EditableText
+          key={b.id}
+          as="li"
+          rich
+          value={b.html}
+          onChange={(v) => a.setTextHtml(b.id, v)}
+          editable={editable}
+          label="Bullet"
+          placeholder="Describe an outcome"
+          fieldId={b.id}
+          onEnter={() => {
+            const next = newText();
+            a.addBullet(section, entryId, next, b.id);
+            requestFocus(next.id);
+          }}
+          onBackspaceEmpty={() => a.removeBullet(section, entryId, b.id)}
+        />
+      ))}
+    </ul>
   );
 }
 
 export function PaperExperience({ doc, editable }: BlockProps) {
   const a = useDocActions();
-  const requestFocus = useStudio((s) => s.requestFocus);
   if (!doc.experience.length) return null;
   return (
     <Section id="experience" title="Experience">
@@ -48,29 +78,7 @@ export function PaperExperience({ doc, editable }: BlockProps) {
             <EditableText className="rt-org" value={e.company} onChange={(v) => a.patch("experience", e.id, { company: v })} editable={editable} label="Company" />
             {editable || e.location ? <EditableText className="rt-meta" value={e.location} onChange={(v) => a.patch("experience", e.id, { location: v })} editable={editable} label="Location" /> : null}
           </div>
-          {e.description ? <EditableText className="rt-desc" value={e.description} onChange={(v) => a.patch("experience", e.id, { description: v })} editable={editable} label="Role description" /> : null}
-          <ul className="rt-bullets">
-            {e.bullets.filter((b) => shows(b, editable)).map((b) => (
-              <EditableText
-                key={b.id}
-                as="li"
-                rich
-                value={b.html}
-                onChange={(v) => a.setClaimHtml(b.id, v)}
-                editable={editable}
-                label="Bullet"
-                placeholder="Describe an outcome"
-                claimId={b.id}
-                claimState={b.state}
-                onEnter={() => {
-                  const next = newClaim();
-                  a.addBullet(e.id, next, b.id);
-                  requestFocus(next.id);
-                }}
-                onBackspaceEmpty={() => a.removeBullet(e.id, b.id)}
-              />
-            ))}
-          </ul>
+          <PaperBullets section="experience" entryId={e.id} bullets={e.bullets} editable={editable} />
         </div>
       ))}
     </Section>
@@ -102,11 +110,11 @@ export function PaperEducation({ doc, editable }: BlockProps) {
         <div key={e.id} className="rt-entry">
           <div className="rt-entry-head">
             <EditableText className="rt-role" value={e.school} onChange={(v) => a.patch("education", e.id, { school: v })} editable={editable} label="School" />
-            <EditableText className="rt-meta" value={e.years} onChange={(v) => a.patch("education", e.id, { years: v })} editable={editable} label="Years" />
+            <EditableText className="rt-meta" value={e.graduationDate} onChange={(v) => a.patch("education", e.id, { graduationDate: v })} editable={editable} label="Graduation" />
           </div>
           <div className="rt-entry-head">
             <EditableText className="rt-org" value={e.degree} onChange={(v) => a.patch("education", e.id, { degree: v })} editable={editable} label="Degree" />
-            {editable || e.location ? <EditableText className="rt-meta" value={e.location} onChange={(v) => a.patch("education", e.id, { location: v })} editable={editable} label="Location" /> : null}
+            {editable || e.grade ? <EditableText className="rt-meta" value={e.grade} onChange={(v) => a.patch("education", e.id, { grade: v })} editable={editable} label="Grade" placeholder="Grade" /> : null}
           </div>
         </div>
       ))}
@@ -114,23 +122,30 @@ export function PaperEducation({ doc, editable }: BlockProps) {
   );
 }
 
-export function PaperCertifications({ doc, editable }: BlockProps) {
+function PaperCredentials({ doc, editable, section, title }: BlockProps & { section: "certifications" | "awards"; title: string }) {
   const a = useDocActions();
-  if (!doc.certifications.length) return null;
+  const rows = doc[section];
+  if (!rows.length) return null;
   return (
-    <Section id="certifications" title="Certifications">
-      {doc.certifications.map((c) => (
-        <div key={c.id} className="rt-entry-head">
-          <span>
-            <EditableText className="rt-role" value={c.name} onChange={(v) => a.patch("certifications", c.id, { name: v })} editable={editable} label="Certification" />
-            {editable || c.issuer ? <>{" · "}<EditableText className="rt-org" value={c.issuer} onChange={(v) => a.patch("certifications", c.id, { issuer: v })} editable={editable} label="Issuer" /></> : null}
-          </span>
-          <EditableText className="rt-meta" value={c.year} onChange={(v) => a.patch("certifications", c.id, { year: v })} editable={editable} label="Year" />
+    <Section id={section} title={title}>
+      {rows.map((c) => (
+        <div key={c.id} className="rt-entry">
+          <div className="rt-entry-head">
+            <span>
+              <EditableText className="rt-role" value={c.name} onChange={(v) => a.patch(section, c.id, { name: v })} editable={editable} label="Name" />
+              {editable || c.issuer ? <>{" · "}<EditableText className="rt-org" value={c.issuer} onChange={(v) => a.patch(section, c.id, { issuer: v })} editable={editable} label="Issuer" placeholder="Issuer" /></> : null}
+            </span>
+            {editable || c.date ? <EditableText className="rt-meta" value={c.date} onChange={(v) => a.patch(section, c.id, { date: v })} editable={editable} label="Date" placeholder="Date" /> : null}
+          </div>
+          {editable || c.detail ? <EditableText className="rt-desc" value={c.detail} onChange={(v) => a.patch(section, c.id, { detail: v })} editable={editable} label="Detail" placeholder="Detail (optional)" /> : null}
         </div>
       ))}
     </Section>
   );
 }
+
+export const PaperCertifications = (props: BlockProps) => <PaperCredentials {...props} section="certifications" title="Certifications" />;
+export const PaperAwards = (props: BlockProps) => <PaperCredentials {...props} section="awards" title="Awards" />;
 
 export function PaperProjects({ doc, editable }: BlockProps) {
   const a = useDocActions();
@@ -141,11 +156,15 @@ export function PaperProjects({ doc, editable }: BlockProps) {
         <div key={p.id} className="rt-entry">
           <div className="rt-entry-head">
             <EditableText className="rt-role" value={p.name} onChange={(v) => a.patch("projects", p.id, { name: v })} editable={editable} label="Project name" />
-            {editable || p.link ? <EditableText className="rt-meta" value={p.link} onChange={(v) => a.patch("projects", p.id, { link: v })} editable={editable} label="Project link" /> : null}
+            {editable || p.dates ? <EditableText className="rt-meta" value={p.dates} onChange={(v) => a.patch("projects", p.id, { dates: v })} editable={editable} label="Project dates" placeholder="Dates" /> : null}
           </div>
-          {shows(p.description, editable) ? (
-            <EditableText as="p" rich value={p.description.html} onChange={(v) => a.setClaimHtml(p.description.id, v)} editable={editable} label="Project description" claimId={p.description.id} claimState={p.description.state} />
+          {editable || p.link || p.technologies ? (
+            <div className="rt-entry-head">
+              {editable || p.technologies ? <EditableText className="rt-org" value={p.technologies} onChange={(v) => a.patch("projects", p.id, { technologies: v })} editable={editable} label="Technologies" placeholder="Technologies" /> : <span />}
+              {editable || p.link ? <EditableText className="rt-meta" value={p.link} onChange={(v) => a.patch("projects", p.id, { link: v })} editable={editable} label="Project link" placeholder="Link" /> : null}
+            </div>
           ) : null}
+          <PaperBullets section="projects" entryId={p.id} bullets={p.bullets} editable={editable} />
         </div>
       ))}
     </Section>

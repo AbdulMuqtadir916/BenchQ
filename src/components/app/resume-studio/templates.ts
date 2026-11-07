@@ -17,7 +17,7 @@ export const RESUME_TEMPLATES: ResumeTemplate[] = [
   { id: "template_minimal", name: "Minimal", description: "Quiet headings and generous whitespace", className: "rt-minimal", layout: "single" },
   { id: "template_executive", name: "Executive", description: "Serif name, navy rules, senior-level feel", className: "rt-executive", layout: "single" },
   { id: "template_compact", name: "Compact", description: "Tighter type to fit more on one page", className: "rt-compact", layout: "single" },
-  { id: "template_sidebar", name: "Two Column", description: "Skills and education in a side column", className: "rt-sidebar", layout: "sidebar" },
+  { id: "template_sidebar", name: "Two Column", description: "Contact and skills in a side column", className: "rt-sidebar", layout: "sidebar" },
 ];
 
 export function templateById(id: string): ResumeTemplate {

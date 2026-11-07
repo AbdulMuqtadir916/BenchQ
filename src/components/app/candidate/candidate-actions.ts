@@ -8,6 +8,4 @@ export interface CandidateActions {
   openMessage: (messageId: string) => void;
   applySuggestion: (suggestion: Suggestion) => void;
   findJobs: () => void;
-  /** Open the master resume builder on its first unverified claim. */
-  reviewMasterResume: () => void;
 }
