@@ -117,6 +117,114 @@ def test_owner_and_manager_can_move_candidate_application_both_directions(
     assert all(event.candidate_id == candidate.id for event in events)
 
 
+FORM = {"fields": [
+    {"label": "First name", "value": "Asha", "required": True, "source": "autofill"},
+    {"label": "Why this role?", "value": "Typed on the form", "required": False, "source": "bde"},
+]}
+
+
+def test_the_form_is_kept_when_applied_and_cleared_when_saved_again(
+    api_client, test_db, accounts, jobs_in_default_firm
+):
+    from backend.models.db import Application
+
+    _, _, application, _, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "OWNER"
+    )
+    path = f"/api/applications/{application.id}/candidate-status"
+    is_null = test_db.query(Application).filter(Application.id == application.id, Application.form_data.is_(None))
+    assert is_null.count() == 1
+
+    applied = api_client.patch(
+        path, json={"status": "applied", "expected_revision": 0, "form_data": FORM}, headers=headers
+    )
+    assert applied.status_code == 200, applied.text
+    assert "form_data" not in applied.json()
+    test_db.expire_all()
+    assert test_db.get(Application, application.id).form_data == FORM
+
+    saved = api_client.patch(path, json={"status": "saved", "expected_revision": 1}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    test_db.expire_all()
+    assert is_null.count() == 1  # SQL NULL, not a JSON null
+
+
+def test_applied_without_a_form_leaves_form_data_null(api_client, test_db, accounts, jobs_in_default_firm):
+    from backend.models.db import Application
+
+    _, _, application, _, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "OWNER"
+    )
+    path = f"/api/applications/{application.id}/candidate-status"
+    applied = api_client.patch(path, json={"status": "applied", "expected_revision": 0}, headers=headers)
+    assert applied.status_code == 200, applied.text
+    test_db.expire_all()
+    assert test_db.get(Application, application.id).form_data is None
+
+
+def test_an_empty_form_still_marks_the_job_applied(api_client, test_db, accounts, jobs_in_default_firm):
+    from backend.models.db import Application
+
+    _, _, application, _, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "OWNER"
+    )
+    path = f"/api/applications/{application.id}/candidate-status"
+    applied = api_client.patch(
+        path, json={"status": "applied", "expected_revision": 0, "form_data": {"fields": []}}, headers=headers
+    )
+    assert applied.status_code == 200, applied.text
+    test_db.expire_all()
+    assert test_db.get(Application, application.id).form_data == {"fields": []}
+
+
+def _field(**changes):
+    return {"label": "City", "value": "Dallas", "required": False, "source": "bde", **changes}
+
+
+@pytest.mark.parametrize("form_data", [
+    "not an object",
+    {"fields": "not a list"},
+    {"fields": [], "url": "https://jobs.example.test"},
+    {"fields": ["not a field"]},
+    {"fields": [{"label": "City", "value": "Dallas"}]},
+    {"fields": [_field(value=7)]},
+    {"fields": [_field(required="yes")]},
+    {"fields": [_field(source="someone")]},
+    {"fields": [_field(source=["bde"])]},
+    {"fields": [_field(label="L" * 501)]},
+    {"fields": [_field(value="V" * 4001)]},
+    {"fields": [_field(value="a\x00b")]},
+    {"fields": [_field() for _ in range(201)]},
+])
+def test_a_malformed_form_is_refused_without_changes(
+    api_client, test_db, accounts, jobs_in_default_firm, form_data
+):
+    from backend.models.db import Application
+
+    _, _, application, _, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "OWNER"
+    )
+    response = api_client.patch(
+        f"/api/applications/{application.id}/candidate-status",
+        json={"status": "applied", "expected_revision": 0, "form_data": form_data}, headers=headers,
+    )
+    assert response.status_code == 400, response.text
+    test_db.expire_all()
+    stored = test_db.get(Application, application.id)
+    assert (stored.status, stored.status_revision, stored.form_data) == ("saved", 0, None)
+
+
+def test_a_form_goes_only_with_a_move_to_applied(api_client, test_db, accounts, jobs_in_default_firm):
+    _, _, application, _, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "OWNER"
+    )
+    response = api_client.patch(
+        f"/api/applications/{application.id}/candidate-status",
+        json={"status": "screening_call", "expected_revision": 0, "form_data": FORM}, headers=headers,
+    )
+    assert response.status_code == 400, response.text
+
+
 def test_candidate_application_status_rejects_unsupported_status_without_changes(
     api_client, test_db, accounts, jobs_in_default_firm
 ):

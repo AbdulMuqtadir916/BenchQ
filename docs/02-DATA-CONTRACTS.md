@@ -1409,8 +1409,16 @@ unchanged in this PR; their live DTO integration and display changes belong to l
 - `GET /api/applications` accepts `candidate_id` and `tracked_only`. Candidate visibility applies to list, detail,
   edits, interviews and preparation; legacy rows are visible to firm-wide readers only.
 - `PATCH /api/applications/{id}/candidate-status` accepts
-  `{status, expected_revision, command_id?, note?}`. A changed revision returns 409. A matching command replay
-  creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+  `{status, expected_revision, command_id?, note?, form_data?}`. A changed revision returns 409. A matching command
+  replay creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+- `applications.form_data` (migration 0016, nullable JSONB) is what the employer's form held when the BDE marked the
+  job applied from the extension: `{fields: [{label, value, required, source}]}`, `source` being `autofill` or `bde`.
+  Only a move to `applied` may send it; at most 200 fields, labels up to 500 characters, values up to 4000; anything
+  else returns 400. It stays null on a Saved job and on an applied job with no form to send, and a move back to Saved
+  clears it. An empty form (`{fields: []}`) is valid: the page couldn't be read. It holds the candidate's answers, so
+  no response returns it, the ledger and status events don't copy it, and logs never carry it. The extension leaves
+  out passwords, government IDs, payment details, dates of birth, signatures and EEO answers, and an upload is its
+  file name only.
 - `PATCH /api/applications/{id}/review` also requires `review_id` and `expected_review_revision`. Only a pending
   persisted review for this application can be confirmed; another route cannot bypass it with a normal status move.
   Review resolution and status/event/ledger writes commit together. Model classification and review queue creation

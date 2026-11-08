@@ -345,6 +345,10 @@ class Application(Base):
     last_email_received = Column(DateTime(timezone=True), nullable=True)
     last_email_snippet = Column(Text, nullable=True)
     status_transitions = Column(JSON, default=[])  # [{from, to, at, source}]
+    # What the employer's form held when the BDE marked the job applied from the extension (docs/02 §9). Null while
+    # Saved. It is the candidate's answers, so no response carries it and nothing logs it. Deferred so a list never
+    # loads it; `none_as_null` so None is SQL NULL, not a JSON null. Owner: Samad.
+    form_data = deferred(Column(JSONB(none_as_null=True), nullable=True))
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     __table_args__ = (
