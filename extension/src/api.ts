@@ -1,3 +1,5 @@
+import type { AppliedForm, AutofillConfig } from "./autofill/types";
+
 export const BENCHQ_URL = __BENCHQ_URL__.replace(/\/$/, "");
 
 type Principal = { kind: "firm" | "platform"; role: string; user_id: string; firm_id?: string };
@@ -5,7 +7,6 @@ export type Session = { principal: Principal; user?: { id: string; name: string;
 type StatusTransition = { from: string | null; to: string };
 export type Application = {
   id: string;
-  job_id: string;
   candidate_id: string | null;
   status: string;
   title: string | null;
@@ -29,6 +30,11 @@ export type Application = {
   match_score?: number | null;
   best_score?: number | null;
   best_cv_score?: number | null;
+  /** The résumé the application was sent with, else the newest one tailored for its job (routes_applications.py). */
+  tailored_resume_id?: string | null;
+  tailored_resume_name?: string | null;
+  tailored_resume_deleted?: boolean;
+  has_cover_letter?: boolean;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -40,11 +46,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
 
+export const isSessionExpired = (error: unknown) => error instanceof Error && error.message === "SESSION_EXPIRED";
+
+/** The candidate's Resumes tab on the website: `candidates.detail` in src/lib/routes/registry.ts, tab `resumes`. The
+ * website reads the backend's candidate id as it is while candidates run on the backend. */
+export const candidateResumesUrl = (firmSlug: string, candidateId: string) =>
+  `${BENCHQ_URL}/${encodeURIComponent(firmSlug)}/candidates/${encodeURIComponent(candidateId)}?tab=resumes`;
+
 export const getSession = () => request<Session>("/api/auth/me");
 export type Candidate = { id: string; full_name: string };
 
 export const getCandidates = (firmId: string) =>
   request<Candidate[]>(`/api/firms/${encodeURIComponent(firmId)}/candidates`);
+
+export const getAutofillConfig = (candidateId: string) =>
+  request<AutofillConfig>(`/api/autofill/config?candidate_id=${encodeURIComponent(candidateId)}`);
 
 export const getSavedApplications = async (candidateId: string) => {
   const candidate = `&candidate_id=${encodeURIComponent(candidateId)}`;
@@ -60,7 +76,7 @@ export const getSavedApplications = async (candidateId: string) => {
   );
   return [...saved.applications, ...appliedFromSaved];
 };
-export const markApplied = (application: Application) => request<Application>(`/api/applications/${encodeURIComponent(application.id)}/candidate-status`, {
+export const markApplied = (application: Application, form: AppliedForm) => request<Application>(`/api/applications/${encodeURIComponent(application.id)}/candidate-status`, {
   method: "PATCH",
-  body: JSON.stringify({ status: "applied", expected_revision: application.status_revision ?? 0, command_id: crypto.randomUUID() }),
+  body: JSON.stringify({ status: "applied", expected_revision: application.status_revision ?? 0, command_id: crypto.randomUUID(), form_data: form }),
 });

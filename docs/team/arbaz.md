@@ -12,20 +12,25 @@ All extension implementation is isolated in `extension/`, alongside the root `pa
 extension/
 ├── public/manifest.json       MV3 side panel and service worker registration
 ├── src/
-│   ├── api.ts                 Session, saved applications, and status API calls
-│   ├── background.ts          Opens the panel from the toolbar action
+│   ├── api.ts                 Session, saved applications, autofill config, and status API calls
+│   ├── autofill/              Matching, never-fill rules, tab bridge, and the review panel
+│   ├── background.ts          Opens the panel; keeps each tab's job connection
+│   ├── engine/                The autofill engine: see its README for sources and licences
 │   ├── chrome.d.ts            Minimal Chrome API declarations
-│   ├── JobHighlight.tsx       Selected-job card with Apply
+│   ├── JobTabs.tsx            The Saved and Applied tabs
 │   ├── main.tsx               Side panel UI and session/job state
-│   └── style.css              Compact BenchQ-inspired side panel styling
+│   ├── page/                  Injected page script: scans, fills, verifies and undoes
+│   ├── style.css              Tailwind setup: the website's tokens, type scale and buttons
+│   └── ui.ts                  Tailwind class lists the panel's components share
 ├── index.html
 ├── package.json
 ├── package-lock.json
+├── postcss.config.mjs         Tailwind, the same way the website loads it
 ├── tsconfig.json
 └── vite.config.ts
 ```
 
-Uses React, TypeScript, Vite, and Chrome Side Panel API. Vite outputs to `extension/dist/`; the checked build produced `manifest.json`, `index.html`, `panel.js`, `background.js`, and CSS under `assets/`.
+Uses React, TypeScript, Vite, Tailwind v4 (through PostCSS, as the website does), and Chrome Side Panel API. Tailwind's reset only reaches the side panel: nothing is injected into employer pages. Vite outputs to `extension/dist/`; the checked build produced `manifest.json`, `index.html`, `panel.js`, `background.js`, and CSS under `assets/`.
 
 ## Reused BenchQ behavior
 
@@ -37,14 +42,54 @@ Uses React, TypeScript, Vite, and Chrome Side Panel API. Vite outputs to `extens
 - **Non-BDE:** displays the requested BDE-only explanation and no jobs.
 - **Theme and identity:** the panel has an interactive Light/Dark toggle with the same Moon/Sun icon states as `src/components/theme/theme-toggle.tsx`; it remembers the selection in extension-local storage and uses BenchQ light and navy dark palette values. The signed-in header shows the user's name, BDE role, and firm.
 
+## Autofill
+
+- **Connection:** **Open job** opens the URL from the background worker and stores `tabId → application, candidate, job summary` in `chrome.storage.session`, ids only. Marking a job applied ends its connection on every tab, and the tab stays open. A tab the employer's page opens inherits it. Clicking a job's title does the same as **Open job**. While a job is linked the panel shows only that job, with no list or tabs, and the candidate dropdown follows it and stays locked; the ✕ on the card ends the connection and the tab stays open. Typing an address into the tab or closing it clears the connection.
+- **Scan:** `page.js` is injected only into connected tabs, in all frames, on load, on a single-page route change, and when the regular check finds the form has changed. It reads and never writes. A captcha's frames (hCaptcha, reCAPTCHA, Turnstile, Arkose) are skipped: their controls, like hCaptcha's language menu, aren't part of the form.
+- **Source:** `GET /api/autofill/config?candidate_id=` returns only the candidate's `qa_bank`, checked against the caller's scope, in the format below. The panel holds it in memory and does all the matching itself: by wording, by what a question asks for, and from what answers hold inside them (`src/autofill/derive.ts`): the city in "Dallas, TX", first and last name from a two-word full name, the full name from the first (and middle) and last name, the ZIP or six-digit PIN code an address or location ends with ("…, OH 43215"), a start date from the notice period in a date box, and the linked job's title for "Position applied for". A location fills without its ZIP code or a note, and only "City, ST" or "City, State, Country" gives a city or a state. A saved answer of the field's own kind comes first, but a screening answer (background check, clearance, travel, commute, former employer…) counts only when both questions ask the same thing: the same stance (willing, have, ever, need), the same numbers and places, and a named company only when it's the job's. Pay goes in only in the unit the field asks for, hourly or yearly: BenchQ never converts (`src/autofill/pay.ts`). Names and contact details under a section about someone else (emergency contact, references, referred by), and a start date in a work-history block, stay with the BDE. Matching reads the question without its examples and notes ("(e.g. LinkedIn)", "(Note: …)"). A candidate with an empty bank gets nothing filled.
+- **Panel:** top to bottom: the job card (the job's first letter, title, company, the candidate, and, once the job list has the saved application, its location, pay and when BenchQ found it; pay under 1,000 reads per hour, since the job pool stores no unit), **Autofill**, the run while it goes, a **Resume** and a **Cover letter** section, then **Required**, **Optional** and **Other uploads**. **Mark applied** and **Undo** stay at the bottom. Mark applied steps aside while a run fills the form and is back when it ends, and the panel then scrolls up to **Autofill complete** (or to the run's note when fields are left), stopping just under the sticky top bar, smoothly unless the system asks for reduced motion. The job card keeps to a few short lines: title, company and candidate, location on its own row, pay and when it was found side by side.
+- **Never filled:** government, tax and payment IDs, date and place of birth, passwords and account forms, CAPTCHA, consent and legal statements, signatures, uploads (`src/autofill/never-fill.ts`). A yes or no about having a licence or passport, a profile's user name ("GitHub username"), a name "as on passport", a PIN code and "Tax terms" are questions, so they fill. EEO and self-ID questions fill only from an explicit bank answer, never from a guess. Self-rating questions and experience in a line of work are always left to the BDE.
+- **Fill:** every field with an answer, one at a time, each read back after the page updates and again once the run settles. While it runs, the field lists make way for the run: each field joins it as BenchQ reaches it, with a spinner, then a green tick and the value it took, or a warning and why it's the BDE's. The run never waits for the list, and with reduced motion nothing moves. Once it ends, the result note and the lists come back. The note is a small strip: what the run filled ("Filled 15 fields"), then how many fields are still empty, required and optional, and why ("Still empty: 2 required, 1 optional. Autofill didn't recognize these or couldn't fill them. Fill in the required ones below, then submit the form."), counting every empty field on the form; amber while a required field is empty, green otherwise. It goes after six seconds (not while hovered or focused), or with its ✕, and stays when a run stopped because the form changed. Custom dropdowns such as Greenhouse's are opened at fill time, and the answer is matched against the options they show, with one search when it isn't on show; no clear match leaves them untouched, and the row then offers **Choose an option**: the dropdown's options in the panel, and the one picked there is selected on the page. A dropdown or list box that keeps several choices gets each part of the answer, all of them or none. Race and ethnicity lists are read by group, whatever their wording ("East Asian (inclusive of Chinese, …)", "Asian (Not Hispanic or Latino)"; `src/autofill/race.ts`): a broad "Asian" is never narrowed, several saved races pick "Two or More Races" or nothing, and a saved Hispanic answer picks the Hispanic option where the list has one. Work-authorization status sentences ("I am authorized … but will require sponsorship") come from the saved authorization and sponsorship answers, however they're worded (`src/autofill/authorization.ts`), never from a visa type. Styled radios, checkboxes, switches and toggle buttons (`role="radio"`, `aria-pressed`) fill like real ones. A value the form only reformatted, like "11-20-2026" for "11/20/2026", counts as taken. Once the run settles, Autofill fills once more for questions its answers brought out, like "If yes, which visa?". Prior values stay in the page for **Undo**, which puts back every field BenchQ filled, leaves one the BDE has edited, and says which dropdowns couldn't be cleared. A field that can't be filled is put back as it was and stays with the BDE, with the reason on its row. It stays that way when the BDE switches tabs, and a page load offers it again. The extension never submits a form, and **Mark applied** on the linked job, after a confirmation, is the only way it changes status. The confirmation is a modal dialog: it names the job and the candidate, lists each required field still empty as a link back to it, starts on **Yes, mark applied**, and Cancel or Esc returns focus to the button. An answer that fits several options, like a saved "Asian" on a form listing East, South and Southeast Asian, stays with the BDE and the row names them: BenchQ doesn't narrow it down. A saved "South Asian" fills that form and any form offering plain "Asian".
+- **Tracking:** while the panel is showing, it reads the form every two seconds, because a page has no way to message the extension. A field the BDE fills ticks in the **Required** or **Optional** list and the fills are theirs: Autofill won't write over them. Nor over a value the form held before BenchQ first looked, typed earlier or filled by the site from the résumé: when it differs from the saved answer, **Already on the form** shows both, with **Replace** and **Replace all**. Autofill always leaves uploads to the BDE. The **Resume** and **Cover letter** sections show whether the form asks for each ("No field found" when it doesn't), tick once a file is attached and show its name, go to the field, and say what BenchQ holds for the job: the tailored résumé, with a link to the candidate's résumés on the website, and whether a cover letter is saved. They're found by label (`src/autofill/documents.ts`), since the engine misses résumé uploads; a cover letter can also be a text box. Any other upload is listed last. New fields, removed fields and new dropdown options bring a fresh scan, so there is no Rescan button.
+- **`form_data`:** **Mark applied** sends each field's label, value, required flag and source (`autofill` or `bde`) to `applications.form_data` (`docs/02` §9). Values are kept from when they were last seen, across every page of the form, in the panel's memory only and never in Chrome storage, so closing the panel loses them. Passwords, government IDs, payment details, dates and places of birth, signatures, account forms and EEO answers are left out, and an upload is its file name.
+
+### The answer bank `/config` returns
+
+Each entry has exactly these four fields. The extension needs nothing else.
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Candidate QA bank",
+  "type": "array",
+  "maxItems": 500,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "question", "answer", "category"],
+    "properties": {
+      "id": { "type": "string", "pattern": "^qa_[a-z0-9_]{1,64}$" },
+      "question": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+      "answer": { "type": "string", "minLength": 1, "maxLength": 4000, "pattern": "\\S" },
+      "category": { "enum": ["WORK_AUTH", "COMPENSATION", "AVAILABILITY", "RELOCATION", "EXPERIENCE", "BEHAVIOURAL", "OTHER"] }
+    }
+  }
+}
+```
+
+- `id` is unique within the candidate's bank and never reused. JSON Schema can't say that, so whatever writes the bank checks it.
+- `answer` is plain text. A choice is the option's wording ("Yes", "H-1B"); several are comma-separated ("English, Hindi").
+- `candidates.qa_bank` stores four more fields per entry (`use_count`, `last_used_at`, `state`, `evidence_id`), which the website's candidate reader still requires; `/config` leaves them out.
+
 ## Build and setup
 
 - `npm run ext:build` — builds the standalone extension.
 - `npm run ext:watch` — rebuilds on source changes.
+- `pnpm ext:test` — runs the extension's tests, or in `extension/`: `npm test`, and `npm run test:watch` while working.
 - Vite loads `BENCHQ_URL` from `extension/.env`; copy `extension/.env.example` as a starting point. It is the BenchQ web-app origin used for the sign-in tab and all `/api/*` requests. In local development it is `http://localhost:3000`; Next.js rewrites those API paths to the backend at `BACKEND_URL`. For another environment, set it to that BenchQ web-app origin, rebuild, and ensure the backend `ALLOWED_ORIGINS` includes the extension's exact `chrome-extension://` origin.
 - Load unpacked in Chrome: run the build, open `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose `extension/dist/`.
 
-The extension calls the BenchQ origin directly with browser-managed cookies. Backend CORS and unsafe-request origin checks use `ALLOWED_ORIGINS`; the deployment must include the installed extension's `chrome-extension://<extension-id>` origin. This is an environment setup dependency, not changed by this implementation. The manifest declares HTTPS host access to allow a deployment origin; runtime access is still limited to the configured `BENCHQ_URL` in the API client.
+The extension calls the BenchQ origin directly with browser-managed cookies. Backend CORS and unsafe-request origin checks use `ALLOWED_ORIGINS`; the deployment must include the installed extension's `chrome-extension://<extension-id>` origin. This is an environment setup dependency, not changed by this implementation. The manifest's HTTPS host access is also what lets the page script run on employer sites, in connected tabs only; API calls stay limited to the configured `BENCHQ_URL`.
 
 ## Verification and limitations
 
