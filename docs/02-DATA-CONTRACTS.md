@@ -1343,7 +1343,7 @@ export const ResumeSchema = z.object({
 });
 ```
 
-### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off)
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off); the version's `autofill` (`?autofill=true`) APPROVED 2026-11-08 (Abdul, issue 119), BUILT (PR 118)
 
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
@@ -1353,8 +1353,9 @@ rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateI
 `versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
 `ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
 
-**`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK; finished 2026-11-08 from
-Abdul's review, the `key` approved by Abdul):** `GET …/resumes/{id}?autofill=true`, on the candidate's route and on
+**`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK; this contract signed off
+by Abdul 2026-11-08 in issue 119, the `key` added with his OK):** `GET …/resumes/{id}?autofill=true`, on the
+candidate's route and on
 `GET /firms/{firm}/resumes/{id}`, adds `autofill`: every question an application form can ask, each once. Two parts:
 
 - **Fixed answers**, built from the version and the profile for that read and never stored (`backend/candidates/autofill.py`

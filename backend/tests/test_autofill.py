@@ -171,10 +171,21 @@ def test_the_current_job_is_the_one_marked_current_else_the_one_that_ended_last(
     assert answers([_job("", "", True), *older_first]) == ("Recent Co", "Senior Developer")   # an empty row isn't one
 
 
-def test_an_entry_with_nothing_but_its_current_flag_is_left_out():
-    jobs = [_job("", "", False), _job("", "", True), _job("2020-01", "", True, company="Acme")]
-    assert build(CANDIDATE, {**VERSION, "experiences": jobs}, TODAY)["List your work experience."] == [
-        {"company": "Acme", "start": "2020-01", "current": True}]
+def test_a_blank_row_is_left_out():
+    """Without its empty fields, a blank job is `{"current": false}` and a blank education, project or award is `{}`:
+    neither is an entry, and a list with nothing else leaves its question out."""
+    blank = {**VERSION,
+             "experiences": [_job("", "", False), _job("", "", True), _job("2020-01", "", True, company="Acme")],
+             "educations": [{"id": "d0", "degree": "", "institution": "", "graduation_date": "", "grade": ""}, {}],
+             "projects": [{"id": "p0", "name": "", "url": "", "dates": "", "technologies": "", "bullets": []}, {}],
+             "awards": [{"id": "a0", "name": "", "issuer": "", "date": "", "detail": ""}, {}]}
+    answers = build(CANDIDATE, blank, TODAY)
+    assert answers["List your work experience."] == [{"company": "Acme", "start": "2020-01", "current": True}]
+    for question in ("List your education.", "List your projects.", "Which awards have you received?",
+                     "What is your highest degree?", "Which school did you attend?", "What year did you graduate?"):
+        assert question not in answers
+    one_school = build(CANDIDATE, {**blank, "educations": [{}, *VERSION["educations"]]}, TODAY)
+    assert one_school["List your education."] == [{"degree": "B.Tech", "school": "JNTU", "graduation_date": "May 2017"}]
 
 
 def test_a_date_is_its_day_in_utc_whatever_the_sessions_timezone():
