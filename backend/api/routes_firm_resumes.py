@@ -5,6 +5,7 @@ sent", the studio's URL).
 - GET /firms/{firm_id}/resumes               every candidate in the principal's scope: their bases with versions and
                                              their tailored résumés (no content)
 - GET /firms/{firm_id}/resumes/{resume_id}   one version with its content, and the candidate it belongs to
+                                             (`?autofill=true`: and its autofill, docs/02 §8.1)
 
 Scope is the candidates list's (07 Q47): the OWNER, a VIEWER and a support view see the firm, a MANAGER their team, a
 BDE their own candidates. A version of a candidate outside that scope, of another firm, or deleted is the same 404 as a
@@ -37,12 +38,12 @@ def list_firm_resumes(firm_id: uuid.UUID, principal: Principal = Depends(current
 
 
 @router.get("/{resume_id}", summary="One version with its content, by its id alone")
-def get_firm_resume(firm_id: uuid.UUID, resume_id: uuid.UUID, principal: Principal = Depends(current_principal),
-                    db: DbSession = Depends(get_db)):
+def get_firm_resume(firm_id: uuid.UUID, resume_id: uuid.UUID, autofill: bool = False,
+                    principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
     row = scoped(db, Resume, firm_id).filter(Resume.id == resume_id, Resume.base_resume_id.isnot(None),
                                              Resume.deleted_at.is_(None)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Not found.")
     candidate = _candidate(db, firm_id, principal, row.candidate_id)  # outside the principal's scope: the same 404
-    return versions.opened_json(row, candidate)
+    return versions.opened_json(row, candidate, with_autofill=autofill)

@@ -30,7 +30,7 @@ from backend.auth.scoping import own_scope, scoped, team_scope
 from backend.auth.sessions import Principal
 from backend.candidates.first_base import first_base
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
-from backend.candidates import autofill, profile
+from backend.candidates import profile
 from backend.candidates.serialize import candidate_json
 from backend.models.candidates import (EMPLOYMENT_TYPES, REMOTE_MODES, WORK_AUTHS, WORKING_STATUSES, Candidate,
                                        ResumeParse)
@@ -312,8 +312,6 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     if candidate.rate_min is not None and candidate.rate_target is not None and candidate.rate_min > candidate.rate_target:
         raise _bad("The floor can't be above the target rate.")
     if changes:
-        # The profile answers in every version's autofill follow the profile (decided 2026-11-07).
-        autofill.refresh_candidate(db, candidate)
         ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="candidate",
                       entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
                       summary=f"Updated {', '.join(f.replace('_', ' ') for f in changes)}")

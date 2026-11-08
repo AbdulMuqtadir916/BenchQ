@@ -1353,15 +1353,41 @@ rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateI
 `versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
 `ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
 
-**`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK):** each `resumes` row
-holds every non-id fact about the candidate as `{question: answer}` (`backend/candidates/autofill.py`): this version's
-header, summary, skills, every job with its bullets, education, projects, awards, certifications and languages, and the
-profile facts (sponsorship, transfer, work authorization expiry, target rate, availability, notice, relocation,
-engagement types, work settings, preferred locations and industries, primary and target roles). Years of experience
-come from the version's own jobs (the New candidate form's rule), else `years_experience`. Never: ids, `rate_min`,
-`contact_notes`, `deal_breakers`, `status`, `bench_start_date`. A missing fact leaves its question out; answers keep
-their JSON type. Only `GET …/resumes/{id}` (one version) returns it, with the years worked out for today; not the list,
-not a save. The frontend doesn't map it (no screen shows it); the extension reads it (Samad).
+**`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK; finished 2026-11-08 from
+Abdul's review, the `key` approved by Abdul):** `GET …/resumes/{id}?autofill=true`, on the candidate's route and on
+`GET /firms/{firm}/resumes/{id}`, adds `autofill`: every question an application form can ask, each once. Two parts:
+
+- **Fixed answers**, built from the version and the profile for that read and never stored (`backend/candidates/autofill.py`
+  `build()`): this version's header, summary, skills, every job with its dates and bullets, its education (the highest
+  degree, with that degree's school and year), projects, awards, certifications and languages; and the profile's facts:
+  work authorization (the profile's status; the résumé's text only without one), its expiry, sponsorship, transfer,
+  target rate, availability, notice, relocation, engagement types, work settings, preferred locations and industries,
+  primary and target roles. Years of experience come from the version's own jobs, counted to today (the New candidate
+  form's rule), else `years_experience`. A profile edit shows in every version at once; nothing is rewritten.
+- **The user's entries**, stored in `resumes.autofill` as `{question: answer}` (`{}` by default): an edit to a fixed
+  answer, or a question they added. An entry wins over the built answer. A save and a promote copy them to the new
+  version; a new upload starts with none.
+
+Each entry is `{question, answer, kind, key?, built?}`:
+
+| Field | What |
+|---|---|
+| `question` | As written once in `autofill.py`, or as the user typed it |
+| `answer` | Its JSON type kept: text, a number, `true`/`false`, a list, a list of objects (jobs, education, projects, awards), a date as `"YYYY-MM-DD"` |
+| `kind` | `FIXED` (built), `EDITED` (the user's entry for a fixed question), `CUSTOM` (a question the user added) |
+| `key` | On `FIXED` and `EDITED`: what the question asks, a fixed name that doesn't change with the wording, so a reader (the extension) matches by it. A new question gets a new key |
+| `built` | On `EDITED`: the built answer a reset gives back; `null` when the version and the profile don't answer it |
+
+The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`, `address-city`, `address-region`,
+`address-country`, `professional-title`, `summary`, `work-auth-status`, `skills`, `current-company`, `current-title`,
+`work-history`, `education-degree`, `education-school`, `graduation-year`, `education-history`, `projects`, `awards`,
+`certifications`, `languages`, `work-auth-expiry`, `visa-sponsorship`, `visa-transfer`, `years-experience`,
+`primary-role`, `target-roles`, `pay-rate`, `start-date`, `notice-period-days`, `relocation-willing`,
+`employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`. The fixed questions come first in
+that order, then the user's. A missing fact leaves its question out. Never in it: ids, `rate_min`, `contact_notes`,
+`deal_breakers`, `status`, `bench_start_date`. Not in the list, a save, or a read without `?autofill=true`. Writing the
+user's entries (a route) is planned; its contract goes here first. The frontend doesn't map `autofill` (no screen
+shows it yet); the extension reads it (Arbaz).
 
 ```ts
 // src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker

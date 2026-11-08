@@ -1,16 +1,16 @@
-"""Résumé autofill (decided 2026-11-07): each résumé version holds its own `autofill`, and `candidates.qa_bank` goes.
+"""Résumé autofill (decided 2026-11-07; the built answers stopped being stored 2026-11-08, Abdul): each résumé version
+keeps the autofill entries the user typed for it, and `candidates.qa_bank` goes.
 
-1. `resumes.autofill` (JSONB, `{}` by default): every non-id fact about the candidate as `{question: answer}`, from the
-   version and the candidate's profile (`backend/candidates/autofill.py`).
-2. Every existing version, deleted ones too, is filled with the same code the app uses.
-3. `candidates.qa_bank` is dropped: only the demo seed ever filled it (the persona's own `qa_bank` stays, with the
+1. `resumes.autofill` (JSONB, `{}` by default): only what a person typed for this version, `{question: answer}` (an edit
+   to a built answer, or a question they added). The built answers aren't stored: `backend/candidates/autofill.py`
+   builds them from the version and the profile each time they're read. So no row is filled here, and this migration
+   imports no app code: every existing version starts with no entries.
+2. `candidates.qa_bank` is dropped: only the demo seed ever filled it (the persona's own `qa_bank` stays, with the
    persona). The candidate's Documents tab "Screening answers" panel shows its empty state until the Documents section
    is removed (planned, docs/team/abdul.md §3).
 
 The downgrade drops `autofill` and puts `qa_bank` back empty. Follows 0018.
 """
-import json
-
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -22,19 +22,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    from backend.candidates.autofill import CANDIDATE_FIELDS, VERSION_FIELDS, build
     op.add_column('resumes', sa.Column('autofill', postgresql.JSONB(astext_type=sa.Text()),
                                        server_default=sa.text("'{}'::jsonb"), nullable=False))
-    conn = op.get_bind()
-    rows = conn.execute(sa.text(
-        "SELECT r.id, " + ", ".join(f"r.{f}" for f in VERSION_FIELDS) + ", "
-        + ", ".join(f"c.{f} AS c_{f}" for f in CANDIDATE_FIELDS)
-        + " FROM resumes r JOIN candidates c ON c.id = r.candidate_id")).mappings().all()
-    for row in rows:
-        version = {f: row[f] for f in VERSION_FIELDS}
-        candidate = {f: row[f"c_{f}"] for f in CANDIDATE_FIELDS}
-        conn.execute(sa.text("UPDATE resumes SET autofill = CAST(:autofill AS jsonb) WHERE id = :id"),
-                     {"autofill": json.dumps(build(candidate, version)), "id": row["id"]})
     op.drop_column('candidates', 'qa_bank')
 
 

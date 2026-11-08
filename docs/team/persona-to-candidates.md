@@ -105,7 +105,7 @@ The `autofill_prompt` setting keeps its placeholders. They are filled from the c
 
 | Placeholder | Was | Now |
 |---|---|---|
-| `{qa_bank}` | `persona.qa_bank` | **The résumé version's `autofill`** (migration 0019: `candidates.qa_bank` is gone): `{question: answer}`, one version's, from `GET …/resumes/{id}`. `_qa_pair` already reads the single-key `{question: answer}` shape |
+| `{qa_bank}` | `persona.qa_bank` | **The résumé version's `autofill`** (migration 0019: `candidates.qa_bank` is gone): one version's `{question, answer, kind, key}` entries from `GET …/resumes/{id}?autofill=true` ([docs/02](../02-DATA-CONTRACTS.md) §8.1). `_qa_pair` already reads the `{question, answer, …}` shape |
 | `{persona}` (the profile) | `persona.contact`, `work_auth`, `preferences`, `resume_content` as JSON | **From `candidates`:** the §4 facts, plus `primary_role`, `target_roles`, `years_experience`, `employment_types`, `preferred_locations`, `preferred_industries`, `deal_breakers`. **From the résumé:** `resume_text(version)` (`backend/candidates/resume_text.py`), see below |
 
 **Which résumé version:**
@@ -118,8 +118,9 @@ The `autofill_prompt` setting keeps its placeholders. They are filled from the c
 That belongs in Samad's extension proposal ([samad.md](./samad.md) §3).
 
 **Saving an answer.** "Save this answer to the bank" was `POST /api/persona/qa-bank`. `candidates.qa_bank` is gone
-(0019), and `autofill` is built from the version and the profile, not typed into: where a hand-saved answer lives is
-open, for Samad's extension design (with Abdul and Zuhair).
+(0019). A hand-saved answer becomes one of the résumé version's own entries (`resumes.autofill`, docs/02 §8.1), which
+wins over the built answer and goes with the résumé to its next version. The route that writes them is planned; its
+contract goes in docs/02 first.
 
 ## 6. Cover letters (Zuhair)
 

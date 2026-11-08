@@ -159,11 +159,11 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
     return {**out, **content_of(row)} if with_content else out
 
 
-def opened_json(row: Resume, candidate) -> dict:
-    """One version as it is opened: its content and its autofill, the years worked out for today. Only this answer
-    carries the autofill, not the list or a save (decided 2026-11-07)."""
-    return {**version_json(row, with_content=True),
-            "autofill": autofill.for_reading(row.autofill, candidate, row)}
+def opened_json(row: Resume, candidate, *, with_autofill: bool = False) -> dict:
+    """One version as it is opened: its content and, with `with_autofill` (`?autofill=true`), its autofill, built
+    for this read (`autofill.merged`: nothing is written). Only these answers carry it, never the list or a save."""
+    out = version_json(row, with_content=True)
+    return {**out, "autofill": autofill.merged(candidate, row)} if with_autofill else out
 
 
 def base_json(base: BaseResume, number: int) -> dict:
@@ -273,10 +273,11 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
     if content == before:
         raise _bad("No changes to save.")
     latest = _group(db, source).with_entities(func.max(Resume.version)).scalar() or source.version
+    # The autofill entries the user typed go to the next version with the résumé (the built answers aren't stored).
     row = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=source.base_resume_id,
                  category=source.category, job_id=source.job_id, version=latest + 1, name=source.name,
-                 template=source.template, page_format=source.page_format, created_by_user_id=actor.id, **content)
-    autofill.fill(candidate, row)
+                 template=source.template, page_format=source.page_format, created_by_user_id=actor.id,
+                 autofill=copy.deepcopy(source.autofill or {}), **content)
     db.add(row)
     db.flush()
     profile.refresh(candidate)              # a new newest version may change the name (07 Q57; review #3)
@@ -317,8 +318,7 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     _activate(db, candidate, base)
     copied = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
                     job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                    created_by_user_id=actor.id, **content_of(row))
-    autofill.fill(candidate, copied)
+                    created_by_user_id=actor.id, autofill=copy.deepcopy(row.autofill or {}), **content_of(row))
     db.add(copied)
     db.flush()
     number = len(numbers) + 1

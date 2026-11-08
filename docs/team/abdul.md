@@ -34,8 +34,8 @@ in `src/app/[firm]/(app)/(workspace)/candidates/[id]/page.tsx`), uploads of visa
 files, the Screening answers panel, `src/lib/api/documents.ts`, `src/lib/hooks/use-documents.ts`, the documents mock
 and fixtures, the `CandidateDocument` contract (`docs/02` §9.y) and the screen spec (`docs/04-SCREENS.md`
 "Documents"). Nothing is removed yet. Until then, Screening answers reads `candidate.qaBank`; the résumé autofill PR
-(Zuhair, next after PR 7) moves those answers to `resumes.autofill` and drops `candidates.qa_bank`, so the panel then
-shows its empty state.
+(Zuhair, next after PR 7) drops `candidates.qa_bank` (each résumé version's autofill answers instead, `docs/02` §8.1),
+so the panel then shows its empty state.
 
 **The `personas` table** (decided 2026-11-05: kept for now): once autofill, cover letters and scoring read the candidate
 instead, one migration drops it with `cover_letters.from_persona`, and the persona routes go

@@ -186,7 +186,7 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
 3. Then the extension itself.
 4. **Autofill reads the candidate, not the shared persona** (decided 2026-11-05, Abdul): fixed answers from
    `candidates` and the candidate's résumé, drafted answers from the résumé version's `autofill` (migration 0019,
-   `GET …/resumes/{id}`; `candidates.qa_bank` is gone); the extension names the candidate.
+   `GET …/resumes/{id}?autofill=true`; `candidates.qa_bank` is gone); the extension names the candidate.
    Field-by-field mapping and the two open points (an H1B transfer and sponsorship; self-ID defaults):
    [persona-to-candidates.md](./persona-to-candidates.md) §4–§5 (a suggestion; the facts are §1–§2).
 

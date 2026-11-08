@@ -3,19 +3,21 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
-## Résumé autofill (`feat/resume-autofill`, Zuhair)
+## Résumé autofill (`feat/resume-autofill`, Zuhair; finished by Arbaz)
 
-Decided by Zuhair 2026-11-07 (Abdul and Samad OK): each résumé version holds its own `autofill`, every non-id fact
-about the candidate as `{question: answer}` ([docs/02](../02-DATA-CONTRACTS.md) §8.1, `backend/candidates/autofill.py`).
+Decided by Zuhair 2026-11-07 (Abdul and Samad OK); finished 2026-11-08 from Abdul's review: every non-id fact about the
+candidate is built from the résumé version and the profile each time one version is read with `?autofill=true`, each
+answer with its `key`, and each version stores only the entries the user typed ([docs/02](../02-DATA-CONTRACTS.md)
+§8.1, `backend/candidates/autofill.py`).
 
 | Area (owner) | File | What changed | Why |
 |---|---|---|---|
 | Candidates table (Abdul) | `backend/models/candidates.py`, migration `0019_resume_autofill.py` (+ test) | `candidates.qa_bank` is dropped. The downgrade puts it back empty. | The answers live on each résumé version now. Only the demo seed ever filled it; the persona's own `qa_bank` stays with the persona. **One-way for the demo answers.** |
-| Candidate JSON and edit route (Abdul) | `backend/candidates/serialize.py`, `backend/api/routes_candidates.py` | `qa_bank` leaves the candidate JSON. A profile edit (`PATCH …/candidates/{id}`) also rewrites the `autofill` of every version of that candidate. | The profile answers follow the profile; each version's résumé answers stay its own. |
+| Candidate JSON (Abdul) | `backend/candidates/serialize.py` | `qa_bank` leaves the candidate JSON. The edit route is unchanged: a profile edit writes nothing to the résumés. | The profile answers are built on each read, so the next read shows the edit. |
 | Demo seed (Abdul) | `backend/scripts/seed_demo.py` | No `qa_bank` on the demo candidates; the unused camelCase helpers go. | The column is gone. |
 | Candidate DTO (shared) | `src/lib/api/dto/candidates.ts`, its sample and test | The backend sends no `qa_bank`; the mapper gives `qaBank: []`. `CandidateSchema.qaBank` stays. | The Documents tab's Screening answers panel reads it and shows its empty state until the Documents section is removed (planned, [abdul.md](./abdul.md) §3). Mock mode still shows the fixtures' answers. |
-| Autofill and the extension (Samad) | none | Nothing changed. **For you:** drafted answers can read the résumé version's `autofill` from `GET …/resumes/{id}` (one version; the years are worked out for today) instead of `persona.qa_bank`. Where a hand-saved answer goes is open ([persona-to-candidates.md](./persona-to-candidates.md) §5). | Q7 of the design: this PR builds and fills `autofill`; switching the extension is your PR. |
-| Old tailoring (JobNavigator leftover) | `backend/analyzer/legacy_tailoring.py` | Not changed. It still builds résumés with columns PR 6 dropped (`is_base`, `json_data`), so it makes no versions and gets no `autofill`. | The tailoring module (Zuhair) will create tailored versions through `versions.py`, which fills `autofill`. |
+| Autofill and the extension (Arbaz) | none | Nothing changed. **For you:** read the selected résumé's `GET …/resumes/{id}?autofill=true` instead of `persona.qa_bank`, and match each entry by its `key` before its wording. A hand-saved answer becomes one of the version's own entries (`resumes.autofill`); the route that writes them is planned ([persona-to-candidates.md](./persona-to-candidates.md) §5). | This PR builds the answers; switching the extension is your PR. |
+| Old tailoring (JobNavigator leftover) | `backend/analyzer/legacy_tailoring.py` | Not changed. It isn't wired to anything and can't make versions (it reads columns 0013 dropped). | **Open for the tailoring module (Zuhair):** whether a tailored v1 starts with its base version's typed entries, as a save and a promote do. Its fixed answers are built from its own text either way. |
 
 ## Résumé screens live — no claim states, the tree (`integrate/resumes`, Zuhair)
 

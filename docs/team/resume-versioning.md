@@ -202,7 +202,7 @@ All reads, edits, tailoring, previews and downloads go through this table.
 | `certifications` | jsonb | | `[{id, name, issuer, date, detail}]` | **new** |
 | `awards` | jsonb | | `[{id, name, issuer, date, detail}]` | **new** |
 | `languages` | jsonb | | `[{id, name}]` | **new** |
-| `autofill` | jsonb | `'{}'` | Every non-id fact about the candidate as `{question: answer}`, from this version and the profile (`backend/candidates/autofill.py`). Written when the version is made; every version's is rewritten when the profile is edited; the years are worked out again when one version is read. Not content: a save never compares it | **new in 0019** |
+| `autofill` | jsonb | `'{}'` | The autofill entries the user typed for this version, `{question: answer}`: an edit to a built answer, or a question they added ([docs/02](../02-DATA-CONTRACTS.md) §8.1). The built answers aren't stored: `backend/candidates/autofill.py` builds them from the version and the profile each time one version is read with `?autofill=true`. A save and a promote copy it to the new version. Not content: a save never compares it | **new in 0019** |
 | `created_by_user_id` | uuid | FK → users | Who saved this version | **new** |
 | `created_at` | timestamptz | `now()` | When this version was saved | exists |
 
