@@ -5,17 +5,23 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b && vite build",
-    "watch": "vite build --watch"
+    "watch": "vite build --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "vite": "latest",
-    "typescript": "^5.8.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "typescript": "^5.8.0",
+    "vite": "latest"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "latest",
+    "@tailwindcss/postcss": "^4.3.5",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "latest",
+    "jsdom": "^31.0.0",
+    "tailwindcss": "^4.3.5",
+    "vitest": "^5.1.0"
   }
 }
