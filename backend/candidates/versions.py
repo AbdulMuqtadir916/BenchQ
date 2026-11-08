@@ -273,11 +273,12 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
     if content == before:
         raise _bad("No changes to save.")
     latest = _group(db, source).with_entities(func.max(Resume.version)).scalar() or source.version
-    # The autofill entries the user typed go to the next version with the résumé (the built answers aren't stored).
+    # The autofill entries the user typed go to the next version with the résumé (the built answers aren't stored). An
+    # edit applies there only while its built answer is the one it replaced, so the new text still shows.
     row = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=source.base_resume_id,
                  category=source.category, job_id=source.job_id, version=latest + 1, name=source.name,
                  template=source.template, page_format=source.page_format, created_by_user_id=actor.id,
-                 autofill=copy.deepcopy(source.autofill or {}), **content)
+                 autofill=copy.deepcopy(autofill.entries_of(source)), **content)
     db.add(row)
     db.flush()
     profile.refresh(candidate)              # a new newest version may change the name (07 Q57; review #3)
@@ -318,7 +319,7 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     _activate(db, candidate, base)
     copied = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
                     job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                    created_by_user_id=actor.id, autofill=copy.deepcopy(row.autofill or {}), **content_of(row))
+                    created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)), **content_of(row))
     db.add(copied)
     db.flush()
     number = len(numbers) + 1

@@ -1,13 +1,15 @@
 """Résumé autofill (decided 2026-11-07, finished 2026-11-08; docs/02 §8.1): the fixed answers are built from the version
-and the profile on each read, each with its key; the user's own entries are stored per version, win, and go with a
-save and a promote; only opening one version with `?autofill=true` returns them."""
+and the profile on each read, each with its key; the user's own entries are stored per version, an edit by its key with
+the built answer it replaced, and go with a save and a promote; only opening one version with `?autofill=true` returns
+them."""
 import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
-from backend.candidates.autofill import KEY_OF, QUESTIONS, YEARS, build, merged, years_from_work
+from backend.candidates import autofill
+from backend.candidates.autofill import QUESTIONS, YEARS, build, entries_of, merged, years_from_work
 from backend.tests.test_candidates_api import world  # noqa: F401  (the fixture)
 from backend.tests.test_resume_versions import _candidate, _listing, _pdf, _save, _url, _v, parser  # noqa: F401
 
@@ -111,13 +113,17 @@ def test_every_non_id_fact_as_a_typed_answer_and_nothing_of_the_firms_own():
 
 
 def test_every_question_has_its_own_key():
-    assert len(set(QUESTIONS.values())) == len(QUESTIONS) == len(KEY_OF)
+    assert len(set(QUESTIONS.values())) == len(QUESTIONS)
     assert all(re.fullmatch(r"[a-z]+(-[a-z]+)*", key) for key in QUESTIONS)
 
 
+def _edit(answer, over):
+    return {"answer": answer, "over": over}
+
+
 def test_the_users_entry_wins_and_every_answer_says_what_it_is():
-    typed = {"What is your expected rate?": 95, "What is your GitHub profile URL?": "github.com/ravi",
-             "Why do you want to work here?": "Payments."}
+    typed = {"edited": {"pay-rate": _edit(95, 85), "github-url": _edit("github.com/ravi", None)},
+             "custom": {"Why do you want to work here?": "Payments."}}
     entries = merged(CANDIDATE, {**VERSION, "autofill": typed}, TODAY)
     by_question = {entry["question"]: entry for entry in entries}
     assert entries[0] == {"question": "What is your full name?", "answer": "Ravi Teja", "kind": "FIXED",
@@ -131,13 +137,54 @@ def test_the_users_entry_wins_and_every_answer_says_what_it_is():
     assert entries[-1] == {"question": "Why do you want to work here?", "answer": "Payments.", "kind": "CUSTOM"}
     questions = [entry["question"] for entry in entries]
     assert len(questions) == len(set(questions))                    # each question once
-    assert set(questions) == set(build(CANDIDATE, VERSION, TODAY)) | set(typed)
+    assert set(questions) == set(build(CANDIDATE, VERSION, TODAY)) | {
+        "What is your GitHub profile URL?", "Why do you want to work here?"}
 
 
-def test_work_authorization_is_the_profiles_and_the_resumes_text_only_without_one():
-    assert build(CANDIDATE, VERSION, TODAY)["What is your work authorization?"] == "H-1B"
+def test_an_edit_applies_while_the_answer_it_replaced_is_the_built_one():
+    typed = {"edited": {"pay-rate": _edit(95, 85), "professional-title": _edit("Staff Engineer", "Java Developer")}}
+    kinds = lambda candidate, version: {e["key"]: (e["kind"], e["answer"]) for e in merged(candidate, version, TODAY)
+                                        if "key" in e}                           # noqa: E731
+    both = kinds(CANDIDATE, {**VERSION, "autofill": typed})
+    assert both["pay-rate"] == ("EDITED", 95) and both["professional-title"] == ("EDITED", "Staff Engineer")
+    # The profile's rate changed after the edit: the new rate shows. The version's own title changed: so does it.
+    later = kinds({**CANDIDATE, "rate_target": 100}, {**VERSION, "title": "Principal Engineer", "autofill": typed})
+    assert later["pay-rate"] == ("FIXED", 100) and later["professional-title"] == ("FIXED", "Principal Engineer")
+    # `true` isn't `1`: an edit made over one doesn't apply over the other.
+    flag = {"edited": {"visa-sponsorship": _edit(False, 1)}}
+    assert kinds(CANDIDATE, {**VERSION, "autofill": flag})["visa-sponsorship"] == ("FIXED", True)
+
+
+def test_an_edit_is_kept_by_its_key_whatever_the_wording(monkeypatch):
+    typed = {"edited": {"address-region": _edit("Texas", "TX")}}
+    monkeypatch.setitem(autofill.QUESTIONS, "address-region", "In which state do you reside?")
+    region = next(e for e in merged(CANDIDATE, {**VERSION, "autofill": typed}, TODAY) if e.get("key") == "address-region")
+    assert region == {"question": "In which state do you reside?", "answer": "Texas", "kind": "EDITED",
+                      "key": "address-region", "built": "TX"}
+
+
+@pytest.mark.parametrize("stored", [
+    "Texas", ["a", "b"], [], None, {"edited": "Texas"}, {"edited": {"address-region": "Texas"}},
+    # What the first 0019 wrote: every built answer by its question, never typed by anyone.
+    {"What is your full name?": "Old Name", "Which state do you live in?": "CA"},
+])
+def test_anything_else_stored_reads_as_no_entries(stored):
+    entries = merged(CANDIDATE, {**VERSION, "autofill": stored}, TODAY)
+    assert all(entry["kind"] == "FIXED" for entry in entries)
+    assert entries[0]["answer"] == "Ravi Teja" and entries_of({"autofill": stored}) == {}
+
+
+def test_a_custom_question_cant_take_a_fixed_questions_wording():
+    typed = {"custom": {"What is your full name?": "Someone Else", "Why us?": "Payments."}}
+    entries = merged(CANDIDATE, {**VERSION, "autofill": typed}, TODAY)
+    assert [e["answer"] for e in entries if e["question"] == "What is your full name?"] == ["Ravi Teja"]
+    assert entries[-1] == {"question": "Why us?", "answer": "Payments.", "kind": "CUSTOM"}
+
+
+def test_work_authorization_is_the_profiles_status():
+    assert build(CANDIDATE, VERSION, TODAY)["What is your work authorization?"] == "H-1B"   # not the résumé's "H1B visa"
     assert build({**CANDIDATE, "work_auth": "GC_EAD"}, VERSION, TODAY)["What is your work authorization?"] == "GC EAD"
-    assert build({**CANDIDATE, "work_auth": None}, VERSION, TODAY)["What is your work authorization?"] == "H1B visa"
+    assert "What is your work authorization?" not in build({**CANDIDATE, "work_auth": None}, VERSION, TODAY)
 
 
 def test_the_highest_degree_comes_with_its_own_school_and_year():
@@ -154,6 +201,13 @@ def test_the_highest_degree_comes_with_its_own_school_and_year():
     assert answers([schools[2], schools[0]]) == ("B.Tech in ME", "JNTU", 2017)      # the last year written
     assert answers([{"degree": "Coursework", "institution": "A"}, {"degree": "Training", "institution": "B"}]) == (
         "Coursework", "A", None)                                                    # can't tell: the first listed
+    # A two-letter code names a degree only at its start: "to be completed" isn't a bachelor's.
+    assert answers([{"degree": "Coursework, to be completed 2025", "institution": "A"},
+                    {"degree": "Associate of Arts", "institution": "B", "graduation_date": "2019"}]) == (
+        "Associate of Arts", "B", 2019)
+    # The levels a degree starts with count, the highest of them.
+    assert answers([{"degree": "B.Tech", "institution": "A"}, {"degree": "BE/ME dual degree", "institution": "B"}])[:2] == (
+        "BE/ME dual degree", "B")
 
 
 def test_the_current_job_is_the_one_marked_current_else_the_one_that_ended_last():
@@ -173,9 +227,11 @@ def test_the_current_job_is_the_one_marked_current_else_the_one_that_ended_last(
 
 def test_a_blank_row_is_left_out():
     """Without its empty fields, a blank job is `{"current": false}` and a blank education, project or award is `{}`:
-    neither is an entry, and a list with nothing else leaves its question out."""
+    neither is an entry, and a list with nothing else leaves its question out. A row with no company or title (only a
+    location, or dates and bullets) isn't a job either."""
+    not_jobs = [_job("", "", False, location="Remote"), _job("2019-01", "2019-06", bullets=[{"id": "b", "text": "Led QA."}])]
     blank = {**VERSION,
-             "experiences": [_job("", "", False), _job("", "", True), _job("2020-01", "", True, company="Acme")],
+             "experiences": [_job("", "", False), _job("", "", True), *not_jobs, _job("2020-01", "", True, company="Acme")],
              "educations": [{"id": "d0", "degree": "", "institution": "", "graduation_date": "", "grade": ""}, {}],
              "projects": [{"id": "p0", "name": "", "url": "", "dates": "", "technologies": "", "bullets": []}, {}],
              "awards": [{"id": "a0", "name": "", "issuer": "", "date": "", "detail": ""}, {}]}
@@ -262,9 +318,12 @@ def test_the_users_entries_go_with_a_save_and_a_promote_and_an_upload_starts_wit
                                                                                        world, parser):
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     v1 = _v(anonymous_client, world, c, who="adnan")
-    typed = {"What is your expected rate?": 120, "Why do you want to work here?": "Payments."}
+    typed = {"edited": {"pay-rate": _edit(120, None), "professional-title": _edit("Lead Java Developer", "Java Developer")},
+             "custom": {"Why do you want to work here?": "Payments."}}
     _stored(test_db, v1["id"]).autofill = typed
     test_db.commit()
+    on_v1 = {e["question"]: e for e in _open(anonymous_client, world, c, v1["id"], "adnan", autofill="true")["autofill"]}
+    assert on_v1["What is your professional title?"]["answer"] == "Lead Java Developer"
 
     v2 = _save(anonymous_client, world, c, v1, "adnan", title="Staff Engineer").json()
     assert _stored(test_db, v2["id"]).autofill == typed
@@ -272,7 +331,10 @@ def test_the_users_entries_go_with_a_save_and_a_promote_and_an_upload_starts_wit
     assert entries["What is your expected rate?"] == {"question": "What is your expected rate?", "answer": 120,
                                                       "kind": "EDITED", "key": "pay-rate", "built": None}
     assert entries["Why do you want to work here?"]["kind"] == "CUSTOM"
-    assert entries["What is your professional title?"]["answer"] == "Staff Engineer"
+    # v2's own title shows: the edit replaced v1's title, which v2 doesn't have.
+    assert entries["What is your professional title?"] == {"question": "What is your professional title?",
+                                                           "answer": "Staff Engineer", "kind": "FIXED",
+                                                           "key": "professional-title"}
 
     r = anonymous_client.post(_url(world, c, f"/{v2['id']}/use-as-base"), headers=world["as"]["adnan"])
     assert r.status_code in (200, 201), r.text
@@ -282,6 +344,18 @@ def test_the_users_entries_go_with_a_save_and_a_promote_and_an_upload_starts_wit
     assert anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"]).status_code == 201
     uploaded = _listing(anonymous_client, world, c, "adnan")["bases"][2]["versions"][0]
     assert _stored(test_db, uploaded["id"]).autofill == {}
+
+
+def test_a_save_leaves_behind_what_isnt_an_entry(anonymous_client, test_db, world):
+    """What the first 0019 wrote (every built answer by its question) isn't copied on: a save keeps only entries."""
+    c = _candidate(anonymous_client, test_db, world)
+    v1 = _v(anonymous_client, world, c)
+    _stored(test_db, v1["id"]).autofill = {"What is your full name?": "Old Name", "edited": {"pay-rate": _edit(120, None)}}
+    test_db.commit()
+    v2 = _save(anonymous_client, world, c, v1, title="Staff Engineer").json()
+    assert _stored(test_db, v2["id"]).autofill == {"edited": {"pay-rate": _edit(120, None)}, "custom": {}}
+    answers = {e["question"]: e["answer"] for e in _open(anonymous_client, world, c, v1["id"], autofill="true")["autofill"]}
+    assert answers["What is your full name?"] == "Ravi Teja"
 
 
 @pytest.mark.parametrize("field", ["qa_bank"])

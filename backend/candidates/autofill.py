@@ -3,22 +3,25 @@ docs/02 §8.1): every question an application form can ask, answered in two part
 
 - **Fixed answers** are built by `build()` from the version and the candidate's profile when they're asked for. They
   aren't stored, so they're never stale: a profile edit, or a new question added here, shows on every version at once.
-- **The user's entries** are stored in `resumes.autofill` (`{question: answer}`, `{}` by default): only what a person
-  typed, an edit to a fixed answer or a question they added. A save and a promote copy them to the new version.
+- **The user's entries** are stored in `resumes.autofill`, only what a person typed (`{}` by default):
+  `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit is kept by its question's key,
+  so rewording a question here never loses it, with `over`, the built answer it replaced. It applies while that is
+  still the built answer: once the version's own text or the profile changes it, the new built answer shows. A save
+  and a promote copy the entries; on the new version an edit applies only where its built answer is still `over`.
 
-`merged()` is what `GET …/resumes/{id}?autofill=true` returns: every question once, the user's entry winning, with
-its `kind` (FIXED; EDITED, with `built`, the answer reset gives back; CUSTOM) and, for a question built here, its
-`key`: a fixed name for what it asks (`address-city`, `work-auth-status`…), so a reader such as the extension can
-match it whatever its wording. Answers keep their JSON type: 10, true/false, a list, a date as "YYYY-MM-DD".
+`merged()` is what `GET …/resumes/{id}?autofill=true` returns: every question once, with its `kind` (FIXED; EDITED,
+with `built`, the answer reset gives back; CUSTOM) and, for a question built here, its `key`: a fixed name for what it
+asks (`address-city`, `work-auth-status`…), so a reader such as the extension can match it whatever its wording.
+Answers keep their JSON type: 10, true/false, a list, a date as "YYYY-MM-DD".
 
 - **From the version:** the header (name, contact, location, title), the summary, skills, every job with its dates
   and bullets (the current one: marked current, else the one that ended last), every education (the highest degree,
   with its own school and year), projects, awards, certifications and languages. A tailored version answers from its
   own text.
 - **From the candidate:** the profile facts the owner and the candidate's manager keep (07 Q56): work authorization
-  (the résumé's text only when the profile has none), its expiry, sponsorship, transfer, the target rate,
-  availability, notice period, relocation, engagement types, work settings, preferred locations and industries,
-  primary and target roles.
+  (the profile's status: every candidate has one), its expiry, sponsorship, transfer, the target rate, availability,
+  notice period, relocation, engagement types, work settings, preferred locations and industries, primary and target
+  roles.
 - **Years of experience:** worked out from the version's own jobs for today (`years_from_work`, the rule the New
   candidate form uses, src/lib/api/dto/resume-parse.ts `yearsFromWork`), else the candidate's `years_experience`.
 
@@ -26,6 +29,7 @@ Never in it: ids (candidate, firm, BDE, manager, base, job), and what is the fir
 the notes for the BDE (`contact_notes`), `deal_breakers`, `status`, `bench_start_date`. A fact that is missing leaves
 its question out (no empty answers).
 """
+import json
 import re
 from collections.abc import Mapping
 from datetime import date, datetime, timezone
@@ -82,20 +86,26 @@ QUESTIONS: dict[str, str] = {
     "preferred-industries": "Which industries do you prefer?",
 }
 YEARS = QUESTIONS["years-experience"]
-KEY_OF = {question: key for key, question in QUESTIONS.items()}
 
 # A month is 01–12: "2024-00" or "2024-13" isn't one (src/lib/api/dto/resume-parse.ts `monthIndex`, in step).
 _MONTH = re.compile(r"^(\d{4})(?:-(0[1-9]|1[0-2]))?$")
 _YEAR = re.compile(r"\d{4}")
-# Degree levels, highest first, read from the degree without its dots ("M.S." is "ms", "B.Tech." is "btech").
-_LEVELS = (
-    re.compile(r"\b(phd|ph d|doctor\w*|dphil|edd|md)\b"),
-    re.compile(r"\b(masters?|ms|msc|m sc|mtech|m tech|me|meng|mba|mca|mcom|ma|mfa|mph|pgdm|pg diploma|"
-               r"post ?graduate)\b"),
-    re.compile(r"\b(bachelors?|bs|bsc|b sc|btech|b tech|be|beng|bca|bba|bcom|ba|undergraduate)\b"),
-    re.compile(r"\bassociates?\b"),
-    re.compile(r"\b(high school|secondary|diploma|12th|10th|hsc|ssc|intermediate|ged)\b"),
-)
+# Degree levels, 5 a doctorate down to 1 school, by the word or code that names them, read without dots ("M.S." is
+# "ms", "B.Tech." is "btech"); a few two-word names are read as one word first.
+_LEVEL_OF = {
+    **dict.fromkeys(("phd", "dphil", "edd", "md"), 5),
+    **dict.fromkeys(("master", "masters", "ms", "msc", "mtech", "me", "meng", "mba", "mca", "mcom", "ma", "mfa", "mph",
+                     "pgdm", "pgdiploma", "postgraduate"), 4),
+    **dict.fromkeys(("bachelor", "bachelors", "bs", "bsc", "btech", "be", "beng", "bca", "bba", "bcom", "ba",
+                     "undergraduate"), 3),
+    **dict.fromkeys(("associate", "associates"), 2),
+    **dict.fromkeys(("highschool", "secondary", "diploma", "12th", "10th", "hsc", "ssc", "intermediate", "ged"), 1),
+}
+_TWO_WORDS = ((r"ph d", "phd"), (r"m sc", "msc"), (r"b sc", "bsc"), (r"m tech", "mtech"), (r"b tech", "btech"),
+              (r"pg diploma", "pgdiploma"), (r"post graduate", "postgraduate"), (r"high school", "highschool"))
+# Codes that are also everyday words or branch names ("to be completed", "B.Tech in ME"): they name a degree only at
+# its start.
+_SHORT_CODES = {"ms", "me", "ma", "md", "bs", "be", "ba"}
 
 
 def _get(source, key):
@@ -173,14 +183,18 @@ def _years(version, candidate, today: date):
     return worked if worked is not None else _number(_get(candidate, "years_experience"))
 
 
+def _is_job(job: Mapping) -> bool:
+    """A row is a job when it names a company or a title: one with only a location, dates or bullets isn't."""
+    return bool(text(job.get("company")) or text(job.get("job_title")))
+
+
 def _latest_job(jobs: list[dict]) -> dict:
     """The current or most recent job: the one marked current (the latest started, if several), else the one that
-    ended last, else the first listed. A résumé's order doesn't say: a tailored version can put an older role first.
-    A row with neither a company nor a title isn't a job."""
+    ended last, else the first listed. A résumé's order doesn't say: a tailored version can put an older role first."""
     def month(job, field):
         index = _month_index(job.get(field))
         return -1 if index is None else index
-    jobs = [job for job in jobs if text(job.get("company")) or text(job.get("job_title"))]
+    jobs = [job for job in jobs if _is_job(job)]
     current = [job for job in jobs if job.get("current")]
     if current:
         return max(current, key=lambda job: month(job, "start"))
@@ -189,12 +203,24 @@ def _latest_job(jobs: list[dict]) -> dict:
 
 
 def _level(degree: str) -> int:
-    """How high a degree is, from the first level it names ("B.Tech in ME" is a bachelor's, whatever ME stands for):
-    5 for a doctorate down to 1 for school, 0 when it names none."""
+    """How high a degree is: 5 for a doctorate down to 1 for school, 0 when it names none. The levels a degree starts
+    with count, the highest of them ("BE/ME dual degree" is a master's); else the first level named by a word or a long
+    code anywhere. A two-letter code counts only at the start: "B.Tech in ME" is a bachelor's, and "Coursework, to be
+    completed" is no degree."""
     words = re.sub(r"[^a-z0-9]+", " ", re.sub(r"[.'’]", "", degree.lower()))
-    found = [(match.start(), len(_LEVELS) - rank) for rank, pattern in enumerate(_LEVELS)
-             if (match := pattern.search(words))]
-    return min(found)[1] if found else 0
+    for pair, word in _TWO_WORDS:
+        words = re.sub(rf"\b{pair}\b", word, words)
+    def level(word):
+        return 5 if word.startswith("doctor") else _LEVEL_OF.get(word, 0)
+    tokens = words.split()
+    leading = []
+    for word in tokens:
+        if not level(word):
+            break
+        leading.append(level(word))
+    if leading:
+        return max(leading)
+    return next((level(word) for word in tokens if word not in _SHORT_CODES and level(word)), 0)
 
 
 def _highest_school(schools: list[dict]) -> dict:
@@ -208,15 +234,20 @@ def _graduation_year(school: Mapping) -> int | None:
     return int(years[-1]) if years else None
 
 
-def _work_authorization(candidate, version) -> str:
-    """The profile's status, the same one sponsorship and transfer come from; the résumé's text only without one."""
+def _work_authorization(candidate) -> str:
+    """The profile's status, the one sponsorship and transfer come from. Every candidate has one: `work_auth` is
+    required, with a check on its values."""
     code = text(_get(candidate, "work_auth"))
-    return WORK_AUTH_LABEL.get(code, code) if code else text(_get(version, "work_authorization"))
+    return WORK_AUTH_LABEL.get(code, code)
 
 
 def build(candidate, version, today: date | None = None) -> dict:
     """The fixed answers for one version of `candidate`, by question: plain mappings or ORM rows alike."""
-    today = today or date.today()
+    return {QUESTIONS[key]: answer for key, answer in _answers(candidate, version, today or date.today()).items()}
+
+
+def _answers(candidate, version, today: date) -> dict:
+    """The fixed answers by key, a missing fact left out."""
     v = lambda key: _get(version, key)            # noqa: E731
     c = lambda key: _get(candidate, key)          # noqa: E731
     jobs = dicts(v("experiences"))
@@ -236,14 +267,14 @@ def build(candidate, version, today: date | None = None) -> dict:
         "address-country": text(v("country")),
         "professional-title": text(v("title")),
         "summary": text(v("summary")),
-        "work-auth-status": _work_authorization(candidate, version),
+        "work-auth-status": _work_authorization(candidate),
         "skills": _texts(s.get("name") for s in dicts(v("skills"))),
         "current-company": text(latest.get("company")),
         "current-title": text(latest.get("job_title")),
         "work-history": _entries({
             "company": text(j.get("company")), "title": text(j.get("job_title")), "location": text(j.get("location")),
             "dates": text(j.get("dates")), "start": text(j.get("start")), "end": text(j.get("end")),
-            "current": bool(j.get("current")), "bullets": _bullets(j)} for j in jobs),
+            "current": bool(j.get("current")), "bullets": _bullets(j)} for j in jobs if _is_job(j)),
         "education-degree": text(school.get("degree")),
         "education-school": text(school.get("institution")),
         "graduation-year": _graduation_year(school),
@@ -274,20 +305,43 @@ def build(candidate, version, today: date | None = None) -> dict:
         "preferred-locations": _texts(c("preferred_locations")),
         "preferred-industries": _texts(c("preferred_industries")),
     }
-    return {QUESTIONS[key]: answer for key, answer in answers.items() if answer not in (None, "", [])}
+    return {key: answer for key, answer in answers.items() if answer not in (None, "", [])}
+
+
+def entries_of(version) -> dict:
+    """The user's entries a version stores, as they're read and copied: `edited` by key, each with the built answer it
+    replaced (`over`), and `custom` by question. Anything else stored is no entry: a value that isn't an object, the
+    first 0019's `{question: answer}` (built answers, not typed ones), an edit without an answer, a custom question
+    worded as a fixed one. `{}` when none are left."""
+    stored = _get(version, "autofill")
+    if not isinstance(stored, Mapping):
+        return {}
+    edited, custom = stored.get("edited"), stored.get("custom")
+    edits = {key: {"answer": edit["answer"], "over": edit.get("over")} for key, edit in edited.items()
+             if isinstance(key, str) and isinstance(edit, Mapping) and "answer" in edit} if isinstance(edited, Mapping) else {}
+    fixed = set(QUESTIONS.values())
+    added = {question: answer for question, answer in custom.items()
+             if isinstance(question, str) and question.strip() and question not in fixed} if isinstance(custom, Mapping) else {}
+    return {"edited": edits, "custom": added} if edits or added else {}
+
+
+def _same(left, right) -> bool:
+    """The same JSON value: `true` isn't `1`, as Python's `==` would have it."""
+    return json.dumps(left, sort_keys=True, default=str) == json.dumps(right, sort_keys=True, default=str)
 
 
 def merged(candidate, version, today: date | None = None) -> list[dict]:
-    """Every question of one version once: the fixed ones in build() order, each the user's entry if they edited it,
-    then the questions the user added. Built for this read; nothing is written."""
-    built = build(candidate, version, today)
-    entries = dict(_get(version, "autofill") or {})
+    """Every question of one version once: the fixed ones in QUESTIONS order, each the user's edit while the answer it
+    replaced is still the built one, then the questions the user added. Built for this read; nothing is written."""
+    built = _answers(candidate, version, today or date.today())
+    entries = entries_of(version)
+    edits, added = entries.get("edited", {}), entries.get("custom", {})
     out = []
-    for question, key in KEY_OF.items():
-        if question in entries:
-            out.append({"question": question, "answer": entries.pop(question), "kind": EDITED, "key": key,
-                        "built": built.get(question)})
-        elif question in built:
-            out.append({"question": question, "answer": built[question], "kind": FIXED, "key": key})
-    out.extend({"question": question, "answer": answer, "kind": CUSTOM} for question, answer in entries.items())
+    for key, question in QUESTIONS.items():
+        answer, edit = built.get(key), edits.get(key)
+        if edit is not None and _same(edit["over"], answer):
+            out.append({"question": question, "answer": edit["answer"], "kind": EDITED, "key": key, "built": answer})
+        elif answer is not None:
+            out.append({"question": question, "answer": answer, "kind": FIXED, "key": key})
+    out.extend({"question": question, "answer": answer, "kind": CUSTOM} for question, answer in added.items())
     return out

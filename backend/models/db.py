@@ -636,9 +636,10 @@ class Resume(Base):
     certifications = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     awards = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     languages = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
-    # The autofill entries the user typed for this version, {question: answer}: an edit to a built answer, or a
-    # question they added (migration 0019). The built answers aren't stored: backend/candidates/autofill.py builds
-    # them on read. Not content: a save never compares it, and copies it to the next version.
+    # The autofill entries the user typed for this version (migration 0019, docs/02 §8.1): {"edited": {key: {"answer",
+    # "over"}}, "custom": {question: answer}}, an edit to a built answer by its key with the built answer it replaced,
+    # or a question they added. The built answers aren't stored: backend/candidates/autofill.py builds them on read.
+    # Not content: a save never compares it, and copies it to the next version.
     autofill = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
 
     __table_args__ = (

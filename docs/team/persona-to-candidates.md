@@ -118,9 +118,10 @@ The `autofill_prompt` setting keeps its placeholders. They are filled from the c
 That belongs in Samad's extension proposal ([samad.md](./samad.md) §3).
 
 **Saving an answer.** "Save this answer to the bank" was `POST /api/persona/qa-bank`. `candidates.qa_bank` is gone
-(0019). A hand-saved answer becomes one of the résumé version's own entries (`resumes.autofill`, docs/02 §8.1), which
-wins over the built answer and goes with the résumé to its next version. The route that writes them is planned; its
-contract goes in docs/02 first.
+(0019). A hand-saved answer becomes one of the résumé version's own entries (`resumes.autofill`, docs/02 §8.1): an
+edit of a fixed answer by its key, which wins while the built answer is still the one it replaced, or a question of
+its own. Entries go with the résumé to its next version. The route that writes them is planned; its contract goes in
+docs/02 first.
 
 ## 6. Cover letters (Zuhair)
 

@@ -1361,13 +1361,18 @@ candidate's route and on
 - **Fixed answers**, built from the version and the profile for that read and never stored (`backend/candidates/autofill.py`
   `build()`): this version's header, summary, skills, every job with its dates and bullets, its education (the highest
   degree, with that degree's school and year), projects, awards, certifications and languages; and the profile's facts:
-  work authorization (the profile's status; the résumé's text only without one), its expiry, sponsorship, transfer,
+  work authorization (the profile's status, which every candidate has), its expiry, sponsorship, transfer,
   target rate, availability, notice, relocation, engagement types, work settings, preferred locations and industries,
   primary and target roles. Years of experience come from the version's own jobs, counted to today (the New candidate
   form's rule), else `years_experience`. A profile edit shows in every version at once; nothing is rewritten.
-- **The user's entries**, stored in `resumes.autofill` as `{question: answer}` (`{}` by default): an edit to a fixed
-  answer, or a question they added. An entry wins over the built answer. A save and a promote copy them to the new
-  version; a new upload starts with none.
+- **The user's entries**, stored in `resumes.autofill` (`{}` by default) as
+  `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit to a fixed answer is kept by
+  its question's key, so rewording a question never loses it, with `over`, the built answer it replaced. A question
+  they added can't take a fixed question's wording. An edit applies while `over` is still the built answer: once the
+  version's own text or the profile changes that answer, the new built answer shows (so a yearly step in the years
+  worked out ends an edit of the years too). A save and a promote copy the entries, and on the new version an edit
+  applies only where its built answer is still `over`; a new upload starts with none. Anything else stored (a value
+  that isn't an object, or the first 0019's `{question: answer}` of built answers) reads as no entries.
 
 Each entry is `{question, answer, kind, key?, built?}`:
 
