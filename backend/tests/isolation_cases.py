@@ -20,7 +20,9 @@ class Case:
     path: dict = field(default_factory=dict)
     # The JSON body, from the target firm's ids (B's, or ones that exist nowhere).
     body: Callable[[dict], dict] | None = None
-    # The body names rows (by id), so another firm's ids must get the same answer as missing ones.
+    # The query string, from the same ids.
+    query: Callable[[dict], dict] | None = None
+    # The body or query names rows (by id), so another firm's ids must get the same answer as missing ones.
     body_ids: bool = False
     # Answers another firm's ids in a `not_found` list (200) rather than with 404.
     bulk: bool = False
@@ -164,6 +166,9 @@ CASES: dict[str, Case] = {
     "GET /api/cover-letters/{cl_id}/pdf": Case(),
     "GET /api/cover-letters/{cl_id}/tracer-stats": Case(),
 
+    # ── Autofill (the extension): the candidate is a parameter, read in the caller's scope ──
+    "GET /api/autofill/config": Case(query=lambda i: {"candidate_id": str(i["candidate"])}, body_ids=True),
+
     # ── Analytics (track 05) ─────────────────────────────────────────────────
     "GET /api/stats": Case(),
     "GET /api/stats/sankey": Case(),
@@ -189,9 +194,6 @@ KNOWN_GAPS: dict[str, Gap] = {
     "GET /api/persona": _PERSONA,
     "PATCH /api/persona": _PERSONA,
     "POST /api/persona/qa-bank": _PERSONA,
-    "GET /api/autofill/config": _PERSONA,
-    "POST /api/autofill/answer": _PERSONA,
-    "POST /api/autofill/answer/stream": _PERSONA,
 }
 
 # Routes that are isolated (they're in CASES), except on a job both firms link to. test_isolation checks the gap is

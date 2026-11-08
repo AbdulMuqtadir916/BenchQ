@@ -3,6 +3,19 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Extension autofill — the autofill routes read the candidate (`feat/apply-extension-autofill`)
+
+Not agreed yet: Samad and Abdul review this before merge.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Autofill (Samad) | `backend/api/routes_autofill.py`, `backend/autofill_schema.py` | `GET /api/autofill/config` takes a required `candidate_id`, checks it against the caller's scope and returns only `candidate_id` and `qa_bank`: the extension does the matching. `POST /api/autofill/answer` and `/answer/stream` are removed, because nothing called them, and `backend/autofill_schema.py` with them. `backend/auth/access.py` and `backend/analyzer/llm_client.py` are not changed here: `access.py` still lists the two removed routes, so `test_the_table_names_no_route_that_does_not_exist` fails until its owner removes those rows. |
+| Applications (Samad) | `backend/models/db.py`, `backend/migrations/versions/0016_application_form_data.py`, `backend/applications/tracking.py`, `backend/api/routes_applications.py`, `test_candidate_application_status.py`, `docs/02-DATA-CONTRACTS.md` §9 | `applications.form_data`: `PATCH .../candidate-status` takes an optional `form_data` on a move to `applied`, a move back to `saved` clears it, and no response returns it. | Marking a job applied from the extension keeps what the form held. Talked through with Samad and Abdul before it was built. |
+| Access table (Abdul) | `backend/auth/access.py` | The `POST /api/autofill/answer` and `/answer/stream` rows removed. `GET /api/autofill/config` stays. | The routes are gone, and `test_access.py` refuses a row with no route. Nothing else in `backend/auth` changed. |
+| Logging checks (Uzair) | `backend/tests/test_log_lint.py` | The two `routes_autofill.py` entries left the list of known calls. | The calls went with the removed `/answer` routes, and the test asks for that. |
+| Isolation tests (Abdul) | `backend/tests/isolation_cases.py`, `isolation_support.py`, `test_isolation.py` | `GET /api/autofill/config` moved from the known gaps to the matrix; `Case` gained `query`. | They are firm-scoped now. |
+| Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
+
 ## Candidates final schema — `persona`, `skills`, `summary_state` removed, and no claims (`feat/candidates-final-schema`, Zuhair)
 
 Plan: [zuhair.md](./zuhair.md) §1.1 and §1.3. Migration 0015. **Abdul approves every `candidates` change: his review of

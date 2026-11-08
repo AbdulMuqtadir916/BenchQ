@@ -82,8 +82,6 @@ NOT_PERSONAL = {
     ("api/routes_applications.py", "_known_posting"): "a job posting's URL",
     ("api/routes_applications.py", "create_application"): "a company's name",
     ("api/routes_applications.py", "extract_posting"): "a job posting's URL",
-    ("api/routes_autofill.py", "_events"): "the provider's error names the status, not the prompt",
-    ("api/routes_autofill.py", "autofill_answer"): "the provider's error names the status, not the prompt",
     ("api/routes_jobs.py", "_score_resume_names"): "a job id and a lookup error",
     ("api/routes_jobs.py", "save_from_extension"): "the extension's body is a job posting (title, company)",
     ("api/routes_llm.py", "list_models"): "an AI provider's name",

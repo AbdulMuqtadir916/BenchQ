@@ -124,8 +124,6 @@ ROUTE_ACCESS: dict[str, Access] = {
     "PATCH /api/applications/{app_id}": F,
     "POST /api/applications/{app_id}/interviews": F,
     "GET /api/applications/{app_id}/prep": F,
-    "POST /api/autofill/answer": F,
-    "POST /api/autofill/answer/stream": F,
     "GET /api/autofill/config": F,
     "GET /api/cover-letters": F,
     "POST /api/cover-letters": F,

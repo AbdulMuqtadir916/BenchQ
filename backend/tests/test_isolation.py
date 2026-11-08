@@ -55,6 +55,8 @@ def _call(client, key: str, case: Case, ids: dict, headers: dict | None):
               for name in PARAM if "{" + name + "}" in template}
     path = template.format(**params)
     kwargs = {"headers": headers or {}}
+    if case.query is not None:
+        kwargs["params"] = case.query(ids)
     if case.upload:
         kwargs["files"] = {"file": ("resume.pdf", b"%PDF-1.4 isolation", "application/pdf")}
     elif case.body is not None:
@@ -246,6 +248,6 @@ def test_a_shared_jobs_status_is_still_one_row_for_both_firms(key, anonymous_cli
 
 
 def test_known_gaps_match_07_auth_f4(world):
-    """The Persona routes are exactly the Persona and autofill ones; each names its track."""
-    assert sorted(KNOWN_GAPS) == sorted(k for k in FIRM if "/persona" in k or "/autofill" in k)
+    """The known gaps are exactly the Persona routes; each names its track."""
+    assert sorted(KNOWN_GAPS) == sorted(k for k in FIRM if "/persona" in k)
     assert json.dumps([gap.removed_by for gap in KNOWN_GAPS.values()]).count("D1") == len(KNOWN_GAPS)

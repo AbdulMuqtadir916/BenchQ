@@ -187,6 +187,19 @@ def make_resume(db, name="Base", is_base=True, **kw):
     return r
 
 
+def make_candidate(db) -> str:
+    """A candidate of the signed-in test firm, managed by its OWNER; returns the id a request names it by."""
+    from backend.models.candidates import Candidate
+    from backend.models.tenancy import User
+    firm_id = default_firm_id(db)
+    owner = db.query(User).filter(User.firm_id == firm_id, User.role == "OWNER").first()
+    candidate = Candidate(firm_id=firm_id, manager_id=owner.id, created_by_user_id=owner.id, full_name="Vee Kay",
+                          work_auth="H1B")
+    db.add(candidate)
+    db.commit()
+    return str(candidate.id)
+
+
 def make_persona(db):
     from backend.models.db import Persona
     p = db.query(Persona).filter(Persona.id == 1).first()

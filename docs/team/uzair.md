@@ -103,8 +103,7 @@ Three PRs, in order:
     `POST /api/firms/{firm_id}/candidates/parse-resume`, and 30 s or less for the rest. Of the routes the frontend
     calls today, parse-resume is the only one doing slow work inside the request.
   - **Slow work inside other requests, not called by the frontend today** (JobNavigator routes, the extension, later
-    modules): AI in `autofill/answer` (and `/stream`) and the candidate's résumé upload (the parser, like
-    parse-resume); a headless browser in `cover-letters/{id}/pdf`; scrapes in `companies/{id}/test-scrape` and
+    modules): the candidate's résumé upload (the parser, like parse-resume); a headless browser in `cover-letters/{id}/pdf`; scrapes in `companies/{id}/test-scrape` and
     `searches/{id}/test`; a live H-1B lookup per company in `companies/refresh-h1b`, which grows with the number of
     companies. Each gets a number when BenchQ starts using it.
   - **Still open:** the AI libraries retry on their own (neither the Anthropic nor the OpenAI client sets
