@@ -17,7 +17,7 @@ def firm_json(firm: Firm) -> dict:
     return {
         "id": str(firm.id), "name": firm.name, "slug": firm.slug, "logo_url": firm.logo_url,
         "primary_timezone": firm.primary_timezone, "client_timezone": firm.client_timezone,
-        "truth_guard_mode": firm.truth_guard_mode, "application_expiry_days": firm.application_expiry_days,
+        "application_expiry_days": firm.application_expiry_days,
         "status": firm.status, "plan_id": str(firm.plan_id), "seat_limit": firm.seat_limit,
         "candidate_limit": firm.candidate_limit, "contact_phone": firm.contact_phone,
         "bde_capacity": firm.bde_capacity, "created_at": _iso(firm.created_at),

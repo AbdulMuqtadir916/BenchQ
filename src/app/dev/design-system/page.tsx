@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { Plus, Download, Check, X, SlidersHorizontal, ArrowUpRight } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable, type Density } from "@/components/app/data-table";
-import { ClaimChip } from "@/components/app/claim-chip";
 import { StatusRing } from "@/components/app/status-ring";
 import { AvatarStack } from "@/components/app/avatar-stack";
 import { Button } from "@/components/ui/button";
@@ -126,7 +125,6 @@ function ShowcasePage() {
               <CardHeader><CardTitle>Tags & status</CardTitle><span className="text-mono-sm text-[var(--color-text-3)]">02 / METADATA</span></CardHeader>
               <p className="text-sm text-[var(--color-text-3)] mb-4">JetBrains Mono. Soft color, fine borders, explicit meaning.</p>
               <div className="flex flex-wrap gap-2"><Tag tone="green">Available</Tag><Tag tone="blue">In progress</Tag><Tag tone="amber">In review</Tag><Tag tone="violet">Interview</Tag><Tag tone="red">Blocked</Tag><Tag tone="teal">Remote</Tag><Tag>On hold</Tag></div>
-              <div className="mt-4 pt-3 border-t border-[var(--color-border)] flex flex-wrap items-center gap-2"><ClaimChip state="VERIFIED" /><ClaimChip state="UNVERIFIED" /><ClaimChip state="CONTRADICTED" /><span className="ml-auto text-caption text-[var(--color-text-3)]">Evidence states stay distinct</span></div>
             </Card>
           </div>
           <DesignPatterns compact />

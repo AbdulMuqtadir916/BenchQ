@@ -198,8 +198,14 @@ def build_firm(db, firm, owner, tag: str) -> dict:
         expires_at=utcnow() + timedelta(minutes=10))
     db.add(attempt)
     db.flush()
+    # A résumé read waiting for its create (07 Q58: no candidate is added without one).
+    pending = ResumeParse(firm_id=firm.id, uploaded_by_user_id=owner.id, file_name=f"{tag} new.pdf",
+                          mime_type="application/pdf", size_bytes=len(tag), content=f"{tag} new file".encode(),
+                          parse={"header": {}}, expires_at=utcnow() + timedelta(minutes=30))
+    db.add(pending)
+    db.flush()
 
-    return {"oauth_attempt": attempt.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
+    return {"oauth_attempt": attempt.id, "pending_parse": pending.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
             "version": v2.id, "base": second.id,
 
             "firm": firm.id, "slug": firm.slug, "job": job.id,

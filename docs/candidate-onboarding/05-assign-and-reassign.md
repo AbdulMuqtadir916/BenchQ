@@ -77,8 +77,7 @@ Built as `src/components/app/candidate-wizard/step-assign.tsx` (+ `bde-option.ts
 1. Refuse with the policy (`can` + `canAssignTo`) and the limit (when `bdeId` is set), with the exact messages.
 2. The candidate: `status: ON_BENCH`, `benchStartDate: now` (A2), `managerId`, `bdeId`, the step fields; persona from
    summary, industries, deal breakers, relocation, notice period.
-3. Its Record (`src/mocks/records.ts`): `headline` = "Marketed as", `summary` with `summaryState: UNVERIFIED`, one
-   `RecordSkill` per skill with `state: UNVERIFIED` and its `source`; no evidence. **Never `VERIFIED`** (Q49).
+3. Its Record (`src/mocks/records.ts`): `headline` = "Marketed as", the `summary`, and one `RecordSkill` per skill (Q49). The Record is plain résumé content on mocks; there are no claim states.
 4. With `resumeParseId`: a `CandidateDocument` of kind `RESUME` with the file name (mock: no file content).
 5. **No ledger entries on mocks.** The ledger is served only by the backend since F6, so the mock can't write to it.
    `CREATE` and `ASSIGN` (with the handoff note) are written by the backend's create in 06 PR 4 and appear once 07
@@ -145,8 +144,7 @@ the ledger and candidates. Empty: "No new candidates this week." Skeleton and er
 - Step 5: MANAGER sees only their BDEs; OWNER sees managers, then that manager's BDEs; at capacity → warning, still
   selectable; at the limit → BDE rows disabled with the message, manager-only still works; create refused for a BDE
   outside the team.
-- Create: candidate, Record (`UNVERIFIED` only), document, `CREATE` + `ASSIGN` entries; nothing `VERIFIED` (assert over
-  the whole Record).
+- Create: candidate, Record, document, `CREATE` + `ASSIGN` entries.
 - Reassign: OWNER across managers → queue when no BDE; MANAGER across teams refused; one ledger entry per move;
   applications stay.
 - "New assignments": a 6-day-old assignment shows, an 8-day-old one doesn't; a candidate reassigned away disappears.

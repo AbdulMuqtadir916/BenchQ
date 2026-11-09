@@ -12,8 +12,8 @@ import { toIso, toIsoOrNull } from "./shared";
 /**
  * backend/candidates/serialize.py `candidate_json` (docs/candidate-onboarding/06-backend.md §5): the frontend's
  * `CandidateSchema` in snake_case. Seeded ids are UUIDv5 of the fixture ids and come back as `cand_01` etc., so the
- * modules still on mocks (applications, résumés…) keep finding their candidates. The skills and the summary are the Record's
- * claims and the base résumé's, not the candidate's (migration 0015).
+ * modules still on mocks (applications, résumés…) keep finding their candidates. The skills and the summary are the base résumé's,
+ * not the candidate's (migration 0015).
  */
 const QaEntryDto = z.object({
   id: z.string(),
@@ -22,8 +22,6 @@ const QaEntryDto = z.object({
   category: z.string(),
   use_count: z.number().int(),
   last_used_at: z.string().nullable(),
-  state: z.string(),
-  evidence_id: z.string().nullable(),
 });
 
 export const CandidateDto = z.object({
@@ -37,7 +35,7 @@ export const CandidateDto = z.object({
   linkedin_url: z.string().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
-  country: z.string(),
+  country: z.string().nullable(),
   willing_to_relocate: z.boolean(),
   work_auth: z.string(),
   work_auth_expiry: z.string().nullable(),
@@ -64,11 +62,8 @@ export const CandidateDto = z.object({
 });
 export type CandidateDto = z.infer<typeof CandidateDto>;
 
-/** Backend candidate → `Candidate`. Throws on a VERIFIED answer without evidence (Truth Guard, 07 §2). */
+/** Backend candidate → `Candidate`. */
 export function toCandidate(dto: CandidateDto): Candidate {
-  for (const entry of dto.qa_bank) {
-    if (entry.state === "VERIFIED" && !entry.evidence_id) throw new Error(`Candidate ${dto.id}: answer ${entry.id} is VERIFIED without evidence.`);
-  }
   return CandidateSchema.parse({
     id: fromBackendId(dto.id),
     firmId: fromBackendId(dto.firm_id),
@@ -108,8 +103,6 @@ export function toCandidate(dto: CandidateDto): Candidate {
       category: entry.category,
       useCount: entry.use_count,
       lastUsedAt: toIsoOrNull(entry.last_used_at),
-      state: entry.state,
-      evidenceId: entry.evidence_id,
     })),
     createdAt: toIso(dto.created_at),
     updatedAt: toIso(dto.updated_at),
@@ -143,7 +136,7 @@ export function toBackendCreateCandidate(body: CreateCandidate) {
     preferred_locations: body.preferredLocations,
     contact_notes: body.contactNotes,
     summary: body.summary,
-    skills: body.skills.map((skill) => ({ name: skill.name, family: skill.family, source: skill.source })),
+    skills: body.skills.map((skill) => ({ name: skill.name, family: skill.family })),
     preferred_industries: body.preferredIndustries,
     deal_breakers: body.dealBreakers,
     resume_parse_id: body.resumeParseId,
@@ -156,7 +149,8 @@ export function toBackendCreateCandidate(body: CreateCandidate) {
 /** `UpdateCandidate` → UpdateCandidateBody: only the fields being changed (the backend reads unset as "leave it"). */
 export function toBackendUpdateCandidate(patch: UpdateCandidate) {
   const names: Record<keyof UpdateCandidate, string> = {
-    workAuth: "work_auth", workAuthExpiry: "work_auth_expiry", rateTarget: "rate_target", rateMin: "rate_min",
+    workAuth: "work_auth", needsSponsorship: "needs_sponsorship", needsTransfer: "needs_transfer",
+    workAuthExpiry: "work_auth_expiry", rateTarget: "rate_target", rateMin: "rate_min",
     availableFrom: "available_from", noticePeriodDays: "notice_period_days", willingToRelocate: "willing_to_relocate",
     employmentTypes: "employment_types",
   };

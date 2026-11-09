@@ -13,8 +13,8 @@ from fastapi import Depends, HTTPException
 
 from backend.auth.sessions import Principal
 
-FIRM_ACTIONS = ("candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit",
-                "outreach.act", "followup.act", "email.retry", "email.reclassify")
+FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply",
+                "application.move", "resume.edit", "outreach.act", "followup.act", "email.retry", "email.reclassify")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
                 "candidate.assign", "firmSettings.edit", "notification.approve")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
@@ -28,7 +28,8 @@ _OWNER_AND_MANAGER = ("OWNER", "MANAGER")
 # Who in a firm may take each action. VIEWER reads everything it can open and acts on nothing.
 _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "candidate.create": _OWNER_AND_MANAGER,      # 07 Q41: a BDE no longer adds candidates
-    "candidate.edit": _ALL_ACTING,
+    "candidate.edit": _ALL_ACTING,               # work on the candidate: inbox, documents
+    "candidate.editProfile": _OWNER_AND_MANAGER,  # 07 Q56: the profile (submission facts) isn't the BDE's
     "email.retry": _ALL_ACTING,
     "email.reclassify": _OWNER_AND_MANAGER,
     "job.capture": _ALL_ACTING,
