@@ -1,4 +1,6 @@
 """Candidate Saved ↔ Applied moves (the separate candidate-board endpoint)."""
+import uuid
+
 import pytest
 
 
@@ -221,6 +223,71 @@ def test_a_form_goes_only_with_a_move_to_applied(api_client, test_db, accounts, 
     response = api_client.patch(
         f"/api/applications/{application.id}/candidate-status",
         json={"status": "screening_call", "expected_revision": 0, "form_data": FORM}, headers=headers,
+    )
+    assert response.status_code == 400, response.text
+
+
+def test_the_resume_sent_is_kept_with_the_application(api_client, test_db, accounts, jobs_in_default_firm):
+    from backend.models.db import Application
+    from backend.tests.resume_support import make_version
+
+    candidate, _, application, _, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "OWNER"
+    )
+    version = make_version(test_db, jobs_in_default_firm, candidate=candidate)
+    test_db.commit()
+    response = api_client.patch(
+        f"/api/applications/{application.id}/candidate-status",
+        json={"status": "applied", "expected_revision": 0, "form_data": FORM, "resume_id": str(version.id)},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    test_db.expire_all()
+    assert test_db.get(Application, application.id).resume_id == version.id
+
+
+@pytest.mark.parametrize("which", ["another candidate's", "deleted", "unknown", "malformed"])
+def test_a_resume_that_isnt_this_candidates_is_refused_without_changes(
+    api_client, test_db, accounts, jobs_in_default_firm, which
+):
+    from backend.models.db import Application, utcnow
+    from backend.tests.resume_support import make_version
+
+    candidate, _, application, _, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "OWNER"
+    )
+    if which == "another candidate's":
+        resume_id = str(make_version(test_db, jobs_in_default_firm).id)
+    elif which == "deleted":
+        version = make_version(test_db, jobs_in_default_firm, candidate=candidate)
+        version.deleted_at = utcnow()
+        resume_id = str(version.id)
+    elif which == "unknown":
+        resume_id = str(uuid.uuid4())
+    else:
+        resume_id = "not-an-id"
+    test_db.commit()
+    response = api_client.patch(
+        f"/api/applications/{application.id}/candidate-status",
+        json={"status": "applied", "expected_revision": 0, "resume_id": resume_id}, headers=headers,
+    )
+    assert response.status_code == 400, response.text
+    test_db.expire_all()
+    stored = test_db.get(Application, application.id)
+    assert (stored.status, stored.status_revision, stored.resume_id) == ("saved", 0, None)
+
+
+def test_a_resume_goes_only_with_a_move_to_applied(api_client, test_db, accounts, jobs_in_default_firm):
+    from backend.tests.resume_support import make_version
+
+    candidate, _, application, _, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "OWNER"
+    )
+    version = make_version(test_db, jobs_in_default_firm, candidate=candidate)
+    test_db.commit()
+    response = api_client.patch(
+        f"/api/applications/{application.id}/candidate-status",
+        json={"status": "screening_call", "expected_revision": 0, "resume_id": str(version.id)}, headers=headers,
     )
     assert response.status_code == 400, response.text
 

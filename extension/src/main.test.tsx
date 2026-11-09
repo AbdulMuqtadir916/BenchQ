@@ -251,7 +251,7 @@ it("sends the form with the status, and only once confirmed", async () => {
   await markApplied();
   const [, init] = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes("candidate-status"))!;
   expect(init?.method).toBe("PATCH");
-  expect(JSON.parse(String(init?.body))).toMatchObject({ status: "applied", expected_revision: 0, form_data: { fields: [] } });
+  expect(JSON.parse(String(init?.body))).toMatchObject({ status: "applied", expected_revision: 0, form_data: { fields: [] }, resume_id: "res-1" });
 });
 
 it("ends the job's connections once it's marked applied", async () => {

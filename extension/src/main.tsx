@@ -289,11 +289,11 @@ function App() {
     }).catch(() => null);
     if (!reply?.ok) setError("Could not open this job. Try again.");
   };
-  const apply = async (job: Application, form: AppliedForm) => {
+  const apply = async (job: Application, form: AppliedForm, resumeId: string | null) => {
     setBusy(job.id);
     setError("");
     try {
-      const updated = await markApplied(job, form);
+      const updated = await markApplied(job, form, resumeId);
       setJobs((all) =>
         all.map((item) =>
           item.id === job.id
@@ -586,7 +586,7 @@ function App() {
               isApplied={linkedJob?.status === "applied"}
               onApply={
                 linkedJob?.status === "saved"
-                  ? (form) => void apply(linkedJob, form)
+                  ? (form, resumeId) => void apply(linkedJob, form, resumeId)
                   : undefined
               }
               onDisconnect={disconnectTab}

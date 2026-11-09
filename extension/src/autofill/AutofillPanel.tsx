@@ -28,7 +28,8 @@ type AutofillPanelProps = {
   candidateName: string;
   applying: boolean;
   isApplied: boolean;
-  onApply?: (form: AppliedForm) => void;
+  /** Marks the job applied with the form as it stands and the résumé the answers came from, the one sent. */
+  onApply?: (form: AppliedForm, resumeId: string | null) => void;
   onDisconnect: () => void;
   onSessionExpired: () => void;
   onAccessLost: () => void;
@@ -106,7 +107,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     setIsCollecting(true);
     const form = await state.finalForm();
     setIsCollecting(false);
-    onApply?.(form);
+    onApply?.(form, picked?.id ?? null);
   };
 
   return <section ref={card} data-slot="autofill" className={`mb-3 ${CARD}`} aria-labelledby="autofill-title">

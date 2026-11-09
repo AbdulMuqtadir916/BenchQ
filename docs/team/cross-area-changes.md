@@ -11,7 +11,7 @@ of the AI answer routes and their `access.py` rows are undone (2026-11-09): the 
 
 | Area (owner) | File | What changed | Why |
 |---|---|---|---|
-| Applications (Samad) | `backend/models/db.py`, `backend/migrations/versions/0020_application_form_data.py`, `backend/applications/tracking.py`, `backend/api/routes_applications.py`, `test_candidate_application_status.py`, `docs/02-DATA-CONTRACTS.md` §9 | `applications.form_data`: `PATCH .../candidate-status` takes an optional `form_data` on a move to `applied`, a move back to `saved` clears it, and no response returns it. | Marking a job applied from the extension keeps what the form held. Talked through with Samad and Abdul before it was built. |
+| Applications (Samad) | `backend/models/db.py`, `backend/migrations/versions/0020_application_form_data.py`, `backend/applications/tracking.py`, `backend/api/routes_applications.py`, `test_candidate_application_status.py`, `docs/02-DATA-CONTRACTS.md` §9 | `applications.form_data`: `PATCH .../candidate-status` takes an optional `form_data` on a move to `applied`, a move back to `saved` clears it, and no response returns it. It also takes an optional `resume_id`, the résumé version the form was sent with (this candidate's, not deleted), which becomes the application's `resume_id` (docs/02 §9). | Marking a job applied from the extension keeps what the form held, and which résumé answered it. Talked through with Samad and Abdul before it was built. |
 | Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
 
 ## Résumé autofill (`feat/resume-autofill`, Zuhair; finished by Arbaz)

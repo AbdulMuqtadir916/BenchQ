@@ -337,7 +337,7 @@ describe("confirming Mark applied", () => {
     await click("Mark applied");
     await click("Yes, mark applied");
     expect(finalForm).toHaveBeenCalledTimes(1);
-    expect(onApply).toHaveBeenCalledWith(form);
+    expect(onApply).toHaveBeenCalledWith(form, "res-2");
   });
 
   it("shows it's saving while it reads the form", async () => {
@@ -349,7 +349,7 @@ describe("confirming Mark applied", () => {
     expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Saving…"]);
     expect(onApply).not.toHaveBeenCalled();
     await act(async () => { finish(form); });
-    expect(onApply).toHaveBeenCalledWith(form);
+    expect(onApply).toHaveBeenCalledWith(form, "res-2");
   });
 
   it("goes back on Cancel, to the button it came from", async () => {
@@ -377,7 +377,7 @@ describe("confirming Mark applied", () => {
     expect(note()?.querySelector("p")?.textContent).toBe("2 required fields are still empty:");
     expect([...note()!.querySelectorAll("li button")].map(({ textContent }) => textContent)).toEqual(["Email", "Phone"]);
     await click("Yes, mark applied");
-    expect(onApply).toHaveBeenCalledWith(form);
+    expect(onApply).toHaveBeenCalledWith(form, "res-2");
   });
 
   it("says it right for one", async () => {

@@ -1494,8 +1494,12 @@ unchanged in this PR; their live DTO integration and display changes belong to l
 - `GET /api/applications` accepts `candidate_id` and `tracked_only`. Candidate visibility applies to list, detail,
   edits, interviews and preparation; legacy rows are visible to firm-wide readers only.
 - `PATCH /api/applications/{id}/candidate-status` accepts
-  `{status, expected_revision, command_id?, note?, form_data?}`. A changed revision returns 409. A matching command
-  replay creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+  `{status, expected_revision, command_id?, note?, form_data?, resume_id?}`. A changed revision returns 409. A matching
+  command replay creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+- `resume_id` on that move is the résumé version the form was sent with: the one the extension's answers came from.
+  Only a move to `applied` may send it, and it must be one of the application's candidate's versions, not deleted;
+  anything else returns 400 and changes nothing. It becomes the application's `resume_id`, the résumé the application
+  shows as sent. A move back to Saved leaves it.
 - `applications.form_data` (migration 0020, nullable JSONB) is what the employer's form held when the BDE marked the
   job applied from the extension: `{fields: [{label, value, required, source}]}`, `source` being `autofill` or `bde`.
   Only a move to `applied` may send it; at most 200 fields, labels up to 500 characters, values up to 4000; anything

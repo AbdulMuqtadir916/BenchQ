@@ -104,7 +104,12 @@ export const getSavedApplications = async (candidateId: string) => {
   );
   return [...saved.applications, ...appliedFromSaved];
 };
-export const markApplied = (application: Application, form: AppliedForm) => request<Application>(`/api/applications/${encodeURIComponent(application.id)}/candidate-status`, {
+/** Marks the job applied with the form as it stood and, when known, the résumé version its answers came from: the one
+ * sent (docs/02 §9). */
+export const markApplied = (application: Application, form: AppliedForm, resumeId: string | null = null) => request<Application>(`/api/applications/${encodeURIComponent(application.id)}/candidate-status`, {
   method: "PATCH",
-  body: JSON.stringify({ status: "applied", expected_revision: application.status_revision ?? 0, command_id: crypto.randomUUID(), form_data: form }),
+  body: JSON.stringify({
+    status: "applied", expected_revision: application.status_revision ?? 0, command_id: crypto.randomUUID(), form_data: form,
+    ...(resumeId ? { resume_id: resumeId } : {}),
+  }),
 });

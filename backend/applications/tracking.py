@@ -35,6 +35,21 @@ def check_form_data(form_data):
         raise HTTPException(400, 'Invalid form data.')
 
 
+def sent_resume(db, app, resume_id):
+    """The résumé version an application was sent with (docs/02 §9): one of its candidate's, not deleted. The extension
+    sends the one its answers came from when the BDE marks the job applied."""
+    from backend.models.db import Resume
+    try:
+        resume_id = uuid.UUID(str(resume_id))
+    except (ValueError, TypeError):
+        raise HTTPException(400, 'Invalid resume ID.') from None
+    resume = scoped(db, Resume, app.firm_id).filter(
+        Resume.id == resume_id, Resume.candidate_id == app.candidate_id, Resume.deleted_at.is_(None)).first()
+    if resume is None:
+        raise HTTPException(400, "That resume isn't one of this candidate's, or it was deleted.")
+    return resume
+
+
 def accessible_application(db, firm_id, principal, app_id, *, lock=False):
     from backend.api.routes_candidates import _candidate
     try:
@@ -49,7 +64,8 @@ def accessible_application(db, firm_id, principal, app_id, *, lock=False):
     return app
 
 
-def move(db, app, principal, *, status, expected_revision, note=None, command_id=None, review=None, form_data=None):
+def move(db, app, principal, *, status, expected_revision, note=None, command_id=None, review=None, form_data=None,
+         resume_id=None):
     if not can(principal, 'application.move'):
         raise HTTPException(403, "You don't have permission to move applications.")
     if note is not None and (not isinstance(note, str) or len(note) > 2000):
@@ -58,6 +74,11 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
         if status != 'applied':
             raise HTTPException(400, 'Form data goes with a move to Applied.')
         check_form_data(form_data)
+    sent = None
+    if resume_id is not None:
+        if status != 'applied':
+            raise HTTPException(400, 'The resume sent goes with a move to Applied.')
+        sent = sent_resume(db, app, resume_id)
     if command_id is not None:
         try:
             command_id = uuid.UUID(str(command_id))
@@ -122,6 +143,8 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
                 app.submitted_by_user_id = actor.id
         if form_data is not None:
             app.form_data = form_data
+        if sent is not None:
+            app.resume_id = sent.id
         if favorite:
             db.delete(favorite)
     if review:
