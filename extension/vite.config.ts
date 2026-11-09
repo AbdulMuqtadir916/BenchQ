@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
