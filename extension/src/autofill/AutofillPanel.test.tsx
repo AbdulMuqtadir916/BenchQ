@@ -137,15 +137,18 @@ describe("the résumé the answers come from", () => {
   const picker = () => host.querySelector("[data-slot='resume-picker']")!;
   const twoResumes: Resumes = { status: "ready", choices: [tailored, base], picked: base };
 
-  it("names it on one line, with a way to view it in BenchQ", () => {
+  it("lists the candidate's résumés first, then folds to the picked one, with a way to view it in BenchQ", async () => {
     show({ fillCount: 1 });
+    expect(picker().querySelectorAll("[data-slot='resume-choice']")).toHaveLength(1);
+    await click("Picked");
     expect(picker().querySelector("[data-slot='resume-picked']")!.textContent).toBe(base.label);
     expect(picker().querySelector("a")!.getAttribute("href")).toContain("/acme-staffing/resumes/res-2");
     expect(picker().querySelectorAll("button")).toHaveLength(0);
   });
 
-  it("lists the candidate's résumés on Change, each with Pick and a link", async () => {
+  it("lists the candidate's résumés, each with Pick and a link, and again on Change", async () => {
     show({ fillCount: 1 }, {}, twoResumes);
+    await click("Pick");
     await click("Change");
     const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
     expect(choices.map((choice) => choice.querySelector("button")!.textContent)).toEqual(["Pick", "Picked"]);
@@ -156,7 +159,6 @@ describe("the résumé the answers come from", () => {
   it("fills the form as soon as the picked résumé's answers are in", async () => {
     const rows = [row("Email", true)];
     show({ fillCount: 1, rows, answeredFrom: "res-2" }, {}, twoResumes);
-    await click("Change");
     await click("Pick");
     expect(pick).toHaveBeenCalledWith("res-9");
     expect(autofill).not.toHaveBeenCalled();
@@ -166,7 +168,6 @@ describe("the résumé the answers come from", () => {
 
   it("only picks when the form isn't on the page yet", async () => {
     show({ fillCount: 0, rows: [], answeredFrom: "res-2" }, {}, twoResumes);
-    await click("Change");
     await click("Pick");
     update({ fillCount: 0, rows: [], answeredFrom: "res-9" }, { ...twoResumes, picked: tailored });
     expect(autofill).not.toHaveBeenCalled();
@@ -175,7 +176,6 @@ describe("the résumé the answers come from", () => {
   it("only picks when the page may be a different job", async () => {
     const rows = [row("Email", true)];
     show({ fillCount: 1, rows, answeredFrom: "res-2" }, {}, twoResumes);
-    await click("Change");
     await click("Pick");
     update({ fillCount: 1, rows, answeredFrom: "res-9", needsConfirmation: true }, { ...twoResumes, picked: tailored });
     expect(autofill).not.toHaveBeenCalled();

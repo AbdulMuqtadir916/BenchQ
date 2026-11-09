@@ -30,10 +30,11 @@ function ViewLink({ url }: { url: string | null }) {
   return url ? <a className={LINK} href={url} target="_blank" rel="noreferrer">View in BenchQ{EXTERNAL_ICON}</a> : null;
 }
 
-/** Which résumé Autofill answers from (docs/02 §8.1): one line with Change, or the candidate's résumés to pick from.
- * The panel fills the form as soon as one is picked, when the form is on the page. BenchQ never uploads the file. */
+/** Which résumé Autofill answers from (docs/02 §8.1): the candidate's résumés, each with Pick, until the BDE picks one;
+ * then one line with Change. Picking reads that résumé's answers and fills the form at once when it's on the page (the
+ * panel does that). BenchQ never uploads the file. */
 export default function ResumePicker({ resumes, candidateName, resumesUrl, studioUrl, isBusy, onPick, onRetry }: ResumePickerProps) {
-  const [isChanging, setIsChanging] = useState(false);
+  const [isListed, setIsListed] = useState(true);
   if (resumes.status === "loading") {
     return <Section><p className={MUTED_TEXT} role="status">Loading {candidateName}&apos;s resumes…</p></Section>;
   }
@@ -50,17 +51,17 @@ export default function ResumePicker({ resumes, candidateName, resumesUrl, studi
       {resumesUrl && <a className={LINK} href={resumesUrl} target="_blank" rel="noreferrer">Add one in BenchQ{EXTERNAL_ICON}</a>}
     </Section>;
   }
-  if (picked && !isChanging) {
+  if (picked && !isListed) {
     return <Section>
       <div className="flex min-w-0 items-center justify-between gap-2">
         <span data-slot="resume-picked" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{picked.label}</span>
-        {choices.length > 1 && <button type="button" className={`flex-none ${button("secondary", "compact")}`} disabled={isBusy} onClick={() => setIsChanging(true)}>Change</button>}
+        {choices.length > 1 && <button type="button" className={`flex-none ${button("secondary", "compact")}`} disabled={isBusy} onClick={() => setIsListed(true)}>Change</button>}
       </div>
       <ViewLink url={studioUrl(picked.id)} />
     </Section>;
   }
   const pick = (id: string) => {
-    setIsChanging(false);
+    setIsListed(false);
     onPick(id);
   };
   return <Section>
@@ -79,6 +80,6 @@ export default function ResumePicker({ resumes, candidateName, resumesUrl, studi
         </li>;
       })}
     </ul>
-    {picked && <button type="button" className={TEXT_BUTTON} onClick={() => setIsChanging(false)}>Cancel</button>}
+    {picked && <button type="button" className={TEXT_BUTTON} onClick={() => setIsListed(false)}>Close</button>}
   </Section>;
 }
