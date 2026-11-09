@@ -1358,19 +1358,24 @@ by Abdul 2026-11-08 in issue 119, the `key` added with his OK):** `GET …/resum
 candidate's route and on
 `GET /firms/{firm}/resumes/{id}`, adds `autofill`: every question an application form can ask, each once. Two parts:
 
-- **Fixed answers**, built from the version and the profile for that read and never stored (`backend/candidates/autofill.py`
-  `build()`): this version's header, summary, skills, every job with its dates and bullets, its education (the highest
-  degree, with that degree's school and year), projects, awards, certifications and languages; and the profile's facts:
+- **Fixed answers**, built from the version and the profile for that read (`backend/candidates/autofill.py` `build()`)
+  and never stored as answers (an edit keeps a copy of the one it replaced, below): this version's header, summary,
+  skills, every job with its dates and bullets, its education (the highest degree, with that degree's school and
+  year), projects, awards, certifications and languages; and the profile's facts:
   work authorization (the profile's status, which every candidate has), its expiry, sponsorship, transfer,
   target rate, availability, notice, relocation, engagement types, work settings, preferred locations and industries,
   primary and target roles. Years of experience come from the version's own jobs, counted to today (the New candidate
   form's rule), else `years_experience`. A profile edit shows in every version at once; nothing is rewritten.
 - **The user's entries**, stored in `resumes.autofill` (`{}` by default) as
   `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit to a fixed answer is kept by
-  its question's key, so rewording a question never loses it, with `over`, the built answer it replaced. A question
-  they added can't take a fixed question's wording. An edit applies while `over` is still the built answer: once the
-  version's own text or the profile changes that answer, the new built answer shows (so a yearly step in the years
-  worked out ends an edit of the years too). A save and a promote copy the entries, and on the new version an edit
+  its question's key, so rewording a question never loses it, with `over`: a copy of the built answer it replaced (for
+  a list such as the work history, the whole list). An edit applies while `over` is still the built answer, compared
+  as JSON (85.0 is 85, but `true` isn't 1): once the version's own text or the profile changes that answer, the new
+  built answer shows (so a yearly step in the years worked out ends an edit of the years too). So does a change to how
+  the backend writes an answer (a label, a field of the jobs, the date format), unless that change also rewrites the
+  stored `over` values. A question they added can't take a fixed question's wording; one whose words a fixed question
+  takes later (a new question, or a reworded one) is kept and copied, and shows only while that fixed question has no
+  answer. A save, a promote and tailoring (a tailored v1, 07 Q55) copy the entries, and on the new version an edit
   applies only where its built answer is still `over`; a new upload starts with none. Anything else stored (a value
   that isn't an object, or the first 0019's `{question: answer}` of built answers) reads as no entries.
 
@@ -1392,8 +1397,8 @@ The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`,
 `employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`. The fixed questions come first in
 that order, then the user's. A missing fact leaves its question out. Never in it: ids, `rate_min`, `contact_notes`,
 `deal_breakers`, `status`, `bench_start_date`. Not in the list, a save, or a read without `?autofill=true`. Writing the
-user's entries (a route) is planned; its contract goes here first. The frontend doesn't map `autofill` (no screen
-shows it yet); the extension reads it (Arbaz).
+user's entries (a route) is planned: it takes `over` from its own build, never from the request, and its contract goes
+here first. The frontend doesn't map `autofill` (no screen shows it yet); the extension reads it (Arbaz).
 
 ```ts
 // src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker

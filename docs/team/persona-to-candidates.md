@@ -25,7 +25,7 @@ For everyone on the team. Decided 2026-11-05 (Abdul).
 | Availability | `status`, `bench_start_date`, `available_from`, `notice_period_days` |
 | Role | `primary_role` ("Marketed as"), `target_roles`, `years_experience` |
 | Preferences | `work_settings` (onsite, hybrid, remote), `preferred_locations`, `preferred_industries`, `deal_breakers`, `contact_notes` |
-| Saved answers | `qa_bank`: a list of `{id, question, answer, category, …}` |
+| Saved answers | None since 0019 (`qa_bank` is dropped): each résumé version keeps its own (`resumes.autofill`, [docs/02](../02-DATA-CONTRACTS.md) §8.1) |
 | Ownership | `firm_id`, `manager_id`, `bde_id` (read through `scoped()`, 07 Q47) |
 
 **`resumes`** (`backend/models/db.py`; Zuhair's table). What the candidate did. Each row is one version of one
@@ -120,8 +120,8 @@ That belongs in Samad's extension proposal ([samad.md](./samad.md) §3).
 **Saving an answer.** "Save this answer to the bank" was `POST /api/persona/qa-bank`. `candidates.qa_bank` is gone
 (0019). A hand-saved answer becomes one of the résumé version's own entries (`resumes.autofill`, docs/02 §8.1): an
 edit of a fixed answer by its key, which wins while the built answer is still the one it replaced, or a question of
-its own. Entries go with the résumé to its next version. The route that writes them is planned; its contract goes in
-docs/02 first.
+its own. Entries go with the résumé to its next version, and to a version tailored from it. The route that writes
+them is planned; its contract goes in docs/02 first.
 
 ## 6. Cover letters (Zuhair)
 

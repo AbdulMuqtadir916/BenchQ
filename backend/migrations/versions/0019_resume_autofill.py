@@ -1,12 +1,12 @@
 """Résumé autofill (decided 2026-11-07; the built answers stopped being stored 2026-11-08, Abdul): each résumé version
 keeps the autofill entries the user typed for it, and `candidates.qa_bank` goes.
 
-1. `resumes.autofill` (JSONB, `{}` by default): only what a person typed for this version,
+1. `resumes.autofill` (JSONB, `{}` by default): what a person typed for this version,
    `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}` (an edit to a built answer, by its
-   question's key, with the built answer it replaced; or a question they added; docs/02 §8.1). The built answers
-   aren't stored: `backend/candidates/autofill.py` builds them from the version and the profile each time they're
-   read. So no row is filled here, and this migration imports no app code: every existing version starts with no
-   entries.
+   question's key; or a question they added; docs/02 §8.1). The built answers aren't stored as answers:
+   `backend/candidates/autofill.py` builds them from the version and the profile each time they're read, and an edit
+   keeps a copy of the one it replaced as `over` (for the work history, the whole list). So no row is filled here, and
+   this migration imports no app code: every existing version starts with no entries.
 2. `candidates.qa_bank` is dropped: only the demo seed ever filled it (the persona's own `qa_bank` stays, with the
    persona). The candidate's Documents tab "Screening answers" panel shows its empty state until the Documents section
    is removed (planned, docs/team/abdul.md §3).

@@ -153,6 +153,10 @@ def test_an_edit_applies_while_the_answer_it_replaced_is_the_built_one():
     # `true` isn't `1`: an edit made over one doesn't apply over the other.
     flag = {"edited": {"visa-sponsorship": _edit(False, 1)}}
     assert kinds(CANDIDATE, {**VERSION, "autofill": flag})["visa-sponsorship"] == ("FIXED", True)
+    # But 85.0 is 85, as the built numbers are written, at any depth (Abdul's third review).
+    whole = {"edited": {"pay-rate": _edit(95, 85.0)}}
+    assert kinds(CANDIDATE, {**VERSION, "autofill": whole})["pay-rate"] == ("EDITED", 95)
+    assert autofill._same([{"rate": 2.0}], [{"rate": 2}]) and not autofill._same([True], [1.0])
 
 
 def test_an_edit_is_kept_by_its_key_whatever_the_wording(monkeypatch):
@@ -174,11 +178,21 @@ def test_anything_else_stored_reads_as_no_entries(stored):
     assert entries[0]["answer"] == "Ravi Teja" and entries_of({"autofill": stored}) == {}
 
 
-def test_a_custom_question_cant_take_a_fixed_questions_wording():
-    typed = {"custom": {"What is your full name?": "Someone Else", "Why us?": "Payments."}}
-    entries = merged(CANDIDATE, {**VERSION, "autofill": typed}, TODAY)
-    assert [e["answer"] for e in entries if e["question"] == "What is your full name?"] == ["Ravi Teja"]
-    assert entries[-1] == {"question": "Why us?", "answer": "Payments.", "kind": "CUSTOM"}
+def test_a_custom_question_in_a_fixed_questions_words_is_kept_and_shows_while_that_one_has_no_answer():
+    """A question added or reworded here can take the words of one the user typed before (Abdul's third review): the
+    entry stays, so a save copies it on, and the read shows the fixed question while it has an answer."""
+    notice = "What is your notice period in days?"
+    typed = {"custom": {notice: "30, negotiable", "What is your full name?": "Someone Else", "Why us?": "Payments."}}
+    assert entries_of({"autofill": typed}) == {"edited": {}, "custom": typed["custom"]}
+
+    def asked(candidate, question):
+        entries = merged(candidate, {**VERSION, "autofill": typed}, TODAY)
+        assert entries[-1] == {"question": "Why us?", "answer": "Payments.", "kind": "CUSTOM"}
+        return [(e["answer"], e["kind"]) for e in entries if e["question"] == question]
+
+    assert asked(CANDIDATE, notice) == [(14, "FIXED")]
+    assert asked(CANDIDATE, "What is your full name?") == [("Ravi Teja", "FIXED")]
+    assert asked({**CANDIDATE, "notice_period_days": None}, notice) == [("30, negotiable", "CUSTOM")]
 
 
 def test_work_authorization_is_the_profiles_status():
@@ -208,6 +222,11 @@ def test_the_highest_degree_comes_with_its_own_school_and_year():
     # The levels a degree starts with count, the highest of them.
     assert answers([{"degree": "B.Tech", "institution": "A"}, {"degree": "BE/ME dual degree", "institution": "B"}])[:2] == (
         "BE/ME dual degree", "B")
+    # The highest level named counts, in whatever order it's written (Abdul's third review).
+    for dual in ("B.Tech + M.Tech Dual Degree", "Dual Degree (B.Tech + M.Tech)",
+                 "Bachelor of Technology and Master of Technology", "Integrated MS"):
+        assert answers([{"degree": "B.Sc. Physics", "institution": "A"}, {"degree": dual, "institution": "B"}])[:2] == (
+            dual, "B")
 
 
 def test_the_current_job_is_the_one_marked_current_else_the_one_that_ended_last():
@@ -242,6 +261,11 @@ def test_a_blank_row_is_left_out():
         assert question not in answers
     one_school = build(CANDIDATE, {**blank, "educations": [{}, *VERSION["educations"]]}, TODAY)
     assert one_school["List your education."] == [{"degree": "B.Tech", "school": "JNTU", "graduation_date": "May 2017"}]
+    # A blank row first doesn't hide a degree the levels don't name (Abdul's third review).
+    arch = {"degree": "B.Arch", "institution": "SPA Delhi", "graduation_date": "2016"}
+    unranked = build(CANDIDATE, {**VERSION, "educations": [{"degree": "", "institution": ""}, arch]}, TODAY)
+    assert [unranked.get(q) for q in ("What is your highest degree?", "Which school did you attend?",
+                                      "What year did you graduate?")] == ["B.Arch", "SPA Delhi", 2016]
 
 
 def test_a_date_is_its_day_in_utc_whatever_the_sessions_timezone():
@@ -319,7 +343,8 @@ def test_the_users_entries_go_with_a_save_and_a_promote_and_an_upload_starts_wit
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     v1 = _v(anonymous_client, world, c, who="adnan")
     typed = {"edited": {"pay-rate": _edit(120, None), "professional-title": _edit("Lead Java Developer", "Java Developer")},
-             "custom": {"Why do you want to work here?": "Payments."}}
+             "custom": {"Why do you want to work here?": "Payments.",
+                        "What is your notice period in days?": "30, negotiable"}}     # in a fixed question's words
     _stored(test_db, v1["id"]).autofill = typed
     test_db.commit()
     on_v1 = {e["question"]: e for e in _open(anonymous_client, world, c, v1["id"], "adnan", autofill="true")["autofill"]}

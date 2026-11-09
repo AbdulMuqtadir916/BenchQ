@@ -2,12 +2,14 @@
 docs/02 §8.1): every question an application form can ask, answered in two parts.
 
 - **Fixed answers** are built by `build()` from the version and the candidate's profile when they're asked for. They
-  aren't stored, so they're never stale: a profile edit, or a new question added here, shows on every version at once.
-- **The user's entries** are stored in `resumes.autofill`, only what a person typed (`{}` by default):
+  aren't stored as answers, so they're never stale: a profile edit, or a new question added here, shows on every
+  version at once. The one copy kept is an edit's `over`, below.
+- **The user's entries** are stored in `resumes.autofill` (`{}` by default):
   `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit is kept by its question's key,
-  so rewording a question here never loses it, with `over`, the built answer it replaced. It applies while that is
-  still the built answer: once the version's own text or the profile changes it, the new built answer shows. A save
-  and a promote copy the entries; on the new version an edit applies only where its built answer is still `over`.
+  so rewording a question here never loses it, with `over`: a copy of the built answer it replaced (for a list such
+  as the work history, the whole list). It applies while that is still the built answer: once the version's own text
+  or the profile changes it, the new built answer shows. A save and a promote copy the entries, as tailoring will
+  (docs/02 §8.1); on the new version an edit applies only where its built answer is still `over`.
 
 `merged()` is what `GET …/resumes/{id}?autofill=true` returns: every question once, with its `kind` (FIXED; EDITED,
 with `built`, the answer reset gives back; CUSTOM) and, for a question built here, its `key`: a fixed name for what it
@@ -46,6 +48,10 @@ FIXED, EDITED, CUSTOM = "FIXED", "EDITED", "CUSTOM"
 
 # Every question build() answers, in order, by its key: what it asks, named once, so a reader doesn't depend on the
 # wording. A new question goes here with a new key.
+# How build() writes an answer is part of every edit stored over it: an edit applies only while its `over` is the
+# built answer, so changing how one is written (a label in WORK_AUTH_LABEL, a field of the work-history entries, the
+# date format) ends every edit of that question, on every version, once it's deployed. To keep them, the same change
+# rewrites the stored `over` values (a migration).
 QUESTIONS: dict[str, str] = {
     "full-name": "What is your full name?",
     "email": "What is your email address?",
@@ -104,8 +110,9 @@ _LEVEL_OF = {
 _TWO_WORDS = ((r"ph d", "phd"), (r"m sc", "msc"), (r"b sc", "bsc"), (r"m tech", "mtech"), (r"b tech", "btech"),
               (r"pg diploma", "pgdiploma"), (r"post graduate", "postgraduate"), (r"high school", "highschool"))
 # Codes that are also everyday words or branch names ("to be completed", "B.Tech in ME"): they name a degree only at
-# its start.
+# its start, which can follow one of these words ("Integrated MS").
 _SHORT_CODES = {"ms", "me", "ma", "md", "bs", "be", "ba"}
+_BEFORE_A_CODE = {"integrated", "dual"}
 
 
 def _get(source, key):
@@ -203,29 +210,31 @@ def _latest_job(jobs: list[dict]) -> dict:
 
 
 def _level(degree: str) -> int:
-    """How high a degree is: 5 for a doctorate down to 1 for school, 0 when it names none. The levels a degree starts
-    with count, the highest of them ("BE/ME dual degree" is a master's); else the first level named by a word or a long
-    code anywhere. A two-letter code counts only at the start: "B.Tech in ME" is a bachelor's, and "Coursework, to be
-    completed" is no degree."""
+    """How high a degree is: 5 for a doctorate down to 1 for school, 0 when it names none. The highest level it names
+    counts, in whatever order ("Dual Degree (B.Tech + M.Tech)" is a master's, as "B.Tech + M.Tech" is). A two-letter
+    code counts only among the levels a degree starts with: "BE/ME dual degree" and "Integrated MS" are master's,
+    "B.Tech in ME" is a bachelor's, and "Coursework, to be completed" is no degree."""
     words = re.sub(r"[^a-z0-9]+", " ", re.sub(r"[.'’]", "", degree.lower()))
     for pair, word in _TWO_WORDS:
         words = re.sub(rf"\b{pair}\b", word, words)
     def level(word):
         return 5 if word.startswith("doctor") else _LEVEL_OF.get(word, 0)
     tokens = words.split()
-    leading = []
+    while tokens and tokens[0] in _BEFORE_A_CODE:
+        tokens = tokens[1:]
+    levels, leading = [], True
     for word in tokens:
-        if not level(word):
-            break
-        leading.append(level(word))
-    if leading:
-        return max(leading)
-    return next((level(word) for word in tokens if word not in _SHORT_CODES and level(word)), 0)
+        leading = leading and bool(level(word))
+        if level(word) and (leading or word not in _SHORT_CODES):
+            levels.append(level(word))
+    return max(levels, default=0)
 
 
 def _highest_school(schools: list[dict]) -> dict:
-    """The education with the highest degree; the first listed when they're level or can't be told apart."""
-    return max(schools, key=lambda school: _level(text(school.get("degree"))), default={})
+    """The education with the highest degree, among the rows that name a degree or a school (a blank row is none);
+    the first listed when they're level or can't be told apart."""
+    named = [school for school in schools if text(school.get("degree")) or text(school.get("institution"))]
+    return max(named, key=lambda school: _level(text(school.get("degree"))), default={})
 
 
 def _graduation_year(school: Mapping) -> int | None:
@@ -311,23 +320,38 @@ def _answers(candidate, version, today: date) -> dict:
 def entries_of(version) -> dict:
     """The user's entries a version stores, as they're read and copied: `edited` by key, each with the built answer it
     replaced (`over`), and `custom` by question. Anything else stored is no entry: a value that isn't an object, the
-    first 0019's `{question: answer}` (built answers, not typed ones), an edit without an answer, a custom question
-    worded as a fixed one. `{}` when none are left."""
+    first 0019's `{question: answer}` (built answers, not typed ones), an edit without an answer, a blank question. A
+    question in a fixed question's words stays (a question added or reworded here can take them after it was typed):
+    `merged()` decides whether it shows. `{}` when none are left."""
     stored = _get(version, "autofill")
     if not isinstance(stored, Mapping):
         return {}
     edited, custom = stored.get("edited"), stored.get("custom")
     edits = {key: {"answer": edit["answer"], "over": edit.get("over")} for key, edit in edited.items()
              if isinstance(key, str) and isinstance(edit, Mapping) and "answer" in edit} if isinstance(edited, Mapping) else {}
-    fixed = set(QUESTIONS.values())
     added = {question: answer for question, answer in custom.items()
-             if isinstance(question, str) and question.strip() and question not in fixed} if isinstance(custom, Mapping) else {}
+             if isinstance(question, str) and question.strip()} if isinstance(custom, Mapping) else {}
     return {"edited": edits, "custom": added} if edits or added else {}
 
 
+def _plain(value):
+    """A value as `_same` reads it: a whole number as an int, as `_number` writes the built ones (85.0 is 85)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (float, Decimal)):
+        return _number(value)
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(item) for item in value]
+    return value
+
+
 def _same(left, right) -> bool:
-    """The same JSON value: `true` isn't `1`, as Python's `==` would have it."""
-    return json.dumps(left, sort_keys=True, default=str) == json.dumps(right, sort_keys=True, default=str)
+    """The same JSON value: 85.0 is 85, but `true` isn't `1`, as Python's `==` would have it."""
+    def dump(value):
+        return json.dumps(_plain(value), sort_keys=True, default=str)
+    return dump(left) == dump(right)
 
 
 def merged(candidate, version, today: date | None = None) -> list[dict]:
@@ -343,5 +367,9 @@ def merged(candidate, version, today: date | None = None) -> list[dict]:
             out.append({"question": question, "answer": edit["answer"], "kind": EDITED, "key": key, "built": answer})
         elif answer is not None:
             out.append({"question": question, "answer": answer, "kind": FIXED, "key": key})
-    out.extend({"question": question, "answer": answer, "kind": CUSTOM} for question, answer in added.items())
+    # A question the user added in words a fixed question took later shows only while that one has no answer: each
+    # question once.
+    shown = {entry["question"] for entry in out}
+    out.extend({"question": question, "answer": answer, "kind": CUSTOM}
+               for question, answer in added.items() if question not in shown)
     return out
