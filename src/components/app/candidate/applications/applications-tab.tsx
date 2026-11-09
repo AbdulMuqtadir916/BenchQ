@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Columns3, List, Send } from "lucide-react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { cn } from "@/lib/cn";
@@ -13,20 +13,48 @@ import { STATUS_LABEL, isClosed } from "@/components/app/applications/status-met
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { ApplicationList } from "./application-list";
+import { IrrelevantEmails, irrelevantEmails } from "./irrelevant-emails";
 
 type View = "board" | "list";
-type Scope = "active" | "all";
+type Scope = "active" | "review" | "irrelevant";
 
 /** Every submission for this candidate: a board to move stages, a list to scan fast. */
 export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; onMove: (id: string, to: ApplicationStatus) => void }) {
   const [view, setView] = useState<View>("board");
   const [scope, setScope] = useState<Scope>("active");
+  // Switching tabs changes the page height; keep the switch row where it was on screen instead of letting the
+  // browser clamp the scroll position (which made the page jump up when a shorter tab opened).
+  const switchRef = useRef<HTMLDivElement>(null);
+  const switchTopBefore = useRef<number | null>(null);
+  const chooseScope = (next: Scope) => {
+    switchTopBefore.current = switchRef.current?.getBoundingClientRect().top ?? null;
+    setScope(next);
+  };
+  const spacerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const before = switchTopBefore.current;
+    switchTopBefore.current = null;
+    const row = switchRef.current;
+    const spacer = spacerRef.current;
+    if (before === null || !row || !spacer) return;
+    spacer.style.height = "0px";
+    const scroller = scrollParent(row);
+    const shift = row.getBoundingClientRect().top - before;
+    if (Math.abs(shift) >= 1) scroller.scrollBy({ top: shift, behavior: "instant" });
+    // A shorter tab may leave too little page below to scroll back: add only the missing height, until the next switch.
+    const missing = row.getBoundingClientRect().top - before;
+    if (missing >= 1) {
+      spacer.style.height = `${Math.ceil(missing)}px`;
+      scroller.scrollBy({ top: missing, behavior: "instant" });
+    }
+  }, [scope]);
   const all = ws.applications;
   // Move On is a current stage with its own board column, so a confirmed Move On card is always shown;
-  // "Active" hides only the older closed values (Placed, Rejected, Withdrawn, Expired).
-  const visible = scope === "active" ? all.filter((a) => a.status === "MOVE_ON" || !isClosed(a.status)) : all;
+  // the board hides only the older closed values (Placed, Rejected, Withdrawn, Expired).
+  const visible = all.filter((a) => a.status === "MOVE_ON" || !isClosed(a.status));
   const moveOnCount = all.filter((a) => a.status === "MOVE_ON").length;
   const closedCount = all.filter((a) => isClosed(a.status) && a.status !== "MOVE_ON").length;
+  const irrelevantCount = irrelevantEmails(ws.messages).length;
 
   if (ws.applicationsQuery.error) return <ErrorState error={ws.applicationsQuery.error} onRetry={() => void ws.applicationsQuery.refetch()} />;
   if (ws.applicationsQuery.isLoading) return <SkeletonList rows={6} />;
@@ -42,20 +70,20 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
           <span className="text-body-strong text-[var(--color-text)]">{all.length - closedCount - moveOnCount} active</span> · {moveOnCount} Move On · {closedCount} older closed · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
         </p>
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">
-            {(["active", "all"] as const).map((s) => (
-              <button key={s} type="button" aria-pressed={scope === s} onClick={() => setScope(s)} className={cn(toggle, scope === s ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
-                {s === "active" ? "Active" : "All"}
+          <div ref={switchRef} className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">
+            {(["active", "review", "irrelevant"] as const).map((s) => (
+              <button key={s} type="button" aria-pressed={scope === s} onClick={() => chooseScope(s)} className={cn(toggle, scope === s ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
+                {s === "active" ? "Active" : s === "review" ? `BDE review ${ws.reviewTotal}` : `Irrelevant ${irrelevantCount}`}
               </button>
             ))}
           </div>
-          <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="View">
+          {scope === "active" ? <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="View">
             {([["board", "Board", Columns3], ["list", "List", List]] as const).map(([id, label, Icon]) => (
               <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} className={cn(toggle, view === id ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
                 <Icon size={14} aria-hidden />{label}
               </button>
             ))}
-          </div>
+          </div> : null}
         </div>
       </div>
 
@@ -73,13 +101,25 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
         </div>
       ) : null}
 
-      {view === "list" && (ws.reviewTotal > 0 || ws.reviewsQuery.error) ? <ReviewQueue ws={ws} actions={actions} /> : null}
-
-      {view === "board" ? (
-        <ApplicationBoard reviewCount={ws.reviewTotal} reviewColumn={<ReviewQueue ws={ws} actions={actions} inBoard />} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} signals={ws.signals} onOpen={actions.openApplication} showClosed={scope === "all"} />
+      {scope === "review" ? (
+        <ReviewQueue ws={ws} actions={actions} />
+      ) : scope === "irrelevant" ? (
+        <IrrelevantEmails ws={ws} actions={actions} />
+      ) : view === "board" ? (
+        <ApplicationBoard showReviewColumn={false} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} onOpen={actions.openApplication} />
       ) : (
-        <ApplicationList apps={visible} signals={ws.signals} onOpen={actions.openApplication} />
+        <ApplicationList apps={visible} onOpen={actions.openApplication} />
       )}
+      <div ref={spacerRef} aria-hidden className="-mt-4" />
     </div>
   );
+}
+
+/** The nearest element that scrolls vertically (the app shell's content area), else the page itself. */
+function scrollParent(el: HTMLElement): HTMLElement | Window {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node;
+  }
+  return window;
 }

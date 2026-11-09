@@ -26,8 +26,8 @@ from backend.inbox import backfill, classifier_pause
 from backend.inbox.decider_categories import CATEGORY_VERSION, CONFIDENCE_THRESHOLD
 from backend.inbox.policy import review_reason
 from backend.applications.tracking import apply_email_decision, automation_ready, email_history
-from backend.inbox.google_oauth import encrypt_content
-from backend.models.candidates import CandidateMailbox, InboxMessage
+from backend.inbox.masking import KnownIdentity
+from backend.models.candidates import Candidate, CandidateMailbox, InboxMessage
 from backend.models.db import Application, ApplicationReview, EmailClassification, JobRun, SessionLocal, utcnow
 from backend.models.tenancy import Firm
 import logging
@@ -113,6 +113,15 @@ def _gate(db, cfg):
     return 'probe' if classifier_pause.claim_probe(db, cfg) else None
 
 
+def _known_identity(db, row, mailbox):
+    """What the masking must remove for this email, read with the content it is sent with. Never stored or logged."""
+    candidate = scoped(db, Candidate, row.firm_id).filter_by(id=row.candidate_id).first()
+    values = (candidate.email, candidate.phone, candidate.linkedin_url) if candidate else ()
+    return KnownIdentity(candidate_name=candidate.full_name if candidate else '',
+                         candidate_values=tuple(v for v in (*values, mailbox.address) if v),
+                         sender_name=row.from_name or '', sender_email=row.from_email or '')
+
+
 def process_one(message_id, *, provider=None, aliases=None):
     if not enabled():
         return False
@@ -176,6 +185,7 @@ def process_one(message_id, *, provider=None, aliases=None):
                 raise DeciderError('WORK_INVALIDATED')
             parts = email_parts(row)
             subject, body = parts.subject, parts.current
+            known = _known_identity(db, row, box)
             # Committed before the request: "dispatch started; charge unknown" (DEBUG D-15). A crash after this
             # point is counted as possibly charged, never as free.
             started = scoped(db, JobRun, snapshot.firm_id).filter_by(id=snapshot.job_id).one()
@@ -183,7 +193,7 @@ def process_one(message_id, *, provider=None, aliases=None):
             db.commit()
         sent_at = time.monotonic()
         try:
-            result = (provider or classify)(subject, ai_input(parts), cfg)
+            result = (provider or classify)(subject, ai_input(parts), cfg, known)
         finally:
             duration_ms = int((time.monotonic() - sent_at) * 1000)
     except DeciderError as exc:
@@ -301,10 +311,9 @@ def process_one(message_id, *, provider=None, aliases=None):
         # An existing pending human business review must remain accessible until human resolution.
         pending = scoped(db, ApplicationReview, row.firm_id).filter_by(inbox_message_id=row.id, state='PENDING').first()
         if confident_other and pending is None and not had_application_link:
-            row.hidden_at = utcnow()
-            row.other_purge_after = row.hidden_at + timedelta(days=30)
-            for field in ('subject', 'from_name', 'from_email'):
-                setattr(row, field, encrypt_content(getattr(row, field)))
+            # Shown in the Inbox as Irrelevant (decided 2026-11-07, replacing hide-and-encrypt); still erased after
+            # 30 days once the purge switches are on (retention.purge_due).
+            row.other_purge_after = utcnow() + timedelta(days=30)
         elif not confident_other and reason not in ('SAME_STAGE', 'AUTO_APPLIED'):
             _add_review(db, row, app, record)
         row.classification_state = 'DONE'

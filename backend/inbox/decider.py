@@ -7,7 +7,7 @@ import httpx
 
 from backend.inbox.decider_categories import (CATEGORIES, INSTRUCTIONS, QUESTION_KEY, CATEGORY_VERSION,
                                               CONFIDENCE_THRESHOLD, DISAGREEMENT_LIMIT)
-from backend.inbox.safe_text import redact_sensitive_text
+from backend.inbox.masking import mask_for_classifier
 
 ENDPOINT = 'https://openrouter.ai/api/alpha/decisions'
 
@@ -31,15 +31,16 @@ class Classification:
 def config_identity(cfg):
     return hashlib.sha256(repr((cfg.provider, cfg.model, cfg.prompts, cfg.preset_id, cfg.preset_version,
                                 INSTRUCTIONS, CATEGORIES, CATEGORY_VERSION, CONFIDENCE_THRESHOLD, DISAGREEMENT_LIMIT,
-                                "minimization-2026-11-04.1", "gmail-auth-2026-11-04.1")).encode()).hexdigest()
+                                "minimization-2026-11-07.1", "gmail-auth-2026-11-04.1")).encode()).hexdigest()
 
 
-def build_request(subject, body, cfg):
+def build_request(subject, body, cfg, known=None):
     # Caller content is data, not instructions. No tools, URL fetches or attachments.
+    # known: the worker's KnownIdentity for this email (candidate, mailbox, sender), used only for masking.
     instructions = cfg.prompts.get('instructions') or INSTRUCTIONS
     return {'model': cfg.model,
-            'state': [{'subject': redact_sensitive_text(subject[:1000]),
-                       'body': redact_sensitive_text(body[:24000])}],
+            'state': [{'subject': mask_for_classifier(subject[:1000], known),
+                       'body': mask_for_classifier(body[:24000], known)}],
             'questions': {QUESTION_KEY: {'type': 'choice', 'instructions': instructions,
                                         'criteria': dict(CATEGORIES)}}}
 
@@ -91,13 +92,15 @@ def is_configured(cfg) -> bool:
     return cfg.provider == 'openrouter' and bool(cfg.model) and bool(cfg.api_key)
 
 
-def classify(subject, body, cfg, *, post=None):
+def classify(subject, body, cfg, known=None, *, post=None):
     if not is_configured(cfg):
         raise DeciderError('CLASSIFIER_NOT_CONFIGURED')
     send = post or httpx.post
+    # Masked before the try: a masking failure must not look like a provider error, and nothing is sent.
+    request = build_request(subject, body, cfg, known)
     try:
         response = send(ENDPOINT, headers={'Authorization': 'Bearer ' + cfg.api_key},
-                        json=build_request(subject, body, cfg), timeout=35, follow_redirects=False)
+                        json=request, timeout=35, follow_redirects=False)
         if response.status_code == 429 or response.status_code >= 500:
             raise DeciderError('PROVIDER_UNAVAILABLE', retryable=True)
         if response.status_code in (401, 403):

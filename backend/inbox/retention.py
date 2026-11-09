@@ -1,4 +1,4 @@
-"""Central readable-mail policy and independently gated hidden-Other erasure."""
+"""Central readable-mail policy and independently gated erasure of Other (Irrelevant) mail."""
 import logging
 
 from backend.inbox.decider_categories import CONFIDENCE_THRESHOLD
@@ -28,8 +28,9 @@ def purge_due(*, limit=100):
         return 0
     now = utcnow()
     with SessionLocal() as db:
+        # Other mail is shown as Irrelevant now, not hidden (2026-11-07); earlier hidden mail still qualifies.
         rows = db.query(InboxMessage).filter(
-            InboxMessage.deleted_at.is_(None), InboxMessage.hidden_at.isnot(None),
+            InboxMessage.deleted_at.is_(None), InboxMessage.other_purge_after.isnot(None),
             InboxMessage.other_purge_after <= now, InboxMessage.classification_state == 'DONE',
         ).order_by(InboxMessage.other_purge_after).with_for_update(skip_locked=True).limit(min(limit, 500)).all()
         count = 0
@@ -40,7 +41,9 @@ def purge_due(*, limit=100):
             review = scoped(db, ApplicationReview, message.firm_id).filter_by(inbox_message_id=message.id).first()
             known_job = scoped(db, EmailClassification, message.firm_id).filter(
                 EmailClassification.inbox_message_id == message.id, EmailClassification.category != 'other').first()
+            # A visible email can be linked to an application (by the matcher or a BDE): linked mail is never erased.
             if (not latest or latest.category != 'other' or latest.confidence < CONFIDENCE_THRESHOLD or review or known_job
+                    or message.application_id is not None
                     or latest.prompt_version != config.CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID):
                 continue
             message.body = None
@@ -58,5 +61,5 @@ def purge_due(*, limit=100):
             count += 1
         db.commit()
         if rows:
-            logger.info("Email retention: purged %d of %d due hidden emails", count, len(rows))
+            logger.info("Email retention: purged %d of %d due Other emails", count, len(rows))
         return count

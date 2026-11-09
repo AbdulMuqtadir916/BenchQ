@@ -14,7 +14,10 @@ import { Tag } from "@/components/ui/tag";
 
 /** A review may confirm every stage except Saved (DEBUG D-10). */
 const REVIEW_STAGES: readonly ApplicationStatus[] = SELECTABLE.filter((s) => s !== "SAVED");
-const STAGE_OPTIONS = [{ value: "", label: "Choose a stage" }, ...REVIEW_STAGES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))];
+/** Not a stage: confirming it dismisses the review as not about any application (DISMISS_NON_APPLICATION). */
+const IRRELEVANT = "IRRELEVANT";
+export const STAGE_OPTIONS = [{ value: "", label: "Choose a stage" }, ...REVIEW_STAGES.map((s) => ({ value: s, label: STATUS_LABEL[s] })),
+  { value: IRRELEVANT, label: "Irrelevant (not about an application)" }];
 
 function failure(error: Error): string {
   return error instanceof ApiError && error.status === 409
@@ -31,12 +34,14 @@ interface Props {
   onHide: () => void;
 }
 
-/** The BDE's decision on one email: confirm a stage, keep the current one, link only, or dismiss. */
+/** The BDE's decision on one email: confirm a stage, keep the current one, link only, or mark it Irrelevant. */
 export function EmailReviewPanel({ message, review, applications, canAct, onHide }: Props) {
   const mutation = useReviewEmail(message.candidateId);
   const suggested = categoryStatus(message.classificationCategory);
   const [chosenApp, setChosenApp] = useState("");
-  const [stage, setStage] = useState<string>(suggested && REVIEW_STAGES.includes(suggested) ? suggested : "");
+  const [stage, setStage] = useState<string>(message.classificationCategory === "other" ? IRRELEVANT
+    : suggested && REVIEW_STAGES.includes(suggested) ? suggested : "");
+  const isIrrelevant = stage === IRRELEVANT;
   const [note, setNote] = useState("");
   const lockedId = message.applicationId ?? review.applicationId;
   const appId = lockedId ?? chosenApp;
@@ -96,12 +101,12 @@ export function EmailReviewPanel({ message, review, applications, canAct, onHide
             <textarea className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text)]"
               value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} disabled={busy} />
           </label>
-          {app && !canKeep ? <p className="text-caption text-[var(--color-text-3)]">This application has an older status ({STATUS_LABEL[app.status]}); keeping it is not possible. Confirm a current stage, link only, or dismiss.</p> : null}
+          {app && !canKeep ? <p className="text-caption text-[var(--color-text-3)]">This application has an older status ({STATUS_LABEL[app.status]}); keeping it is not possible. Confirm a current stage, link only, or choose Irrelevant.</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" disabled={!app || !stage || busy || !ready} onClick={() => decide("SET_STATUS")}>Confirm stage</Button>
+            <Button size="sm" disabled={(!isIrrelevant && (!app || !stage)) || busy || !ready}
+              onClick={() => decide(isIrrelevant ? "DISMISS_NON_APPLICATION" : "SET_STATUS")}>{isIrrelevant ? "Confirm: Irrelevant" : "Confirm stage"}</Button>
             <Button size="sm" variant="secondary" disabled={!canKeep || busy || !ready} onClick={() => decide("KEEP_CURRENT")}>{canKeep && app ? `Keep ${STATUS_LABEL[app.status]}` : "Keep current stage"}</Button>
             <Button size="sm" variant="secondary" disabled={!app || busy || !ready} onClick={() => decide("LINK_ONLY")}>Link only</Button>
-            <Button size="sm" variant="ghost" disabled={busy || !ready} onClick={() => decide("DISMISS_NON_APPLICATION")}>Dismiss: not about an application</Button>
           </div>
           {mutation.isSuccess ? <p role="status" className="text-sm text-[var(--color-text-2)]">Decision saved.</p> : null}
           {mutation.error ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{failure(mutation.error)}</p> : null}

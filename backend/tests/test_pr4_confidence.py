@@ -61,9 +61,10 @@ def test_worker_routes_by_min_value_and_disagreement(test_db, pipeline, category
     assert test_db.get(Application, app_id).status == 'applied'
 
 
-def test_confident_other_without_disagreement_is_still_hidden(test_db, pipeline):
+def test_confident_other_without_disagreement_is_irrelevant_with_a_purge_date(test_db, pipeline):
     _, _, message_id = pipeline
     assert worker.process_one(message_id, provider=lambda *a: two_numbers('other', .95, .93))
     test_db.expire_all()
-    assert test_db.get(InboxMessage, message_id).hidden_at is not None
+    row = test_db.get(InboxMessage, message_id)
+    assert row.hidden_at is None and row.other_purge_after is not None
     assert test_db.query(EmailClassification).one().reason == 'OTHER'

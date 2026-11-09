@@ -79,7 +79,7 @@ def test_forward_with_a_job_category_is_review_not_automatic(test_db, pipeline):
     _set(test_db, test_db.get(InboxMessage, message_id),
          f'Please see below.\n---------- Forwarded message ---------\n{NAMES}: please complete this assessment.', 'Fwd: next step')
     sent = []
-    assert worker.process_one(message_id, provider=lambda s, b, c: sent.append(b) or decision('assessment', .95))
+    assert worker.process_one(message_id, provider=lambda s, b, c, known=None: sent.append(b) or decision('assessment', .95))
     test_db.expire_all()
     assert '[Forwarded message' in sent[0]
     record = test_db.query(EmailClassification).one()

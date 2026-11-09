@@ -11,9 +11,13 @@ import { formatIst, formatRelative } from "@/lib/format/timezone";
 import { EASE_OUT } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/cn";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { EmptyState } from "@/components/app/empty-state";
 import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
+import { NeedsReviewBadge } from "@/components/app/inbox/needs-review-badge";
+import { useOpenEmailReview } from "@/lib/hooks/use-email-reviews";
 import { STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
 import { StageDots } from "../applications/application-list";
 import type { Suggestion } from "../use-candidate-workspace";
@@ -28,22 +32,29 @@ interface ReaderProps {
   /** The pending review of this email, if any, and the candidate's applications to resolve it against. */
   review?: EmailReview;
   applications?: Application[];
+  /** The full email is still loading: placeholders where its text will appear (not on background refreshes). */
+  isBodyLoading?: boolean;
 }
 
 /** One email, what it means, and the application it belongs to. */
-export function InboxReader({ message, application, suggestion, canAct, actions, review, applications = [] }: ReaderProps) {
+export function InboxReader({ message, application, suggestion, canAct, actions, review, applications = [], isBodyLoading = false }: ReaderProps) {
   const reduce = useReducedMotion() ?? false;
   // Which review is open. Keyed by review id and revision, so another email (or a new revision) starts closed.
   const [openKey, setOpenKey] = useState<string | null>(null);
   const reviewKey = review ? `${review.id}:${review.revision}` : null;
   const isReviewOpen = reviewKey !== null && openKey === reviewKey;
+  // Irrelevant (Other) emails have no review until a BDE asks for one; the new review then opens straight away.
+  const openReview = useOpenEmailReview(message?.candidateId ?? "");
   if (!message) return <EmptyState icon={MailOpen} title="Pick an email" description="Select an email on the left to read it here." />;
   const meta = mailSignalMeta(message.signal, message.classificationState, message.classificationCategory, message.classificationError);
 
   return (
     <motion.article key={message.id} initial={reduce ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="flex h-full flex-col">
       <header className="border-b border-[var(--color-border)] p-5">
-        {meta.isBadge ? <Tag tone={meta.tone}><meta.Icon size={11} aria-hidden />{meta.label}</Tag> : null}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {meta.isBadge ? <Tag tone={meta.tone}><meta.Icon size={11} aria-hidden />{meta.label}</Tag> : null}
+          {review ? <NeedsReviewBadge /> : null}
+        </div>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <h2 className="min-w-0 break-words text-h2 text-[var(--color-text)]">{message.subject}</h2>
           {review && canAct ? (
@@ -51,8 +62,14 @@ export function InboxReader({ message, application, suggestion, canAct, actions,
               onClick={() => setOpenKey(isReviewOpen ? null : reviewKey)}>
               <ClipboardCheck size={14} aria-hidden />{isReviewOpen ? "Hide review" : "Review email"}
             </Button>
-          ) : review ? <Tag tone="violet">Needs review</Tag> : null}
+          ) : canAct && message.classificationState === "DONE" && message.classificationCategory === "other" ? (
+            <Button type="button" size="sm" className="self-start sm:shrink-0" disabled={openReview.isPending}
+              onClick={() => openReview.mutate(message.id, { onSuccess: (reviewId) => setOpenKey(`${reviewId}:0`) })}>
+              <ClipboardCheck size={14} aria-hidden />{openReview.isPending ? "Opening review…" : "Review email"}
+            </Button>
+          ) : null}
         </div>
+        {openReview.error && openReview.variables === message.id ? <p role="alert" className="mt-2 text-sm text-[var(--color-danger-fg)]">{openReview.error.message}</p> : null}
         <p className="mt-1 text-sm text-[var(--color-text-2)]">
           <span className="font-[550]">{message.fromName}</span> <span className="text-[var(--color-text-3)]">&lt;{message.fromEmail}&gt;</span>
         </p>
@@ -101,7 +118,14 @@ export function InboxReader({ message, application, suggestion, canAct, actions,
           <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] px-3 py-2.5 text-sm text-[var(--color-text-3)]">This email is not linked to an application yet.</p>
         )}
 
-        <div className="whitespace-pre-line text-body leading-relaxed text-[var(--color-text)]">{message.body}</div>
+        {isBodyLoading && !message.body ? (
+          <div role="status" className="space-y-2.5">
+            <span className="sr-only">Loading email…</span>
+            {["w-full", "w-11/12", "w-4/5", "w-2/3"].map((width) => <Skeleton key={width} className={cn("h-4", width)} />)}
+          </div>
+        ) : (
+          <div className="whitespace-pre-line text-body leading-relaxed text-[var(--color-text)]">{message.body}</div>
+        )}
       </div>
     </motion.article>
   );

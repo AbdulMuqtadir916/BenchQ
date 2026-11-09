@@ -255,6 +255,36 @@ def test_import_fetch_does_not_hold_mailbox_lock_and_encrypts_content(test_db, m
     assert audit.actor_type == 'SYSTEM' and audit.actor_user_id is None
 
 
+def test_mail_moved_into_the_inbox_later_is_imported_once(test_db, mailbox_case, monkeypatch, import_provider):
+    """Out of Spam or an archive, Gmail reports a label change (labelsAdded), not a new message (messagesAdded)."""
+    jobs, api = import_provider
+    candidate, _, _, mailbox = mailbox_case
+    mailbox.history_id = '5'
+    test_db.commit()
+    email(test_db, mailbox, key='already-imported')
+    asked, fetched = [], []
+    def fetch(http, path, token, params=None):
+        if path == 'history':
+            asked.append(params['historyTypes'])
+            return {'historyId': '9', 'history': [{'labelsAdded': [
+                {'message': {'id': 'moved-from-spam'}, 'labelIds': ['INBOX']},
+                {'message': {'id': 'only-starred'}, 'labelIds': ['STARRED']},
+                {'message': {'id': 'already-imported'}, 'labelIds': ['INBOX']}]}]}
+        if path.startswith('messages/'):
+            fetched.append(path)
+            return {'labelIds': ['INBOX'], 'snippet': 'Synthetic moved body', 'payload': {}}
+        return api(http, path, token, params)
+    monkeypatch.setattr(jobs.gmail, '_api_get', fetch)
+    assert jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at) == 1
+    test_db.expire_all()
+    assert asked == [['messageAdded', 'labelAdded']]
+    # A label other than INBOX is never fetched; an already-imported id is fetched but not stored twice.
+    assert 'messages/only-starred' not in fetched and 'messages/moved-from-spam' in fetched
+    keys = sorted(row.provider_message_id for row in test_db.query(InboxMessage).all())
+    assert keys == ['already-imported', 'moved-from-spam']
+    assert test_db.get(CandidateMailbox, mailbox.id).history_id == '9'
+
+
 def test_disconnect_during_fetch_prevents_late_writes(test_db, mailbox_case, monkeypatch, import_provider):
     jobs, api = import_provider
     candidate, _, _, mailbox = mailbox_case

@@ -43,6 +43,11 @@ export const inboxApi = {
       body: { command_id: commandId, expected_content_revision: expected.contentRevision, expected_result_version: expected.resultVersion },
     });
   },
+  /** Open a review for an email marked Irrelevant (category Other), so the usual review panel works on it. Idempotent. */
+  openReview: async (firmId: string, candidateId: string, messageId: string): Promise<string> => {
+    if (!isLive("inbox")) throw new Error("Email review needs the live inbox.");
+    return (await http.post(base(firmId, candidateId) + `/inbox-messages/${toBackendId(messageId)}/review/open`, z.object({ review_id: z.string() }))).review_id;
+  },
   /** One human decision on a review; returns the refreshed inbox. Retrying with the same command id is idempotent. */
   review: async (firmId: string, candidateId: string, messageId: string, command: ReviewEmailCommand, commandId = newCommandId()): Promise<CandidateInbox> => {
     if (!isLive("inbox")) throw new Error("Email review needs the live inbox.");

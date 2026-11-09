@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDndContext, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { Archive, Inbox } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus, StoredApplicationStatus } from "@/lib/schemas/enums";
-import type { InboxMessage } from "@/lib/schemas/inbox";
 import { useFollowups } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
 import { cn } from "@/lib/cn";
@@ -17,6 +17,8 @@ interface ApplicationBoardProps {
   /** Candidate email review queue, rendered in its own read-only board column. */
   reviewColumn?: ReactNode;
   reviewCount?: number;
+  /** False where BDE review has its own tab (the candidate's Applications tab): the board then has no review column. */
+  showReviewColumn?: boolean;
   /** Returns false when the move is refused (another move for this card is still saving). */
   onMove: (id: string, to: ApplicationStatus) => boolean | void;
   /** Cards whose move is in flight. */
@@ -24,8 +26,6 @@ interface ApplicationBoardProps {
   canAct: boolean;
   /** Show the candidate on each card (firm-wide board). Omit on a candidate's own page. */
   candidateName?: (candidateId: string) => string;
-  /** Latest recruiter email per application, shown on the card. */
-  signals?: Map<string, InboxMessage>;
   onOpen?: (applicationId: string) => void;
   /** Always show the read-only "Older statuses" column (it also appears whenever a legacy value exists). */
   showClosed?: boolean;
@@ -34,11 +34,14 @@ interface ApplicationBoardProps {
 /** The stages as columns. Drag a card to any stage (D1); legacy values sit in a read-only column, never hidden. */
 const LEGACY_COLUMN = "LEGACY";
 const REVIEW_COLUMN = "BDE_REVIEW";
+const noSubscription = () => () => {};
 
-export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals, onOpen, showClosed = false, saving, reviewColumn, reviewCount }: ApplicationBoardProps) {
+export function ApplicationBoard({ apps, onMove, canAct, candidateName, onOpen, showClosed = false, saving, reviewColumn, reviewCount, showReviewColumn = true }: ApplicationBoardProps) {
   const teamQuery = useTeam();
   const followupsQuery = useFollowups();
   const [activeId, setActiveId] = useState<string | null>(null);
+  // True only in the browser (false while server-rendering and hydrating), so the portal never mismatches.
+  const isClient = useSyncExternalStore(noSubscription, () => true, () => false);
   const [refusal, setRefusal] = useState<string | null>(null);
   // Enter opens a card; Space picks it up to move with the arrow keys.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] } }));
@@ -59,7 +62,7 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
     return map;
   }, [followupsQuery.data]);
 
-  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), followUpDue: nextFollowup.get(app.id), signal: signals?.get(app.id), isSaving: saving?.has(app.id) });
+  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), followUpDue: nextFollowup.get(app.id), isSaving: saving?.has(app.id) });
   const active = apps.find((a) => a.id === activeId) ?? null;
   const hasLegacy = apps.some((a) => isLegacy(a.status));
   const columns: Array<{ id: string; statuses: StoredApplicationStatus[] }> = [
@@ -67,7 +70,7 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
       { id: s, statuses: [s] },
       ...(s === "APPLIED" ? [
         ...(apps.some((a) => a.status === INCOMPLETE) ? [{ id: INCOMPLETE, statuses: [INCOMPLETE] }] : []),
-        { id: REVIEW_COLUMN, statuses: [] },
+        ...(showReviewColumn ? [{ id: REVIEW_COLUMN, statuses: [] as StoredApplicationStatus[] }] : []),
       ] : []),
     ]),
     { id: "MOVE_ON", statuses: ["MOVE_ON"] },
@@ -104,7 +107,7 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
               {items.map((app) => col.id === REVIEW_COLUMN ? (
                 <button key={app.id} type="button" onClick={() => onOpen?.(app.id)} className="bq-card w-full p-3.5 text-left">
                   <p className="mb-2 text-caption text-[var(--color-text-3)]">Last confirmed: {STATUS_LABEL[app.status]}</p>
-                  <ApplicationCardFace {...face(app)} />
+                  <ApplicationCardFace {...face(app)} showReviewBadge={false} />
                 </button>
               ) : (
                 <BoardCard key={app.id} app={app} canDrag={canAct && app.pendingReviewCount === 0} onOpen={onOpen}>
@@ -115,7 +118,12 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
           );
         })}
       </div>
-      <DragOverlay>{active ? <div className="bq-card bq-board-overlay p-3.5"><ApplicationCardFace {...face(active)} /></div> : null}</DragOverlay>
+      {/* In <body>: the app shell's backdrop-filter (.bq-frame) would otherwise anchor this fixed overlay to the shell,
+          not the viewport, and the dragged card would float away from the pointer. */}
+      {isClient ? createPortal(
+        <DragOverlay>{active ? <div className="bq-card bq-board-overlay p-3.5"><ApplicationCardFace {...face(active)} /></div> : null}</DragOverlay>,
+        document.body,
+      ) : null}
     </DndContext>
   );
 }

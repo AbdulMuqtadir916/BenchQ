@@ -45,6 +45,16 @@ export function useReviewEmail(candidateId: string) {
   });
 }
 
+/** Open a review for an email marked Irrelevant; the reviews are reloaded so its review panel can open. */
+export function useOpenEmailReview(candidateId: string) {
+  const firmId = useFirmId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => inboxApi.openReview(firmId, candidateId, messageId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inbox.reviews(firmId, candidateId) }),
+  });
+}
+
 /** Put a failed email back in the classification queue; refreshes the inbox and the opened email. */
 export function useRetryClassification(candidateId: string) {
   const firmId = useFirmId();

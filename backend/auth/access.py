@@ -99,6 +99,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": F,
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review/open": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": F,

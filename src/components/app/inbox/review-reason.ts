@@ -5,6 +5,7 @@ import type { ApplicationStatus } from "@/lib/schemas/enums";
 const REASONS: Record<string, string> = {
   UNMATCHED: "No matching application was found",
   LOW_CONFIDENCE: "The classifier is not sure enough",
+  MANUAL_REVIEW: "Marked Irrelevant; a BDE opened it for review",
   OUTCOME_REQUIRES_REVIEW: "Offers and rejections always need a person to confirm",
   SENDER_UNVERIFIED: "The sender could not be verified",
   RECEIVE_TIME_UNVERIFIED: "The time the email arrived could not be verified",

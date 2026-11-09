@@ -19,7 +19,7 @@ CFG = SimpleNamespace(provider='openrouter', model='synthetic-test-only', api_ke
 @pytest.fixture
 def fake_provider(monkeypatch):
     calls = []
-    monkeypatch.setattr(worker, 'classify', lambda subject, body, cfg: calls.append(subject) or decision('screening_call', .95))
+    monkeypatch.setattr(worker, 'classify', lambda subject, body, cfg, known=None: calls.append(subject) or decision('screening_call', .95))
     return calls
 
 

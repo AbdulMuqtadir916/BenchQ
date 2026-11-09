@@ -11,9 +11,8 @@ from backend import config
 from backend.inbox import classification_worker as worker
 from backend.inbox.decider import Classification, DeciderError, parse_response
 from backend.inbox.decider_categories import CATEGORIES, QUESTION_KEY
-from backend.inbox.google_oauth import decrypt_content
 from backend.models.db import Application, ApplicationReview, ApplicationStatusEvent, EmailClassification, JobRun, utcnow
-from backend.models.candidates import InboxMessage
+from backend.models.candidates import Candidate, CandidateMailbox, InboxMessage
 from backend.tests.test_pr3_matching import matching_case, mailbox_case, email
 
 
@@ -46,8 +45,8 @@ def test_decrypted_ai_and_matching_preserve_application_and_resume(test_db, pipe
     before = test_db.get(Application, app_id)
     snapshot = (before.status, before.status_revision, before.applied_at, before.resume_id)
     captured = []
-    def provider(subject, body, cfg):
-        captured.append((subject, body))
+    def provider(subject, body, cfg, known=None):
+        captured.append((subject, body, known))
         assert 'bqenc1:' not in body
         return decision()
     assert worker.process_one(row_id, provider=provider)
@@ -55,6 +54,13 @@ def test_decrypted_ai_and_matching_preserve_application_and_resume(test_db, pipe
     row = test_db.get(InboxMessage, row_id)
     app = test_db.get(Application, app_id)
     assert 'Java Backend Engineer' in captured[0][1]
+    # The masking gets the candidate, the connected mailbox and the sender, read with the content it is sent with.
+    known = captured[0][2]
+    mailbox = test_db.get(CandidateMailbox, row.mailbox_id)
+    candidate = test_db.get(Candidate, row.candidate_id)
+    assert known.candidate_name == candidate.full_name
+    assert mailbox.address in known.candidate_values
+    assert (known.sender_name, known.sender_email) == (row.from_name, row.from_email)
     assert row.body.startswith('bqenc1:')
     assert row.application_id == app_id
     assert (app.status, app.status_revision, app.applied_at, app.resume_id) == snapshot
@@ -86,22 +92,26 @@ def test_threshold_and_outcome_policy_is_review_only(test_db, pipeline, category
         assert test_db.get(InboxMessage, message_id).hidden_at is None
 
 
-def test_other_is_hidden_encrypted_and_never_changes_status(test_db, pipeline, api_client):
+def test_other_is_shown_as_irrelevant_with_a_purge_date_and_never_changes_status(test_db, pipeline, api_client):
+    # Decided 2026-11-07: Other mail is shown in the Inbox (as Irrelevant), no longer hidden and encrypted; the 30-day
+    # purge date is still set (erased only once the purge switches are on).
     app_id, _, message_id = pipeline
     row = test_db.get(InboxMessage, message_id)
     original_subject = row.subject
+    before = utcnow()
     assert worker.process_one(message_id, provider=lambda *a: decision('other'))
     test_db.expire_all()
     row = test_db.get(InboxMessage, message_id)
-    assert row.hidden_at and row.other_purge_after - row.hidden_at == timedelta(days=30)
-    assert row.subject.startswith('bqenc1:') and decrypt_content(row.subject) == original_subject
+    assert row.hidden_at is None and row.subject == original_subject
+    assert timedelta(days=30) <= row.other_purge_after - before < timedelta(days=30, minutes=1)
     assert test_db.get(Application, app_id).status == 'applied'
     path = f'/api/firms/{row.firm_id}/candidates/{row.candidate_id}/inbox'
     result = api_client.get(path)
     assert result.status_code == 200, result.text
-    assert result.json()['messages'] == []
-    assert api_client.get(path, params={'message_id': str(row.id)}).status_code == 404
-    assert api_client.patch(path.replace('/inbox', f'/inbox-messages/{row.id}/read')).status_code == 404
+    [listed] = result.json()['messages']
+    assert listed['id'] == str(row.id) and listed['classification_category'] == 'other'
+    assert listed['subject'] == original_subject
+    assert api_client.get(path, params={'message_id': str(row.id)}).status_code == 200
     assert not test_db.query(ApplicationReview).first()
 
 
@@ -189,6 +199,10 @@ def test_purge_requires_both_flags_and_30_days(test_db, pipeline, monkeypatch):
     row = test_db.get(InboxMessage, message_id)
     row.other_purge_after = utcnow() - timedelta(seconds=1)
     test_db.commit()
+    # The pipeline's email names its application, so the matcher linked it: linked mail is never erased.
+    assert row.application_id is not None and purge_due() == 0
+    row.application_id = None
+    test_db.commit()
     approved_id = config.CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID
     monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID', 'different-model-policy')
     assert purge_due() == 0
@@ -273,6 +287,10 @@ def test_review_link_and_confirmation_are_audited_idempotent_human_commands(test
 @pytest.mark.parametrize(('current','category','text_body','reason'),[
     ('interview_scheduled','screening_call','Please attend a screening.','BACKWARD_STAGE'),
     ('interview_scheduled','interview_scheduled','Second interview round is scheduled.','REPEATED_ROUND'),
+    # "next round": a repeat only at the same stage; a first shortlist or a forward move stays eligible.
+    ('interview_scheduled','interview_scheduled','Your next round interview is on Tuesday.','REPEATED_ROUND'),
+    ('applied','shortlisted','You have been shortlisted for the next round.','AUTO_STATUS_DISABLED'),
+    ('shortlisted','interview_scheduled','Your next interview is scheduled for Tuesday.','AUTO_STATUS_DISABLED'),
     ('assessment','assessment','Please complete the assessment.','SAME_STAGE'),
     ('response','assessment','Please complete the assessment.','LEGACY_OR_CLOSED_STATUS'),
 ])

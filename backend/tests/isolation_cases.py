@@ -46,6 +46,20 @@ def _classification_ready(state):
     return prepare
 
 
+def _irrelevant_ready(db, ids):
+    """The email is classified Other (shown as Irrelevant) and has no review, so a BDE may open one."""
+    from backend.models.candidates import InboxMessage
+    from backend.models.db import EmailClassification
+    message = db.get(InboxMessage, ids['inbox_message'])
+    message.classification_state = 'DONE'
+    message.classification_version = 1
+    db.add(EmailClassification(firm_id=message.firm_id, candidate_id=message.candidate_id, inbox_message_id=message.id,
+        result_version=1, content_revision=message.content_revision, category='other', confidence=0.95,
+        probabilities={'other': 0.95}, model='synthetic-test-only', provider='openrouter', prompt_version='synthetic',
+        category_version='synthetic', sender_auth_result='PASS', receive_time_verified=True, outcome='OTHER', reason='OTHER'))
+    db.commit()
+
+
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
          "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt", "base_id": "base", "event_id": "auto_event"}
 
@@ -125,6 +139,7 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": Case(),
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": Case(path={"message_id":"review_message"}, body=lambda i: {"review_id": str(i["review"]), "command_id": "22222222-2222-4222-8222-222222222222", "expected_review_revision": 0, "expected_content_revision": 0, "application_id": str(i["review_app"]), "expected_application_revision":0, "action": "SET_STATUS", "status":"assessment"}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review/open": Case(prepare=_irrelevant_ready),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": Case(prepare=_classification_ready("ERROR"), body=lambda i: {"command_id": "22222222-2222-4222-8222-222222222222", "expected_content_revision": 0, "expected_result_version": 0}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify": Case(prepare=_classification_ready("DONE"), body=lambda i: {"command_id": "22222222-2222-4222-8222-222222222222", "expected_content_revision": 0, "expected_result_version": 0}),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),

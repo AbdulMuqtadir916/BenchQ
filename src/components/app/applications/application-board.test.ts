@@ -55,3 +55,20 @@ describe("application board: review and incomplete columns", () => {
     expect(app.status).toBe("INCOMPLETE_APPLICATION");
   });
 });
+
+describe("application board: the BDE review column", () => {
+  const renderWith = (showReviewColumn?: boolean) =>
+    renderToString(
+      createElement(QueryClientProvider, { client: new QueryClient() },
+        createElement(FirmProvider, { firm } as ComponentProps<typeof FirmProvider>,
+          createElement(ApplicationBoard, { apps, canAct: true, onMove: () => {}, candidateName: () => "x", showReviewColumn }))),
+    );
+
+  it("is on the board by default (the firm-wide Applications page)", () => {
+    expect(renderWith()).toContain("BDE Review");
+  });
+
+  it("is left out where BDE review has its own tab (the candidate's Applications tab)", () => {
+    expect(renderWith(false)).not.toContain("BDE Review");
+  });
+});

@@ -12,7 +12,10 @@ STAGES = ('saved', 'applied', 'screening_call', 'shortlisted', 'interview_schedu
           'interview_scheduled', 'assessment', 'offer')
 AUTO_TARGETS = frozenset({'screening_call', 'shortlisted', 'interview_schedule_request',
                           'interview_scheduled', 'assessment'})
-_REPEAT = re.compile(r'\b(?:second|third|fourth|2nd|3rd|4th|next)\s+(?:interview|round)|\bround\s*(?:2|3|4|ii|iii)\b', re.I)
+_REPEAT = re.compile(r'\b(?:second|third|fourth|2nd|3rd|4th)\s+(?:interview|round)|\bround\s*(?:2|3|4|ii|iii)\b', re.I)
+# "Shortlisted for the next round" is how a first shortlist is usually worded, so "next" marks a repeated round only
+# when the email names the stage the application is already at (another round of the same stage).
+_NEXT_ROUND = re.compile(r'\bnext\s+(?:interview|round)\b', re.I)
 
 
 def review_reason(app, message, result, body=''):
@@ -29,7 +32,7 @@ def review_reason(app, message, result, body=''):
     barriers = [v for v in (app.applied_at, app.last_manual_change_at, app.status_effective_at) if v]
     if any(message.received_at <= barrier for barrier in barriers):
         return 'STALE_EMAIL'
-    if _REPEAT.search(body):
+    if _REPEAT.search(body) or (_NEXT_ROUND.search(body) and result.category == app.status):
         return 'REPEATED_ROUND'
     if result.category == app.status:
         return 'SAME_STAGE'

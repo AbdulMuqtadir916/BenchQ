@@ -85,11 +85,66 @@ def test_review_cannot_set_saved(test_db, pipeline, api_client):
     assert test_db.get(Application, app_id).status == 'assessment'
 
 
-def test_inbox_reports_how_many_emails_were_hidden_without_their_content(test_db, pipeline, api_client):
+def test_other_is_listed_and_only_earlier_hidden_mail_is_counted_without_its_content(test_db, pipeline, api_client):
+    # Since 2026-11-07 Other mail is listed (shown as Irrelevant), not hidden; mail hidden before that stays hidden
+    # and is reported as a count only.
     _, _, message_id = pipeline
     row = test_db.get(InboxMessage, message_id)
     subject = row.subject
     assert worker.process_one(message_id, provider=lambda *a: decision('other', .97))
     body = api_client.get(_base(row) + '/inbox').json()
+    assert body['hidden_count'] == 0
+    assert [(m['id'], m['classification_category']) for m in body['messages']] == [(str(row.id), 'other')]
+    test_db.expire_all()
+    test_db.get(InboxMessage, message_id).hidden_at = utcnow()
+    test_db.commit()
+    body = api_client.get(_base(row) + '/inbox').json()
     assert body['hidden_count'] == 1 and body['messages'] == []
     assert subject not in str(body)
+
+
+def test_bde_opens_a_review_for_an_irrelevant_email_once(test_db, pipeline, api_client):
+    """An email marked Irrelevant (Other) has no review until a BDE opens one; then the usual review loop works on it."""
+    _, _, message_id = pipeline
+    assert worker.process_one(message_id, provider=lambda *a: decision('other', .97))
+    row = test_db.get(InboxMessage, message_id)
+    assert not test_db.query(ApplicationReview).first()
+    path = _base(row) + f'/inbox-messages/{row.id}/review/open'
+    first = api_client.post(path)
+    assert first.status_code == 200, first.text
+    again = api_client.post(path)
+    assert again.status_code == 200 and again.json() == first.json()
+    test_db.expire_all()
+    review = test_db.query(ApplicationReview).one()
+    assert str(review.id) == first.json()['review_id']
+    assert review.state == 'PENDING' and review.reason == 'MANUAL_REVIEW'
+    listed = api_client.get(_base(row) + '/email-reviews').json()
+    assert [r['id'] for r in listed['reviews']] == [str(review.id)] and listed['reviews'][0]['reason'] == 'MANUAL_REVIEW'
+    dismissed = api_client.patch(_base(row) + f'/inbox-messages/{row.id}/review',
+                                 json=_command(test_db, row, review, action='DISMISS_NON_APPLICATION'))
+    assert dismissed.status_code == 200, dismissed.text
+    reopened = api_client.post(path)
+    assert reopened.status_code == 409 and 'already reviewed' in reopened.json()['detail']
+
+
+def test_only_an_irrelevant_email_can_be_opened_for_review(test_db, pipeline, api_client):
+    _, _, message_id = pipeline
+    assert worker.process_one(message_id, provider=lambda *a: decision('assessment', .5))  # low confidence: its own review
+    row = test_db.get(InboxMessage, message_id)
+    existing = test_db.query(ApplicationReview).one()
+    result = api_client.post(_base(row) + f'/inbox-messages/{row.id}/review/open')
+    assert result.status_code == 200 and result.json()['review_id'] == str(existing.id)  # the pending review, not a new one
+    test_db.expire_all()
+    assert test_db.query(ApplicationReview).count() == 1
+
+
+def test_a_job_email_without_a_review_cannot_be_opened_as_irrelevant(test_db, pipeline, api_client):
+    app_id, _, message_id = pipeline
+    test_db.get(Application, app_id).status = 'assessment'
+    test_db.commit()
+    assert worker.process_one(message_id, provider=lambda *a: decision('assessment', .95))  # same stage: no review
+    row = test_db.get(InboxMessage, message_id)
+    assert not test_db.query(ApplicationReview).first()
+    result = api_client.post(_base(row) + f'/inbox-messages/{row.id}/review/open')
+    assert result.status_code == 409 and 'Irrelevant' in result.json()['detail']
+    assert not test_db.query(ApplicationReview).first()

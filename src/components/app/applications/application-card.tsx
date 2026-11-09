@@ -1,11 +1,10 @@
-import { Clock3, Mail } from "lucide-react";
+import { Clock3 } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
-import type { InboxMessage } from "@/lib/schemas/inbox";
 import { daysBetween } from "@/lib/derive/dates";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { AvatarStack } from "@/components/app/avatar-stack";
-import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
+import { NeedsReviewBadge } from "@/components/app/inbox/needs-review-badge";
 import { STATUS_ICON, STATUS_COLOR, stageEnteredAt } from "./status-meta";
 
 export interface CardFaceProps {
@@ -14,16 +13,16 @@ export interface CardFaceProps {
   candidateName?: string;
   owner: string;
   followUpDue?: string;
-  signal?: InboxMessage;
   /** A move for this card is in flight: shown as "Saving…" until the server confirms it. */
   isSaving?: boolean;
+  /** Off inside the BDE review column, where every card is waiting for review anyway. */
+  showReviewBadge?: boolean;
 }
 
 /** The content of one application card. Shared by the draggable card and its drag overlay. */
-export function ApplicationCardFace({ app, candidateName, owner, followUpDue, signal, isSaving = false }: CardFaceProps) {
+export function ApplicationCardFace({ app, candidateName, owner, followUpDue, isSaving = false, showReviewBadge = true }: CardFaceProps) {
   const days = daysBetween(stageEnteredAt(app), new Date());
   const Icon = STATUS_ICON[app.status];
-  const meta = signal ? mailSignalMeta(signal.signal, signal.classificationState, signal.classificationCategory) : null;
   const ageTone = days >= 7 ? "text-[var(--color-danger-fg)]" : days >= 3 ? "text-[var(--color-warning-fg)]" : "text-[var(--color-text-3)]";
 
   return (
@@ -39,14 +38,8 @@ export function ApplicationCardFace({ app, candidateName, owner, followUpDue, si
         <Icon size={14} aria-hidden className={cn("mt-0.5 shrink-0", STATUS_COLOR[app.status])} />
       </div>
       {isSaving ? <p role="status" className="mt-2 text-caption text-[var(--color-text-3)]">Saving…</p> : null}
-      {app.pendingReviewCount > 0 ? <p className="mt-2 text-caption text-[var(--color-violet-fg)]">Email waiting for review: decide it in the Inbox before moving.</p> : null}
+      {showReviewBadge && app.pendingReviewCount > 0 ? <NeedsReviewBadge className="mt-2.5" title="An email about this application is waiting for review: decide it in the Inbox before moving." /> : null}
       {candidateName ? <p className="mt-2 truncate text-sm text-[var(--color-text-2)]">{candidateName}</p> : null}
-      {meta && signal ? (
-        <span data-tone={meta.tone} className={cn("bq-tag mt-2.5 max-w-full", !signal.isRead && "font-[550]")}>
-          <Mail size={11} aria-hidden />
-          <span className="truncate">{meta.label} · {formatRelative(signal.receivedAt)}</span>
-        </span>
-      ) : null}
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--color-border)] pt-2.5">
         <span className={cn("inline-flex items-center gap-1 text-caption", ageTone)} title="Days in this stage">
           <Clock3 size={12} aria-hidden />

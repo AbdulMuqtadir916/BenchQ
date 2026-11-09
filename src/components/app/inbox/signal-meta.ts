@@ -25,7 +25,7 @@ export const CATEGORY_META: Record<EmailCategory, { label: string; Icon: LucideI
   offer: { label: "Offer", Icon: BadgeCheck, tone: "green" },
   move_on: { label: "Not selected", Icon: XCircle, tone: "red" },
   incomplete_application: { label: "Incomplete application", Icon: AlertCircle, tone: "amber" },
-  other: { label: "Not about a job", Icon: MailX, tone: "neutral" },
+  other: { label: "Irrelevant", Icon: MailX, tone: "neutral" },
 };
 
 /** Failures caused by the classifier's setup, not by the email (PR 4, DEBUG D-27/D-28). */

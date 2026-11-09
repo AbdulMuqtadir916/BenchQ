@@ -35,7 +35,8 @@ export function InboxConnect({ candidate, compact = false }: { candidate: Candid
       {connect.error ? <p role="alert" className="w-full text-sm text-[var(--color-danger-fg)]">{connect.error.message}</p> : null}
       <Button onClick={startConnection} disabled={connect.isPending} className={compact ? "shrink-0" : "mt-5 w-full"}>
         {connect.isPending ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <span className="inline-flex h-5 w-5 items-center justify-center rounded-[var(--radius-sm)] bg-white"><GoogleLogo size={14} /></span>}
-        {connect.isPending ? "Opening Google…" : "Continue to Google"}
+        {/* In its own element: page translation or an extension rewriting bare text crashes React (insertBefore) on the swap. */}
+        <span>{connect.isPending ? "Opening Google…" : "Continue to Google"}</span>
       </Button>
       {!compact ? <p className="mt-3 flex items-center justify-center gap-1.5 text-caption text-[var(--color-text-3)]"><Lock size={12} aria-hidden />Read-only. Disconnect revokes Google access and stops sync. Saved mail remains until an Owner or Manager deletes it; the candidate can request deletion. Gmail originals are never deleted.</p> : null}
     </Card>

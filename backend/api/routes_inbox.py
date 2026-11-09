@@ -779,6 +779,45 @@ def _queue_classification(db, firm_id, candidate_id, message_id, principal, body
     logger.info("Email %s queued for %s by user %s", row.id, 'reclassification' if rerun else 'retry', principal.user_id)
 
 
+@router.post('/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review/open')
+def open_candidate_email_review(candidate_id: uuid.UUID, message_id: uuid.UUID,
+                                principal: Principal = Depends(current_principal), db: Session = Depends(get_db),
+                                firm_id=Depends(reader_firm_id)):
+    """A BDE opens a review for an email the classifier put aside as Other (shown as Irrelevant), so the usual review
+    panel (link, set a status, dismiss) works on it. Only emails a person chooses join the queue (2026-11-09)."""
+    if not can(principal, 'application.move'):
+        raise HTTPException(403, "You don't have permission to review this email.")
+    _candidate(db, firm_id, candidate_id, principal)
+    message = readable(scoped(db, InboxMessage, firm_id).filter_by(
+        id=message_id, candidate_id=candidate_id)).with_for_update().first()
+    if not message:
+        raise HTTPException(404, 'Email not found.')
+    pending = scoped(db, ApplicationReview, firm_id).filter_by(inbox_message_id=message.id, state='PENDING').first()
+    if pending:
+        return {'review_id': str(pending.id)}
+    record = scoped(db, EmailClassification, firm_id).filter_by(
+        inbox_message_id=message.id, result_version=message.classification_version,
+        content_revision=message.content_revision).first()
+    if message.classification_state != 'DONE' or record is None or record.outcome != 'OTHER':
+        raise HTTPException(409, 'Only an email marked Irrelevant can be opened for review.')
+    if scoped(db, ApplicationReview, firm_id).filter_by(
+            inbox_message_id=message.id, classification_version=record.result_version).first():
+        raise HTTPException(409, 'This email was already reviewed. Reclassify it to review it again.')
+    app = (scoped(db, Application, firm_id).filter_by(id=message.application_id, candidate_id=candidate_id).first()
+           if message.application_id else None)
+    review = ApplicationReview(firm_id=firm_id, candidate_id=candidate_id, inbox_message_id=message.id,
+                               application_id=app.id if app else None,
+                               application_revision=app.status_revision if app else None,
+                               classification_id=record.id, classification_version=record.result_version,
+                               reason='MANUAL_REVIEW')
+    db.add(review)
+    db.flush()
+    _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=review.id,
+           summary='Opened an email marked Irrelevant for review')
+    db.commit()
+    return {'review_id': str(review.id)}
+
+
 @router.post('/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry')
 def retry_candidate_classification(candidate_id: uuid.UUID, message_id: uuid.UUID, body: ClassificationCommand,
                                     background_tasks: BackgroundTasks, principal: Principal = Depends(current_principal),
