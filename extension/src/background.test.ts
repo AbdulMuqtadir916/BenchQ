@@ -71,6 +71,25 @@ describe("opening a job", () => {
   });
 });
 
+describe("the keyboard shortcuts", () => {
+  it("open the panel and pass the key on, with the tab it was pressed on", () => {
+    fake.commands.onCommand.fire("run-autofill", { id: 7, windowId: 3 });
+    expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 3 });
+    expect(fake.runtime.sendMessage).toHaveBeenCalledWith({ type: "shortcut", command: "run-autofill", tabId: 7 });
+  });
+
+  it("pass Mark applied on the same way", () => {
+    fake.commands.onCommand.fire("mark-applied", { id: 9, windowId: 1 });
+    expect(fake.runtime.sendMessage).toHaveBeenCalledWith({ type: "shortcut", command: "mark-applied", tabId: 9 });
+  });
+
+  it("leave any other command alone", () => {
+    fake.commands.onCommand.fire("_execute_action", { id: 7, windowId: 1 });
+    expect(fake.sidePanel.open).not.toHaveBeenCalled();
+    expect(fake.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe("ending a connection", () => {
   const connect = (tabId: number) => fake.session.set(connectionKey(tabId), { ...details, tabId, confirmedHosts: [] });
 

@@ -20,7 +20,11 @@ declare const chrome: {
     sendMessage(message: unknown): Promise<unknown>;
     reload(): void;
   };
-  sidePanel: { setPanelBehavior(options: { openPanelOnActionClick: boolean }): Promise<void> };
+  sidePanel: {
+    setPanelBehavior(options: { openPanelOnActionClick: boolean }): Promise<void>;
+    open(options: { windowId: number }): Promise<void>;
+  };
+  commands: { onCommand: ChromeEvent<(command: string, tab?: ChromeTab) => void> };
   tabs: {
     create(options: { url: string }): Promise<ChromeTab>;
     query(info: { active: boolean; currentWindow: boolean }): Promise<ChromeTab[]>;

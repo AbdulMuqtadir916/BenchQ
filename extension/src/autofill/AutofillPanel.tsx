@@ -12,7 +12,7 @@ import OutcomeNote from "./OutcomeNote";
 import ResumePicker from "./ResumePicker";
 import ReviewList from "./ReviewList";
 import RunList from "./RunList";
-import type { AppliedForm, Connection, ReviewRow } from "./types";
+import type { AppliedForm, Connection, ReviewRow, ShortcutMessage } from "./types";
 import { useAutofill, type Outcome } from "./use-autofill";
 import { useResumes } from "./use-resumes";
 
@@ -80,6 +80,19 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     fillOnPick.current = null;
     if (rows?.length && !needsConfirmation && fillCount > 0) void autofill();
   }, [answeredFrom, scanning, filling, rows, needsConfirmation, fillCount, autofill]);
+  // The keyboard shortcuts (background.ts), for this tab's job: each clicks its button, so it does nothing when the
+  // button couldn't be clicked. Mark applied opens its dialog with Yes focused, so Enter confirms.
+  useEffect(() => {
+    const onShortcut = (message: unknown, sender: { id?: string; tab?: ChromeTab }) => {
+      const shortcut = message as Partial<ShortcutMessage> | null;
+      if (sender.id !== chrome.runtime.id || sender.tab || shortcut?.type !== "shortcut" || shortcut.tabId !== tabId) return false;
+      const slot = { "run-autofill": "autofill-run", "mark-applied": "mark-applied" }[shortcut.command ?? "run-autofill"];
+      card.current?.querySelector<HTMLButtonElement>(`[data-slot='${slot}']`)?.click();
+      return false;
+    };
+    chrome.runtime.onMessage.addListener(onShortcut);
+    return () => chrome.runtime.onMessage.removeListener(onShortcut);
+  }, [tabId]);
   const [isCollecting, setIsCollecting] = useState(false);
   const card = useRef<HTMLElement>(null);
   const wasFilling = useRef(filling);
@@ -126,7 +139,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
       <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl} isBusy={filling}
         onPick={pickResume} onRetry={retry} />
 
-      {hasFillsLeft && <button type="button" className={button("primary", "large")} disabled={filling || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
+      {hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={filling || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
         {filling ? "Filling…" : "Autofill"}
       </button>}
       {isComplete && <p data-slot="autofill-done" className={`flex items-center gap-1 ${BELOW_TOP_BAR} text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`} role="status">{CHECK}Autofill complete</p>}

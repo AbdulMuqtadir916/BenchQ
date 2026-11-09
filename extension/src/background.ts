@@ -1,6 +1,6 @@
 import { connectionKey } from "./autofill/connection-store";
 import { hostOf } from "./autofill/job-check";
-import type { Connection, NewConnection, PanelMessage, PanelReply } from "./autofill/types";
+import type { Connection, NewConnection, PanelMessage, PanelReply, ShortcutCommand, ShortcutMessage } from "./autofill/types";
 
 /** The one writer of tab connections. It keeps them in session storage, because Chrome can stop this worker at any
  * time, and every listener is registered at the top level so an event can wake it. */
@@ -80,6 +80,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => void removeConnection(tabId));
+
+const SHORTCUTS = new Set<string>(["run-autofill", "mark-applied"] satisfies ShortcutCommand[]);
+
+// The keyboard shortcuts (manifest `commands`): the panel opens on the first press, here and before anything is
+// awaited, since Chrome lets it open only in answer to the key; then the panel hears which key, for which tab.
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (!SHORTCUTS.has(command)) return;
+  if (tab) void chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => undefined);
+  const message: ShortcutMessage = { type: "shortcut", command: command as ShortcutCommand, tabId: tab?.id };
+  void chrome.runtime.sendMessage(message).catch(() => undefined);
+});
 
 chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
   void readConnection(removedTabId).then(async (connection) => {

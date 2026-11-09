@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Application } from "../api";
 import { installDialog } from "../test/dialog";
+import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import AutofillPanel from "./AutofillPanel";
 import type { AppliedForm, Connection, ReviewRow, TabField } from "./types";
 import { useAutofill } from "./use-autofill";
@@ -42,16 +43,19 @@ const oneResume: Resumes = { status: "ready", choices: [base], picked: base };
 
 let root: Root | null = null;
 let host: HTMLElement;
+let fake: FakeChrome;
 let element: ReactElement;
 
 type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
-  answeredFrom?: string | null; needsConfirmation?: boolean;
+  answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean;
 };
 
 function show(state: State, panel: { onApply?: (form: AppliedForm) => void; isApplied?: boolean; applying?: boolean; details?: Application | null } = {}, resumes: Resumes = oneResume) {
   vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state } as unknown as ReturnType<typeof useAutofill>);
   vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
+  fake = fakeChrome();
+  vi.stubGlobal("chrome", fake);
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -198,6 +202,40 @@ describe("the résumé the answers come from", () => {
     const upload = { key: "cv", status: "manual", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } } as unknown as ReviewRow;
     show({ fillCount: 0, rows: [upload] });
     expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe(`Attach: ${base.label}`);
+  });
+});
+
+describe("the keyboard shortcuts", () => {
+  const press = (command: string, tabId = 7, sender: object = { id: "extension-id" }) =>
+    act(async () => { fake.runtime.onMessage.fire({ type: "shortcut", command, tabId }, sender, () => undefined); });
+
+  it("run Autofill on its key, for this tab's job", async () => {
+    show({ fillCount: 1, rows: [row("Email", true)] });
+    await press("run-autofill");
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it("do nothing when Autofill couldn't be clicked", async () => {
+    show({ fillCount: 0, rows: [row("Email", true)], scanning: true });
+    await press("run-autofill");
+    expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("leave another tab's key alone, and a message that isn't the worker's", async () => {
+    show({ fillCount: 1, rows: [row("Email", true)] });
+    await press("run-autofill", 8);
+    await press("run-autofill", 7, { id: "extension-id", tab: { id: 7, windowId: 1 } });
+    await press("run-autofill", 7, { id: "another-extension" });
+    expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("open Mark applied on its key, with Yes ready for Enter", async () => {
+    const onApply = vi.fn();
+    show({ fillCount: 0 }, { onApply });
+    await press("mark-applied");
+    expect(host.querySelector("dialog[data-slot='autofill-confirm']")!.hasAttribute("open")).toBe(true);
+    expect(document.activeElement?.textContent).toBe("Yes, mark applied");
+    expect(onApply).not.toHaveBeenCalled();
   });
 });
 

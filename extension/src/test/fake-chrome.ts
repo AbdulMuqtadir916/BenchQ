@@ -25,7 +25,8 @@ export function fakeChrome() {
       id: "extension-id", onInstalled: new FakeEvent(), onMessage: new FakeEvent(),
       sendMessage: vi.fn(async () => ({ ok: true })), reload: vi.fn(),
     },
-    sidePanel: { setPanelBehavior: vi.fn(async () => undefined) },
+    sidePanel: { setPanelBehavior: vi.fn(async () => undefined), open: vi.fn(async () => undefined) },
+    commands: { onCommand: new FakeEvent() },
     tabs: {
       create: vi.fn(async () => {
         nextTab += 1;

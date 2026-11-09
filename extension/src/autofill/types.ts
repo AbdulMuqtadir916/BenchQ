@@ -116,9 +116,10 @@ export type PanelMessage =
 
 export type PanelReply = { ok: true; tabId?: number } | { ok: false };
 
-/** The keyboard shortcuts (manifest `commands`), which the worker passes on to the panel. */
+/** The keyboard shortcuts (manifest `commands`), which the worker passes on to the panel with the tab they were pressed
+ * on: the panel acts only for its own job's tab. */
 export type ShortcutCommand = "run-autofill" | "mark-applied";
-export type ShortcutMessage = { type: "shortcut"; command: ShortcutCommand };
+export type ShortcutMessage = { type: "shortcut"; command: ShortcutCommand; tabId?: number };
 
 export type ReviewRow = {
   key: string;

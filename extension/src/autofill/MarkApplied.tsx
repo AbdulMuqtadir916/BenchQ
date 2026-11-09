@@ -51,7 +51,7 @@ export default function MarkApplied({ isPrimary, isSaving, isDisabled, jobLine, 
   const count = emptyRequired.length;
 
   return <>
-    <button ref={markButton} type="button" className={button(isPrimary ? "primary" : "secondary", "large")} disabled={isSaving || isDisabled} onClick={() => setIsOpen(true)}>
+    <button ref={markButton} type="button" data-slot="mark-applied" className={button(isPrimary ? "primary" : "secondary", "large")} disabled={isSaving || isDisabled} onClick={() => setIsOpen(true)}>
       {CHECK}{isSaving ? "Saving…" : "Mark applied"}
     </button>
     <dialog ref={dialog} data-slot="autofill-confirm" className={DIALOG} aria-labelledby="autofill-confirm-title" aria-describedby="autofill-confirm-job" onClose={onClose}>
