@@ -14,10 +14,39 @@ import { GroupRowError } from "@/components/app/card-group";
 import { hasPageFailed, queryGroup } from "@/lib/query/query-group";
 import { useFirm } from "@/lib/tenancy/firm-context";
 import { FloorContent } from "./manager-dashboard";
+import { OwnerActivityDashboard } from "./owner-activity-dashboard";
+import { useUrlState } from "@/lib/routes/use-url-state";
+import { DashboardSearch } from "@/lib/schemas/dashboard-search";
 
 const EMPTY: never[] = [];
 
 export function OwnerDashboard() {
+  const [query, setQuery] = useUrlState(DashboardSearch);
+
+  return (
+    <div className="bq-page">
+      <PageHeader
+        title={query.view === "finance" ? "The business" : "Firm activity"}
+        subtitle={query.view === "finance" ? "Placements, throughput, and plan usage at a glance." : "Follow activity from the firm to managers, BDEs, and their candidates."}
+      />
+      <div role="group" aria-label="Dashboard views" className="mb-6 inline-flex rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-1">
+        <button type="button" aria-pressed={query.view === "finance"} onClick={() => setQuery({ view: "finance" })}
+          className={`rounded-[var(--radius-sm)] px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${query.view === "finance" ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
+          Finance dashboard
+        </button>
+        <button type="button" aria-pressed={query.view === "activity"} onClick={() => setQuery({ view: "activity" })}
+          className={`rounded-[var(--radius-sm)] px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${query.view === "activity" ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
+          Activity dashboard
+        </button>
+      </div>
+      <div aria-label={query.view === "finance" ? "Finance dashboard" : "Activity dashboard"}>
+        {query.view === "finance" ? <FinanceDashboardContent /> : <OwnerActivityDashboard />}
+      </div>
+    </div>
+  );
+}
+
+function FinanceDashboardContent() {
   const applicationsQuery = useApplications();
   const candidatesQuery = useCandidates();
   const teamQuery = useTeam();
@@ -60,18 +89,11 @@ export function OwnerDashboard() {
   const seatDetail = `${activeBdes} BDE${activeBdes === 1 ? "" : "s"} + ${pendingInvites} pending`;
 
   if (hasPageFailed(applicationsQuery, candidatesQuery, teamQuery, invitesQuery, followupsQuery)) {
-    return (
-      <div className="bq-page">
-        <PageHeader title="The business" subtitle="Placements, throughput, and plan usage at a glance." />
-        <ErrorState variant="page" error={page.error ?? new Error("The request failed.")} onRetry={page.retry} />
-      </div>
-    );
+    return <ErrorState variant="page" error={page.error ?? new Error("The request failed.")} onRetry={page.retry} />;
   }
 
   return (
-    <div className="bq-page">
-      <PageHeader title="The business" subtitle="Placements, throughput, and plan usage at a glance." />
-
+    <>
       <section aria-label="Business rollups" className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rollups.status === "error" ? (
           <GroupRowError group={rollups} />
@@ -88,6 +110,6 @@ export function OwnerDashboard() {
       </section>
 
       <FloorContent />
-    </div>
+    </>
   );
 }
