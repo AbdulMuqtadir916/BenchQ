@@ -1,5 +1,5 @@
 import { normalize } from "./text";
-import type { ScannedField } from "./types";
+import type { ResumeFile, ReviewRow, ScannedField } from "./types";
 
 export type DocumentKind = "resume" | "cover-letter";
 
@@ -17,4 +17,22 @@ export function documentOf({ kind, label, hints }: Pick<ScannedField, "kind" | "
   const text = normalize(`${label} ${hints}`.replace(/([a-z])([A-Z])/g, "$1 $2"));
   if (RESUME.test(text)) return "resume";
   return COVER_LETTER.test(text) ? "cover-letter" : null;
+}
+
+/** The picked résumé's file for the form's first résumé upload (07 Q51), never a cover letter's. It's filled like an
+ * answer, so a file that was there before BenchQ looked stays, and one BenchQ attached is replaced when another résumé
+ * is picked. Without a file the upload stays the BDE's to do. */
+export function withResumeFile(rows: ReviewRow[], file: ResumeFile | null): ReviewRow[] {
+  const upload = file && rows.find(({ field }) => field.kind === "file" && documentOf(field) === "resume");
+  if (!file || !upload) return rows;
+  return rows.map((row) => (row === upload
+    ? { ...row, status: "ready" as const, reason: undefined, proposed: file.name, write: { type: "file" as const, ...file } }
+    : row));
+}
+
+/** The name the picked résumé's file goes on a form by, without its extension: "<Candidate> - <Title>" (07 Q52), with
+ * what a file name can't hold taken out. */
+export function resumeFileName(candidate: string, title: string | null): string {
+  const clean = (text: string) => text.replace(/[\/:*?"<>|\p{Cc}]+/gu, " ").replace(/\s+/g, " ").trim();
+  return [clean(candidate), clean(title ?? "") || "Resume"].filter(Boolean).join(" - ");
 }

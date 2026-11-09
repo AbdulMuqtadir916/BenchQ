@@ -21,8 +21,9 @@ reads only (backend/auth/access.py).
 import asyncio
 import uuid
 from typing import Annotated
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
@@ -160,6 +161,21 @@ def get_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID
     candidate = _candidate(db, firm_id, principal, candidate_id)
     row = versions.candidate_version(db, candidate, resume_id)
     return versions.opened_json(row, candidate, with_autofill=autofill)
+
+
+@router.get("/{resume_id}/file", summary="The file an uploaded résumé was read from")
+def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+                    principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    """An uploaded base's version 1 as its PDF or Word file, as uploaded: the extension attaches it to a form (docs/02
+    §8.2). Any other version has no file of its own and answers 404, so the BDE attaches that one by hand."""
+    _member_of(firm_id, principal)
+    candidate = _candidate(db, firm_id, principal, candidate_id)
+    kept = versions.uploaded_file(db, candidate, versions.candidate_version(db, candidate, resume_id))
+    if kept is None:
+        raise HTTPException(status_code=404, detail="This version has no uploaded file.")
+    return Response(content=kept.content, media_type=kept.mime_type, headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(kept.file_name, safe='')}",
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
 @router.post("/{resume_id}/save", status_code=201, summary="Save an edit as the résumé's next version")

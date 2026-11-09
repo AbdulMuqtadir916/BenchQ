@@ -2,13 +2,13 @@
 import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getResumeAnswers } from "../api";
+import { getResumeAnswers, getResumeFile } from "../api";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import { fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, scanTab, undoCount, undoFills, type TabScan } from "./tab-bridge";
 import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, TabField } from "./types";
 import { forgetTabs, useAutofill } from "./use-autofill";
 
-vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn() }));
+vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn(), getResumeFile: vi.fn() }));
 vi.mock("./tab-bridge", () => ({
   scanTab: vi.fn(), readTab: vi.fn(), fillField: vi.fn(), fillChoice: vi.fn(), rejectedFields: vi.fn(), flaggedFields: vi.fn(), focusField: vi.fn(),
   undoFills: vi.fn(), undoCount: vi.fn(),
@@ -51,7 +51,9 @@ const report = (state: ReturnType<typeof useAutofill>) => { hook = state; };
 const LOADING = "loading";
 
 function Harness({ value, resumeId = "res-1" }: { value: Connection; resumeId?: string | null }) {
-  const state = useAutofill({ connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, onSessionExpired, onAccessLost });
+  const state = useAutofill({
+    connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, fileName: "Priya Shah - Java Developer", onSessionExpired, onAccessLost,
+  });
   useEffect(() => report(state));
   return null;
 }
@@ -78,6 +80,7 @@ beforeEach(() => {
   fake = fakeChrome();
   vi.stubGlobal("chrome", fake);
   vi.mocked(getResumeAnswers).mockResolvedValue(answers);
+  vi.mocked(getResumeFile).mockResolvedValue(null);
   vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City")], onSite));
   vi.mocked(fillField).mockResolvedValue({ status: "filled", current: "" });
   vi.mocked(fillChoice).mockResolvedValue({ status: "filled", current: "" });
@@ -854,5 +857,59 @@ describe("the form for Mark applied", () => {
     forgetTabs();
     vi.mocked(readTab).mockRejectedValue(new Error("No tab"));
     expect(await finalForm()).toEqual({ fields: [] });
+  });
+});
+
+describe("the picked résumé's file (07 Q49–Q52)", () => {
+  const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+  const pdf = { mimeType: "application/pdf", data: "JVBERi0=" };
+  const NAME = "Priya Shah - Java Developer.pdf";
+  const upload = (current = "") => field("r", "Resume/CV", "file", current);
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("goes on first, and the answers go on once the form is still, over what the site read from it", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) => {
+      // The site reads the file and fills the email itself, as Lever does.
+      if (write.type === "file") vi.mocked(scanTab).mockResolvedValue(page([upload(NAME), field("a", "Email", "text", "site@parsed.test")], onSite));
+      return { status: "filled", current: write.type === "file" ? NAME : write.type === "text" ? write.value : "" };
+    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} />); });
+    await advance(1);
+    expect(hook.attachment).toBe(NAME);
+    expect(statuses()).toEqual([["r", "ready"], ["a", "ready"]]);
+    const running = hook.autofill();
+    await advance(500 * 24);
+    await act(async () => { await running; });
+    const requests = vi.mocked(fillField).mock.calls.map(([, , request]) => request);
+    expect(requests).toEqual([
+      { scanId: 1, fieldId: "r", current: "", write: { type: "file", name: NAME, ...pdf } },
+      { scanId: 1, fieldId: "a", current: "site@parsed.test", write: { type: "text", value: "priya@example.test" } },
+    ]);
+    const answered = vi.mocked(fillField).mock.invocationCallOrder[1]!;
+    expect(vi.mocked(readTab).mock.invocationCallOrder.filter((order) => order < answered).length).toBeGreaterThanOrEqual(6);
+    expect(hook.outcome).toEqual({ filled: 2, handedBack: 0, stopped: false });
+  });
+
+  it("leaves a file that was on the form before BenchQ looked", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    vi.mocked(scanTab).mockResolvedValue(page([upload("mine.pdf"), field("a", "Email")], onSite));
+    await mount();
+    expect(statuses()).toEqual([["r", "kept"], ["a", "ready"]]);
+    expect(hook.fillCount).toBe(1);
+  });
+
+  it("is the BDE's to attach when the résumé has none, and is fetched once per version", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));
+    await mount();
+    expect(statuses()).toEqual([["r", "blocked"], ["a", "ready"]]);
+    expect(hook.attachment).toBeNull();
+    await run(() => hook.rescan());
+    expect(getResumeFile).toHaveBeenCalledTimes(1);
+    expect(getResumeFile).toHaveBeenCalledWith("firm-1", "cand-1", "res-1");
   });
 });

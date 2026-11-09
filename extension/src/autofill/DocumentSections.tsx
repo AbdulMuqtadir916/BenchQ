@@ -14,8 +14,9 @@ type DocumentSectionsProps = {
   resumesUrl: string | null;
   isFilling: boolean;
   onGoTo: (row: ReviewRow) => void;
-  /** The résumé Autofill answers from, which is the one to attach: BenchQ doesn't upload files yet. */
-  picked?: { label: string; url: string | null } | null;
+  /** The résumé Autofill answers from, which is the one to attach. `file`: the name Autofill attaches it by, when
+   * BenchQ has its file (an uploaded résumé's first version, 07 Q49); else the BDE attaches it. */
+  picked?: { label: string; url: string | null; file?: string | null } | null;
 };
 
 type Actions = Pick<DocumentSectionsProps, "isFilling" | "onGoTo">;
@@ -76,14 +77,19 @@ function DocumentSection({ kind, title, icon, rows, held, link, isFilling, onGoT
   </section>;
 }
 
-/** The résumé and the cover letter, each in a section of its own whether or not the form asks for it. Autofill never
- * uploads a file: a section says what the form wants, takes the BDE to the field, and says what to attach: the résumé
- * the answers come from. */
+/** What the Resume section says about the picked résumé: the file Autofill attaches, or that it's the BDE's to attach. */
+function pickedHeld({ label, file }: NonNullable<DocumentSectionsProps["picked"]>) {
+  return file ? `Autofill attaches: ${file}` : `Attach by hand: ${label}`;
+}
+
+/** The résumé and the cover letter, each in a section of its own whether or not the form asks for it. A section says
+ * what the form wants, takes the BDE to the field, and says what goes there: Autofill attaches the picked résumé's file
+ * when BenchQ has it, and otherwise says which résumé to attach. A cover letter is always the BDE's. */
 export default function DocumentSections({ rows, details, resumesUrl, isFilling, onGoTo, picked = null }: DocumentSectionsProps) {
   const of = (kind: DocumentKind) => rows.filter(({ field }) => documentOf(field) === kind);
   const actions = { isFilling, onGoTo };
   return <div data-slot="documents" className="grid gap-2">
-    <DocumentSection kind="resume" title="Resume" icon={RESUME_ICON} rows={of("resume")} held={picked ? `Attach: ${picked.label}` : resumeHeld(details)}
+    <DocumentSection kind="resume" title="Resume" icon={RESUME_ICON} rows={of("resume")} held={picked ? pickedHeld(picked) : resumeHeld(details)}
       link={picked?.url ?? resumesUrl} {...actions} />
     <DocumentSection kind="cover-letter" title="Cover letter" icon={LETTER_ICON} rows={of("cover-letter")} held={letterHeld(details)} link={null} {...actions} />
   </div>;

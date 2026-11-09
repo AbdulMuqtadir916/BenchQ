@@ -243,6 +243,58 @@ function setup(html: string) {
 
 const element = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
 
+describe("attaching the résumé's file (07 Q49–Q51)", () => {
+  /** jsdom has no DataTransfer, and its upload takes only a FileList: the page's own list stands in for both. */
+  class FakeTransfer {
+    files: File[] = [];
+    items = { add: (file: File) => { this.files.push(file); } };
+  }
+
+  function upload(html = `<input id="r" type="file" aria-label="Resume/CV">`) {
+    vi.stubGlobal("DataTransfer", FakeTransfer);
+    const made = setup(html);
+    const input = element<HTMLInputElement>("#r");
+    let held: File[] = [];
+    Object.defineProperty(input, "files", { configurable: true, get: () => held, set: (next: File[]) => { held = [...next]; } });
+    return { ...made, input, held: () => held, put: (files: File[]) => { held = files; } };
+  }
+
+  const write = { type: "file" as const, name: "Priya Shah - Java Developer.pdf", mimeType: "application/pdf", data: btoa("%PDF-1.7") };
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("puts the file on the upload, tells the page, and undo takes it off again", async () => {
+    const { filler, rescan, input, held } = upload();
+    const seen: string[] = [];
+    input.addEventListener("change", () => seen.push("change"));
+    const { scanId, fields } = rescan();
+    const result = await filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "" });
+    expect(result).toEqual({ status: "filled", current: "Priya Shah - Java Developer.pdf" });
+    expect(seen).toEqual(["change"]);
+    expect([held()[0]!.type, held()[0]!.size]).toEqual(["application/pdf", 8]);
+    expect(await filler.undo()).toEqual({ restored: 1, kept: 0, skipped: 0 });
+    expect(held()).toEqual([]);
+  });
+
+  it("puts back the file that was there when the upload doesn't take it", async () => {
+    const { filler, rescan, input, held, put } = upload();
+    const mine = new File(["mine"], "mine.pdf", { type: "application/pdf" });
+    put([mine]);
+    Object.defineProperty(input, "files", { configurable: true, get: () => held(), set: () => undefined });
+    const { scanId, fields } = rescan();
+    expect(await filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "mine.pdf" })).toEqual({ status: "failed", current: "mine.pdf" });
+    expect(held()).toEqual([mine]);
+  });
+
+  it("keeps a file the BDE put on after BenchQ's", async () => {
+    const { filler, rescan, put } = upload();
+    const { scanId, fields } = rescan();
+    await filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "" });
+    put([new File(["theirs"], "theirs.pdf")]);
+    expect(await filler.undo()).toEqual({ restored: 0, kept: 1, skipped: 0 });
+  });
+});
+
 describe("filling", () => {
   it("writes text, fires the events a page listens for, and reports what stuck", async () => {
     const { filler, rescan } = setup(`<input id="a" aria-label="Name">`);

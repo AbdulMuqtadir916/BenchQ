@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getResumeAnswers, isSessionExpired } from "../api";
+import { getResumeAnswers, getResumeFile, isSessionExpired } from "../api";
+import { withResumeFile } from "./documents";
 import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./form-memory";
 import { checkJob, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
@@ -8,7 +9,9 @@ import { buildReview, suggestedRow } from "./review";
 import {
   chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, scanTab, undoCount, undoFills, type TabScan,
 } from "./tab-bridge";
-import type { AppliedForm, AutofillRun, BankEntry, Connection, FillResult, FieldWrite, PageSignals, ReviewRow, RunItem, TabField } from "./types";
+import type {
+  AppliedForm, AutofillRun, BankEntry, Connection, FillResult, FieldWrite, PageSignals, ResumeFile, ReviewRow, RunItem, TabField,
+} from "./types";
 
 const RESCAN_DELAY_MS = 500;
 const WATCH_MS = 2000;
@@ -17,6 +20,11 @@ const TOP_FRAME = 0;
 const LATE_CHECK_MS = 300;
 /** A run fills what it found, then once more for questions its answers brought out, like "If yes, which visa?". */
 const PASSES = 2;
+/** Once the résumé is attached, the form is read every half second until it has been still for three looks, after
+ * six at least and 24 at most: a site that reads the file (Lever's "Analyzing resume…") fills fields of its own first. */
+const SETTLE_LOOK_MS = 500;
+const SETTLE = { least: 6, still: 3, most: 24 };
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const STALE: FillResult = { status: "stale", current: "" };
 const PAGE_UNREADABLE = "BenchQ can't read this page. You can still fill the form yourself.";
 const REVIEW_FAILED = "BenchQ couldn't work out this form.";
@@ -34,12 +42,16 @@ export type Outcome = { filled: number; handedBack: number; stopped: boolean };
 type FillableRow = ReviewRow & { write: FieldWrite };
 type Pass = { filled: FillableRow[]; failed: number; late: number; stopped: boolean };
 
+const isAttachment = (row: FillableRow) => row.write.type === "file";
+
 /** `resumeId`: the résumé version the answers come from (docs/02 §8.1); null when the candidate has none, so the form is
- * reviewed with no answers; undefined while the panel is still finding out, so nothing is reviewed yet. */
+ * reviewed with no answers; undefined while the panel is still finding out, so nothing is reviewed yet. `fileName`: what
+ * its file is called on the form, without the extension (07 Q52). */
 type Options = {
   connection: Connection;
   firmId: string | null;
   resumeId: string | null | undefined;
+  fileName?: string | null;
   onSessionExpired: () => void;
   onAccessLost: () => void;
 };
@@ -134,7 +146,7 @@ function withMemory(rows: ReviewRow[], memory: TabMemory, resume: string | null,
 /** One connected tab's review, held in memory: scan the page, match it against the picked résumé's answers, fill what
  * has an answer, verify it stuck, follow what happens on the form, and undo. Unmounting (another tab, sign-out) drops
  * the answers. */
-export function useAutofill({ connection, firmId, resumeId, onSessionExpired, onAccessLost }: Options) {
+export function useAutofill({ connection, firmId, resumeId, fileName = null, onSessionExpired, onAccessLost }: Options) {
   const { tabId, applicationId, candidateId, job, confirmedHosts } = connection;
   // The résumé the review in hand answers from, once a scan has used it: the panel fills on a pick once it's the pick.
   const [answeredFrom, setAnsweredFrom] = useState<string | null | undefined>(undefined);
@@ -158,7 +170,11 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
   const busy = useRef(false);
   const frames = useRef<Pick<TabScan, "scanIds" | "unreadableFrames">>({ scanIds: new Map(), unreadableFrames: 0 });
   const shownRows = useRef<ReviewRow[] | null>(null);
-  const bank = useRef<{ resumeId: string | null; entries: BankEntry[] } | null>(null);
+  const bank = useRef<{ resumeId: string | null; entries: BankEntry[]; file: ResumeFile | null } | null>(null);
+  // The picked résumé's file, by version: a version's file never changes, so it's fetched once. Null: it has none.
+  const files = useRef<{ resumeId: string; found: { mimeType: string; data: string } | null } | null>(null);
+  // The name of the file Autofill attaches to the résumé upload, while the picked résumé has one.
+  const [attachment, setAttachment] = useState<string | null>(null);
 
   /** The picked résumé's answers, with "How did you hear about us?" from where BenchQ found the job. No résumé, no
    * answers. A backend that sends no autofill for the version can't answer either. */
@@ -181,6 +197,19 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
     }
   }, [firmId, candidateId, resumeId, job, onSessionExpired, onAccessLost]);
 
+  /** The picked résumé's file, when it has one (an uploaded base's first version, 07 Q49), named for the form (Q52).
+   * One that won't load leaves the upload to the BDE, as a version without a file does. */
+  const loadFile = useCallback(async (): Promise<ResumeFile | null> => {
+    if (!resumeId || !firmId) return null;
+    let found = files.current?.resumeId === resumeId ? files.current.found : undefined;
+    if (found === undefined) {
+      found = await getResumeFile(firmId, candidateId, resumeId).catch(() => undefined);
+      if (found === undefined) return null;
+      files.current = { resumeId, found };
+    }
+    return found && { ...found, name: `${fileName?.trim() || "Resume"}.${found.mimeType === DOCX_MIME ? "docx" : "pdf"}` };
+  }, [firmId, candidateId, resumeId, fileName]);
+
   const readPage = useCallback(async (isCurrent: () => boolean) => {
     try {
       return { ...await scanTab(tabId), pending: await undoCount(tabId) };
@@ -196,7 +225,8 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
   }, []);
 
   const review = useCallback((fields: TabField[], answers: BankEntry[], justFilled?: ReadonlySet<string>) => {
-    const next = withMemory(buildReview(fields, answers, job), memory.current, resume.current, justFilled);
+    const reviewed = withResumeFile(buildReview(fields, answers, job), bank.current?.file ?? null);
+    const next = withMemory(reviewed, memory.current, resume.current, justFilled);
     showRows(next);
     const { settled } = memory.current;
     const autofilled = new Map(next.flatMap((row) => {
@@ -214,8 +244,8 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
     const isCurrent = () => run === latestScan.current && !busy.current;
     isScanRunning.current = true;
     setScanning(true);
-    const held = reuseBank && bank.current?.resumeId === resumeId ? bank.current.entries : null;
-    const answers = held ?? await loadAnswers();
+    const held = reuseBank && bank.current?.resumeId === resumeId ? bank.current : null;
+    const [answers, file] = held ? [held.entries, held.file] : await Promise.all([loadAnswers(), loadFile()]);
     const page = answers ? await readPage(isCurrent) : null;
     if (answers && page && isCurrent()) {
       try {
@@ -223,8 +253,9 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
         const topScan = page.scanIds.get(TOP_FRAME) ?? 0;
         if (topScan < memory.current.lastScan) Object.assign(memory.current, pageMemory());
         memory.current.lastScan = topScan;
-        bank.current = { resumeId, entries: answers };
+        bank.current = { resumeId, entries: answers, file };
         review(page.fields, answers, justFilled);
+        setAttachment(file?.name ?? null);
         frames.current = page;
         setSignals(page.signals);
         setBankEmpty(answers.length === 0);
@@ -240,7 +271,7 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
       isScanRunning.current = false;
       setScanning(false);
     }
-  }, [resumeId, loadAnswers, readPage, review]);
+  }, [resumeId, loadAnswers, loadFile, readPage, review]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void scan(), 0);
@@ -382,8 +413,24 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
     return { filled, failed, late, stopped };
   }, [lateFailures, showResult, tabId, track]);
 
+  /** Waits for the form to go still once the résumé is on it: a site that reads the file fills fields of its own, and
+   * the answers go on after that, never under it (07 Q50). */
+  const settle = useCallback(async () => {
+    let last: string | null = null;
+    let still = 0;
+    for (let look = 1; look <= SETTLE.most; look += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, SETTLE_LOOK_MS));
+      const read = await readTab(tabId, frames.current).catch(() => null);
+      const now = read ? JSON.stringify([read.moved, [...read.values]]) : "";
+      still = now === last ? still + 1 : 0;
+      last = now;
+      if (look >= SETTLE.least && still >= SETTLE.still) return;
+    }
+  }, [tabId]);
+
   /** Fills `first`, then, when `passes` allows, the questions its answers brought out: fields that weren't on the form
-   * before the run. A field that was there keeps whatever the first pass left it. */
+   * before the run. A field that was there keeps whatever the first pass left it. The résumé's file goes on before
+   * anything else: what the site reads from it is then the site's, and the answers replace it (07 Q50). */
   const fillRows = useCallback(async (first: FillableRow[], passes: number) => {
     if (busy.current || needsConfirmation || first.length === 0) return;
     busy.current = true;
@@ -394,6 +441,22 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
     const total: Outcome = { filled: 0, handedBack: 0, stopped: false };
     const known = new Set((shownRows.current ?? []).map(memoKeyOf));
     let batch = first;
+    const files = first.filter(isAttachment);
+    if (files.length > 0) {
+      const { filled, failed, late, stopped } = await fillPass(files);
+      total.filled += filled.length - late;
+      total.handedBack += failed + late;
+      total.stopped = stopped;
+      if (filled.length > 0 && !stopped) await settle();
+      // A look that counts what changed meanwhile as BenchQ's doing: a field the site filled from the file is no edit
+      // of the BDE's, so its answer still goes on.
+      busy.current = false;
+      await scan(new Set(filled.map(memoKeyOf).filter((key) => !memory.current.handedBack.has(key))));
+      busy.current = true;
+      batch = stopped ? [] : (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !isAttachment(row as FillableRow));
+      const count = batch.length;
+      setRun((current) => current && { ...current, total: files.length + count });
+    }
     for (let pass = 0; pass < passes && batch.length > 0; pass += 1) {
       const count = batch.length;
       if (pass > 0) setRun((current) => current && { ...current, total: current.total + count });
@@ -413,7 +476,7 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
     setFilling(false);
     setRun(null);
     setOutcome(total);
-  }, [fillPass, needsConfirmation, scan]);
+  }, [fillPass, needsConfirmation, scan, settle]);
 
   const autofill = useCallback(() => fillRows(targets, PASSES), [fillRows, targets]);
 
@@ -491,7 +554,7 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
   }, [applicationId, watchForm]);
 
   return {
-    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom,
+    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, attachment,
     needsConfirmation, fillCount: targets.length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
   };
 }

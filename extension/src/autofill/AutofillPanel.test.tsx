@@ -35,8 +35,8 @@ const row = (label: string, required: boolean, current = ""): ReviewRow => ({
   key: label, status: "manual", field: { label, required, current } as TabField,
 });
 
-const base = { id: "res-2", label: "Base 1 · Java Developer · v2 (in use)", isTailored: false, isActive: true };
-const tailored = { id: "res-9", label: "Tailored for this job · from Base 1 · v1", isTailored: true, isActive: false };
+const base = { id: "res-2", label: "Base 1 · Java Developer · v2 (in use)", isTailored: false, isActive: true, title: "Java Developer" };
+const tailored = { id: "res-9", label: "Tailored for this job · from Base 1 · v1", isTailored: true, isActive: false, title: "Java Developer" };
 const pick = vi.fn();
 const retry = vi.fn();
 const oneResume: Resumes = { status: "ready", choices: [base], picked: base };
@@ -48,7 +48,7 @@ let element: ReactElement;
 
 type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
-  answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean;
+  answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null;
 };
 
 function show(state: State, panel: { onApply?: (form: AppliedForm) => void; isApplied?: boolean; applying?: boolean; details?: Application | null } = {}, resumes: Resumes = oneResume) {
@@ -198,10 +198,17 @@ describe("the résumé the answers come from", () => {
     expect(picker().querySelector("[role='status']")!.textContent).toContain("Loading Priya's resumes");
   });
 
-  it("names it as the one to attach when the form asks for a résumé", () => {
+  it("names it as the one to attach by hand when BenchQ has no file for it", () => {
     const upload = { key: "cv", status: "manual", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } } as unknown as ReviewRow;
     show({ fillCount: 0, rows: [upload] });
-    expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe(`Attach: ${base.label}`);
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe(`Attach by hand: ${base.label}`);
+  });
+
+  it("says Autofill attaches its file when BenchQ has one (07 Q49)", () => {
+    const upload = { key: "cv", status: "ready", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } } as unknown as ReviewRow;
+    show({ fillCount: 1, rows: [upload], attachment: "Priya - Java Developer.pdf", answeredFrom: base.id });
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe("Autofill attaches: Priya - Java Developer.pdf");
+    expect(host.querySelector("[data-slot='autofill-ready']")!.textContent).toBe("Ready to fill 1 field, the resume file first.");
   });
 });
 

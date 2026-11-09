@@ -2,7 +2,8 @@ import type { ResumeListing, ResumeVersion } from "../api";
 
 /** The résumés Autofill can answer from: what the picker in the Resume section offers, and which one it starts on. */
 
-export type ResumeChoice = { id: string; label: string; isTailored: boolean; isActive: boolean };
+/** `title`: the version's headline, which names its file on a form (07 Q52). */
+export type ResumeChoice = { id: string; label: string; isTailored: boolean; isActive: boolean; title: string | null };
 
 const newest = (versions: ResumeVersion[]) =>
   versions.reduce<ResumeVersion | null>((latest, version) => (!latest || version.version > latest.version ? version : latest), null);
@@ -14,14 +15,17 @@ export function resumeChoices(listing: ResumeListing, jobId: string | null): Res
   const tailored = (jobId ? listing.tailored.filter((shelf) => shelf.job_id === jobId) : []).flatMap((shelf) => {
     const version = newest(shelf.versions);
     const base = numbers.get(shelf.base_resume_id);
-    return version ? [{ id: version.id, label: `Tailored for this job${base ? ` · from Base ${base}` : ""} · v${version.version}`, isTailored: true, isActive: false }] : [];
+    return version ? [{
+      id: version.id, label: `Tailored for this job${base ? ` · from Base ${base}` : ""} · v${version.version}`, isTailored: true, isActive: false,
+      title: version.title?.trim() || null,
+    }] : [];
   });
   const bases = listing.bases.filter(({ archived_at }) => !archived_at).flatMap((base) => {
     const version = newest(base.versions);
     if (!version) return [];
     const title = version.title?.trim();
     const label = `Base ${base.number}${title ? ` · ${title}` : ""} · v${version.version}${base.is_active ? " (in use)" : ""}`;
-    return [{ id: version.id, label, isTailored: false, isActive: base.is_active }];
+    return [{ id: version.id, label, isTailored: false, isActive: base.is_active, title: title || null }];
   });
   return [...tailored, ...bases];
 }

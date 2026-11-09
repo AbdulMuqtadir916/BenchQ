@@ -32,7 +32,7 @@ function ViewLink({ url }: { url: string | null }) {
 
 /** Which résumé Autofill answers from (docs/02 §8.1): the candidate's résumés, each with Pick, until the BDE picks one;
  * then one line with Change. Picking reads that résumé's answers and fills the form at once when it's on the page (the
- * panel does that). BenchQ never uploads the file. */
+ * panel does that), its file first when BenchQ has one (07 Q49–Q50). */
 export default function ResumePicker({ resumes, candidateName, resumesUrl, studioUrl, isBusy, onPick, onRetry }: ResumePickerProps) {
   const [isListed, setIsListed] = useState(true);
   if (resumes.status === "loading") {

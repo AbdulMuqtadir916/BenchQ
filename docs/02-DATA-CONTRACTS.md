@@ -1469,6 +1469,15 @@ export const ResumeSaveResultSchema = z.object({ opened: OpenedResumeSchema, not
 - Change `src/lib/schemas/` to match this only in the PR that builds it (versioning PR 2 for `country`, PR 7 for
   the rest).
 
+### 8.2 A résumé version's file — PROPOSED 2026-11-09 (07 Q49; Zuhair's area, for his sign-off), BUILT (PR 121)
+
+`GET /api/firms/{firm}/candidates/{cid}/resumes/{rid}/file` answers the PDF or Word file an uploaded base was read
+from, as uploaded (`resume_parses.content`, its `mime_type`, `Content-Disposition: attachment` with the uploaded file's
+name, `Cache-Control: no-store`). Only an uploaded base's version 1 has one: that version is the file as read. Any later
+version, a tailored one or a promoted base's answers 404 ("This version has no uploaded file."), as does a version out
+of the principal's scope. The read follows the version's own access (§8.1). The extension attaches it to a form's
+résumé upload (07 Q50–Q52); a file for every version (rendered by the backend) is asked of Zuhair (Q25).
+
 ---
 
 ## 9. Application, outreach, follow-up

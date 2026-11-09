@@ -3,9 +3,10 @@ import { resumeStudioUrl, type Application } from "../api";
 import { ALERT, BELOW_TOP_BAR, button, CARD, FITTED_BUTTONS, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON, WARNING } from "../ui";
 import { sendToBackground } from "./connection-store";
 import DocumentSections from "./DocumentSections";
-import { documentOf } from "./documents";
+import { documentOf, resumeFileName } from "./documents";
 import { filledValue } from "./form-memory";
-import { CHECK } from "./icons";
+import FormProgress from "./FormProgress";
+import { CHECK, SPARKLES_ICON } from "./icons";
 import JobCard from "./JobCard";
 import MarkApplied from "./MarkApplied";
 import OutcomeNote from "./OutcomeNote";
@@ -64,8 +65,9 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   const picked = resumes.status === "ready" ? resumes.picked : null;
   // While the résumés load there's nothing to answer from; with none, the form is reviewed with no answers.
   const resumeId = resumes.status === "loading" ? undefined : picked?.id ?? null;
-  const state = useAutofill({ connection, firmId, resumeId, onSessionExpired, onAccessLost });
-  const { rows, scanning, error, filling, run, outcome, undoable, fillCount, needsConfirmation, answeredFrom } = state;
+  const fileName = picked ? resumeFileName(candidateName, picked.title) : null;
+  const state = useAutofill({ connection, firmId, resumeId, fileName, onSessionExpired, onAccessLost });
+  const { rows, scanning, error, filling, run, outcome, undoable, fillCount, needsConfirmation, answeredFrom, attachment } = state;
   const studioUrl = useCallback((versionId: string) => (firmSlug ? resumeStudioUrl(firmSlug, versionId) : null), [firmSlug]);
   // A pick fills the form at once, once its answers are in, when the form is on the page and it's the right job.
   const fillOnPick = useRef<string | null>(null);
@@ -139,9 +141,14 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
       <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl} isBusy={filling}
         onPick={pickResume} onRetry={retry} />
 
+      {hasForm && <FormProgress rows={rows} />}
+
       {hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={filling || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
-        {filling ? "Filling…" : "Autofill"}
+        {filling ? "Filling…" : <>{SPARKLES_ICON}Autofill</>}
       </button>}
+      {hasFillsLeft && !filling && fillCount > 0 && <p data-slot="autofill-ready" className={`-mt-1.5 text-center ${MUTED_TEXT}`}>
+        Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id ? ", the resume file first" : ""}.
+      </p>}
       {isComplete && <p data-slot="autofill-done" className={`flex items-center gap-1 ${BELOW_TOP_BAR} text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`} role="status">{CHECK}Autofill complete</p>}
 
       {error && <div role="alert">
@@ -161,7 +168,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
       {state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
 
       {hasForm && <DocumentSections rows={rows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
-        picked={picked ? { label: picked.label, url: studioUrl(picked.id) } : null} />}
+        picked={picked ? { label: picked.label, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null } : null} />}
       {!filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
         onSuggest={(row, entry) => void state.fillWith(row, entry)} />}

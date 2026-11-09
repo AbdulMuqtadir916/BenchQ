@@ -16,8 +16,9 @@ const RING_MS = 1200;
 
 type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 
-/** A field's whole state: its value, which of its choices are checked, or what a custom dropdown shows. */
-type Snapshot = { value: string } | { checked: boolean[] } | { choice: string };
+/** A field's whole state: its value, which of its choices are checked, what a custom dropdown shows, or an upload's
+ * files. */
+type Snapshot = { value: string } | { checked: boolean[] } | { choice: string } | { files: File[] };
 
 type Filled = { scanId: number; entry: Entry; write: FieldWrite; before: Snapshot; after: Snapshot };
 
@@ -45,6 +46,17 @@ function setChecked(input: HTMLInputElement, checked: boolean) {
   fireEvents(input);
 }
 
+/** An upload takes files only as a list the browser made: a DataTransfer's. Its change event is how the site sees it. */
+function setFiles(input: HTMLInputElement, files: File[]) {
+  const transfer = new DataTransfer();
+  files.forEach((file) => transfer.items.add(file));
+  input.files = transfer.files;
+  fireEvents(input);
+}
+
+const fileOf = ({ name, mimeType, data }: FieldWrite & { type: "file" }) =>
+  new File([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], name, { type: mimeType });
+
 function checkTargets(entry: Entry, write: FieldWrite & { type: "check" }) {
   return write.optionIds?.map((id) => entry.options.get(id)) ?? [entry.controls[0]];
 }
@@ -52,6 +64,7 @@ function checkTargets(entry: Entry, write: FieldWrite & { type: "check" }) {
 function apply(entry: Entry, write: FieldWrite) {
   const control = entry.controls[0] as Control;
   if (write.type === "text") setText(control as HTMLInputElement, write.value);
+  else if (write.type === "file") setFiles(control as HTMLInputElement, [fileOf(write)]);
   else if (write.type === "check") {
     checkTargets(entry, write).forEach((target) => setChecked(target as HTMLInputElement, write.checked));
   } else if (write.type === "option") {
@@ -89,6 +102,7 @@ function sameValue(shown: string, wanted: string) {
 function accepted(entry: Entry, write: FieldWrite): boolean {
   const control = entry.controls[0] as HTMLInputElement;
   if (write.type === "choice") return sameChoice(readCurrent(entry), write.value);
+  if (write.type === "file") return control.files?.length === 1 && control.files[0]!.name === write.name;
   if (write.type === "text") {
     const value = control.value.trim();
     const wanted = write.value.trim();
@@ -125,11 +139,16 @@ function snapshot(entry: Entry): Snapshot {
   const inputs = entry.controls as HTMLInputElement[];
   const first = inputs[0]!;
   if (first.type === "radio" || first.type === "checkbox") return { checked: inputs.map((input) => input.checked) };
+  if (first.type === "file") return { files: Array.from(first.files ?? []) };
   return { value: first.value };
 }
 
-function restore(entry: Entry, saved: { value: string } | { checked: boolean[] }) {
+function restore(entry: Entry, saved: { value: string } | { checked: boolean[] } | { files: File[] }) {
   const inputs = entry.controls as HTMLInputElement[];
+  if ("files" in saved) {
+    setFiles(inputs[0]!, saved.files);
+    return;
+  }
   if ("checked" in saved) {
     // Unchecking first: a radio's click unchecks its group, and a checked one must end up checked.
     inputs.forEach((input, index) => { if (!saved.checked[index]) setChecked(input, false); });
@@ -171,7 +190,9 @@ async function putBack(entry: Entry, before: Snapshot): Promise<boolean> {
   return sameSnapshot(snapshot(entry), before);
 }
 
-const sameSnapshot = (left: Snapshot, right: Snapshot) => JSON.stringify(left) === JSON.stringify(right);
+/** Files compare by what they are, since a File has no fields JSON can see. */
+const comparable = (snap: Snapshot) => ("files" in snap ? { files: snap.files.map(({ name, size, lastModified }) => [name, size, lastModified]) } : snap);
+const sameSnapshot = (left: Snapshot, right: Snapshot) => JSON.stringify(comparable(left)) === JSON.stringify(comparable(right));
 
 function listed(entry: Entry, found: HTMLElement[]): ChoiceList {
   entry.options = new Map(found.map((element, index) => [`c${index}`, element]));

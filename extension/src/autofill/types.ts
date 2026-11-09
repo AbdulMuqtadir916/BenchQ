@@ -61,7 +61,13 @@ export type FieldWrite =
   | { type: "check"; checked: boolean; optionIds?: string[] }
   /** `also`: other wordings of the answer, tried in turn when the dropdown has no option for `value`, like the status a
    * candidate's authorization answers come to. */
-  | { type: "choice"; value: string; also?: string[] };
+  | { type: "choice"; value: string; also?: string[] }
+  /** The picked résumé's own file, for the form's résumé upload (07 Q49–Q52). `data` is the file in base64, as a
+   * message to the page carries it. */
+  | { type: "file" } & ResumeFile;
+
+/** A résumé's file as the panel holds it: its name on the form, its type and its bytes in base64. */
+export type ResumeFile = { name: string; mimeType: string; data: string };
 
 export type FillRequest = { scanId: number; fieldId: string; write: FieldWrite; current: string };
 export type FillResult = { status: "filled" | "failed" | "stale" | "changed" | "no-match"; current: string; reason?: string };

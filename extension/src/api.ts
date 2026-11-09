@@ -40,13 +40,25 @@ export type Application = {
   has_cover_letter?: boolean;
 };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function send(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${BENCHQ_URL}${path}`, {
     ...init, credentials: "include", cache: "no-store",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   if (!response.ok) throw Object.assign(new Error(response.status === 401 ? "SESSION_EXPIRED" : `Request failed (${response.status})`), { status: response.status });
+  return response;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await send(path, init);
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+}
+
+/** Bytes as base64, in slices: a whole file at once would overflow the call stack. */
+function base64Of(bytes: Uint8Array): string {
+  let binary = "";
+  for (let start = 0; start < bytes.length; start += 0x8000) binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+  return btoa(binary);
 }
 
 export const isSessionExpired = (error: unknown) => error instanceof Error && error.message === "SESSION_EXPIRED";
@@ -88,6 +100,19 @@ export const getResumeListing = (firmId: string, candidateId: string) =>
 export async function getResumeAnswers(firmId: string, candidateId: string, resumeId: string): Promise<unknown[] | null> {
   const version = await request<{ autofill?: unknown }>(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}?autofill=true`);
   return Array.isArray(version?.autofill) ? version.autofill : null;
+}
+
+/** A résumé version's file as it was uploaded, its type and its bytes in base64, held in memory while a tab is reviewed
+ * (docs/02 §8.2). Only an uploaded base's first version has one: null for any other. */
+export async function getResumeFile(firmId: string, candidateId: string, resumeId: string): Promise<{ mimeType: string; data: string } | null> {
+  try {
+    const response = await send(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}/file`);
+    const mimeType = (response.headers.get("Content-Type") ?? "").split(";")[0]!.trim();
+    return { mimeType, data: base64Of(new Uint8Array(await response.arrayBuffer())) };
+  } catch (error) {
+    if ((error as { status?: number }).status === 404) return null;
+    throw error;
+  }
 }
 
 export const getSavedApplications = async (candidateId: string) => {

@@ -89,6 +89,8 @@ CASES: dict[str, Case] = {
     # Résumé versions and bases (résumé versioning PR 5): under the candidate; writes are the candidate's BDE's.
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": Case(path={"resume_id": "version"}),
+    # The upload's own v1 ("resume"): only an uploaded base's first version has a file (07 Q49).
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": Case(path={"resume_id": "version"}, as_bde=True,
                                        body=lambda i: {"full_name": "Edited", "email": "edited@example.test", "summary": "An edited summary"}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": Case(path={"resume_id": "version"}, as_bde=True),
