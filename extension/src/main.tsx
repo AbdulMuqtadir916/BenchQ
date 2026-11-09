@@ -569,6 +569,8 @@ function App() {
             <AutofillPanel
               key={connection.tabId}
               connection={connection}
+              firmId={session.principal.firm_id ?? null}
+              firmSlug={session.firm?.slug ?? null}
               details={linkedJob}
               resumesUrl={
                 session.firm?.slug

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getAutofillConfig, isSessionExpired } from "../api";
+import { getResumeAnswers, isSessionExpired } from "../api";
 import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./form-memory";
 import { checkJob, hostOf } from "./job-check";
+import { withJobSite } from "./job-site";
+import { answersFromResume } from "./resume-answers";
 import { buildReview } from "./review";
 import {
   chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, scanTab, undoCount, undoFills, type TabScan,
 } from "./tab-bridge";
-import type { AppliedForm, AutofillConfig, AutofillRun, BankEntry, Connection, FillResult, FieldWrite, PageSignals, ReviewRow, RunItem, TabField } from "./types";
+import type { AppliedForm, AutofillRun, BankEntry, Connection, FillResult, FieldWrite, PageSignals, ReviewRow, RunItem, TabField } from "./types";
 
 const RESCAN_DELAY_MS = 500;
 const WATCH_MS = 2000;
@@ -18,7 +20,7 @@ const PASSES = 2;
 const STALE: FillResult = { status: "stale", current: "" };
 const PAGE_UNREADABLE = "BenchQ can't read this page. You can still fill the form yourself.";
 const REVIEW_FAILED = "BenchQ couldn't work out this form.";
-const ANSWERS_UNAVAILABLE = "Could not load this candidate's answers. Try again.";
+const ANSWERS_UNAVAILABLE = "Could not load this resume's answers. Try again.";
 const PAGE_RESET = "The page reset this value.";
 const FORM_FLAGGED = "The form flagged this value.";
 const RUN_STOPPED = "The form changed, so BenchQ stopped here.";
@@ -32,7 +34,15 @@ export type Outcome = { filled: number; handedBack: number; stopped: boolean };
 type FillableRow = ReviewRow & { write: FieldWrite };
 type Pass = { filled: FillableRow[]; failed: number; late: number; stopped: boolean };
 
-type Options = { connection: Connection; onSessionExpired: () => void; onAccessLost: () => void };
+/** `resumeId`: the résumé version the answers come from (docs/02 §8.1); null when the candidate has none, so the form is
+ * reviewed with no answers; undefined while the panel is still finding out, so nothing is reviewed yet. */
+type Options = {
+  connection: Connection;
+  firmId: string | null;
+  resumeId: string | null | undefined;
+  onSessionExpired: () => void;
+  onAccessLost: () => void;
+};
 
 /** What a tab's review remembers while the panel is open. Switching tabs unmounts the review, so this lives outside it. */
 type TabMemory = {
@@ -48,12 +58,14 @@ type TabMemory = {
   found: Set<string>;
   // Dropdowns Autofill opened and found no clear option in: the BDE can pick one from the panel.
   unmatched: Set<string>;
+  // The résumé each of BenchQ's fills came from. Another résumé picked later refills those fields, and only those.
+  filledFrom: Map<string, string | null>;
 };
 
 /** What a page load wipes. */
 const pageMemory = () => ({
   settled: new Map<string, string>(), handedBack: new Map<string, string>(), seen: new Map<string, string>(), edited: new Set<string>(),
-  found: new Set<string>(), unmatched: new Set<string>(),
+  found: new Set<string>(), unmatched: new Set<string>(), filledFrom: new Map<string, string | null>(),
 });
 
 const tabMemory = new Map<string, TabMemory>();
@@ -88,9 +100,10 @@ function plural(count: number, word: string) {
 
 /** Fresh rows, given what the tab remembers. `justFilled` marks a look straight after BenchQ wrote to the form: what
  * changed then is BenchQ's doing. Any other change is the BDE's, and Autofill won't write over it, nor over a value the
- * form held when BenchQ first saw it: that one shows as kept, for the BDE to replace if they want. */
-function withMemory(rows: ReviewRow[], memory: TabMemory, justFilled?: ReadonlySet<string>): ReviewRow[] {
-  const { settled, handedBack, seen, edited, found, unmatched } = memory;
+ * form held when BenchQ first saw it: that one shows as kept, for the BDE to replace if they want. A field BenchQ
+ * filled from another résumé than `resume` is ready again when this résumé answers it differently. */
+function withMemory(rows: ReviewRow[], memory: TabMemory, resume: string | null, justFilled?: ReadonlySet<string>): ReviewRow[] {
+  const { settled, handedBack, seen, edited, found, unmatched, filledFrom } = memory;
   return rows.map((row) => {
     // Never filled, so there's nothing to remember, and a value like an SSN shouldn't linger here.
     if (row.status === "blocked") return row;
@@ -108,7 +121,8 @@ function withMemory(rows: ReviewRow[], memory: TabMemory, justFilled?: ReadonlyS
       handedBack.delete(key);
     }
     if (row.status !== "ready") return row;
-    if (settled.get(key) === current || (current && edited.has(key))) return { ...row, status: "same" as const };
+    const isOtherResumes = filledFrom.has(key) && filledFrom.get(key) !== resume;
+    if ((settled.get(key) === current && !isOtherResumes) || (current && edited.has(key))) return { ...row, status: "same" as const };
     if (current && found.has(key) && !settled.has(key)) return { ...row, status: "kept" as const };
     const reason = handedBack.get(key);
     if (!reason) return row;
@@ -117,11 +131,16 @@ function withMemory(rows: ReviewRow[], memory: TabMemory, justFilled?: ReadonlyS
   });
 }
 
-/** One connected tab's review, held in memory: scan the page, match it against the candidate's bank, fill what has an
- * answer, verify it stuck, follow what happens on the form, and undo. Unmounting (another tab, sign-out) drops the
- * candidate's answers. */
-export function useAutofill({ connection, onSessionExpired, onAccessLost }: Options) {
+/** One connected tab's review, held in memory: scan the page, match it against the picked résumé's answers, fill what
+ * has an answer, verify it stuck, follow what happens on the form, and undo. Unmounting (another tab, sign-out) drops
+ * the answers. */
+export function useAutofill({ connection, firmId, resumeId, onSessionExpired, onAccessLost }: Options) {
   const { tabId, applicationId, candidateId, job, confirmedHosts } = connection;
+  // The résumé the review in hand answers from, once a scan has used it: the panel fills on a pick once it's the pick.
+  const [answeredFrom, setAnsweredFrom] = useState<string | null | undefined>(undefined);
+  // The résumé a fill comes from. Kept up to date before the scan below runs for a new pick.
+  const resume = useRef(resumeId ?? null);
+  useEffect(() => { resume.current = resumeId ?? null; }, [resumeId]);
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [scanning, setScanning] = useState(true);
   const [error, setError] = useState("");
@@ -139,12 +158,19 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
   const busy = useRef(false);
   const frames = useRef<Pick<TabScan, "scanIds" | "unreadableFrames">>({ scanIds: new Map(), unreadableFrames: 0 });
   const shownRows = useRef<ReviewRow[] | null>(null);
-  const bank = useRef<BankEntry[] | null>(null);
+  const bank = useRef<{ resumeId: string | null; entries: BankEntry[] } | null>(null);
 
-  const loadConfig = useCallback(async (): Promise<AutofillConfig | null> => {
+  /** The picked résumé's answers, with "How did you hear about us?" from where BenchQ found the job. No résumé, no
+   * answers. A backend that sends no autofill for the version can't answer either. */
+  const loadAnswers = useCallback(async (): Promise<BankEntry[] | null> => {
+    if (!resumeId) return [];
+    if (!firmId) {
+      setError(ANSWERS_UNAVAILABLE);
+      return null;
+    }
     try {
-      const config = await getAutofillConfig(candidateId);
-      if (Array.isArray(config.qa_bank)) return config;
+      const entries = await getResumeAnswers(firmId, candidateId, resumeId);
+      if (entries) return withJobSite(answersFromResume(entries), job);
       setError(ANSWERS_UNAVAILABLE);
       return null;
     } catch (e) {
@@ -153,7 +179,7 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
       else setError(ANSWERS_UNAVAILABLE);
       return null;
     }
-  }, [candidateId, onSessionExpired, onAccessLost]);
+  }, [firmId, candidateId, resumeId, job, onSessionExpired, onAccessLost]);
 
   const readPage = useCallback(async (isCurrent: () => boolean) => {
     try {
@@ -170,7 +196,7 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
   }, []);
 
   const review = useCallback((fields: TabField[], answers: BankEntry[], justFilled?: ReadonlySet<string>) => {
-    const next = withMemory(buildReview(fields, answers, job), memory.current, justFilled);
+    const next = withMemory(buildReview(fields, answers, job), memory.current, resume.current, justFilled);
     showRows(next);
     const { settled } = memory.current;
     const autofilled = new Map(next.flatMap((row) => {
@@ -181,25 +207,28 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
   }, [applicationId, job, showRows]);
 
   const scan = useCallback(async (justFilled?: ReadonlySet<string>, reuseBank = false) => {
-    if (busy.current) return;
+    // The résumés are still loading: there's nothing to answer from yet.
+    if (busy.current || resumeId === undefined) return;
     latestScan.current += 1;
     const run = latestScan.current;
     const isCurrent = () => run === latestScan.current && !busy.current;
     isScanRunning.current = true;
     setScanning(true);
-    const config = reuseBank && bank.current ? { qa_bank: bank.current } : await loadConfig();
-    const page = config ? await readPage(isCurrent) : null;
-    if (config && page && isCurrent()) {
+    const held = reuseBank && bank.current?.resumeId === resumeId ? bank.current.entries : null;
+    const answers = held ?? await loadAnswers();
+    const page = answers ? await readPage(isCurrent) : null;
+    if (answers && page && isCurrent()) {
       try {
         // A page's scans count from one, so a lower count means it loaded afresh.
         const topScan = page.scanIds.get(TOP_FRAME) ?? 0;
         if (topScan < memory.current.lastScan) Object.assign(memory.current, pageMemory());
         memory.current.lastScan = topScan;
-        bank.current = config.qa_bank;
-        review(page.fields, config.qa_bank, justFilled);
+        bank.current = { resumeId, entries: answers };
+        review(page.fields, answers, justFilled);
         frames.current = page;
         setSignals(page.signals);
-        setBankEmpty(config.qa_bank.length === 0);
+        setBankEmpty(answers.length === 0);
+        setAnsweredFrom(resumeId);
         setUnreadableFrames(page.unreadableFrames);
         setUndoable(page.pending);
         setError("");
@@ -211,7 +240,7 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
       isScanRunning.current = false;
       setScanning(false);
     }
-  }, [loadConfig, readPage, review]);
+  }, [resumeId, loadAnswers, readPage, review]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void scan(), 0);
@@ -250,7 +279,7 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
     const fields = shown.map(({ field }) => ({ ...field, current: look.values.get(`${field.frameId}:${field.id}`) ?? field.current }));
     if (fields.every(({ current }, index) => current === shown[index]!.field.current)) return;
     try {
-      review(fields, bank.current!);
+      review(fields, bank.current?.entries ?? []);
     } catch (e) {
       setError(explain(REVIEW_FAILED, e));
     }
@@ -333,6 +362,7 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
       }
       if (result.status === "filled") {
         filled.push(row);
+        memory.current.filledFrom.set(memoKeyOf(row), resume.current);
         track({ key, label, status: "filled", value: result.current || row.proposed });
         showResult(key, (item) => ({ ...item, status: "same", field: { ...item.field, current: result.current } }));
       } else {
@@ -437,6 +467,7 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
       setUndoNote("Could not undo: this page has changed.");
     }
     memory.current.settled.clear();
+    memory.current.filledFrom.clear();
     busy.current = false;
     await scan(new Set());
   }, [scan, tabId]);
@@ -449,7 +480,7 @@ export function useAutofill({ connection, onSessionExpired, onAccessLost }: Opti
   }, [applicationId, watchForm]);
 
   return {
-    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host,
+    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom,
     needsConfirmation, fillCount: targets.length, rescan: scan, autofill, replace, listOptions, choose, undo, goToField, finalForm,
   };
 }

@@ -5,9 +5,6 @@
  * (`answer-keys.ts`). A saved question has none. */
 export type BankEntry = { id: string; question: string; answer: string; category: string; key?: string };
 
-/** `GET /api/autofill/config`: held in memory while a tab is reviewed, never stored. */
-export type AutofillConfig = { candidate_id: string; qa_bank: BankEntry[] };
-
 export type FieldKind =
   | "text" | "email" | "tel" | "url" | "number" | "date" | "textarea" | "select" | "radio" | "checkbox"
   | "combobox" | "password" | "file" | "custom";

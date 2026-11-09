@@ -12,6 +12,8 @@ import type { BankEntry } from "./types";
  * - a list of words is one line, and a list of places parts them with semicolons ("Dallas, TX; Austin, TX");
  * - a list of jobs, schools, projects or awards answers no one field, so it's left out, as is an empty answer.
  *
+ * A question the BDE saved with other wordings (`also`, docs/02 §8.1) answers each of them with the same answer.
+ *
  * Two answers are worked out from the others: whether the candidate may work in the US, from their status (all eight
  * statuses BenchQ records may; a status typed in reads as it says), and where they live, from the city and state. */
 
@@ -71,13 +73,18 @@ export function answersFromResume(entries: unknown): BankEntry[] {
   const asked = new Set<string>();
   for (const entry of entries) {
     if (!entry || typeof entry !== "object") continue;
-    const { question, answer, key } = entry as { question?: unknown; answer?: unknown; key?: unknown };
+    const { question, answer, key, also } = entry as { question?: unknown; answer?: unknown; key?: unknown; also?: unknown };
     if (typeof question !== "string" || !question.trim() || asked.has(question.trim())) continue;
     const named = typeof key === "string" && key.trim() ? key.trim() : null;
     const text = textOf(named, answer);
     if (text === null) continue;
     asked.add(question.trim());
     bank.push(entryOf(question.trim(), text, named));
+    for (const wording of Array.isArray(also) ? also : []) {
+      if (typeof wording !== "string" || !wording.trim() || asked.has(wording.trim())) continue;
+      asked.add(wording.trim());
+      bank.push(entryOf(wording.trim(), text, null));
+    }
   }
   return [...bank, ...workedOut(bank)];
 }

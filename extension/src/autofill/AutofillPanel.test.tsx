@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, cloneElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Application } from "../api";
@@ -7,8 +7,10 @@ import { installDialog } from "../test/dialog";
 import AutofillPanel from "./AutofillPanel";
 import type { AppliedForm, Connection, ReviewRow, TabField } from "./types";
 import { useAutofill } from "./use-autofill";
+import { useResumes, type Resumes } from "./use-resumes";
 
 vi.mock("./use-autofill", () => ({ useAutofill: vi.fn() }));
+vi.mock("./use-resumes", () => ({ useResumes: vi.fn() }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 installDialog();
@@ -32,19 +34,38 @@ const row = (label: string, required: boolean, current = ""): ReviewRow => ({
   key: label, status: "manual", field: { label, required, current } as TabField,
 });
 
+const base = { id: "res-2", label: "Base 1 · Java Developer · v2 (in use)", isTailored: false, isActive: true };
+const tailored = { id: "res-9", label: "Tailored for this job · from Base 1 · v1", isTailored: true, isActive: false };
+const pick = vi.fn();
+const retry = vi.fn();
+const oneResume: Resumes = { status: "ready", choices: [base], picked: base };
+
 let root: Root | null = null;
 let host: HTMLElement;
+let element: ReactElement;
 
-type State = { fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null };
+type State = {
+  fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
+  answeredFrom?: string | null; needsConfirmation?: boolean;
+};
 
-function show(state: State, panel: { onApply?: (form: AppliedForm) => void; isApplied?: boolean; applying?: boolean; details?: Application | null } = {}) {
+function show(state: State, panel: { onApply?: (form: AppliedForm) => void; isApplied?: boolean; applying?: boolean; details?: Application | null } = {}, resumes: Resumes = oneResume) {
   vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state } as unknown as ReturnType<typeof useAutofill>);
+  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  act(() => {
-    root!.render(<AutofillPanel connection={connection} candidateName="Priya" applying={false} isApplied={false} onDisconnect={vi.fn()} onSessionExpired={vi.fn()} onAccessLost={vi.fn()} {...panel} />);
-  });
+  element = <AutofillPanel connection={connection} firmId="firm-1" firmSlug="acme-staffing" candidateName="Priya" applying={false} isApplied={false} onDisconnect={vi.fn()} onSessionExpired={vi.fn()} onAccessLost={vi.fn()} {...panel} />;
+  act(() => { root!.render(element); });
+}
+
+/** The panel again with what the hooks now say, as after the BDE's pick. */
+function update(state: State, resumes: Resumes) {
+  vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state } as unknown as ReturnType<typeof useAutofill>);
+  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
+  // A copy, so React renders the panel again instead of keeping the one it has.
+  element = cloneElement(element);
+  act(() => { root!.render(element); });
 }
 
 const inBody = () => [...host.querySelectorAll<HTMLButtonElement>("[data-slot='autofill-body'] > button")];
@@ -105,6 +126,78 @@ describe("Autofill", () => {
   it("leaves no way to rescan by hand: the panel does that itself", () => {
     show({ fillCount: 1, undoable: 1 });
     expect(host.textContent).not.toContain("Rescan");
+  });
+});
+
+describe("the résumé the answers come from", () => {
+  const picker = () => host.querySelector("[data-slot='resume-picker']")!;
+  const twoResumes: Resumes = { status: "ready", choices: [tailored, base], picked: base };
+
+  it("names it on one line, with a way to view it in BenchQ", () => {
+    show({ fillCount: 1 });
+    expect(picker().querySelector("[data-slot='resume-picked']")!.textContent).toBe(base.label);
+    expect(picker().querySelector("a")!.getAttribute("href")).toContain("/acme-staffing/resumes/res-2");
+    expect(picker().querySelectorAll("button")).toHaveLength(0);
+  });
+
+  it("lists the candidate's résumés on Change, each with Pick and a link", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    await click("Change");
+    const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
+    expect(choices.map((choice) => choice.querySelector("button")!.textContent)).toEqual(["Pick", "Picked"]);
+    expect(choices[0]!.textContent).toContain("Tailored");
+    expect(choices[0]!.querySelector("a")!.getAttribute("href")).toContain("/resumes/res-9");
+  });
+
+  it("fills the form as soon as the picked résumé's answers are in", async () => {
+    const rows = [row("Email", true)];
+    show({ fillCount: 1, rows, answeredFrom: "res-2" }, {}, twoResumes);
+    await click("Change");
+    await click("Pick");
+    expect(pick).toHaveBeenCalledWith("res-9");
+    expect(autofill).not.toHaveBeenCalled();
+    update({ fillCount: 1, rows, answeredFrom: "res-9" }, { ...twoResumes, picked: tailored });
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it("only picks when the form isn't on the page yet", async () => {
+    show({ fillCount: 0, rows: [], answeredFrom: "res-2" }, {}, twoResumes);
+    await click("Change");
+    await click("Pick");
+    update({ fillCount: 0, rows: [], answeredFrom: "res-9" }, { ...twoResumes, picked: tailored });
+    expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("only picks when the page may be a different job", async () => {
+    const rows = [row("Email", true)];
+    show({ fillCount: 1, rows, answeredFrom: "res-2" }, {}, twoResumes);
+    await click("Change");
+    await click("Pick");
+    update({ fillCount: 1, rows, answeredFrom: "res-9", needsConfirmation: true }, { ...twoResumes, picked: tailored });
+    expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("says when the candidate has no résumé yet", () => {
+    show({ fillCount: 0, rows: [] }, {}, { status: "ready", choices: [], picked: null });
+    expect(picker().textContent).toContain("Priya has no resume in BenchQ yet");
+  });
+
+  it("says when the résumés couldn't be loaded, with a way to try again", async () => {
+    show({ fillCount: 0, rows: [] }, {}, { status: "error" });
+    expect(picker().querySelector("[role='alert']")!.textContent).toContain("Could not load Priya's resumes");
+    await click("Try again");
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("says it's loading them", () => {
+    show({ fillCount: 0, rows: null }, {}, { status: "loading" });
+    expect(picker().querySelector("[role='status']")!.textContent).toContain("Loading Priya's resumes");
+  });
+
+  it("names it as the one to attach when the form asks for a résumé", () => {
+    const upload = { key: "cv", status: "manual", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } } as unknown as ReviewRow;
+    show({ fillCount: 0, rows: [upload] });
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe(`Attach: ${base.label}`);
   });
 });
 

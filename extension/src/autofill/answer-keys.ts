@@ -7,12 +7,16 @@ import type { EngineFieldType } from "../engine/field-types";
  * - A key mapped to a field kind answers the fields of that kind.
  * - A key mapped to null is matched by its wording only, like a saved question: no field kind says the same thing, and
  *   reading its wording as one would misread it ("What is your professional title?" isn't the job held).
- * - A key missing here (one the backend adds later) is read by its wording too, until a line is added.
- * - Lists of jobs, schools, projects and awards answer no one field, so they never get this far. */
+ * - A key missing here (one the backend adds later) is read by its wording too, until a line is added; a test
+ *   (`answer-keys.test.ts`) fails until it is.
+ * - Lists of jobs, schools, projects and awards answer no one field, so they never get this far; they're listed, as
+ *   null, so the table names every key. */
 
-/** Worked out in the extension from a résumé's answers (`resume-answers.ts`); the backend never sends these keys. */
+/** Worked out in the extension from a résumé's answers (`resume-answers.ts`) or the job (`job-site.ts`); the backend
+ * never sends these keys. */
 export const WORK_AUTHORIZED = "benchq:work-authorized";
 export const LOCATION = "benchq:location";
+export const REFERRAL = "benchq:referral-source";
 
 export const KEY_TYPES: Record<string, EngineFieldType | null> = {
   "full-name": "full-name",
@@ -31,6 +35,11 @@ export const KEY_TYPES: Record<string, EngineFieldType | null> = {
   skills: null,
   "current-company": "current-company",
   "current-title": "current-title",
+  // Lists of objects: `resume-answers.ts` leaves them out.
+  "work-history": null,
+  "education-history": null,
+  projects: null,
+  awards: null,
   "education-degree": "education-degree",
   "education-school": "education-school",
   "graduation-year": "graduation-year",
@@ -52,6 +61,7 @@ export const KEY_TYPES: Record<string, EngineFieldType | null> = {
   "preferred-industries": null,
   [WORK_AUTHORIZED]: "work-authorization",
   [LOCATION]: "city-state",
+  [REFERRAL]: "referral-source",
 };
 
 /** The field kind a key answers: undefined when the key isn't in the table, so its wording decides. */

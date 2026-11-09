@@ -20,8 +20,12 @@ const otherJob = { ...job, id: "app-2", candidate_id: "cand-2", title: "Data Eng
 /** Each candidate has one saved job. */
 function reply(url: string) {
   if (url.includes("auth/me")) return { principal: { kind: "firm", role: "BDE", user_id: "user-1", firm_id: "firm-1" } };
+  if (url.includes("/resumes/") && url.includes("autofill=true")) return { autofill: [] };
+  if (url.endsWith("/resumes")) {
+    const version = { id: "res-1", version: 1, name: "Base", title: "Java Developer", category: "BASE", job_id: null };
+    return { bases: [{ id: "base-1", number: 1, is_active: true, archived_at: null, versions: [version] }], tailored: [] };
+  }
   if (url.includes("/candidates")) return [{ id: "cand-1", full_name: "Aarav" }, { id: "cand-2", full_name: "Priya" }];
-  if (url.includes("autofill/config")) return { candidate_id: "cand-1", qa_bank: [] };
   if (url.includes("candidate-status")) return { status: "applied", status_revision: 1, status_transitions: [] };
   const owned = [job, otherJob].filter(({ candidate_id }) => url.includes(`candidate_id=${candidate_id}`));
   return { applications: url.includes("status=saved") ? owned : [] };

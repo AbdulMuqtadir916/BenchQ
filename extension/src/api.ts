@@ -1,4 +1,4 @@
-import type { AppliedForm, AutofillConfig } from "./autofill/types";
+import type { AppliedForm } from "./autofill/types";
 
 export const BENCHQ_URL = __BENCHQ_URL__.replace(/\/$/, "");
 
@@ -56,14 +56,16 @@ export const isSessionExpired = (error: unknown) => error instanceof Error && er
 export const candidateResumesUrl = (firmSlug: string, candidateId: string) =>
   `${BENCHQ_URL}/${encodeURIComponent(firmSlug)}/candidates/${encodeURIComponent(candidateId)}?tab=resumes`;
 
+/** One résumé version in the studio on the website: `resumes.studio` in src/lib/routes/registry.ts, whose URL names
+ * the version. */
+export const resumeStudioUrl = (firmSlug: string, versionId: string) =>
+  `${BENCHQ_URL}/${encodeURIComponent(firmSlug)}/resumes/${encodeURIComponent(versionId)}`;
+
 export const getSession = () => request<Session>("/api/auth/me");
 export type Candidate = { id: string; full_name: string };
 
 export const getCandidates = (firmId: string) =>
   request<Candidate[]>(`/api/firms/${encodeURIComponent(firmId)}/candidates`);
-
-export const getAutofillConfig = (candidateId: string) =>
-  request<AutofillConfig>(`/api/autofill/config?candidate_id=${encodeURIComponent(candidateId)}`);
 
 /** One version in a candidate's résumé list: its details, never its content (backend/candidates/versions.py). */
 export type ResumeVersion = { id: string; version: number; name: string; title: string | null; category: string; job_id: string | null };

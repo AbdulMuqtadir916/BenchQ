@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Application } from "../api";
+import { resumeStudioUrl, type Application } from "../api";
 import { ALERT, BELOW_TOP_BAR, button, CARD, FITTED_BUTTONS, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON, WARNING } from "../ui";
 import { sendToBackground } from "./connection-store";
 import DocumentSections from "./DocumentSections";
@@ -9,13 +9,18 @@ import { CHECK } from "./icons";
 import JobCard from "./JobCard";
 import MarkApplied from "./MarkApplied";
 import OutcomeNote from "./OutcomeNote";
+import ResumePicker from "./ResumePicker";
 import ReviewList from "./ReviewList";
 import RunList from "./RunList";
 import type { AppliedForm, Connection, ReviewRow } from "./types";
 import { useAutofill, type Outcome } from "./use-autofill";
+import { useResumes } from "./use-resumes";
 
 type AutofillPanelProps = {
   connection: Connection;
+  /** The BDE's firm: its id reaches the candidate's résumés, its slug links to them on the website. */
+  firmId?: string | null;
+  firmSlug?: string | null;
   /** The saved application behind the tab, once the job list has it: where the job is, its pay, its documents. */
   details?: Application | null;
   /** The candidate's résumés on the website, when the firm is known. */
@@ -46,12 +51,34 @@ function scrollToResult(card: HTMLElement | null) {
   scroller?.scrollTo?.({ top: 0, behavior });
 }
 
-/** The connected tab's job and its form, top to bottom: the job, Autofill, the run as it goes, the résumé and the cover
- * letter, then the rest of the form. Nothing is written until the BDE clicks Autofill, and the form is theirs to submit. */
-export default function AutofillPanel({ connection, details = null, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
+/** The connected tab's job and its form, top to bottom: the job, the résumé the answers come from, Autofill, the run as
+ * it goes, the résumé and the cover letter, then the rest of the form. Nothing is written until the BDE clicks Autofill
+ * or picks a résumé, and the form is theirs to submit. */
+export default function AutofillPanel({ connection, firmId = null, firmSlug = null, details = null, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
   const { tabId, job } = connection;
-  const state = useAutofill({ connection, onSessionExpired, onAccessLost });
-  const { rows, scanning, error, filling, run, outcome, undoable, fillCount, needsConfirmation } = state;
+  const { resumes, pick, retry } = useResumes({
+    firmId, candidateId: connection.candidateId, jobId: details?.job_id ?? null, namedId: details?.tailored_resume_id ?? null,
+    onSessionExpired, onAccessLost,
+  });
+  const picked = resumes.status === "ready" ? resumes.picked : null;
+  // While the résumés load there's nothing to answer from; with none, the form is reviewed with no answers.
+  const resumeId = resumes.status === "loading" ? undefined : picked?.id ?? null;
+  const state = useAutofill({ connection, firmId, resumeId, onSessionExpired, onAccessLost });
+  const { rows, scanning, error, filling, run, outcome, undoable, fillCount, needsConfirmation, answeredFrom } = state;
+  const studioUrl = useCallback((versionId: string) => (firmSlug ? resumeStudioUrl(firmSlug, versionId) : null), [firmSlug]);
+  // A pick fills the form at once, once its answers are in, when the form is on the page and it's the right job.
+  const fillOnPick = useRef<string | null>(null);
+  const pickResume = (id: string) => {
+    fillOnPick.current = id;
+    pick(id);
+  };
+  const { autofill } = state;
+  useEffect(() => {
+    const wanted = fillOnPick.current;
+    if (!wanted || answeredFrom !== wanted || scanning || filling) return;
+    fillOnPick.current = null;
+    if (rows?.length && !needsConfirmation && fillCount > 0) void autofill();
+  }, [answeredFrom, scanning, filling, rows, needsConfirmation, fillCount, autofill]);
   const [isCollecting, setIsCollecting] = useState(false);
   const card = useRef<HTMLElement>(null);
   const wasFilling = useRef(filling);
@@ -95,6 +122,9 @@ export default function AutofillPanel({ connection, details = null, resumesUrl =
         </div>
       </div>}
 
+      <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl} isBusy={filling}
+        onPick={pickResume} onRetry={retry} />
+
       {hasFillsLeft && <button type="button" className={button("primary", "large")} disabled={filling || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
         {filling ? "Filling…" : "Autofill"}
       </button>}
@@ -110,13 +140,14 @@ export default function AutofillPanel({ connection, details = null, resumesUrl =
         <p className={`mt-0.5 ${SOFT_TEXT}`}>Click Apply on the employer&apos;s page. BenchQ scans the form when it opens, in this tab or a new one.</p>
         {state.unreadableFrames > 0 && <p className={`mt-1 ${SOFT_TEXT}`}>If you can already see a form, BenchQ can&apos;t read that part of the page, so fill it in yourself.</p>}
       </div>}
-      {hasForm && state.bankEmpty && <p className={MUTED_TEXT}>{candidateName} has nothing in their QA bank yet, so BenchQ has no answers to fill.</p>}
+      {hasForm && state.bankEmpty && picked && <p className={MUTED_TEXT}>This resume has no answers BenchQ can fill yet.</p>}
 
       {filling && run && <RunList run={run} />}
       {outcome && outcome !== dismissed && <OutcomeNote outcome={outcome} left={left} onDismiss={dismiss} />}
       {state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
 
-      {hasForm && <DocumentSections rows={rows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo} />}
+      {hasForm && <DocumentSections rows={rows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
+        picked={picked ? { label: picked.label, url: studioUrl(picked.id) } : null} />}
       {!filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)} />}
     </div>

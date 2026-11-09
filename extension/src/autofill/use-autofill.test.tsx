@@ -2,13 +2,13 @@
 import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAutofillConfig } from "../api";
+import { getResumeAnswers } from "../api";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import { fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, scanTab, undoCount, undoFills, type TabScan } from "./tab-bridge";
-import type { AppliedForm, AutofillConfig, Connection, FieldKind, FillResult, PageSignals, TabField } from "./types";
+import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, TabField } from "./types";
 import { forgetTabs, useAutofill } from "./use-autofill";
 
-vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getAutofillConfig: vi.fn() }));
+vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn() }));
 vi.mock("./tab-bridge", () => ({
   scanTab: vi.fn(), readTab: vi.fn(), fillField: vi.fn(), fillChoice: vi.fn(), rejectedFields: vi.fn(), flaggedFields: vi.fn(), focusField: vi.fn(),
   undoFills: vi.fn(), undoCount: vi.fn(),
@@ -21,14 +21,9 @@ const connection: Connection = {
   job: { title: "Senior Java Developer", company: "Acme", url: "https://jobs.acme.test/1" },
 };
 
-const config: AutofillConfig = {
-  candidate_id: "cand-1",
-  qa_bank: [
-    { id: "q1", question: "Email", answer: "priya@example.test", category: "OTHER" },
-    { id: "q2", question: "City", answer: "Phoenix", category: "OTHER" },
-    { id: "q3", question: "Do you need sponsorship?", answer: "Yes", category: "WORK_AUTH" },
-  ],
-};
+/** The picked résumé's answers, as `GET …/resumes/{id}?autofill=true` sends them (docs/02 §8.1). */
+const custom = (question: string, answer: unknown) => ({ question, answer, kind: "CUSTOM" });
+const answers = [custom("Email", "priya@example.test"), custom("City", "Phoenix"), custom("Do you need sponsorship?", "Yes")];
 
 const field = (id: string, label: string, kind: FieldKind = "text", current = ""): TabField => ({
   id, frameId: 0, pageUrl: "https://jobs.acme.test/1", kind, label, hints: "", autocomplete: "", required: false, current,
@@ -52,17 +47,26 @@ const onAccessLost = vi.fn();
 
 const report = (state: ReturnType<typeof useAutofill>) => { hook = state; };
 
-function Harness({ value }: { value: Connection }) {
-  const state = useAutofill({ connection: value, onSessionExpired, onAccessLost });
+/** A résumé id that stands for "the panel is still loading the résumés". */
+const LOADING = "loading";
+
+function Harness({ value, resumeId = "res-1" }: { value: Connection; resumeId?: string | null }) {
+  const state = useAutofill({ connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, onSessionExpired, onAccessLost });
   useEffect(() => report(state));
   return null;
 }
 
 const wait = (ms: number) => act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
 
-async function mount(value = connection) {
+async function mount(value = connection, resumeId: string | null = "res-1") {
   root = createRoot(document.createElement("div"));
-  await act(async () => { root.render(<Harness value={value} />); });
+  await act(async () => { root.render(<Harness value={value} resumeId={resumeId} />); });
+  await wait(5);
+}
+
+/** The BDE picks another résumé in the panel. */
+async function pickResume(resumeId: string | null) {
+  await act(async () => { root.render(<Harness value={connection} resumeId={resumeId} />); });
   await wait(5);
 }
 
@@ -73,7 +77,7 @@ const statuses = () => hook.rows?.map(({ field: { id }, status }) => [id, status
 beforeEach(() => {
   fake = fakeChrome();
   vi.stubGlobal("chrome", fake);
-  vi.mocked(getAutofillConfig).mockResolvedValue(config);
+  vi.mocked(getResumeAnswers).mockResolvedValue(answers);
   vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City")], onSite));
   vi.mocked(fillField).mockResolvedValue({ status: "filled", current: "" });
   vi.mocked(fillChoice).mockResolvedValue({ status: "filled", current: "" });
@@ -116,37 +120,87 @@ describe("going to a field", () => {
   });
 });
 
+describe("the picked résumé", () => {
+  it("waits while the résumés load", async () => {
+    await mount(connection, LOADING);
+    expect(scanTab).not.toHaveBeenCalled();
+    expect(getResumeAnswers).not.toHaveBeenCalled();
+    expect(hook.rows).toBeNull();
+  });
+
+  it("reviews the form with no answers when the candidate has no résumé", async () => {
+    await mount(connection, null);
+    expect(getResumeAnswers).not.toHaveBeenCalled();
+    expect(statuses()).toEqual([["a", "manual"], ["b", "manual"]]);
+    expect(hook.bankEmpty).toBe(true);
+  });
+
+  it("says which résumé the review answers from", async () => {
+    await mount();
+    expect(hook.answeredFrom).toBe("res-1");
+  });
+
+  it("answers \"How did you hear about us?\" with where BenchQ found the job, over the résumé's answer", async () => {
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("How did you hear about us?", "A friend")]);
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "How did you hear about us?")], onSite));
+    await mount({ ...connection, job: { ...connection.job, source: "jobspy_linkedin" } });
+    expect(hook.rows![0]).toMatchObject({ status: "ready", proposed: "LinkedIn" });
+  });
+
+  it("keeps the résumé's answer when the job's site isn't known", async () => {
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("How did you hear about us?", "A friend")]);
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "How did you hear about us?")], onSite));
+    await mount();
+    expect(hook.rows![0]).toMatchObject({ status: "ready", proposed: "A friend" });
+  });
+
+  it("refills BenchQ's own fills from another résumé, never what the BDE changed", async () => {
+    await mount();
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email", "text", "priya@example.test"), field("b", "City", "text", "Phoenix")]));
+    await run(() => hook.autofill());
+    expect(statuses()).toEqual([["a", "same"], ["b", "same"]]);
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email", "text", "mine@example.test"), field("b", "City", "text", "Phoenix")]));
+    await run(() => hook.rescan());
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("Email", "work@example.test"), custom("City", "Dallas")]);
+    await pickResume("res-2");
+    expect(getResumeAnswers).toHaveBeenLastCalledWith("firm-1", "cand-1", "res-2");
+    expect(hook.answeredFrom).toBe("res-2");
+    expect(statuses()).toEqual([["a", "same"], ["b", "ready"]]);
+    expect(hook.rows![1]!.proposed).toBe("Dallas");
+  });
+});
+
 describe("scanning", () => {
   it("reviews the page when it opens", async () => {
     await mount();
     expect(scanTab).toHaveBeenCalledWith(7);
-    expect(getAutofillConfig).toHaveBeenCalledWith("cand-1");
+    expect(getResumeAnswers).toHaveBeenCalledWith("firm-1", "cand-1", "res-1");
     expect(statuses()).toEqual([["a", "ready"], ["b", "ready"]]);
     expect(hook.fillCount).toBe(2);
     expect(hook.scanning).toBe(false);
   });
 
   it("ends the session on a 401", async () => {
-    vi.mocked(getAutofillConfig).mockRejectedValue(Object.assign(new Error("SESSION_EXPIRED"), { status: 401 }));
+    vi.mocked(getResumeAnswers).mockRejectedValue(Object.assign(new Error("SESSION_EXPIRED"), { status: 401 }));
     await mount();
     expect(onSessionExpired).toHaveBeenCalled();
   });
 
   it("reports lost access on a 404", async () => {
-    vi.mocked(getAutofillConfig).mockRejectedValue(Object.assign(new Error("Request failed"), { status: 404 }));
+    vi.mocked(getResumeAnswers).mockRejectedValue(Object.assign(new Error("Request failed"), { status: 404 }));
     await mount();
     expect(onAccessLost).toHaveBeenCalled();
   });
 
   it("offers a retry when the answers won't load", async () => {
-    vi.mocked(getAutofillConfig).mockRejectedValue(Object.assign(new Error("Request failed"), { status: 500 }));
+    vi.mocked(getResumeAnswers).mockRejectedValue(Object.assign(new Error("Request failed"), { status: 500 }));
     await mount();
     expect(hook.error).toContain("Could not load");
     expect(hook.rows).toBeNull();
   });
 
   it("copes with an older backend's answer", async () => {
-    vi.mocked(getAutofillConfig).mockResolvedValue({ answers: {} } as unknown as AutofillConfig);
+    vi.mocked(getResumeAnswers).mockResolvedValue(null);
     await mount();
     expect(hook.error).toContain("Could not load");
   });
@@ -177,7 +231,7 @@ describe("scanning", () => {
   });
 
   it("notes an empty bank and unreadable frames", async () => {
-    vi.mocked(getAutofillConfig).mockResolvedValue({ ...config, qa_bank: [] });
+    vi.mocked(getResumeAnswers).mockResolvedValue([]);
     vi.mocked(scanTab).mockResolvedValue({ ...page([field("a", "Email")]), unreadableFrames: 2 });
     await mount();
     expect(hook.bankEmpty).toBe(true);
@@ -250,7 +304,7 @@ describe("autofill", () => {
   });
 
   it("uses the dropdown path for a custom dropdown, searching on the city alone", async () => {
-    vi.mocked(getAutofillConfig).mockResolvedValue({ ...config, qa_bank: [{ id: "q1", question: "Current location", answer: "Phoenix, AZ", category: "OTHER" }] });
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("Current location", "Phoenix, AZ")]);
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Location (City)", "combobox")]));
     await mount();
     await run(() => hook.autofill());
@@ -577,12 +631,12 @@ describe("following the form", () => {
   it("scans by itself when the form changes shape, with the answers it already has", async () => {
     await mount();
     vi.mocked(scanTab).mockClear();
-    vi.mocked(getAutofillConfig).mockClear();
+    vi.mocked(getResumeAnswers).mockClear();
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City"), field("c", "Do you need sponsorship?")]));
     vi.mocked(readTab).mockResolvedValue({ values: new Map(), moved: true });
     await finalForm();
     expect(scanTab).toHaveBeenCalledTimes(1);
-    expect(getAutofillConfig).not.toHaveBeenCalled();
+    expect(getResumeAnswers).not.toHaveBeenCalled();
     expect(hook.rows).toHaveLength(3);
   });
 
