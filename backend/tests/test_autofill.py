@@ -227,6 +227,19 @@ def test_the_highest_degree_comes_with_its_own_school_and_year():
                  "Bachelor of Technology and Master of Technology", "Integrated MS"):
         assert answers([{"degree": "B.Sc. Physics", "institution": "A"}, {"degree": dual, "institution": "B"}])[:2] == (
             dual, "B")
+    # Words such as "Dual", "Degree", "Five" and "Year" can come before the codes (Abdul's fourth review).
+    for dual in ("Dual Degree (BS-MS)", "Dual Degree BS-MS", "Integrated Dual Degree BS-MS", "Five Year Integrated MS",
+                 "BS-MS Dual Degree", "Integrated BS-MS"):
+        assert answers([{"degree": "Diploma in Electronics", "institution": "SBTET"},
+                        {"degree": dual, "institution": "IISER Pune"}])[:2] == (dual, "IISER Pune")
+    # A certificate listed under education isn't a degree, and "Master" or a "Doctor" word that doesn't lead names one
+    # only before "of" or "in" (Abdul's fourth review).
+    btech = {"degree": "B.Tech in CSE", "institution": "JNTU", "graduation_date": "2017"}
+    for other in ("Certified Scrum Master", "Master Data Management Certificate",
+                  "B.Sc., Pre-Doctoral Research Fellow"):
+        assert answers([btech, {"degree": other, "institution": "B", "graduation_date": "2021"}]) == (
+            "B.Tech in CSE", "JNTU", 2017)
+    assert answers([{"degree": "Certified Scrum Master", "institution": "Scrum Alliance"}]) == (None, None, None)
 
 
 def test_the_current_job_is_the_one_marked_current_else_the_one_that_ended_last():

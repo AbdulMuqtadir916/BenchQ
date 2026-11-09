@@ -110,9 +110,10 @@ _LEVEL_OF = {
 _TWO_WORDS = ((r"ph d", "phd"), (r"m sc", "msc"), (r"b sc", "bsc"), (r"m tech", "mtech"), (r"b tech", "btech"),
               (r"pg diploma", "pgdiploma"), (r"post graduate", "postgraduate"), (r"high school", "highschool"))
 # Codes that are also everyday words or branch names ("to be completed", "B.Tech in ME"): they name a degree only at
-# its start, which can follow one of these words ("Integrated MS").
+# its start, which can follow words such as these, or a number ("Integrated MS", "Dual Degree (BS-MS)", "Five Year
+# Integrated MS").
 _SHORT_CODES = {"ms", "me", "ma", "md", "bs", "be", "ba"}
-_BEFORE_A_CODE = {"integrated", "dual"}
+_BEFORE_A_CODE = {"integrated", "dual", "degree", "five", "year", "years"}
 
 
 def _get(source, key):
@@ -209,31 +210,46 @@ def _latest_job(jobs: list[dict]) -> dict:
     return max(ended, key=lambda job: month(job, "end")) if ended else (jobs[0] if jobs else {})
 
 
+def _everyday(word: str) -> bool:
+    """A degree's word that is also an everyday one: "Scrum Master", "Pre-Doctoral Research Fellow"."""
+    return word == "master" or word.startswith("doctor")
+
+
 def _level(degree: str) -> int:
     """How high a degree is: 5 for a doctorate down to 1 for school, 0 when it names none. The highest level it names
-    counts, in whatever order ("Dual Degree (B.Tech + M.Tech)" is a master's, as "B.Tech + M.Tech" is). A two-letter
-    code counts only among the levels a degree starts with: "BE/ME dual degree" and "Integrated MS" are master's,
-    "B.Tech in ME" is a bachelor's, and "Coursework, to be completed" is no degree."""
+    counts, in whatever order ("Dual Degree (B.Tech + M.Tech)" is a master's, as "B.Tech + M.Tech" is). Every level a
+    degree starts with counts: "BE/ME dual degree", "Dual Degree (BS-MS)" and "Integrated MS" are master's. After
+    them, a two-letter code doesn't ("B.Tech in ME" is a bachelor's, and "Coursework, to be completed" no degree), and
+    "master" or a "doctor" word counts only before "of" or "in" ("Bachelor of Technology and Master of Technology" is a
+    master's, and "Certified Scrum Master" no degree)."""
     words = re.sub(r"[^a-z0-9]+", " ", re.sub(r"[.'’]", "", degree.lower()))
     for pair, word in _TWO_WORDS:
         words = re.sub(rf"\b{pair}\b", word, words)
     def level(word):
         return 5 if word.startswith("doctor") else _LEVEL_OF.get(word, 0)
     tokens = words.split()
-    while tokens and tokens[0] in _BEFORE_A_CODE:
+    while tokens and (tokens[0] in _BEFORE_A_CODE or tokens[0].isdigit()):
         tokens = tokens[1:]
     levels, leading = [], True
-    for word in tokens:
-        leading = leading and bool(level(word))
-        if level(word) and (leading or word not in _SHORT_CODES):
-            levels.append(level(word))
+    for word, following in zip(tokens, [*tokens[1:], ""]):
+        named = level(word)
+        leading = leading and bool(named)
+        if leading or (named and word not in _SHORT_CODES and (not _everyday(word) or following in ("of", "in"))):
+            levels.append(named)
     return max(levels, default=0)
 
 
+def _is_certificate(degree: str) -> bool:
+    """A certificate, not a degree ("Certified Scrum Master", "Master Data Management Certificate"): résumés often list
+    them under education."""
+    return any(word.startswith("certif") for word in re.findall(r"[a-z]+", degree.lower()))
+
+
 def _highest_school(schools: list[dict]) -> dict:
-    """The education with the highest degree, among the rows that name a degree or a school (a blank row is none);
-    the first listed when they're level or can't be told apart."""
-    named = [school for school in schools if text(school.get("degree")) or text(school.get("institution"))]
+    """The education with the highest degree, among the rows that name a degree or a school (a blank row is none) and
+    aren't a certificate; the first listed when they're level or can't be told apart."""
+    named = [school for school in schools if (text(school.get("degree")) or text(school.get("institution")))
+             and not _is_certificate(text(school.get("degree")))]
     return max(named, key=lambda school: _level(text(school.get("degree"))), default={})
 
 

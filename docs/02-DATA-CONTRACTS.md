@@ -1397,8 +1397,10 @@ The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`,
 `employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`. The fixed questions come first in
 that order, then the user's. A missing fact leaves its question out. Never in it: ids, `rate_min`, `contact_notes`,
 `deal_breakers`, `status`, `bench_start_date`. Not in the list, a save, or a read without `?autofill=true`. Writing the
-user's entries (a route) is planned: it takes `over` from its own build, never from the request, and its contract goes
-here first. The frontend doesn't map `autofill` (no screen shows it yet); the extension reads it (Arbaz).
+user's entries (a route) is planned: it takes `over` from its own build, never from the request, and the request
+carries the built answer the user was shown, so the route answers 409 when its own build differs (an edit is never
+saved over an answer the user didn't see). Its contract goes here first. The frontend doesn't map `autofill` (no screen
+shows it yet); the extension reads it (Arbaz).
 
 ```ts
 // src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker
