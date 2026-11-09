@@ -1171,6 +1171,55 @@ export const JobMarkSchema = z.object({
 - Endpoints: `GET /api/job-marks` (the signed-in user's), `PUT /api/job-marks/:jobId/:kind`,
   `DELETE /api/job-marks/:jobId/:kind`.
 
+### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migration 0020; backend only, no frontend schema/screen yet)
+
+> Zuhair's track. Deliberately **not** `jobs`: this is a separate, candidate+batch-scoped table
+> (`backend/models/job_search.py`), not the existing shared-pool `jobs` table above (`backend/models/db.py`) or its
+> `JobSchema`/`JobMarkSchema` frontend contracts. One row per job a search found for one candidate — `(candidate_id,
+> job_id)` is unique, so the same posting content found again for the same candidate updates the existing row
+> (`batch_id`, `last_seen_at`) instead of inserting a duplicate.
+
+- **Identity (revised 2026-11-09):** `job_id` (SHA256 of normalized company + title + full job description; a
+  content hash, not an id from the job board, and not the row's primary key `id`)
+  is the only identity key. A content change is treated as a new posting by design, so the board's own job id adds
+  nothing to dedup and isn't stored (`source_id` was dropped before anything shipped). `source` records which
+  provider the row came from.
+- **Content (revised 2026-11-09): one `content` JSONB column, not separate typed columns.** Everything about the
+  job — title, description, location, salary, seniority, skills, apply link, whatever a source sends — lives
+  inside it. The original design (migration 0020, first cut) had a normalized core of typed columns plus a `raw`
+  fallback, modeled on JSearch's `job-details` response; that's been replaced before anything shipped, because the
+  set of sources isn't fixed to JSearch/freehire.me, and typed columns built around one source's fields would need
+  a migration every time another aggregator is added or a source changes its response shape. `content`'s internal
+  shape is the ingestion/adapter code's decision (not yet written), not this table's — so filtering/ranking on its
+  fields (location, salary, seniority, skills) is a JSON-path query, not a plain `WHERE` on a column, and no CHECK
+  constraint can cover anything inside it. `status` (new/saved/dismissed/applied) stays a real column — it's the
+  BDE's own interaction with the row, not job content, and the app filters on it directly.
+- **Not yet built:** the ingestion/adapter code itself, and repointing
+  `applications.job_id` / `job_runs.target_job_id` off the old `jobs` table onto this one. The old `jobs` table and
+  everything still pointing at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`, `job_runs`) is
+  unchanged for now; retiring it and reclaiming the `jobs` name is a later migration once those are repointed.
+- **Frontend contract:** none yet — this table has no adapter, DTO mapper, or screen. `JobSchema`/`CompanySchema`
+  above describe the existing mock-backed job explorer, not this table; reconciling (or replacing) that contract
+  is separate, later work once this module starts serving real screens.
+- **Second source, freehire.me (decided 2026-11-09, still applies under the `content` design):** target markets
+  are US, Canada and India, so a posting can legitimately list more than one country/city (e.g. a remote NA role
+  open to `["us", "ca"]`). Rather than a multi-location child table (the old `job_locations` pattern, dropped), the
+  ingestion/adapter code (not yet written) should set `content`'s location fields to whichever country the search
+  itself targeted — not the first entry in the provider's array — while keeping the full array somewhere in
+  `content` too. Cross-market queries ("all jobs open to India OR Canada at once") are out of scope; a candidate's
+  search is always scoped to one target market. freehire.me's own `source` response field names the underlying ATS
+  (e.g. `"successfactors"`) and maps to a publisher field inside `content`, the same role JSearch's `job_publisher`
+  plays — not to this table's own `source` column, which holds the literal provider name (`"freehire"`). A closed
+  posting is filtered out before it reaches this table; a posting that closes *after* being stored has no
+  automatic signal and stays visible until something else catches it — accepted for now, revisit with a staleness
+  rule if it becomes a real problem.
+- **`scrape_jobs` (migration 0020, with `job_postings`):** one row per finished batch — `firm_id`, `candidate_id`, `batch_id` (unique),
+  `state` (`success` | `error`), `error` (text, only set when `state = 'error'`), `created_at`. Written once the
+  batch completes; there is no `request`/`pending` row, so this is a log, not a queue — any "search in progress"
+  UI state is the frontend's own, not backed by a row here. One row per batch, not per source: freehire.me is the
+  only live source, so there's nothing to break down yet; a per-source breakdown becomes a real question again
+  once a second source goes live alongside it.
+
 ## 7. Matching & scoring
 
 ```ts

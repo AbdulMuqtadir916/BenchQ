@@ -42,6 +42,7 @@ it. Everyone else reads it.
 | `candidates` | **Abdul approves**, Zuhair changes | Every change to `candidates` is confirmed with Abdul first, whoever makes it |
 | `resume_parses` | Zuhair | |
 | `searches` (candidate columns), `candidate_jobs`, `jobs`, `companies`, `job_locations`, `firm_jobs` | Zuhair | `jobs` is the shared pool (07 Q37) |
+| `job_postings`, `scrape_jobs` (new, 0020) | Zuhair | The job-search module's own tables, separate from `jobs`; see [zuhair.md](./zuhair.md) |
 | `favorite_jobs` | Samad | Written by the BDE in the app and read by the extension |
 | `resumes`, `cover_letters`, `tracer_links`, `tracer_click_events` | Zuhair | |
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
