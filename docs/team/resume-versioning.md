@@ -202,6 +202,7 @@ All reads, edits, tailoring, previews and downloads go through this table.
 | `certifications` | jsonb | | `[{id, name, issuer, date, detail}]` | **new** |
 | `awards` | jsonb | | `[{id, name, issuer, date, detail}]` | **new** |
 | `languages` | jsonb | | `[{id, name}]` | **new** |
+| `autofill` | jsonb | `'{}'` | The autofill entries the user typed for this version, `{"edited": {key: {"answer", "over"}}, "custom": {question: answer}}`: an edit to a built answer, by its key, with `over`, a copy of the built answer it replaced (for the work history, the whole list; the edit applies while that's still the built answer), or a question they added ([docs/02](../02-DATA-CONTRACTS.md) §8.1). The built answers aren't otherwise stored: `backend/candidates/autofill.py` builds them from the version and the profile each time one version is read with `?autofill=true`. A save, a promote and tailoring copy the entries to the new version. Not content: a save never compares it | **new in 0019** |
 | `created_by_user_id` | uuid | FK → users | Who saved this version | **new** |
 | `created_at` | timestamptz | `now()` | When this version was saved | exists |
 

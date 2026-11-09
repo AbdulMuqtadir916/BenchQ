@@ -75,9 +75,7 @@ class Candidate(Base):
     preferred_industries = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
     deal_breakers = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
 
-    # The answer bank (documents tab, the extension's autofill), as the frontend shapes it, in snake_case. The summary
-    # and the skills are not here: they are the active base résumé's (`resumes`).
-    qa_bank = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    # No answer bank here: each résumé version holds its own (`resumes.autofill`, migration 0019).
 
     created_at = _created_at()
     updated_at = _updated_at()

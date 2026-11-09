@@ -85,8 +85,9 @@ export function toLinkedinUrl(value: string): string | null {
   return z.string().url().safeParse(withScheme).success ? withScheme : null;
 }
 
+/** "2024-05" (or a year alone) as a month count; a month is 01–12. In step with backend/candidates/autofill.py `_MONTH`. */
 const monthIndex = (value: string): number | null => {
-  const match = /^(\d{4})(?:-(\d{2}))?$/.exec(value.trim());
+  const match = /^(\d{4})(?:-(0[1-9]|1[0-2]))?$/.exec(value.trim());
   if (!match) return null;
   return Number(match[1]) * 12 + (match[2] ? Number(match[2]) - 1 : 0);
 };

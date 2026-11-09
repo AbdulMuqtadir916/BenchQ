@@ -39,6 +39,6 @@ def candidate_json(c: Candidate) -> dict:
         "primary_role": c.primary_role, "target_roles": list(c.target_roles or []),
         "work_settings": list(c.work_settings or []), "preferred_locations": list(c.preferred_locations or []),
         "contact_notes": c.contact_notes, "preferred_industries": list(c.preferred_industries or []),
-        "deal_breakers": list(c.deal_breakers or []), "qa_bank": c.qa_bank or [],
+        "deal_breakers": list(c.deal_breakers or []),
         "created_at": _iso(c.created_at), "updated_at": _iso(c.updated_at),
     }

@@ -3,6 +3,22 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé autofill (`feat/resume-autofill`, Zuhair; finished by Arbaz)
+
+Decided by Zuhair 2026-11-07 (Abdul and Samad OK); finished 2026-11-08 from Abdul's review: every non-id fact about the
+candidate is built from the résumé version and the profile each time one version is read with `?autofill=true`, each
+answer with its `key`, and each version stores only the entries the user typed ([docs/02](../02-DATA-CONTRACTS.md)
+§8.1, `backend/candidates/autofill.py`).
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Candidates table (Abdul) | `backend/models/candidates.py`, migration `0019_resume_autofill.py` (+ test) | `candidates.qa_bank` is dropped. The downgrade puts it back empty. | The answers live on each résumé version now. Only the demo seed ever filled it; the persona's own `qa_bank` stays with the persona. **One-way for the demo answers.** |
+| Candidate JSON (Abdul) | `backend/candidates/serialize.py` | `qa_bank` leaves the candidate JSON. The edit route is unchanged: a profile edit writes nothing to the résumés. | The profile answers are built on each read, so the next read shows the edit. |
+| Demo seed (Abdul) | `backend/scripts/seed_demo.py` | No `qa_bank` on the demo candidates; the unused camelCase helpers go. | The column is gone. |
+| Candidate DTO (shared) | `src/lib/api/dto/candidates.ts`, its sample and test | The backend sends no `qa_bank`; the mapper gives `qaBank: []`. `CandidateSchema.qaBank` stays. | The Documents tab's Screening answers panel reads it and shows its empty state until the Documents section is removed (planned, [abdul.md](./abdul.md) §3). Mock mode still shows the fixtures' answers. |
+| Autofill and the extension (Arbaz) | none | Nothing changed. **For you:** read the selected résumé's `GET …/resumes/{id}?autofill=true` instead of `persona.qa_bank`, and match each entry by its `key` before its wording. A hand-saved answer becomes one of the version's own entries (`resumes.autofill`); the route that writes them is planned ([persona-to-candidates.md](./persona-to-candidates.md) §5). | This PR builds the answers; switching the extension is your PR. |
+| Old tailoring (JobNavigator leftover) | `backend/analyzer/legacy_tailoring.py` | Not changed. It isn't wired to anything and can't make versions (it reads columns 0013 dropped). | **For the tailoring module (Zuhair):** a tailored v1 copies its source version's typed entries (`autofill.entries_of`), as a save and a promote do (docs/02 §8.1, Abdul's third review). Its fixed answers are built from its own text, and an edit applies only where that text still gives the answer it replaced. |
+
 ## Résumé screens live — no claim states, the tree (`integrate/resumes`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §5 and §7. Decided 2026-11-05: BenchQ has no Verified / Unverified /
