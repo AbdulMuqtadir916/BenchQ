@@ -25,7 +25,8 @@ already runs `db_upgrade`), monitoring. Coordinate with Uzair's production layer
 ## 3. Cleaning the project dump
 
 Once the tracks are live: delete each module's mock and fixtures (`src/mocks/*`, `NEXT_PUBLIC_LIVE_MODULES` and
-`src/lib/api/config.ts` once everything is live), `activity_log_v2`, the JobNavigator leftovers no track uses, old
+`src/lib/api/config.ts` once everything is live), the JobNavigator leftovers no track uses (`activity_log_v2` is done:
+removed by Umamah in Activity Log PR 7, as agreed), old
 docs (`docs/archive/`), and regenerate `docs/CURRENT_STATE.md`.
 
 **The `personas` table** (decided 2026-11-05: kept for now): once autofill, cover letters and scoring read the candidate

@@ -277,8 +277,8 @@ def test_only_a_platform_session_carries_a_support_view():
 
 # ── Ledger ────────────────────────────────────────────────────────────────────
 
-_ENTRY = """INSERT INTO ledger_entries (firm_id, actor_type, actor_name, entity_type, entity_id, entity_label,
-                                        action, summary)
+_ENTRY = """INSERT INTO activity_logs (firm_id, actor_type, actor_name, entity_type, entity_id, entity_label,
+                                       action, summary)
             VALUES (:firm, 'PLATFORM_ADMIN', 'Sana Mirza', 'firm', 'x', 'Acme', :action, 's')"""
 
 
@@ -286,7 +286,7 @@ def test_ledger_actions_come_from_the_contract():
     fid = _firm()
     _run(_ENTRY, firm=fid, action="FIRM_CREATED")
     _run(_ENTRY, firm=None, action="LOGIN")       # platform-only events have no firm (A13)
-    with pytest.raises(IntegrityError, match="ck_ledger_entries_action"):
+    with pytest.raises(IntegrityError, match="ck_activity_logs_action"):
         _run(_ENTRY, firm=fid, action="FIRM_DELETED")
 
 

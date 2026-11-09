@@ -30,7 +30,7 @@ rules (§5). §6 lists what in the backend makes this harder than it looks.
 | IDs | UUIDs (Postgres `UUID`), plus `jobs.short_id` from a sequence | `models/db.py` |
 | Global uniqueness | `jobs.external_id` (SHA-256 dedup key) and `jobs.short_id` unique across the table; `companies.name` unique; `tracer_links.token` unique; `personas.id` always 1 (a singleton); `settings` one global key-value store | `models/db.py` |
 | Background work | APScheduler inside the API process: `scrape_all`, `email_check` (one Gmail account), `auto_reject`, `daily_digest` (one Telegram chat), `db_backup`, `h1b_refresh`, `job_cleanup`; plus `job_monitor.launch_background` for on-demand runs | `scheduler.py`, `job_monitor.py` |
-| Activity log | `activity_log_v2`: system events (`scrape`, `h1b`, `cv_score`, `email`, `telegram`) with a message. No actor, entity, action or firm | `models/db.py:444` |
+| Activity log | `activity_log_v2`: system events with a message. Removed by migration 0021; its rows and later events are system rows in `activity_logs` | migration 0021 |
 | LLM spend | `llm_call_log` per call, no firm | `analyzer/llm_logger.py` |
 | Size | 120 endpoints (main.py + 11 routers); about 1,900 tests, run on **in-memory SQLite** with `create_all` | `backend/tests/conftest.py` |
 
@@ -504,8 +504,8 @@ tests can be written before its dependencies are live; only "switch the adapter 
    separate worker process or a lock before scaling out.
 6. **`activity_log_v2` is an operations log, not the ledger.** It has no actor, entity, action or firm, and
    its `type` values are system events. The first 01-ledger.md mapped it to `LedgerEntry`; that mapping got
-   the "who did what" part of the product wrong (rewritten with track 01). The ledger becomes its own table (F2), and the activity log
-   stays as the platform's system log (it feeds `/admin/system` in Phase S).
+   the "who did what" part of the product wrong (rewritten with track 01). The ledger became its own table (F2). Since
+   migration 0021 there is one log, `activity_logs`: background events sit in it with no firm, for the Super Admin only.
 7. **Singletons and global uniques**: `personas.id = 1` (D1 replaces it); `jobs.external_id` unique
    globally (fine for the shared pool; a per-firm copy would need `(firm_id, external_id)`);
    `companies.name` unique (right for global reference data). `jobs.short_id` comes from one global

@@ -11,13 +11,13 @@ Backend only: the screen (PR 4) is unchanged, and the route stays `/ledger`. No 
 - **New table, `activity_logs`** (model `ActivityEntry`; `ActivityLog` stays the old system log, `activity_log_v2`).
   It has every `ledger_entries` column, plus: `on_behalf_of_user_id`, `actor_role`, `team_manager_id`,
   `candidate_manager_id`, `candidate_bde_id`, `changes`, `request_id`.
-- **Old data copied:** migration 0016 copies every `ledger_entries` row, with its id and date. Their stamps come from
+- **Old data copied:** migration 0019 copies every `ledger_entries` row, with its id and date. Their stamps come from
   today's roles and assignments. `ledger_entries` itself is left as it was; nothing writes or reads it now, and the demo
   reset only clears it. Removing it is Abdul's call. A downgrade puts new rows back into it.
 - **Can't be rewritten:** a database trigger refuses UPDATE and DELETE. The one way past it is the local demo reset, which
   may delete but never edit.
 - **Time-based history:** what the role reads now follows the stamps on each row, so history stays with the manager and
-  BDE at the time (07 Q56 replaces PR 1's today-based team lookup with this).
+  BDE at the time (07 Q59 replaces PR 1's today-based team lookup with this).
 - **Reads:** filters by person (`actor_id`, which includes what their AI did), team (`team_id`), `actor_type`, candidate,
   dates and search (`q`), plus `cursor` paging. `GET …/ledger/people` gives the people and their counts, the firm's time
   zone and the action types the reader may filter by. `GET …/ledger/candidates` gives the candidates the reader can pick.
@@ -31,7 +31,7 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 
 | File | Changes and reason |
 |---|---|
-| `backend/migrations/versions/0016_activity_logs.py` | New: the table, the copy, the trigger, a real downgrade. |
+| `backend/migrations/versions/0019_activity_logs.py` | New: the table, the copy, the trigger, a real downgrade. |
 | `backend/models/tenancy.py` | `ActivityEntry`. `LedgerEntry` stays, marked as frozen. |
 | `backend/auth/ledger.py` | Writes to the new table, stamps every entry, `diff` for before/after with masking, `on_behalf_of` for AI actors. |
 | `backend/api/routes_ledger.py` | Rewritten on the new table: the role limit by stamps, `Filters`, cursor paging, the two new routes. |
@@ -42,11 +42,11 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 | `backend/tests/test_activity_logs.py` | New: stamps, the trigger, each role, time-based history, filters, paging, people, candidates, the migration. |
 | `backend/tests/test_ledger_rules.py` | The rules now watch the new table, and nothing may use the old one but the demo reset. |
 | Other `backend/tests/*` | Read the new model's name. No expectation changed except the entry's shape. |
-| `docs/integration/01-ledger.md`, `docs/team/README.md`, `docs/team/umamah.md` | The new table, migration number 0016, status. |
+| `docs/integration/01-ledger.md`, `docs/team/README.md`, `docs/team/umamah.md` | The new table, migration number 0019, status. |
 
 ## Migration number
 
-0016, following Zuhair's 0015 (#112). 0015 dropped the ledger's `claim_state` and `evidence_ids`, so `activity_logs`
+0019, following main's 0018. Migration 0015 dropped the ledger's `claim_state` and `evidence_ids`, so `activity_logs`
 doesn't have them either.
 
 ## Known limit

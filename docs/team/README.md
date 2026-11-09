@@ -47,7 +47,7 @@ it. Everyone else reads it.
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
 | `applications`, `interviews` | Samad | |
 | `candidate_mailboxes`, `inbox_messages`, `candidate_google_oauth_attempts` (0010) | Samad | Candidate connection, imported mail and one-use OAuth handoff state |
-| `ledger_entries` | Abdul | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table |
+| `activity_logs` | Umamah | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table. It replaced `ledger_entries` and `activity_log_v2` (migration 0018) |
 | billing tables (new) | Abdul | |
 | `users`, `firms`, `plans`, `invites`, `sessions`, `support_views` | Abdul | Tenancy |
 | `notifications`, `password_reset_requests` | Mohammed Abdul Ahad Umamah | Extensible inbox; password recovery approvals |
@@ -106,11 +106,8 @@ it. Everyone else reads it.
 | 0012 | Samad | Candidate Gmail OAuth/sync and provenance | Merged #104 |
 | 0013 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0012 (Samad's) | `feat/drop-legacy-resume-columns` |
 | 0014 | Samad | Candidate email classification | Merged #111 |
-| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, no `OTHER` work authorization, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
-| 0016 | Zuhair | `firms.truth_guard_mode` and its CHECK dropped (claim-era setting; no claim states) | `integrate/resumes` |
-| 0017 | Zuhair | The résumé's fields leave `candidates` (`full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`; 07 Q57): a MANUAL base for every candidate without one, empty header fields filled, then the drop | `integrate/resumes` |
-| 0018 | Zuhair | No MANUAL bases (07 Q58): each becomes an UPLOAD base with a generated résumé file; a placeholder next to a real upload is removed; the checks allow UPLOAD and PROMOTED only | `integrate/resumes` |
-| 0019 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries` | `activity-log/pr3-new-table-and-endpoints` (renumbered after main's 0016–0018) |
-| 0020 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts | `activity-logs/pr6-signin-events-and-super-admin` |
-| 0021 | Mohammed Abdul Ahad Umamah | Remove `activity_log_v2` and `ledger_entries` after copying their rows into `activity_logs` | `activity-logs/pr7-remove-old-log-tables` |
-| 0022+ | — | Claim the next number here in your PR | — |
+| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
+| 0016 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries` | `activity-log/pr3-new-table-and-endpoints` |
+| 0017 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts | `activity-logs/pr6-signin-events-and-super-admin` |
+| 0018 | Mohammed Abdul Ahad Umamah | Remove `activity_log_v2` and `ledger_entries`, after copying their rows into `activity_logs` | `activity-logs/pr7-remove-old-log-tables` |
+| 0019+ | — | Claim the next number here in your PR | — |

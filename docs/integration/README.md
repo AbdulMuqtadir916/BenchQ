@@ -178,7 +178,7 @@ dependencies are live; only switching the adapter to live waits.
 
 | Track | Module | Depends on | Owner | Status |
 |---|---|---|---|---|
-| 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6). **The worked example: copy it** | F1–F4 | Abdul | Live behind flag (`session,ledger`) |
+| 01 | [Ledger](./01-ledger.md) — the `activity_logs` table (migration 0019), which replaced `ledger_entries` and `activity_log_v2` (0021). **The worked example: copy it** | F1–F4 | Abdul | Live behind flag (`session,ledger`) |
 | 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md); searches and jobs per candidate (Q53b) | F1–F7; 0007 | Zuhair (2nd) | Not started |
 | — | Candidates (D1), with the firm hierarchy and onboarding: [`docs/candidate-onboarding/06-backend.md`](../candidate-onboarding/06-backend.md) | F1–F7; D1 (option 1, Q50) | Abdul (from Zuhair, 2026-10-27) | Built (PRs 1–5, 2026-10-27). Frontend live behind flag (`session,ledger,candidates`, onboarding 07b, 2026-10-28); the mock stays until Tracks 03/04 |
 | — | Admin API (firms, plans, users, invites, platform team, audit) | F1–F7 | Uzair (after F7) | In progress: create firm, invites, read lists live behind flag (#36, #39, #40); firm edits, suspend, plans, limits, user deactivate, platform-team invites not started |

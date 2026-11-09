@@ -257,8 +257,7 @@ def test_scheduler_jobs_is_a_list(client):
     "/api/stats/llm-costs?days=0", "/api/stats/llm-costs?days=-1",
     "/api/health/entities", "/api/health/entities?window=1",
     "/api/scrape-log", "/api/scrape-log?errors_only=true",
-    "/api/scrape-log?warnings_only=true", "/api/activity-log",
-    "/api/activity-log?type=scrape", "/api/activity-log?company=" + EMOJI,
+    "/api/scrape-log?warnings_only=true",
 ])
 def test_stats_endpoints_answer_cleanly(client, path):
     assert_clean(client.get(path), 200)
@@ -267,7 +266,6 @@ def test_stats_endpoints_answer_cleanly(client, path):
 @pytest.mark.parametrize("path", [
     "/api/stats/timeline?days=abc", "/api/stats/llm-costs?days=abc",
     "/api/health/entities?window=abc", "/api/scrape-log?errors_only=maybe",
-    "/api/activity-log?limit=abc",
 ])
 def test_stats_endpoints_reject_bad_query_types(client, path):
     assert_clean(client.get(path), 422)
@@ -387,7 +385,7 @@ def test_telegram_webhook_null_message_never_leaks_internals(client, test_db):
 
 @pytest.mark.parametrize("path", [
     "/api/monitor/history?limit=-5", "/api/monitor/finished?limit=-5",
-    "/api/activity-log?limit=-3", "/api/scrape-log?limit=-3",
+    "/api/scrape-log?limit=-3",
 ])
 def test_negative_limit_is_422_on_every_system_listing(client, path):
     """R4-T1-07: a plain `int` limit reached Postgres as LIMIT -5."""
@@ -395,7 +393,7 @@ def test_negative_limit_is_422_on_every_system_listing(client, path):
 
 
 @pytest.mark.parametrize("path", [
-    "/api/monitor/history?offset=-5", "/api/activity-log?offset=-5",
+    "/api/monitor/history?offset=-5",
 ])
 def test_negative_offset_stays_clamped_not_rejected(client, path):
     """`offset` was already clamped with max(0, …) and keeps that contract."""

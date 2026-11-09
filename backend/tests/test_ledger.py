@@ -1,5 +1,5 @@
 """A firm's ledger (backend/api/routes_ledger.py; docs/integration/01-ledger.md): the firm's own entries, newest
-first; a MANAGER's team only (07 Q56); a BDE's own entries only; another firm's ledger and a Super Admin get no
+first; a MANAGER's team only (07 Q59); a BDE's own entries only; another firm's ledger and a Super Admin get no
 answer."""
 from datetime import timedelta
 
@@ -127,7 +127,7 @@ def test_a_write_shows_up_in_the_ledger(anonymous_client, accounts, ledger, test
 # 07 Q52: a BDE also reads the ASSIGN entries about the candidates they work now; and every reader can filter.
 
 def _stamp_from_today(test_db):
-    """These entries are built by hand, so they get their stamps as migration 0016 gave the rows it copied."""
+    """These entries are built by hand, so they get their stamps as migration 0019 gave the rows it copied."""
     from sqlalchemy import text
     test_db.execute(text("ALTER TABLE activity_logs DISABLE TRIGGER activity_logs_append_only"))
     test_db.execute(text("UPDATE activity_logs a SET team_manager_id = CASE u.role WHEN 'MANAGER' THEN u.id "
@@ -218,7 +218,7 @@ def test_filters_by_candidate_their_whole_activity(api_client, accounts, ledger,
         ["Applied for Asha", "Mira edited Asha", "Assigned Asha to Bea"]
 
 
-# 07 Q56: a MANAGER reads their own team, not the firm.
+# 07 Q59: a MANAGER reads their own team, not the firm.
 
 @pytest.fixture
 def teams(test_db, accounts, ledger, assignments):

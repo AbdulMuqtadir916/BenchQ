@@ -1,4 +1,4 @@
-"""The activity log (backend/auth/ledger.py, backend/api/routes_ledger.py, migration 0016): entries stamped with who was
+"""The activity log (backend/auth/ledger.py, backend/api/routes_ledger.py, migration 0019): entries stamped with who was
 responsible at the time, history that stays with them, a table that can't be rewritten, and the log's filters, paging
 and counts."""
 from datetime import datetime, timedelta, timezone
@@ -16,7 +16,7 @@ from sqlalchemy.pool import NullPool
 from backend.auth import ledger
 from backend.logging_setup import request_id
 from backend.models.candidates import Candidate
-from backend.models.tenancy import ActivityEntry, Firm, LedgerEntry, User
+from backend.models.tenancy import ActivityEntry, Firm, User
 from backend.tests.auth_support import make_firm, make_plan, make_user
 from backend.tests.scratch_db import _admin_engine, _url_for
 
@@ -487,16 +487,20 @@ def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0015)
         db.flush()
         when = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
         entry_id, firm_id, manager_id, bde_id, candidate_id = uuid.uuid4(), firm.id, manager.id, bde.id, candidate.id
-        db.add(LedgerEntry(id=entry_id, firm_id=firm.id, actor_type="USER", actor_user_id=bde.id, actor_name="Bea",
-                           entity_type="candidate", entity_id=str(candidate.id), entity_label="Asha", action="ASSIGN",
-                           summary="Old", note="Handoff", candidate_id=candidate.id, created_at=when))
-        db.add(LedgerEntry(firm_id=None, actor_type="SYSTEM", actor_name="script", entity_type="firm", entity_id="x",
-                           entity_label="x", action="CREATE", summary="Platform"))
+        db.commit()
+        db.execute(text("""INSERT INTO ledger_entries (id, firm_id, actor_type, actor_user_id, actor_name, entity_type, entity_id,
+                                                       entity_label, action, summary, note, candidate_id, created_at)
+                           VALUES (:id, :firm, 'USER', :bde, 'Bea', 'candidate', :candidate_text, 'Asha', 'ASSIGN', 'Old',
+                                   'Handoff', :candidate, :when)"""),
+                   {"id": entry_id, "firm": firm_id, "bde": bde_id, "candidate_text": str(candidate_id),
+                    "candidate": candidate_id, "when": when})
+        db.execute(text("""INSERT INTO ledger_entries (actor_type, actor_name, entity_type, entity_id, entity_label, action, summary)
+                           VALUES ('SYSTEM', 'script', 'firm', 'x', 'x', 'CREATE', 'Platform')"""))
         db.commit()
 
     _alembic(url, "upgrade", "head")
     with Session(engine) as db:
-        assert db.query(ActivityEntry).count() == 2 == db.query(LedgerEntry).count()
+        assert db.query(ActivityEntry).count() == 2
         row = db.get(ActivityEntry, entry_id)
         assert (row.summary, row.note, row.created_at, row.firm_id) == ("Old", "Handoff", when, firm_id)
         assert (row.actor_role, row.team_manager_id) == ("BDE", manager_id)
@@ -509,5 +513,5 @@ def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0015)
     _alembic(url, "downgrade", "0015")
     with Session(engine) as db:
         assert db.execute(text("SELECT to_regclass('activity_logs')")).scalar() is None
-        assert db.query(LedgerEntry).count() == 3
-        assert db.query(LedgerEntry).filter(LedgerEntry.summary == "Written after").count() == 1
+        assert db.execute(text("SELECT count(*) FROM ledger_entries")).scalar() == 3
+        assert db.execute(text("SELECT count(*) FROM ledger_entries WHERE summary = 'Written after'")).scalar() == 1

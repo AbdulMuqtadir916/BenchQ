@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.models.candidates import Candidate, ResumeParse
 from backend.models.db import utcnow
-from backend.models.tenancy import Firm, Invite, LedgerEntry, User
+from backend.models.tenancy import ActivityEntry, Firm, Invite, User
 from backend.tests.auth_support import make_user
 
 
@@ -54,9 +54,9 @@ def test_bde_capacity_is_one_to_fifty(test_db, firm):
 
 
 def test_the_ledger_takes_assign_with_a_note(test_db, firm):
-    test_db.add(LedgerEntry(firm_id=firm.id, actor_type="USER", actor_name="Owner", entity_type="candidate",
-                            entity_id=str(uuid.uuid4()), entity_label="Ravi", action="ASSIGN",
-                            summary="Assigned to Adnan Khan (Fatima Reddy)", note="Push banking clients first."))
+    test_db.add(ActivityEntry(firm_id=firm.id, actor_type="USER", actor_name="Owner", entity_type="candidate",
+                              entity_id=str(uuid.uuid4()), entity_label="Ravi", action="ASSIGN",
+                              summary="Assigned to Adnan Khan (Fatima Reddy)", note="Push banking clients first."))
     test_db.flush()
 
 
@@ -75,8 +75,8 @@ def test_a_candidate_keeps_to_the_contract(test_db, firm):
                             ({"employment_types": ["CONTRACT"]}, "ck_candidates_employment_types"),
                             ({"work_settings": ["ANYWHERE"]}, "ck_candidates_work_settings"),
                             ({"rate_min": 90, "rate_target": 85}, "ck_candidates_floor_not_above_target"),
-                            ({"years_experience": 61}, "ck_candidates_years_experience")):
-        # (ck_candidates_full_name_not_blank went with the column in 0017: the name is the résumé's, 07 Q57.)
+                            ({"years_experience": 61}, "ck_candidates_years_experience"),
+                            ({"full_name": "  "}, "ck_candidates_full_name_not_blank")):
         _refused(test_db, _candidate(firm, manager, **bad), constraint)
 
 

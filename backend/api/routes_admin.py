@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import and_, not_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
@@ -177,13 +178,25 @@ def list_team(db: DbSession = Depends(get_db)):
 
 
 AUDIT_LIMIT = 500
+AUDIT_BACKGROUND_LIMIT = 100
 
 
 @router.get("/audit", summary="The ledger across the platform and every firm, newest first")
 def list_audit(limit: int = Query(default=AUDIT_LIMIT, ge=1, le=2000), db: DbSession = Depends(get_db)):
-    """Platform events and every firm's (A13). The newest `limit` entries; paging comes with the audit screen's
-    filters. A support view that ran out is settled first, so the overview never counts it as open."""
+    """Platform events and every firm's (A13), newest first: the newest `limit` entries, then what the Super Admin's
+    screens work out their numbers from however old it is, so background rows never push it out: each firm's latest
+    entry, every plan change and every support view. Background work adds only its newest rows. The full log is
+    `/api/admin/activity`. A support view that ran out is settled first, so the overview never counts it as open."""
     support.settle_expired(db)
     db.commit()
-    entries = db.query(ActivityEntry).order_by(ActivityEntry.created_at.desc(), ActivityEntry.id).limit(limit)
-    return [ledger_entry_json(e, hide_email=True) for e in entries]
+    newest = (ActivityEntry.created_at.desc(), ActivityEntry.id)
+    background = and_(ActivityEntry.firm_id.is_(None), ActivityEntry.actor_type.in_(("SYSTEM", "AGENT")))
+    entries = {e.id: e for e in db.query(ActivityEntry).filter(not_(background)).order_by(*newest).limit(limit)}
+    entries.update({e.id: e for e in db.query(ActivityEntry).filter(background).order_by(*newest).limit(AUDIT_BACKGROUND_LIMIT)})
+    latest = db.query(ActivityEntry).filter(ActivityEntry.firm_id.isnot(None)).distinct(ActivityEntry.firm_id) \
+        .order_by(ActivityEntry.firm_id, ActivityEntry.created_at.desc())
+    entries.update({e.id: e for e in latest})
+    lasting = db.query(ActivityEntry).filter(ActivityEntry.action.in_(("PLAN_CHANGED", "ADMIN_ACCESS", "ADMIN_ACCESS_END")))
+    entries.update({e.id: e for e in lasting})
+    ordered = sorted(entries.values(), key=lambda e: e.created_at, reverse=True)
+    return [ledger_entry_json(e, hide_email=True) for e in ordered]

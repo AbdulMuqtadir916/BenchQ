@@ -10,7 +10,7 @@ contract changes and the migration number with Abdul.
 ## Status
 
 **Activity logs (from 2026-11-05):** the ledger plan, agreed with Abdul, runs as one branch per PR named `activity/…`.
-PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q56).
+PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q59).
 Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
 Next: PR 2, the ledger rules as tests.
 
@@ -80,8 +80,16 @@ the reads the screen needs. Change document:
 screen: people list, searchable actor and candidate dropdowns, dates, and the sidebar name. Change document:
 [pr-changes/activity-logs-pr4-activity-screen.md](./pr-changes/activity-logs-pr4-activity-screen.md).
 
+**Activity Log PR 7 (2026-11-07):** `activity-logs/pr7-remove-old-log-tables`, built on PR 6, not pushed yet. Removing
+`activity_log_v2` and `ledger_entries` is my responsibility, agreed with Abdul. Migration 0021 copies any row not yet in
+`activity_logs`, stops if one is missing, then drops both tables. Details in
+[pr-changes/activity-logs-pr7-remove-old-log-tables.md](./pr-changes/activity-logs-pr7-remove-old-log-tables.md).
+
+**Activity Log PR 5 part 2, added 2026-11-07:** background work (scrapes, scoring, Gmail, Telegram, scheduled runs and AI
+calls) writes to `activity_logs` with no firm, so only the Super Admin sees it.
+
 **Activity Log PR 6 (2026-11-07):** `activity-logs/pr6-signin-events-and-super-admin`, built on PR 5 part 3, not pushed
-yet. Sign-out, failed sign-ins and lockouts are logged (migration 0017), and the Super Admin has the full Activity page,
+yet. Sign-out, failed sign-ins and lockouts are logged (migration 0020), and the Super Admin has the full Activity page,
 with a Failed sign-ins view only they can see. Details in
 [pr-changes/activity-logs-pr6-signin-events-and-super-admin.md](./pr-changes/activity-logs-pr6-signin-events-and-super-admin.md).
 
