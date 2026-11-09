@@ -254,7 +254,7 @@ describe("autofill", () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Location (City)", "combobox")]));
     await mount();
     await run(() => hook.autofill());
-    expect(fillChoice).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", search: "Phoenix" }, "Phoenix, AZ");
+    expect(fillChoice).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", search: "Phoenix" }, "Phoenix, AZ", undefined);
     expect(fillField).not.toHaveBeenCalled();
   });
 

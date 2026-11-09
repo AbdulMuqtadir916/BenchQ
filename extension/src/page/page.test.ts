@@ -91,9 +91,9 @@ describe("which controls count", () => {
     expect(scan(`<input aria-label="on"><input required tabindex="-1" aria-hidden="true">`).scan.fields).toHaveLength(1);
   });
 
-  it("treats a read-only or multiple control as one it can't fill", () => {
+  it("treats a read-only control as one it can't fill, and a multiple select as a list of choices", () => {
     const fields = scan(`<input aria-label="a" readonly><select aria-label="b" multiple><option>x</option></select>`).scan.fields;
-    expect(fields.map(({ kind }) => kind)).toEqual(["custom", "custom"]);
+    expect(fields.map(({ kind }) => kind)).toEqual(["custom", "checkbox"]);
   });
 
   it("marks every field of a sign-in form", () => {
