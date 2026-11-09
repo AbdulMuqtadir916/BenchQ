@@ -4,7 +4,7 @@ import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./fo
 import { checkJob, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
 import { answersFromResume } from "./resume-answers";
-import { buildReview } from "./review";
+import { buildReview, suggestedRow } from "./review";
 import {
   chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, scanTab, undoCount, undoFills, type TabScan,
 } from "./tab-bridge";
@@ -421,6 +421,17 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
   const replace = useCallback((chosen: ReviewRow[]) =>
     fillRows(chosen.filter((row): row is FillableRow => row.status === "kept" && Boolean(row.write)), 1), [fillRows]);
 
+  /** Fills a field with one of the saved answers suggested for it, which the BDE picked (Q26). It counts as BenchQ's
+   * fill, so Undo takes it back too. An answer that doesn't fit the field says why instead. */
+  const fillWith = useCallback(async (row: ReviewRow, entry: BankEntry) => {
+    const picked = suggestedRow(row, entry);
+    if (picked.status === "ready" && picked.write) {
+      await fillRows([picked as FillableRow], 1);
+      return;
+    }
+    if (picked.status === "manual") showResult(row.key, (item) => ({ ...item, reason: picked.reason }));
+  }, [fillRows, showResult]);
+
   /** A dropdown's options, for a row Autofill found no clear option for, so the BDE can choose one in the panel. */
   const listOptions = useCallback(async ({ field }: ReviewRow): Promise<string[] | null> => {
     const scanId = frames.current.scanIds.get(field.frameId);
@@ -481,6 +492,6 @@ export function useAutofill({ connection, firmId, resumeId, onSessionExpired, on
 
   return {
     rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom,
-    needsConfirmation, fillCount: targets.length, rescan: scan, autofill, replace, listOptions, choose, undo, goToField, finalForm,
+    needsConfirmation, fillCount: targets.length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
   };
 }

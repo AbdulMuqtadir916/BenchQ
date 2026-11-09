@@ -170,6 +170,18 @@ describe("the picked résumé", () => {
   });
 });
 
+describe("a suggestion the BDE picks", () => {
+  it("fills the field with it, as BenchQ's own fill", async () => {
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("Willing to work weekends?", "Yes")]);
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Can you support Saturday/Sunday shifts?")]));
+    await mount();
+    const row = hook.rows![0]!;
+    expect(row.suggestions?.map(({ question }) => question)).toEqual(["Willing to work weekends?"]);
+    await run(() => hook.fillWith(row, row.suggestions![0]!));
+    expect(fillField).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", write: { type: "text", value: "Yes" } });
+  });
+});
+
 describe("scanning", () => {
   it("reviews the page when it opens", async () => {
     await mount();

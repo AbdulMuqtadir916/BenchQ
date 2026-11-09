@@ -7,6 +7,7 @@ import { neverFillReason, staysOutOfSavedForm } from "./never-fill";
 import { authorizedIn, sponsorshipIn, sponsorshipWordsIn, statusAnswer, statusOptionFor } from "./authorization";
 import { numberIn, optionFor, pickOneReason, polarity } from "./options";
 import { payUnitClash } from "./pay";
+import { similarity } from "../engine/universal-ai-autofill/signals";
 import { racePartsFor, withHispanic } from "./race";
 import { canonical, normalize, questionOf } from "./text";
 import type { BankEntry, FieldKind, FieldOption, FieldWrite, JobSummary, ReviewRow, TabField } from "./types";
@@ -30,6 +31,11 @@ const PERSON_KINDS = new Set<EngineFieldType>([
 ]);
 /** A block of work or education history, where a start date is that entry's, not when the candidate can start. */
 const HISTORY_SECTION = /\b(experience|education|employment|work history)\b/;
+/** Words that mark one entry of a question asked again for another: "Employer 2", "Other phone", "Previous employer". */
+const ENTRY_MARKER = /\b(\d+|first|second|third|other|another|alternate|alternative|secondary|additional|previous|former|prior|past|current|present|primary|most recent|latest)\b/g;
+const REPEATED = "This asks the same thing again, for another entry, so it's yours to fill.";
+const CHOICE_KINDS = new Set<FieldKind>(["select", "radio", "combobox", "checkbox"]);
+const MAX_SUGGESTIONS = 3;
 
 type Fit = { write: FieldWrite; proposed: string } | { reason: string };
 type Base = Pick<ReviewRow, "key" | "field" | "isUnsaved">;
@@ -134,8 +140,29 @@ function tied(base: Base, entries: BankEntry[], type: EngineFieldType | null, an
       .filter(({ id }) => id !== null);
     if (fitting.length > 0 && new Set(fitting.map(({ id }) => id)).size === 1) return fromBank(base, fitting[0]!.entry, type, answerOf(fitting[0]!.entry));
   }
-  const alternatives = [...new Set(entries.map((entry) => entry.answer.trim()))];
-  return { ...base, status: "manual", reason: "More than one saved answer fits.", alternatives };
+  // Each answer once, by what it says: "Yes" and "yes." are one answer, and one answer is no tie.
+  const byMeaning = new Map<string, BankEntry>();
+  entries.forEach((entry) => { if (!byMeaning.has(normalize(entry.answer))) byMeaning.set(normalize(entry.answer), entry); });
+  const distinct = [...byMeaning.values()];
+  if (distinct.length === 1) return fromBank(base, distinct[0]!, type, answerOf(distinct[0]!));
+  return { ...base, status: "manual", reason: "More than one saved answer fits.", alternatives: distinct.map(({ answer }) => answer.trim()) };
+}
+
+/** The candidate's own screening answers closest in wording to a question nothing answered, for the BDE to use with a
+ * click (Q26). Only for a question, a choice or a label that asks, never a plain field like "Middle name", and never for
+ * a field of a kind BenchQ knows, whose answer would have matched already. */
+function suggestionsFor(field: TabField, label: string, type: EngineFieldType | null, { bank, byType }: Review): BankEntry[] | undefined {
+  if (type || !(CHOICE_KINDS.has(field.kind) || /\?\s*$/.test(field.label.trim()))) return undefined;
+  const typed = new Set([...byType.values()].flat());
+  const closest = bank.filter((entry) => !typed.has(entry))
+    .map((entry) => ({ entry, score: similarity(label, questionOf(entry.question)) }))
+    .sort((left, right) => right.score - left.score).slice(0, MAX_SUGGESTIONS).map(({ entry }) => entry);
+  return closest.length > 0 ? closest : undefined;
+}
+
+/** The row a suggestion the BDE picked makes: ready to fill, or why the answer doesn't fit this field. */
+export function suggestedRow({ key, field, isUnsaved }: ReviewRow, entry: BankEntry): ReviewRow {
+  return rowFor({ key, field, isUnsaved }, entry.answer, entry);
 }
 
 /** Whether a saved answer found by kind or by close wording answers this field: a screening question asks the same
@@ -246,7 +273,26 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   // Pay saved in another unit: shown, but never converted.
   const otherUnit = type ? (byType.get(type) ?? []).find((saved) => payUnitClash(type, field.label, saved.answer)) : undefined;
   if (otherUnit) return { ...manual(payUnitClash(type, field.label, otherUnit.answer)!), proposed: otherUnit.answer, source: otherUnit };
-  return manual(NO_ANSWER);
+  const suggestions = suggestionsFor(field, asked.label, type, { bank, byType, job });
+  return suggestions ? { ...manual(NO_ANSWER), suggestions } : manual(NO_ANSWER);
+}
+
+/** "Employer 2" after "Employer 1", "Other phone" after "Phone": the same question again, for another entry, with the
+ * same saved answer. The first one takes it; a later one is the BDE's, since the same answer twice is rarely right. A
+ * self-ID question asked twice is the exception: its answer is the same, wherever the form asks it. */
+function handBackRepeats(rows: ReviewRow[]): ReviewRow[] {
+  const answered = new Set<string>();
+  return rows.map((row) => {
+    if (!row.source || !row.proposed || row.isUnsaved || (row.status !== "ready" && row.status !== "same")) return row;
+    const asked = normalize(row.field.label).replace(ENTRY_MARKER, " ").replace(/\s+/g, " ").trim();
+    if (!asked) return row;
+    const repeat = `${row.source.id}\u0000${normalize(row.proposed)}\u0000${asked}`;
+    if (!answered.has(repeat)) {
+      answered.add(repeat);
+      return row;
+    }
+    return row.status === "ready" ? { ...row, status: "manual", reason: REPEATED, write: undefined } : row;
+  });
 }
 
 /** One row per scanned field, in the form's order. `key` survives a rescan, so what a tab remembers about a field does.
@@ -259,11 +305,11 @@ export function buildReview(fields: TabField[], bank: BankEntry[], job: Job | nu
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   const seen = new Map<string, number>();
-  return fields.map((field) => {
+  return handBackRepeats(fields.map((field) => {
     const label = normalize(field.label);
     const index = seen.get(label) ?? 0;
     seen.set(label, index + 1);
     const key = `${field.frameId}:${field.kind}:${label}:${index}`;
     return reviewField({ key, field }, Boolean(label) && (counts.get(label) ?? 0) > 1, review);
-  });
+  }));
 }

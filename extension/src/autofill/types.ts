@@ -136,6 +136,9 @@ export type ReviewRow = {
   isUnsaved?: boolean;
   /** A dropdown Autofill opened but found no clear option in: the BDE can pick one from its options in the panel. */
   canChoose?: boolean;
+  /** For a question no saved answer clearly matches: the closest of the candidate's own screening answers, which the
+   * BDE can use with a click. Never filled on their own. */
+  suggestions?: BankEntry[];
 };
 
 /** One field of an Autofill run, as the panel lists it while the run goes: the value it took, or why it didn't. */

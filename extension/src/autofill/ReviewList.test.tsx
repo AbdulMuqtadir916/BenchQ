@@ -242,3 +242,33 @@ describe("a dropdown Autofill found no clear option in", () => {
     expect(host.querySelector("[data-slot='choice-open']")).toBeNull();
   });
 });
+
+describe("suggestions", () => {
+  const weekends: BankEntry = { id: "w", question: "Willing to work weekends?", answer: "Yes", category: "OTHER" };
+  const unmatched = row("Can you support Saturday/Sunday shifts?", true, "manual", { reason: "No answer in the bank.", suggestions: [weekends] });
+  const onSuggest = vi.fn();
+  const showWith = (rows: ReviewRow[], isFilling = false) => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => { root!.render(<ReviewList rows={rows} isFilling={isFilling} onGoTo={onGoTo} onSuggest={onSuggest} />); });
+  };
+
+  it("offers saved answers for a question nothing matched, each a button that fills the field", () => {
+    showWith([unmatched]);
+    const button = host.querySelector<HTMLButtonElement>("[data-slot='review-suggestions'] button")!;
+    expect(button.textContent).toBe("Willing to work weekends? Yes");
+    act(() => { button.click(); });
+    expect(onSuggest).toHaveBeenCalledWith(unmatched, weekends);
+  });
+
+  it("waits while a run fills the form", () => {
+    showWith([unmatched], true);
+    expect(host.querySelector<HTMLButtonElement>("[data-slot='review-suggestions'] button")!.disabled).toBe(true);
+  });
+
+  it("goes once the field is filled", () => {
+    showWith([{ ...unmatched, field: { ...unmatched.field, current: "Yes" } }]);
+    expect(host.querySelector("[data-slot='review-suggestions']")).toBeNull();
+  });
+});

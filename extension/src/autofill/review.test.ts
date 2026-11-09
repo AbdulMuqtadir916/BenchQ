@@ -484,3 +484,51 @@ describe("what stays out of the form saved with an application", () => {
     expect(review(field("Why this company?")).isUnsaved).toBeFalsy();
   });
 });
+
+describe("the same answer again", () => {
+  it("lists each saved answer once, by what it says", () => {
+    const bank = [entry("ZIP code", "75001"), entry("Postcode", "75001."), entry("Zip", "75002")];
+    expect(review(field("Postal code"), bank)).toMatchObject({ status: "manual", alternatives: ["75001", "75002"] });
+  });
+
+  it("leaves a repeat of an answered question, for another entry, to the BDE", () => {
+    const bank = [entry("Phone", "+1 214 555 0167"), entry("Current employer", "Acme")];
+    const labels = ["Phone", "Other phone", "Phone 2", "Current employer", "Previous employer", "Employer 2"];
+    const rows = buildReview(labels.map((label, index) => field(label, { id: `f${index}` })), bank);
+    expect(rows.map(({ status }) => status)).toEqual(["ready", "manual", "manual", "ready", "manual", "manual"]);
+    expect(rows[1]).toMatchObject({ reason: "This asks the same thing again, for another entry, so it's yours to fill.", write: undefined });
+  });
+
+  it("still fills fields that ask different things with one answer", () => {
+    const bank = [entry("Current location", "Dallas, TX")];
+    const rows = buildReview([field("City", { id: "a" }), field("Current location", { id: "b" })], bank);
+    expect(rows.map(({ status }) => status)).toEqual(["ready", "ready"]);
+  });
+});
+
+describe("suggestions for a question nothing answers", () => {
+  const radio: Partial<TabField> = { kind: "radio", options: yesNo };
+
+  it("offers the candidate's own screening answers, never to fill on their own", () => {
+    const bank = [entry("Willing to work weekends?", "Yes"), entry("Do you own a car?", "No"), entry("Email", "a@example.test")];
+    const row = review(field("Can you support Saturday/Sunday shifts?", radio), bank);
+    expect(row).toMatchObject({ status: "manual", reason: "No answer in the bank." });
+    expect(row.write).toBeUndefined();
+    const offered = row.suggestions!.map(({ question }) => question);
+    expect(offered).toEqual(expect.arrayContaining(["Willing to work weekends?", "Do you own a car?"]));
+    expect(offered).not.toContain("Email");
+  });
+
+  it("offers none for a plain field, or for a kind of question BenchQ knows", () => {
+    const bank = [entry("Willing to work weekends?", "Yes")];
+    expect(review(field("Middle name"), bank).suggestions).toBeUndefined();
+    expect(review(field("Are you a protected veteran?", radio), bank).suggestions).toBeUndefined();
+  });
+
+  it("offers three at most, the closest wording first", () => {
+    const bank = ["Do you smoke?", "Can you work holidays?", "Do you own a car?", "Can you drive a truck?"].map((question) => entry(question, "Yes"));
+    const offered = review(field("Are you available to work on public holidays?", radio), bank).suggestions!;
+    expect(offered).toHaveLength(3);
+    expect(offered[0]!.question).toBe("Can you work holidays?");
+  });
+});

@@ -3,7 +3,7 @@ import { button, MOTION, SOFT_TEXT } from "../ui";
 import ChoicePicker from "./ChoicePicker";
 import { fieldLabel, filledValue } from "./form-memory";
 import { Tick } from "./marks";
-import type { ReviewRow } from "./types";
+import type { BankEntry, ReviewRow } from "./types";
 
 type ReviewListProps = {
   rows: ReviewRow[];
@@ -14,9 +14,11 @@ type ReviewListProps = {
   /** A dropdown's options, for a row Autofill found no clear option in, and the one the BDE picks from them. */
   onListOptions?: (row: ReviewRow) => Promise<string[] | null>;
   onChoose?: (row: ReviewRow, label: string) => void;
+  /** Fills a field with one of the saved answers suggested for it. */
+  onSuggest?: (row: ReviewRow, entry: BankEntry) => void;
 };
 
-type RowActions = Pick<ReviewListProps, "isFilling" | "onGoTo" | "onListOptions" | "onChoose">;
+type RowActions = Pick<ReviewListProps, "isFilling" | "onGoTo" | "onListOptions" | "onChoose" | "onSuggest">;
 
 /** One line per field: its tick, its label, and what it holds. The row hangs into the margin, so ticks line up with the
  * heading above. */
@@ -74,7 +76,21 @@ function Row({ row, ...actions }: RowActions & { row: ReviewRow }) {
     {row.canChoose && !filled && actions.onListOptions && actions.onChoose && <div className="pl-[calc(var(--icon-md)+var(--spacing)*2)]">
       <ChoicePicker row={row} isFilling={actions.isFilling} onListOptions={actions.onListOptions} onChoose={actions.onChoose} />
     </div>}
+    {row.suggestions && !filled && actions.onSuggest && <Suggestions row={row} suggestions={row.suggestions} isFilling={actions.isFilling} onSuggest={actions.onSuggest} />}
   </li>;
+}
+
+/** Saved answers that might answer a question nothing matched: one click fills the field with one. */
+function Suggestions({ row, suggestions, isFilling, onSuggest }: { row: ReviewRow; suggestions: BankEntry[]; isFilling: boolean; onSuggest: (row: ReviewRow, entry: BankEntry) => void }) {
+  return <div data-slot="review-suggestions" className="grid gap-1 pl-[calc(var(--icon-md)+var(--spacing)*2)]">
+    <p className={NOTE}>Saved answers that might fit:</p>
+    <ul className="grid gap-1">{suggestions.map((entry) => <li key={entry.id}>
+      <button type="button" className={`max-w-full text-left ${button("secondary", "compact")}`} disabled={isFilling}
+        aria-label={`Fill ${fieldLabel(row.field)} with "${entry.answer}", saved for "${entry.question}"`} onClick={() => onSuggest(row, entry)}>
+        <span className="min-w-0 wrap-anywhere"><span className="text-[var(--color-text-3)]">{entry.question}</span> {entry.answer}</span>
+      </button>
+    </li>)}</ul>
+  </div>;
 }
 
 function Group({ title, rows, ...actions }: RowActions & { title: string; rows: ReviewRow[] }) {
@@ -116,8 +132,8 @@ function KeptGroup({ rows, isFilling, onGoTo, onReplace }: RowActions & { rows: 
 /** The form's fields and what each holds: what the form already held that differs from the saved answers, what's
  * required, what's optional, then any upload the Resume and Cover letter sections don't stand for, since Autofill leaves
  * uploads to the BDE every time. Labels and values come from the employer's page and render as plain text. */
-export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListOptions, onChoose }: ReviewListProps) {
-  const actions = { isFilling, onGoTo, onListOptions, onChoose };
+export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListOptions, onChoose, onSuggest }: ReviewListProps) {
+  const actions = { isFilling, onGoTo, onListOptions, onChoose, onSuggest };
   const isKept = (row: ReviewRow) => row.status === "kept";
   const typed = rows.filter((row) => !isUpload(row) && !isKept(row));
   return <div data-slot="review" className="grid grid-cols-[minmax(0,1fr)] gap-3">

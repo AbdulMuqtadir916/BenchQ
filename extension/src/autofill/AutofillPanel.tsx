@@ -163,7 +163,8 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
       {hasForm && <DocumentSections rows={rows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
         picked={picked ? { label: picked.label, url: studioUrl(picked.id) } : null} />}
       {!filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
-        onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)} />}
+        onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
+        onSuggest={(row, entry) => void state.fillWith(row, entry)} />}
     </div>
 
     <div data-slot="autofill-actions" className="sticky bottom-0 z-1 grid gap-1.5 rounded-b-[var(--radius-lg)] border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pt-2 pb-3 empty:hidden">
