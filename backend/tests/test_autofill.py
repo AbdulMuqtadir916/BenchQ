@@ -240,6 +240,27 @@ def test_the_highest_degree_comes_with_its_own_school_and_year():
         assert answers([btech, {"degree": other, "institution": "B", "graduation_date": "2021"}]) == (
             "B.Tech in CSE", "JNTU", 2017)
     assert answers([{"degree": "Certified Scrum Master", "institution": "Scrum Alliance"}]) == (None, None, None)
+    # Abdul's fifth review. A degree with a certificate attached is still a degree; a certificate alone isn't one.
+    mba = {"degree": "MBA with Graduate Certificate in Business Analytics", "institution": "UT Dallas",
+           "graduation_date": "2017"}
+    assert answers([btech, mba]) == (mba["degree"], "UT Dallas", 2017)
+    for degree in ("M.S. Computer Science (Certificate in Data Science)", "B.Tech (NBA Certified program)"):
+        assert answers([{"degree": degree, "institution": "A"}])[:2] == (degree, "A")
+    for certificate in ("AWS Certified Solutions Architect", "Certificate in Project Management"):
+        assert answers([{"degree": certificate, "institution": "A"}]) == (None, None, None)
+    # "and", "with" or "plus" doesn't end the levels a degree starts with; "in" does.
+    both = {"degree": "B.S. and M.S.", "institution": "IISER", "graduation_date": "2015"}
+    assert answers([btech, both]) == ("B.S. and M.S.", "IISER", 2015)
+    assert [autofill._level(d) for d in ("BE and ME", "B.Tech and MS", "Bachelor and Master Degree",
+                                         "B.Tech in Electronics and ME")] == [4, 4, 4, 3]
+    # Any number word can come before the codes, as a digit can.
+    assert answers([{"degree": "Diploma in Electronics", "institution": "SBTET"},
+                    {"degree": "Two Year MS", "institution": "UIUC"}])[:2] == ("Two Year MS", "UIUC")
+    assert [autofill._level(d) for d in ("Four-year B.S.", "Three Year BA")] == [3, 3]
+    # "Master" names a degree only before "of", "in" or "degree", at the start too; "Doctorate" always does.
+    assert answers([btech, {"degree": "Master Data Management Specialist", "institution": "B"}])[:2] == (
+        "B.Tech in CSE", "JNTU")
+    assert [autofill._level(d) for d in ("Master Trainer", "Master Degree in CS", "Doctorate")] == [0, 4, 5]
 
 
 def test_the_current_job_is_the_one_marked_current_else_the_one_that_ended_last():
