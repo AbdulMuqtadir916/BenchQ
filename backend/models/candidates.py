@@ -46,13 +46,8 @@ class Candidate(Base):
     bde_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True)         # null = "Needs a BDE" (Q42)
     created_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
 
-    full_name = Column(String, nullable=False)
-    email = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
-    linkedin_url = Column(String, nullable=True)
-    city = Column(String, nullable=True)
-    state = Column(String, nullable=True)
-    country = Column(String, nullable=False, server_default=text("'US'"))
+    # 07 Q57 (migration 0017): name, email, phone, LinkedIn, city, state and country are the résumé's, read from the
+    # active base's newest version (backend/candidates/profile.py). See `_resume_field` below the class.
     willing_to_relocate = Column(Boolean, nullable=False, server_default=text("false"))
 
     work_auth = Column(String, nullable=False)
@@ -80,9 +75,7 @@ class Candidate(Base):
     preferred_industries = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
     deal_breakers = Column(ARRAY(String), nullable=False, server_default=text("'{}'::character varying[]"))
 
-    # The answer bank (documents tab, the extension's autofill), as the frontend shapes it, in snake_case. The summary
-    # and the skills are not here: they are the active base résumé's (`resumes`).
-    qa_bank = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    # No answer bank here: each résumé version holds its own (`resumes.autofill`, migration 0019).
 
     created_at = _created_at()
     updated_at = _updated_at()
@@ -105,6 +98,30 @@ class Candidate(Base):
         Index("ix_candidates_firm_bde", "firm_id", "bde_id"),
     )
 
+
+
+def _resume_field(name: str) -> property:
+    """`Candidate.<name>` reads the résumé (07 Q57). Set on a new candidate (the create route, the seed), the value is
+    held on the object until its first base's v1 is written from it; it is never stored on `candidates`."""
+    def get(self):
+        pending = self.__dict__.get("_pending_header", {})
+        if name in pending:
+            return pending[name]
+        header = self.__dict__.get("_resume_header")
+        if header is None:
+            from backend.candidates.profile import load
+            header = self.__dict__["_resume_header"] = load(self)
+        value = header.get(name)
+        # No active résumé (shouldn't happen since 0017/0018): an empty name, never None, for labels and the ledger.
+        return (value or "") if name == "full_name" else value
+
+    def put(self, value):
+        self.__dict__.setdefault("_pending_header", {})[name] = value
+    return property(get, put)
+
+
+for _field in ("full_name", "email", "phone", "linkedin_url", "city", "state", "country"):
+    setattr(Candidate, _field, _resume_field(_field))
 
 class ResumeParse(Base):
     """A résumé read for a candidate: the file and the parser's answer. For a new candidate (06 §4, decided 2026-10-27)
@@ -144,14 +161,15 @@ def file_sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-BASE_RESUME_SOURCES = ("UPLOAD", "PROMOTED", "MANUAL")
+BASE_RESUME_SOURCES = ("UPLOAD", "PROMOTED")          # no MANUAL since 0018 (07 Q58)
 
 
 class BaseResume(Base):
     """One of a candidate's base résumés (docs/team/resume-versioning.md §3.2, migration 0008): an entry on their shelf
     of bases, holding no content. Its content is its `resumes` versions (category BASE); the active one is what
     tailoring and job search use. Made from an upload (with the parse it came from), promoted by a person from a
-    version, or (MANUAL, 0015) made from the new-candidate form alone when no file was given. Owner: Zuhair."""
+    version. A candidate is onboarded only with their résumé (07 Q58, 0018: the form-only MANUAL base is gone). Owner:
+    Zuhair."""
     __tablename__ = "base_resumes"
 
     id = _pk()
@@ -174,7 +192,7 @@ class BaseResume(Base):
     __table_args__ = (
         CheckConstraint(_in("source", BASE_RESUME_SOURCES), name="ck_base_resumes_source_values"),
         # An upload has its parse; a promoted or manual base (the form alone, 0015) has none.
-        CheckConstraint("source IN ('PROMOTED', 'MANUAL') OR resume_parse_id IS NOT NULL", name="ck_base_resumes_source"),
+        CheckConstraint("source = 'PROMOTED' OR resume_parse_id IS NOT NULL", name="ck_base_resumes_source"),
         # For the composite foreign key from resumes: a version's base belongs to the same candidate.
         UniqueConstraint("id", "candidate_id", name="uq_base_resumes_id_candidate"),
         Index("uq_base_resumes_one_active", "candidate_id", unique=True, postgresql_where=text("is_active")),

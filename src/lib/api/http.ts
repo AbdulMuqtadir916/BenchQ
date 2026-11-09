@@ -47,14 +47,21 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
   return qs ? `${path}?${qs}` : path;
 }
 
-/** FastAPI errors are `{"detail": "..."}`, or `{"detail": [{loc, msg}]}` for 422s. */
+/**
+ * FastAPI errors are `{"detail": "..."}`, `{"detail": [{loc, msg}]}` for 422s, or `{"detail": {message, …}}` when the
+ * backend names what the request clashed with (kept as `ApiError.details`).
+ */
 async function toApiError(response: Response): Promise<ApiError> {
   let message = `Request failed with status ${response.status}.`;
+  let details: Record<string, unknown> | null = null;
   try {
     const payload: unknown = await response.json();
     const detail = (payload as { detail?: unknown }).detail;
     if (typeof detail === "string") message = detail;
-    else if (Array.isArray(detail)) {
+    else if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+      details = detail as Record<string, unknown>;
+      if (typeof details.message === "string") message = details.message;
+    } else if (Array.isArray(detail)) {
       message = detail
         .map((item: { loc?: unknown[]; msg?: string }) => `${(item.loc ?? []).join(".")}: ${item.msg ?? "invalid"}`)
         .join("; ");
@@ -62,7 +69,7 @@ async function toApiError(response: Response): Promise<ApiError> {
   } catch {
     // Non-JSON error body; keep the status message.
   }
-  return new ApiError(message, STATUS_CODES[response.status] ?? `HTTP_${response.status}`, response.status);
+  return new ApiError(message, STATUS_CODES[response.status] ?? `HTTP_${response.status}`, response.status, details);
 }
 
 async function request<T>(target: HttpTarget, method: string, path: string, schema: ZodType<T>, options: RequestOptions = {}): Promise<T> {

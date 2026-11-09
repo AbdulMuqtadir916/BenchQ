@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { can } from "@/lib/auth/permissions";
+import { can, canManageResume } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { EASE_OUT } from "@/lib/motion";
@@ -20,12 +20,13 @@ import { CandidateTabs, isCandidateTab, type CandidateTabId } from "@/components
 import { CandidateToast } from "@/components/app/candidate/candidate-toast";
 import { useCandidateWorkspace, type Suggestion } from "@/components/app/candidate/use-candidate-workspace";
 import type { CandidateActions } from "@/components/app/candidate/candidate-actions";
-import { OverviewTab, masterReviewHref } from "@/components/app/candidate/overview/overview-tab";
+import { OverviewTab } from "@/components/app/candidate/overview/overview-tab";
 import { DocumentsTab } from "@/components/app/candidate/documents/documents-tab";
 import { ApplicationsTab } from "@/components/app/candidate/applications/applications-tab";
 import { ApplicationDrawer } from "@/components/app/candidate/applications/application-drawer";
 import { InboxTab } from "@/components/app/candidate/inbox/inbox-tab";
 import { ResumesTab } from "@/components/app/candidate/resumes-tab";
+import { UploadResume } from "@/components/app/resumes/upload-resume";
 import { ActivityTab } from "@/components/app/candidate/activity-tab";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
 import { useHref } from "@/lib/routes/use-href";
@@ -43,6 +44,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const { access } = useRouteAccess();
   const updateStatus = useUpdateApplicationStatus();
   const canAct = can(principal, "candidate.edit");
+  const canEditProfile = can(principal, "candidate.editProfile");
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
@@ -93,11 +95,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
       setTab("jobs");
       requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
     },
-    reviewMasterResume: () => {
-      const href = masterReviewHref(ws.master, toHref);
-      if (href) router.push(href);
-    },
-  }), [setTab, moveApplication, reduce, router, ws.master, toHref]);
+  }), [setTab, moveApplication, reduce]);
 
   const closeDrawer = useCallback(() => setOpenApplicationId(null), []);
   const finishMatch = useCallback(() => setMatchDone(matchRun), [matchRun]);
@@ -113,7 +111,6 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   if (!isInScope(access, principal.userId, { bdeId: candidate.bdeId, managerId: candidate.managerId })) {
     return notFoundState;
   }
-  const resumes = ws.resumesQuery.data ?? [];
 
   return (
     <div className="bq-page">
@@ -123,7 +120,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         ownerName={ws.ownerName}
         showOwner={can(principal, "team.view")}
         canAct={canAct}
-        resumeHref={toHref("resumes.studio", { id: resumes[0]?.id ?? "new" })}
+        resumeHref={ws.base ? toHref("resumes.studio", { id: ws.base.version.id }) : null}
         onFindJobs={actions.findJobs}
         onOpenTab={setTab}
       />
@@ -132,8 +129,11 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         ref={tabsRef}
         value={tab}
         onChange={setTab}
-        counts={{ applications: ws.stats?.applicationsSubmitted, resumes: resumes.length, documents: ws.documentsQuery.data?.length }}
+        counts={{ applications: ws.stats?.applicationsSubmitted, resumes: ws.resumes.length, documents: ws.documentsQuery.data?.length }}
         alerts={{ overview: ws.suggestions.length + ws.upcoming.length > 0, inbox: ws.unread > 0, documents: ws.expiringDocuments.length > 0 }}
+        // Upload sits on the tab bar's line; with no résumé yet, the tab's empty state offers it instead.
+        trailing={tab === "resumes" && canAct && canManageResume(principal, candidate) && (ws.shelfQuery.data?.bases.length ?? 0) > 0
+          ? <UploadResume candidateId={candidate.id} /> : null}
       />
 
       <AnimatePresence mode="wait" initial={false}>
@@ -147,7 +147,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
           exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
           transition={{ duration: 0.18, ease: EASE_OUT }}
         >
-          {tab === "overview" ? <OverviewTab ws={ws} actions={actions} canAct={canAct} onNotify={setToast} /> : null}
+          {tab === "overview" ? <OverviewTab ws={ws} actions={actions} canAct={canAct} canEditProfile={canEditProfile} onNotify={setToast} /> : null}
           {tab === "applications" ? <ApplicationsTab ws={ws} actions={actions} canAct={canAct} onMove={moveApplication} /> : null}
           {tab === "inbox" ? <InboxTab ws={ws} actions={actions} canAct={canAct} selectedId={selectedMessageId} onSelect={setSelectedMessageId} /> : null}
           {tab === "jobs" ? (
@@ -161,7 +161,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
               onMatchDone={finishMatch}
             />
           ) : null}
-          {tab === "resumes" ? <ResumesTab candidate={candidate} resumes={resumes} isLoading={ws.resumesQuery.isLoading} error={ws.resumesQuery.error} onRetry={() => void ws.resumesQuery.refetch()} canAct={canAct} /> : null}
+          {tab === "resumes" ? <ResumesTab candidate={candidate} shelf={ws.shelfQuery.data} isLoading={ws.shelfQuery.isLoading} error={ws.shelfQuery.error} onRetry={() => void ws.shelfQuery.refetch()} canAct={canAct} /> : null}
           {tab === "documents" ? <DocumentsTab ws={ws} canAct={canAct} onNotify={setToast} /> : null}
           {tab === "activity" ? <ActivityTab applications={ws.applications} messages={ws.messages} teamName={ws.teamName} onOpenApplication={setOpenApplicationId} /> : null}
         </motion.div>

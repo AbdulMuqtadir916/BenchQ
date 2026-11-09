@@ -29,6 +29,11 @@ async function load(email: string | null) {
   return { db, signInAs: signIn.signInAs, candidates: candidates.candidatesMock, allCandidates: candidates.allCandidates, jobs: jobs.jobsMock, DuplicateJobError: jobs.DuplicateJobError };
 }
 
+async function uploadedCandidate(m: Awaited<ReturnType<typeof load>>, overrides: Parameters<typeof candidate>[0] = {}) {
+  const parse = await m.candidates.parseResume(FIRM, { fileName: "Nisha_Verma.pdf", sizeBytes: 204800, mimeType: "application/pdf" });
+  return candidate({ resumeParseId: parse.parse_id, ...overrides });
+}
+
 const job = (overrides: Partial<CaptureJob> = {}): CaptureJob => ({
   sourceUrl: "https://careers.example.com/jobs/4021?utm_source=linkedin", title: "Senior Data Engineer", companyName: "JPMorgan Chase", location: "Dallas, TX",
   remoteMode: "HYBRID", employmentType: "C2C", payPeriod: "HOUR", payMin: 80, payMax: 95, sponsorsVisa: true, excludesC2C: false,
@@ -48,7 +53,7 @@ afterEach(() => {
 describe("New candidate", () => {
   it("an OWNER adds one: ON_BENCH, with the manager and BDE chosen, still there after a reload", async () => {
     const m = await load(EMAIL.imran);
-    const created = await m.candidates.create(FIRM, candidate({ bdeId: "user_adnan" }));
+    const created = await m.candidates.create(FIRM, await uploadedCandidate(m, { bdeId: "user_adnan" }));
     expect(created).toMatchObject({ firmId: FIRM, fullName: "Nisha Verma", status: "ON_BENCH", workAuth: "H1B", managerId: "user_fatima", bdeId: "user_adnan", primaryRole: "Data Engineer" });
     expect((await m.candidates.list(FIRM))[0]?.id).toBe(created.id);
     m.db.flush();
@@ -57,36 +62,57 @@ describe("New candidate", () => {
     expect(await later.candidates.byId(FIRM, created.id)).toMatchObject({ fullName: "Nisha Verma" });
   });
 
-  it("with it: a Record whose every claim is UNVERIFIED with no evidence, and the parsed résumé as a RESUME document (05 §2, Q49)", async () => {
+  it("with it: a Record with the form's skills and summary, and the parsed résumé as a RESUME document (05 §2, Q49)", async () => {
     const m = await load(EMAIL.imran);
     const [records, documents] = await Promise.all([import("./records"), import("./documents")]);
     const parse = await m.candidates.parseResume(FIRM, { fileName: "Nisha_Verma.pdf", sizeBytes: 204800, mimeType: "application/pdf" });
     const created = await m.candidates.create(FIRM, candidate({
       bdeId: "user_adnan", summary: "Eight years of data pipelines.", resumeParseId: parse.parse_id,
-      skills: [{ name: "Spark", family: "Data", source: "AI_EXTRACTED" }, { name: "Airflow", family: null, source: "MANUAL" }],
+      skills: [{ name: "Spark", family: "Data" }, { name: "Airflow", family: null }],
     }));
     const record = await records.recordsMock.byCandidate(FIRM, created.id);
-    expect(record).toMatchObject({ headline: "Data Engineer", summary: "Eight years of data pipelines.", summaryState: "UNVERIFIED", evidence: [], lastVerifiedAt: null });
-    expect(record.skills.map((skill) => [skill.name, skill.source, skill.state])).toEqual([["Spark", "AI_EXTRACTED", "UNVERIFIED"], ["Airflow", "MANUAL", "UNVERIFIED"]]);
-    expect(JSON.stringify(record)).not.toMatch(/"VERIFIED"/);
+    expect(record).toMatchObject({ headline: "Data Engineer", summary: "Eight years of data pipelines." });
+    expect(record.skills.map((skill) => skill.name)).toEqual(["Spark", "Airflow"]);
     expect(await documents.documentsMock.byCandidate(FIRM, created.id)).toEqual([expect.objectContaining({ kind: "RESUME", fileName: "Nisha_Verma.pdf", sizeKb: 200 })]);
 
-    const noResume = await m.candidates.create(FIRM, candidate({ email: "other@example.com" }));
-    expect(await documents.documentsMock.byCandidate(FIRM, noResume.id)).toEqual([]);
+    // 07 Q58: never without the résumé.
+    await expect(m.candidates.create(FIRM, candidate({ email: "other@example.com", resumeParseId: "" }))).rejects.toThrow();
+  });
+
+  it("with it: the first base résumé, active, holding v1, as the backend's create makes (07 Q58), still there after a reload", async () => {
+    const m = await load(EMAIL.imran);
+    await import("./resumes");                     // loaded before the create, so the create itself must make the base
+    const parse = await m.candidates.parseResume(FIRM, { fileName: "Nisha_Verma.pdf", sizeBytes: 204800, mimeType: "application/pdf" });
+    const created = await m.candidates.create(FIRM, candidate({ bdeId: "user_adnan", resumeParseId: parse.parse_id }));
+    const firstBase = async () => {
+      const { resumesMock } = await import("./resumes");
+      const shelf = await resumesMock.shelfByCandidate(FIRM, created.id);
+      expect(shelf.bases).toEqual([expect.objectContaining({ candidateId: created.id, source: "UPLOAD", isActive: true })]);
+      expect(shelf.resumes).toHaveLength(1);
+      expect(shelf.resumes[0]).toMatchObject({ isMaster: true, baseResumeId: shelf.bases[0]?.id });
+      expect(shelf.resumes[0]?.versions.map((v) => v.versionNumber)).toEqual([1]);
+      const opened = await resumesMock.open(FIRM, shelf.resumes[0]!.latestVersionId);
+      expect(opened.document).toMatchObject({ fullName: "Nisha Verma", title: "Data Engineer" });
+    };
+    await firstBase();
+    m.db.flush();
+
+    await load(EMAIL.imran);
+    await firstBase();
   });
 
   it("an OWNER may hand it to a manager without a BDE, and may only name an active manager and a BDE under them", async () => {
     const m = await load(EMAIL.imran);
-    expect(await m.candidates.create(FIRM, candidate())).toMatchObject({ managerId: "user_fatima", bdeId: null });
-    await expect(m.candidates.create(FIRM, candidate({ managerId: "user_adnan" }))).rejects.toMatchObject({ status: 400 }); // a BDE, not a manager
-    await expect(m.candidates.create(FIRM, candidate({ managerId: "user_arjun" }))).rejects.toMatchObject({ status: 400 }); // another firm's manager
-    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_fatima" }))).rejects.toMatchObject({ status: 400 }); // a MANAGER as the BDE
-    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_kiran" }))).rejects.toMatchObject({ status: 400 }); // another firm's BDE
+    expect(await m.candidates.create(FIRM, await uploadedCandidate(m))).toMatchObject({ managerId: "user_fatima", bdeId: null });
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m, { managerId: "user_adnan" }))).rejects.toMatchObject({ status: 400 }); // a BDE, not a manager
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m, { managerId: "user_arjun" }))).rejects.toMatchObject({ status: 400 }); // another firm's manager
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m, { bdeId: "user_fatima" }))).rejects.toMatchObject({ status: 400 }); // a MANAGER as the BDE
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m, { bdeId: "user_kiran" }))).rejects.toMatchObject({ status: 400 }); // another firm's BDE
   });
 
   it("a named BDE brings their own manager (the mock holds the hierarchy until the backend sends it)", async () => {
     const m = await load(EMAIL.imran);
-    expect(await m.candidates.create(FIRM, candidate({ bdeId: "user_vikram" }))).toMatchObject({ managerId: "user_priya", bdeId: "user_vikram" });
+    expect(await m.candidates.create(FIRM, await uploadedCandidate(m, { bdeId: "user_vikram" }))).toMatchObject({ managerId: "user_priya", bdeId: "user_vikram" });
   });
 
   it("a BDE can't add a candidate (07 Q41)", async () => {
@@ -96,9 +122,9 @@ describe("New candidate", () => {
 
   it("a MANAGER adds one for a BDE of their own team only, never to their queue alone (07 Q41)", async () => {
     const m = await load("user_fatima");
-    expect(await m.candidates.create(FIRM, candidate({ bdeId: "user_sneha" }))).toMatchObject({ managerId: "user_fatima", bdeId: "user_sneha" });
-    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_vikram" }))).rejects.toMatchObject({ status: 403 }); // Priya's BDE
-    await expect(m.candidates.create(FIRM, candidate())).rejects.toMatchObject({ status: 403 }); // no BDE
+    expect(await m.candidates.create(FIRM, await uploadedCandidate(m, { bdeId: "user_sneha" }))).toMatchObject({ managerId: "user_fatima", bdeId: "user_sneha" });
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m, { bdeId: "user_vikram" }))).rejects.toMatchObject({ status: 403 }); // Priya's BDE
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m))).rejects.toMatchObject({ status: 403 }); // no BDE
   });
 
   it("at the candidate limit, giving it a BDE is refused with the reason; a manager's queue never is (07 Q45)", async () => {
@@ -107,18 +133,27 @@ describe("New candidate", () => {
     const { firms } = await import("./team-data");
     firms.find((item) => item.id === FIRM)!.candidateLimit = assigned; // the plan's limit, as the backend would hold it
     const before = m.allCandidates.length;
-    await expect(m.candidates.create(FIRM, candidate({ bdeId: "user_adnan" }))).rejects.toMatchObject({
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m, { bdeId: "user_adnan" }))).rejects.toMatchObject({
       status: 409, code: "CANDIDATE_LIMIT",
       message: `Your plan allows ${assigned} assigned candidates; ${assigned} are assigned. Hand this candidate to a manager instead, or free a slot.`,
     });
     expect(m.allCandidates.length).toBe(before);
-    expect(await m.candidates.create(FIRM, candidate())).toMatchObject({ bdeId: null });
+    expect(await m.candidates.create(FIRM, await uploadedCandidate(m))).toMatchObject({ bdeId: null });
+  });
+
+  it("rejects an unknown parse ID without creating a candidate, record, or document", async () => {
+    const m = await load(EMAIL.imran);
+    const { allRecords } = await import("./records");
+    const { allDocuments } = await import("./documents");
+    const before = [m.allCandidates.length, allRecords.length, allDocuments.length];
+    await expect(m.candidates.create(FIRM, candidate({ resumeParseId: "parse_unknown" }))).rejects.toMatchObject({ status: 400, code: "INVALID_RESUME_PARSE" });
+    expect([m.allCandidates.length, allRecords.length, allDocuments.length]).toEqual(before);
   });
 
   it("checks the fields", async () => {
     const m = await load(EMAIL.imran);
-    await expect(m.candidates.create(FIRM, candidate({ fullName: "  " }))).rejects.toThrow();
-    await expect(m.candidates.create(FIRM, candidate({ primaryRole: "" }))).rejects.toThrow();
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m, { fullName: "  " }))).rejects.toThrow();
+    await expect(m.candidates.create(FIRM, await uploadedCandidate(m, { primaryRole: "" }))).rejects.toThrow();
   });
 });
 

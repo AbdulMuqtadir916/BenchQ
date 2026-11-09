@@ -1,12 +1,20 @@
 "use client";
 
-import type { ResumeDocument } from "@/lib/schemas/resume-document";
-import { newId } from "@/lib/resume-doc/build";
+import type { ResumeDocument, ResumeHeader } from "@/lib/schemas/resume-document";
 import { stripTags } from "@/lib/resume-doc/rich-text";
-import { Input } from "@/components/ui/input";
 import { useDocActions } from "../use-doc-actions";
-import { AddButton, FieldLabel, RowControls, TextField, moveHandlers } from "./fields";
-import { ClaimField } from "./claim-field";
+import { FieldLabel, TextField } from "./fields";
+import { RichField } from "./rich-field";
+
+const CONTACT: Array<{ key: Exclude<keyof ResumeHeader, "workAuthorization">; label: string; placeholder: string }> = [
+  { key: "email", label: "Email", placeholder: "name@example.com" },
+  { key: "phone", label: "Phone", placeholder: "+1 214 555 0100" },
+  { key: "city", label: "City", placeholder: "e.g. Dallas" },
+  { key: "state", label: "State", placeholder: "e.g. TX" },
+  { key: "country", label: "Country", placeholder: "e.g. US" },
+  { key: "linkedin", label: "LinkedIn", placeholder: "linkedin.com/in/…" },
+  { key: "github", label: "GitHub", placeholder: "github.com/…" },
+];
 
 export function HeaderFields({ doc }: { doc: ResumeDocument }) {
   const a = useDocActions();
@@ -14,20 +22,16 @@ export function HeaderFields({ doc }: { doc: ResumeDocument }) {
     <>
       <TextField label="Full name" value={doc.fullName} onChange={(v) => a.setTop("fullName", v)} />
       <TextField label="Title" value={doc.title} onChange={(v) => a.setTop("title", v)} placeholder="Headline, e.g. Senior Java Developer" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        {CONTACT.map((f) => (
+          <TextField key={f.key} label={f.label} value={doc.header[f.key]} onChange={(v) => a.setHeader(f.key, v)} placeholder={f.placeholder} />
+        ))}
+      </div>
       <div>
-        <FieldLabel hint="text · link (optional)">Contact items</FieldLabel>
-        <ul className="space-y-2">
-          {doc.contacts.map((c, i) => (
-            <li key={c.id} className="flex items-center gap-2">
-              <Input aria-label={`Contact ${i + 1} text`} value={c.label} onChange={(e) => a.patch("contacts", c.id, { label: e.target.value })} placeholder="e.g. Dallas, TX" />
-              <Input aria-label={`Contact ${i + 1} link`} value={c.url} onChange={(e) => a.patch("contacts", c.id, { url: e.target.value })} placeholder="URL (optional)" />
-              <RowControls label={`contact ${c.label || i + 1}`} onRemove={() => a.remove("contacts", c.id)} {...moveHandlers(i, doc.contacts.length, (d) => a.move("contacts", c.id, d))} />
-            </li>
-          ))}
-        </ul>
-        <div className="mt-2">
-          <AddButton onClick={() => a.add("contacts", { id: newId("contact"), label: "", url: "" })}>Add contact item</AddButton>
-        </div>
+        <FieldLabel hint="from the candidate's profile">Work authorization</FieldLabel>
+        <p className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-2)]">
+          {doc.header.workAuthorization || "Not set"}
+        </p>
       </div>
     </>
   );
@@ -37,7 +41,7 @@ export function SummaryFields({ doc }: { doc: ResumeDocument }) {
   const length = stripTags(doc.summary.html).length;
   return (
     <>
-      <ClaimField claim={doc.summary} label="Summary" placeholder="Two or three lines on who the candidate is and what they deliver" />
+      <RichField field={doc.summary} label="Summary" placeholder="Two or three lines on who the candidate is and what they deliver" />
       <p className="tabular text-caption text-[var(--color-text-3)]">{length} characters{length > 450 ? " · recruiters skim — aim for under 450" : ""}</p>
     </>
   );

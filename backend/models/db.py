@@ -640,6 +640,12 @@ class Resume(Base):
     certifications = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     awards = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     languages = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    # The autofill entries the user typed for this version (migration 0019, docs/02 §8.1): {"edited": {key: {"answer",
+    # "over"}}, "custom": {question: answer}}, an edit to a built answer by its key, or a question they added. The built
+    # answers aren't stored as answers (backend/candidates/autofill.py builds them on read), but an edit keeps a copy of
+    # the one it replaced as `over`: for the work history, the whole list.
+    # Not content: a save never compares it, and copies it to the next version.
+    autofill = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
 
     __table_args__ = (
         CheckConstraint("category IN ('BASE', 'TAILORED')", name="ck_resumes_category_values"),
