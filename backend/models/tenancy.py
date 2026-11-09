@@ -24,7 +24,6 @@ from backend.models.db import Base, utcnow
 
 FIRM_ROLES = ("OWNER", "MANAGER", "BDE", "VIEWER")
 FIRM_STATUSES = ("ONBOARDING", "ACTIVE", "SUSPENDED")
-TRUTH_GUARD_MODES = ("STRICT", "BALANCED", "LENIENT")
 INVITE_ROLES = FIRM_ROLES + ("PLATFORM_ADMIN",)
 INVITE_STATUSES = ("PENDING", "ACCEPTED", "REVOKED", "EXPIRED")
 LEDGER_ACTOR_TYPES = ("USER", "SYSTEM", "AGENT", "PLATFORM_ADMIN")
@@ -106,7 +105,6 @@ class Firm(Base):
     logo_url = Column(String, nullable=True)
     primary_timezone = Column(String, nullable=False, server_default=text("'Asia/Kolkata'"))
     client_timezone = Column(String, nullable=False, server_default=text("'America/New_York'"))
-    truth_guard_mode = Column(String, nullable=False, server_default=text("'BALANCED'"))
     application_expiry_days = Column(Integer, nullable=False, server_default=text("30"))
     # 07 Q46: a BDE's comfortable load. A warning when assigning, never a block; the OWNER edits it.
     bde_capacity = Column(Integer, nullable=False, server_default=text("10"))
@@ -117,7 +115,6 @@ class Firm(Base):
         CheckConstraint(f"slug ~ '{SLUG_PATTERN}'", name="ck_firms_slug_format"),
         CheckConstraint("bde_capacity BETWEEN 1 AND 50", name="ck_firms_bde_capacity_range"),
         CheckConstraint(_in("status", FIRM_STATUSES), name="ck_firms_status"),
-        CheckConstraint(_in("truth_guard_mode", TRUTH_GUARD_MODES), name="ck_firms_truth_guard_mode"),
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_firms_limits_not_negative"),
         CheckConstraint("application_expiry_days > 0", name="ck_firms_application_expiry_days_positive"),
     )

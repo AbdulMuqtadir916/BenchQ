@@ -75,8 +75,8 @@ def test_a_candidate_keeps_to_the_contract(test_db, firm):
                             ({"employment_types": ["CONTRACT"]}, "ck_candidates_employment_types"),
                             ({"work_settings": ["ANYWHERE"]}, "ck_candidates_work_settings"),
                             ({"rate_min": 90, "rate_target": 85}, "ck_candidates_floor_not_above_target"),
-                            ({"years_experience": 61}, "ck_candidates_years_experience"),
-                            ({"full_name": "  "}, "ck_candidates_full_name_not_blank")):
+                            ({"years_experience": 61}, "ck_candidates_years_experience")):
+        # (ck_candidates_full_name_not_blank went with the column in 0017: the name is the résumé's, 07 Q57.)
         _refused(test_db, _candidate(firm, manager, **bad), constraint)
 
 
