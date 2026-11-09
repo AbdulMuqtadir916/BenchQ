@@ -8,7 +8,7 @@ import pytest
 
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
-    make_candidate, set_setting, big_string, EMOJI,
+    make_persona, set_setting, big_string, EMOJI,
 )
 
 
@@ -282,10 +282,91 @@ def test_llm_models_serves_a_stale_cache_when_the_provider_is_down(client, monke
 # ══ /api/autofill ════════════════════════════════════════════════════════════
 
 def test_autofill_config_shape(client, test_db):
-    candidate_id = make_candidate(test_db)
-    body = assert_clean(client.get("/api/autofill/config", params={"candidate_id": candidate_id}), 200).json()
-    for key in ("candidate_id", "qa_bank"):
+    make_persona(test_db)
+    body = assert_clean(client.get("/api/autofill/config"), 200).json()
+    for key in ("answers", "field_patterns", "option_synonyms", "schema", "decline_self_id"):
         assert key in body
+
+
+@pytest.mark.parametrize("body", [{}, {"question": ""}, {"question": "   "},
+                                  {"question": None}])
+def test_autofill_answer_requires_a_question(client, body):
+    assert_clean(client.post("/api/autofill/answer", json=body), 400)
+
+
+def test_autofill_missing_prompt_setting_is_500_with_a_reason(client, test_db):
+    make_persona(test_db)
+    r = client.post("/api/autofill/answer", json={"question": "Why us?"})
+    assert r.status_code == 500
+    assert_no_leak(r)
+    assert "autofill_prompt" in r.text
+
+
+def test_autofill_stream_uses_the_editable_prompt_setting(client, test_db):
+    """The SSE path hardcodes its own prompt, so an edited `autofill_prompt` is
+    silently ignored by the variant the extension actually streams from."""
+    make_persona(test_db)
+    r = client.post("/api/autofill/answer/stream", json={"question": "Why us?"})
+    assert r.status_code == 500 and "autofill_prompt" in r.text
+
+
+def test_autofill_answer_llm_failure_is_502_not_500(client, test_db, monkeypatch):
+    import backend.api.routes_autofill as ra
+    make_persona(test_db)
+    set_setting(test_db, "autofill_prompt", "{persona}{company}{position}{question}")
+
+    async def _boom(*a, **k):
+        raise RuntimeError("provider exploded")
+    monkeypatch.setattr(ra, "call_autofill_llm", _boom)
+    r = assert_clean(client.post("/api/autofill/answer",
+                                 json={"question": "Why us?"}), 502)
+    assert "provider exploded" not in r.text
+
+
+def test_autofill_answer_trims_to_max_chars(client, test_db, monkeypatch):
+    import backend.api.routes_autofill as ra
+    make_persona(test_db)
+    set_setting(test_db, "autofill_prompt", "{persona}{company}{position}{question}")
+
+    async def _long(*a, **k):
+        return {"text": '{"answer": "' + "y" * 500 + '"}', "usage": {}}
+    monkeypatch.setattr(ra, "call_autofill_llm", _long)
+    r = assert_clean(client.post("/api/autofill/answer",
+                                 json={"question": "Why?", "max_chars": 40}), 200)
+    assert len(r.json()["answer"]) <= 40
+    assert r.json()["trimmed"] is True
+
+
+@pytest.mark.parametrize("bad", ["abc", -5, "-5", None, [], {}])
+def test_autofill_answer_bad_max_chars_falls_back_to_the_default(client, test_db,
+                                                                 monkeypatch, bad):
+    import backend.api.routes_autofill as ra
+    make_persona(test_db)
+    set_setting(test_db, "autofill_prompt", "{persona}{company}{position}{question}")
+
+    async def _short(*a, **k):
+        return {"text": '{"answer": "ok"}', "usage": {}}
+    monkeypatch.setattr(ra, "call_autofill_llm", _short)
+    r = assert_clean(client.post("/api/autofill/answer",
+                                 json={"question": "Why?", "max_chars": bad}), 200)
+    assert r.json()["max_chars"] > 0
+
+
+def test_autofill_answer_ten_megabyte_question(client, test_db, monkeypatch):
+    import backend.api.routes_autofill as ra
+    make_persona(test_db)
+    set_setting(test_db, "autofill_prompt", "{persona}{company}{position}{question}")
+
+    async def _short(*a, **k):
+        return {"text": '{"answer": "ok"}', "usage": {}}
+    monkeypatch.setattr(ra, "call_autofill_llm", _short)
+    r = client.post("/api/autofill/answer", json={"question": big_string(10)})
+    assert_clean(r, 200, 400, 413, 422)
+
+
+@pytest.mark.parametrize("body", [[1], "x", 3, None])
+def test_autofill_answer_non_object_body_is_422(client, body):
+    assert_clean(client.post("/api/autofill/answer", json=body), 422)
 
 
 # ══ /api/linkedin ════════════════════════════════════════════════════════════
@@ -305,3 +386,43 @@ def test_linkedin_pin_without_digits_is_rejected(client, pin):
 @pytest.mark.parametrize("body", [{}, {"pin": None}, {"pin": 1234}, [1], "x"])
 def test_linkedin_pin_bad_body_never_500(client, body):
     assert_clean(client.post("/api/linkedin/session/pin", json=body), 200, 400, 422)
+
+
+# ── R4 fix-loop regression (R4-T1-22) ────────────────────────────────────────
+
+def test_autofill_stream_and_answer_read_the_same_prompt_setting(client, test_db, monkeypatch):
+    """Both variants must build their prompt from the editable `autofill_prompt`."""
+    import backend.api.routes_autofill as ra
+    make_persona(test_db)
+    set_setting(test_db, "autofill_prompt",
+                "PROFILE {persona}\nSENTINEL-TOKEN\n{company} {position} {question}")
+
+    seen = {}
+
+    async def _stream(suffix, system, max_tokens=None, cached_prefix=None):
+        seen["prefix"] = cached_prefix
+        seen["suffix"] = suffix
+        yield "ok"
+
+    monkeypatch.setattr(ra, "call_autofill_llm_stream", _stream)
+    r = client.post("/api/autofill/answer/stream",
+                    json={"question": "Why us?", "company": "Acme"})
+    assert r.status_code == 200
+    assert "SENTINEL-TOKEN" in (seen["prefix"] or "")
+    assert "Why us?" in seen["suffix"] and "Acme" in seen["suffix"]
+
+
+def test_autofill_stream_still_suppresses_the_json_envelope(client, test_db, monkeypatch):
+    """The template steers toward {"answer": …}; the streamed variant must not."""
+    import backend.api.routes_autofill as ra
+    make_persona(test_db)
+    set_setting(test_db, "autofill_prompt", "{persona}{company}{position}{question}")
+    seen = {}
+
+    async def _stream(suffix, system, max_tokens=None, cached_prefix=None):
+        seen["suffix"] = suffix
+        yield "ok"
+
+    monkeypatch.setattr(ra, "call_autofill_llm_stream", _stream)
+    client.post("/api/autofill/answer/stream", json={"question": "Why us?"})
+    assert "no JSON" in seen["suffix"]
