@@ -1360,8 +1360,9 @@ candidate's route and on
 
 - **Fixed answers**, built from the version and the profile for that read (`backend/candidates/autofill.py` `build()`)
   and never stored as answers (an edit keeps a copy of the one it replaced, below): this version's header, summary,
-  skills, every job with its dates and bullets, its education (the highest degree, with that degree's school and
-  year), projects, awards, certifications and languages; and the profile's facts:
+  skills, every job with its dates and bullets, its education (the highest degree by the rules written in
+  `autofill._level`, with that degree's school and year; a certificate listed under education isn't a degree),
+  projects, awards, certifications and languages; and the profile's facts:
   work authorization (the profile's status, which every candidate has), its expiry, sponsorship, transfer,
   target rate, availability, notice, relocation, engagement types, work settings, preferred locations and industries,
   primary and target roles. Years of experience come from the version's own jobs, counted to today (the New candidate

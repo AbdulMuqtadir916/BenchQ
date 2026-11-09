@@ -99,22 +99,27 @@ _YEAR = re.compile(r"\d{4}")
 # Degree levels, 5 a doctorate down to 1 school, by the word or code that names them, read without dots ("M.S." is
 # "ms", "B.Tech." is "btech"); a few two-word names are read as one word first.
 _LEVEL_OF = {
-    **dict.fromkeys(("phd", "dphil", "edd", "md"), 5),
+    **dict.fromkeys(("phd", "dphil", "edd", "md", "pharmd"), 5),
     **dict.fromkeys(("master", "masters", "ms", "msc", "mtech", "me", "meng", "mba", "mca", "mcom", "ma", "mfa", "mph",
-                     "pgdm", "pgdiploma", "postgraduate"), 4),
+                     "mpharm", "mpharmacy", "pgdm", "pgdiploma", "postgraduate"), 4),
     **dict.fromkeys(("bachelor", "bachelors", "bs", "bsc", "btech", "be", "beng", "bca", "bba", "bcom", "ba",
-                     "undergraduate"), 3),
+                     "bpharm", "bpharmacy", "undergraduate"), 3),
     **dict.fromkeys(("associate", "associates"), 2),
     **dict.fromkeys(("highschool", "secondary", "diploma", "12th", "10th", "hsc", "ssc", "intermediate", "ged"), 1),
 }
 _TWO_WORDS = ((r"ph d", "phd"), (r"m sc", "msc"), (r"b sc", "bsc"), (r"m tech", "mtech"), (r"b tech", "btech"),
-              (r"pg diploma", "pgdiploma"), (r"post graduate", "postgraduate"), (r"high school", "highschool"))
+              (r"pg diploma", "pgdiploma"), (r"post graduate", "postgraduate"), (r"high school", "highschool"),
+              (r"b pharm", "bpharm"), (r"m pharm", "mpharm"), (r"b pharmacy", "bpharmacy"), (r"m pharmacy", "mpharmacy"),
+              (r"pharm d", "pharmd"))
 # Codes that are also everyday words or branch names ("to be completed", "B.Tech in ME"): they name a degree only at
 # its start, which can follow words such as these, or a number ("Integrated MS", "Dual Degree (BS-MS)", "Two Year MS").
 _SHORT_CODES = {"ms", "me", "ma", "md", "bs", "be", "ba"}
 _BEFORE_A_CODE = {"integrated", "dual", "degree", "year", "years", "one", "two", "three", "four", "five", "six"}
 # Words that join the levels a degree starts with without ending them ("B.S. and M.S.").
-_JOINERS = {"and", "with", "plus"}
+_JOINERS = {"and", "plus"}
+# A short master's code after another degree names one only after its own bachelor's code ("BE/ME", "BS-MS") or a
+# joiner: anywhere else it's a branch ("B.Tech (ME)" is Mechanical).
+_PAIRED = {"ms": "bs", "me": "be", "ma": "ba"}
 
 
 def _get(source, key):
@@ -212,43 +217,78 @@ def _latest_job(jobs: list[dict]) -> dict:
 
 
 def _everyday(word: str) -> bool:
-    """A degree's word that is also an everyday one ("Scrum Master", "Master Trainer", "Pre-Doctoral Fellow"): it names
-    a degree only before "of", "in" or "degree". "Doctorate" and "Master's" always name one."""
-    return word == "master" or (word.startswith("doctor") and word != "doctorate")
+    """A degree's word that is also an everyday one ("Scrum Master", "Master Trainer", "AWS Certified Developer –
+    Associate", "Pre-Doctoral Fellow"): it names a degree only before "of", "in", "degree" or a degree's code ("Master
+    (MS)"). "Doctorate", "Master's" and "Associate's" always name one."""
+    return word in ("master", "associate") or (word.startswith("doctor") and word != "doctorate")
 
 
-def _level(degree: str) -> int:
+def _level(degree: str, certificate: bool = False) -> int:
     """How high a degree is: 5 for a doctorate down to 1 for school, 0 when it names none. The highest level it names
-    counts, in whatever order ("Dual Degree (B.Tech + M.Tech)" is a master's, as "B.Tech + M.Tech" is). Every level a
-    degree starts with counts, joined by "and", "with" or "plus" or not: "BE/ME dual degree", "B.S. and M.S.", "Dual
-    Degree (BS-MS)" and "Two Year MS" are master's. After them, a two-letter code doesn't ("B.Tech in ME" is a
-    bachelor's, and "Coursework, to be completed" no degree). "Master" or a "doctor" word counts only before "of", "in"
-    or "degree", wherever it is ("Master of Technology" and "Master Degree in CS" are master's; "Certified Scrum Master"
-    and "Master Data Management" no degree)."""
-    words = re.sub(r"[^a-z0-9]+", " ", re.sub(r"[.'’]", "", degree.lower()))
+    counts, by these rules:
+
+    1. "Integrated", "Dual", "Degree", "Two Year" or a number before a degree's codes is skipped.
+    2. Every level a degree starts with counts, joined by "and" or "plus" or not: "BE/ME dual degree", "B.S. and M.S."
+       and "Dual Degree (BS-MS)" are master's. After another level, a short master's code counts only after its own
+       bachelor's code or a joiner, so "B.Tech (ME)" is a bachelor's in Mechanical.
+    3. After that start, a longer code counts anywhere ("Dual Degree (B.Tech + M.Tech)" is a master's) and a two-letter
+       one doesn't ("B.Tech in ME", "Coursework, to be completed").
+    4. "Master", "Associate" and a "doctor" word other than "Doctorate" count only before "of", "in", "degree" or a
+       degree's code: "Master of Technology", "Master Degree in CS" and "Master (MS)" are master's; "Certified Scrum
+       Master", "Master Trainer" and "AWS Certified Developer – Associate" name none.
+    5. With `certificate` (a row that says certified or certificate), a two-letter code counts only written with dots
+       or before "in" or "of": "M.S. Computer Science (Certificate in Data Science)" is a master's, "MS Certified: Azure
+       Data Engineer Associate" names none.
+
+    Known limits, left as they are (pinned with the rest in `test_autofill.py`'s EDUCATION_LINES): "Master" before a
+    plain word ("Master, Computer Science", "Master Computer Applications") names none, as "Master Trainer" doesn't; a
+    second degree after "in" ("BS in CS and MS in Data Science") isn't counted; "Post Graduate Certificate" ranks as a
+    PG Diploma does; a bare two-letter code beside a certificate ("BA (Certificate in Accounting)") is set aside; and a
+    degree the levels don't list (MBBS, B.Arch, LLB, AA) is 0, as is a certification that doesn't say certified or
+    certificate ("CompTIA Security+")."""
+    lowered = degree.lower()
+    dotted = {first + second for first, second in re.findall(r"\b([a-z])\.\s?([a-z])\b", lowered)}
+    plain = re.sub(r"[.'’]", "", lowered)
+    words = re.sub(r"[^a-z0-9]+", " ", plain)
     for pair, word in _TWO_WORDS:
         words = re.sub(rf"\b{pair}\b", word, words)
     def level(word):
         return 5 if word.startswith("doctor") else _LEVEL_OF.get(word, 0)
+    def joined(bachelor, master):
+        """Written as one dual degree ("BE/ME", "BS-MS", "BS & MS"), not a branch ("B.E. (ME)", "B.E. - ME")."""
+        found = re.search(rf"\b{bachelor}\b([^a-z0-9]*)\b{master}\b", plain)
+        return bool(found) and (found[1].strip() in ("/", "&", "+") or found[1] == "-")
     tokens = words.split()
+    dual = any(word in ("dual", "integrated") for word in tokens)
     while tokens and (tokens[0] in _BEFORE_A_CODE or tokens[0].isdigit()):
         tokens = tokens[1:]
-    levels, leading = [], True
+    levels, leading, previous = [], True, ""
     for word, following in zip(tokens, [*tokens[1:], ""]):
         if leading and word in _JOINERS:
+            previous = word
             continue
-        named = level(word) if not _everyday(word) or following in ("of", "in", "degree") else 0
+        named = level(word)
+        if _everyday(word) and following not in ("of", "in", "degree") and not level(following):
+            named = 0
+        elif certificate and word in _SHORT_CODES and word not in dotted and following not in ("in", "of"):
+            named = 0
+        elif word in _PAIRED and levels and not (
+                previous in _JOINERS or previous == _PAIRED[word] and (dual or joined(previous, word))):
+            named = 0
         leading = leading and bool(named)
         if named and (leading or word not in _SHORT_CODES):
             levels.append(named)
+        previous = word
     return max(levels, default=0)
 
 
 def _is_certificate(degree: str) -> bool:
-    """A certificate, not a degree: a row that says certified or certificate and names no degree ("Certified Scrum
-    Master", "AWS Certified Solutions Architect"). Résumés often list them under education. A degree with a
-    certificate attached is still a degree ("MBA with Graduate Certificate in Business Analytics")."""
-    return any(word.startswith("certif") for word in re.findall(r"[a-z]+", degree.lower())) and not _level(degree)
+    """A certificate, not a degree: a row that says certified or certificate and names no degree, read with the
+    certificate rule ("Certified Scrum Master", "MS Certified: Azure Data Engineer Associate", "AWS Certified Developer
+    – Associate"). Résumés often list them under education. A degree with a certificate attached is still a degree
+    ("MBA with Graduate Certificate in Business Analytics", "M.S. Computer Science (Certificate in Data Science)")."""
+    says = any(word.startswith("certif") for word in re.findall(r"[a-z]+", degree.lower()))
+    return says and not _level(degree, certificate=True)
 
 
 def _highest_school(schools: list[dict]) -> dict:

@@ -248,7 +248,7 @@ def test_the_highest_degree_comes_with_its_own_school_and_year():
         assert answers([{"degree": degree, "institution": "A"}])[:2] == (degree, "A")
     for certificate in ("AWS Certified Solutions Architect", "Certificate in Project Management"):
         assert answers([{"degree": certificate, "institution": "A"}]) == (None, None, None)
-    # "and", "with" or "plus" doesn't end the levels a degree starts with; "in" does.
+    # "and" or "plus" doesn't end the levels a degree starts with; "in" and "with" do.
     both = {"degree": "B.S. and M.S.", "institution": "IISER", "graduation_date": "2015"}
     assert answers([btech, both]) == ("B.S. and M.S.", "IISER", 2015)
     assert [autofill._level(d) for d in ("BE and ME", "B.Tech and MS", "Bachelor and Master Degree",
@@ -261,6 +261,78 @@ def test_the_highest_degree_comes_with_its_own_school_and_year():
     assert answers([btech, {"degree": "Master Data Management Specialist", "institution": "B"}])[:2] == (
         "B.Tech in CSE", "JNTU")
     assert [autofill._level(d) for d in ("Master Trainer", "Master Degree in CS", "Doctorate")] == [0, 4, 5]
+
+
+# Abdul's sixth review: real education lines, each with the level the rules written in `autofill._level` give it, or
+# None for a certificate, which is never the highest degree. Every line from his six reviews is here, with Indian and US
+# degrees, dual and integrated degrees, branches, vendor certificates, school levels and bootcamps.
+EDUCATION_LINES = [
+    # Bachelor's, with a branch written after it.
+    ("B.Tech in CSE", 3), ("B.Tech (CSE)", 3), ("B.Tech - Computer Science", 3), ("BTech", 3), ("B.Tech (Hons.)", 3),
+    ("B.E. Computer Science", 3), ("B.E (ECE)", 3), ("BE in Mechanical Engineering", 3), ("B.Tech (ME)", 3),
+    ("B.Tech - ME", 3), ("B.E. (ME)", 3), ("BE (ME)", 3), ("B.E. ME", 3), ("B.E. - ME", 3), ("BE - ME", 3),
+    ("B.Sc (MS)", 3), ("B.Com with MS Office", 3), ("B.Tech with ME specialization", 3),
+    ("B.Tech in Electronics and ME", 3), ("B.Sc. Computer Science", 3), ("B.Sc (MPC)", 3), ("BCA", 3), ("B.Com", 3),
+    ("BBA", 3), ("Four-year B.S.", 3), ("B.Pharm", 3), ("B.Pharmacy", 3), ("Bachelor of Pharmacy", 3),
+    ("Bachelor of Science in Computer Science", 3), ("Bachelor of Science (BS) in Information Technology", 3),
+    ("BS Computer Science", 3), ("B.S., Computer Science", 3), ("BS in CS", 3), ("Bachelor's in Computer Science", 3),
+    ("Bachelor's Degree", 3), ("Bachelors of Engineering", 3), ("B.Sc., Pre-Doctoral Research Fellow", 3),
+    # Master's.
+    ("M.Tech (CSE)", 4), ("M.Tech in Software Engineering", 4), ("MCA", 4), ("M.Sc (IT)", 4), ("M.Com", 4),
+    ("MBA (Finance)", 4), ("MBA - Marketing", 4), ("PGDM", 4), ("PG Diploma in Data Science", 4),
+    ("Post Graduate Diploma in Management", 4), ("Post Graduate Programme in Management (PGPM)", 4), ("M.Pharm", 4),
+    ("M. Pharm", 4), ("Master of Pharmacy", 4), ("M.E.", 4), ("M.E. (Structures)", 4), ("MS (CS)", 4),
+    ("MS - Computer Science", 4), ("Master of Science in Computer Science", 4),
+    ("Master of Science (MS) in Information Systems", 4), ("MS in Computer Science", 4), ("M.S. Data Science", 4),
+    ("MS Computer Science", 4), ("Master's in CS", 4), ("Master's Degree in Computer Science", 4),
+    ("Master Degree in CS", 4), ("Master (MS) in Computer Science", 4), ("Master (M.S.), Computer Science", 4),
+    ("Master (M.Tech)", 4), ("Master in Computer Applications (MCA)", 4), ("Master of Business Administration", 4),
+    ("Executive MBA", 4), ("MBA", 4),
+    # Dual and integrated degrees.
+    ("Integrated M.Tech", 4), ("Integrated MS", 4), ("Integrated BS-MS", 4), ("Dual Degree (B.Tech + M.Tech)", 4),
+    ("Dual Degree (BS-MS)", 4), ("B.Tech + M.Tech Dual Degree", 4), ("Five Year Integrated M.Sc", 4),
+    ("Five Year Integrated MS", 4), ("Two Year MS", 4), ("BE/ME dual degree", 4), ("BS & MS", 4), ("B.S. and M.S.", 4),
+    ("B.S.-M.S.", 4), ("BS - MS Dual Degree", 4), ("BS / MS", 4), ("BE+ME", 4), ("BE and ME", 4), ("B.Tech and MS", 4),
+    ("Bachelor and Master Degree", 4), ("BS/MS in Physics", 4), ("BA/MA Economics", 4),
+    # Doctorates, associate degrees, school.
+    ("Ph.D. in Physics", 5), ("PhD", 5), ("Doctor of Philosophy", 5), ("Doctorate", 5), ("Doctoral Degree in Education", 5),
+    ("Pharm.D", 5), ("Doctor of Pharmacy (Pharm.D)", 5), ("Associate of Applied Science", 2), ("Associate of Arts", 2),
+    ("Associate Degree in Nursing", 2), ("Associate's Degree", 2), ("Diploma in Electrical Engineering", 1),
+    ("Diploma in Electronics", 1), ("Intermediate (MPC)", 1), ("Intermediate", 1), ("SSC", 1),
+    ("SSC (Secondary School Certificate)", 1), ("HSC (Higher Secondary Certificate)", 1), ("12th (CBSE)", 1),
+    ("10th (ICSE)", 1), ("High School Diploma", 1), ("High School", 1), ("GED", 1),
+    # A degree with a certificate attached is still a degree.
+    ("M.S. Computer Science (Certificate in Data Science)", 4), ("MS in Computer Science (Certificate in AI)", 4),
+    ("MBA with Graduate Certificate in Business Analytics", 4), ("B.Tech (NBA Certified program)", 3),
+    ("Associate of Arts, Certificate in Accounting", 2),
+    # Certificates.
+    ("MS Certified: Azure Data Engineer Associate", None), ("Microsoft Certified: Azure Fundamentals", None),
+    ("MS Office Certification", None), ("MS SQL Server Certified DBA", None),
+    ("MS Azure Fundamentals (AZ-900) Certified", None), ("AWS Certified Solutions Architect – Associate", None),
+    ("AWS Certified Developer – Associate", None), ("Oracle Certified Associate, Java SE 8 Programmer", None),
+    ("Oracle Certified Professional", None), ("Google Cloud Certified Professional Data Engineer", None),
+    ("Cisco Certified Network Associate (CCNA)", None), ("PMP Certification", None), ("Certified Scrum Master", None),
+    ("Certified Scrum Master (CSM)", None), ("ITIL Foundation Certificate", None),
+    ("Salesforce Certified Administrator", None), ("Certificate in Project Management", None),
+    ("BA Certified (Business Analysis)", None), ("Coursera Machine Learning Certificate", None),
+    ("Master Data Management Certificate", None),
+    # No degree.
+    ("Coursework", 0), ("Training", 0), ("Full Stack Development Bootcamp", 0), ("Master Trainer", 0),
+    ("Master Data Management", 0), ("Master Data Management Specialist", 0), ("Coursework, to be completed 2025", 0),
+    # Known limits, left as they are (`autofill._level`).
+    ("Master, Computer Science", 0), ("Master Computer Applications", 0), ("BS in CS and MS in Data Science", 3),
+    ("Post Graduate Certificate in Data Science", 4), ("BA (Certificate in Accounting)", None), ("MBBS", 0),
+    ("B.Arch", 0), ("LLB", 0), ("AA", 0), ("CompTIA Security+", 0), ("Project Management Professional (PMP)", 0),
+]
+
+
+@pytest.mark.parametrize("line, level", EDUCATION_LINES)
+def test_each_education_line_ranks_by_the_written_rules(line, level):
+    if level is None:
+        alone = build(CANDIDATE, {**VERSION, "educations": [{"degree": line, "institution": "A"}]}, TODAY)
+        assert autofill._is_certificate(line) and "What is your highest degree?" not in alone
+    else:
+        assert not autofill._is_certificate(line) and autofill._level(line) == level
 
 
 def test_the_current_job_is_the_one_marked_current_else_the_one_that_ended_last():
