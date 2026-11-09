@@ -713,10 +713,10 @@ export const AiUsageSchema = z.object({
 | S11 | Time zone for period boundaries | **Answered (07 Q34):** IST, like the rest of the admin area |
 | S12 | Do failed AI calls count in spend? | **Answered (07 Q34):** yes, when the provider billed them |
 
-### 3.3 Firm working rhythm — DRAFT, awaiting sign-off (2026-10-19)
+### 3.3 Firm working rhythm — WITHDRAWN 2026-11-08 (07 Q59)
 
-> **Status: draft for the product owner's sign-off.** Nothing is built from it. Until it is approved,
-> `settings/firm` shows **"Not set"** for both values, never an invented one (Phase B audit W7).
+> **Withdrawn, never built.** The product owner dropped the shift window and the follow-up cadence on 2026-11-08: no
+> columns, no endpoint, and `settings/firm` shows neither. Kept below only as a record of what was proposed.
 
 Two additions to `FirmSchema` (§3.1). Both are set when a firm is created (to the defaults below) and
 edited by the OWNER on `settings/firm`; a support view reads them.

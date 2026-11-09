@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PlanUsageCard } from "@/components/app/settings/plan-usage-card";
 import { SettingRow } from "@/components/app/settings/setting-row";
 import { errorMessage } from "@/features/admin/admin-dialog";
 import { useCan } from "@/lib/auth/permissions";
@@ -15,18 +16,20 @@ export default function FirmSettingsPage() {
   const canEdit = useCan("firmSettings.edit");
 
   return (
-    <Card>
-      <CardHeader><CardTitle>Firm</CardTitle></CardHeader>
-      <dl className="space-y-3 text-sm">
-        <SettingRow label="Firm name" value={firm.name} />
-        <SettingRow label="Primary timezone" value={firm.primaryTimezone} />
-        <SettingRow label="Client timezone" value={firm.clientTimezone} />
-        <SettingRow label="Shift window" value="18:30 – 00:30 IST" />
-        <SettingRow label="Default follow-up cadence" value="Day-3 LinkedIn · Day-7 email" />
-        {canEdit ? null : <SettingRow label="BDE capacity" value={`${firm.bdeCapacity} candidates per BDE`} />}
-      </dl>
-      {canEdit ? <BdeCapacityForm current={firm.bdeCapacity} /> : null}
-    </Card>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader><CardTitle>Firm</CardTitle></CardHeader>
+        <dl className="space-y-3 text-sm">
+          <SettingRow label="Firm name" value={firm.name} />
+          <SettingRow label="Primary timezone" value={firm.primaryTimezone} />
+          <SettingRow label="Client timezone" value={firm.clientTimezone} />
+          {canEdit ? null : <SettingRow label="BDE capacity" value={`${firm.bdeCapacity} candidates per BDE`} />}
+        </dl>
+        <p className="mt-3 text-caption text-[var(--color-text-3)]">Ask BenchQ to change the firm name or timezones.</p>
+        {canEdit ? <BdeCapacityForm current={firm.bdeCapacity} /> : null}
+      </Card>
+      <PlanUsageCard />
+    </div>
   );
 }
 
