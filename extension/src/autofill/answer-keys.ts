@@ -1,0 +1,59 @@
+import type { EngineFieldType } from "../engine/field-types";
+
+/** What each fixed question of a résumé's autofill asks, by its key (docs/02 §8.1; the questions are
+ * backend/candidates/autofill.py `QUESTIONS`). An answer with a key finds a form's field by what it asks, however the
+ * question is worded, so a new question on the backend needs no new pattern here: only a line in this table.
+ *
+ * - A key mapped to a field kind answers the fields of that kind.
+ * - A key mapped to null is matched by its wording only, like a saved question: no field kind says the same thing, and
+ *   reading its wording as one would misread it ("What is your professional title?" isn't the job held).
+ * - A key missing here (one the backend adds later) is read by its wording too, until a line is added.
+ * - Lists of jobs, schools, projects and awards answer no one field, so they never get this far. */
+
+/** Worked out in the extension from a résumé's answers (`resume-answers.ts`); the backend never sends these keys. */
+export const WORK_AUTHORIZED = "benchq:work-authorized";
+export const LOCATION = "benchq:location";
+
+export const KEY_TYPES: Record<string, EngineFieldType | null> = {
+  "full-name": "full-name",
+  email: "email",
+  phone: "phone",
+  "linkedin-url": "linkedin-url",
+  "github-url": "github-url",
+  "address-city": "address-city",
+  "address-region": "address-region",
+  "address-country": "address-country",
+  // The résumé's headline. "Current job title" is the job held, `current-title`.
+  "professional-title": null,
+  summary: null,
+  // "H-1B" says which status, so it answers "Visa status". "Are you authorized to work?" takes WORK_AUTHORIZED.
+  "work-auth-status": "visa-type",
+  skills: null,
+  "current-company": "current-company",
+  "current-title": "current-title",
+  "education-degree": "education-degree",
+  "education-school": "education-school",
+  "graduation-year": "graduation-year",
+  certifications: null,
+  languages: "languages",
+  "work-auth-expiry": "work-auth-expiry",
+  "visa-sponsorship": "visa-sponsorship",
+  "visa-transfer": null,
+  "years-experience": "years-experience",
+  "primary-role": null,
+  "target-roles": null,
+  "pay-rate": "pay-rate",
+  "start-date": "start-date",
+  "notice-period-days": "notice-period",
+  "relocation-willing": "relocation-willing",
+  "employment-types": null,
+  "work-settings": null,
+  "preferred-locations": "preferred-locations",
+  "preferred-industries": null,
+  [WORK_AUTHORIZED]: "work-authorization",
+  [LOCATION]: "city-state",
+};
+
+/** The field kind a key answers: undefined when the key isn't in the table, so its wording decides. */
+export const typeOfKey = (key: string): EngineFieldType | null | undefined =>
+  Object.prototype.hasOwnProperty.call(KEY_TYPES, key) ? KEY_TYPES[key] : undefined;

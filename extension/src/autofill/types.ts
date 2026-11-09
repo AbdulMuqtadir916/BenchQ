@@ -1,7 +1,9 @@
 /** What the side panel, the background worker and the page script say to each other. Types only: the page script
  * must stay free of shared runtime code (vite.config.ts checks it). */
 
-export type BankEntry = { id: string; question: string; answer: string; category: string };
+/** `key`: what a résumé's fixed question asks (docs/02 §8.1), so it finds a form's field by that, not by its wording
+ * (`answer-keys.ts`). A saved question has none. */
+export type BankEntry = { id: string; question: string; answer: string; category: string; key?: string };
 
 /** `GET /api/autofill/config`: held in memory while a tab is reviewed, never stored. */
 export type AutofillConfig = { candidate_id: string; qa_bank: BankEntry[] };
@@ -92,7 +94,9 @@ export type PageApi = {
   undoCount(): number;
 };
 
-export type JobSummary = { title: string | null; company: string | null; url: string };
+/** `source`: where BenchQ found the job (`jobs.source`: `jobspy_linkedin`, `direct`…), for "How did you hear about
+ * us?". A connection made before it was kept has none. */
+export type JobSummary = { title: string | null; company: string | null; url: string; source?: string | null };
 
 /** A tab connected to a saved application: ids and the job's summary, never the candidate's answers. */
 export type Connection = {
@@ -114,6 +118,10 @@ export type PanelMessage =
   | { type: "clear-connections" };
 
 export type PanelReply = { ok: true; tabId?: number } | { ok: false };
+
+/** The keyboard shortcuts (manifest `commands`), which the worker passes on to the panel. */
+export type ShortcutCommand = "run-autofill" | "mark-applied";
+export type ShortcutMessage = { type: "shortcut"; command: ShortcutCommand };
 
 export type ReviewRow = {
   key: string;

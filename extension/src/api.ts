@@ -30,6 +30,9 @@ export type Application = {
   match_score?: number | null;
   best_score?: number | null;
   best_cv_score?: number | null;
+  job_id?: string;
+  /** Where BenchQ found the job (`jobs.source`): `jobspy_linkedin`, `linkedin_extension`, `direct`, `manual`… */
+  source?: string | null;
   /** The résumé the application was sent with, else the newest one tailored for its job (routes_applications.py). */
   tailored_resume_id?: string | null;
   tailored_resume_name?: string | null;
@@ -61,6 +64,29 @@ export const getCandidates = (firmId: string) =>
 
 export const getAutofillConfig = (candidateId: string) =>
   request<AutofillConfig>(`/api/autofill/config?candidate_id=${encodeURIComponent(candidateId)}`);
+
+/** One version in a candidate's résumé list: its details, never its content (backend/candidates/versions.py). */
+export type ResumeVersion = { id: string; version: number; name: string; title: string | null; category: string; job_id: string | null };
+export type ResumeBase = { id: string; number: number; is_active: boolean; archived_at: string | null; versions: ResumeVersion[] };
+export type TailoredResume = { base_resume_id: string; job_id: string; versions: ResumeVersion[] };
+export type ResumeListing = { bases: ResumeBase[]; tailored: TailoredResume[] };
+
+/** One answer of a résumé version's autofill (docs/02 §8.1). Answers keep their JSON type; `key` names what a fixed
+ * question asks. */
+export type ResumeAnswer = { question: string; answer: unknown; kind: "FIXED" | "EDITED" | "CUSTOM"; key?: string; built?: unknown };
+
+const candidatePath = (firmId: string, candidateId: string) =>
+  `/api/firms/${encodeURIComponent(firmId)}/candidates/${encodeURIComponent(candidateId)}`;
+
+export const getResumeListing = (firmId: string, candidateId: string) =>
+  request<ResumeListing>(`${candidatePath(firmId, candidateId)}/resumes`);
+
+/** A version's autofill, held in memory while a tab is reviewed and never stored. Null from a backend that doesn't send
+ * one yet: it ignores `?autofill=true` and answers with the content alone. */
+export async function getResumeAnswers(firmId: string, candidateId: string, resumeId: string): Promise<unknown[] | null> {
+  const version = await request<{ autofill?: unknown }>(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}?autofill=true`);
+  return Array.isArray(version?.autofill) ? version.autofill : null;
+}
 
 export const getSavedApplications = async (candidateId: string) => {
   const candidate = `&candidate_id=${encodeURIComponent(candidateId)}`;

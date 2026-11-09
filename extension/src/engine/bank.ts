@@ -1,3 +1,4 @@
+import { typeOfKey } from "../autofill/answer-keys";
 import { fieldTypeFor } from "../autofill/match";
 import { normalize, questionOf, strongTokens, tokens } from "../autofill/text";
 import type { BankEntry } from "../autofill/types";
@@ -17,9 +18,12 @@ const RACE = /\b(asian|white|black|african|native|pacific|islander|hawaiian|indi
 
 const agree = (entries: BankEntry[]) => new Set(entries.map(({ answer }) => normalize(answer))).size === 1;
 
-/** What a bank question asks for. An "Ethnicity" that only says whether the candidate is Hispanic answers that
- * question, not the one about race. */
+/** What a bank question asks for. A résumé's fixed answer says so by its key, whatever its wording; one the extension
+ * doesn't know yet, or a saved question, is read by its wording. An "Ethnicity" that only says whether the candidate is
+ * Hispanic answers that question, not the one about race. */
 function typeOfQuestion(entry: BankEntry): EngineFieldType | null {
+  const byKey = entry.key ? typeOfKey(entry.key) : undefined;
+  if (byKey !== undefined) return byKey;
   const question = questionOf(entry.question);
   const type = fieldTypeFor({ label: question, kind: "select", autocomplete: "" }) ?? classifyQuestion(question);
   const answer = normalize(entry.answer);
