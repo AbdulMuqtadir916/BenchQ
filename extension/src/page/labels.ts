@@ -228,3 +228,33 @@ export function isVisible(element: Element): boolean {
 export function isChoiceVisible(input: HTMLInputElement): boolean {
   return isVisible(input) || Array.from(input.labels ?? []).some(isVisible);
 }
+
+export const isFileInput = (element: Element): element is HTMLInputElement =>
+  element.tagName === "INPUT" && (element as HTMLInputElement).type === "file";
+
+/** The boxes an upload sits in, nearest first: its button, drop zone and chip live there. */
+function* uploadBoxes(input: HTMLInputElement) {
+  let box = input.parentElement;
+  for (let depth = 0; box && depth < 3; depth += 1, box = box.parentElement) yield box;
+}
+
+/** A styled upload hides its file input behind a button or a drop zone (07 Q53): the upload is on the form while the
+ * input's label, or a box it sits in, shows. */
+export function isUploadShown(input: HTMLInputElement): boolean {
+  return Array.from(input.labels ?? []).some(isVisible) || [...uploadBoxes(input)].some(isVisible);
+}
+
+/** A file name as an upload's chip shows it: a name before the extension, so "Accepted: .pdf" isn't one. */
+const FILE_NAME = /\S\.(?:pdf|docx?|rtf|odt|txt)$/i;
+
+/** The file an upload shows when the page keeps it beside an emptied input, as a chip after the upload (07 Q53). */
+export function shownFileName(input: HTMLInputElement): string {
+  for (const box of uploadBoxes(input)) {
+    const walker = box.ownerDocument.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = collapse(node.textContent ?? "");
+      if (text.length <= 255 && FILE_NAME.test(text)) return text;
+    }
+  }
+  return "";
+}

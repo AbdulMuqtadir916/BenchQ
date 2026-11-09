@@ -1,7 +1,8 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { button, MOTION, SOFT_TEXT } from "../ui";
 import ChoicePicker from "./ChoicePicker";
 import { fieldLabel, filledValue } from "./form-memory";
+import { CHEVRON_DOWN_ICON } from "./icons";
 import { Tick } from "./marks";
 import type { BankEntry, ReviewRow } from "./types";
 
@@ -24,6 +25,15 @@ type RowActions = Pick<ReviewListProps, "isFilling" | "onGoTo" | "onListOptions"
  * heading above. */
 const ROW = `-mx-1.5 flex cursor-pointer gap-2 rounded-[var(--radius-sm)] px-1.5 py-1 transition-[background] ${MOTION} aria-disabled:cursor-default aria-[disabled=false]:hover:bg-[var(--color-surface-2)]`;
 const NOTE = "text-caption text-[var(--color-text-3)] wrap-anywhere";
+/** A value from the form: two lines at most, the rest on hover (07 Q56). */
+const VALUE = `line-clamp-2 wrap-anywhere ${SOFT_TEXT}`;
+const REQUIRED = "flex-none rounded-full bg-[var(--color-surface-3)] px-1.5 text-caption font-[550] text-[var(--color-text-2)]";
+/** A saved answer to use with a click: a card that wraps, never a line cut off at the panel's edge (07 Q54). */
+const ANSWER_CARD = `grid w-full gap-0.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-left text-sm text-[var(--color-text)] wrap-anywhere transition-[background,border-color] ${MOTION} hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] disabled:cursor-not-allowed disabled:opacity-50`;
+const LINK = "text-caption text-[var(--color-text-2)] underline-offset-2 hover:text-[var(--color-primary)] hover:underline";
+const FOLD = `-mx-1.5 flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-left text-sm font-[550] transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:transition-transform motion-reduce:[&_svg]:transition-none aria-expanded:[&_svg]:rotate-180`;
+/** An answer longer than this shows four lines until "Show all". */
+const LONG_ANSWER = 220;
 
 const isFilled = (row: ReviewRow) => Boolean(filledValue(row));
 const isUpload = ({ field }: ReviewRow) => field.kind === "file";
@@ -67,8 +77,11 @@ function Row({ row, ...actions }: RowActions & { row: ReviewRow }) {
     <RowBody row={row} {...actions}>
       <Tick isFilled={filled} slot="review-tick" />
       <span className="grid min-w-0 flex-1">
-        <span data-slot="review-label" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{fieldLabel(row.field)}</span>
-        {value && <span data-slot="review-value" className={`truncate ${SOFT_TEXT}`} title={value}>{value}</span>}
+        <span className="flex min-w-0 items-start justify-between gap-2">
+          <span data-slot="review-label" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{fieldLabel(row.field)}</span>
+          {!filled && row.field.required && !isUpload(row) && <span data-slot="review-required" className={REQUIRED}>Required</span>}
+        </span>
+        {value && <span data-slot="review-value" className={VALUE} title={value}>{value}</span>}
         {!filled && note && <span data-slot="review-reason" className={NOTE}>{note}</span>}
         {!filled && savedAnswers(row).map((answer) => <span key={answer} data-slot="review-saved" className={NOTE}>Saved: {answer}</span>)}
       </span>
@@ -81,25 +94,47 @@ function Row({ row, ...actions }: RowActions & { row: ReviewRow }) {
 }
 
 /** Saved answers that might answer a question nothing matched: one click fills the field with one. */
-function Suggestions({ row, suggestions, isFilling, onSuggest }: { row: ReviewRow; suggestions: BankEntry[]; isFilling: boolean; onSuggest: (row: ReviewRow, entry: BankEntry) => void }) {
+type SuggestionProps = { row: ReviewRow; isFilling: boolean; onSuggest: (row: ReviewRow, entry: BankEntry) => void };
+
+/** One saved answer: the question it was saved for, small, then the answer on as many lines as it takes. A long one
+ * shows four lines until "Show all". */
+function Suggestion({ row, entry, isFilling, onSuggest }: SuggestionProps & { entry: BankEntry }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isLong = entry.answer.length > LONG_ANSWER || entry.answer.split("\n").length > 4;
+  return <li className="grid justify-items-start gap-0.5">
+    <button type="button" className={ANSWER_CARD} disabled={isFilling} onClick={() => onSuggest(row, entry)}
+      aria-label={`Fill ${fieldLabel(row.field)} with "${entry.answer}", saved for "${entry.question}"`}>
+      <span className="text-caption text-[var(--color-text-3)]">{entry.question}</span>{" "}
+      <span className={isLong && !isOpen ? "line-clamp-4" : undefined}>{entry.answer}</span>
+    </button>
+    {isLong && <button type="button" className={LINK} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>{isOpen ? "Show less" : "Show all"}</button>}
+  </li>;
+}
+
+function Suggestions({ suggestions, ...props }: SuggestionProps & { suggestions: BankEntry[] }) {
   return <div data-slot="review-suggestions" className="grid gap-1 pl-[calc(var(--icon-md)+var(--spacing)*2)]">
     <p className={NOTE}>Saved answers that might fit:</p>
-    <ul className="grid gap-1">{suggestions.map((entry) => <li key={entry.id}>
-      <button type="button" className={`max-w-full text-left ${button("secondary", "compact")}`} disabled={isFilling}
-        aria-label={`Fill ${fieldLabel(row.field)} with "${entry.answer}", saved for "${entry.question}"`} onClick={() => onSuggest(row, entry)}>
-        <span className="min-w-0 wrap-anywhere"><span className="text-[var(--color-text-3)]">{entry.question}</span> {entry.answer}</span>
-      </button>
-    </li>)}</ul>
+    <ul className="grid gap-1">{suggestions.map((entry) => <Suggestion key={entry.id} entry={entry} {...props} />)}</ul>
   </div>;
 }
 
-function Group({ title, rows, ...actions }: RowActions & { title: string; rows: ReviewRow[] }) {
+function Group({ title, count, rows, ...actions }: RowActions & { title: string; count: string; rows: ReviewRow[] }) {
   if (rows.length === 0) return null;
-  const { isFilling } = actions;
-  const inOrder = isFilling ? rows : stillToFillFirst(rows);
   return <section className="grid min-w-0 gap-1" aria-label={title}>
-    <h3 className="text-sm font-[550]">{title} <span className="font-normal text-[var(--color-text-3)]">({rows.filter(isFilled).length} of {rows.length} filled)</span></h3>
-    <ul className="grid gap-0.5">{inOrder.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>
+    <h3 className="text-sm font-[550]">{title} <span className="font-normal text-[var(--color-text-3)]">({count})</span></h3>
+    <ul className="grid gap-0.5">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>
+  </section>;
+}
+
+/** What already holds a value, folded under its count so what's left comes first (07 Q56). */
+function FilledGroup({ rows, ...actions }: RowActions & { rows: ReviewRow[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+  if (rows.length === 0) return null;
+  return <section data-slot="review-filled" className="grid min-w-0 gap-1" aria-label="Filled">
+    <button type="button" data-slot="review-filled-toggle" className={FOLD} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>
+      {CHEVRON_DOWN_ICON}Filled <span className="font-normal text-[var(--color-text-3)]">({rows.length})</span>
+    </button>
+    {isOpen && <ul className="grid gap-0.5">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>}
   </section>;
 }
 
@@ -119,7 +154,7 @@ function KeptGroup({ rows, isFilling, onGoTo, onReplace }: RowActions & { rows: 
           <Tick isFilled slot="review-tick" />
           <span className="grid min-w-0 flex-1">
             <span data-slot="review-label" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{fieldLabel(row.field)}</span>
-            <span data-slot="review-value" className={`truncate ${SOFT_TEXT}`} title={row.field.current}>On the form: {row.field.current}</span>
+            <span data-slot="review-value" className={VALUE} title={row.field.current}>On the form: {row.field.current}</span>
             <span data-slot="review-saved" className={NOTE}>Saved: {row.proposed}</span>
           </span>
         </RowBody>
@@ -129,17 +164,20 @@ function KeptGroup({ rows, isFilling, onGoTo, onReplace }: RowActions & { rows: 
   </section>;
 }
 
-/** The form's fields and what each holds: what the form already held that differs from the saved answers, what's
- * required, what's optional, then any upload the Resume and Cover letter sections don't stand for, since Autofill leaves
- * uploads to the BDE every time. Labels and values come from the employer's page and render as plain text. */
+/** The form's fields and what each holds: what the form already held that differs from the saved answers, what still
+ * needs the BDE (required first, each marked), what's filled (folded under its count), then any upload the Resume and
+ * Cover letter sections don't stand for. Labels and values come from the employer's page and render as plain text. */
 export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListOptions, onChoose, onSuggest }: ReviewListProps) {
   const actions = { isFilling, onGoTo, onListOptions, onChoose, onSuggest };
   const isKept = (row: ReviewRow) => row.status === "kept";
   const typed = rows.filter((row) => !isUpload(row) && !isKept(row));
+  const needed = typed.filter((row) => !isFilled(row));
+  const uploads = rows.filter(isUpload);
   return <div data-slot="review" className="grid grid-cols-[minmax(0,1fr)] gap-3">
     <KeptGroup rows={rows.filter(isKept)} onReplace={onReplace} {...actions} />
-    <Group title="Required" rows={typed.filter(({ field }) => field.required)} {...actions} />
-    <Group title="Optional" rows={typed.filter(({ field }) => !field.required)} {...actions} />
-    <Group title="Other uploads" rows={rows.filter(isUpload)} {...actions} />
+    <Group title="Needs you" count={String(needed.length)} {...actions}
+      rows={[...needed.filter(({ field }) => field.required), ...needed.filter(({ field }) => !field.required)]} />
+    <FilledGroup rows={typed.filter(isFilled)} {...actions} />
+    <Group title="Other uploads" count={`${uploads.filter(isFilled).length} of ${uploads.length} filled`} rows={stillToFillFirst(uploads)} {...actions} />
   </div>;
 }

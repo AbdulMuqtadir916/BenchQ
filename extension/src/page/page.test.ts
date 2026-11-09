@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { documentOf } from "../autofill/documents";
 import { createFiller } from "./fill";
 import { readFields, scanDocument, waitForQuiet, type Registry } from "./scan";
 
@@ -242,6 +243,28 @@ function setup(html: string) {
 }
 
 const element = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
+
+describe("a résumé upload behind a styled button (07 Q53)", () => {
+  const fieldsOf = (html: string) => scan(html).scan.fields;
+
+  it("is on the form while the box its hidden input sits in shows", () => {
+    const [field, ...rest] = fieldsOf(`<div><p>Resume/CV</p><button type="button">Attach</button><span data-hidden><input type="file" name="resume"></span></div>`);
+    expect(rest).toEqual([]);
+    expect(field!.kind).toBe("file");
+    expect(documentOf(field!)).toBe("resume");
+  });
+
+  it("isn't, when the whole upload is hidden", () => {
+    expect(fieldsOf(`<div data-hidden><div><span><input type="file" name="resume"></span></div></div>`)).toEqual([]);
+  });
+
+  it("holds the file its chip shows once the page has emptied the input", () => {
+    const [chip] = fieldsOf(`<div><span>Priya Shah - Java Developer.pdf</span><button type="button">Remove</button><span data-hidden><input type="file" name="resume"></span></div>`);
+    expect(chip!.current).toBe("Priya Shah - Java Developer.pdf");
+    const [empty] = fieldsOf(`<div><span>Accepted: .pdf, .docx</span><span data-hidden><input type="file" name="resume"></span></div>`);
+    expect(empty!.current).toBe("");
+  });
+});
 
 describe("attaching the résumé's file (07 Q49–Q51)", () => {
   /** jsdom has no DataTransfer, and its upload takes only a FileList: the page's own list stands in for both. */

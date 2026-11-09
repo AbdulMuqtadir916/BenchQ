@@ -48,7 +48,7 @@ let element: ReactElement;
 
 type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
-  answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null;
+  answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
 };
 
 function show(state: State, panel: { onApply?: (form: AppliedForm) => void; isApplied?: boolean; applying?: boolean; details?: Application | null } = {}, resumes: Resumes = oneResume) {
@@ -137,28 +137,44 @@ describe("the résumé the answers come from", () => {
   const picker = () => host.querySelector("[data-slot='resume-picker']")!;
   const twoResumes: Resumes = { status: "ready", choices: [tailored, base], picked: base };
 
-  it("lists the candidate's résumés first, then folds to the picked one, with a way to view it in BenchQ", async () => {
+  const select = () => picker().querySelector<HTMLButtonElement>("[data-slot='resume-select']")!;
+  const open = () => act(async () => { select().click(); });
+
+  it("shows the one résumé as a plain row, with a way to view it in BenchQ (07 Q55)", () => {
     show({ fillCount: 1 });
-    expect(picker().querySelectorAll("[data-slot='resume-choice']")).toHaveLength(1);
-    await click("Picked");
     expect(picker().querySelector("[data-slot='resume-picked']")!.textContent).toBe(base.label);
     expect(picker().querySelector("a")!.getAttribute("href")).toContain("/acme-staffing/resumes/res-2");
     expect(picker().querySelectorAll("button")).toHaveLength(0);
   });
 
-  it("lists the candidate's résumés, each with Pick and a link, and again on Change", async () => {
+  it("starts closed on the résumé in use; its ▾ opens every résumé with Pick and a link, and Esc closes them", async () => {
     show({ fillCount: 1 }, {}, twoResumes);
-    await click("Pick");
-    await click("Change");
+    expect(select().getAttribute("aria-expanded")).toBe("false");
+    expect(select().textContent).toContain(base.label);
+    expect(picker().querySelectorAll("[data-slot='resume-choice']")).toHaveLength(0);
+    await open();
+    expect(select().getAttribute("aria-expanded")).toBe("true");
     const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
     expect(choices.map((choice) => choice.querySelector("button")!.textContent)).toEqual(["Pick", "Picked"]);
     expect(choices[0]!.textContent).toContain("Tailored");
     expect(choices[0]!.querySelector("a")!.getAttribute("href")).toContain("/resumes/res-9");
+    act(() => { select().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(select().getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(select());
+  });
+
+  it("closes once a résumé is picked", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    await open();
+    await click("Pick");
+    expect(pick).toHaveBeenCalledWith("res-9");
+    expect(picker().querySelectorAll("[data-slot='resume-choice']")).toHaveLength(0);
   });
 
   it("fills the form as soon as the picked résumé's answers are in", async () => {
     const rows = [row("Email", true)];
     show({ fillCount: 1, rows, answeredFrom: "res-2" }, {}, twoResumes);
+    await open();
     await click("Pick");
     expect(pick).toHaveBeenCalledWith("res-9");
     expect(autofill).not.toHaveBeenCalled();
@@ -168,6 +184,7 @@ describe("the résumé the answers come from", () => {
 
   it("only picks when the form isn't on the page yet", async () => {
     show({ fillCount: 0, rows: [], answeredFrom: "res-2" }, {}, twoResumes);
+    await open();
     await click("Pick");
     update({ fillCount: 0, rows: [], answeredFrom: "res-9" }, { ...twoResumes, picked: tailored });
     expect(autofill).not.toHaveBeenCalled();
@@ -176,6 +193,7 @@ describe("the résumé the answers come from", () => {
   it("only picks when the page may be a different job", async () => {
     const rows = [row("Email", true)];
     show({ fillCount: 1, rows, answeredFrom: "res-2" }, {}, twoResumes);
+    await open();
     await click("Pick");
     update({ fillCount: 1, rows, answeredFrom: "res-9", needsConfirmation: true }, { ...twoResumes, picked: tailored });
     expect(autofill).not.toHaveBeenCalled();
@@ -202,6 +220,19 @@ describe("the résumé the answers come from", () => {
     const upload = { key: "cv", status: "manual", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } } as unknown as ReviewRow;
     show({ fillCount: 0, rows: [upload] });
     expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe(`Attach by hand: ${base.label}`);
+  });
+
+  it("shows the file Autofill attached when the site swapped its upload for a chip (07 Q53)", () => {
+    show({ fillCount: 0, rows: [row("Email", true)], attachedFile: "Priya - Java Developer.pdf" });
+    const resume = host.querySelector("[data-document='resume']")!;
+    expect(resume.querySelector("[data-slot='document-status']")!.textContent).toBe("Attached");
+    expect(resume.querySelector("[data-slot='document-attached']")!.textContent).toBe("Attached: Priya - Java Developer.pdf");
+  });
+
+  it("shows an upload's file as a green Attached chip (07 Q56)", () => {
+    const upload = { key: "cv", status: "same", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "cv.pdf" } } as unknown as ReviewRow;
+    show({ fillCount: 0, rows: [upload] });
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-attached']")!.textContent).toBe("Attached: cv.pdf");
   });
 
   it("says Autofill attaches its file when BenchQ has one (07 Q49)", () => {

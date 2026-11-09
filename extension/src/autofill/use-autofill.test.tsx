@@ -893,6 +893,11 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     const answered = vi.mocked(fillField).mock.invocationCallOrder[1]!;
     expect(vi.mocked(readTab).mock.invocationCallOrder.filter((order) => order < answered).length).toBeGreaterThanOrEqual(6);
     expect(hook.outcome).toEqual({ filled: 2, handedBack: 0, stopped: false });
+    // The panel keeps the attached file's name, for when the site swaps its input for a chip (07 Q53); Undo forgets it.
+    expect(hook.attachedFile).toBe(NAME);
+    vi.mocked(undoFills).mockResolvedValue({ restored: 2, kept: 0, skipped: 0 });
+    await act(async () => { const undoing = hook.undo(); await vi.advanceTimersByTimeAsync(500 * 24); await undoing; });
+    expect(hook.attachedFile).toBeNull();
   });
 
   it("leaves a file that was on the form before BenchQ looked", async () => {

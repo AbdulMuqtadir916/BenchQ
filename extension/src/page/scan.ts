@@ -1,7 +1,7 @@
 import type { FieldKind, FieldOption, FrameRead, FrameScan, PageSignals, ScannedField } from "../autofill/types";
 import {
-  ariaChecked, ariaLabelOf, cleanLabel, collapse, fieldClues, groupLabel, hasOptionalMark, hasRequiredMark, isAriaChoice, isChoiceVisible, isOn,
-  isVisible, optionLabel, PLACEHOLDER_OPTION, rawLabel, shownValue, textOf,
+  ariaChecked, ariaLabelOf, cleanLabel, collapse, fieldClues, groupLabel, hasOptionalMark, hasRequiredMark, isAriaChoice, isChoiceVisible, isFileInput,
+  isOn, isUploadShown, isVisible, optionLabel, PLACEHOLDER_OPTION, rawLabel, shownFileName, shownValue, textOf,
 } from "./labels";
 
 /** One field of a scan: what the panel sees, and the elements a later fill writes to. */
@@ -116,7 +116,10 @@ export function readCurrent(entry: Entry): string {
   const [control] = entry.controls;
   if (!control) return "";
   if (entry.field.kind === "password") return "";
-  if (entry.field.kind === "file") return Array.from((control as HTMLInputElement).files ?? [], ({ name }) => name).join(", ");
+  if (entry.field.kind === "file") {
+    const input = control as HTMLInputElement;
+    return Array.from(input.files ?? [], ({ name }) => name).join(", ") || shownFileName(input);
+  }
   if (entry.field.kind === "combobox") return shownValue(control);
   if (isSelect(control)) {
     const selected = control.selectedOptions[0];
@@ -255,7 +258,7 @@ function collectSlots(doc: Document): Slot[] {
         groups.set(key, fresh);
         slots.push(fresh);
       }
-    } else if (isVisible(element)) slots.push(element);
+    } else if (isVisible(element) || (isFileInput(element) && isUploadShown(element))) slots.push(element);
   }
   return slots;
 }

@@ -72,12 +72,14 @@ type TabMemory = {
   unmatched: Set<string>;
   // The résumé each of BenchQ's fills came from. Another résumé picked later refills those fields, and only those.
   filledFrom: Map<string, string | null>;
+  // The file BenchQ attached to each upload: the Resume section still shows it when the site swaps the input for a chip.
+  attached: Map<string, string>;
 };
 
 /** What a page load wipes. */
 const pageMemory = () => ({
   settled: new Map<string, string>(), handedBack: new Map<string, string>(), seen: new Map<string, string>(), edited: new Set<string>(),
-  found: new Set<string>(), unmatched: new Set<string>(), filledFrom: new Map<string, string | null>(),
+  found: new Set<string>(), unmatched: new Set<string>(), filledFrom: new Map<string, string | null>(), attached: new Map<string, string>(),
 });
 
 const tabMemory = new Map<string, TabMemory>();
@@ -160,6 +162,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const [unreadableFrames, setUnreadableFrames] = useState(0);
   const [signals, setSignals] = useState<PageSignals | null>(null);
   const memory = useRef(memoryOf(connection));
+  // The last file BenchQ attached on this page (07 Q53).
+  const [attachedFile, setAttachedFile] = useState<string | null>(() => [...memoryOf(connection).attached.values()].at(-1) ?? null);
   const [filling, setFilling] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [run, setRun] = useState<AutofillRun | null>(null);
@@ -251,7 +255,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       try {
         // A page's scans count from one, so a lower count means it loaded afresh.
         const topScan = page.scanIds.get(TOP_FRAME) ?? 0;
-        if (topScan < memory.current.lastScan) Object.assign(memory.current, pageMemory());
+        if (topScan < memory.current.lastScan) {
+          Object.assign(memory.current, pageMemory());
+          setAttachedFile(null);
+        }
         memory.current.lastScan = topScan;
         bank.current = { resumeId, entries: answers, file };
         review(page.fields, answers, justFilled);
@@ -394,6 +401,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       if (result.status === "filled") {
         filled.push(row);
         memory.current.filledFrom.set(memoKeyOf(row), resume.current);
+        if (write.type === "file") {
+          memory.current.attached.set(memoKeyOf(row), write.name);
+          setAttachedFile(write.name);
+        }
         track({ key, label, status: "filled", value: result.current || row.proposed });
         showResult(key, (item) => ({ ...item, status: "same", field: { ...item.field, current: result.current } }));
       } else {
@@ -542,6 +553,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     }
     memory.current.settled.clear();
     memory.current.filledFrom.clear();
+    memory.current.attached.clear();
+    setAttachedFile(null);
     busy.current = false;
     await scan(new Set());
   }, [scan, tabId]);
@@ -554,7 +567,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, [applicationId, watchForm]);
 
   return {
-    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, attachment,
+    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, attachment, attachedFile,
     needsConfirmation, fillCount: targets.length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
   };
 }

@@ -25,11 +25,14 @@ const render = (rows: ReviewRow[], isFilling = false) => act(() => {
   root!.render(<ReviewList rows={rows} isFilling={isFilling} onGoTo={onGoTo} />);
 });
 
-function show(rows: ReviewRow[], isFilling = false) {
+/** Renders the list with "Filled" opened, unless a test is about the fold itself. */
+function show(rows: ReviewRow[], isFilling = false, isFilledOpen = true) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   render(rows, isFilling);
+  const toggle = host.querySelector<HTMLButtonElement>("[data-slot='review-filled-toggle']");
+  if (isFilledOpen && toggle) act(() => { toggle.click(); });
 }
 
 const all = (selector: string) => [...host.querySelectorAll(selector)];
@@ -44,35 +47,28 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("the two lists", () => {
-  it("splits the form into Required and Optional, each saying how much is filled", () => {
-    show([holding("First name", true, "Priya"), row("Resume", true, "blocked"), row("Email", true), holding("LinkedIn", false, "https://x.test"), row("Why us?", false, "manual")]);
-    expect(titles()).toEqual(["Required (1 of 3 filled)", "Optional (1 of 2 filled)"]);
+describe("the groups (07 Q56)", () => {
+  const fold = () => host.querySelector<HTMLButtonElement>("[data-slot='review-filled-toggle']");
+
+  it("put what still needs the BDE first, required before optional, each required one marked", () => {
+    show([holding("First name", true, "Priya"), row("Why us?", false, "manual"), row("Email", true), holding("LinkedIn", false, "https://x.test")], false, false);
+    expect(titles()).toEqual(["Needs you (2)"]);
+    expect(labels()).toEqual(["Email", "Why us?"]);
+    expect(all("[data-slot='review-required']").map((tag) => tag.textContent)).toEqual(["Required"]);
   });
 
-  it("are always open, with nothing to expand", () => {
-    show([row("Email", true), row("LinkedIn", false)]);
-    expect(host.querySelector("details")).toBeNull();
-    expect(labels()).toEqual(["Email", "LinkedIn"]);
+  it("fold what's filled under its count, open on a click", () => {
+    show([holding("First name", true, "Priya"), row("Email", true), holding("LinkedIn", false, "https://x.test")], false, false);
+    expect([fold()!.textContent, fold()!.getAttribute("aria-expanded")]).toEqual(["Filled (2)", "false"]);
+    act(() => { fold()!.click(); });
+    expect(fold()!.getAttribute("aria-expanded")).toBe("true");
+    expect(labels()).toEqual(["Email", "First name", "LinkedIn"]);
   });
 
-  it("leave out a list with nothing in it", () => {
+  it("leave out a group with nothing in it", () => {
     show([row("Email", true)]);
-    expect(titles()).toEqual(["Required (0 of 1 filled)"]);
-  });
-
-  it("put what's still to fill first, each kind in the form's order", () => {
-    show([holding("First", true, "a"), row("Second", true), holding("Third", true, "b"), row("Fourth", true)]);
-    expect(labels()).toEqual(["Second", "Fourth", "First", "Third"]);
-  });
-
-  it("keep every row in place during a run, so each ticks where it is", () => {
-    const rows = [row("First", true), holding("Second", true, "b"), row("Third", true)];
-    show(rows, true);
-    expect(labels()).toEqual(["First", "Second", "Third"]);
-    render([holding("First", true, "a"), rows[1]!, rows[2]!], true);
-    expect(labels()).toEqual(["First", "Second", "Third"]);
-    expect(ticks()).toEqual(["Filled", "Filled", "Not filled"]);
+    expect(titles()).toEqual(["Needs you (1)"]);
+    expect(fold()).toBeNull();
   });
 
   it("have no checkboxes", () => {
@@ -80,10 +76,12 @@ describe("the two lists", () => {
     expect(host.querySelector("input")).toBeNull();
   });
 
-  it("show a value from the page as plain text", () => {
+  it("show a value from the page as plain text, on two lines at most", () => {
     show([holding("Name", true, "<img src=x onerror=alert(1)>")]);
     expect(host.querySelector("img")).toBeNull();
-    expect(host.querySelector("[data-slot='review-value']")?.textContent).toBe("<img src=x onerror=alert(1)>");
+    const value = host.querySelector("[data-slot='review-value']")!;
+    expect(value.textContent).toBe("<img src=x onerror=alert(1)>");
+    expect(value.className).toContain("line-clamp-2");
   });
 });
 
@@ -152,18 +150,18 @@ describe("file uploads", () => {
 
   it("get their own section, after the rest", () => {
     show([row("Email", true), upload("Resume/CV", true), row("LinkedIn", false), upload("Cover Letter", false, "letter.pdf")]);
-    expect(titles()).toEqual(["Required (0 of 1 filled)", "Optional (0 of 1 filled)", "Other uploads (1 of 2 filled)"]);
+    expect(titles()).toEqual(["Needs you (2)", "Other uploads (1 of 2 filled)"]);
     expect(labels()).toEqual(["Email", "LinkedIn", "Resume/CV", "Cover Letter"]);
   });
 
-  it("leave Required and Optional counting only what's left", () => {
+  it("stay out of the other groups' counts", () => {
     show([upload("Resume/CV", true), holding("Email", true, "a@example.test")]);
-    expect(titles()).toEqual(["Required (1 of 1 filled)", "Other uploads (0 of 1 filled)"]);
+    expect(titles()).toEqual(["Other uploads (0 of 1 filled)"]);
   });
 
   it("show no section when the form has none", () => {
     show([row("Email", true)]);
-    expect(titles()).toEqual(["Required (0 of 1 filled)"]);
+    expect(titles()).toEqual(["Needs you (1)"]);
   });
 
   it("show the BDE what's needed, without repeating that it's an upload", () => {
@@ -270,5 +268,37 @@ describe("suggestions", () => {
   it("goes once the field is filled", () => {
     showWith([{ ...unmatched, field: { ...unmatched.field, current: "Yes" } }]);
     expect(host.querySelector("[data-slot='review-suggestions']")).toBeNull();
+  });
+});
+
+describe("a long saved answer and a long dropdown (07 Q54)", () => {
+  it("shows a long answer on four lines until Show all, wrapping instead of running off the panel", () => {
+    const long: BankEntry = { id: "l", question: "Why do you want to work here?", answer: "Because ".repeat(40).trim(), category: "OTHER" };
+    const unmatched = row("Why us?", false, "manual", { reason: "No answer in the bank.", suggestions: [long] });
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => { root!.render(<ReviewList rows={[unmatched]} isFilling={false} onGoTo={onGoTo} onSuggest={vi.fn()} />); });
+    const card = host.querySelector<HTMLButtonElement>("[data-slot='review-suggestions'] li > button")!;
+    expect(card.className).toContain("wrap-anywhere");
+    expect(card.lastElementChild!.className).toBe("line-clamp-4");
+    const more = [...host.querySelectorAll<HTMLButtonElement>("button")].find(({ textContent }) => textContent === "Show all")!;
+    act(() => { more.click(); });
+    expect(card.lastElementChild!.className).toBe("");
+    expect(more.textContent).toBe("Show less");
+  });
+
+  it("lists eight options, then all of them on request, with no scroll", async () => {
+    const options = Array.from({ length: 10 }, (_, index) => `Option ${index + 1}`);
+    const dropdown = row("Country", true, "manual", { canChoose: true, field: { label: "Country", required: true, current: "", kind: "combobox" } as TabField });
+    show([]);
+    act(() => { root!.render(<ReviewList rows={[dropdown]} isFilling={false} onGoTo={onGoTo} onListOptions={async () => options} onChoose={vi.fn()} />); });
+    await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='choice-open']")!.click(); });
+    const list = () => [...host.querySelectorAll("[data-slot='choice-list'] button")];
+    expect(list()).toHaveLength(8);
+    expect(host.querySelector("[data-slot='choice-list']")!.className).not.toContain("overflow");
+    act(() => { host.querySelector<HTMLButtonElement>("[data-slot='choice-all']")!.click(); });
+    expect(list()).toHaveLength(10);
+    expect(host.querySelector("[data-slot='choice-all']")).toBeNull();
   });
 });
