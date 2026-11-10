@@ -1,6 +1,6 @@
 """The form behind an application: `applications.form_data` (docs/02 §9).
 
-Revision ID: 0020
+Revision ID: 0021
 Revises: 0019
 Create Date: 2026-11-07 12:00:00.000000
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = '0020'
+revision = '0021'
 down_revision = '0019'
 branch_labels = None
 depends_on = None
