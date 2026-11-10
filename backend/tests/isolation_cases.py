@@ -46,8 +46,16 @@ def _classification_ready(state):
     return prepare
 
 
+def _resume_country_us(db, ids):
+    """The candidate's résumés say US, so a job search has a country (backend/job_search/country.py)."""
+    from backend.models.db import Resume
+    db.query(Resume).filter(Resume.candidate_id == ids["candidate"]).update({Resume.country: "US"})
+    db.commit()
+
+
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt", "base_id": "base"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt", "base_id": "base",
+         "posting_id": "posting"}
 
 
 
@@ -100,6 +108,12 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/removal": Case(),
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}": Case(as_bde=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/show": Case(as_bde=True),
+    # Job search (job search PR 1): a search is the candidate's BDE's, with the résumé country it searches in.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(
+        as_bde=True, body=lambda i: {"query": "Java Developer"}, prepare=_resume_country_us),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": Case(),
 

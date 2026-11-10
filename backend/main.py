@@ -37,6 +37,7 @@ from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
 from backend.api.routes_candidates import router as candidates_router
 from backend.api.routes_candidate_resumes import router as candidate_resumes_router
+from backend.api.routes_job_search import router as job_search_router
 from backend.api.routes_firm_resumes import router as firm_resumes_router
 from backend.api.routes_ledger import router as ledger_router
 from backend.api.routes_support import router as support_router
@@ -194,6 +195,7 @@ app.include_router(invites_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
 app.include_router(candidates_router, prefix="/api")
 app.include_router(candidate_resumes_router, prefix="/api")
+app.include_router(job_search_router, prefix="/api")
 app.include_router(firm_resumes_router, prefix="/api")
 app.include_router(ledger_router, prefix="/api")
 app.include_router(support_router, prefix="/api")

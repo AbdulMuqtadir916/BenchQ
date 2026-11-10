@@ -9,16 +9,20 @@ change once those are repointed.
 Dedup identity (per candidate): `job_id` (SHA256 hex of normalized company + title + full JD text) is the only
 identity key. A content change is a new posting by design, so the board's own id adds nothing and isn't stored. A
 repeat match on `job_id` for the same candidate updates `batch_id`/`last_seen_at` on the existing row instead
-of inserting a duplicate (done in the ingestion code, not here).
+of inserting a duplicate, and replaces `content` with the latest (backend/job_search/pipeline.py).
 
 Everything about the job itself — title, description, location, salary, seniority, skills, apply link, whatever
 a given source sends — lives in one `content` JSONB column, not separate typed columns (decided 2026-11-09): the
 set of sources isn't fixed to JSearch/freehire.me, and a schema built around one source's fields would need a
-migration every time another aggregator is added or a source's response shape changes. The ingestion/adapter code
-(not yet written) decides `content`'s internal shape; this table doesn't enforce one.
+migration every time another aggregator is added or a source's response shape changes. `content` is the provider's
+own job object as it arrived (decided 2026-11-10); each provider's `read()` (backend/job_search/providers/) turns it
+into the common fields, chosen by `source`. This table doesn't enforce a shape.
 
 No status column (decided 2026-11-10): whether a job was saved or applied to lives in `applications`, so it can't
 drift from a copy here. Hiding a job (dismissed) isn't built.
+
+`scrape_jobs.user_id` (migration 0022) is who ran the search, the candidate's BDE; a plain FK to `users.id` (users has
+no `UNIQUE (firm_id, id)` to aim a firm-safe key at; the route takes the user from the session, in the candidate's firm).
 
 Tenancy: `(firm_id, candidate_id)` references `candidates (firm_id, id)` on both tables, so a row can't carry a
 firm other than its candidate's; and `job_postings (firm_id, candidate_id, batch_id)` references the same three on
@@ -42,6 +46,8 @@ class ScrapeJob(Base):
     id = _pk()
     firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False)
     candidate_id = Column(UUID(as_uuid=True), nullable=False)
+    # Who ran the search (migration 0022): the candidate's BDE. The BDE's daily attempts are counted from these rows.
+    user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
     batch_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
     # success: the source answered with at least one job | empty: it answered with none | error: it failed
     state = Column(String, nullable=False)
@@ -58,6 +64,9 @@ class ScrapeJob(Base):
         CheckConstraint("(state = 'error') = (error IS NOT NULL)", name="ck_scrape_jobs_error_iff_error"),
         # The target of job_postings' batch key: a posting can only name a batch run for its own candidate and firm.
         UniqueConstraint("firm_id", "candidate_id", "batch_id", name="uq_scrape_jobs_firm_candidate_batch"),
+        # The BDE's attempts since the last 6:30 PM IST, and a candidate's search history (backend/job_search/limits.py).
+        Index("ix_scrape_jobs_user_created", "user_id", "created_at"),
+        Index("ix_scrape_jobs_candidate_created", "candidate_id", "created_at"),
     )
 
 
@@ -95,6 +104,8 @@ class JobPosting(Base):
         CheckConstraint("job_id ~ '^[0-9a-f]{64}$'", name="ck_job_postings_job_id_sha256"),
         # The list screen (one candidate's jobs in a firm, or a firm's) and the batch key, by its leading columns.
         Index("ix_job_postings_firm_candidate_batch", "firm_id", "candidate_id", "batch_id"),
+        # A candidate's jobs newest first, and the new jobs saved since the last 6:30 PM IST (migration 0022).
+        Index("ix_job_postings_candidate_discovered", "candidate_id", "discovered_at"),
     )
 
 

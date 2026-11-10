@@ -59,7 +59,7 @@ ID_ALIASES = {"app": "applications", "cl": "cover_letters", "base": "base_resume
               "attempt": "candidate_google_oauth_attempts", "interview": "interviews", "manager": "users",
               "bde": "users", "user": "users", "owner": "users", "firm": "firms", "plan": "plans",
               "resume": "resumes", "base_resume": "base_resumes", "notification": "notifications", "run": "job_runs",
-              "review": "application_reviews"}
+              "review": "application_reviews", "posting": "job_postings"}
 JOB_URL = "https://jobs.example.test/posting/1"
 # Values the routes check in code, not in their schema, by field name.
 FIELD_VALUES = {"role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",

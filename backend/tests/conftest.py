@@ -44,6 +44,16 @@ def _clean_auth_throttle():
 
 # ── Anthropic mock fixtures ───────────────────────────────────────────────
 
+@pytest.fixture(autouse=True)
+def _no_job_search_network(monkeypatch):
+    """No test reaches a real job source (job search PR 1, Q31): the outbound call answers with no jobs unless a test
+    sets its own transport (backend/job_search/http.py). A live check is run by hand, never here."""
+    import httpx
+    from backend.job_search import http as job_search_http
+    monkeypatch.setattr(job_search_http, "transport",
+                        httpx.MockTransport(lambda request: httpx.Response(200, json={"data": [], "meta": {}})))
+
+
 @pytest.fixture
 def mock_anthropic_response():
     """Factory for a fake anthropic.messages.create response."""

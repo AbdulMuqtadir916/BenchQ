@@ -1,0 +1,83 @@
+"""The job search's outbound call (decided 2026-11-10): a 20 s limit on the whole call, one retry after 2 s on a
+timeout, a dropped connection, 5xx or 429, a 5 MB cap on the body, no redirects. Every failure is a `ProviderError`
+with a fixed code; the URL, the parameters and the body never reach an error or a log line (another source's key may
+travel in them)."""
+import asyncio
+import json
+import logging
+import time
+
+import httpx
+
+from backend.job_search.providers.base import ProviderError
+
+logger = logging.getLogger("benchq.job_search")
+
+TIMEOUT_SECONDS = 20.0
+RETRY_DELAY_SECONDS = 2.0
+MAX_BYTES = 5 * 1024 * 1024
+
+# Tests swap in an httpx.MockTransport here; production uses httpx's own.
+transport: httpx.AsyncBaseTransport | None = None
+
+
+class _Retry(Exception):
+    def __init__(self, code: str):
+        self.code = code
+
+
+async def _once(url: str, params: dict, headers: dict) -> dict:
+    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=False, transport=transport) as client:
+        async with client.stream("GET", url, params=params, headers=headers) as resp:
+            status = resp.status_code
+            if status == 429 or status >= 500:
+                raise _Retry("provider_unavailable")
+            if status >= 300:            # 3xx too: a redirect is not followed
+                raise ProviderError("provider_rejected")
+            declared = resp.headers.get("content-length")
+            if declared and declared.isdigit() and int(declared) > MAX_BYTES:
+                raise ProviderError("too_large")
+            body = bytearray()
+            async for chunk in resp.aiter_bytes():
+                body.extend(chunk)
+                if len(body) > MAX_BYTES:
+                    raise ProviderError("too_large")
+    try:
+        payload = json.loads(bytes(body))
+    except (ValueError, UnicodeDecodeError):
+        raise ProviderError("bad_response") from None
+    if not isinstance(payload, dict):
+        raise ProviderError("bad_response")
+    return payload
+
+
+async def _attempt(url: str, params: dict, headers: dict) -> dict:
+    try:
+        return await asyncio.wait_for(_once(url, params, headers), timeout=TIMEOUT_SECONDS)
+    except (asyncio.TimeoutError, httpx.TimeoutException):
+        raise _Retry("timeout") from None
+    except httpx.TransportError:
+        raise _Retry("provider_unavailable") from None
+
+
+async def get_json(url: str, params: dict, *, headers: dict | None = None, source: str = "") -> dict:
+    """The source's JSON object, or `ProviderError`. Logs the outcome by code and timing only."""
+    started = time.monotonic()
+    headers = headers or {}
+    for attempt in (1, 2):
+        try:
+            payload = await _attempt(url, params, headers)
+            logger.info("job search source=%s attempt=%d ok ms=%d", source, attempt,
+                        (time.monotonic() - started) * 1000)
+            return payload
+        except _Retry as retry:
+            logger.warning("job search source=%s attempt=%d code=%s ms=%d", source, attempt, retry.code,
+                           (time.monotonic() - started) * 1000)
+            if attempt == 2:
+                raise ProviderError(retry.code) from None
+            await asyncio.sleep(RETRY_DELAY_SECONDS)
+        except ProviderError as error:
+            logger.warning("job search source=%s attempt=%d code=%s ms=%d", source, attempt, error.code,
+                           (time.monotonic() - started) * 1000)
+            raise
+    raise ProviderError("internal")      # unreachable: the loop returns or raises

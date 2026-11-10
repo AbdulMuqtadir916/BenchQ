@@ -2,6 +2,16 @@
 
 **Difficulty:** Medium · **Depends on:** 00 · **Module names:** `jobs`, `companies` (enable together)
 
+> **Job search (2026-11-10, `feat/job-search-pipeline`):** a candidate's searched jobs are a new backend, separate
+> from the old `jobs` pool below: `job_postings`, read under the candidate's URL —
+> `GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings?page=&size=` (`{items, total, page, size}`, newest
+> first; each item `id, candidate_id, batch_id, source, job_id, discovered_at, last_seen_at, title, company,
+> apply_url, location, countries, posted_at, employment_type, skills, is_closed`), `…/job-postings/{posting_id}`
+> (the same plus `description`, plain text), `GET …/job-searches` (`running`, `searches`, `usage`) and
+> `POST …/job-searches` `{query}` (202 `{run_id}`; the candidate's BDE only; 403 / 404 / 409 / 422 / 429). docs/02
+> §6.y has the rules. Showing them in the screens, with Apply and Tailor off for them until PR 3 repoints
+> `applications`, is PR 2. The rest of this page still describes the old pool.
+
 ## Why companies are folded in
 
 No screen calls `useCompanies`. Company data reaches the UI only as the `company` object nested

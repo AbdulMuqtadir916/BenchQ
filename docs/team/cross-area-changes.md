@@ -3,6 +3,19 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Job search pipeline (`feat/job-search-pipeline`, Zuhair)
+
+The search itself (docs/02 §6.y "The search pipeline"): a BDE searches jobs for their candidate in the background,
+freehire.me first, with daily caps. Each row below is needed for the routes to exist and be checked.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Permissions (Abdul) | `backend/auth/policy.py`, `src/lib/auth/policy.ts`, `backend/auth/policy_table.json`, `src/lib/auth/policy-table.test.ts` | A new firm action `job.search`, BDE only; `can_search_jobs` / `canSearchJobs`: the action **and** the candidate's `bde_id` is the user, like `can_manage_resume`. | Only the candidate's assigned BDE searches (decided 2026-11-10). The table is shared by both sides and their tests. | **Pending: Abdul** |
+| Route access (Abdul) | `backend/auth/access.py` | Four `F` rows: `POST`/`GET …/candidates/{candidate_id}/job-searches`, `GET …/job-postings`, `GET …/job-postings/{posting_id}`. | Every route has a class; a support view reads and never writes. | **Pending: Abdul** |
+| Background work (Uzair) | `backend/job_monitor.py` | `_JOB_TYPE_LIMITER["job_search"]` and a `job_search` limiter of 4 (not user-tunable). | Four searches at once per worker; the rest queue (decided 2026-11-10). | **Pending: Uzair** |
+| Logging and isolation checks (Uzair) | `backend/tests/route_sweep.py` (`"posting": "job_postings"` alias), `test_log_every_route.py` (`NOT_REACHED` for the POST), `isolation_support.py` (a search and a posting per firm), `isolation_cases.py` (four cases, `_resume_country_us`), `conftest.py` (`_no_job_search_network`, autouse) | The sweeps cover the new routes. The POST is BDE-only and the log sweep signs in as the OWNER, so it is listed as not reached; its logging is tested in `test_job_search_api.py`. The autouse fixture answers every job search call with no jobs, so no test reaches a real source. | The route sweeps fail on a route they don't know, and a test must never call freehire.me (Q31). | **Pending: Uzair** |
+| Deployment (Abdul) | none | **For you:** the search runs in the API process (`launch_background`). A restart loses a search in flight, and with several workers the startup clean-up (`cleanup_stale_runs`) marks every running row failed, other workers' too. A real job queue (a separate worker) fixes both. | A known limit, recorded for the deployment work. | **Pending: Abdul** |
+
 ## Extension autofill — the form behind an application, and the extension's own tests (`feat/apply-extension-autofill`)
 
 Not agreed yet: Samad reviews the applications change before merge. The branch's earlier `/config` change, its removal

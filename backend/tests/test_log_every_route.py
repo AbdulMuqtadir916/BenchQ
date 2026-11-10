@@ -53,6 +53,9 @@ NOT_REACHED: dict[str, str] = {
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}":
         "409: Mailbox confirmation expired. Connect again",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": "400: Invalid local return path",
+    # Only the candidate's BDE searches (decided 2026-11-10) and the sweep signs in as the OWNER. The search's own
+    # logging (ids, codes, counts; never the query) is checked in test_job_search_api.py.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": "403: Only this candidate's BDE searches jobs for them",
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}":
         "409: Base 1 holds what an owner or manager added, so it can't be deleted",
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}":

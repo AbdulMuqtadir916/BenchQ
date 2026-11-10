@@ -198,6 +198,19 @@ def build_firm(db, firm, owner, tag: str) -> dict:
         expires_at=utcnow() + timedelta(minutes=10))
     db.add(attempt)
     db.flush()
+    # Job search (job search PR 1): one finished search by the candidate's BDE and the job it found, `tag` in its title.
+    import hashlib
+    from backend.models.job_search import JobPosting, ScrapeJob
+    batch = ScrapeJob(firm_id=firm.id, candidate_id=candidate.id, user_id=bde.id, batch_id=uuid.uuid4(),
+                      state="success", meta={"request": {"query": f"{tag} Java Developer", "country": "us"}})
+    db.add(batch)
+    db.flush()
+    posting = JobPosting(firm_id=firm.id, candidate_id=candidate.id, batch_id=batch.batch_id, source="freehire",
+                         job_id=hashlib.sha256(tag.encode()).hexdigest(),
+                         content={"title": f"{tag} Java Developer", "company": f"{tag} Corp",
+                                  "description": f"{tag} job description", "url": "https://jobs.example.test/search"})
+    db.add(posting)
+    db.flush()
     # A résumé read waiting for its create (07 Q58: no candidate is added without one).
     pending = ResumeParse(firm_id=firm.id, uploaded_by_user_id=owner.id, file_name=f"{tag} new.pdf",
                           mime_type="application/pdf", size_bytes=len(tag), content=f"{tag} new file".encode(),
@@ -206,7 +219,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.flush()
 
     return {"oauth_attempt": attempt.id, "pending_parse": pending.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
-            "version": v2.id, "base": second.id,
+            "version": v2.id, "base": second.id, "posting": posting.id,
 
             "firm": firm.id, "slug": firm.slug, "job": job.id,
             "app": app.id, "legacy_app": legacy_app.id, "inbox_message": candidate_message.id, "interview": interview.id,
