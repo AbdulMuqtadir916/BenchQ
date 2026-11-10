@@ -12,6 +12,42 @@ STATUSES = frozenset({
     'saved', 'applied', 'screening_call', 'interview_schedule_request', 'interview_scheduled',
     'offer', 'shortlisted', 'move_on', 'incomplete_application', 'assessment',
 })
+FORM_FIELD_KEYS = {'label', 'value', 'required', 'source'}
+MAX_FORM_FIELDS = 200
+MAX_FORM_LABEL = 500
+MAX_FORM_VALUE = 4000
+
+
+def _is_form_text(value, limit):
+    return isinstance(value, str) and len(value) <= limit and '\x00' not in value
+
+
+def _is_form_field(field):
+    return (isinstance(field, dict) and set(field) == FORM_FIELD_KEYS
+            and _is_form_text(field['label'], MAX_FORM_LABEL) and _is_form_text(field['value'], MAX_FORM_VALUE)
+            and type(field['required']) is bool and field['source'] in ('autofill', 'bde'))
+
+
+def check_form_data(form_data):
+    """`{fields: [{label, value, required, source}]}` (docs/02 §9). The text is the candidate's, so no error quotes it."""
+    fields = form_data.get('fields') if isinstance(form_data, dict) and set(form_data) == {'fields'} else None
+    if not isinstance(fields, list) or len(fields) > MAX_FORM_FIELDS or not all(map(_is_form_field, fields)):
+        raise HTTPException(400, 'Invalid form data.')
+
+
+def sent_resume(db, app, resume_id):
+    """The résumé version an application was sent with (docs/02 §9): one of its candidate's, not deleted. The extension
+    sends the one its answers came from when the BDE marks the job applied."""
+    from backend.models.db import Resume
+    try:
+        resume_id = uuid.UUID(str(resume_id))
+    except (ValueError, TypeError):
+        raise HTTPException(400, 'Invalid resume ID.') from None
+    resume = scoped(db, Resume, app.firm_id).filter(
+        Resume.id == resume_id, Resume.candidate_id == app.candidate_id, Resume.deleted_at.is_(None)).first()
+    if resume is None:
+        raise HTTPException(400, "That resume isn't one of this candidate's, or it was deleted.")
+    return resume
 
 
 def accessible_application(db, firm_id, principal, app_id, *, lock=False):
@@ -28,11 +64,21 @@ def accessible_application(db, firm_id, principal, app_id, *, lock=False):
     return app
 
 
-def move(db, app, principal, *, status, expected_revision, note=None, command_id=None, review=None):
+def move(db, app, principal, *, status, expected_revision, note=None, command_id=None, review=None, form_data=None,
+         resume_id=None):
     if not can(principal, 'application.move'):
         raise HTTPException(403, "You don't have permission to move applications.")
     if note is not None and (not isinstance(note, str) or len(note) > 2000):
         raise HTTPException(400, 'Status note must be at most 2000 characters.')
+    if form_data is not None:
+        if status != 'applied':
+            raise HTTPException(400, 'Form data goes with a move to Applied.')
+        check_form_data(form_data)
+    sent = None
+    if resume_id is not None:
+        if status != 'applied':
+            raise HTTPException(400, 'The resume sent goes with a move to Applied.')
+        sent = sent_resume(db, app, resume_id)
     if command_id is not None:
         try:
             command_id = uuid.UUID(str(command_id))
@@ -85,7 +131,8 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
     favorite = scoped(db, FavoriteJob, app.firm_id).filter_by(
         candidate_id=app.candidate_id, job_id=app.job_id).first()
     if status == 'saved':
-        # Saved changes the queue, not the historical fact of a submission.
+        # Saved changes the queue, not the historical fact of a submission. The form goes: the next apply sends its own.
+        app.form_data = None
         if favorite is None:
             db.add(FavoriteJob(firm_id=app.firm_id, candidate_id=app.candidate_id,
                               job_id=app.job_id, marked_by_user_id=actor.id))
@@ -94,6 +141,10 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
             app.applied_at = now
             if app.submitted_by_user_id is None:
                 app.submitted_by_user_id = actor.id
+        if form_data is not None:
+            app.form_data = form_data
+        if sent is not None:
+            app.resume_id = sent.id
         if favorite:
             db.delete(favorite)
     if review:

@@ -1200,6 +1200,76 @@ export const JobMarkSchema = z.object({
 - Endpoints: `GET /api/job-marks` (the signed-in user's), `PUT /api/job-marks/:jobId/:kind`,
   `DELETE /api/job-marks/:jobId/:kind`.
 
+### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migration 0020; backend only, no frontend schema/screen yet)
+
+> Zuhair's track. Deliberately **not** `jobs`: this is a separate, candidate+batch-scoped table
+> (`backend/models/job_search.py`), not the existing shared-pool `jobs` table above (`backend/models/db.py`) or its
+> `JobSchema`/`JobMarkSchema` frontend contracts. One row per job a search found for one candidate — `(candidate_id,
+> job_id)` is unique, so the same posting content found again for the same candidate updates the existing row
+> (`batch_id`, `last_seen_at`) instead of inserting a duplicate. So `batch_id` is **the last batch that found the
+> job**, not its batch history; "which jobs did batch X find" leaves out jobs a later batch found again. A
+> membership table is the answer if a screen ever needs that history.
+
+- **Columns (revised 2026-11-10, from Abdul's review):** `id`, `firm_id`, `candidate_id`, `batch_id`, `source`,
+  `job_id`, `content`, `discovered_at`, `last_seen_at`, `created_at`, `updated_at`.
+  - **No `status` column.** Whether a job was saved or applied to lives in `applications` (its `saved` status, and
+    an application row), so a copy here can't drift from it. Hiding a job (dismissed) isn't built.
+  - **Tenancy:** `(firm_id, candidate_id)` references `candidates (firm_id, id)` (on `scrape_jobs` too), so a row
+    can't carry a firm other than its candidate's; `candidates` gets `UNIQUE (firm_id, id)` for it.
+  - **`(firm_id, candidate_id, batch_id)` references the same three on `scrape_jobs`** (unique together there), so
+    a posting can only name a batch run for its own candidate in its own firm, never another candidate's or another
+    firm's (Abdul's review, 2026-11-10). On a successful batch the ingestion code writes the `scrape_jobs` row and
+    the postings in one transaction, the batch row first, so a crash leaves neither.
+  - **`job_id` is checked:** `CHECK (job_id ~ '^[0-9a-f]{64}$')`, lower-case SHA256 hex, so a raw board id or a
+    truncated or upper-case hash is refused instead of silently breaking dedup.
+  - **Indexes:** the unique `(candidate_id, job_id)` (dedup, and lookups by candidate) and
+    `(firm_id, candidate_id, batch_id)` (one candidate's list in a firm, a firm's list, and the batch key, by its
+    leading columns). Nothing looks up by the hash alone. On `scrape_jobs`, the unique `(firm_id, candidate_id,
+    batch_id)` serves a candidate's batches the same way.
+- **Identity (revised 2026-11-09):** `job_id` (SHA256 of normalized company + title + full job description; a
+  content hash, not an id from the job board, and not the row's primary key `id`)
+  is the only identity key. A content change is treated as a new posting by design, so the board's own job id adds
+  nothing to dedup and isn't stored (`source_id` was dropped before anything shipped). `source` records which
+  provider the row came from.
+- **Content (revised 2026-11-09): one `content` JSONB column, not separate typed columns.** Everything about the
+  job — title, description, location, salary, seniority, skills, apply link, whatever a source sends — lives
+  inside it. The original design (migration 0020, first cut) had a normalized core of typed columns plus a `raw`
+  fallback, modeled on JSearch's `job-details` response; that's been replaced before anything shipped, because the
+  set of sources isn't fixed to JSearch/freehire.me, and typed columns built around one source's fields would need
+  a migration every time another aggregator is added or a source changes its response shape. `content`'s internal
+  shape is the ingestion/adapter code's decision (not yet written), not this table's — so filtering/ranking on its
+  fields (location, salary, seniority, skills) is a JSON-path query, not a plain `WHERE` on a column, and no CHECK
+  constraint can cover anything inside it.
+- **Not yet built:** the ingestion/adapter code itself, and repointing
+  `applications.job_id` / `job_runs.target_job_id` off the old `jobs` table onto this one. The old `jobs` table and
+  everything still pointing at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`, `job_runs`) is
+  unchanged for now; retiring it and reclaiming the `jobs` name is a later migration once those are repointed.
+- **Frontend contract:** none yet — this table has no adapter, DTO mapper, or screen. `JobSchema`/`CompanySchema`
+  above describe the existing mock-backed job explorer, not this table; reconciling (or replacing) that contract
+  is separate, later work once this module starts serving real screens.
+- **Second source, freehire.me (decided 2026-11-09, still applies under the `content` design):** target markets
+  are US, Canada and India, so a posting can legitimately list more than one country/city (e.g. a remote NA role
+  open to `["us", "ca"]`). Rather than a multi-location child table (the old `job_locations` pattern, dropped), the
+  ingestion/adapter code (not yet written) should set `content`'s location fields to whichever country the search
+  itself targeted — not the first entry in the provider's array — while keeping the full array somewhere in
+  `content` too. Cross-market queries ("all jobs open to India OR Canada at once") are out of scope; a candidate's
+  search is always scoped to one target market. freehire.me's own `source` response field names the underlying ATS
+  (e.g. `"successfactors"`) and maps to a publisher field inside `content`, the same role JSearch's `job_publisher`
+  plays — not to this table's own `source` column, which holds the literal provider name (`"freehire"`). A closed
+  posting is filtered out before it reaches this table; a posting that closes *after* being stored has no
+  automatic signal and stays visible until something else catches it — accepted for now, revisit with a staleness
+  rule if it becomes a real problem.
+- **`scrape_jobs` (migration 0020, with `job_postings`):** one row per finished batch — `firm_id`, `candidate_id`, `batch_id` (unique),
+  `state` (revised 2026-11-10: `success`, the source answered with at least one job | `empty`, it answered with
+  none | `error`, it failed), `error` (text, the failure detail, set exactly when `state = 'error'`: a real failure
+  and an empty result never look the same), `metadata` (JSONB, `{}` by
+  default: everything in the source's response except the jobs themselves, such as request id, parameters and
+  totals, stored once per batch rather than on every job row), `created_at`. Written once the
+  batch completes; there is no `request`/`pending` row, so this is a log, not a queue — any "search in progress"
+  UI state is the frontend's own, not backed by a row here. One row per batch, not per source: freehire.me is the
+  only live source, so there's nothing to break down yet; a per-source breakdown becomes a real question again
+  once a second source goes live alongside it.
+
 ## 7. Matching & scoring
 
 ```ts
@@ -1498,6 +1568,15 @@ export const ResumeSaveResultSchema = z.object({ opened: OpenedResumeSchema, not
 - Change `src/lib/schemas/` to match this only in the PR that builds it (versioning PR 2 for `country`, PR 7 for
   the rest).
 
+### 8.2 A résumé version's file — PROPOSED 2026-11-09 (07 Q49; Zuhair's area, for his sign-off), BUILT (PR 121)
+
+`GET /api/firms/{firm}/candidates/{cid}/resumes/{rid}/file` answers the PDF or Word file an uploaded base was read
+from, as uploaded (`resume_parses.content`, its `mime_type`, `Content-Disposition: attachment` with the uploaded file's
+name, `Cache-Control: no-store`). Only an uploaded base's version 1 has one: that version is the file as read. Any later
+version, a tailored one or a promoted base's answers 404 ("This version has no uploaded file."), as does a version out
+of the principal's scope. The read follows the version's own access (§8.1). The extension attaches it to a form's
+résumé upload (07 Q50–Q52); a file for every version (rendered by the backend) is asked of Zuhair (Q25).
+
 ---
 
 ## 9. Application, outreach, follow-up
@@ -1523,8 +1602,20 @@ unchanged in this PR; their live DTO integration and display changes belong to l
 - `GET /api/applications` accepts `candidate_id` and `tracked_only`. Candidate visibility applies to list, detail,
   edits, interviews and preparation; legacy rows are visible to firm-wide readers only.
 - `PATCH /api/applications/{id}/candidate-status` accepts
-  `{status, expected_revision, command_id?, note?}`. A changed revision returns 409. A matching command replay
-  creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+  `{status, expected_revision, command_id?, note?, form_data?, resume_id?}`. A changed revision returns 409. A matching
+  command replay creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+- `resume_id` on that move is the résumé version the form was sent with: the one the extension's answers came from.
+  Only a move to `applied` may send it, and it must be one of the application's candidate's versions, not deleted;
+  anything else returns 400 and changes nothing. It becomes the application's `resume_id`, the résumé the application
+  shows as sent. A move back to Saved leaves it.
+- `applications.form_data` (migration 0021, nullable JSONB) is what the employer's form held when the BDE marked the
+  job applied from the extension: `{fields: [{label, value, required, source}]}`, `source` being `autofill` or `bde`.
+  Only a move to `applied` may send it; at most 200 fields, labels up to 500 characters, values up to 4000; anything
+  else returns 400. It stays null on a Saved job and on an applied job with no form to send, and a move back to Saved
+  clears it. An empty form (`{fields: []}`) is valid: the page couldn't be read. It holds the candidate's answers, so
+  no response returns it, the ledger and status events don't copy it, and logs never carry it. The extension leaves
+  out passwords, government IDs, payment details, dates of birth, signatures and EEO answers, and an upload is its
+  file name only.
 - `PATCH /api/applications/{id}/review` also requires `review_id` and `expected_review_revision`. Only a pending
   persisted review for this application can be confirmed; another route cannot bypass it with a normal status move.
   Review resolution and status/event/ledger writes commit together. Model classification and review queue creation

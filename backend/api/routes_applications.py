@@ -564,11 +564,12 @@ def move_candidate_application_status(app_id: str, updates: dict,
     from backend.applications.tracking import accessible_application, move
     try:
         app = accessible_application(db, firm_id, principal, app_id, lock=True)
-        if set(updates) - {"status", "expected_revision", "note", "command_id"}:
+        if set(updates) - {"status", "expected_revision", "note", "command_id", "form_data", "resume_id"}:
             raise HTTPException(400, "Unexpected status command fields.")
         move(db, app, principal, status=updates.get("status"),
              expected_revision=updates.get("expected_revision"), note=updates.get("note"),
-             command_id=updates.get("command_id"))
+             command_id=updates.get("command_id"), form_data=updates.get("form_data"),
+             resume_id=updates.get("resume_id"))
         db.commit()
         return _application_responses(db, firm_id, [app])[0]
     except Exception:

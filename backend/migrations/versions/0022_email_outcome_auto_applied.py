@@ -1,13 +1,13 @@
 """Allow the AUTO_APPLIED classification outcome (PR 4 automatic status updates); no data change.
 
-Revision ID: 0020
-Revises: 0019
+Revision ID: 0022
+Revises: 0021
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0020'
-down_revision = '0019'
+revision = '0022'
+down_revision = '0021'
 branch_labels = None
 depends_on = None
 
