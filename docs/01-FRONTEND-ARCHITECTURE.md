@@ -46,7 +46,7 @@ ever read by the adapter layer.
 | Drag & drop | **dnd-kit** | Kanban columns, Record section reordering |
 | Dates | **date-fns** + **date-fns-tz** | Dual IST / US timezone display is everywhere |
 | Icons | **lucide-react** | Consistent, tree-shakeable |
-| Animation | **Framer Motion** | Only for the unverified→verified transition and layout shifts |
+| Animation | **Framer Motion** | Only for layout shifts and small transitions |
 | Testing | **Vitest** + **Playwright** + **@axe-core/playwright** | Unit, E2E, accessibility |
 | Workshop | **Storybook 8** | Every domain component gets a story with all states |
 | Package manager | **pnpm** | Fast, strict |

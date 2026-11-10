@@ -28,7 +28,7 @@ export function StepBasic({ wizard, errors }: { wizard: Wizard; errors: Errors }
 
   return (
     <div className="space-y-8">
-      <ReviewStrip count={drafts.length} onReviewed={() => wizard.markReviewed(drafts)} />
+      <ReviewStrip count={drafts.length} />
 
       <StepSection title="Identity">
         <WizardField id="cw-name" label="Full name" required error={errors.fullName} isDrafted={drafted.has("fullName")}>
@@ -63,7 +63,7 @@ export function StepBasic({ wizard, errors }: { wizard: Wizard; errors: Errors }
           <WizardField id="cw-state" label="State" isDrafted={drafted.has("state")}>
             <Input {...fieldAria("cw-state")} {...text("state")} placeholder="e.g. TX" />
           </WizardField>
-          <WizardField id="cw-country" label="Country" required hint="Any country; US unless they live elsewhere." error={errors.country} isDrafted={drafted.has("country")}>
+          <WizardField id="cw-country" label="Country" required hint="Any country; filled from the résumé when it names one." error={errors.country} isDrafted={drafted.has("country")}>
             <Input {...fieldAria("cw-country", errors.country)} {...text("country")} placeholder="e.g. Canada" />
           </WizardField>
         </div>

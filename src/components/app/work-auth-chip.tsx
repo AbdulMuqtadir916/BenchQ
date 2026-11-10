@@ -1,19 +1,10 @@
 import { TriangleAlert } from "lucide-react";
 import type { WorkAuth } from "@/lib/schemas/enums";
 import { Tag } from "@/components/ui/tag";
-import { NEEDS_SPONSOR } from "@/lib/constants/work-auth";
-import { daysBetween } from "@/lib/derive/dates";
+import { NEEDS_SPONSOR, WORK_AUTH_LABEL } from "@/lib/constants/work-auth";
 
-export const WORK_AUTH_LABEL: Record<WorkAuth, string> = {
-  H1B: "H-1B",
-  H4_EAD: "H4 EAD",
-  OPT: "OPT",
-  CPT: "CPT",
-  GC: "Green Card",
-  GC_EAD: "GC EAD",
-  USC: "US Citizen",
-  TN: "TN",
-};
+export { WORK_AUTH_LABEL };
+import { daysBetween } from "@/lib/derive/dates";
 
 /** WorkAuthChip — work authorization with an amber warning when expiring soon. */
 export function WorkAuthChip({

@@ -259,7 +259,6 @@ export const FirmSchema = z.object({
   logoUrl: z.string().url().nullable(),
   primaryTimezone: z.string().default('Asia/Kolkata'),
   clientTimezone: z.string().default('America/New_York'),
-  truthGuardMode: z.enum(['STRICT', 'BALANCED', 'LENIENT']).default('BALANCED'),   // goes in résumé versioning PR 7 (0016)
   applicationExpiryDays: z.number().int().default(30),
 });
 
@@ -338,7 +337,7 @@ its `summary`).
 
 ```ts
 // existing fields unchanged: id, name, slug, logoUrl, primaryTimezone, clientTimezone,
-// truthGuardMode, applicationExpiryDays
+// applicationExpiryDays (truthGuardMode was dropped 2026-11-05, migration 0016)
 status: z.enum(['ONBOARDING', 'ACTIVE', 'SUSPENDED']),
   // ONBOARDING → ACTIVE automatically when the OWNER accepts their invite (A5).
   // Only Super Admin suspends or reactivates (A5). No TRIAL state until billing exists.
@@ -850,7 +849,7 @@ export const CandidateSchema = z.object({
   linkedinUrl: z.string().url().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
-  country: z.string().default('US'),
+  country: z.string().nullable(),   // from the active base résumé (07 Q57); null when it names none; never defaulted
   willingToRelocate: z.boolean(),
 
   workAuth: WorkAuth,
@@ -881,7 +880,8 @@ export const CandidateSchema = z.object({
   preferredIndustries: z.array(z.string()), // step 4 (was inside `persona`, dropped in 0015)
   dealBreakers: z.array(z.string()),     // step 4 (same)
 
-  qaBank: z.array(QaBankEntrySchema),
+  qaBank: z.array(QaBankEntrySchema),     // always [] on the backend since 0019 (no `candidates.qa_bank`; each résumé
+                                         // version's `autofill` instead, §8.1); kept for the Documents tab until it goes
 
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -963,9 +963,15 @@ TN need sponsorship; H-1B needs a transfer; GC, GC EAD and US citizen send `fals
 always known) and sends them; the backend
 works nothing out and only checks that they were sent (a missing one is a 422 naming the field). An edit that changes
 `workAuth` must carry both. Required on create, in the form and in the backend alike: `fullName`, `primaryRole`, `email`,
-`phone`, `yearsExperience`, `country` (any country; the flow's Country box starts at `US` and takes the parsed résumé's
-country, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
-`employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. A candidate created without a résumé file gets a `MANUAL` base from the form alone, so every candidate has a base.
+`phone`, `yearsExperience`, `country` (any country; the flow's Country box starts empty, takes the parsed résumé's
+country, else the person types one, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
+`employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. `resumeParseId` is required: no candidate without their résumé (07 Q58), whose file becomes their first base.
+
+**No default country — 2026-11-07 (Zuhair; raised by Abdul in the PR 7 review, #5, and approved in his re-review).**
+BenchQ never invents a country. `Candidate.country` is the active base résumé's (07 Q57) and is `null` when that résumé
+names none; the API sends `null`, never `"US"`. On create the country is required: the form starts empty, takes the
+parsed résumé's country, else the person types it ("USA", "United States" and the like are sent as `US`). The Job
+schema's own `country` default (§6) is a separate contract and is unchanged.
 
 `ResumeDraftSchema` gains `country` with the new parser (§8.1). The skills a new candidate is created with go into
 the first base résumé's version 1 (`resumes.skills`); they carry no source or state.
@@ -1366,7 +1372,7 @@ export const ResumeSchema = z.object({
 });
 ```
 
-### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2), the rest NOT BUILT
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off); the version's `autofill` (`?autofill=true`) APPROVED 2026-11-08 (Abdul, issue 119), BUILT (PR 118)
 
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
@@ -1376,13 +1382,63 @@ rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateI
 `versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
 `ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
 
+**`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK; this contract signed off
+by Abdul 2026-11-08 in issue 119, the `key` added with his OK):** `GET …/resumes/{id}?autofill=true`, on the
+candidate's route and on
+`GET /firms/{firm}/resumes/{id}`, adds `autofill`: every question an application form can ask, each once. Two parts:
+
+- **Fixed answers**, built from the version and the profile for that read (`backend/candidates/autofill.py` `build()`)
+  and never stored as answers (an edit keeps a copy of the one it replaced, below): this version's header, summary,
+  skills, every job with its dates and bullets, its education (the highest degree by the rules written in
+  `autofill._level`, with that degree's school and year; a certificate listed under education isn't a degree),
+  projects, awards, certifications and languages; and the profile's facts:
+  work authorization (the profile's status, which every candidate has), its expiry, sponsorship, transfer,
+  target rate, availability, notice, relocation, engagement types, work settings, preferred locations and industries,
+  primary and target roles. Years of experience come from the version's own jobs, counted to today (the New candidate
+  form's rule), else `years_experience`. A profile edit shows in every version at once; nothing is rewritten.
+- **The user's entries**, stored in `resumes.autofill` (`{}` by default) as
+  `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit to a fixed answer is kept by
+  its question's key, so rewording a question never loses it, with `over`: a copy of the built answer it replaced (for
+  a list such as the work history, the whole list). An edit applies while `over` is still the built answer, compared
+  as JSON (85.0 is 85, but `true` isn't 1): once the version's own text or the profile changes that answer, the new
+  built answer shows (so a yearly step in the years worked out ends an edit of the years too). So does a change to how
+  the backend writes an answer (a label, a field of the jobs, the date format), unless that change also rewrites the
+  stored `over` values. A question they added can't take a fixed question's wording; one whose words a fixed question
+  takes later (a new question, or a reworded one) is kept and copied, and shows only while that fixed question has no
+  answer. A save, a promote and tailoring (a tailored v1, 07 Q55) copy the entries, and on the new version an edit
+  applies only where its built answer is still `over`; a new upload starts with none. Anything else stored (a value
+  that isn't an object, or the first 0019's `{question: answer}` of built answers) reads as no entries.
+
+Each entry is `{question, answer, kind, key?, built?}`:
+
+| Field | What |
+|---|---|
+| `question` | As written once in `autofill.py`, or as the user typed it |
+| `answer` | Its JSON type kept: text, a number, `true`/`false`, a list, a list of objects (jobs, education, projects, awards), a date as `"YYYY-MM-DD"` |
+| `kind` | `FIXED` (built), `EDITED` (the user's entry for a fixed question), `CUSTOM` (a question the user added) |
+| `key` | On `FIXED` and `EDITED`: what the question asks, a fixed name that doesn't change with the wording, so a reader (the extension) matches by it. A new question gets a new key |
+| `built` | On `EDITED`: the built answer a reset gives back; `null` when the version and the profile don't answer it |
+
+The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`, `address-city`, `address-region`,
+`address-country`, `professional-title`, `summary`, `work-auth-status`, `skills`, `current-company`, `current-title`,
+`work-history`, `education-degree`, `education-school`, `graduation-year`, `education-history`, `projects`, `awards`,
+`certifications`, `languages`, `work-auth-expiry`, `visa-sponsorship`, `visa-transfer`, `years-experience`,
+`primary-role`, `target-roles`, `pay-rate`, `start-date`, `notice-period-days`, `relocation-willing`,
+`employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`. The fixed questions come first in
+that order, then the user's. A missing fact leaves its question out. Never in it: ids, `rate_min`, `contact_notes`,
+`deal_breakers`, `status`, `bench_start_date`. Not in the list, a save, or a read without `?autofill=true`. Writing the
+user's entries (a route) is planned: it takes `over` from its own build, never from the request, and the request
+carries the built answer the user was shown, so the route answers 409 when its own build differs (an edit is never
+saved over an answer the user didn't see). Its contract goes here first. The frontend doesn't map `autofill` (no screen
+shows it yet); the extension reads it (Arbaz).
+
 ```ts
 // src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker
 export const BaseResumeSchema = z.object({
   id: z.string(),
   firmId: z.string(),
   candidateId: z.string(),
-  source: z.enum(['UPLOAD', 'PROMOTED', 'MANUAL']),   // an upload, a version a person chose, or the form alone (0015)
+  source: z.enum(['UPLOAD', 'PROMOTED']),   // an upload or a version a person chose (no MANUAL since 07 Q58, 0018)
   isActive: z.boolean(),                    // exactly one per candidate
   createdByUserId: z.string(),
   createdAt: z.string().datetime(),
@@ -1390,20 +1446,49 @@ export const BaseResumeSchema = z.object({
   archivedAt: z.string().datetime().nullable(), // set while hidden (a used base the BDE deleted); null otherwise
 });
 
+// src/lib/schemas/resume.ts — what a résumé list reads (PR 7): the bases and their résumés
+export const ResumeShelfSchema = z.object({ bases: z.array(BaseResumeSchema), resumes: z.array(ResumeSchema) });
+
+// src/lib/schemas/resume-document.ts — one version opened in the studio (PR 7); the studio's URL names the version
+export const OpenedResumeSchema = z.object({ resume: ResumeSchema, versionId: z.string(), document: ResumeDocumentSchema });
+
 // ResumeSchema gains:
-  baseResumeId: z.string().nullable(),      // null only for résumés from before versioning
+  baseResumeId: z.string().nullable(),      // the base a version belongs to (a tailored résumé's base); null only for old ones
 
 // src/lib/schemas/resume-draft.ts — ResumeDraftSchema gains:
   country: z.string().nullable(),           // header.country as printed; null when not printed (never guessed)
 
-// src/lib/schemas/resume-document.ts — the studio's content gains:
-export const AwardEntrySchema = z.object({
-  id: z.string(), name: z.string(), issuer: z.string(), date: z.string(), detail: z.string(),
+// src/lib/schemas/resume-document.ts — the studio's document, field for field the parser's strict format (PR 7,
+// Zuhair 2026-11-05: "every field of the strict response format except languages is shown"; needs Abdul's sign-off).
+// Languages are never shown: a save carries them over from the version as the backend has it.
+export const ResumeHeaderSchema = z.object({
+  city: z.string(), state: z.string(), country: z.string(), email: z.string(), phone: z.string(),
+  linkedin: z.string(), github: z.string(),
+  workAuthorization: z.string(),           // shown read-only (the profile's fact); not printed; a save keeps the backend's
 });
-// ResumeDocumentSchema: awards: z.array(AwardEntrySchema), languages: z.array(z.string()) (kept, never printed);
-// summaryId: z.string().nullable() (versioning PR 5: the summary's id; an id names one exact text, a changed one
-// gets a new id, so a changed text is told apart from the one before);
-// ResumeSectionKey: + 'awards'
+export const ExperienceEntrySchema = z.object({
+  id: z.string(), company: z.string(), title: z.string(), location: z.string(),
+  dates: z.string(),                       // as printed
+  start: z.string(), end: z.string(), current: z.boolean(),   // for sorting and matching; not printed
+  bullets: z.array(RichTextSchema),
+});
+export const EducationEntrySchema = z.object({ id: z.string(), school: z.string(), degree: z.string(), graduationDate: z.string(), grade: z.string() });
+export const CredentialEntrySchema = z.object({ id: z.string(), name: z.string(), issuer: z.string(), date: z.string(), detail: z.string() });  // certifications and awards
+export const ProjectEntrySchema = z.object({ id: z.string(), name: z.string(), link: z.string(), dates: z.string(), technologies: z.string(), bullets: z.array(RichTextSchema) });
+// ResumeDocumentSchema: fullName, title, header, summary (RichText; its id is summary_id), experience, skills
+// ({id, category, items}: one row per category, skills comma-separated), education, certifications, awards, projects.
+// Removed (no backend column, so a save would lose them): contacts (now header), experience.description,
+// education.location, education.years (now graduationDate), certification.year (now date), project.description (now bullets).
+// ResumeSectionKey: + 'awards'.
+
+// src/lib/schemas/resume.ts — what deleting a base or a version would do, or did (§4.7)
+export const ResumeRemovalSchema = z.object({
+  outcome: z.enum(['DELETE', 'HIDE', 'REFUSED']), message: z.string(),
+  uses: z.record(z.string(), z.number().int()),
+  rest: z.object({ versions: z.number().int().optional(), tailored: z.number().int().optional() }),
+});
+// src/lib/schemas/resume-document.ts — a save's answer: the new version opened, and the notice (§4.3)
+export const ResumeSaveResultSchema = z.object({ opened: OpenedResumeSchema, notice: z.string().nullable() });
 
 // No claim or evidence types (dropped 2026-11-05).
 ```
@@ -1566,6 +1651,8 @@ an `ApplicationEvent` — the same write the kanban makes.
 
 ### 9.y Candidate documents (`src/lib/schemas/document.ts`)
 
+> **Planned to be dropped (Abdul, relayed by Zuhair 2026-11-07):** the candidate's Documents section — uploading visa copies, ID, certificates and other files, and the Screening answers panel. It may come back in a later version, not now. Nothing is removed yet: its owners remove it, with this contract (`docs/team/abdul.md` §3). Don't build on it.
+
 - `CandidateDocument` — `kind` (`WORK_AUTH | IDENTITY | RESUME | CERTIFICATION | EDUCATION |
   EMPLOYMENT | OTHER`), `title`, `fileName`, `mimeType`, `sizeKb`, `uploadedAt`, `uploadedByUserId`,
   `expiresAt` (nullable), `shareUrl`.
@@ -1574,9 +1661,11 @@ an `ApplicationEvent` — the same write the kanban makes.
 
 ### 9.z Candidate submission facts
 
-`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — a partial of `workAuth`, `workAuthExpiry`,
-`rateTarget`, `rateMin`, `availableFrom`, `noticePeriodDays`, `willingToRelocate`,
-`employmentTypes`, sent to `PATCH /api/candidates/:id`.
+`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — a partial of `workAuth`, `needsSponsorship`, `needsTransfer`,
+`workAuthExpiry`, `rateTarget`, `rateMin`, `availableFrom`, `noticePeriodDays`, `willingToRelocate`,
+`employmentTypes`, sent to `PATCH /api/firms/{firm}/candidates/{id}`. A changed `workAuth` is sent with
+`needsSponsorship` and `needsTransfer` worked out by the same rule as the new-candidate flow (`workAuthChange` in
+`src/lib/constants/work-auth.ts`); the backend refuses a new `work_auth` without both.
 
 `CreateCandidate` (`src/lib/schemas/candidate.ts`, Phase B fix PR 1) — the New candidate form (docs/04 §4.2),
 sent to `POST /api/candidates`: `fullName`, `primaryRole`, `email`, `phone`, `workAuth`, `needsSponsorship`,

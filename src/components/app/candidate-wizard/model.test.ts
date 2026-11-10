@@ -9,7 +9,7 @@ const draft: ResumeDraft = {
   phone: null, linkedinUrl: null, city: "Irving", state: "TX", country: null, yearsExperience: 9, workAuth: "H1B", workAuthText: null,
   summary: "Nine years of Java.", skills: [{ name: "Java", family: "Languages" }, { name: "AWS", family: "Cloud" }],
 };
-const valid: WizardValues = { ...EMPTY_VALUES, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRoles: ["Java Developer"] };
+const valid: WizardValues = { ...EMPTY_VALUES, resume: { parseId: "parse_1", fileName: "Ravi.pdf" }, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", country: "US", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRoles: ["Java Developer"] };
 
 describe("applyDraft (07 Q49)", () => {
   it("fills empty fields and marks them drafted; null fields stay empty", () => {
@@ -27,12 +27,24 @@ describe("applyDraft (07 Q49)", () => {
     expect(drafted).not.toContain("fullName");
   });
 
+  it("a second résumé replaces every résumé field, edited or not, and keeps the rest", () => {
+    const first = applyDraft(EMPTY_VALUES, { ...draft, country: "Canada" });
+    // The owner edits the city, adds a skill by hand and sets a rate; then uploads the right file.
+    const edited = { ...first.values, city: "Plano", rateTarget: "80", skills: [...first.values.skills, { name: "Kafka", family: null, source: "MANUAL" as const }] };
+    const second = applyDraft(edited, { ...draft, parseId: "parse_2", fileName: "Right.pdf", fullName: "Asha Rao", email: "asha@example.com",
+      city: "Dallas", country: null, summary: "", workAuth: "GC", skills: [{ name: "Python", family: "Languages" }] });
+    expect(second.values).toMatchObject({ resume: { parseId: "parse_2", fileName: "Right.pdf" }, fullName: "Asha Rao", email: "asha@example.com",
+      city: "Dallas", country: "", summary: "", workAuth: "GC", rateTarget: "80" });
+    expect(second.values.skills.map((skill) => `${skill.name}:${skill.source}`)).toEqual(["Python:RESUME_UPLOAD"]);
+  });
+
   it("keeps the printed work authorization when it matched nothing", () => {
     expect(applyDraft(EMPTY_VALUES, { ...draft, workAuth: null, workAuthText: "Authorized to work" }).values).toMatchObject({ workAuth: null, workAuthText: "Authorized to work" });
   });
 
-  it("takes the résumé's country over the default US, but never over one that was typed", () => {
-    expect(EMPTY_VALUES.country).toBe("US");
+  it("never invents a country: it starts empty, the résumé fills it, one that was typed is kept (review #5)", () => {
+    expect(EMPTY_VALUES.country).toBe("");
+    expect(applyDraft(EMPTY_VALUES, { ...draft, country: null }).values.country).toBe("");
     const canada = applyDraft(EMPTY_VALUES, { ...draft, country: "Canada" });
     expect(canada.values.country).toBe("Canada");
     expect(canada.drafted).toContain("country");
@@ -57,7 +69,7 @@ describe("the country sent", () => {
 
 describe("validateStep", () => {
   it("basic: name, 'Marketed as' and a valid email are required (Q48); years 0–60; LinkedIn a full link", () => {
-    expect(Object.keys(validateStep("basic", EMPTY_VALUES)).sort()).toEqual(["email", "fullName", "phone", "primaryRole", "yearsExperience"]);
+    expect(Object.keys(validateStep("basic", EMPTY_VALUES)).sort()).toEqual(["country", "email", "fullName", "phone", "primaryRole", "yearsExperience"]);
     expect(validateStep("basic", { ...valid, email: "ravi[at]example.com" }).email).toMatch(/valid email/);
     expect(validateStep("basic", { ...valid, yearsExperience: "212" }).yearsExperience).toMatch(/0 to 60/);
     expect(validateStep("basic", { ...valid, yearsExperience: "2.5" }).yearsExperience).toBeDefined();
@@ -81,8 +93,9 @@ describe("validateStep", () => {
     expect(isDirty({ ...EMPTY_VALUES, managerId: "m", bdeId: "b" })).toBe(false);
   });
 
-  it("the résumé never blocks; preferences need one target role", () => {
-    expect(validateStep("resume", EMPTY_VALUES)).toEqual({});
+  it("the résumé is required (07 Q58); preferences need one target role", () => {
+    expect(validateStep("resume", EMPTY_VALUES)).toEqual({ resume: "Upload the candidate's résumé." });
+    expect(validateStep("resume", valid)).toEqual({});
     expect(validateStep("preferences", EMPTY_VALUES)).toEqual({ targetRoles: "Add at least one role they are looking for." });
     expect(validateStep("preferences", valid)).toEqual({});
   });
@@ -91,10 +104,10 @@ describe("validateStep", () => {
 describe("the flow", () => {
   it("a reload lands on the first step that can't be passed yet", () => {
     expect(firstOpenStep("preferences", EMPTY_VALUES, false)).toBe("resume");
-    // "Skip, enter manually": started, still empty, so the first step that can't be passed.
-    expect(firstOpenStep("basic", EMPTY_VALUES, true)).toBe("basic");
-    expect(firstOpenStep("preferences", EMPTY_VALUES)).toBe("basic");
-    expect(firstOpenStep("preferences", { ...EMPTY_VALUES, city: "Irving" })).toBe("basic");
+    // No résumé, no way past step 1 (07 Q58), whatever else was typed.
+    expect(firstOpenStep("basic", EMPTY_VALUES, true)).toBe("resume");
+    expect(firstOpenStep("preferences", { ...EMPTY_VALUES, city: "Irving" })).toBe("resume");
+    expect(firstOpenStep("preferences", { ...valid, fullName: "" })).toBe("basic");
     expect(firstOpenStep("preferences", { ...valid, workAuth: null })).toBe("work");
     expect(firstOpenStep("preferences", valid)).toBe("preferences");
     expect(firstOpenStep("resume", EMPTY_VALUES)).toBe("resume");
@@ -110,7 +123,7 @@ describe("the flow", () => {
 describe("toCreateCandidate", () => {
   it("builds a valid payload: trimmed text, numbers, ISO dates, sponsorship from the work authorization (A3)", () => {
     const values: WizardValues = {
-      ...applyDraft(EMPTY_VALUES, draft).values, phone: " (469) 555-0182 ", targetRoles: ["Java Developer"], rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
+      ...applyDraft(EMPTY_VALUES, draft).values, phone: " (469) 555-0182 ", country: "USA", targetRoles: ["Java Developer"], rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
       employmentTypes: ["C2C", "W2"], workSettings: ["REMOTE"], contactNotes: "Prefers WhatsApp.",
     };
     const body = toCreateCandidate({ ...values, managerId: "user_fatima", bdeId: "user_adnan", handoffNote: "  Push banking.  " });
@@ -120,7 +133,7 @@ describe("toCreateCandidate", () => {
       resumeParseId: "parse_1", managerId: "user_fatima", bdeId: "user_adnan",
       handoffNote: "Push banking.",
     });
-    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ resumeParseId: null, bdeId: null, handoffNote: null });
+    expect(toCreateCandidate({ ...valid, workAuth: "GC", managerId: "m" })).toMatchObject({ resumeParseId: "parse_1", bdeId: null, handoffNote: null });
     // The flow works sponsorship and transfer out from the work authorization and sends them (A3); the backend only checks they are there.
     const sent = (workAuth: WorkAuth) => toCreateCandidate({ ...valid, workAuth, managerId: "m" });
     expect(sent("H1B")).toMatchObject({ needsSponsorship: true, needsTransfer: true });

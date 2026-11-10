@@ -1,35 +1,32 @@
-"""0016 adds the AUTO_APPLIED outcome; downgrade refuses to discard automatic status evidence."""
-from sqlalchemy import text
-from backend.db_schema import head_revision
-from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401 (fixture)
+"""Migration 0016: `firms.truth_guard_mode` and its CHECK go (no claim states, 2026-11-05); and the way back."""
+from sqlalchemy import inspect, text
+
+from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401
+
+CHECK = "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_firms_truth_guard_mode'"
+DEFAULT = ("SELECT column_default FROM information_schema.columns "
+           "WHERE table_name = 'firms' AND column_name = 'truth_guard_mode'")
 
 
-def _insert_result(engine, outcome):
-    with engine.begin() as conn:
-        message = conn.execute(text('SELECT id, firm_id, candidate_id FROM inbox_messages LIMIT 1')).one()
-        conn.execute(text(
-            "INSERT INTO email_classifications (id, firm_id, candidate_id, inbox_message_id, result_version, content_revision,"
-            " category, confidence, probabilities, model, provider, prompt_version, category_version, sender_auth_result,"
-            " receive_time_verified, outcome, reason) VALUES (gen_random_uuid(), :f, :c, :m, 1, 0, 'assessment', 0.9,"
-            " '{}', 'synthetic', 'openrouter', 'p', 'c', 'PASS', true, :o, 'AUTO_STATUS_DISABLED')"),
-            {'f': message.firm_id, 'c': message.candidate_id, 'm': message.id, 'o': outcome})
+def _columns(engine) -> set[str]:
+    return {c["name"] for c in inspect(engine).get_columns("firms")}
 
 
-def test_auto_applied_is_allowed_and_the_revision_roundtrips(scratch_db):
+def test_the_column_and_its_check_go_and_come_back_on_balanced(scratch_db):
     name, engine = scratch_db
-    _ok(_alembic(name, 'upgrade', 'head'))
-    _ok(_alembic(name, 'downgrade', '0015'))
-    _ok(_alembic(name, 'upgrade', 'head'))
-    with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision() == '0016'
+    _ok(_alembic(name, "upgrade", "0015"))
+    assert "truth_guard_mode" in _columns(engine)
 
-
-def test_downgrade_refuses_while_automatic_evidence_exists(scratch_db):
-    from backend.tests.test_migration_0012 import populated
-    name, engine = scratch_db
-    populated(scratch_db)
-    _insert_result(engine, 'AUTO_APPLIED')
-    result = _alembic(name, 'downgrade', '0015')
-    assert result.returncode != 0 and 'Refusing to discard automatic status evidence' in result.stderr
+    _ok(_alembic(name, "upgrade", "0016"))
+    assert "truth_guard_mode" not in _columns(engine)
     with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0016'
+        assert conn.execute(text(CHECK)).scalar() is None
+
+    _ok(_alembic(name, "downgrade", "0015"))
+    assert "truth_guard_mode" in _columns(engine)
+    with engine.connect() as conn:
+        assert "BALANCED" in conn.execute(text(DEFAULT)).scalar_one()
+        check = conn.execute(text(CHECK)).scalar_one()
+    assert all(mode in check for mode in ("STRICT", "BALANCED", "LENIENT"))
+
+    _ok(_alembic(name, "upgrade", "0016"))

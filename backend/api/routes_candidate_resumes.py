@@ -3,7 +3,7 @@ candidate's URL: another firm, a candidate outside the principal's scope, or a r
 same 404 as a missing one.
 
 - GET    …/resumes                          the bases with their versions, and the tailored résumés
-- GET    …/resumes/{resume_id}              one version with its content
+- GET    …/resumes/{resume_id}              one version with its content (`?autofill=true`: and its autofill)
 - POST   …/resumes/{resume_id}/save         its next version (the edit), with a notice if another was saved meanwhile
 - POST   …/resumes/{resume_id}/use-as-base  "Use this as the base?" Yes, and a pick in the base dropdown
 - POST   …/resumes/upload                   a later résumé: a new active base from the parse (the BDE)
@@ -153,11 +153,13 @@ def list_resumes(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princip
 
 
 @router.get("/{resume_id}", summary="One version of a candidate's résumé, with its content")
-def get_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+def get_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID, autofill: bool = False,
                principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    """With `?autofill=true`, also its autofill: every question a form can ask, built for this read (docs/02 §8.1)."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
-    return versions.version_json(versions.candidate_version(db, candidate, resume_id), with_content=True)
+    row = versions.candidate_version(db, candidate, resume_id)
+    return versions.opened_json(row, candidate, with_autofill=autofill)
 
 
 @router.post("/{resume_id}/save", status_code=201, summary="Save an edit as the résumé's next version")

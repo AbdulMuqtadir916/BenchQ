@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Send, Mail, Check, TriangleAlert, Link2 } from "lucide-react";
+import { Send, Mail, TriangleAlert, Link2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
@@ -76,7 +76,7 @@ export default function OutreachPage() {
   if (loadError) {
     return (
       <div className="bq-page">
-        <PageHeader title="Outreach" subtitle="Templated, merge-filled, and checked for unverified claims before it goes out." />
+        <PageHeader title="Outreach" subtitle="Templated and merge-filled before it goes out." />
         <ErrorState error={loadError} onRetry={() => { void applicationsQuery.refetch(); void candidatesQuery.refetch(); }} />
       </div>
     );
@@ -84,7 +84,7 @@ export default function OutreachPage() {
 
   return (
     <div className="bq-page">
-      <PageHeader title="Outreach" subtitle="Templated, merge-filled, and checked for unverified claims before it goes out." />
+      <PageHeader title="Outreach" subtitle="Templated and merge-filled before it goes out." />
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <Card className="p-0 lg:sticky lg:top-4 lg:self-start">
@@ -110,10 +110,6 @@ export default function OutreachPage() {
                   {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </CardHeader>
-
-              <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-success-fg)]/30 bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success-fg)]">
-                <Check size={14} aria-hidden /> No unverified claims in this message — cleared to send.
-              </div>
 
               <label className="mb-1 block text-label text-[var(--color-text-3)]">Subject</label>
               <div className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text)]">{resolved.subject}</div>

@@ -22,7 +22,7 @@ export function requireMember(firmId: string, access: "read" | "write" = "read")
 }
 
 /** The firm-scoped methods that only read; every other method of a firm-scoped mock writes. */
-const READ_METHODS = new Set(["list", "byId", "byCandidate"]);
+const READ_METHODS = new Set(["list", "byId", "byCandidate", "shelf", "shelfByCandidate", "open", "baseRemoval", "versionRemoval"]);
 export const isReadMethod = (name: string): boolean => READ_METHODS.has(name);
 
 /**
@@ -54,7 +54,7 @@ type FirmMethod = (firmId: string, ...args: never[]) => Promise<unknown>;
 
 /**
  * A firm-scoped mock: every method takes the firm id first and runs only for that firm's members.
- * Reads (`list`, `byId`, `byCandidate`) need membership — or a support view of the firm. Every other
+ * Reads (`list`, `byId`, `byCandidate`, and the résumés' `shelf`, `shelfByCandidate`, `open`) need membership — or a support view of the firm. Every other
  * method is a write and must name its action in `writes`: it then needs membership *and* `can(action)`,
  * so a VIEWER and a support view are refused (403). A write without an action fails at load time.
  */

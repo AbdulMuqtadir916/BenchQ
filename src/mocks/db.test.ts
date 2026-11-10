@@ -89,7 +89,8 @@ describe("persistence across reloads, sign-outs and accounts", () => {
   });
 
   it("persists every write the mock backend accepts, in the table it changed", async () => {
-    const m = await load(T0, ADNAN);
+    // The manager: the profile edit is the owner's and manager's (07 Q56); documents and the inbox are theirs too.
+    const m = await load(T0, FATIMA);
     const candidate = m.candidates.allCandidates.find((c) => c.firmId === "firm_hts")!;
     await m.candidates.candidatesMock.update("firm_hts", candidate.id, { noticePeriodDays: 45 } as never);
     m.db.flush();
@@ -112,6 +113,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
 
     const reloaded = await load(at(1), ADNAN);
     expect(reloaded.candidates.allCandidates.find((c) => c.id === candidate.id)?.noticePeriodDays).toBe(45);
+    await expect(reloaded.candidates.candidatesMock.update("firm_hts", candidate.id, { noticePeriodDays: 30 } as never)).rejects.toMatchObject({ status: 403 });
   });
 
   it("reset (Super Admin only) wipes every change and re-anchors to now; nobody else may reset", async () => {

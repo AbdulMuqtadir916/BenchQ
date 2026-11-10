@@ -37,7 +37,8 @@ describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
     expect(onlyFirm(await jobsApi.list(mine, { limit: 1000 }), mine)).toBe(true);
     expect(onlyFirm(await applicationsApi.list(mine), mine)).toBe(true);
     expect(onlyFirm(await followupsApi.list(mine), mine)).toBe(true);
-    expect(onlyFirm(await resumesApi.list(mine), mine)).toBe(true);
+    const shelf = await resumesApi.shelf(mine);
+    expect(onlyFirm(shelf.resumes, mine) && onlyFirm(shelf.bases, mine)).toBe(true);
   });
 
   it("reads by id or candidate: the other firm's records are 404", async () => {
@@ -45,15 +46,15 @@ describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
     const theirCandidate = (await candidatesApi.list(other))[0]!;
     const theirJob = (await jobsApi.list(other))[0]!;
     const theirApplication = (await applicationsApi.list(other))[0]!;
-    const theirResume = (await resumesApi.list(other))[0]!;
+    const theirResume = (await resumesApi.shelf(other)).resumes[0]!;
     await as(mine);
     expect(await is404(candidatesApi.byId(mine, theirCandidate.id))).toBe(true);
     expect(await is404(jobsApi.byId(mine, theirJob.id))).toBe(true);
     expect(await is404(applicationsApi.byId(mine, theirApplication.id))).toBe(true);
-    expect(await is404(resumesApi.byId(mine, theirResume.id))).toBe(true);
+    expect(await is404(resumesApi.open(mine, theirResume.latestVersionId))).toBe(true);
     expect(await is404(recordsApi.byCandidate(mine, theirCandidate.id))).toBe(true);
     expect(await is404(inboxApi.byCandidate(mine, theirCandidate.id))).toBe(true);
-    expect(await resumesApi.byCandidate(mine, theirCandidate.id)).toEqual([]);
+    expect(await resumesApi.shelfByCandidate(mine, theirCandidate.id)).toEqual({ bases: [], resumes: [] });
     expect(await documentsApi.byCandidate(mine, theirCandidate.id)).toEqual([]);
     expect((await applicationsApi.list(mine, { candidateId: theirCandidate.id }))).toEqual([]);
   });

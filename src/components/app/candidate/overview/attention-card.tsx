@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { BellRing, CalendarClock, CheckCircle2, CircleHelp, Mail, PhoneCall, Stamp, type LucideIcon } from "lucide-react";
+import { BellRing, CalendarClock, CheckCircle2, Mail, PhoneCall, Stamp, type LucideIcon } from "lucide-react";
 import type { TagTone } from "@/components/ui/tag";
 import { formatIst, formatRelative } from "@/lib/format/timezone";
 import { EASE_OUT } from "@/lib/motion";
@@ -30,7 +30,7 @@ interface Item {
 const VISIBLE = 5;
 
 const TONE_CLASS: Record<TagTone, string> = {
-  neutral: "bg-[var(--color-unverified-bg)] text-[var(--color-unverified-fg)]",
+  neutral: "bg-[var(--color-neutral-bg)] text-[var(--color-neutral-fg)]",
   blue: "bg-[var(--color-info-bg)] text-[var(--color-info-fg)]",
   green: "bg-[var(--color-success-bg)] text-[var(--color-success-fg)]",
   amber: "bg-[var(--color-warning-bg)] text-[var(--color-warning-fg)]",
@@ -106,9 +106,6 @@ export function AttentionCard({ ws, actions, canAct }: { ws: CandidateWorkspace;
       detail: `Ask ${first} for the renewed copy — vendors will ask for it`,
       primary: { label: "Documents", onClick: () => actions.openTab("documents") },
     })),
-    ...(ws.master && ws.master.gate.unverifiedCount > 0
-      ? [{ key: "master", Icon: CircleHelp, tone: "neutral" as const, title: `${ws.master.gate.unverifiedCount} master resume ${ws.master.gate.unverifiedCount === 1 ? "claim needs" : "claims need"} evidence`, detail: "No copy can be exported until they're verified", primary: { label: "Review", onClick: actions.reviewMasterResume } }]
-      : []),
   ];
 
   return (

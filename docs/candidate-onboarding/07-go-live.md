@@ -50,7 +50,6 @@ Read first: `docs/integration/README.md`, `src/lib/api/http.ts`, `src/lib/api/dt
 - Every snake_case field maps to the docs/02 name; nothing snake_case leaves `src/lib/api/dto/`.
 - If the backend's candidate contract differs from docs/02 (Zuhair owns it, Q50), **stop and ask**: either docs/02
   changes with product sign-off, or the mapper fills the gap. Never edit `src/lib/schemas/` to fit (CLAUDE.md).
-- A response with a `VERIFIED` claim without an `evidenceId` is a mapping error: the mapper throws (Truth Guard).
 
 ## 3. Tests
 

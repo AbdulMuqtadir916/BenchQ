@@ -34,19 +34,6 @@ export const CandidateStatus = z.enum([
 ]);
 export type CandidateStatus = z.infer<typeof CandidateStatus>;
 
-/** The three claim states. The product's core concept. */
-export const ClaimState = z.enum(["VERIFIED", "UNVERIFIED", "CONTRADICTED"]);
-export type ClaimState = z.infer<typeof ClaimState>;
-
-export const FieldSource = z.enum([
-  "MANUAL",
-  "RESUME_UPLOAD",
-  "LINKEDIN_EXPORT",
-  "INTAKE_CALL",
-  "AI_EXTRACTED",
-]);
-export type FieldSource = z.infer<typeof FieldSource>;
-
 export const JobSourceType = z.enum([
   "CONNECTOR",
   "AGGREGATOR",

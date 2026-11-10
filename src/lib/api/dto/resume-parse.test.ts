@@ -119,6 +119,13 @@ describe("the mapping rules", () => {
     expect(yearsFromWork([], NOW)).toBeNull();
   });
 
+  it("counts only real months: 00 and 13 aren't one, so that job is skipped", () => {
+    const job = (start: string, end: string) => ({ job_title: "", company: "", location: "", dates: "", start, end, current: false, bullets: [] });
+    expect(yearsFromWork([job("2020-00", "2021-12")], NOW)).toBeNull();
+    expect(yearsFromWork([job("2020-01", "2021-13")], NOW)).toBeNull();
+    expect(yearsFromWork([job("2020-01", "2021-13"), job("2020-01", "2021-12")], NOW)).toBe(2);
+  });
+
   it("splits skills: trimmed, no empties, no case-insensitive duplicates", () => {
     expect(splitSkills([{ category: "A", skills: " Java ,java, ,SQL" }, { category: "", skills: "sql, Go" }])).toEqual([
       { name: "Java", family: "A" }, { name: "SQL", family: "A" }, { name: "Go", family: null },

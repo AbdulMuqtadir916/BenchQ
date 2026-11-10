@@ -7,12 +7,12 @@ import { useCandidate } from "@/lib/hooks/use-candidates";
 import { useApplications, useFollowups, useWithPendingMoves } from "@/lib/hooks/use-applications";
 import { useEmailReviews } from "@/lib/hooks/use-email-reviews";
 import { useRecord } from "@/lib/hooks/use-records";
-import { useResumes } from "@/lib/hooks/use-resumes";
+import { useResumeShelf } from "@/lib/hooks/use-resumes";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { useTeam } from "@/lib/hooks/use-team";
 import { useCandidateInbox } from "@/lib/hooks/use-inbox";
 import { useCandidateDocuments } from "@/lib/hooks/use-documents";
-import { deriveCandidateStats, deriveExportGate } from "@/lib/derive";
+import { deriveCandidateStats } from "@/lib/derive";
 import { isClosed } from "@/components/app/applications/status-meta";
 import { latestSignalByApplication, pendingSuggestion } from "@/components/app/inbox/signal-meta";
 
@@ -31,7 +31,7 @@ export function useCandidateWorkspace(candidateId: string) {
   const candidateQuery = useCandidate(candidateId);
   const applicationsQuery = useApplications(candidateId);
   const recordQuery = useRecord(candidateId);
-  const resumesQuery = useResumes(candidateId);
+  const shelfQuery = useResumeShelf(candidateId);
   const jobsQuery = useJobs({ limit: 300 });
   const inboxQuery = useCandidateInbox(candidateId);
   const reviewsQuery = useEmailReviews(candidateId);
@@ -80,14 +80,15 @@ export function useCandidateWorkspace(candidateId: string) {
     [documentsQuery.data, now],
   );
 
-  /** The master resume is the verified source every tailored copy reuses. */
-  const master = useMemo(() => {
-    const resume = (resumesQuery.data ?? []).find((r) => r.isMaster);
+  const resumes = useMemo(() => shelfQuery.data?.resumes ?? [], [shelfQuery.data]);
+  /** The active base (the one the workflow uses), its newest version, and how many copies were tailored from it. */
+  const base = useMemo(() => {
+    const active = shelfQuery.data?.bases.find((b) => b.isActive);
+    const resume = active ? resumes.find((r) => r.isMaster && r.baseResumeId === active.id) : undefined;
     const version = resume?.versions.find((v) => v.id === resume.latestVersionId) ?? resume?.versions[0];
     if (!resume || !version) return null;
-    const claims = version.claims.filter((c) => c.state !== "CONTRADICTED");
-    return { resume, gate: deriveExportGate(version), total: claims.length, verified: claims.filter((c) => c.state === "VERIFIED").length };
-  }, [resumesQuery.data]);
+    return { resume, version, tailoredCount: resumes.filter((r) => !r.isMaster && r.baseResumeId === active!.id).length };
+  }, [shelfQuery.data, resumes]);
   const teamName = useMemo(() => {
     const names = new Map((teamQuery.data ?? []).map((u) => [u.id, u.name]));
     return (id: string | null) => (id ? (names.get(id) ?? null) : null);
@@ -104,7 +105,8 @@ export function useCandidateWorkspace(candidateId: string) {
     applicationsQuery,
     saving,
     recordQuery,
-    resumesQuery,
+    shelfQuery,
+    resumes,
     jobsQuery,
     inboxQuery,
     inbox: inboxQuery.data ?? null,
@@ -113,7 +115,7 @@ export function useCandidateWorkspace(candidateId: string) {
     reviewTotal,
     documentsQuery,
     expiringDocuments,
-    master,
+    base,
     messages,
     stats,
     ownerName,

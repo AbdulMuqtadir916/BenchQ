@@ -147,7 +147,7 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
 
         <section aria-label="Resume sent">
           <h3 className="mb-2 text-label text-[var(--color-text-3)]">Resume sent</h3>
-          <ResumeSent application={app} resumes={ws.resumesQuery.data ?? []} isLoading={ws.resumesQuery.isLoading} />
+          <ResumeSent application={app} resumes={ws.resumes} isLoading={ws.shelfQuery.isLoading} />
         </section>
 
         <section aria-label="Emails">

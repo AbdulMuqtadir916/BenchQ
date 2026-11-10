@@ -42,7 +42,7 @@ const DASHBOARDS: Dashboard[] = [
   { name: "MANAGER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "MANAGER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
   { name: "VIEWER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
   { name: "BDE", as: "user_adnan", component: BdeDashboard, queries: ["candidates", "applications", "followups", "jobs"], groups: {
-    numbers: { reads: ["candidates", "applications", "followups"], labels: ["Unverified claims", "Responses"] },
+    numbers: { reads: ["candidates", "applications", "followups"], labels: ["Candidates", "Responses"] },
     mine: { reads: ["candidates", "applications"], labels: ["apps</span>"] }, // per-candidate app counts in the list body
     queue: { reads: ["candidates", "applications", "jobs"], labels: ["Tailor resume"] }, // the queue rows' action
     newAssignments: { reads: ["candidates"], labels: ["No new candidates this week."] }, // its empty state: no ASSIGN entries on mocks (05 §7)

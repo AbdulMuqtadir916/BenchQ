@@ -48,5 +48,4 @@ export const durations = {
   fast: 0.15,
   base: 0.2,
   slow: 0.28,
-  verify: 0.35,
 } as const;

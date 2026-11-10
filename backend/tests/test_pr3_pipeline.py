@@ -44,6 +44,25 @@ def test_decrypted_ai_and_matching_preserve_application_and_resume(test_db, pipe
     app_id, _, row_id = pipeline
     before = test_db.get(Application, app_id)
     snapshot = (before.status, before.status_revision, before.applied_at, before.resume_id)
+    # Since 0017 (07 Q57) the candidate's name and contact details live in the active base's newest résumé version;
+    # the masking reads them there through Candidate.full_name / .email / .phone / .linkedin_url.
+    from backend.models.candidates import BaseResume, ResumeParse
+    from backend.models.db import Resume
+    candidate = test_db.get(Candidate, before.candidate_id)
+    upload = ResumeParse(firm_id=candidate.firm_id, uploaded_by_user_id=candidate.created_by_user_id,
+                         candidate_id=candidate.id, file_name='synthetic.pdf', mime_type='application/pdf', size_bytes=9,
+                         content=b'synthetic', parse={'header': {'name': 'Priya Masker Test'}})
+    test_db.add(upload)
+    test_db.flush()
+    base = BaseResume(firm_id=candidate.firm_id, candidate_id=candidate.id, source='UPLOAD', resume_parse_id=upload.id,
+                      is_active=True, created_by_user_id=candidate.created_by_user_id)
+    test_db.add(base)
+    test_db.flush()
+    test_db.add(Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category='BASE',
+                       version=1, name='Synthetic base', created_by_user_id=candidate.created_by_user_id,
+                       full_name='Priya Masker Test', email='priya.masker@example.test', phone='+1 614 555 0123',
+                       linkedin='https://www.linkedin.com/in/priya-masker-test'))
+    test_db.commit()
     captured = []
     def provider(subject, body, cfg, known=None):
         captured.append((subject, body, known))
@@ -57,9 +76,9 @@ def test_decrypted_ai_and_matching_preserve_application_and_resume(test_db, pipe
     # The masking gets the candidate, the connected mailbox and the sender, read with the content it is sent with.
     known = captured[0][2]
     mailbox = test_db.get(CandidateMailbox, row.mailbox_id)
-    candidate = test_db.get(Candidate, row.candidate_id)
-    assert known.candidate_name == candidate.full_name
-    assert mailbox.address in known.candidate_values
+    assert known.candidate_name == 'Priya Masker Test'
+    assert set(known.candidate_values) >= {'priya.masker@example.test', '+1 614 555 0123',
+                                           'https://www.linkedin.com/in/priya-masker-test', mailbox.address}
     assert (known.sender_name, known.sender_email) == (row.from_name, row.from_email)
     assert row.body.startswith('bqenc1:')
     assert row.application_id == app_id
