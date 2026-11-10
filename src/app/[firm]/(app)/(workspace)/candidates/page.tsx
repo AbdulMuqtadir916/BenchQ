@@ -191,7 +191,9 @@ function CandidatesList() {
   ].filter((chip): chip is FilterChip => chip !== null);
   const clearFilters = () => setQuery({ assignment: "all", status: "ALL", bench: "", manager: "", bde: "", role: "" });
   // A link from the dashboard can leave nothing: that is "no match", not a firm with no candidates.
-  const emptyFiltered = chips.length > 0 ? (
+  // The assignment toggle and the status select filter too, though they are not chips.
+  const hasFilters = chips.length > 0 || assignment !== "all" || statusFilter !== "ALL";
+  const emptyFiltered = hasFilters ? (
     <EmptyState variant="filtered" icon={SearchX} title="No candidates match these filters" description="Remove a filter above, or clear them all to see every candidate."
       action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>} />
   ) : undefined;
