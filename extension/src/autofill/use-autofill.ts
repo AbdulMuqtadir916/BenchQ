@@ -7,7 +7,8 @@ import { withJobSite } from "./job-site";
 import { answersFromResume } from "./resume-answers";
 import { buildReview, suggestedRow } from "./review";
 import {
-  chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, scanTab, undoCount, undoFills, type TabScan,
+  chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills,
+  type TabScan,
 } from "./tab-bridge";
 import type {
   AppliedForm, AutofillRun, BankEntry, Connection, FillResult, FieldWrite, PageSignals, ResumeFile, ReviewRow, RunItem, TabField,
@@ -20,10 +21,15 @@ const TOP_FRAME = 0;
 const LATE_CHECK_MS = 300;
 /** A run fills what it found, then once more for questions its answers brought out, like "If yes, which visa?". */
 const PASSES = 2;
-/** Once the résumé is attached, the form is read every half second until it has been still for three looks, after
- * six at least and 24 at most: a site that reads the file (Lever's "Analyzing resume…") fills fields of its own first. */
-const SETTLE_LOOK_MS = 500;
-const SETTLE = { least: 6, still: 3, most: 24 };
+/** Once the résumé is attached, the form is read every 400 ms until it has been still for three looks, after five at
+ * least (2 s) and 30 at most: a site that reads the file (Lever's "Analyzing resume…") fills fields of its own first. */
+const SETTLE = { every: 400, least: 5, still: 3, most: 30 };
+/** Once BenchQ took its old file off, the page only has to bring its upload back: a look every 250 ms, still for one. */
+const SETTLE_AFTER_REMOVE = { every: 250, least: 2, still: 1, most: 16 };
+/** What a run is doing before it fills, said in the panel so a change of résumé never looks stuck. */
+const STEP_REMOVING = "Taking the old resume's file off…";
+const STEP_CLEARING = "Clearing what the old resume filled…";
+const STEP_READING = "Letting the page read the file…";
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const STALE: FillResult = { status: "stale", current: "" };
 const PAGE_UNREADABLE = "BenchQ can't read this page. You can still fill the form yourself.";
@@ -32,6 +38,8 @@ const ANSWERS_UNAVAILABLE = "Could not load this resume's answers. Try again.";
 const PAGE_RESET = "The page reset this value.";
 const FORM_FLAGGED = "The form flagged this value.";
 const RUN_STOPPED = "The form changed, so BenchQ stopped here.";
+/** A résumé upload the page swapped out once it took a file (a chip for it, with a new input): the BDE changes it there. */
+const UPLOAD_GONE = "The page changed this upload, so change the file there.";
 const FAILURE_REASONS: Partial<Record<FillResult["status"], string>> = {
   changed: "This field changed after the review.",
   failed: "The form didn't accept this value.",
@@ -43,6 +51,7 @@ type FillableRow = ReviewRow & { write: FieldWrite };
 type Pass = { filled: FillableRow[]; failed: number; late: number; stopped: boolean };
 
 const isAttachment = (row: FillableRow) => row.write.type === "file";
+const isFillable = (row: ReviewRow): row is FillableRow => row.status === "ready" && Boolean(row.write);
 
 /** `resumeId`: the résumé version the answers come from (docs/02 §8.1); null when the candidate has none, so the form is
  * reviewed with no answers; undefined while the panel is still finding out, so nothing is reviewed yet. `fileName`: what
@@ -119,10 +128,13 @@ function plural(count: number, word: string) {
 function withMemory(rows: ReviewRow[], memory: TabMemory, resume: string | null, justFilled?: ReadonlySet<string>): ReviewRow[] {
   const { settled, handedBack, seen, edited, found, unmatched, filledFrom } = memory;
   return rows.map((row) => {
-    // Never filled, so there's nothing to remember, and a value like an SSN shouldn't linger here.
-    if (row.status === "blocked") return row;
     const key = memoKeyOf(row);
     const { field: { current } } = row;
+    // A fill of BenchQ's from another résumé, untouched since, that this résumé doesn't answer: it mustn't stay behind.
+    const isStale = filledFrom.has(key) && filledFrom.get(key) !== resume && Boolean(current) && settled.get(key) === current;
+    // Never filled, so there's nothing to remember, and a value like an SSN shouldn't linger here. Only an upload BenchQ
+    // attached can be stale: the picked résumé has no file of its own.
+    if (row.status === "blocked") return isStale && row.field.kind === "file" ? { ...row, isStale: true } : row;
     if (justFilled?.has(key)) {
       if (current) settled.set(key, current);
       else handedBack.set(key, PAGE_RESET);
@@ -134,7 +146,7 @@ function withMemory(rows: ReviewRow[], memory: TabMemory, resume: string | null,
       edited.add(key);
       handedBack.delete(key);
     }
-    if (row.status !== "ready") return row;
+    if (row.status !== "ready") return isStale ? { ...row, isStale: true } : row;
     const isOtherResumes = filledFrom.has(key) && filledFrom.get(key) !== resume;
     if ((settled.get(key) === current && !isOtherResumes) || (current && edited.has(key))) return { ...row, status: "same" as const };
     if (current && found.has(key) && !settled.has(key)) return { ...row, status: "kept" as const };
@@ -162,6 +174,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const [unreadableFrames, setUnreadableFrames] = useState(0);
   const [signals, setSignals] = useState<PageSignals | null>(null);
   const memory = useRef(memoryOf(connection));
+  // What the run is doing before it fills (taking the old file off, attaching, waiting for the page), for the panel.
+  const [step, setStep] = useState<string | null>(null);
   // The last file BenchQ attached on this page (07 Q53).
   const [attachedFile, setAttachedFile] = useState<string | null>(() => [...memoryOf(connection).attached.values()].at(-1) ?? null);
   const [filling, setFilling] = useState(false);
@@ -426,16 +440,16 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
 
   /** Waits for the form to go still once the résumé is on it: a site that reads the file fills fields of its own, and
    * the answers go on after that, never under it (07 Q50). */
-  const settle = useCallback(async () => {
+  const settle = useCallback(async ({ every, least, still: needed, most } = SETTLE) => {
     let last: string | null = null;
     let still = 0;
-    for (let look = 1; look <= SETTLE.most; look += 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, SETTLE_LOOK_MS));
+    for (let look = 1; look <= most; look += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, every));
       const read = await readTab(tabId, frames.current).catch(() => null);
       const now = read ? JSON.stringify([read.moved, [...read.values]]) : "";
       still = now === last ? still + 1 : 0;
       last = now;
-      if (look >= SETTLE.least && still >= SETTLE.still) return;
+      if (look >= least && still >= needed) return;
     }
   }, [tabId]);
 
@@ -454,17 +468,30 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     let batch = first;
     const files = first.filter(isAttachment);
     if (files.length > 0) {
+      const [file] = files;
+      setStep(`Attaching ${file!.write.type === "file" ? file!.write.name : "the resume"}…`);
       const { filled, failed, late, stopped } = await fillPass(files);
       total.filled += filled.length - late;
       total.handedBack += failed + late;
-      total.stopped = stopped;
-      if (filled.length > 0 && !stopped) await settle();
+      // An upload the page swapped out is the BDE's to change; it doesn't stop the answers (07 Q24, Q50).
+      if (stopped) {
+        for (const row of files.filter((file) => !filled.includes(file))) {
+          memory.current.handedBack.set(memoKeyOf(row), UPLOAD_GONE);
+          track({ key: row.key, label: fieldLabel(row.field), status: "failed", reason: UPLOAD_GONE });
+          total.handedBack += 1;
+        }
+      }
+      if (filled.length > 0) {
+        setStep(STEP_READING);
+        await settle();
+      }
+      setStep(null);
       // A look that counts what changed meanwhile as BenchQ's doing: a field the site filled from the file is no edit
       // of the BDE's, so its answer still goes on.
       busy.current = false;
       await scan(new Set(filled.map(memoKeyOf).filter((key) => !memory.current.handedBack.has(key))));
       busy.current = true;
-      batch = stopped ? [] : (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !isAttachment(row as FillableRow));
+      batch = (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !isAttachment(row as FillableRow));
       const count = batch.length;
       setRun((current) => current && { ...current, total: files.length + count });
     }
@@ -487,9 +514,69 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     setFilling(false);
     setRun(null);
     setOutcome(total);
-  }, [fillPass, needsConfirmation, scan, settle]);
+  }, [fillPass, needsConfirmation, scan, settle, track]);
 
-  const autofill = useCallback(() => fillRows(targets, PASSES), [fillRows, targets]);
+  /** Takes back BenchQ's fills from another résumé that the picked one doesn't answer, as Undo would, so the form holds
+   * nothing of the old résumé; a field the BDE has changed since stays as it is. */
+  const takeBackStale = useCallback(async (stale: ReviewRow[]) => {
+    busy.current = true;
+    setStep(STEP_CLEARING);
+    for (const row of stale) {
+      const scanId = frames.current.scanIds.get(row.field.frameId);
+      const target = { scanId: scanId ?? 0, fieldId: row.field.id };
+      const isBack = scanId !== undefined && await takeBackField(tabId, row.field.frameId, target).catch(() => false);
+      if (!isBack) continue;
+      const key = memoKeyOf(row);
+      memory.current.filledFrom.delete(key);
+      memory.current.settled.delete(key);
+      memory.current.attached.delete(key);
+    }
+    setAttachedFile([...memory.current.attached.values()].at(-1) ?? null);
+    busy.current = false;
+    // What changed is BenchQ's doing, so none of it counts as the BDE's edit.
+    await scan(new Set());
+  }, [scan, tabId]);
+
+  /** Takes the files BenchQ attached for another résumé off the page, through the page's own remove control, so the
+   * picked résumé's file replaces them instead of being ignored beside them (Greenhouse shows a taken file as a chip and
+   * ignores a new one put under it). Once one came off, the page gets to go still and is looked at again. `keep`: the
+   * picked résumé's file, left where it is. A page with no remove control keeps its file, and the new one goes over it. */
+  const removeOldFiles = useCallback(async (keep: string | null) => {
+    const old = [...memory.current.attached.entries()].filter(([, name]) => name !== keep);
+    if (old.length === 0) return;
+    busy.current = true;
+    setStep(STEP_REMOVING);
+    let isRemoved = false;
+    for (const [key, name] of old) {
+      if (!await removeFileOnPage(tabId, name).catch(() => false)) continue;
+      memory.current.attached.delete(key);
+      memory.current.settled.delete(key);
+      memory.current.filledFrom.delete(key);
+      isRemoved = true;
+    }
+    if (isRemoved) {
+      setAttachedFile([...memory.current.attached.values()].at(-1) ?? null);
+      await settle(SETTLE_AFTER_REMOVE);
+    }
+    busy.current = false;
+    // What changed is BenchQ's doing, so none of it counts as the BDE's edit.
+    if (isRemoved) await scan(new Set());
+  }, [scan, settle, tabId]);
+
+  /** Fills the form from the picked résumé. After a change of résumé, the file BenchQ attached for the old one comes off
+   * first, then the old one's fills the new one doesn't answer go back, then the new one's answers and file go on. */
+  const autofill = useCallback(async () => {
+    if (busy.current || needsConfirmation) return;
+    try {
+      await removeOldFiles(bank.current?.file?.name ?? null);
+      const stale = (shownRows.current ?? []).filter((row) => row.isStale);
+      if (stale.length > 0) await takeBackStale(stale);
+      setStep(null);
+      await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
+    } finally {
+      setStep(null);
+    }
+  }, [fillRows, needsConfirmation, removeOldFiles, takeBackStale]);
 
   /** Writes the saved answers over values the form held before BenchQ looked, for the rows the BDE chose. */
   const replace = useCallback((chosen: ReviewRow[]) =>
@@ -567,7 +654,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, [applicationId, watchForm]);
 
   return {
-    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, attachment, attachedFile,
-    needsConfirmation, fillCount: targets.length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
+    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, attachment, attachedFile, step,
+    needsConfirmation, fillCount: targets.length, staleCount: (rows ?? []).filter((row) => row.isStale).length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
   };
 }

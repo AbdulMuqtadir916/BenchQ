@@ -93,6 +93,8 @@ export type PageApi = {
   rejected(scanId: number, fieldIds: string[]): string[];
   flagged(scanId: number, fieldIds: string[]): Promise<string[]>;
   focusField(target: FieldTarget): boolean;
+  takeBack(target: FieldTarget): Promise<boolean>;
+  removeFile(name: string): Promise<boolean>;
   undo(): Promise<UndoResult>;
   undoCount(): number;
 };
@@ -142,6 +144,9 @@ export type ReviewRow = {
   isUnsaved?: boolean;
   /** A dropdown Autofill opened but found no clear option in: the BDE can pick one from its options in the panel. */
   canChoose?: boolean;
+  /** BenchQ filled it from another résumé, it's unchanged since, and the picked résumé doesn't answer it: Autofill takes
+   * it back, so the old résumé's value doesn't stay on the form. */
+  isStale?: boolean;
   /** For a question no saved answer clearly matches: the closest of the candidate's own screening answers, which the
    * BDE can use with a click. Never filled on their own. */
   suggestions?: BankEntry[];

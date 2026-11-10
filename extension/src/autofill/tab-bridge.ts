@@ -188,6 +188,18 @@ export async function focusField(tabId: number, frameId: number, target: FieldTa
   return answer?.result ?? false;
 }
 
+/** Takes back BenchQ's fill of one field while the BDE hasn't changed it: true when it went back. */
+export async function takeBackField(tabId: number, frameId: number, target: FieldTarget): Promise<boolean> {
+  const [answer] = await inFrames<boolean>({ tabId, frameIds: [frameId] }, "takeBack", [target]);
+  return answer?.result ?? false;
+}
+
+/** Takes a file BenchQ attached off the page by its name, in whichever frame shows it: true when one was removed. */
+export async function removeFileOnPage(tabId: number, name: string): Promise<boolean> {
+  const answers = await inFrames<boolean>({ tabId, allFrames: true }, "removeFile", [name]);
+  return answers.some(({ result }) => result);
+}
+
 export async function undoFills(tabId: number): Promise<UndoResult> {
   const answers = await inFrames<UndoResult>({ tabId, allFrames: true }, "undo", []);
   return answers.reduce((total, { result }) => ({

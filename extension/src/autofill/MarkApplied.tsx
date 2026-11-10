@@ -16,7 +16,11 @@ type MarkAppliedProps = {
 };
 
 const DIALOG = "m-auto max-h-[calc(100dvh-var(--dialog-gutter))] w-[min(var(--dialog-width),calc(100vw-var(--dialog-gutter)))] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-glass-edge)] bg-[var(--color-surface)] p-6 text-[var(--color-text)] shadow-[var(--shadow-lg)] backdrop:bg-[var(--color-overlay)] backdrop:backdrop-blur-[var(--blur-overlay)]";
-const FIELD_LINK = "text-left font-[550] underline underline-offset-2 wrap-anywhere hover:text-[var(--color-text)]";
+/** One empty field, on one line (its whole label on hover): a way back to it. */
+const FIELD_LINK = "block w-full truncate text-left font-[550] underline-offset-2 hover:text-[var(--color-text)] hover:underline";
+const MORE = "mt-1 text-caption font-[550] underline underline-offset-2 hover:text-[var(--color-text)]";
+/** The empty fields the dialog lists before "Show all". */
+const SHOWN_EMPTY = 3;
 /** Mark applied while fields are still left to fill: Autofill keeps the primary look, and this one reads as "done", in
  * the success colours, so it's never mistaken for a quiet extra. */
 const DONE = `inline-flex min-h-[var(--control-lg)] items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-success-fg)_40%,transparent)] bg-[var(--color-success-bg)] px-3 py-1 text-body-strong text-[var(--color-success-fg)] transition-[border-color,box-shadow] ${MOTION} hover:border-[var(--color-success-fg)] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none`;
@@ -30,6 +34,7 @@ export default function MarkApplied({ isPrimary, isSaving, isDisabled, jobLine, 
   const markButton = useRef<HTMLButtonElement>(null);
   const yesButton = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [isAllShown, setIsAllShown] = useState(false);
 
   useLayoutEffect(() => {
     const element = dialog.current;
@@ -42,6 +47,7 @@ export default function MarkApplied({ isPrimary, isSaving, isDisabled, jobLine, 
   // However it closes (a button, Esc), the dialog empties and focus goes back to where the BDE was.
   const onClose = () => {
     setIsOpen(false);
+    setIsAllShown(false);
     markButton.current?.focus();
   };
   const confirm = () => {
@@ -53,6 +59,7 @@ export default function MarkApplied({ isPrimary, isSaving, isDisabled, jobLine, 
     onGoTo(row);
   };
   const count = emptyRequired.length;
+  const shown = isAllShown ? emptyRequired : emptyRequired.slice(0, SHOWN_EMPTY);
 
   return <>
     <button ref={markButton} type="button" data-slot="mark-applied" className={isPrimary ? button("primary", "large") : DONE} disabled={isSaving || isDisabled}
@@ -69,13 +76,15 @@ export default function MarkApplied({ isPrimary, isSaving, isDisabled, jobLine, 
         {count > 0 && <div data-slot="autofill-confirm-note" className={WARNING}>
           <p>{count === 1 ? "1 required field is still empty:" : `${count} required fields are still empty:`}</p>
           <ul className="mt-1 grid gap-0.5">
-            {emptyRequired.map((row) => <li key={row.key}>
-              <button type="button" className={FIELD_LINK} onClick={() => goTo(row)}>{fieldLabel(row.field)}</button>
+            {shown.map((row) => <li key={row.key} className="min-w-0">
+              <button type="button" className={FIELD_LINK} title={fieldLabel(row.field)} onClick={() => goTo(row)}>{fieldLabel(row.field)}</button>
             </li>)}
           </ul>
+          {count > SHOWN_EMPTY && <button type="button" data-slot="autofill-confirm-more" className={MORE} aria-expanded={isAllShown}
+            onClick={() => setIsAllShown(!isAllShown)}>{isAllShown ? "Show fewer" : `Show all ${count}`}</button>}
         </div>}
         <div className={FITTED_BUTTONS}>
-          <button ref={yesButton} type="button" className={button("primary", "large")} disabled={isDisabled} onClick={confirm}>{CHECK}Yes, mark applied</button>
+          <button ref={yesButton} type="button" data-slot="mark-applied-confirm" className={button("primary", "large")} disabled={isDisabled} onClick={confirm}>Mark applied</button>
           <button type="button" className={button("secondary", "large")} onClick={close}>Cancel</button>
         </div>
       </div>}

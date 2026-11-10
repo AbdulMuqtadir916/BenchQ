@@ -40,15 +40,17 @@ function ViewLink({ url, choice }: { url: string | null; choice: ResumeChoice })
   return url ? <a className={ICON_BUTTON_QUIET} href={url} target="_blank" rel="noreferrer" aria-label={`View ${choice.label} in BenchQ`} title="View in BenchQ">{EXTERNAL_ICON}</a> : null;
 }
 
-/** A résumé in two lines: its role, Active when it's the base the candidate's workflow uses (picked in BenchQ), then
- * which base or job it is and its version. Without a role, that second line heads it alone. */
+/** A résumé in two lines: its role across the whole row, then which base or job it is and its version, with Active
+ * after them when it's the base the candidate's workflow uses (picked in BenchQ). Without a role, that second line heads
+ * it, and the tag sits under it. */
 function Named({ choice }: { choice: ResumeChoice }) {
-  return <span className="grid min-w-0 flex-1">
-    <span className="flex min-w-0 items-start gap-1.5">
-      <span data-slot="resume-picked" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{choice.title ?? choice.meta}</span>
-      {choice.isActive && <span data-slot="resume-active" className={ACTIVE}>Active</span>}
-    </span>
-    {choice.title && <span className={`${MUTED_TEXT} wrap-anywhere`}>{choice.meta}</span>}
+  const tag = choice.isActive ? <span data-slot="resume-active" className={ACTIVE}>Active</span> : null;
+  return <span className="grid min-w-0 flex-1 gap-0.5">
+    <span data-slot="resume-picked" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{choice.title ?? choice.meta}</span>
+    {(choice.title || tag) && <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+      {choice.title && <span className={`${MUTED_TEXT} wrap-anywhere`}>{choice.meta}</span>}
+      {tag}
+    </span>}
   </span>;
 }
 

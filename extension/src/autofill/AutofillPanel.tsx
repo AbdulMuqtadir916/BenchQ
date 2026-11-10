@@ -6,7 +6,7 @@ import DocumentSections from "./DocumentSections";
 import { documentOf, resumeFileName } from "./documents";
 import { filledValue } from "./form-memory";
 import FormProgress from "./FormProgress";
-import { CHECK, SPARKLES_ICON } from "./icons";
+import { CHECK, SPARKLES_ICON, SPINNER_ICON } from "./icons";
 import JobCard from "./JobCard";
 import MarkApplied from "./MarkApplied";
 import OutcomeNote from "./OutcomeNote";
@@ -36,6 +36,8 @@ type AutofillPanelProps = {
   onAccessLost: () => void;
 };
 
+/** What a run is doing before its first fill, beside a spinner. */
+const STEP = "flex items-center gap-1.5 text-sm text-[var(--color-text-2)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:animate-spin [&_svg]:text-[var(--color-primary)] motion-reduce:[&_svg]:animate-none";
 const SKELETON = "grid gap-1.5 *:h-[var(--skeleton-row)] *:animate-pulse *:rounded-[var(--radius-md)] *:bg-[var(--color-surface-3)]";
 
 /** To "Autofill complete" once a run ends, or to the run's note when fields are left, so the BDE sees how it went: just
@@ -67,7 +69,9 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   const resumeId = resumes.status === "loading" ? undefined : picked?.id ?? null;
   const fileName = picked ? resumeFileName(candidateName, picked.title) : null;
   const state = useAutofill({ connection, firmId, resumeId, fileName, onSessionExpired, onAccessLost });
-  const { rows, scanning, error, filling, run, outcome, undoable, fillCount, needsConfirmation, answeredFrom, attachment } = state;
+  const { rows, scanning, error, filling, run, outcome, undoable, fillCount, staleCount, needsConfirmation, answeredFrom, attachment, step } = state;
+  // A run is busy from its first step (taking the old file off) to its last fill.
+  const isWorking = filling || Boolean(step);
   const studioUrl = useCallback((versionId: string) => (firmSlug ? resumeStudioUrl(firmSlug, versionId) : null), [firmSlug]);
   // A pick fills the form at once, once its answers are in, when the form is on the page and it's the right job.
   const fillOnPick = useRef<string | null>(null);
@@ -80,8 +84,9 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     const wanted = fillOnPick.current;
     if (!wanted || answeredFrom !== wanted || scanning || filling) return;
     fillOnPick.current = null;
-    if (rows?.length && !needsConfirmation && fillCount > 0) void autofill();
-  }, [answeredFrom, scanning, filling, rows, needsConfirmation, fillCount, autofill]);
+    // A new pick fills what it answers and takes back what the old one filled that it doesn't, so nothing stale stays.
+    if (rows?.length && !needsConfirmation && (fillCount > 0 || staleCount > 0)) void autofill();
+  }, [answeredFrom, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
   // The keyboard shortcuts (background.ts), for this tab's job: each clicks its button, so it does nothing when the
   // button couldn't be clicked. Mark applied opens its dialog with Yes focused, so Enter confirms.
   useEffect(() => {
@@ -117,6 +122,16 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   const rest = (rows ?? []).filter(({ field }) => !documentOf(field));
   const jobLine = `${job.title || "Untitled role"}${job.company ? ` at ${job.company}` : ""} · for ${candidateName}`;
   const goTo = (row: ReviewRow) => void state.goToField(row);
+  // The attached résumé's Change resume opens the picker at the top, on its list, when there's another to pick (07 Q55).
+  const hasOtherResumes = resumes.status === "ready" && resumes.choices.length > 1;
+  const changeResume = () => {
+    const select = card.current?.querySelector<HTMLButtonElement>("[data-slot='resume-select']");
+    if (!select) return;
+    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    select.scrollIntoView?.({ block: "nearest", behavior });
+    if (select.getAttribute("aria-expanded") === "true") select.focus();
+    else select.click();
+  };
   const confirmHost = () => void sendToBackground({ type: "confirm-host", tabId, host: state.host });
   const apply = async () => {
     setIsCollecting(true);
@@ -138,13 +153,13 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
         </div>
       </div>}
 
-      <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl} isBusy={filling}
+      <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl} isBusy={isWorking}
         onPick={pickResume} onRetry={retry} />
 
       {hasForm && <FormProgress rows={rows} />}
 
-      {hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={filling || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
-        {filling ? "Filling…" : <>{SPARKLES_ICON}Autofill</>}
+      {hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={isWorking || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
+        {isWorking ? "Filling…" : <>{SPARKLES_ICON}Autofill</>}
       </button>}
       {hasFillsLeft && !filling && fillCount > 0 && <p data-slot="autofill-ready" className={`-mt-1.5 text-center ${MUTED_TEXT}`}>
         Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id ? ", the resume file first" : ""}.
@@ -163,12 +178,14 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
       </div>}
       {hasForm && state.bankEmpty && picked && <p className={MUTED_TEXT}>This resume has no answers BenchQ can fill yet.</p>}
 
+      {step && <p data-slot="autofill-step" role="status" className={STEP}>{SPINNER_ICON}{step}</p>}
       {filling && run && <RunList run={run} />}
       {outcome && outcome !== dismissed && <OutcomeNote outcome={outcome} left={left} onDismiss={dismiss} />}
       {state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
 
       {hasForm && <DocumentSections rows={rows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
-        picked={picked ? { label: picked.label, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null } : null} attached={state.attachedFile} />}
+        picked={picked ? { label: picked.label, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null } : null} attached={state.attachedFile}
+        onChangeResume={hasOtherResumes ? changeResume : undefined} />}
       {!filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
         onSuggest={(row, entry) => void state.fillWith(row, entry)} />}

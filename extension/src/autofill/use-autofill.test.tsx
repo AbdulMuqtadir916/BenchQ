@@ -4,14 +4,14 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getResumeAnswers, getResumeFile } from "../api";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
-import { fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, scanTab, undoCount, undoFills, type TabScan } from "./tab-bridge";
+import { fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills, type TabScan } from "./tab-bridge";
 import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, TabField } from "./types";
 import { forgetTabs, useAutofill } from "./use-autofill";
 
 vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn(), getResumeFile: vi.fn() }));
 vi.mock("./tab-bridge", () => ({
   scanTab: vi.fn(), readTab: vi.fn(), fillField: vi.fn(), fillChoice: vi.fn(), rejectedFields: vi.fn(), flaggedFields: vi.fn(), focusField: vi.fn(),
-  undoFills: vi.fn(), undoCount: vi.fn(),
+  undoFills: vi.fn(), undoCount: vi.fn(), takeBackField: vi.fn(), removeFileOnPage: vi.fn(),
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -90,6 +90,7 @@ beforeEach(() => {
   vi.mocked(focusField).mockResolvedValue(true);
   vi.mocked(undoCount).mockResolvedValue(0);
   vi.mocked(readTab).mockResolvedValue({ values: new Map(), moved: false });
+  vi.mocked(removeFileOnPage).mockResolvedValue(false);
 });
 
 afterEach(async () => {
@@ -891,13 +892,31 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
       { scanId: 1, fieldId: "a", current: "site@parsed.test", write: { type: "text", value: "priya@example.test" } },
     ]);
     const answered = vi.mocked(fillField).mock.invocationCallOrder[1]!;
-    expect(vi.mocked(readTab).mock.invocationCallOrder.filter((order) => order < answered).length).toBeGreaterThanOrEqual(6);
+    // Five looks at least (2 s), still for three, before the answers go on.
+    expect(vi.mocked(readTab).mock.invocationCallOrder.filter((order) => order < answered).length).toBeGreaterThanOrEqual(5);
     expect(hook.outcome).toEqual({ filled: 2, handedBack: 0, stopped: false });
     // The panel keeps the attached file's name, for when the site swaps its input for a chip (07 Q53); Undo forgets it.
     expect(hook.attachedFile).toBe(NAME);
     vi.mocked(undoFills).mockResolvedValue({ restored: 2, kept: 0, skipped: 0 });
     await act(async () => { const undoing = hook.undo(); await vi.advanceTimersByTimeAsync(500 * 24); await undoing; });
     expect(hook.attachedFile).toBeNull();
+  });
+
+  it("goes on with the answers when the page swapped its upload out, and leaves that upload to the BDE", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) =>
+      (write.type === "file" ? { status: "stale", current: "" } : { status: "filled", current: write.type === "text" ? write.value : "" }));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} />); });
+    await advance(1);
+    const running = hook.autofill();
+    await advance(500 * 24);
+    await act(async () => { await running; });
+    expect(vi.mocked(fillField).mock.calls.map(([, , request]) => request.write.type)).toEqual(["file", "text"]);
+    expect(hook.outcome).toEqual({ filled: 1, handedBack: 1, stopped: false });
+    expect(hook.rows!.find(({ field: { id } }) => id === "r")).toMatchObject({ status: "manual", reason: "The page changed this upload, so change the file there." });
   });
 
   it("leaves a file that was on the form before BenchQ looked", async () => {
@@ -916,5 +935,53 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     await run(() => hook.rescan());
     expect(getResumeFile).toHaveBeenCalledTimes(1);
     expect(getResumeFile).toHaveBeenCalledWith("firm-1", "cand-1", "res-1");
+  });
+});
+
+describe("picking another résumé (07 Q24)", () => {
+  type OnPage = { a: string; b: string };
+
+  function formWith(onPage: OnPage) {
+    vi.mocked(scanTab).mockImplementation(async () => page([field("a", "Email", "text", onPage.a), field("b", "City", "text", onPage.b)], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { fieldId, write }) => {
+      const value = write.type === "text" ? write.value : "";
+      onPage[fieldId as keyof OnPage] = value;
+      return { status: "filled", current: value };
+    });
+    vi.mocked(takeBackField).mockImplementation(async (_tab, _frame, { fieldId }) => {
+      onPage[fieldId as keyof OnPage] = "";
+      return true;
+    });
+  }
+
+  it("takes back what the old one filled that the new one doesn't answer, then fills from the new one", async () => {
+    vi.mocked(getResumeAnswers).mockImplementation(async (_firm, _candidate, resumeId) =>
+      (resumeId === "res-2" ? [custom("Email", "priya@new.test")] : answers));
+    const onPage: OnPage = { a: "", b: "" };
+    formWith(onPage);
+    await mount();
+    await run(() => hook.autofill());
+    expect(onPage).toEqual({ a: "priya@example.test", b: "Phoenix" });
+    await pickResume("res-2");
+    expect(hook.staleCount).toBe(1);
+    await run(() => hook.autofill());
+    expect(takeBackField).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "b" });
+    expect(onPage).toEqual({ a: "priya@new.test", b: "" });
+    expect(hook.staleCount).toBe(0);
+  });
+
+  it("leaves a value the BDE changed after BenchQ filled it", async () => {
+    vi.mocked(getResumeAnswers).mockImplementation(async (_firm, _candidate, resumeId) =>
+      (resumeId === "res-2" ? [custom("Email", "priya@new.test")] : answers));
+    const onPage: OnPage = { a: "", b: "" };
+    formWith(onPage);
+    await mount();
+    await run(() => hook.autofill());
+    onPage.b = "Tempe";
+    await pickResume("res-2");
+    expect(hook.staleCount).toBe(0);
+    await run(() => hook.autofill());
+    expect(takeBackField).not.toHaveBeenCalled();
+    expect(onPage.b).toBe("Tempe");
   });
 });

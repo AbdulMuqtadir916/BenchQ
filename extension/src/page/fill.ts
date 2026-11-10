@@ -57,6 +57,35 @@ function setFiles(input: HTMLInputElement, files: File[]) {
 const fileOf = ({ name, mimeType, data }: FieldWrite & { type: "file" }) =>
   new File([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], name, { type: mimeType });
 
+/** A control that takes a file off an upload, by its words or its label: "Remove", "Delete", an ×. */
+const REMOVE_CONTROL = /\b(remove|delete|clear|discard)\b|^[×✕✖x]$/i;
+const controlWords = (element: HTMLElement) =>
+  collapse(`${element.getAttribute("aria-label") ?? ""} ${element.getAttribute("title") ?? ""} ${textOf(element)}`);
+
+const ANY_FILE_NAME = /\S\.(?:pdf|docx?|rtf|odt|txt)\b/i;
+
+/** Whether `box` shows a file other than `name`: then it's wider than that file's chip, and its controls may be
+ * another file's. */
+function showsOtherFile(box: HTMLElement, name: string): boolean {
+  const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = collapse(node.textContent ?? "");
+    if (ANY_FILE_NAME.test(text) && !text.includes(name)) return true;
+  }
+  return false;
+}
+
+/** The element whose text names a file the page took: the chip it shows for it (the name, perhaps with its size). */
+function chipNamed(name: string): HTMLElement | null {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = collapse(node.textContent ?? "");
+    const parent = node.parentElement;
+    if (parent && text.includes(name) && text.length <= name.length + 40 && isVisible(parent)) return parent;
+  }
+  return null;
+}
+
 function checkTargets(entry: Entry, write: FieldWrite & { type: "check" }) {
   return write.optionIds?.map((id) => entry.options.get(id)) ?? [entry.controls[0]];
 }
@@ -294,6 +323,36 @@ export function createFiller(registry: () => Registry | null) {
       target.animate(RING, RING_MS);
       control.focus({ preventScroll: true });
       return true;
+    },
+
+    /** Takes a file BenchQ attached off the page through the page's own remove control, found beside the chip that
+     * names it (07 Q51): a page such as Greenhouse shows a taken file as a chip and ignores a new one put under it. Only
+     * the file of that name is ever removed. True once its control was clicked. */
+    async removeFile(name: string): Promise<boolean> {
+      for (let box = chipNamed(name), depth = 0; box && depth < 4; depth += 1, box = box.parentElement) {
+        if (showsOtherFile(box, name)) break;
+        const control = Array.from(box.querySelectorAll<HTMLElement>("button, a, [role='button']"))
+          .find((element) => isVisible(element) && !element.matches(":disabled") && REMOVE_CONTROL.test(controlWords(element)));
+        if (control) {
+          control.click();
+          await pause(SETTLE_MS);
+          return true;
+        }
+      }
+      return false;
+    },
+
+    /** Takes back BenchQ's fills of one field, as Undo would, while it still holds what BenchQ last put there: another
+     * résumé picked later doesn't answer it, and its value mustn't stay behind. False when the BDE has changed it since,
+     * or BenchQ never filled it. */
+    async takeBack({ scanId, fieldId }: FieldTarget): Promise<boolean> {
+      const entry = liveEntry(scanId, fieldId);
+      if (!entry) return false;
+      const mine = filled.filter((item) => item.entry.controls[0] === entry.controls[0]);
+      const [first] = mine;
+      if (!first || !sameSnapshot(snapshot(entry), mine.at(-1)!.after)) return false;
+      filled = filled.filter((item) => !mine.includes(item));
+      return putBack(entry, first.before);
     },
 
     async undo(): Promise<UndoResult> {

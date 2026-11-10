@@ -49,6 +49,7 @@ let element: ReactElement;
 type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
   answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
+  step?: string | null;
 };
 
 function show(state: State, panel: { onApply?: (form: AppliedForm) => void; isApplied?: boolean; applying?: boolean; details?: Application | null } = {}, resumes: Resumes = oneResume) {
@@ -188,7 +189,11 @@ describe("the résumé the answers come from", () => {
 
   it("tags the base in use Active, as the website does, closed and in the list", async () => {
     show({ fillCount: 1 }, {}, twoResumes);
-    expect(select().querySelector("[data-slot='resume-active']")!.textContent).toBe("Active");
+    const tag = select().querySelector("[data-slot='resume-active']")!;
+    expect(tag.textContent).toBe("Active");
+    // On the second line, after the base and version, so the role keeps the whole row.
+    expect(tag.parentElement!.textContent).toBe("Base 1 · v2Active");
+    expect(select().querySelector("[data-slot='resume-picked']")!.textContent).toBe("Java Developer");
     await open();
     const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
     expect(choices.map((choice) => choice.querySelector("[data-slot='resume-active']")?.textContent ?? null)).toEqual([null, "Active"]);
@@ -258,13 +263,28 @@ describe("the résumé the answers come from", () => {
     show({ fillCount: 0, rows: [row("Email", true)], attachedFile: "Priya - Java Developer.pdf" });
     const resume = host.querySelector("[data-document='resume']")!;
     expect(resume.querySelector("[data-slot='document-status']")!.textContent).toBe("Attached");
-    expect(resume.querySelector("[data-slot='document-attached']")!.textContent).toBe("Attached: Priya - Java Developer.pdf");
+    expect(resume.querySelector("[data-slot='document-attached'] [data-slot='document-value']")!.textContent).toBe("Priya - Java Developer.pdf");
+    expect(resume.querySelector("[data-slot='document-attached']")!.textContent).toContain("Attached");
   });
 
-  it("shows an upload's file as a green Attached chip (07 Q56)", () => {
+  it("shows an upload's file in one line, then Attached and Go to field, with nothing else to say (07 Q56)", () => {
     const upload = { key: "cv", status: "same", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "cv.pdf" } } as unknown as ReviewRow;
     show({ fillCount: 0, rows: [upload] });
-    expect(host.querySelector("[data-document='resume'] [data-slot='document-attached']")!.textContent).toBe("Attached: cv.pdf");
+    const resume = host.querySelector("[data-document='resume']")!;
+    const file = resume.querySelector("[data-slot='document-attached']")!;
+    expect([file.querySelector("[data-slot='document-value']")!.getAttribute("title"), file.textContent]).toEqual(["cv.pdf", "cv.pdfAttachedGo to field"]);
+    expect(resume.querySelector("[data-slot='document-held']")).toBeNull();
+    expect(resume.querySelector("a")).toBeNull();
+  });
+
+  it("offers Change resume on an attached résumé when there's another to pick, opening the picker's list", async () => {
+    const upload = { key: "cv", status: "same", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "cv.pdf" } } as unknown as ReviewRow;
+    show({ fillCount: 0, rows: [upload] }, {}, twoResumes);
+    const change = host.querySelector<HTMLButtonElement>("[data-document='resume'] [data-slot='document-change']")!;
+    expect(change.textContent).toBe("Change resume");
+    await act(async () => { change.click(); });
+    expect(select().getAttribute("aria-expanded")).toBe("true");
+    expect(options()).toHaveLength(2);
   });
 
   it("says Autofill attaches its file when BenchQ has one (07 Q49)", () => {
@@ -304,7 +324,7 @@ describe("the keyboard shortcuts", () => {
     show({ fillCount: 0 }, { onApply });
     await press("mark-applied");
     expect(host.querySelector("dialog[data-slot='autofill-confirm']")!.hasAttribute("open")).toBe(true);
-    expect(document.activeElement?.textContent).toBe("Yes, mark applied");
+    expect(document.activeElement).toBe(host.querySelector("[data-slot='mark-applied-confirm']"));
     expect(onApply).not.toHaveBeenCalled();
   });
 });
@@ -377,6 +397,15 @@ describe("the note a run leaves", () => {
   });
 });
 
+describe("a run's first steps", () => {
+  it("say what's happening beside a spinner, and hold Autofill and the picker until it's done", () => {
+    show({ fillCount: 2, step: "Taking the old resume's file off…" });
+    const step = host.querySelector("[data-slot='autofill-step']")!;
+    expect([step.getAttribute("role"), step.textContent]).toEqual(["status", "Taking the old resume's file off…"]);
+    expect(host.querySelector<HTMLButtonElement>("[data-slot='autofill-run']")!).toMatchObject({ disabled: true, textContent: "Filling…" });
+  });
+});
+
 describe("the buttons at the bottom", () => {
   it("make Mark applied plain to see while there are fields to fill: a done look of its own, and what it's for", () => {
     show({ fillCount: 3 }, { onApply: vi.fn() });
@@ -427,6 +456,9 @@ describe("confirming Mark applied", () => {
   const dialog = () => host.querySelector<HTMLDialogElement>("dialog[data-slot='autofill-confirm']")!;
   const confirmText = () => dialog().textContent;
   const inDialog = () => [...dialog().querySelectorAll<HTMLButtonElement>("button")];
+  // The dialog's own Mark applied, beside the one that opened it.
+  const confirmButton = () => host.querySelector<HTMLButtonElement>("[data-slot='mark-applied-confirm']")!;
+  const confirm = () => act(async () => { confirmButton().click(); });
   const note = () => host.querySelector("[data-slot='autofill-confirm-note']");
 
   it("asks first, in a modal dialog that names the job, and marks nothing yet", async () => {
@@ -437,9 +469,9 @@ describe("confirming Mark applied", () => {
     expect(dialog().getAttribute("aria-labelledby")).toBe("autofill-confirm-title");
     expect(host.querySelector("#autofill-confirm-title")?.textContent).toBe("Mark this job as applied?");
     expect(host.querySelector("#autofill-confirm-job")?.textContent).toBe("Java Developer at Acme · for Priya");
-    expect(inDialog().map(({ textContent }) => textContent)).toEqual(["Yes, mark applied", "Cancel"]);
+    expect(inDialog().map(({ textContent }) => textContent)).toEqual(["Mark applied", "Cancel"]);
     expect(inDialog()[0]!.className).toContain("bq-primary");
-    expect(document.activeElement).toBe(named("Yes, mark applied"));
+    expect(document.activeElement).toBe(confirmButton());
     expect(onApply).not.toHaveBeenCalled();
     expect(finalForm).not.toHaveBeenCalled();
   });
@@ -447,7 +479,7 @@ describe("confirming Mark applied", () => {
   it("sends the form as it stands on Yes", async () => {
     show({ fillCount: 0 }, { onApply });
     await click("Mark applied");
-    await click("Yes, mark applied");
+    await confirm();
     expect(finalForm).toHaveBeenCalledTimes(1);
     expect(onApply).toHaveBeenCalledWith(form, "res-2");
   });
@@ -457,7 +489,7 @@ describe("confirming Mark applied", () => {
     finalForm.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     show({ fillCount: 0 }, { onApply });
     await click("Mark applied");
-    await click("Yes, mark applied");
+    await confirm();
     expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Saving…"]);
     expect(onApply).not.toHaveBeenCalled();
     await act(async () => { finish(form); });
@@ -476,7 +508,7 @@ describe("confirming Mark applied", () => {
   it("goes back on Esc, to the button it came from", async () => {
     show({ fillCount: 0 }, { onApply });
     await click("Mark applied");
-    await act(async () => { named("Yes, mark applied").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    await act(async () => { confirmButton().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
     expect(dialog().hasAttribute("open")).toBe(false);
     expect(confirmText()).toBe("");
     expect(document.activeElement).toBe(named("Mark applied"));
@@ -488,8 +520,23 @@ describe("confirming Mark applied", () => {
     await click("Mark applied");
     expect(note()?.querySelector("p")?.textContent).toBe("2 required fields are still empty:");
     expect([...note()!.querySelectorAll("li button")].map(({ textContent }) => textContent)).toEqual(["Email", "Phone"]);
-    await click("Yes, mark applied");
+    await confirm();
     expect(onApply).toHaveBeenCalledWith(form, "res-2");
+  });
+
+  it("lists the first three empty fields, one line each, and all of them on request", async () => {
+    const empty = ["Email", "Phone", "Zip code", "Which of the following metropolitan areas do you reside in?", "Veteran status"];
+    show({ fillCount: 0, rows: empty.map((label) => row(label, true)) }, { onApply });
+    await click("Mark applied");
+    const fields = () => [...note()!.querySelectorAll<HTMLButtonElement>("li button")];
+    expect(fields().map(({ textContent }) => textContent)).toEqual(["Email", "Phone", "Zip code"]);
+    expect(fields()[0]!.className).toContain("truncate");
+    expect(fields()[0]!.getAttribute("title")).toBe("Email");
+    const more = note()!.querySelector<HTMLButtonElement>("[data-slot='autofill-confirm-more']")!;
+    expect(more.textContent).toBe("Show all 5");
+    await act(async () => { more.click(); });
+    expect(fields()).toHaveLength(5);
+    expect(more.textContent).toBe("Show fewer");
   });
 
   it("says it right for one", async () => {
@@ -501,7 +548,7 @@ describe("confirming Mark applied", () => {
   it("has nothing to warn about when the required fields are filled, or no form could be read", async () => {
     show({ fillCount: 0, rows: [row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
     await click("Mark applied");
-    expect(confirmText()).toBe("Mark this job as applied?Java Developer at Acme · for PriyaYes, mark appliedCancel");
+    expect(confirmText()).toBe("Mark this job as applied?Java Developer at Acme · for PriyaMark appliedCancel");
     act(() => { root?.unmount(); });
     host.remove();
     show({ fillCount: 0, rows: null }, { onApply });

@@ -266,6 +266,48 @@ describe("a résumé upload behind a styled button (07 Q53)", () => {
   });
 });
 
+describe("taking a file off through the page's own control (07 Q51)", () => {
+  it("clicks the remove control beside the chip that names the file", async () => {
+    const { filler } = setup(`<div class="upload"><div class="chip"><span>Priya - Java Developer.pdf</span><button type="button" aria-label="Remove file">×</button></div></div>`);
+    const removed = vi.fn();
+    element("button").addEventListener("click", removed);
+    expect(await filler.removeFile("Priya - Java Developer.pdf")).toBe(true);
+    expect(removed).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes nothing when no chip names that file, or it has no remove control", async () => {
+    const { filler } = setup(`<div><span>someone-else.pdf</span><button type="button">Remove</button></div><div><span>Priya - Java Developer.pdf</span><button type="button">Replace</button></div>`);
+    const clicks = vi.fn();
+    document.querySelectorAll("button").forEach((button) => button.addEventListener("click", clicks));
+    expect(await filler.removeFile("Priya - Data Engineer.pdf")).toBe(false);
+    expect(await filler.removeFile("Priya - Java Developer.pdf")).toBe(false);
+    expect(clicks).not.toHaveBeenCalled();
+  });
+});
+
+describe("taking back a fill another résumé made (07 Q24)", () => {
+  it("puts back what the field held before BenchQ, while it still holds BenchQ's value", async () => {
+    const { filler, rescan } = setup(`<input id="a" aria-label="LinkedIn">`);
+    const { scanId, fields } = rescan();
+    await filler.fill({ scanId, fieldId: fields[0]!.id, write: { type: "text", value: "https://linkedin.com/in/old" }, current: "" });
+    const again = rescan();
+    expect(await filler.takeBack({ scanId: again.scanId, fieldId: again.fields[0]!.id })).toBe(true);
+    expect(element<HTMLInputElement>("#a").value).toBe("");
+    expect(filler.undoCount()).toBe(0);
+  });
+
+  it("leaves a field the BDE changed since, and one BenchQ never filled", async () => {
+    const { filler, rescan } = setup(`<input id="a" aria-label="LinkedIn"><input id="b" aria-label="Phone">`);
+    const { scanId, fields } = rescan();
+    await filler.fill({ scanId, fieldId: fields[0]!.id, write: { type: "text", value: "https://linkedin.com/in/old" }, current: "" });
+    element<HTMLInputElement>("#a").value = "https://linkedin.com/in/mine";
+    const again = rescan();
+    expect(await filler.takeBack({ scanId: again.scanId, fieldId: again.fields[0]!.id })).toBe(false);
+    expect(element<HTMLInputElement>("#a").value).toBe("https://linkedin.com/in/mine");
+    expect(await filler.takeBack({ scanId: again.scanId, fieldId: again.fields[1]!.id })).toBe(false);
+  });
+});
+
 describe("attaching the résumé's file (07 Q49–Q51)", () => {
   /** jsdom has no DataTransfer, and its upload takes only a FileList: the page's own list stands in for both. */
   class FakeTransfer {
