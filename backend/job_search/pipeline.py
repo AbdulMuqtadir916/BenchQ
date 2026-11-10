@@ -1,11 +1,11 @@
-"""One job search (job search PR 1, decided 2026-11-10), run in the background by backend/api/routes_job_search.py
-through `job_monitor.launch_background` (job type `job_search`; its `job_runs` row is the "searching…" state).
+"""One job search (job search PR 1, decided 2026-11-10). The route writes the batch `running` (`open_batch`, in the
+request), then runs `run_search` in the background through `job_monitor.launch_background` (job type `job_search`):
 
     provider.search(query, country, 100)
-      fails  → scrape_jobs (error, code) + ledger entry
+      fails  → the batch finished as error (code) + ledger entry
       answers → read each job; drop closed and unreadable ones; job_id = sha256(company | title | description)
               → one transaction, the candidate row locked (two searches for one candidate count the cap in turn):
-                  scrape_jobs (success | empty, counts in metadata)
+                  the batch finished as success | empty (counts in metadata)
                   a job the candidate has: batch_id, last_seen_at and content replaced; discovered_at kept
                   a new job: inserted while the candidate has room under 100 today, in the provider's order
                   ledger entry
@@ -54,11 +54,34 @@ def _ledger(db, *, firm_id, candidate_id, user_id, batch_id, query, country, sum
                   summary=f"{summary} ({COUNTRY_LABELS.get(country, country)})")
 
 
+def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider) -> ScrapeJob:
+    """The search's row, `running`, written when the BDE starts it (the caller holds the candidate row). Flushed."""
+    batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=uuid.uuid4(),
+                      state="running", meta={"request": _request(query, country, provider)})
+    db.add(batch)
+    db.flush()
+    return batch
+
+
+def _running_batch(db, firm_id, candidate_id, batch_id) -> ScrapeJob | None:
+    """The batch to finish, with its candidate locked; None when it was already finished (marked lost after 15
+    minutes), so a late task writes nothing."""
+    db.query(Candidate.id).filter(Candidate.firm_id == firm_id, Candidate.id == candidate_id).with_for_update().one()
+    batch = db.query(ScrapeJob).filter(ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate_id,
+                                       ScrapeJob.batch_id == batch_id).with_for_update().one_or_none()
+    if batch is None or batch.state != "running":
+        logger.warning("job search batch=%s candidate=%s no longer running; result dropped", batch_id, candidate_id)
+        return None
+    return batch
+
+
 def _save_error(*, firm_id, candidate_id, user_id, batch_id, query, country, provider, code) -> None:
     with SessionLocal() as db:
-        db.add(ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id,
-                         state="error", error=f"{code}: {ERROR_MESSAGES[code]}",
-                         meta={"request": _request(query, country, provider), "error_code": code}))
+        batch = _running_batch(db, firm_id, candidate_id, batch_id)
+        if batch is None:
+            return
+        batch.state, batch.error, batch.finished_at = "error", f"{code}: {ERROR_MESSAGES[code]}", utcnow()
+        batch.meta = {**(batch.meta or {}), "request": _request(query, country, provider), "error_code": code}
         _ledger(db, firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
                 country=country, summary=f"Searched jobs for '{query}': failed ({code})")
         db.commit()
@@ -72,7 +95,7 @@ def _read(provider, raw: dict) -> JobFields | None:
     return fields if fields.title and fields.company and fields.description else None
 
 
-def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider, result: SearchResult) -> dict:
+def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider, result: SearchResult) -> dict | None:
     counts = {"found": len(result.jobs), "saved": 0, "refreshed": 0, "skipped_closed": 0, "skipped_unreadable": 0,
               "skipped_duplicate": 0, "skipped_over_cap": 0}
     # Read and identify every job before the transaction: no lock is held while parsing HTML.
@@ -94,18 +117,18 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
         picked.append((key, clean_json(raw)))
 
     with SessionLocal() as db:
-        db.query(Candidate.id).filter(Candidate.firm_id == firm_id, Candidate.id == candidate_id) \
-            .with_for_update().one()
+        batch = _running_batch(db, firm_id, candidate_id, batch_id)
+        if batch is None:
+            return None
         now = utcnow()
         room = max(0, limits.JOBS_PER_CANDIDATE_PER_DAY - limits.jobs_saved_today(db, firm_id, candidate_id, now))
         existing = {row.job_id: row for row in db.query(JobPosting).filter(
             JobPosting.candidate_id == candidate_id, JobPosting.job_id.in_([k for k, _ in picked]))} if picked else {}
 
-        batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id,
-                          state="success" if result.jobs else "empty",
-                          meta={**clean_json(result.metadata), "request": _request(query, country, provider.name)})
-        db.add(batch)
-        db.flush()                      # the batch row first: job_postings.batch_id references it
+        batch.state, batch.finished_at = ("success" if result.jobs else "empty"), now
+        kept = {k: v for k, v in (batch.meta or {}).items() if k == "run_id"}     # the run → batch link
+        batch.meta = {**clean_json(result.metadata), **kept, "request": _request(query, country, provider.name)}
+        db.flush()
         for key, content in picked:
             row = existing.get(key)
             if row is not None:
@@ -125,11 +148,11 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
     return counts
 
 
-async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uuid.UUID, query: str, country: str,
-                     provider_name: str) -> str:
-    """The background task. Returns the run's summary; a failed search also marks its `job_runs` row failed."""
+async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uuid.UUID, batch_id: uuid.UUID,
+                     query: str, country: str, provider_name: str) -> str:
+    """The background task: finishes the `running` batch `batch_id`. Returns the run's summary; a failed search also
+    marks its `job_runs` row failed."""
     provider = REGISTRY[provider_name]
-    batch_id = uuid.uuid4()
     started = time.monotonic()
     ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
                country=country)
@@ -149,6 +172,8 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
                          type(error).__name__)
             code = "internal"
         else:
+            if counts is None:
+                return "dropped: the search was no longer running"
             logger.info("job search batch=%s candidate=%s provider=%s state=%s found=%d saved=%d refreshed=%d "
                         "over_cap=%d ms=%d", batch_id, candidate_id, provider.name,
                         "success" if result.jobs else "empty", counts["found"], counts["saved"], counts["refreshed"],

@@ -49,7 +49,8 @@ SEED_OVERRIDES = {
     "base_resumes": {"is_active": True, "deleted_at": None, "archived_at": None},
     "resumes": {"category": "BASE", "job_id": None, "deleted_at": None},
     "support_views": {"ended_at": None},
-    "scrape_jobs": {"error": None, "batch_id": SEED_BATCH},   # error only on an error row; the seed's is 'success'
+    # error only on an error row, finished_at on every row but a running one; the seed's is 'success'
+    "scrape_jobs": {"error": None, "batch_id": SEED_BATCH, "finished_at": datetime.now(timezone.utc)},
     # job_id is a SHA256 hex digest (ck_job_postings_job_id_sha256), and batch_id references scrape_jobs.batch_id,
     # not its id, so the seeded posting names the seeded batch.
     "job_postings": {"job_id": "0" * 64, "batch_id": SEED_BATCH},

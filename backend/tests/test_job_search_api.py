@@ -50,18 +50,13 @@ def fake(monkeypatch, test_db):
 
 @pytest.fixture
 def launched(monkeypatch):
-    """POST without the background task: the launch is recorded, and a `job_runs` row says it is running."""
+    """POST without the background task: the launch is recorded; the batch the POST wrote stays `running`."""
     from backend.api import routes_job_search
-    from backend.models.db import JobRun, SessionLocal
     calls = []
 
     def launch(job_type, func, scope_key=None, meta=None, func_kwargs=None, **kw):
         calls.append({"job_type": job_type, "scope_key": scope_key, "meta": meta, "kwargs": func_kwargs})
-        run_id = uuid.uuid4()
-        with SessionLocal() as db:
-            db.add(JobRun(id=run_id, job_type=job_type, trigger="manual", status="running", meta=meta))
-            db.commit()
-        return str(run_id)
+        return str(uuid.uuid4())
     monkeypatch.setattr(routes_job_search, "launch_background", launch)
     return calls
 
@@ -74,10 +69,22 @@ def _post(client, world, candidate, who="adnan", query="Java Developer"):
     return client.post(_url(world, candidate, "job-searches"), json={"query": query}, headers=world["as"][who])
 
 
-def _run(world, candidate, query="Java Developer", country="us", provider="fake"):
+def _open(world, candidate, query="Java Developer", country="us", provider="fake"):
+    """The `running` batch, as the POST writes it."""
+    from backend.models.db import SessionLocal
+    with SessionLocal() as db:
+        batch = pipeline.open_batch(db, firm_id=world["firm"].id, candidate_id=uuid.UUID(candidate["id"]),
+                                    user_id=world["people"]["adnan"].id, query=query, country=country,
+                                    provider=provider)
+        db.commit()
+        return batch.batch_id
+
+
+def _run(world, candidate, query="Java Developer", country="us", provider="fake", batch_id=None):
+    batch_id = batch_id or _open(world, candidate, query, country, provider)
     return asyncio.run(pipeline.run_search(firm_id=world["firm"].id, candidate_id=uuid.UUID(candidate["id"]),
-                                           user_id=world["people"]["adnan"].id, query=query, country=country,
-                                           provider_name=provider))
+                                           user_id=world["people"]["adnan"].id, batch_id=batch_id, query=query,
+                                           country=country, provider_name=provider))
 
 
 @pytest.fixture
@@ -90,14 +97,20 @@ def adnans(anonymous_client, world):
 
 # ── who ──────────────────────────────────────────────────────────────────────
 
-def test_the_candidates_bde_starts_a_search_in_the_background(anonymous_client, world, adnans, fake, launched):
+def test_the_candidates_bde_starts_a_search_in_the_background(anonymous_client, world, adnans, fake, launched,
+                                                              test_db):
+    from backend.models.job_search import ScrapeJob
     r = _post(anonymous_client, world, adnans, query="  Java Developer  ")
     assert r.status_code == 202, r.text
     call = launched[0]
     assert (call["job_type"], call["scope_key"]) == ("job_search", adnans["id"])
     assert call["kwargs"]["query"] == "Java Developer" and call["kwargs"]["country"] == "us"
     assert call["kwargs"]["provider_name"] == "fake" and call["kwargs"]["user_id"] == world["people"]["adnan"].id
-    assert r.json()["run_id"]
+    batch_id = uuid.UUID(r.json()["batch_id"])
+    assert call["kwargs"]["batch_id"] == batch_id and call["meta"]["batch_id"] == str(batch_id)
+    row = test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == batch_id).one()
+    assert (row.state, row.finished_at, row.user_id) == ("running", None, world["people"]["adnan"].id)
+    assert row.meta["run_id"] == r.json()["run_id"] and row.meta["request"]["query"] == "Java Developer"
 
 
 @pytest.mark.parametrize("who", ["owner", "fatima", "rohan"])
@@ -153,13 +166,40 @@ def test_a_second_search_while_one_runs_is_refused(anonymous_client, world, adna
     assert r.status_code == 409 and len(launched) == 1
 
 
-def test_a_running_row_left_by_a_dead_worker_stops_blocking(anonymous_client, world, adnans, fake, launched, test_db):
-    from backend.models.db import JobRun, utcnow
-    test_db.add(JobRun(job_type="job_search", trigger="manual", status="running",
-                       started_at=utcnow() - limits.RUNNING_FOR_AT_MOST - timedelta(minutes=1),
-                       meta={"candidate_id": adnans["id"], "user_id": str(world["people"]["adnan"].id)}))
+def _lose(test_db, batch_id):
+    """The batch started longer ago than a search may run: a restart lost it."""
+    from backend.models.db import utcnow
+    from backend.models.job_search import ScrapeJob
+    test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == batch_id).update(
+        {ScrapeJob.created_at: utcnow() - limits.RUNNING_FOR_AT_MOST - timedelta(minutes=1)})
     test_db.commit()
+
+
+def test_a_search_lost_by_a_restart_stops_blocking_and_becomes_an_error(anonymous_client, world, adnans, fake,
+                                                                        launched, test_db):
+    from backend.models.job_search import ScrapeJob
+    lost = _open(world, adnans)
+    _lose(test_db, lost)
+    body = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["owner"]).json()
+    assert body["running"] is None and (body["searches"][0]["state"], body["searches"][0]["error_code"]) == (
+        "error", "internal")
+    test_db.expire_all()
+    assert test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == lost).one().state == "running"   # a read writes nothing
     assert _post(anonymous_client, world, adnans).status_code == 202
+    test_db.expire_all()
+    row = test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == lost).one()
+    assert (row.state, row.error.split(":")[0]) == ("error", "internal") and row.finished_at is not None
+
+
+def test_a_task_that_finishes_after_its_search_was_marked_lost_writes_nothing(anonymous_client, world, adnans, fake,
+                                                                              launched, test_db):
+    fake.jobs = [_job(1)]
+    lost = _open(world, adnans)
+    _lose(test_db, lost)
+    assert _post(anonymous_client, world, adnans).status_code == 202          # marks it lost
+    assert _run(world, adnans, batch_id=lost) == "dropped: the search was no longer running"
+    _, postings = _rows(test_db, adnans)
+    assert postings == []
 
 
 def test_a_candidate_with_100_new_jobs_today_is_refused_without_a_row(anonymous_client, world, adnans, fake, launched):
@@ -317,6 +357,7 @@ def test_the_history_shows_the_running_search_the_finished_ones_and_todays_usage
     assert _post(anonymous_client, world, adnans, query="Kotlin Developer").status_code == 202
     body = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["fatima"]).json()
     assert body["running"]["query"] == "Kotlin Developer" and body["running"]["state"] == "running"
+    assert body["running"]["finished_at"] is None and body["searches"][0]["finished_at"]
     assert [(s["query"], s["state"], s["error_code"]) for s in body["searches"]] == [
         ("Spring Developer", "error", "timeout"), ("Java Developer", "success", None)]
     usage = body["usage"]
@@ -340,6 +381,8 @@ def test_a_search_runs_in_the_background_and_finishes(anonymous_client, world, a
                 break
         time.sleep(0.05)
     with SessionLocal() as db:
-        assert db.get(JobRun, run_id).status == "completed"
+        run = db.get(JobRun, run_id)
+        assert run.status == "completed" and run.meta["batch_id"] == r.json()["batch_id"]
     body = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["adnan"]).json()
     assert body["running"] is None and body["searches"][0]["counts"]["saved"] == 2
+    assert (body["searches"][0]["state"], body["searches"][0]["run_id"]) == ("success", str(run_id))

@@ -37,10 +37,11 @@ from backend.models.tenancy import _created_at, _pk, _restrict, _updated_at
 
 
 class ScrapeJob(Base):
-    """One row per finished search batch (docs/02 §6.y): logging, not a queue. Written once the batch completes —
-    there is no in-progress state, so a row's existence already means the batch is done. On success the row and
-    the batch's `job_postings` are written in one transaction, this row first (`job_postings.batch_id` references
-    it)."""
+    """One row per search batch (docs/02 §6.y). Written `running` when the BDE starts the search (migration 0022,
+    decided 2026-11-10: the search runs in the background, so its row exists while it runs) and finished in place:
+    `success` / `empty` / `error`, `finished_at` set. On success the finish and the batch's `job_postings` are one
+    transaction (`job_postings.batch_id` references this row). A row left `running` by a restart is marked `error`
+    once it is older than 15 minutes (backend/job_search/limits.py)."""
     __tablename__ = "scrape_jobs"
 
     id = _pk()
@@ -49,18 +50,21 @@ class ScrapeJob(Base):
     # Who ran the search (migration 0022): the candidate's BDE. The BDE's daily attempts are counted from these rows.
     user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
     batch_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
-    # success: the source answered with at least one job | empty: it answered with none | error: it failed
+    # running: started, not finished | success: the source answered with at least one job | empty: it answered with
+    # none | error: it failed
     state = Column(String, nullable=False)
     error = Column(Text, nullable=True)      # the failure detail; set exactly when state = 'error'
     # Everything in the source's response except the jobs themselves (those are job_postings rows): request id,
     # parameters, totals, pagination. `metadata` is reserved on a declarative model, hence the attribute name.
     meta = Column("metadata", JSONB, nullable=False, server_default=text("'{}'::jsonb"))
-    created_at = _created_at()
+    created_at = _created_at()                                        # when the search started
+    finished_at = Column(DateTime(timezone=True), nullable=True)      # set exactly when it isn't running (0022)
 
     __table_args__ = (
         ForeignKeyConstraint(["firm_id", "candidate_id"], ["candidates.firm_id", "candidates.id"],
                              name="fk_scrape_jobs_firm_candidate", ondelete="RESTRICT"),
-        CheckConstraint("state IN ('success', 'empty', 'error')", name="ck_scrape_jobs_state"),
+        CheckConstraint("state IN ('success', 'empty', 'error', 'running')", name="ck_scrape_jobs_state"),
+        CheckConstraint("(state = 'running') = (finished_at IS NULL)", name="ck_scrape_jobs_finished_iff_done"),
         CheckConstraint("(state = 'error') = (error IS NOT NULL)", name="ck_scrape_jobs_error_iff_error"),
         # The target of job_postings' batch key: a posting can only name a batch run for its own candidate and firm.
         UniqueConstraint("firm_id", "candidate_id", "batch_id", name="uq_scrape_jobs_firm_candidate_batch"),

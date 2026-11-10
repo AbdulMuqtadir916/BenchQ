@@ -202,7 +202,8 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     import hashlib
     from backend.models.job_search import JobPosting, ScrapeJob
     batch = ScrapeJob(firm_id=firm.id, candidate_id=candidate.id, user_id=bde.id, batch_id=uuid.uuid4(),
-                      state="success", meta={"request": {"query": f"{tag} Java Developer", "country": "us"}})
+                      state="success", finished_at=utcnow(),
+                      meta={"request": {"query": f"{tag} Java Developer", "country": "us"}})
     db.add(batch)
     db.flush()
     posting = JobPosting(firm_id=firm.id, candidate_id=candidate.id, batch_id=batch.batch_id, source="freehire",

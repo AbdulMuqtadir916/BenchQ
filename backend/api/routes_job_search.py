@@ -1,7 +1,8 @@
 """A candidate's job searches and the jobs they found (job search PR 1; docs/02 §6.y; docs/integration/02-jobs.md).
 Under the candidate's URL: another firm, a candidate outside the principal's scope, or a posting that isn't the
 candidate's is the same 404 as a missing one.
-- POST …/job-searches              start a search `{query}` in the background: 202 `{run_id}`
+- POST …/job-searches              start a search `{query}`: its batch is written `running`, the search runs in the
+                                   background: 202 `{batch_id, run_id}`
 - GET  …/job-searches              the running search, the finished ones (newest first), today's usage and caps
 - GET  …/job-postings?page=&size=  the candidate's jobs, newest first, in the common fields
 - GET  …/job-postings/{posting_id} one job, with its description
@@ -50,8 +51,8 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
                        principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     """Async so the background task starts on the app's loop. Another firm or a candidate out of scope is 404 before
     anything else (never confirm it exists); then `can_search_jobs` (job.search, the candidate's BDE) is 403. The checks
-    run with the candidate row locked, so two POSTs for one candidate take turns: the second sees the first one's
-    running `job_runs` row and gets 409."""
+    and the `running` batch row are one transaction with the candidate row locked, so two POSTs for one candidate take
+    turns: the second sees the first one's `running` row and gets 409, on any worker."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     if not can_search_jobs(principal, candidate):
@@ -61,33 +62,41 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
         raise HTTPException(status_code=422, detail="Add the candidate's country (US, Canada or India) to their "
                                                     "résumé first.")
     now = utcnow()
-    if limits.running_search(db, candidate.id, now) is not None:
+    limits.expire_stale(db, firm_id, candidate.id, now)
+    if limits.running_search(db, firm_id, candidate.id, now) is not None:
         raise HTTPException(status_code=409, detail="A search for this candidate is already running.")
     if limits.jobs_saved_today(db, firm_id, candidate.id, now) >= limits.JOBS_PER_CANDIDATE_PER_DAY:
         raise _too_many(f"{limits.JOBS_PER_CANDIDATE_PER_DAY} jobs saved for this candidate today; {_resets(now)}.")
     if limits.attempts_today(db, firm_id, principal.user_id, now) >= limits.ATTEMPTS_PER_BDE_PER_DAY:
         raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today; {_resets(now)}.")
     provider = providers.active(db)
+    batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
+                                query=body.query, country=country, provider=provider.name)
     try:
+        # The task starts only after this handler returns, so it always finds the batch committed.
         run_id = launch_background(
             limits.JOB_TYPE, pipeline.run_search, scope_key=str(candidate.id),
-            meta={"firm_id": str(firm_id), "candidate_id": str(candidate.id), "user_id": str(principal.user_id),
-                  "query": body.query, "country": country, "provider": provider.name},
+            meta={"firm_id": str(firm_id), "candidate_id": str(candidate.id), "batch_id": str(batch.batch_id)},
             func_kwargs={"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
-                         "query": body.query, "country": country, "provider_name": provider.name})
+                         "batch_id": batch.batch_id, "query": body.query, "country": country,
+                         "provider_name": provider.name})
     except JobAlreadyRunningError:
+        db.rollback()
         raise HTTPException(status_code=409, detail="A search for this candidate is already running.") from None
-    finally:
-        db.commit()                     # releases the candidate row; nothing else was written in this session
-    return {"run_id": str(run_id)}
+    batch.meta = {**batch.meta, "run_id": str(run_id)}      # the run → batch link, both ways
+    db.commit()
+    return {"batch_id": str(batch.batch_id), "run_id": str(run_id)}
 
 
-def _search_json(row: ScrapeJob) -> dict:
+def _search_json(row: ScrapeJob, now=None) -> dict:
     meta = row.meta or {}
     request = meta.get("request") or {}
-    return {"batch_id": str(row.batch_id), "state": row.state, "error_code": meta.get("error_code"),
-            "query": request.get("query"), "country": request.get("country"), "provider": request.get("provider"),
-            "counts": meta.get("counts"), "user_id": str(row.user_id), "created_at": row.created_at.isoformat()}
+    lost = limits.is_lost(row, now)            # shown as the error it becomes; a read writes nothing
+    return {"batch_id": str(row.batch_id), "run_id": meta.get("run_id"), "state": "error" if lost else row.state,
+            "error_code": "internal" if lost else meta.get("error_code"), "query": request.get("query"), "country": request.get("country"),
+            "provider": request.get("provider"), "counts": meta.get("counts"), "user_id": str(row.user_id),
+            "started_at": row.created_at.isoformat(),
+            "finished_at": row.finished_at.isoformat() if row.finished_at else None}
 
 
 @router.get("/job-searches", summary="A candidate's job searches and today's usage")
@@ -96,16 +105,13 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
     now = utcnow()
-    run = limits.running_search(db, candidate.id, now)
-    rows = db.query(ScrapeJob).filter(ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate.id) \
-        .order_by(ScrapeJob.created_at.desc()).limit(HISTORY).all()
-    running = None
+    run = limits.running_search(db, firm_id, candidate.id, now)
+    query = db.query(ScrapeJob).filter(ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate.id)
     if run is not None:
-        meta = run.meta or {}
-        running = {"run_id": str(run.id), "state": "running", "query": meta.get("query"),
-                   "country": meta.get("country"), "user_id": meta.get("user_id"),
-                   "started_at": run.started_at.isoformat()}
-    return {"running": running, "searches": [_search_json(r) for r in rows],
+        query = query.filter(ScrapeJob.id != run.id)
+    rows = query.order_by(ScrapeJob.created_at.desc()).limit(HISTORY).all()
+    return {"running": _search_json(run, now) if run is not None else None,
+            "searches": [_search_json(r, now) for r in rows],
             "usage": limits.usage(db, firm_id, candidate.id, candidate.bde_id, now)}
 
 

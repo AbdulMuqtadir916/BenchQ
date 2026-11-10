@@ -1232,15 +1232,19 @@ export const JobMarkSchema = z.object({
   posting is filtered out before it reaches this table; a posting that closes *after* being stored has no
   automatic signal and stays visible until something else catches it — accepted for now, revisit with a staleness
   rule if it becomes a real problem.
-- **`scrape_jobs` (migration 0020, with `job_postings`):** one row per finished batch — `firm_id`, `candidate_id`,
+- **`scrape_jobs` (migration 0020, with `job_postings`):** one row per batch — `firm_id`, `candidate_id`,
   `user_id` (migration 0022: who ran it, the candidate's BDE; FK `users.id`, NOT NULL), `batch_id` (unique),
   `state` (revised 2026-11-10: `success`, the source answered with at least one job | `empty`, it answered with
   none | `error`, it failed), `error` (text, the failure detail, set exactly when `state = 'error'`: a real failure
   and an empty result never look the same), `metadata` (JSONB, `{}` by
   default: everything in the source's response except the jobs themselves, such as request id, parameters and
-  totals, stored once per batch rather than on every job row), `created_at`. Written once the
-  batch completes; there is no `request`/`pending` row, so this is a log, not a queue. The "search in progress"
-  state is the search's `job_runs` row (job type `job_search`, revised 2026-11-10). `metadata` also carries
+  totals, stored once per batch rather than on every job row), `created_at` (when it started), `finished_at`
+  (migration 0022). **Revised 2026-11-10 (Q18): the search runs in the background, so its row is written `running`
+  when the BDE starts it** and finished in place (`success` / `empty` / `error`); `finished_at` is set exactly when
+  it isn't running (`ck_scrape_jobs_finished_iff_done`). "Is a search running", the attempt count and the history
+  read this table, not `job_runs`. A row still `running` after 15 minutes was lost (a restart): the BDE's next search
+  marks it `error` (`internal`), and reads show it as that error without writing. The search's `job_runs` row (the
+  background launcher's own record) carries the `batch_id`, and the batch carries its `run_id`. `metadata` also carries
   `request` (`query`, `country`, `provider`, `limit`), `counts` (`found`, `saved`, `refreshed`, `skipped_closed`,
   `skipped_unreadable`, `skipped_duplicate`, `skipped_over_cap`) and, on an error, `error_code`; `error` is
   `"<code>: <safe message>"`, never the source's body or URL. One row per batch, not per source: freehire.me is the
@@ -1257,9 +1261,9 @@ export const JobMarkSchema = z.object({
     `freehire`). Every search asks for 100 jobs. One call: 20 s limit, one retry after 2 s on a timeout, a dropped
     connection, 5xx or 429; 5 MB cap; no redirects. Error codes: `timeout`, `provider_unavailable`,
     `provider_rejected`, `bad_response`, `too_large`, `internal`.
-  - **Background:** `POST` returns 202 `{run_id}`; the search runs through `job_monitor.launch_background` (four at
-    once per worker). One search per candidate at a time (409), checked from `job_runs` with the candidate row
-    locked, so it holds across workers.
+  - **Background:** `POST` writes the batch `running` and returns 202 `{batch_id, run_id}`; the search runs through
+    `job_monitor.launch_background` (four at once per worker) and finishes the batch. One search per candidate at a
+    time (409), checked from the `running` row with the candidate row locked, so it holds across workers.
   - **Caps (per day from 6:30 PM IST):** 100 **new** jobs per candidate (a job seen again only refreshes its row);
     20 attempts per BDE, any outcome. Over either is 429 up front, nothing written. A search that reaches the
     candidate's 100 keeps the provider's order and drops the rest (`skipped_over_cap`).
@@ -1271,8 +1275,8 @@ export const JobMarkSchema = z.object({
     `POST /job-searches`, `GET /job-searches` (`running`, `searches` newest first, `usage`: `jobs_saved_today`,
     `jobs_cap`, `attempts_today`, `attempts_cap`, `resets_at`), `GET /job-postings?page=&size=` (newest first,
     common fields, no description), `GET /job-postings/{posting_id}` (with the description).
-  - **Known limit:** the search runs in the API process. A restart loses a search in flight (its `job_runs` row is
-    marked failed and the BDE searches again); a real job queue is the deployment work's.
+  - **Known limit:** the search runs in the API process. A restart loses a search in flight (its batch shows as an
+    `internal` error after 15 minutes and the BDE searches again); a real job queue is the deployment work's.
 
 ## 7. Matching & scoring
 

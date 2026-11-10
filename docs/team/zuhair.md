@@ -41,7 +41,8 @@ by content hash, with everything about the job itself (title, description, locat
 Live source right now: freehire.me. **Built so far:** both tables (0020), and the search pipeline
 (`feat/job-search-pipeline`, migration 0022, docs/02 §6.y "The search pipeline"): `backend/job_search/` (providers
 behind one contract, freehire.me first; `content` is the provider's job as sent, read through its `read()`), the
-background search (`POST …/candidates/{id}/job-searches`, the candidate's BDE only), the caps (100 new jobs per
+background search (`POST …/candidates/{id}/job-searches`, the candidate's BDE only; its `scrape_jobs` row is
+`running` until it finishes), the caps (100 new jobs per
 candidate, 20 attempts per BDE, per 6:30 PM IST day) and the reads (`GET …/job-searches`, `…/job-postings`). **Not yet
 built:** the frontend (PR 2: show the jobs, Apply/Tailor off for them, the Search button frozen while one runs), and
 (PR 3) repointing `applications.job_id` and `job_runs.target_job_id` off the old `jobs` table, retiring
