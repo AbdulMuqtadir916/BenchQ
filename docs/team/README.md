@@ -112,4 +112,5 @@ it. Everyone else reads it.
 | 0017 | Zuhair | The résumé's fields leave `candidates` (`full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`; 07 Q57): a MANUAL base for every candidate without one, empty header fields filled, then the drop | `integrate/resumes` |
 | 0018 | Zuhair | No MANUAL bases (07 Q58): each becomes an UPLOAD base with a generated résumé file; a placeholder next to a real upload is removed; the checks allow UPLOAD and PROMOTED only | `integrate/resumes` |
 | 0019 | Zuhair | Résumé autofill: `resumes.autofill`, the entries the user typed (`{}` on every version; the built answers aren't stored), `candidates.qa_bank` dropped | `feat/resume-autofill` |
-| 0020+ | — | Claim the next number here in your PR | — |
+| 0020 | Zuhair | Job-search tables: `job_postings` and `scrape_jobs` | PR #122 |
+| 0021+ | — | Claim the next number here in your PR | — |
