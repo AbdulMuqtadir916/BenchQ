@@ -301,7 +301,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       isScanRunning.current = false;
       setScanning(false);
     }
-  }, [resumeId, loadAnswers, loadFile, readPage, review]);
+  }, [applicationId, candidateId, resumeId, loadAnswers, loadFile, readPage, review]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void scan(), 0);

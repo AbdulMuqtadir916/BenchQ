@@ -58,6 +58,9 @@ function scrollToResult(card: HTMLElement | null) {
   scroller?.scrollTo?.({ top: 0, behavior });
 }
 
+/** A fill waiting for its résumé's review: which application it's for and which résumé answers it. */
+type PendingFill = { context: string; resumeId: string | null };
+
 /** The connected tab's job and its form, top to bottom: the job, the résumé the answers come from, Autofill, the run as
  * it goes, the résumé and the cover letter, then the rest of the form. The form stays theirs to submit. */
 export default function AutofillPanel({ connection, firmId = null, firmSlug = null, details = null, applicationStatus = "ready", onRetryContext = () => {}, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
@@ -74,46 +77,40 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   const fileName = picked ? resumeFileName(candidateName, picked.title) : null;
   const state = useAutofill({ connection, firmId, resumeId, fileName, onSessionExpired, onAccessLost });
   const { rows, scanning, error, filling, run, outcome, undoable, fillCount, staleCount, needsConfirmation, answeredFrom, reviewedFor, attachment, step } = state;
-  // A run is busy from its first step (taking the old file off) to its last fill.
-  const [isSelectionSyncing, setIsSelectionSyncing] = useState(false);
-  const isWorking = filling || Boolean(step) || isSelectionSyncing;
   const context = `${connection.candidateId}:${connection.applicationId}`;
-  const readyContext = useRef<string | null>(null);
+  // A pick, or another application linked to this tab, waits for its own résumé's review, then fills the form so
+  // nothing of the last one stays (07 Q24). The panel is busy until that fill ends, unless the review failed: then the
+  // BDE can pick again, and Try again picks the fill up.
+  const [pendingFill, setPendingFill] = useState<PendingFill | null>(null);
+  // The application the panel was last ready for, as state, so a new one is seen in the render that shows it.
+  const [readyContext, setReadyContext] = useState<string | null>(null);
+  if (applicationStatus === "ready" && resumes.status === "ready" && readyContext !== context) {
+    setReadyContext(context);
+    if (readyContext !== null) setPendingFill({ context, resumeId: picked?.id ?? null });
+  }
+  const isSelectionSyncing = pendingFill !== null && !(error && !scanning);
+  // A run is busy from its first step (taking the old file off) to its last fill.
+  const isWorking = filling || Boolean(step) || isSelectionSyncing;
   const reviewMatches = canReview && reviewedFor?.applicationId === connection.applicationId
     && reviewedFor.candidateId === connection.candidateId && reviewedFor.resumeId === resumeId;
   const currentRows = reviewMatches ? rows : null;
   const studioUrl = useCallback((versionId: string) => (firmSlug ? resumeStudioUrl(firmSlug, versionId) : null), [firmSlug]);
-  // A pick fills the form at once, once its answers are in, when the form is on the page and it's the right job.
-  const fillOnPick = useRef<{ context: string; resumeId: string | null } | null>(null);
-  // A context change in the same tab must replace values from the previous application only after its résumé is reviewed.
-  useEffect(() => {
-    if (applicationStatus !== "ready" || resumes.status !== "ready") return;
-    const previous = readyContext.current;
-    readyContext.current = context;
-    if (previous && previous !== context) {
-      fillOnPick.current = { context, resumeId: picked?.id ?? null };
-      setIsSelectionSyncing(true);
-    }
-  }, [applicationStatus, resumes.status, context, picked?.id]);
   const pickResume = (id: string) => {
-    fillOnPick.current = { context, resumeId: id };
-    setIsSelectionSyncing(true);
+    setPendingFill({ context, resumeId: id });
     pick(id);
   };
   const { autofill } = state;
+  // The pending fill already started, so each one starts once.
+  const startedFill = useRef<PendingFill | null>(null);
+  // A pick fills the form at once, once its answers are in, when the form is on the page and it's the right job.
   useEffect(() => {
-    const wanted = fillOnPick.current;
-    if (!wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
-    fillOnPick.current = null;
+    const wanted = pendingFill;
+    if (!wanted || startedFill.current === wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
+    startedFill.current = wanted;
     // A new pick fills what it answers and takes back what the old one filled that it doesn't, so nothing stale stays.
-    if (needsConfirmation) {
-      setIsSelectionSyncing(false);
-    } else if (rows?.length && (fillCount > 0 || staleCount > 0)) {
-      void Promise.resolve(autofill()).finally(() => setIsSelectionSyncing(false));
-    } else {
-      setIsSelectionSyncing(false);
-    }
-  }, [context, resumeId, reviewMatches, answeredFrom, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
+    const fill = !needsConfirmation && rows?.length && (fillCount > 0 || staleCount > 0) ? autofill() : undefined;
+    void Promise.resolve(fill).finally(() => setPendingFill((now) => (now === wanted ? null : now)));
+  }, [pendingFill, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
   // The keyboard shortcuts (background.ts), for this tab's job: each clicks its button, so it does nothing when the
   // button couldn't be clicked. Mark applied opens its dialog with Yes focused, so Enter confirms.
   useEffect(() => {
@@ -151,7 +148,8 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   const goTo = (row: ReviewRow) => void state.goToField(row);
   // The attached résumé's Change resume opens the picker at the top, on its list, when there's another to pick (07 Q55).
   const hasOtherResumes = resumes.status === "ready" && resumes.choices.length > 1;
-  const contextChanged = readyContext.current !== null && readyContext.current !== context;
+  // Another application in this tab whose résumés aren't ready yet: the form still holds the last one's fills.
+  const contextChanged = readyContext !== null && readyContext !== context;
   const canApply = applicationStatus === "ready" && !["loading", "unavailable", "missing"].includes(resumes.status)
     && !contextChanged && !isSelectionSyncing;
   const changeResume = () => {

@@ -49,7 +49,7 @@ let element: ReactElement<{ connection: Connection }>;
 type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
   answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
-  step?: string | null;
+  step?: string | null; error?: string;
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
 };
 
@@ -274,6 +274,24 @@ describe("the résumé the answers come from", () => {
     await choose(0);
     update({ fillCount: 1, rows, answeredFrom: "res-9", needsConfirmation: true }, { ...twoResumes, picked: tailored });
     expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("lets the BDE pick again when the picked résumé's answers can't load, and Try again still fills", async () => {
+    const rows = [row("Email", true)];
+    show({ fillCount: 1, rows, answeredFrom: "res-2" }, { onApply: vi.fn() }, twoResumes);
+    await open();
+    await choose(0);
+    // While the pick waits for its answers, the list and Mark applied wait with it.
+    expect(select().disabled).toBe(true);
+    expect(named("Mark applied")).toBeUndefined();
+    // They never came: the review in hand is still the old résumé's.
+    const failed = "Could not load this resume's answers. Try again.";
+    update({ fillCount: 1, rows, answeredFrom: "res-2", error: failed, reviewedFor: { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: "res-2" } }, { ...twoResumes, picked: tailored });
+    expect(select().disabled).toBe(false);
+    expect(named("Mark applied")).toBeDefined();
+    expect(autofill).not.toHaveBeenCalled();
+    update({ fillCount: 1, rows, answeredFrom: "res-9" }, { ...twoResumes, picked: tailored });
+    expect(autofill).toHaveBeenCalledTimes(1);
   });
 
   it("says when the candidate has no résumé yet", () => {

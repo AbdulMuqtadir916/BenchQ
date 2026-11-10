@@ -3,7 +3,7 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getResumeListing, type ResumeListing } from "../api";
-import { useResumes, type Resumes } from "./use-resumes";
+import { useResumes } from "./use-resumes";
 
 vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeListing: vi.fn() }));
 
