@@ -252,17 +252,22 @@ describe("suggestions", () => {
     act(() => { root!.render(<ReviewList rows={rows} isFilling={isFilling} onGoTo={onGoTo} onSuggest={onSuggest} />); });
   };
 
-  it("offers saved answers for a question nothing matched, each a button that fills the field", () => {
+  it("offers saved answers for a question nothing matched, each with what it was saved for and Use", () => {
     showWith([unmatched]);
-    const button = host.querySelector<HTMLButtonElement>("[data-slot='review-suggestions'] button")!;
-    expect(button.textContent).toBe("Willing to work weekends? Yes");
-    act(() => { button.click(); });
+    const box = host.querySelector("[data-slot='review-suggestions']")!;
+    expect(box.textContent).toContain("Saved answers that might fit");
+    expect(box.textContent).toContain("No saved answer matched this question.");
+    expect(box.querySelector("[data-slot='suggestion-answer']")!.textContent).toBe("Yes");
+    expect(box.querySelector("[data-slot='suggestion-question']")!.textContent).toBe("Saved for “Willing to work weekends?”");
+    const use = box.querySelector<HTMLButtonElement>("[data-slot='suggestion-use']")!;
+    expect(use.textContent).toBe("Use");
+    act(() => { use.click(); });
     expect(onSuggest).toHaveBeenCalledWith(unmatched, weekends);
   });
 
   it("waits while a run fills the form", () => {
     showWith([unmatched], true);
-    expect(host.querySelector<HTMLButtonElement>("[data-slot='review-suggestions'] button")!.disabled).toBe(true);
+    expect(host.querySelector<HTMLButtonElement>("[data-slot='suggestion-use']")!.disabled).toBe(true);
   });
 
   it("goes once the field is filled", () => {
@@ -279,12 +284,12 @@ describe("a long saved answer and a long dropdown (07 Q54)", () => {
     document.body.append(host);
     root = createRoot(host);
     act(() => { root!.render(<ReviewList rows={[unmatched]} isFilling={false} onGoTo={onGoTo} onSuggest={vi.fn()} />); });
-    const card = host.querySelector<HTMLButtonElement>("[data-slot='review-suggestions'] li > button")!;
-    expect(card.className).toContain("wrap-anywhere");
-    expect(card.lastElementChild!.className).toBe("line-clamp-4");
+    const answer = host.querySelector("[data-slot='suggestion-answer']")!;
+    expect(answer.className).toContain("wrap-anywhere");
+    expect(answer.className).toContain("line-clamp-4");
     const more = [...host.querySelectorAll<HTMLButtonElement>("button")].find(({ textContent }) => textContent === "Show all")!;
     act(() => { more.click(); });
-    expect(card.lastElementChild!.className).toBe("");
+    expect(answer.className).not.toContain("line-clamp-4");
     expect(more.textContent).toBe("Show less");
   });
 

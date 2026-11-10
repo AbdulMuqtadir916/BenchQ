@@ -19,11 +19,19 @@ const listing: ResumeListing = {
 };
 
 describe("the résumés the picker offers", () => {
-  it("puts this job's tailored résumé first, then each base at its newest version, the one in use marked", () => {
-    expect(resumeChoices(listing, "job-1").map(({ id, label }) => [id, label])).toEqual([
-      ["t1v2", "Tailored for this job · from Base 2 · v2"],
-      ["b1v2", "Base 1 · Java Developer · v2"],
-      ["b2v1", "Base 2 · Backend Engineer · v1 (in use)"],
+  it("puts this job's tailored résumé first, then each base at its newest version, the one in use marked active", () => {
+    expect(resumeChoices(listing, "job-1").map(({ id, label, isActive }) => [id, label, isActive])).toEqual([
+      ["t1v2", "Tailored for this job · from Base 2 · v2", false],
+      ["b1v2", "Base 1 · Java Developer · v2", false],
+      ["b2v1", "Base 2 · Backend Engineer · v1", true],
+    ]);
+  });
+
+  it("heads each row with its role and puts which base or job it is, and its version, under it", () => {
+    expect(resumeChoices(listing, "job-1").map(({ title, meta }) => [title, meta])).toEqual([
+      [null, "Tailored for this job · from Base 2 · v2"],
+      ["Java Developer", "Base 1 · v2"],
+      ["Backend Engineer", "Base 2 · v1"],
     ]);
   });
 

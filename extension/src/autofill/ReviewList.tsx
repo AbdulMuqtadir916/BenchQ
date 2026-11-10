@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { button, MOTION, SOFT_TEXT } from "../ui";
 import ChoicePicker from "./ChoicePicker";
 import { fieldLabel, filledValue } from "./form-memory";
-import { CHEVRON_DOWN_ICON } from "./icons";
+import { CHEVRON_DOWN_ICON, LIGHTBULB_ICON } from "./icons";
 import { Tick } from "./marks";
 import type { BankEntry, ReviewRow } from "./types";
 
@@ -28,8 +28,9 @@ const NOTE = "text-caption text-[var(--color-text-3)] wrap-anywhere";
 /** A value from the form: two lines at most, the rest on hover (07 Q56). */
 const VALUE = `line-clamp-2 wrap-anywhere ${SOFT_TEXT}`;
 const REQUIRED = "flex-none rounded-full bg-[var(--color-surface-3)] px-1.5 text-caption font-[550] text-[var(--color-text-2)]";
-/** A saved answer to use with a click: a card that wraps, never a line cut off at the panel's edge (07 Q54). */
-const ANSWER_CARD = `grid w-full gap-0.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-left text-sm text-[var(--color-text)] wrap-anywhere transition-[background,border-color] ${MOTION} hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] disabled:cursor-not-allowed disabled:opacity-50`;
+/** The saved answers that might fit a question nothing matched: a box of their own, set apart from the field's row. */
+const SUGGESTIONS = "ml-[calc(var(--icon-md)+var(--spacing)*2)] mt-1 grid gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2.5";
+const SUGGESTIONS_TITLE = "flex items-center gap-1.5 text-sm font-[550] text-[var(--color-text)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:text-[var(--color-text-3)]";
 const LINK = "text-caption text-[var(--color-text-2)] underline-offset-2 hover:text-[var(--color-primary)] hover:underline";
 const FOLD = `-mx-1.5 flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-left text-sm font-[550] transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:transition-transform motion-reduce:[&_svg]:transition-none aria-expanded:[&_svg]:rotate-180`;
 /** An answer longer than this shows four lines until "Show all". */
@@ -96,25 +97,31 @@ function Row({ row, ...actions }: RowActions & { row: ReviewRow }) {
 /** Saved answers that might answer a question nothing matched: one click fills the field with one. */
 type SuggestionProps = { row: ReviewRow; isFilling: boolean; onSuggest: (row: ReviewRow, entry: BankEntry) => void };
 
-/** One saved answer: the question it was saved for, small, then the answer on as many lines as it takes. A long one
- * shows four lines until "Show all". */
+/** One saved answer: the answer itself first, on as many lines as it takes (a long one four until "Show all"), the
+ * question it was saved for under it, and Use, which fills the field with it. */
 function Suggestion({ row, entry, isFilling, onSuggest }: SuggestionProps & { entry: BankEntry }) {
   const [isOpen, setIsOpen] = useState(false);
   const isLong = entry.answer.length > LONG_ANSWER || entry.answer.split("\n").length > 4;
-  return <li className="grid justify-items-start gap-0.5">
-    <button type="button" className={ANSWER_CARD} disabled={isFilling} onClick={() => onSuggest(row, entry)}
-      aria-label={`Fill ${fieldLabel(row.field)} with "${entry.answer}", saved for "${entry.question}"`}>
-      <span className="text-caption text-[var(--color-text-3)]">{entry.question}</span>{" "}
-      <span className={isLong && !isOpen ? "line-clamp-4" : undefined}>{entry.answer}</span>
-    </button>
-    {isLong && <button type="button" className={LINK} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>{isOpen ? "Show less" : "Show all"}</button>}
+  return <li data-slot="suggestion" className="flex min-w-0 items-start gap-3 py-2 first:pt-0 last:pb-0">
+    <div className="grid min-w-0 flex-1 justify-items-start gap-0.5">
+      <p data-slot="suggestion-answer" className={`text-body-strong text-[var(--color-text)] wrap-anywhere ${isLong && !isOpen ? "line-clamp-4" : ""}`}>{entry.answer}</p>
+      <p data-slot="suggestion-question" className="text-caption text-[var(--color-text-3)] wrap-anywhere">Saved for “{entry.question}”</p>
+      {isLong && <button type="button" className={LINK} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>{isOpen ? "Show less" : "Show all"}</button>}
+    </div>
+    <button type="button" data-slot="suggestion-use" className={`flex-none ${button("secondary", "compact")}`} disabled={isFilling}
+      aria-label={`Fill ${fieldLabel(row.field)} with "${entry.answer}", saved for "${entry.question}"`} onClick={() => onSuggest(row, entry)}>Use</button>
   </li>;
 }
 
+/** Saved answers that might fit a question nothing matched (07 Q26): what they are in a line, then each one to use or
+ * leave. None is ever filled on its own. */
 function Suggestions({ suggestions, ...props }: SuggestionProps & { suggestions: BankEntry[] }) {
-  return <div data-slot="review-suggestions" className="grid gap-1 pl-[calc(var(--icon-md)+var(--spacing)*2)]">
-    <p className={NOTE}>Saved answers that might fit:</p>
-    <ul className="grid gap-1">{suggestions.map((entry) => <Suggestion key={entry.id} entry={entry} {...props} />)}</ul>
+  return <div data-slot="review-suggestions" className={SUGGESTIONS}>
+    <div className="grid gap-0.5">
+      <p className={SUGGESTIONS_TITLE}>{LIGHTBULB_ICON}Saved answers that might fit</p>
+      <p className={NOTE}>No saved answer matched this question. If one of these answers it, use it.</p>
+    </div>
+    <ul className="grid divide-y divide-[var(--color-border)]">{suggestions.map((entry) => <Suggestion key={entry.id} entry={entry} {...props} />)}</ul>
   </div>;
 }
 

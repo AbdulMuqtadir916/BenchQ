@@ -6,6 +6,11 @@ export const CROSS_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m
 
 export const CHEVRON_DOWN_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>;
 
+export const LIGHTBULB_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+  <path d="M9 18h6M10 22h4" />
+</svg>;
+
 export const SPARKLES_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">
   <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
   <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />

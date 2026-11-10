@@ -1,6 +1,6 @@
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ALERT, button, EYEBROW, MOTION, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON } from "../ui";
-import { CHEVRON_DOWN_ICON, EXTERNAL_ICON, RESUME_ICON } from "./icons";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { ALERT, button, ICON_BUTTON_QUIET, MOTION, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON } from "../ui";
+import { CHECK, CHEVRON_DOWN_ICON, EXTERNAL_ICON, RESUME_ICON } from "./icons";
 import type { ResumeChoice } from "./resume-choices";
 import type { Resumes } from "./use-resumes";
 
@@ -20,8 +20,13 @@ const SECTION = "grid gap-2 rounded-[var(--radius-md)] border border-[var(--colo
 const TITLE = "flex min-w-0 items-center gap-1.5 text-sm font-[550] [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none [&_svg]:text-[var(--color-text-3)]";
 const LINK = `justify-self-start ${button("secondary", "compact")}`;
 /** The résumé in use, as a select: the whole row opens the list (07 Q55). */
-const SELECT = `flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2.5 py-1.5 text-left transition-[background,border-color] ${MOTION} hover:bg-[var(--color-surface-2)] disabled:cursor-not-allowed disabled:opacity-50 [&>svg]:size-[var(--icon-md)] [&>svg]:flex-none [&>svg]:text-[var(--color-text-3)] [&>svg]:transition-transform motion-reduce:[&>svg]:transition-none aria-expanded:[&>svg]:rotate-180`;
-const ROW = "flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1.5";
+const SELECT = `flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2.5 py-1.5 text-left transition-[background,border-color] ${MOTION} hover:bg-[var(--color-surface-2)] disabled:cursor-not-allowed disabled:opacity-50 [&>svg]:size-[var(--icon-md)] [&>svg]:flex-none [&>svg]:text-[var(--color-text-3)] [&>svg]:transition-transform motion-reduce:[&>svg]:transition-none aria-expanded:[&>svg]:rotate-180`;
+const ROW = "flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1.5";
+/** One résumé in the open list: the whole row picks it; the one in use is ticked. */
+const OPTION = `flex min-w-0 flex-1 items-start gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-left transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] aria-pressed:bg-[var(--color-primary-subtle)] disabled:cursor-not-allowed disabled:opacity-50`;
+const TICK = "mt-0.5 flex-none text-[var(--color-primary)] [&_svg]:size-[var(--icon-md)]";
+/** The base in use, tagged as the website tags it (its blue Active tag). */
+const ACTIVE = "flex-none rounded-full bg-[var(--color-primary-subtle)] px-1.5 text-caption font-[550] text-[var(--color-primary-subtle-fg)]";
 
 function Section({ children }: { children: ReactNode }) {
   return <section data-slot="resume-picker" className={SECTION} aria-labelledby="resume-picker-title">
@@ -30,26 +35,36 @@ function Section({ children }: { children: ReactNode }) {
   </section>;
 }
 
-function ViewLink({ url }: { url: string | null }) {
-  return url ? <a className={LINK} href={url} target="_blank" rel="noreferrer">View in BenchQ{EXTERNAL_ICON}</a> : null;
+/** The résumé in BenchQ's studio, as a small icon beside its row. */
+function ViewLink({ url, choice }: { url: string | null; choice: ResumeChoice }) {
+  return url ? <a className={ICON_BUTTON_QUIET} href={url} target="_blank" rel="noreferrer" aria-label={`View ${choice.label} in BenchQ`} title="View in BenchQ">{EXTERNAL_ICON}</a> : null;
 }
 
-/** A résumé as the picker names it: whether it's tailored or a base, then its label. */
+/** A résumé in two lines: its role, Active when it's the base the candidate's workflow uses (picked in BenchQ), then
+ * which base or job it is and its version. Without a role, that second line heads it alone. */
 function Named({ choice }: { choice: ResumeChoice }) {
   return <span className="grid min-w-0 flex-1">
-    <span className={EYEBROW}>{choice.isTailored ? "Tailored" : "Base"}</span>
-    <span data-slot="resume-picked" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{choice.label}</span>
+    <span className="flex min-w-0 items-start gap-1.5">
+      <span data-slot="resume-picked" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{choice.title ?? choice.meta}</span>
+      {choice.isActive && <span data-slot="resume-active" className={ACTIVE}>Active</span>}
+    </span>
+    {choice.title && <span className={`${MUTED_TEXT} wrap-anywhere`}>{choice.meta}</span>}
   </span>;
 }
 
 /** Which résumé Autofill answers from (docs/02 §8.1): closed by default on the one in use, a select-style row whose ▾
- * opens the candidate's résumés, each with Pick (07 Q55). Esc or a pick closes it. Picking reads that résumé's answers
- * and fills the form at once when it's on the page (the panel does that), its file first when BenchQ has one. One
- * résumé is a plain row: there's nothing to change. */
+ * opens the candidate's résumés, one row each (07 Q55). A click or Enter on a row picks it, the arrow keys move through
+ * them, and Esc closes the list. Picking reads that résumé's answers and fills the form at once when it's on the page
+ * (the panel does that), its file first when BenchQ has one. One résumé is a plain row: there's nothing to change. */
 export default function ResumePicker({ resumes, candidateName, resumesUrl, studioUrl, isBusy, onPick, onRetry }: ResumePickerProps) {
   const [isListed, setIsListed] = useState(false);
   const listId = useId();
   const select = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  // The list opens on the résumé in use, so the arrow keys start from it.
+  useEffect(() => {
+    if (isListed) list.current?.querySelector<HTMLButtonElement>("[aria-pressed='true']")?.focus();
+  }, [isListed]);
   if (resumes.status === "loading") {
     return <Section><p className={MUTED_TEXT} role="status">Loading {candidateName}&apos;s resumes…</p></Section>;
   }
@@ -69,44 +84,62 @@ export default function ResumePicker({ resumes, candidateName, resumesUrl, studi
   }
   if (choices.length < 2) {
     return <Section>
-      <div className={ROW}><Named choice={current} /></div>
-      <ViewLink url={studioUrl(current.id)} />
+      <div className="flex min-w-0 items-center gap-1"><div className={ROW}><Named choice={current} /></div><ViewLink url={studioUrl(current.id)} choice={current} /></div>
     </Section>;
   }
   const close = () => {
     setIsListed(false);
     select.current?.focus();
   };
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || !isListed) return;
-    event.preventDefault();
-    event.stopPropagation();
-    close();
+  const onSelectKey = (event: KeyboardEvent) => {
+    if (event.key === "ArrowDown" && !isListed) {
+      event.preventDefault();
+      setIsListed(true);
+    } else if (event.key === "Escape" && isListed) {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+    }
   };
+  const onOptionKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const options = [...(list.current?.querySelectorAll<HTMLButtonElement>("[data-slot='resume-option']") ?? [])];
+    const at = options.indexOf(event.currentTarget);
+    options[event.key === "ArrowDown" ? Math.min(options.length - 1, at + 1) : Math.max(0, at - 1)]?.focus();
+  };
+  // The one in use only closes the list: picking it again would fill the form again.
   const pick = (id: string) => {
     close();
-    onPick(id);
+    if (id !== current.id) onPick(id);
   };
   return <Section>
-    <button ref={select} type="button" data-slot="resume-select" className={SELECT} disabled={isBusy} aria-expanded={isListed}
-      aria-controls={listId} aria-label={`Change the resume. In use: ${current.label}`} onKeyDown={onKeyDown} onClick={() => setIsListed(!isListed)}>
-      <Named choice={current} />
-      {CHEVRON_DOWN_ICON}
-    </button>
-    {isListed ? <ul id={listId} className="grid gap-1.5" aria-label={`${candidateName}'s resumes`}>
+    <div className="flex min-w-0 items-center gap-1">
+      <button ref={select} type="button" data-slot="resume-select" className={SELECT} disabled={isBusy} aria-expanded={isListed}
+        aria-controls={listId} aria-label={`Change the resume. In use: ${current.label}`} onKeyDown={onSelectKey} onClick={() => setIsListed(!isListed)}>
+        <Named choice={current} />
+        {CHEVRON_DOWN_ICON}
+      </button>
+      {!isListed && <ViewLink url={studioUrl(current.id)} choice={current} />}
+    </div>
+    {isListed && <ul ref={list} id={listId} className="grid gap-0.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-1" aria-label={`${candidateName}'s resumes`}>
       {choices.map((choice) => {
         const isPicked = choice.id === current.id;
-        return <li key={choice.id} data-slot="resume-choice" className="grid gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2">
-          <Named choice={choice} />
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button type="button" className={button(isPicked ? "secondary" : "primary", "compact")} disabled={isBusy} aria-pressed={isPicked}
-              onKeyDown={onKeyDown} onClick={() => pick(choice.id)}>
-              {isPicked ? "Picked" : "Pick"}
-            </button>
-            <ViewLink url={studioUrl(choice.id)} />
-          </div>
+        return <li key={choice.id} data-slot="resume-choice" className="flex min-w-0 items-center gap-1">
+          <button type="button" data-slot="resume-option" className={OPTION} disabled={isBusy} aria-pressed={isPicked}
+            onKeyDown={onOptionKey} onClick={() => pick(choice.id)}>
+            <span className={`${TICK} ${isPicked ? "" : "invisible"}`} aria-hidden="true">{CHECK}</span>
+            <Named choice={choice} />
+          </button>
+          <ViewLink url={studioUrl(choice.id)} choice={choice} />
         </li>;
       })}
-    </ul> : <ViewLink url={studioUrl(current.id)} />}
+    </ul>}
   </Section>;
 }
