@@ -1,6 +1,6 @@
 # PR 8: the Activity dashboard, the Managers page, Analytics and Follow-ups removed
 
-Branch: `pr8-activity-dashboard-managers-remove-analytics-followups`, built on `activity-logs/pr7-remove-old-log-tables`.
+Branch: `pr8-dashboards-managers-bdes-remove-analytics-followups`, built on `main`.
 Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 
 ## Scope

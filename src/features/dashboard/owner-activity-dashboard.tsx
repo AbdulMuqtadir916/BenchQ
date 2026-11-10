@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { ChevronRight } from "lucide-react";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonCard } from "@/components/app/skeleton-card";
-import { useEscapeBack } from "@/features/activity/activity-table";
+import { useEscapeBack } from "./activity/use-escape-back";
 import { isBde, isManager } from "@/lib/auth/roles";
 import { can, scopeApplications, scopeCandidates, scopeOf, scopeTeam } from "@/lib/auth/permissions";
 import { useApplications } from "@/lib/hooks/use-applications";
