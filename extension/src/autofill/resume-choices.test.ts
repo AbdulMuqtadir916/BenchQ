@@ -48,9 +48,21 @@ describe("the résumés the picker offers", () => {
       ["b2v1", "Base 2 · Backend Engineer · v1"],
     ]);
     expect(resumeChoices(listing, "job-1", "t1v1").map(({ id }) => id)).toEqual(["t1v2", "t1v1", "b1v2", "b2v1"]);
-    // Not a hidden base's, though, and not another job's tailored résumé.
-    expect(resumeChoices(listing, "job-1", "b3v1").map(({ id }) => id)).toEqual(["t1v2", "b1v2", "b2v1"]);
+    // A hidden base is offered only when the application names its exact version, not another job's tailoring.
+    expect(resumeChoices(listing, "job-1", "b3v1").map(({ id }) => id)).toEqual(["t1v2", "b1v2", "b2v1", "b3v1"]);
     expect(resumeChoices(listing, "job-1", "t2v1").map(({ id }) => id)).toEqual(["t1v2", "b1v2", "b2v1"]);
+  });
+
+  it("offers only the exact hidden-base version named by the application", () => {
+    const choices = resumeChoices(listing, "job-1", "b3v1");
+    expect(choices.map(({ id, label, isActive }) => [id, label, isActive])).toEqual([
+      ["t1v2", "Tailored for this job · from Base 2 · v2", false],
+      ["b1v2", "Base 1 · Java Developer · v2", false],
+      ["b2v1", "Base 2 · Backend Engineer · v1", true],
+      ["b3v1", "Base 3 · hidden · v1", false],
+    ]);
+    expect(defaultResume(choices, "b3v1")).toBe("b3v1");
+    expect(resumeChoices(listing, "job-1", null).some(({ id }) => id === "b3v1")).toBe(false);
   });
 
   it("tags only the newest version of the base in use as active", () => {
@@ -70,7 +82,7 @@ describe("where the picker starts", () => {
 
   it("on an older version the application names, which is offered for it", () => {
     expect(defaultResume(resumeChoices(listing, "job-1", "b1v1"), "b1v1")).toBe("b1v1");
-    expect(defaultResume(resumeChoices(listing, null, "b3v1"), "b3v1")).toBe("b2v1");
+    expect(defaultResume(resumeChoices(listing, null, "b3v1"), "b3v1")).toBe("b3v1");
   });
 
   it("else on this job's tailored résumé, else the base in use", () => {

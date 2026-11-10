@@ -146,8 +146,14 @@ function withMemory(rows: ReviewRow[], memory: TabMemory, resume: string | null,
       edited.add(key);
       handedBack.delete(key);
     }
-    if (row.status !== "ready") return isStale ? { ...row, isStale: true } : row;
     const isOtherResumes = filledFrom.has(key) && filledFrom.get(key) !== resume;
+    // The new context proposes the exact value already on the page. Keep it and update its source instead of taking it
+    // back as stale and leaving the field empty.
+    if (isOtherResumes && row.status === "same") {
+      filledFrom.set(key, resume);
+      return row;
+    }
+    if (row.status !== "ready") return isStale ? { ...row, isStale: true } : row;
     if ((settled.get(key) === current && !isOtherResumes) || (current && edited.has(key))) return { ...row, status: "same" as const };
     if (current && found.has(key) && !settled.has(key)) return { ...row, status: "kept" as const };
     const reason = handedBack.get(key);
@@ -162,11 +168,13 @@ function withMemory(rows: ReviewRow[], memory: TabMemory, resume: string | null,
  * the answers. */
 export function useAutofill({ connection, firmId, resumeId, fileName = null, onSessionExpired, onAccessLost }: Options) {
   const { tabId, applicationId, candidateId, job, confirmedHosts } = connection;
-  // The résumé the review in hand answers from, once a scan has used it: the panel fills on a pick once it's the pick.
+  // The résumé and application context the review in hand answers from; selection changes wait for this exact scan.
   const [answeredFrom, setAnsweredFrom] = useState<string | null | undefined>(undefined);
-  // The résumé a fill comes from. Kept up to date before the scan below runs for a new pick.
-  const resume = useRef(resumeId ?? null);
-  useEffect(() => { resume.current = resumeId ?? null; }, [resumeId]);
+  const [reviewedFor, setReviewedFor] = useState<{ applicationId: string; candidateId: string; resumeId: string | null } | null>(null);
+  const resumeSource = `${applicationId}:${candidateId}:${resumeId ?? "none"}`;
+  // The source of BenchQ's fills includes the linked application: same résumé, different job context can change answers.
+  const resume = useRef(resumeSource);
+  useEffect(() => { resume.current = resumeSource; }, [resumeSource]);
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [scanning, setScanning] = useState(true);
   const [error, setError] = useState("");
@@ -281,6 +289,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
         setSignals(page.signals);
         setBankEmpty(answers.length === 0);
         setAnsweredFrom(resumeId);
+        setReviewedFor({ applicationId, candidateId, resumeId });
         setUnreadableFrames(page.unreadableFrames);
         setUndoable(page.pending);
         setError("");
@@ -654,7 +663,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, [applicationId, watchForm]);
 
   return {
-    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, attachment, attachedFile, step,
+    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, reviewedFor, attachment, attachedFile, step,
     needsConfirmation, fillCount: targets.length, staleCount: (rows ?? []).filter((row) => row.isStale).length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
   };
 }

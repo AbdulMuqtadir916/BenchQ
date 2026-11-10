@@ -8,7 +8,7 @@ import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import AutofillPanel from "./AutofillPanel";
 import type { AppliedForm, Connection, ReviewRow, TabField } from "./types";
 import { useAutofill } from "./use-autofill";
-import { useResumes, type Resumes } from "./use-resumes";
+import { useResumes, type ApplicationContextStatus, type Resumes } from "./use-resumes";
 
 vi.mock("./use-autofill", () => ({ useAutofill: vi.fn() }));
 vi.mock("./use-resumes", () => ({ useResumes: vi.fn() }));
@@ -44,30 +44,33 @@ const oneResume: Resumes = { status: "ready", choices: [base], picked: base };
 let root: Root | null = null;
 let host: HTMLElement;
 let fake: FakeChrome;
-let element: ReactElement;
+let element: ReactElement<{ connection: Connection }>;
 
 type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
   answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
   step?: string | null;
+  reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
 };
 
-function show(state: State, panel: { onApply?: (form: AppliedForm) => void; isApplied?: boolean; applying?: boolean; details?: Application | null } = {}, resumes: Resumes = oneResume) {
-  vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state } as unknown as ReturnType<typeof useAutofill>);
+function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus } = {}, resumes: Resumes = oneResume) {
   vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
+  const applicationStatus = panel.applicationStatus ?? "ready";
+  vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (applicationStatus === "ready" && resumes.status === "ready" ? { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
   fake = fakeChrome();
   vi.stubGlobal("chrome", fake);
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  element = <AutofillPanel connection={connection} firmId="firm-1" firmSlug="acme-staffing" candidateName="Priya" applying={false} isApplied={false} onDisconnect={vi.fn()} onSessionExpired={vi.fn()} onAccessLost={vi.fn()} {...panel} />;
+  element = <AutofillPanel connection={connection} firmId="firm-1" firmSlug="acme-staffing" candidateName="Priya" applying={false} isApplied={false} applicationStatus="ready" onDisconnect={vi.fn()} onSessionExpired={vi.fn()} onAccessLost={vi.fn()} {...panel} />;
   act(() => { root!.render(element); });
 }
 
 /** The panel again with what the hooks now say, as after the BDE's pick. */
 function update(state: State, resumes: Resumes) {
-  vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state } as unknown as ReturnType<typeof useAutofill>);
   vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
+  const appConnection = element.props.connection;
+  vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (resumes.status === "ready" ? { applicationId: appConnection.applicationId, candidateId: appConnection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
   // A copy, so React renders the panel again instead of keeping the one it has.
   element = cloneElement(element);
   act(() => { root!.render(element); });
@@ -144,6 +147,43 @@ describe("the résumé the answers come from", () => {
   /** Picks the résumé on row `index` of the open list. */
   const choose = (index: number) => act(async () => { options()[index]!.click(); });
   const press = (target: Element, key: string) => act(() => { target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })); });
+
+  it("waits for the linked application before enabling fill or Mark applied", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn(), applicationStatus: "loading" }, { status: "loading" });
+    expect(host.querySelector("[data-slot='autofill-run']")).toBeNull();
+    expect(named("Mark applied")).toBeUndefined();
+    expect(vi.mocked(useAutofill).mock.lastCall?.[0].resumeId).toBeUndefined();
+  });
+
+  it("asks to restore a missing named resume instead of using a fallback", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() }, { status: "missing" });
+    expect(host.textContent).toContain("The resume saved with this application is no longer available");
+    expect(host.querySelector("[data-slot='autofill-run']")).toBeNull();
+    expect(named("Mark applied")).toBeUndefined();
+  });
+
+  it("refills after a connected application changes and holds Mark applied until the new résumé is in sync", async () => {
+    let finish!: () => void;
+    autofill.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
+    const rows = [row("Email", true)];
+    show({ fillCount: 1, rows, reviewedFor: { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id } }, { onApply: vi.fn() });
+    expect(autofill).not.toHaveBeenCalled();
+
+    vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows, fillCount: 1, reviewedFor: { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id } } as unknown as ReturnType<typeof useAutofill>);
+    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [base], picked: base }, pick, retry });
+    element = cloneElement(element, { connection: { ...connection, applicationId: "app-2" } });
+    await act(async () => { root!.render(element); });
+
+    expect(autofill).not.toHaveBeenCalled();
+    expect(named("Mark applied")).toBeUndefined();
+    vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows, fillCount: 1, reviewedFor: { applicationId: "app-2", candidateId: "cand-1", resumeId: base.id } } as unknown as ReturnType<typeof useAutofill>);
+    element = cloneElement(element);
+    await act(async () => { root!.render(element); });
+    expect(autofill).toHaveBeenCalledTimes(1);
+    expect(named("Mark applied")).toBeUndefined();
+    await act(async () => { finish(); await Promise.resolve(); });
+    expect(named("Mark applied")).toBeDefined();
+  });
 
   it("shows the one résumé as a plain row, with a way to view it in BenchQ (07 Q55)", () => {
     show({ fillCount: 1 });
@@ -558,7 +598,7 @@ describe("confirming Mark applied", () => {
 
   describe("around a run", () => {
     const rerender = (state: State) => act(() => {
-      vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state } as unknown as ReturnType<typeof useAutofill>);
+      vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id } } as unknown as ReturnType<typeof useAutofill>);
       root!.render(<AutofillPanel connection={connection} candidateName="Priya" applying={false} isApplied={false} onApply={onApply} onDisconnect={vi.fn()} onSessionExpired={vi.fn()} onAccessLost={vi.fn()} />);
     });
     const scrolled = vi.fn();

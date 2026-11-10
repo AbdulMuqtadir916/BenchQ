@@ -34,7 +34,16 @@ export function resumeChoices(listing: ResumeListing, jobId: string | null, name
     // Active is the base in use at its newest version: an older one of it isn't tagged too.
     return { id: version.id, label, meta: `Base ${base.number} · v${version.version}`, isTailored: false, isActive: base.is_active && index === 0, title: title || null };
   }));
-  return [...tailored, ...bases];
+  // A hidden base stays out of the general picker. Keep its exact version available only when this application names it.
+  const namedHidden = listing.bases.flatMap((base) => {
+    if (!base.archived_at) return [];
+    const version = base.versions.find(({ id }) => id === namedId);
+    if (!version) return [];
+    const title = version.title?.trim();
+    const meta = `Base ${base.number} · hidden · v${version.version}`;
+    return [{ id: version.id, label: meta, meta, isTailored: false, isActive: false, title: title || null }];
+  });
+  return [...tailored, ...bases, ...namedHidden];
 }
 
 /** Where the picker starts: the résumé the application names (sent with it, or tailored for its job) when it's on

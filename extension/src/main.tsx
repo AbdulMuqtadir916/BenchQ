@@ -13,6 +13,7 @@ import {
   Session,
 } from "./api";
 import AutofillPanel from "./autofill/AutofillPanel";
+import type { ApplicationContextStatus } from "./autofill/use-resumes";
 import { connectionFor, sendToBackground } from "./autofill/connection-store";
 import { forgetForm } from "./autofill/form-memory";
 import {
@@ -85,7 +86,10 @@ function App() {
   const { connection } = useTabConnection(session?.principal.user_id ?? null);
   const tabCandidateId = connection?.candidateId ?? null;
   const linkedJob =
-    jobs.find((job) => job.id === connection?.applicationId) ?? null;
+    jobs.find((job) => job.id === connection?.applicationId && job.candidate_id === connection?.candidateId) ?? null;
+  const applicationStatus: ApplicationContextStatus = !connection || loading || loadingJobs || selectedCandidateId !== connection.candidateId
+    ? "loading"
+    : linkedJob ? "ready" : "unavailable";
   // Why the dropdown can't be changed. A disabled control takes no focus, so its wrapper does, for the keyboard.
   const candidateLock = connection
     ? "Locked to the linked job's candidate. Click ✕ on the job to change it."
@@ -569,6 +573,8 @@ function App() {
             <AutofillPanel
               key={connection.tabId}
               connection={connection}
+              applicationStatus={applicationStatus}
+              onRetryContext={() => void refresh()}
               firmId={session.principal.firm_id ?? null}
               firmSlug={session.firm?.slug ?? null}
               details={linkedJob}

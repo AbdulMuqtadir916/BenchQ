@@ -14,6 +14,7 @@ type ResumePickerProps = {
   isBusy: boolean;
   onPick: (id: string) => void;
   onRetry: () => void;
+  onRetryContext: () => void;
 };
 
 const SECTION = "grid gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5";
@@ -58,7 +59,7 @@ function Named({ choice }: { choice: ResumeChoice }) {
  * opens the candidate's résumés, one row each (07 Q55). A click or Enter on a row picks it, the arrow keys move through
  * them, and Esc closes the list. Picking reads that résumé's answers and fills the form at once when it's on the page
  * (the panel does that), its file first when BenchQ has one. One résumé is a plain row: there's nothing to change. */
-export default function ResumePicker({ resumes, candidateName, resumesUrl, studioUrl, isBusy, onPick, onRetry }: ResumePickerProps) {
+export default function ResumePicker({ resumes, candidateName, resumesUrl, studioUrl, isBusy, onPick, onRetry, onRetryContext }: ResumePickerProps) {
   const [isListed, setIsListed] = useState(false);
   const listId = useId();
   const select = useRef<HTMLButtonElement>(null);
@@ -74,6 +75,19 @@ export default function ResumePicker({ resumes, candidateName, resumesUrl, studi
     return <Section>
       <p className={ALERT} role="alert">Could not load {candidateName}&apos;s resumes.</p>
       <button type="button" className={TEXT_BUTTON} onClick={onRetry}>Try again</button>
+    </Section>;
+  }
+  if (resumes.status === "unavailable") {
+    return <Section>
+      <p className={ALERT} role="alert">Could not confirm this connected job in BenchQ. Reload it before filling or marking applied.</p>
+      <button type="button" className={TEXT_BUTTON} onClick={onRetryContext}>Reload jobs</button>
+    </Section>;
+  }
+  if (resumes.status === "missing") {
+    return <Section>
+      <p className={ALERT} role="alert">The resume saved with this application is no longer available. Restore it in BenchQ, then reload the resumes before filling.</p>
+      {resumesUrl && <a className={LINK} href={resumesUrl} target="_blank" rel="noreferrer">Open resumes in BenchQ{EXTERNAL_ICON}</a>}
+      <button type="button" className={TEXT_BUTTON} onClick={onRetry}>Reload resumes</button>
     </Section>;
   }
   const { choices, picked } = resumes;

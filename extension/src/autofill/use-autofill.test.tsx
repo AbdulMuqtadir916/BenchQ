@@ -954,6 +954,27 @@ describe("picking another résumé (07 Q24)", () => {
     });
   }
 
+  it("reconsiders fields when the connected application changes, even with the same résumé id", async () => {
+    const onPage = { source: "" };
+    vi.mocked(scanTab).mockImplementation(async () => page([field("source", "How did you hear about us?", "text", onPage.source)], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) => {
+      const value = write.type === "text" ? write.value : "";
+      onPage.source = value;
+      return { status: "filled", current: value };
+    });
+    const first = { ...connection, job: { ...connection.job, source: "linkedin_extension" } };
+    await mount(first, "res-1");
+    await run(() => hook.autofill());
+    expect(onPage.source).toBe("LinkedIn");
+
+    const next = { ...connection, applicationId: "app-2", job: { ...connection.job, source: "indeed" } };
+    await act(async () => { root.render(<Harness value={next} resumeId="res-1" />); });
+    await wait(5);
+    expect(hook.reviewedFor).toEqual({ applicationId: "app-2", candidateId: "cand-1", resumeId: "res-1" });
+    expect(hook.rows![0]).toMatchObject({ status: "ready", proposed: "Indeed" });
+    expect(hook.fillCount).toBe(1);
+  });
+
   it("takes back what the old one filled that the new one doesn't answer, then fills from the new one", async () => {
     vi.mocked(getResumeAnswers).mockImplementation(async (_firm, _candidate, resumeId) =>
       (resumeId === "res-2" ? [custom("Email", "priya@new.test")] : answers));
