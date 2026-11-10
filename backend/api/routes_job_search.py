@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend.api.routes_auth import current_principal
 from backend.api.routes_candidates import _candidate, _member_of
 from backend.auth.policy import can_search_jobs
+from backend.auth.scoping import scoped
 from backend.auth.sessions import Principal
 from backend.job_monitor import JobAlreadyRunningError, launch_background
 from backend.job_search import limits, pipeline, providers
@@ -52,7 +53,9 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
     """Async so the background task starts on the app's loop. Another firm or a candidate out of scope is 404 before
     anything else (never confirm it exists); then `can_search_jobs` (job.search, the candidate's BDE) is 403. The checks
     and the `running` batch row are one transaction with the candidate row locked, so two POSTs for one candidate take
-    turns: the second sees the first one's `running` row and gets 409, on any worker."""
+    turns: the second sees the first one's `running` row and gets 409, on any worker. The BDE is locked too (a Postgres
+    lock on their id, after the candidate's), so two searches of theirs for different candidates count their 20
+    attempts in turn (Abdul's review, P2)."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     if not can_search_jobs(principal, candidate):
@@ -61,6 +64,7 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
     if country is None:
         raise HTTPException(status_code=422, detail="Add the candidate's country (US, Canada or India) to their "
                                                     "résumé first.")
+    limits.lock_bde(db, principal.user_id)
     now = utcnow()
     limits.expire_stale(db, firm_id, candidate.id, now)
     if limits.running_search(db, firm_id, candidate.id, now) is not None:
@@ -73,10 +77,12 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
                                 query=body.query, country=country, provider=provider.name)
     try:
-        # The task starts only after this handler returns, so it always finds the batch committed.
+        # The task starts only after this handler returns, so it always finds the batch committed. The run names
+        # nothing of the firm's (no meta; its scope is the opaque batch id): Super Admin's monitor lists runs across
+        # firms without a support view, so the search's details stay in the firm's own `scrape_jobs` row, which
+        # names the run (Abdul's review, P1).
         run_id = launch_background(
-            limits.JOB_TYPE, pipeline.run_search, scope_key=str(candidate.id),
-            meta={"firm_id": str(firm_id), "candidate_id": str(candidate.id), "batch_id": str(batch.batch_id)},
+            limits.JOB_TYPE, pipeline.run_search, scope_key=str(batch.batch_id),
             func_kwargs={"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
                          "batch_id": batch.batch_id, "query": body.query, "country": country,
                          "provider_name": provider.name})
@@ -106,7 +112,7 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
     candidate = _candidate(db, firm_id, principal, candidate_id)
     now = utcnow()
     run = limits.running_search(db, firm_id, candidate.id, now)
-    query = db.query(ScrapeJob).filter(ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate.id)
+    query = scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.candidate_id == candidate.id)
     if run is not None:
         query = query.filter(ScrapeJob.id != run.id)
     rows = query.order_by(ScrapeJob.created_at.desc()).limit(HISTORY).all()
@@ -137,7 +143,7 @@ def list_postings(firm_id: uuid.UUID, candidate_id: uuid.UUID, page: int = Query
                   db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
-    query = db.query(JobPosting).filter(JobPosting.firm_id == firm_id, JobPosting.candidate_id == candidate.id)
+    query = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id == candidate.id)
     total = query.with_entities(func.count(JobPosting.id)).scalar()
     rows = query.order_by(JobPosting.discovered_at.desc(), JobPosting.id).offset((page - 1) * size).limit(size).all()
     return {"items": [_posting_json(r, with_description=False) for r in rows], "total": total, "page": page,
@@ -149,7 +155,7 @@ def get_posting(firm_id: uuid.UUID, candidate_id: uuid.UUID, posting_id: uuid.UU
                 principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
-    row = db.query(JobPosting).filter(JobPosting.firm_id == firm_id, JobPosting.candidate_id == candidate.id,
+    row = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id == candidate.id,
                                       JobPosting.id == posting_id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Not found.")

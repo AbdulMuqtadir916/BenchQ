@@ -29,6 +29,7 @@ from backend.auth.tokens import hash_token, new_token
 from backend.config import IS_PRODUCTION
 from backend.models.db import SessionLocal, utcnow, Resume
 from backend.models.candidates import BaseResume, Candidate, ResumeParse
+from backend.models.job_search import JobPosting, ScrapeJob
 from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, Session, User
 
 DEMO_PASSWORD = "benchq-demo-2026"                                     # docs/03 §3.2
@@ -82,6 +83,9 @@ def reset(db) -> None:
     db.query(Resume).filter(Resume.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(BaseResume).filter(BaseResume.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(ResumeParse).filter(ResumeParse.firm_id.in_(firm_ids)).delete(synchronize_session=False)
+    # Their job searches: the postings, then the batches they name (both RESTRICT on the candidate).
+    db.query(JobPosting).filter(JobPosting.firm_id.in_(firm_ids)).delete(synchronize_session=False)
+    db.query(ScrapeJob).filter(ScrapeJob.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Candidate).filter(Candidate.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Invite).filter(or_(Invite.id.in_(fixture_ids["invites"]), Invite.firm_id.in_(firm_ids))) \
         .delete(synchronize_session=False)

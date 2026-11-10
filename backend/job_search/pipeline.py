@@ -19,6 +19,7 @@ import time
 import uuid
 
 from backend.auth import ledger
+from backend.auth.scoping import scoped
 from backend.job_monitor import mark_run_failed
 from backend.job_search import limits
 from backend.job_search.providers import REGISTRY, JobFields, ProviderError, SearchResult
@@ -66,9 +67,9 @@ def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider) 
 def _running_batch(db, firm_id, candidate_id, batch_id) -> ScrapeJob | None:
     """The batch to finish, with its candidate locked; None when it was already finished (marked lost after 15
     minutes), so a late task writes nothing."""
-    db.query(Candidate.id).filter(Candidate.firm_id == firm_id, Candidate.id == candidate_id).with_for_update().one()
-    batch = db.query(ScrapeJob).filter(ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate_id,
-                                       ScrapeJob.batch_id == batch_id).with_for_update().one_or_none()
+    scoped(db, Candidate, firm_id, Candidate.id).filter(Candidate.id == candidate_id).with_for_update().one()
+    batch = scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.candidate_id == candidate_id,
+                                                 ScrapeJob.batch_id == batch_id).with_for_update().one_or_none()
     if batch is None or batch.state != "running":
         logger.warning("job search batch=%s candidate=%s no longer running; result dropped", batch_id, candidate_id)
         return None
@@ -122,7 +123,7 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
             return None
         now = utcnow()
         room = max(0, limits.JOBS_PER_CANDIDATE_PER_DAY - limits.jobs_saved_today(db, firm_id, candidate_id, now))
-        existing = {row.job_id: row for row in db.query(JobPosting).filter(
+        existing = {row.job_id: row for row in scoped(db, JobPosting, firm_id).filter(
             JobPosting.candidate_id == candidate_id, JobPosting.job_id.in_([k for k, _ in picked]))} if picked else {}
 
         batch.state, batch.finished_at = ("success" if result.jobs else "empty"), now

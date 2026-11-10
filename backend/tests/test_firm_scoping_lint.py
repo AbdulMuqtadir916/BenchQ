@@ -46,7 +46,8 @@ def _firm_owned_models() -> set[str]:
     for mapper in Base.registry.mappers:
         column = mapper.columns.get("firm_id")
         if column is not None and not column.nullable and mapper.class_.__module__ in (
-                "backend.models.db", "backend.models.tenancy", "backend.models.candidates") \
+                "backend.models.db", "backend.models.tenancy", "backend.models.candidates",
+                "backend.models.job_search") \
                 and mapper.class_.__tablename__ in _F2B_TABLES:
             names.add(mapper.class_.__name__)
     return names
@@ -61,7 +62,9 @@ _F2B_TABLES = {"searches", "applications", "interviews", "resumes", "cover_lette
                # The candidate core (docs/team/00-candidate-core.md, migration 0007).
                "candidate_jobs", "favorite_jobs", "candidate_mailboxes", "inbox_messages",
                # Résumé versioning (docs/team/resume-versioning.md, migration 0008).
-               "base_resumes", "candidate_google_oauth_attempts", "application_reviews", "application_status_events"}
+               "base_resumes", "candidate_google_oauth_attempts", "application_reviews", "application_status_events",
+               # Job search (migration 0020, Abdul's review of job search PR 1).
+               "job_postings", "scrape_jobs"}
 # Firm-owned although `firm_id` may be null: a ledger entry with no firm is a platform-only event (A13), and a
 # firm route must still read only its own firm's entries.
 _NULLABLE_FIRM_OWNED = {"LedgerEntry"}
@@ -104,7 +107,9 @@ def test_the_firm_owned_models_are_known():
                                     # The candidate core (migration 0007).
                                     "CandidateJob", "FavoriteJob", "CandidateMailbox", "InboxMessage",
                                     # Résumé versioning (migration 0008).
-                                    "BaseResume", "CandidateGoogleOAuthAttempt", "ApplicationReview", "ApplicationStatusEvent"}
+                                    "BaseResume", "CandidateGoogleOAuthAttempt", "ApplicationReview", "ApplicationStatusEvent",
+                                    # Job search (migration 0020).
+                                    "JobPosting", "ScrapeJob"}
 
 
 def test_routes_read_firm_rows_only_through_scoped():
