@@ -196,3 +196,16 @@ def test_the_cap_holds_when_two_searches_finish_together(world, adnans, fake, te
     asyncio.run(both())
     _, postings = _rows(test_db, adnans)
     assert len(postings) == 100
+
+
+def test_one_bdes_captures_for_two_candidates_at_once_count_their_20_in_turn(anonymous_client, world, adnans):
+    """At 19 of 20 captures, two captures for two different candidates of the same BDE: exactly one gets in."""
+    from backend.job_search import limits
+    other = _create(anonymous_client, world, bde="adnan").json()
+    for n in range(limits.CAPTURES_PER_BDE_PER_DAY - 1):
+        r = anonymous_client.post(_url(world, adnans, "job-postings"), json=_capture_body(description=f"Job {n}."),
+                                  headers=world["as"]["adnan"])
+        assert r.status_code == 201
+    results = _at_once([_poster(anonymous_client, world, adnans, "job-postings", _capture_body(description="A.")),
+                        _poster(anonymous_client, world, other, "job-postings", _capture_body(description="B."))])
+    assert sorted(r.status_code for r in results) == [201, 429]

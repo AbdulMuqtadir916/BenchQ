@@ -1253,8 +1253,10 @@ export const JobMarkSchema = z.object({
   when the BDE starts it** and finished in place (`success` / `empty` / `error`); `finished_at` is set exactly when
   it isn't running (`ck_scrape_jobs_finished_iff_done`). "Is a search running", the attempt count and the history
   read this table, not `job_runs`. A row still `running` after 15 minutes was lost (a restart): the BDE's next search
-  marks it `error` (`internal`), and reads show it as that error without writing. The search's `job_runs` row (the
-  background launcher's own record) carries the `batch_id`, and the batch carries its `run_id`. `metadata` also carries
+  marks it `error` (`internal`), and reads show it as that error without writing. The batch carries its `run_id`;
+  the search's `job_runs` row (the background launcher's own record) names nothing of the firm's, no `meta` and the
+  opaque `batch_id` as its scope, because Super Admin's monitor lists runs across firms without a support view
+  (Abdul's review, P1). `metadata` also carries
   `request` (`query`, `country`, `provider`, `limit`), `counts` (`found`, `saved`, `refreshed`, `skipped_closed`,
   `skipped_unreadable`, `skipped_duplicate`, `skipped_over_cap`) and, on an error, `error_code`; `error` is
   `"<code>: <safe message>"`, never the source's body or URL. One row per batch, not per source: freehire.me is the
@@ -1268,12 +1270,15 @@ export const JobMarkSchema = z.object({
     (`Candidate.country`: the active base, newest version) mapped to `us` / `ca` / `in`; empty or anything else is
     422, never a default.
   - **Provider:** a registry by name; the active one is the global setting `job_search_provider` (default
-    `freehire`). Every search asks for 100 jobs. One call: 20 s limit, one retry after 2 s on a timeout, a dropped
+    `freehire`), a PLATFORM setting (`settings_scope.py`) that `PATCH /api/settings` takes only as a registered
+    provider. Every search asks for 100 jobs. One call: 20 s limit, one retry after 2 s on a timeout, a dropped
     connection, 5xx or 429; 5 MB cap; no redirects. Error codes: `timeout`, `provider_unavailable`,
     `provider_rejected`, `bad_response`, `too_large`, `internal`.
   - **Background:** `POST` writes the batch `running` and returns 202 `{batch_id, run_id}`; the search runs through
     `job_monitor.launch_background` (four at once per worker) and finishes the batch. One search per candidate at a
-    time (409), checked from the `running` row with the candidate row locked, so it holds across workers.
+    time (409), checked from the `running` row with the candidate row locked, so it holds across workers. The BDE
+    is locked too (a Postgres advisory lock on their id, after the candidate), so two of their searches for
+    different candidates count the 20 attempts in turn (Abdul's review, P2).
   - **Caps (per day from 6:30 PM IST):** 100 **new** jobs per candidate (a job seen again only refreshes its row);
     20 attempts per BDE, any outcome. Over either is 429 up front, nothing written. A search that reaches the
     candidate's 100 keeps the provider's order and drops the rest (`skipped_over_cap`).

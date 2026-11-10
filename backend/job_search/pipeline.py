@@ -19,6 +19,7 @@ import time
 import uuid
 
 from backend.auth import ledger
+from backend.auth.scoping import scoped
 from backend.job_monitor import mark_run_failed
 from backend.job_search import limits
 from backend.job_search.providers import READERS, REGISTRY, JobFields, ProviderError, SearchResult
@@ -56,8 +57,8 @@ def _continue_from(db, firm_id, candidate_id, query: str, country: str, provider
     """Where a search of this role continues today (decided 2026-11-10, Q11 (A)): after the last finished search of
     the same role, country and provider since 6:30 PM IST. (None, False) to start from the top; (None, True) when the
     source had nothing more. A failed search doesn't move it, so a retry asks for the same page."""
-    rows = db.query(ScrapeJob).filter(
-        ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate_id, ScrapeJob.kind == "search",
+    rows = scoped(db, ScrapeJob, firm_id).filter(
+        ScrapeJob.candidate_id == candidate_id, ScrapeJob.kind == "search",
         ScrapeJob.state.in_(("success", "empty")), ScrapeJob.created_at >= limits.day_start(),
     ).order_by(ScrapeJob.created_at.desc()).all()
     for row in rows:
@@ -91,9 +92,9 @@ def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider) 
 def _running_batch(db, firm_id, candidate_id, batch_id) -> ScrapeJob | None:
     """The batch to finish, with its candidate locked; None when it was already finished (marked lost after 15
     minutes), so a late task writes nothing."""
-    db.query(Candidate.id).filter(Candidate.firm_id == firm_id, Candidate.id == candidate_id).with_for_update().one()
-    batch = db.query(ScrapeJob).filter(ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate_id,
-                                       ScrapeJob.batch_id == batch_id).with_for_update().one_or_none()
+    scoped(db, Candidate, firm_id, Candidate.id).filter(Candidate.id == candidate_id).with_for_update().one()
+    batch = scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.candidate_id == candidate_id,
+                                                 ScrapeJob.batch_id == batch_id).with_for_update().one_or_none()
     if batch is None or batch.state != "running":
         logger.warning("job search batch=%s candidate=%s no longer running; result dropped", batch_id, candidate_id)
         return None
@@ -147,7 +148,7 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
             return None
         now = utcnow()
         room = max(0, limits.JOBS_PER_CANDIDATE_PER_DAY - limits.jobs_saved_today(db, firm_id, candidate_id, now))
-        existing = {row.job_id: row for row in db.query(JobPosting).filter(
+        existing = {row.job_id: row for row in scoped(db, JobPosting, firm_id).filter(
             JobPosting.candidate_id == candidate_id, JobPosting.job_id.in_([k for k, _ in picked]))} if picked else {}
 
         batch.state, batch.finished_at = ("success" if result.jobs else "empty"), now
@@ -180,7 +181,8 @@ def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict) -> tu
     content = clean_json({k: v for k, v in job.items() if v is not None})
     fields = READERS[source].read(content)
     key = job_id(fields)
-    existing = db.query(JobPosting).filter(JobPosting.candidate_id == candidate_id, JobPosting.job_id == key).first()
+    existing = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id == candidate_id,
+                                                      JobPosting.job_id == key).first()
     if existing is not None:
         return existing, False
     now = utcnow()
@@ -199,9 +201,9 @@ def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict) -> tu
     return posting, True
 
 
-def _request_of(batch_id) -> dict:
+def _request_of(firm_id, batch_id) -> dict:
     with SessionLocal() as db:
-        meta = db.query(ScrapeJob.meta).filter(ScrapeJob.batch_id == batch_id).scalar() or {}
+        meta = scoped(db, ScrapeJob, firm_id, ScrapeJob.meta).filter(ScrapeJob.batch_id == batch_id).scalar() or {}
     return meta.get("request") or {}
 
 
@@ -211,7 +213,7 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
     marks its `job_runs` row failed."""
     provider = REGISTRY[provider_name]
     started = time.monotonic()
-    request = await asyncio.to_thread(_request_of, batch_id)
+    request = await asyncio.to_thread(_request_of, firm_id, batch_id)
     cursor, exhausted = request.get("cursor"), bool(request.get("exhausted"))
     ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
                country=country)

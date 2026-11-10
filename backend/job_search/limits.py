@@ -16,9 +16,10 @@ The day starts at 6:30 PM IST, the start of the BDE's shift, so one night's work
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from backend.job_search.providers.base import ERROR_MESSAGES
+from backend.auth.scoping import scoped
 from backend.job_search.providers.capture import CAPTURE_SOURCES
 from backend.models.db import utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
@@ -46,17 +47,17 @@ def next_reset(now: datetime | None = None) -> datetime:
 
 
 def jobs_saved_today(db, firm_id, candidate_id, now: datetime | None = None) -> int:
-    return db.query(func.count(JobPosting.id)).filter(
-        JobPosting.firm_id == firm_id, JobPosting.candidate_id == candidate_id,
-        JobPosting.discovered_at >= day_start(now), JobPosting.source.notin_(CAPTURE_SOURCES)).scalar()
+    return scoped(db, JobPosting, firm_id, func.count(JobPosting.id)).filter(
+        JobPosting.candidate_id == candidate_id, JobPosting.discovered_at >= day_start(now),
+        JobPosting.source.notin_(CAPTURE_SOURCES)).scalar()
 
 
 def expire_stale(db, firm_id, candidate_id, now: datetime | None = None) -> int:
     """Mark the candidate's lost searches (`running` for longer than RUNNING_FOR_AT_MOST) as `error`. Flushed, not
     committed. Returns how many."""
     now = now or utcnow()
-    return db.query(ScrapeJob).filter(
-        ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate_id, ScrapeJob.state == "running",
+    return scoped(db, ScrapeJob, firm_id).filter(
+        ScrapeJob.candidate_id == candidate_id, ScrapeJob.state == "running",
         ScrapeJob.kind == "search", ScrapeJob.created_at < now - RUNNING_FOR_AT_MOST,
     ).update({ScrapeJob.state: "error", ScrapeJob.error: f"internal: {ERROR_MESSAGES['internal']}",
               ScrapeJob.finished_at: now}, synchronize_session=False)
@@ -68,16 +69,29 @@ def is_lost(batch: ScrapeJob, now: datetime | None = None) -> bool:
 
 def running_search(db, firm_id, candidate_id, now: datetime | None = None) -> ScrapeJob | None:
     """The candidate's search still running, whichever worker runs it (a lost one doesn't count)."""
-    return db.query(ScrapeJob).filter(
-        ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate_id, ScrapeJob.state == "running",
+    return scoped(db, ScrapeJob, firm_id).filter(
+        ScrapeJob.candidate_id == candidate_id, ScrapeJob.state == "running",
         ScrapeJob.kind == "search", ScrapeJob.created_at >= (now or utcnow()) - RUNNING_FOR_AT_MOST,
     ).order_by(ScrapeJob.created_at.desc()).first()
 
 
+def lock_bde(db, user_id) -> None:
+    """Hold the BDE's admission lock until the transaction ends (a Postgres advisory lock on their id; the users row
+    isn't touched). Taken after the candidate's row, in every route (searches and captures), so two of one BDE's
+    requests for different candidates, on any worker, count the daily caps in turn (Abdul's review, P2)."""
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(user_id)})
+
+
+def _lock_key(user_id) -> int:
+    """A signed 64-bit key from the user's id, in its own namespace (the top bits say "job search BDE")."""
+    import uuid as _uuid
+    return ((0x4A53 << 48) | (_uuid.UUID(str(user_id)).int & 0xFFFFFFFFFFFF)) - (1 << 63)
+
+
 def _today(db, firm_id, user_id, kind: str, now: datetime | None = None) -> int:
-    return db.query(func.count(ScrapeJob.id)).filter(
-        ScrapeJob.firm_id == firm_id, ScrapeJob.user_id == user_id, ScrapeJob.kind == kind,
-        ScrapeJob.created_at >= day_start(now)).scalar()
+    """The BDE's searches or captures started since the day started, whatever became of them: counted by start."""
+    return scoped(db, ScrapeJob, firm_id, func.count(ScrapeJob.id)).filter(
+        ScrapeJob.user_id == user_id, ScrapeJob.kind == kind, ScrapeJob.created_at >= day_start(now)).scalar()
 
 
 def attempts_today(db, firm_id, user_id, now: datetime | None = None) -> int:

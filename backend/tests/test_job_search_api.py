@@ -107,11 +107,11 @@ def test_the_candidates_bde_starts_a_search_in_the_background(anonymous_client, 
     r = _post(anonymous_client, world, adnans, query="  Java Developer  ")
     assert r.status_code == 202, r.text
     call = launched[0]
-    assert (call["job_type"], call["scope_key"]) == ("job_search", adnans["id"])
+    assert call["job_type"] == "job_search" and call["meta"] is None      # the run names nothing of the firm's
     assert call["kwargs"]["query"] == "Java Developer" and call["kwargs"]["country"] == "us"
     assert call["kwargs"]["provider_name"] == "fake" and call["kwargs"]["user_id"] == world["people"]["adnan"].id
     batch_id = uuid.UUID(r.json()["batch_id"])
-    assert call["kwargs"]["batch_id"] == batch_id and call["meta"]["batch_id"] == str(batch_id)
+    assert call["kwargs"]["batch_id"] == batch_id and call["scope_key"] == str(batch_id)
     row = test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == batch_id).one()
     assert (row.state, row.finished_at, row.user_id) == ("running", None, world["people"]["adnan"].id)
     assert row.meta["run_id"] == r.json()["run_id"] and row.meta["request"]["query"] == "Java Developer"
@@ -387,7 +387,7 @@ def test_a_search_runs_in_the_background_and_finishes(anonymous_client, world, a
         time.sleep(0.05)
     with SessionLocal() as db:
         run = db.get(JobRun, run_id)
-        assert run.status == "completed" and run.meta["batch_id"] == r.json()["batch_id"]
+        assert run.status == "completed" and run.meta is None
     body = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["adnan"]).json()
     assert body["running"] is None and body["searches"][0]["counts"]["saved"] == 2
     assert (body["searches"][0]["state"], body["searches"][0]["run_id"]) == ("success", str(run_id))
