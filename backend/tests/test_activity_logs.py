@@ -17,6 +17,7 @@ from backend.auth import ledger
 from backend.logging_setup import request_id
 from backend.models.candidates import Candidate
 from backend.models.tenancy import ActivityEntry, Firm, User
+from backend.tests.resume_support import make_version
 from backend.tests.auth_support import make_firm, make_plan, make_user
 from backend.tests.scratch_db import _admin_engine, _url_for
 
@@ -55,6 +56,9 @@ def firm(test_db, accounts):
                          created_by_user_id=owner.id, full_name=name, work_auth="H1B")
     asha, ravi = person("Asha", mira, bea), person("Ravi", zed, cara)
     test_db.add_all([asha, ravi])
+    test_db.flush()
+    for candidate, name in ((asha, "Asha"), (ravi, "Ravi")):     # the name lives on the résumé (07 Q57)
+        make_version(test_db, acme.id, candidate=candidate, candidate_name=name)
     test_db.commit()
     return type("World", (), dict(id=acme.id, owner=owner, mira=mira, zed=zed, bea=bea, ben=ben, cara=cara, viewer=viewer,
                                   asha=asha, ravi=ravi, url=f"/api/firms/{acme.id}/ledger"))
@@ -481,10 +485,13 @@ def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0015)
         manager = make_user(db, firm, email="m@copied.test", role="MANAGER", name="Mira")
         bde = make_user(db, firm, email="b@copied.test", role="BDE", name="Bea")
         bde.manager_id = manager.id
+        # At 0015 the name is still a column the model no longer has (main's 0017 moved it to the résumé).
+        db.execute(text("ALTER TABLE candidates ALTER COLUMN full_name SET DEFAULT 'Asha'"))
         candidate = Candidate(firm_id=firm.id, manager_id=manager.id, bde_id=bde.id, created_by_user_id=manager.id,
-                              full_name="Asha", work_auth="H1B")
+                              work_auth="H1B")
         db.add(candidate)
         db.flush()
+        db.execute(text("ALTER TABLE candidates ALTER COLUMN full_name DROP DEFAULT"))
         when = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
         entry_id, firm_id, manager_id, bde_id, candidate_id = uuid.uuid4(), firm.id, manager.id, bde.id, candidate.id
         db.commit()

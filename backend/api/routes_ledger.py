@@ -26,6 +26,7 @@ from backend.auth import support
 from backend.auth.scoping import own_scope, reader_firm_id, scoped, team_scope
 from backend.auth.serialize import EPOCH, ledger_entry_json
 from backend.auth.sessions import Principal
+from backend.candidates import profile
 from backend.models.candidates import Candidate
 from backend.models.db import get_db
 from backend.models.tenancy import LEDGER_ACTOR_TYPES, SUPER_ADMIN_ONLY_ACTIONS, ActivityEntry, Firm, User
@@ -138,9 +139,11 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     column = SORTS[sort]
     entries = entries.order_by(column.asc() if direction == "asc" else column.desc(), ActivityEntry.created_at.desc(),
                                ActivityEntry.id.desc()).offset(offset).limit(limit).all()
-    # The log keeps the candidate's id; the name shown is the one they have now.
+    # The log keeps the candidate's id; the name shown is the one they have now, from their résumé (07 Q57).
     ids = {entry.candidate_id for entry in entries if entry.candidate_id is not None}
-    names = dict(scoped(db, Candidate, my_firm, Candidate.id, Candidate.full_name).filter(Candidate.id.in_(ids)).all())
+    named = scoped(db, Candidate, my_firm).filter(Candidate.id.in_(ids)).all()
+    profile.prime(db, my_firm, named)
+    names = {candidate.id: candidate.full_name for candidate in named}
     return [ledger_entry_json(e, hide_email=principal.support_view_id is not None,
                               candidate_name=names.get(e.candidate_id)) for e in entries]
 
@@ -200,6 +203,12 @@ def ledger_candidates(firm_id: uuid.UUID, filters: Filters = Depends(),
         raise HTTPException(status_code=404, detail="Not found.")
     entries = _visible(db, principal, my_firm, filters, candidate=False)
     ids = entries.filter(ActivityEntry.candidate_id.isnot(None)).with_entities(ActivityEntry.candidate_id).distinct()
-    rows = scoped(db, Candidate, my_firm, Candidate.id, Candidate.full_name) \
-        .filter(Candidate.id.in_(ids.scalar_subquery())).order_by(Candidate.full_name, Candidate.id)
-    return [{"id": str(row.id), "name": row.full_name} for row in rows]
+    rows = scoped(db, Candidate, my_firm).filter(Candidate.id.in_(ids.scalar_subquery())).all()
+    profile.prime(db, my_firm, rows)
+    return candidate_options(rows)
+
+
+def candidate_options(candidates) -> list[dict]:
+    """Candidates by name: the name is the résumé's (07 Q57), so it is sorted here, not in the query."""
+    named = sorted(((candidate.full_name, str(candidate.id)) for candidate in candidates), key=lambda row: (row[0].lower(), row[1]))
+    return [{"id": candidate_id, "name": name} for name, candidate_id in named]
