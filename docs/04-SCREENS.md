@@ -112,6 +112,7 @@ gets built in Phase 1, not as a nice-to-have at the end.
 | `⌘K` | Command palette | Global |
 | `g` then `d` | Go to dashboard | Global |
 | `g` then `m` | Go to managers (OWNER) | Global |
+| `g` then `b` | Go to BDEs (MANAGER) | Global |
 | `g` then `c` | Go to candidates | Global |
 | `g` then `j` | Go to jobs | Global |
 | `g` then `a` | Go to applications | Global |
