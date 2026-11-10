@@ -86,7 +86,7 @@ export function averageDaysToPlace(applications: readonly Application[], window:
   const spans = applications.flatMap((app) => {
     const start = at(app.appliedAt);
     const end = at(app.closedAt);
-    return app.status === "PLACED" && start !== null && end !== null && isIn(end, window) ? [(end - start) / DAY_MS] : [];
+    return app.status === "PLACED" && start !== null && end !== null && end >= start && isIn(end, window) ? [(end - start) / DAY_MS] : [];
   });
   return spans.length ? Math.round(spans.reduce((sum, days) => sum + days, 0) / spans.length) : null;
 }

@@ -48,6 +48,9 @@ describe("speed and ratios", () => {
   it("counts days to place only for placements in the period", () => {
     expect(averageDaysToPlace([app({ status: "PLACED", appliedAt: daysAgo(40), closedAt: daysAgo(10) }), app({ status: "PLACED", appliedAt: daysAgo(90), closedAt: daysAgo(60) })], window)).toBe(30);
     expect(averageDaysToPlace([], window)).toBeNull();
+    // A placement dated before its application can't have taken negative time: it is left out, not averaged in.
+    expect(averageDaysToPlace([app({ status: "PLACED", appliedAt: daysAgo(10), closedAt: daysAgo(20) }), app({ status: "PLACED", appliedAt: daysAgo(40), closedAt: daysAgo(10) })], window)).toBe(30);
+    expect(averageDaysToPlace([app({ status: "PLACED", appliedAt: daysAgo(10), closedAt: daysAgo(20) })], window)).toBeNull();
   });
 
   it("gives the submission, interview and placement ratios", () => {

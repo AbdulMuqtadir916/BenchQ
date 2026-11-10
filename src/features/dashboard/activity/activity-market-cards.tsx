@@ -11,6 +11,8 @@ import { Hint } from "./activity-firm-cards";
 
 /** Jobs load on their own: their loading and failure stay in the cards that read them, not the whole page. */
 export interface JobsState {
+  /** The list stopped at its limit, so older jobs are not counted. */
+  isCapped: boolean;
   isLoading: boolean;
   error: Error | null;
   onRetry: () => void;
@@ -27,7 +29,7 @@ export function DemandCard({ rows, jobs, links }: { rows: RoleDemand[]; jobs: Jo
   const max = Math.max(1, ...rows.flatMap((row) => [row.jobs, row.onBench]));
   return (
     <Card>
-      <CardHeader><div><CardTitle>Demand against the bench</CardTitle><Hint>Open jobs by role, beside bench candidates who fit</Hint></div></CardHeader>
+      <CardHeader><div><CardTitle>Demand against the bench</CardTitle><Hint>{jobs.isCapped ? "Open jobs by role, beside bench candidates who fit. Counts the newest jobs only" : "Open jobs by role, beside bench candidates who fit"}</Hint></div></CardHeader>
       {jobs.error ? <ErrorState error={jobs.error} onRetry={jobs.onRetry} /> : rows.length === 0 ? <p className="text-sm text-[var(--color-text-3)]">No open jobs yet.</p> : (
         <>
           <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,9rem)_minmax(0,1fr)] gap-3 text-caption text-[var(--color-text-3)]" aria-hidden>
@@ -64,7 +66,7 @@ export function SourceCard({ rows, jobs }: { rows: SourceRow[]; jobs: JobsState 
   const max = Math.max(1, ...rows.map((row) => row.applications));
   return (
     <Card>
-      <CardHeader><div><CardTitle>Job sources</CardTitle><Hint>Applications this period by where the job came from, and the share that heard back</Hint></div></CardHeader>
+      <CardHeader><div><CardTitle>Job sources</CardTitle><Hint>{jobs.isCapped ? "Applications this period by where the job came from, and the share that heard back. Counts applications to the newest jobs only" : "Applications this period by where the job came from, and the share that heard back"}</Hint></div></CardHeader>
       {jobs.error ? <ErrorState error={jobs.error} onRetry={jobs.onRetry} /> : rows.length === 0 ? <p className="text-sm text-[var(--color-text-3)]">No applications this period.</p> : (
         <dl className="space-y-2">
           {rows.map((row) => (

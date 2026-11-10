@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { Play, Sparkles, Send, Mail, ArrowRight, CalendarDays, MailCheck } from "lucide-react";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { scopeCandidates } from "@/lib/auth/permissions";
+import { scopeApplications, scopeCandidates } from "@/lib/auth/permissions";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useJobs } from "@/lib/hooks/use-jobs";
@@ -53,8 +53,8 @@ export function BdeDashboard() {
   );
 
   const dash = useMemo(
-    () => deriveBdeDashboard(userId, candidates, applications),
-    [userId, candidates, applications],
+    () => deriveBdeDashboard(userId, candidates, scopeApplications(principal, applications, candidates)),
+    [userId, principal, candidates, applications],
   );
 
   const topCandidate = useMemo(

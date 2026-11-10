@@ -1,3 +1,4 @@
+import { teamMemberIds } from "@/lib/auth/policy";
 import { isBde } from "@/lib/auth/roles";
 import { maxDate } from "@/lib/derive";
 import { reachedStatuses } from "@/lib/derive/funnel";
@@ -76,11 +77,13 @@ export function managerRows(managers: readonly User[], users: readonly User[], c
   applications: readonly Application[], window: Window): ManagerRow[] {
   return managers.map((manager) => {
     const team = candidates.filter((candidate) => candidate.managerId === manager.id);
+    // The policy's own team (07 Q47): BDEs who report to the manager, and BDEs holding one of the manager's candidates.
+    const members = teamMemberIds(manager.id, users, candidates);
     return {
       id: manager.id,
       name: manager.name,
       isActive: manager.isActive,
-      bdes: users.filter((user) => isBde(user) && user.isActive && user.managerId === manager.id).length,
+      bdes: users.filter((user) => isBde(user) && user.isActive && members.has(user.id)).length,
       candidates: team.length,
       withoutBde: team.filter((candidate) => candidate.bdeId === null).length,
       counts: countActivity(forCandidates(applications, team), window),

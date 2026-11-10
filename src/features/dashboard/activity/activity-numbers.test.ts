@@ -36,6 +36,13 @@ describe("the activity numbers", () => {
     expect(row).toMatchObject({ bdes: 1, candidates: 2, withoutBde: 1, counts: { applications: 1 } });
   });
 
+  it("counts a BDE holding the manager's candidate in the team, even with no manager of their own", () => {
+    const users = [person("mira", "MANAGER"), person("bea", "BDE", "mira"), person("kai", "BDE", null)];
+    const candidates = [candidate("c1", "mira", "bea"), candidate("c2", "mira", "kai")];
+    const [row] = managerRows([users[0]], users, candidates, [], window);
+    expect(row.bdes).toBe(2);
+  });
+
   it("gives each BDE only their own candidates", () => {
     const [row] = bdeRows([person("bea", "BDE", "mira")], [candidate("c1", "mira", "bea"), candidate("c2", "mira", null)],
       [app({ candidateId: "c1" }), app({ candidateId: "c2" })], window);

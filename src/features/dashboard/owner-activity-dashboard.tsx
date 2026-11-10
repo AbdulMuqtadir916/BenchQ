@@ -6,7 +6,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { useEscapeBack } from "./activity/use-escape-back";
 import { isBde, isManager } from "@/lib/auth/roles";
-import { can, scopeApplications, scopeCandidates, scopeOf, scopeTeam } from "@/lib/auth/permissions";
+import { can, scopeApplications, scopeCandidates, scopeOf, scopeTeam, teamMemberIds } from "@/lib/auth/permissions";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
@@ -29,6 +29,8 @@ const EMPTY_CANDIDATES: Candidate[] = [];
 const EMPTY_APPLICATIONS: Application[] = [];
 const EMPTY_USERS: User[] = [];
 const EMPTY_JOBS: Job[] = [];
+/** The most jobs the backend lists in one call (backend/api/routes_jobs.py: limit le=200). Past it, demand and sources say so. */
+const JOBS_LIMIT = 200;
 
 /** The period buttons, shared with the Managers page. */
 export function PeriodPicker({ value, onChange }: { value: Period; onChange: (period: Period) => void }) {
@@ -57,7 +59,7 @@ export function OwnerActivityDashboard() {
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
   // Jobs only feed demand and sources: their failure stays in those cards, not the whole page.
-  const jobsQuery = useJobs({ limit: 400 });
+  const jobsQuery = useJobs({ limit: JOBS_LIMIT });
   const firm = useFirm();
   const group = queryGroup(teamQuery, candidatesQuery, applicationsQuery);
   const allUsers = teamQuery.data ?? EMPTY_USERS;
@@ -73,18 +75,27 @@ export function OwnerActivityDashboard() {
   const ownTeam = scope.kind === "team" ? scope.managerId : null;
   const managers = useMemo(() => users.filter(isManager), [users]);
   const manager = managers.find((user) => user.id === (ownTeam ?? query.manager));
-  const bde = users.find((user) => isBde(user) && user.id === query.bde && user.managerId === manager?.id);
 
   const teamCandidates = useMemo(() => (manager ? candidates.filter((candidate) => candidate.managerId === manager.id) : candidates), [candidates, manager]);
-  const teamBdes = useMemo(() => (manager ? users.filter((user) => isBde(user) && user.managerId === manager.id) : []), [users, manager]);
+  // A manager's BDEs, as the policy has the team (07 Q47): those who report to them, and those holding one of their candidates.
+  const teamBdes = useMemo(() => {
+    if (!manager) return [];
+    const members = teamMemberIds(manager.id, users, allCandidates);
+    return users.filter((user) => isBde(user) && members.has(user.id));
+  }, [users, manager, allCandidates]);
+  const bde = teamBdes.find((user) => user.id === query.bde);
   const bdeCandidates = useMemo(() => (bde ? teamCandidates.filter((candidate) => candidate.bdeId === bde.id) : []), [teamCandidates, bde]);
   const applicationsOf = (shown: Candidate[]) => {
     const ids = new Set(shown.map((candidate) => candidate.id));
     return applications.filter((app) => ids.has(app.candidateId));
   };
 
-  const jobs: JobsData = { jobs: jobsQuery.data ?? EMPTY_JOBS, isLoading: jobsQuery.isLoading, error: jobsQuery.error, onRetry: () => void jobsQuery.refetch() };
-  const openBde = (bdeId: string) => setQuery({ manager: users.find((user) => user.id === bdeId)?.managerId ?? "", bde: bdeId });
+  const jobs: JobsData = { jobs: jobsQuery.data ?? EMPTY_JOBS, isCapped: (jobsQuery.data?.length ?? 0) >= JOBS_LIMIT, isLoading: jobsQuery.isLoading, error: jobsQuery.error, onRetry: () => void jobsQuery.refetch() };
+  // A BDE with no manager of their own opens under the manager whose candidate they hold.
+  const openBde = (bdeId: string) => {
+    const person = users.find((user) => user.id === bdeId);
+    setQuery({ manager: person?.managerId ?? allCandidates.find((candidate) => candidate.bdeId === bdeId)?.managerId ?? "", bde: bdeId });
+  };
 
   useEscapeBack(bde ? () => setQuery({ bde: "" }) : manager && !ownTeam ? () => setQuery({ manager: "", bde: "" }) : null);
 

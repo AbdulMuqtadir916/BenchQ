@@ -22,7 +22,7 @@ bookkeeping inside application commands is covered here without changing the Job
 
 | Kind | Path |
 |---|---|
-| Screens | `src/app/(app)/applications/page.tsx` (kanban / table / calendar), `applications/[id]/page.tsx`, plus application data in the dashboards, `candidates`, `candidates/[id]`, `jobs`, `analytics`, `outreach`, `followups`, `focus`, `components/app/applications/application-board.tsx` |
+| Screens | `src/app/(app)/applications/page.tsx` (kanban / table / calendar), `applications/[id]/page.tsx`, plus application data in the dashboards, `candidates`, `candidates/[id]`, `jobs`, `outreach`, `focus`, the dashboards' Activity view (its funnel and per-BDE numbers; Analytics and Follow-ups were removed, 07 Q60 and Q61), `components/app/applications/application-board.tsx` |
 | Hooks | `src/lib/hooks/use-applications.ts` — `useApplications(candidateId?)`, `useApplication(id)`, `useUpdateApplicationStatus()` (optimistic update with rollback on error) |
 | Adapter | `src/lib/api/applications.ts` → `applicationsApi` |
 | Frontend type | `ApplicationSchema`, `ApplicationEventSchema` in `src/lib/schemas/application.ts`; `ApplicationStatus` in `enums.ts`; `UpdateApplicationStatus` in `inbox.ts` |

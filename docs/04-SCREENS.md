@@ -51,12 +51,13 @@ supplies a count.
 ├────────────┬─────────────────────────────────────────────────────────────────┤
 │  Sidebar   │                                                                 │
 │  Dashboard │                     route content                               │
-│  Managers  │                                                                 │
+│  Managers  │  (OWNER)                                                        │
+│  BDEs      │  (MANAGER)                                                      │
 │  Candidates│                                                                 │
 │  Jobs      │                                                                 │
 │  Apps      │                                                                 │
 │  Outreach  │                                                                 │
-│  Activity  │                                                                 │
+│  Ledger    │                                                                 │
 │  ───────   │                                                                 │
 │  Settings  │                                                                 │
 └────────────┴─────────────────────────────────────────────────────────────────┘
@@ -81,6 +82,7 @@ Sidebar visibility by role:
 |---|---|---|---|---|
 | Dashboard | ✓ | ✓ | ✓ | ✓ |
 | Managers | ✓ | — | — | — |
+| BDEs | — | ✓ | — | — |
 | Candidates | all | all | assigned only | all, read-only |
 | Jobs | ✓ | ✓ | ✓ | ✓ |
 | Applications | all | all | own only | all, read-only |
@@ -242,8 +244,8 @@ Manager view with every action stripped. No buttons in the DOM, not disabled but
 
 ### 3.5 The Activity tab (07 Q60)
 
-OWNER, MANAGER and VIEWER have two tabs, kept in the URL (`?view=finance|activity`): their overview (§3.2–3.4) and
-**Activity**. Activity drills from the firm to a manager's team to one BDE (`?manager=`, `?bde=`; `Esc` goes up a
+The OWNER and a VIEWER have two tabs, kept in the URL (`?view=finance|activity`): their overview (§3.2, §3.4) and
+**Activity**. A MANAGER has the Activity dashboard only (§3.5b). Activity drills from the firm to a manager's team to one BDE (`?manager=`, `?bde=`; `Esc` goes up a
 level), with a period of 24 hours, 7, 30 or 90 days (`?period=`). The OWNER and a VIEWER start at the firm; a MANAGER
 starts and stays at their own team, with no way up.
 
@@ -256,11 +258,12 @@ starts and stays at their own team, with no way up.
 - **BDE:** the last 24 hours against an ordinary day (a ring); where their applications are now; each candidate's
   furthest stage, today's count and a quiet flag; the funnel and bench aging.
 
-**Every number opens its records**: a tile, funnel stage or stage count opens `/applications` filtered (`status`,
+**Every count opens its records**: a tile, funnel stage or stage count opens `/applications` filtered (`status`,
 `reached`, `period` with `by`, `manager`, `bde`, `candidate`); a bench band, a role or a queue opens `/candidates`
 filtered (`status`, `bench`, `manager`, `bde`, `role`, `assignment`). The lists show the filters as removable chips with
-**Clear all**, and use the dashboard's own counting rules (`lib/derive/list-filters.ts`), so the list always shows the
-number that was clicked. People open their own level of the dashboard; candidates open their profile.
+**Clear all**, and use the dashboard's own counting rules (`src/lib/derive/list-filters.ts`), so the list always shows the
+number that was clicked. People open their own level of the dashboard; candidates open their profile. Two cards do not
+link: **job sources** (the lists have no source filter) and **time between stages** (a duration, not a set of records).
 
 ### 3.5b A manager's dashboard (07 Q62)
 

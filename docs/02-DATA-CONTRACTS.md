@@ -479,7 +479,7 @@ Approval permissions are `notification.approve` (OWNER/MANAGER; request recipien
 | Record | Change | Note |
 |---|---|---|
 | Candidate, User | none | already have `firmId` |
-| Job, Application, Resume, Record (candidate record), Document, Inbox (`CandidateInbox`, `InboxMessage`, `MailboxConnection`), Followup (`FollowUpTask`) | add `firmId: z.string()` | required; every fixture gets one in Phase T (T3) |
+| Job, Application, Resume, Record (candidate record), Document, Inbox (`CandidateInbox`, `InboxMessage`, `MailboxConnection`) | add `firmId: z.string()` | required; every fixture gets one in Phase T (T3) |
 | **Agent and tailoring runs** | add `firmId: z.string()` | **required** (A17): `/admin/system` needs AI spend by firm, and deriving it through joins is fragile |
 | LedgerEntry | add `firmId: z.string().nullable()` | rule below |
 | Company (and `CompanyVerification`) | none | global reference data (07 Q13) |

@@ -18,6 +18,7 @@ import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useNow } from "@/lib/hooks/use-now";
 import { useTeam } from "@/lib/hooks/use-team";
 import { queryGroup } from "@/lib/query/query-group";
+import { useSearchText } from "@/lib/hooks/use-search-text";
 import { useHref } from "@/lib/routes/use-href";
 import { useUrlState } from "@/lib/routes/use-url-state";
 import { BdesSearch } from "@/lib/schemas/list-search";
@@ -34,6 +35,7 @@ export function BdesList() {
   const now = useNow();
   const firm = useFirm();
   const [{ q, period }, setQuery] = useUrlState(BdesSearch);
+  const [text, setText] = useSearchText(q, (next) => setQuery({ q: next }));
   const teamQuery = useTeam();
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
@@ -57,7 +59,7 @@ export function BdesList() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative w-full min-w-48 flex-1 sm:max-w-72">
           <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-3)]" />
-          <Input value={q} onChange={(event) => setQuery({ q: event.target.value })} placeholder="Search BDEs…" aria-label="Search BDEs" className="pl-9" />
+          <Input value={text} onChange={(event) => setText(event.target.value)} placeholder="Search BDEs…" aria-label="Search BDEs" className="pl-9" />
         </div>
         <span className="ml-auto text-mono-sm text-[var(--color-text-3)]" aria-live="polite">{group.status === "success" ? plural(rows.length, "BDE") : null}</span>
       </div>
@@ -66,7 +68,7 @@ export function BdesList() {
           : (
             <div className="bq-card p-0">
               <BdeTable rows={rows} capacity={firm.bdeCapacity} onOpen={open}
-                emptyState={q
+                emptyState={q.trim()
                   ? <EmptyState variant="filtered" icon={Search} title="No BDE matches" description={`Nobody's name contains "${q}".`} />
                   : <EmptyState icon={Users} title="No BDEs on your team yet" description="BDEs show up here once they report to you." />} />
             </div>

@@ -12,7 +12,7 @@ export function useEscapeBack(goBack: (() => void) | null) {
     if (!goBack) return;
     const back = goBack;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !isTypingTarget(event.target)) back();
+      if (event.key === "Escape" && !event.defaultPrevented && !isTypingTarget(event.target)) back();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

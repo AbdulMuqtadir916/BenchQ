@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useMemo, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, Plus, Table2 } from "lucide-react";
+import { LayoutGrid, Plus, SearchX, Table2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CandidateCardGrid } from "@/components/app/candidate/candidate-card-grid";
 import { AssignmentToggle, NeedsBdeTag } from "@/components/app/candidate/assignment-filter";
@@ -28,6 +28,7 @@ import { DataTable } from "@/components/app/data-table";
 import { PageHeader } from "@/components/app/page-header";
 import { WorkAuthChip } from "@/components/app/work-auth-chip";
 import { Tag, type TagTone } from "@/components/ui/tag";
+import { EmptyState } from "@/components/app/empty-state";
 import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/format/timezone";
 import { CandidateStatusSelect } from "@/components/app/candidate-status-select";
@@ -181,7 +182,7 @@ function CandidatesList() {
   }, [isOwnScope]);
 
   const canCreate = can(principal, "candidate.create");
-  const personName = (id: string) => (teamQuery.data ?? []).find((user) => user.id === id)?.name ?? "someone no longer on the team";
+  const personName = (id: string) => teamQuery.data ? (teamQuery.data.find((user) => user.id === id)?.name ?? "someone no longer on the team") : "…";
   const chips: FilterChip[] = [
     search.bench ? { key: "bench", label: BENCH_LABEL[search.bench], onRemove: () => setQuery({ bench: "" }) } : null,
     search.manager ? { key: "manager", label: `Team: ${personName(search.manager)}`, onRemove: () => setQuery({ manager: "" }) } : null,
@@ -189,6 +190,11 @@ function CandidatesList() {
     search.role ? { key: "role", label: `Role: ${search.role.replaceAll("-", " ")}`, onRemove: () => setQuery({ role: "" }) } : null,
   ].filter((chip): chip is FilterChip => chip !== null);
   const clearFilters = () => setQuery({ assignment: "all", status: "ALL", bench: "", manager: "", bde: "", role: "" });
+  // A link from the dashboard can leave nothing: that is "no match", not a firm with no candidates.
+  const emptyFiltered = chips.length > 0 ? (
+    <EmptyState variant="filtered" icon={SearchX} title="No candidates match these filters" description="Remove a filter above, or clear them all to see every candidate."
+      action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>} />
+  ) : undefined;
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
@@ -225,6 +231,7 @@ function CandidatesList() {
             showBde={!isOwnScope}
             status={{ tone: (c) => STATUS_TONE[c.status], label: (c) => STATUS_LABEL[c.status] }}
             toolbar={toolbar}
+            emptyState={emptyFiltered}
           />
         ) : (
         <DataTable
@@ -241,6 +248,7 @@ function CandidatesList() {
           pageSize={15}
           toolbarActions={toolbar}
           toolbarPlacement="outside"
+          emptyState={emptyFiltered}
         />
         )}
       </div>

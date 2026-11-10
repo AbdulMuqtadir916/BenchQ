@@ -21,6 +21,7 @@ import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useNow } from "@/lib/hooks/use-now";
 import { useTeam } from "@/lib/hooks/use-team";
 import { queryGroup } from "@/lib/query/query-group";
+import { useSearchText } from "@/lib/hooks/use-search-text";
 import { useHref } from "@/lib/routes/use-href";
 import { useUrlState } from "@/lib/routes/use-url-state";
 import { ManagersSearch } from "@/lib/schemas/list-search";
@@ -35,6 +36,7 @@ export function ManagersList() {
   const router = useRouter();
   const now = useNow();
   const [{ view, q, period }, setQuery] = useUrlState(ManagersSearch);
+  const [text, setText] = useSearchText(q, (next) => setQuery({ q: next }));
   const teamQuery = useTeam();
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
@@ -52,7 +54,7 @@ export function ManagersList() {
   }, [principal, teamQuery.data, candidatesQuery.data, applicationsQuery.data, q, period, now]);
 
   const dashboardOf = (row: ManagerRow) => toHref("dashboard", {}, { view: "activity", manager: row.id, period });
-  const empty = q
+  const empty = q.trim()
     ? <EmptyState variant="filtered" icon={Search} title="No manager matches" description={`Nobody's name contains "${q}".`} />
     : <EmptyState icon={Users} title="No managers yet" description="Invite a manager from Settings, Team. They show up here with their team." />;
 
@@ -62,7 +64,7 @@ export function ManagersList() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative w-full min-w-48 flex-1 sm:max-w-72">
           <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-3)]" />
-          <Input value={q} onChange={(event) => setQuery({ q: event.target.value })} placeholder="Search managers…" aria-label="Search managers" className="pl-9" />
+          <Input value={text} onChange={(event) => setText(event.target.value)} placeholder="Search managers…" aria-label="Search managers" className="pl-9" />
         </div>
         <div role="tablist" aria-label="View" className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5">
           {([["table", "Table", Table2], ["cards", "Cards", LayoutGrid]] as const).map(([id, label, Icon]) => (

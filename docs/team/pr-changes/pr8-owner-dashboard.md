@@ -138,6 +138,16 @@ firm" becomes a button once a manager is open). The Finance / Activity tabs sit 
 - **New page** `/[firm]/bdes` (MANAGER only, `g b`, sidebar after Dashboard): the manager's BDE table; a row opens the
   BDE's dashboard.
 
+## Review fixes (2026-11-11)
+
+- **Team = the policy's team** (07 Q47): a manager's BDEs are those who report to them and those holding one of their candidates. The dashboard's team, its BDE cards and the Managers page's BDE count all use `teamMemberIds`; a BDE with no manager of their own opens under the manager whose candidate they hold.
+- **BDE dashboard** counts only the BDE's own submissions (`scopeApplications`), as the Applications page does.
+- **Jobs limit** is 200, the most the backend lists at once (it was 400, which the backend would refuse). When the list stops there, the demand and source cards say they count the newest jobs only.
+- **Applications and Candidates pages** wait for candidates as well as applications before showing "no match", name the team chips with a placeholder until the team arrives, and show "No candidates match these filters" when a dashboard link leaves none.
+- **Search boxes** on the Managers and BDEs pages keep the typed text locally and write it to the URL after a short pause (`useSearchText`), so fast typing can't drop characters.
+- **Smaller:** a placement dated before its application is left out of "days to place"; Esc that something else already handled (a closed menu) doesn't also go up a level.
+- **Docs:** the sidebar diagram and table (BDEs added, Ledger back, no "Activity" item), the manager's single-dashboard wording, the file path, the integration inventory and the `FollowUpTask` mention in docs/02; and the two cards that do not link (job sources, time between stages) are named.
+
 ## Files changed
 
 | File | Changes and reason |

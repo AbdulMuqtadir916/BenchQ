@@ -76,7 +76,8 @@ function ApplicationsList() {
     return filterApplications(scoped, search, candidates, now);
   }, [applicationsQuery.data, candidatesQuery.data, principal, search, now]);
 
-  const personName = (id: string) => (teamQuery.data ?? []).find((user) => user.id === id)?.name ?? "someone no longer on the team";
+  // Until the team arrives there is no name to show, so the chip says nothing rather than "no longer on the team".
+  const personName = (id: string) => teamQuery.data ? (teamQuery.data.find((user) => user.id === id)?.name ?? "someone no longer on the team") : "…";
   const chips: FilterChip[] = [
     search.status ? { key: "status", label: `Now: ${STATUS_LABEL[search.status]}`, onRemove: () => setSearch({ status: "" }) } : null,
     search.reached ? { key: "reached", label: `Reached ${STATUS_LABEL[search.reached]}`, onRemove: () => setSearch({ reached: "" }) } : null,
@@ -104,7 +105,7 @@ function ApplicationsList() {
       </div>
       <FilterChips chips={chips} onClear={clearFilters} />
 
-      {loadError ? <ErrorState error={loadError} onRetry={retry} /> : applicationsQuery.isLoading ? <SkeletonCard /> : chips.length && apps.length === 0 ? (
+      {loadError ? <ErrorState error={loadError} onRetry={retry} /> : applicationsQuery.isLoading || candidatesQuery.isLoading ? <SkeletonCard /> : chips.length && apps.length === 0 ? (
         <EmptyState variant="filtered" icon={SearchX} title="No applications match these filters" description="Remove a filter above, or clear them all to see every application."
           action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>} />
       ) : view === "kanban" ? (
