@@ -11,7 +11,7 @@ Backend only: the screen (PR 4) is unchanged, and the route stays `/ledger`. No 
 - **New table, `activity_logs`** (model `ActivityEntry`; `ActivityLog` stays the old system log, `activity_log_v2`).
   It has every `ledger_entries` column, plus: `on_behalf_of_user_id`, `actor_role`, `team_manager_id`,
   `candidate_manager_id`, `candidate_bde_id`, `changes`, `request_id`.
-- **Old data copied:** migration 0019 copies every `ledger_entries` row, with its id and date. Their stamps come from
+- **Old data copied:** migration 0020 copies every `ledger_entries` row, with its id and date. Their stamps come from
   today's roles and assignments. `ledger_entries` itself is left as it was; nothing writes or reads it now, and the demo
   reset only clears it. Removing it is Abdul's call. A downgrade puts new rows back into it.
 - **Can't be rewritten:** a database trigger refuses UPDATE and DELETE. The one way past it is the local demo reset, which
@@ -31,7 +31,7 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 
 | File | Changes and reason |
 |---|---|
-| `backend/migrations/versions/0019_activity_logs.py` | New: the table, the copy, the trigger, a real downgrade. |
+| `backend/migrations/versions/0020_activity_logs.py` | New: the table, the copy, the trigger, a real downgrade. |
 | `backend/models/tenancy.py` | `ActivityEntry`. `LedgerEntry` stays, marked as frozen. |
 | `backend/auth/ledger.py` | Writes to the new table, stamps every entry, `diff` for before/after with masking, `on_behalf_of` for AI actors. |
 | `backend/api/routes_ledger.py` | Rewritten on the new table: the role limit by stamps, `Filters`, cursor paging, the two new routes. |

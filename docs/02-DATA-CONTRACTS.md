@@ -851,7 +851,8 @@ export const CandidateSchema = z.object({
   preferredIndustries: z.array(z.string()), // step 4 (was inside `persona`, dropped in 0015)
   dealBreakers: z.array(z.string()),     // step 4 (same)
 
-  qaBank: z.array(QaBankEntrySchema),
+  qaBank: z.array(QaBankEntrySchema),     // always [] on the backend since 0019 (no `candidates.qa_bank`; each résumé
+                                         // version's `autofill` instead, §8.1); kept for the Documents tab until it goes
 
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -1342,7 +1343,7 @@ export const ResumeSchema = z.object({
 });
 ```
 
-### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off)
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off); the version's `autofill` (`?autofill=true`) APPROVED 2026-11-08 (Abdul, issue 119), BUILT (PR 118)
 
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
@@ -1351,6 +1352,56 @@ every edit as a new row; the frontend keeps its `Resume.versions[]` model, fille
 rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateId` ← `template`, `name` ← `name`,
 `versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
 `ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
+
+**`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK; this contract signed off
+by Abdul 2026-11-08 in issue 119, the `key` added with his OK):** `GET …/resumes/{id}?autofill=true`, on the
+candidate's route and on
+`GET /firms/{firm}/resumes/{id}`, adds `autofill`: every question an application form can ask, each once. Two parts:
+
+- **Fixed answers**, built from the version and the profile for that read (`backend/candidates/autofill.py` `build()`)
+  and never stored as answers (an edit keeps a copy of the one it replaced, below): this version's header, summary,
+  skills, every job with its dates and bullets, its education (the highest degree by the rules written in
+  `autofill._level`, with that degree's school and year; a certificate listed under education isn't a degree),
+  projects, awards, certifications and languages; and the profile's facts:
+  work authorization (the profile's status, which every candidate has), its expiry, sponsorship, transfer,
+  target rate, availability, notice, relocation, engagement types, work settings, preferred locations and industries,
+  primary and target roles. Years of experience come from the version's own jobs, counted to today (the New candidate
+  form's rule), else `years_experience`. A profile edit shows in every version at once; nothing is rewritten.
+- **The user's entries**, stored in `resumes.autofill` (`{}` by default) as
+  `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit to a fixed answer is kept by
+  its question's key, so rewording a question never loses it, with `over`: a copy of the built answer it replaced (for
+  a list such as the work history, the whole list). An edit applies while `over` is still the built answer, compared
+  as JSON (85.0 is 85, but `true` isn't 1): once the version's own text or the profile changes that answer, the new
+  built answer shows (so a yearly step in the years worked out ends an edit of the years too). So does a change to how
+  the backend writes an answer (a label, a field of the jobs, the date format), unless that change also rewrites the
+  stored `over` values. A question they added can't take a fixed question's wording; one whose words a fixed question
+  takes later (a new question, or a reworded one) is kept and copied, and shows only while that fixed question has no
+  answer. A save, a promote and tailoring (a tailored v1, 07 Q55) copy the entries, and on the new version an edit
+  applies only where its built answer is still `over`; a new upload starts with none. Anything else stored (a value
+  that isn't an object, or the first 0019's `{question: answer}` of built answers) reads as no entries.
+
+Each entry is `{question, answer, kind, key?, built?}`:
+
+| Field | What |
+|---|---|
+| `question` | As written once in `autofill.py`, or as the user typed it |
+| `answer` | Its JSON type kept: text, a number, `true`/`false`, a list, a list of objects (jobs, education, projects, awards), a date as `"YYYY-MM-DD"` |
+| `kind` | `FIXED` (built), `EDITED` (the user's entry for a fixed question), `CUSTOM` (a question the user added) |
+| `key` | On `FIXED` and `EDITED`: what the question asks, a fixed name that doesn't change with the wording, so a reader (the extension) matches by it. A new question gets a new key |
+| `built` | On `EDITED`: the built answer a reset gives back; `null` when the version and the profile don't answer it |
+
+The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`, `address-city`, `address-region`,
+`address-country`, `professional-title`, `summary`, `work-auth-status`, `skills`, `current-company`, `current-title`,
+`work-history`, `education-degree`, `education-school`, `graduation-year`, `education-history`, `projects`, `awards`,
+`certifications`, `languages`, `work-auth-expiry`, `visa-sponsorship`, `visa-transfer`, `years-experience`,
+`primary-role`, `target-roles`, `pay-rate`, `start-date`, `notice-period-days`, `relocation-willing`,
+`employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`. The fixed questions come first in
+that order, then the user's. A missing fact leaves its question out. Never in it: ids, `rate_min`, `contact_notes`,
+`deal_breakers`, `status`, `bench_start_date`. Not in the list, a save, or a read without `?autofill=true`. Writing the
+user's entries (a route) is planned: it takes `over` from its own build, never from the request, and the request
+carries the built answer the user was shown, so the route answers 409 when its own build differs (an edit is never
+saved over an answer the user didn't see). Its contract goes here first. The frontend doesn't map `autofill` (no screen
+shows it yet); the extension reads it (Arbaz).
 
 ```ts
 // src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker
@@ -1570,6 +1621,8 @@ Status changes go through `PATCH /api/applications/:id/status` (`{ status, note 
 an `ApplicationEvent` — the same write the kanban makes.
 
 ### 9.y Candidate documents (`src/lib/schemas/document.ts`)
+
+> **Planned to be dropped (Abdul, relayed by Zuhair 2026-11-07):** the candidate's Documents section — uploading visa copies, ID, certificates and other files, and the Screening answers panel. It may come back in a later version, not now. Nothing is removed yet: its owners remove it, with this contract (`docs/team/abdul.md` §3). Don't build on it.
 
 - `CandidateDocument` — `kind` (`WORK_AUTH | IDENTITY | RESUME | CERTIFICATION | EDUCATION |
   EMPLOYMENT | OTHER`), `title`, `fileName`, `mimeType`, `sizeKb`, `uploadedAt`, `uploadedByUserId`,

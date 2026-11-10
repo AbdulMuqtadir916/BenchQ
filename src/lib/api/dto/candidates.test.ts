@@ -16,9 +16,8 @@ describe("the backend candidate → Candidate", () => {
     expect(assigned!.bdeId).toMatch(/^user_/);
   });
 
-  it("maps the preferences and answers, and timestamps to UTC ISO", () => {
-    expect(assigned).toMatchObject({ preferredIndustries: ["any"], dealBreakers: [] });
-    expect(assigned!.qaBank[0]).toMatchObject({ useCount: 3 });
+  it("maps the preferences, no answer bank (each résumé version's autofill since 0019), and timestamps to UTC ISO", () => {
+    expect(assigned).toMatchObject({ preferredIndustries: ["any"], dealBreakers: [], qaBank: [] });
     expect(assigned!.createdAt).toBe("2026-09-26T06:17:52.966Z");
   });
 

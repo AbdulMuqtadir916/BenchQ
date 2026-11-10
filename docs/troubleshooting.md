@@ -58,6 +58,16 @@ same JSON.
 **Fix:** the error message names two ways out. `docker compose down -v` starts over with an empty database (dev data is
 lost), or check out commit `14ba662` and start the backend once to stamp it.
 
+## Autofill entries left by the first migration 0019
+
+**Cause:** your database ran PR 118's first migration 0019 (on its branch before 2026-11-08). That version filled
+every résumé version's `resumes.autofill` with its built answers, as `{question: answer}`. The app reads none of that
+now (it reads only the `edited` and `custom` entries, docs/02 §8.1), but the rows keep it.
+**Fix:** with your database at 0019, `docker compose exec backend python -m alembic -c backend/alembic.ini downgrade
+0018`, then `docker compose restart backend`: the backend upgrades on start, and 0019 adds the column back empty. The
+downgrade puts `candidates.qa_bank` back empty on the way, and the upgrade drops it again. A database that never ran
+the first 0019 needs nothing.
+
 ## `docker compose build` fails with exit code 2
 
 **Cause:** the image build downloads a CLI from Google, and that download occasionally fails.

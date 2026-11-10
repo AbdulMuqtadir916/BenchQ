@@ -7,14 +7,14 @@
 
 The downgrade brings both tables back empty. What was copied stays in `activity_logs`.
 
-Revision ID: 0021
-Revises: 0020
+Revision ID: 0022
+Revises: 0021
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0021'
-down_revision = '0020'
+revision = '0022'
+down_revision = '0021'
 branch_labels = None
 depends_on = None
 

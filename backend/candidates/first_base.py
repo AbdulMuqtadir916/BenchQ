@@ -11,6 +11,7 @@ A BDE's later upload (§4.6, PR 5) builds its base the same way, without a form:
 import uuid
 
 from backend.candidates.base_resume import split_skills
+from backend.candidates.values import dicts as _dicts, text as _text
 from backend.models.candidates import BaseResume
 from backend.models.db import Resume
 
@@ -24,16 +25,8 @@ def _id() -> str:
     return str(uuid.uuid4())
 
 
-def _text(value) -> str:
-    return str(value or "").strip()
-
-
 def _list(value) -> list:
     return value if isinstance(value, list) else []
-
-
-def _dicts(value) -> list[dict]:
-    return [item for item in _list(value) if isinstance(item, dict)]
 
 
 def _bullets(value) -> list[dict]:

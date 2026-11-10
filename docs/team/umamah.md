@@ -81,7 +81,7 @@ screen: people list, searchable actor and candidate dropdowns, dates, and the si
 [pr-changes/activity-logs-pr4-activity-screen.md](./pr-changes/activity-logs-pr4-activity-screen.md).
 
 **Activity Log PR 7 (2026-11-07):** `activity-logs/pr7-remove-old-log-tables`, built on PR 6, not pushed yet. Removing
-`activity_log_v2` and `ledger_entries` is my responsibility, agreed with Abdul. Migration 0021 copies any row not yet in
+`activity_log_v2` and `ledger_entries` is my responsibility, agreed with Abdul. Migration 0022 copies any row not yet in
 `activity_logs`, stops if one is missing, then drops both tables. Details in
 [pr-changes/activity-logs-pr7-remove-old-log-tables.md](./pr-changes/activity-logs-pr7-remove-old-log-tables.md).
 
@@ -89,7 +89,7 @@ screen: people list, searchable actor and candidate dropdowns, dates, and the si
 calls) writes to `activity_logs` with no firm, so only the Super Admin sees it.
 
 **Activity Log PR 6 (2026-11-07):** `activity-logs/pr6-signin-events-and-super-admin`, built on PR 5 part 3, not pushed
-yet. Sign-out, failed sign-ins and lockouts are logged (migration 0020), and the Super Admin has the full Activity page,
+yet. Sign-out, failed sign-ins and lockouts are logged (migration 0021), and the Super Admin has the full Activity page,
 with a Failed sign-ins view only they can see. Details in
 [pr-changes/activity-logs-pr6-signin-events-and-super-admin.md](./pr-changes/activity-logs-pr6-signin-events-and-super-admin.md).
 

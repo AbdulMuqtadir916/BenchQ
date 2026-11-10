@@ -6,15 +6,15 @@
   today's roles and assignments. `ledger_entries` itself is left as it was.
 - A trigger refuses UPDATE and DELETE, so no code path can rewrite history.
 
-Revision ID: 0019
-Revises: 0018
+Revision ID: 0020
+Revises: 0019
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = '0019'
-down_revision = '0018'
+revision = '0020'
+down_revision = '0019'
 branch_labels = None
 depends_on = None
 

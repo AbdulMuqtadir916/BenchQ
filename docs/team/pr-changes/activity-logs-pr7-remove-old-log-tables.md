@@ -9,14 +9,14 @@ Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)). Removing the tabl
 
 What each table held:
 
-- `ledger_entries`: the old activity ledger. Migration 0019 copied it, and nothing has read or written it since.
+- `ledger_entries`: the old activity ledger. Migration 0020 copied it, and nothing has read or written it since.
 - `activity_log_v2`: short event lines from background jobs, with no firm or person. Scores and jobs were never in it:
   they live in `jobs` and `candidate_jobs`. Since the PR 5 part 2 addition, those events are system rows.
 
 Owner, Manager, BDE and Viewer see exactly what they saw before. Every new row has no firm, and those readers only read
 their own firm's rows.
 
-## Migration 0021
+## Migration 0022
 
 1. Copies each `activity_log_v2` row into `activity_logs` as a system row with no firm. It keeps the id, date and message.
    The actor is named by type (Scraper, H-1B refresh, Résumé scoring, Email monitor, Telegram digest), the company becomes
@@ -31,7 +31,7 @@ The downgrade brings both tables back empty. What was copied stays in `activity_
 
 | File | Changes and reason |
 |---|---|
-| `backend/migrations/versions/0021_remove_old_log_tables.py` | New, as above. |
+| `backend/migrations/versions/0022_remove_old_log_tables.py` | New, as above. |
 | `backend/models/db.py`, `backend/models/tenancy.py` | `ActivityLog` and `LedgerEntry` removed. |
 | `backend/main.py`, `backend/auth/access.py` | `GET /api/activity-log` removed. Only the Super Admin could call it, no screen did, and the Activity page now shows those events. |
 | `backend/scripts/seed_demo.py` | The demo reset no longer clears `ledger_entries`. |

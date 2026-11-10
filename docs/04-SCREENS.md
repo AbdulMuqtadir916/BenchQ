@@ -299,7 +299,7 @@ show on Applications and Resumes; a dot marks Overview and Inbox when something 
 | 3 | **Inbox** | What recruiters said, matched to applications, with suggested status updates |
 | 4 | **Jobs** | Where to submit next, ranked for this profile |
 | 5 | **Resumes** | What to submit — the base résumés, their versions and the copies tailored from each |
-| 6 | **Documents** | What vendors ask for: visa papers, ID, certificates, screening answers |
+| 6 | **Documents** | What vendors ask for: visa papers, ID, certificates, screening answers. **Planned to be dropped** (see Documents below) |
 | 7 | **Activity** | The audit trail a manager opens |
 
 There is no separate Profile/Record tab: it duplicated the base résumé and left the BDE unsure where to fix a line.
@@ -358,6 +358,8 @@ version after v1, **Delete** on a base or a version (the backend's warning first
 delete what nothing uses" asks a second time), **Show again** on a hidden base.
 
 #### Documents
+> **Planned to be dropped (Abdul, relayed by Zuhair 2026-11-07):** the candidate's Documents section — uploading visa copies, ID, certificates and other files, and the Screening answers panel. It may come back in a later version, not now. Nothing is removed yet: its owners remove it (the tab, its adapter, hooks and mocks; `docs/team/abdul.md` §3). Don't build on it.
+
 Left: an upload area (drop or browse; the type is detected from the file name and can be changed;
 expiry is asked for visa, ID and certificates), then files grouped by type — work authorization,
 identity, resumes, certifications, education, employment letters. Each row: title, file, size,

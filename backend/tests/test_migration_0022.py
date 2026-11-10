@@ -1,4 +1,4 @@
-"""Migration 0021: nothing is lost, and the two old log tables are gone."""
+"""Migration 0022: nothing is lost, and the two old log tables are gone."""
 import uuid
 from datetime import datetime, timezone
 
@@ -10,13 +10,13 @@ from backend.tests.test_activity_logs import _alembic, at_0015  # noqa: F401  (a
 WHEN = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
 
 
-def _at_0020(url):
-    _alembic(url, "upgrade", "0020")
+def _at_0021(url):
+    _alembic(url, "upgrade", "0021")
 
 
 def test_every_old_row_is_copied_before_the_tables_go(at_0015):
     url, engine = at_0015
-    _at_0020(url)
+    _at_0021(url)
     scrape, score, ledger = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     with engine.begin() as conn:
         conn.execute(text("""INSERT INTO activity_log_v2 (id, type, message, company, details, created_at)
@@ -45,7 +45,7 @@ def test_every_old_row_is_copied_before_the_tables_go(at_0015):
 def test_the_downgrade_brings_both_tables_back_empty(at_0015):
     url, engine = at_0015
     _alembic(url, "upgrade", "head")
-    _alembic(url, "downgrade", "0020")
+    _alembic(url, "downgrade", "0021")
     tables = set(inspect(engine).get_table_names())
     assert {"activity_log_v2", "ledger_entries"} <= tables
     _alembic(url, "upgrade", "head")

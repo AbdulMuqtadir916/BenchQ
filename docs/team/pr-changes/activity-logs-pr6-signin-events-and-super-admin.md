@@ -33,7 +33,7 @@ proxy's address. Locally every row shows Docker's address.
 
 | File | Changes and reason |
 |---|---|
-| `backend/migrations/versions/0020_activity_sign_in_events.py` | New actions, the UNKNOWN actor, `ip_address`, `attempt_count`. The append-only trigger now allows one UPDATE: adding 1 to a failed sign-in's count, with every other column unchanged. Downgrading removes these rows, which have no place in the older log. |
+| `backend/migrations/versions/0021_activity_sign_in_events.py` | New actions, the UNKNOWN actor, `ip_address`, `attempt_count`. The append-only trigger now allows one UPDATE: adding 1 to a failed sign-in's count, with every other column unchanged. Downgrading removes these rows, which have no place in the older log. |
 | `backend/models/tenancy.py` | The columns and action lists. `ledger_entries` keeps its own list. |
 | `backend/auth/ledger.py`, `backend/auth/throttle.py`, `backend/api/routes_auth.py` | Writing the entries. `record_failure` says when a limit is used up. |
 | `backend/api/routes_ledger.py` | `_visible` leaves out failed sign-ins for every firm reader. `people_in_view` and the `Filters` time zone are shared with the Super Admin's routes. |

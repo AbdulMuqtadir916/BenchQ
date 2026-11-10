@@ -1,4 +1,4 @@
-"""The activity log (backend/auth/ledger.py, backend/api/routes_ledger.py, migration 0019): entries stamped with who was
+"""The activity log (backend/auth/ledger.py, backend/api/routes_ledger.py, migration 0020): entries stamped with who was
 responsible at the time, history that stays with them, a table that can't be rewritten, and the log's filters, paging
 and counts."""
 from datetime import datetime, timedelta, timezone

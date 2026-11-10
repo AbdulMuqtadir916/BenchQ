@@ -15,15 +15,6 @@ import { toIso, toIsoOrNull } from "./shared";
  * modules still on mocks (applications, résumés…) keep finding their candidates. The skills and the summary are the base résumé's,
  * not the candidate's (migration 0015).
  */
-const QaEntryDto = z.object({
-  id: z.string(),
-  question: z.string(),
-  answer: z.string(),
-  category: z.string(),
-  use_count: z.number().int(),
-  last_used_at: z.string().nullable(),
-});
-
 export const CandidateDto = z.object({
   id: z.string(),
   firm_id: z.string(),
@@ -56,7 +47,6 @@ export const CandidateDto = z.object({
   contact_notes: z.string().nullable(),
   preferred_industries: z.array(z.string()),
   deal_breakers: z.array(z.string()),
-  qa_bank: z.array(QaEntryDto),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -96,14 +86,10 @@ export function toCandidate(dto: CandidateDto): Candidate {
     contactNotes: dto.contact_notes,
     preferredIndustries: dto.preferred_industries,
     dealBreakers: dto.deal_breakers,
-    qaBank: dto.qa_bank.map((entry) => ({
-      id: entry.id,
-      question: entry.question,
-      answer: entry.answer,
-      category: entry.category,
-      useCount: entry.use_count,
-      lastUsedAt: toIsoOrNull(entry.last_used_at),
-    })),
+    // The backend has no answer bank on the candidate since migration 0019 (each résumé version holds its own
+    // `autofill`). The Documents tab's Screening answers panel shows its empty state until that section is removed
+    // (planned, docs/team/abdul.md §3).
+    qaBank: [],
     createdAt: toIso(dto.created_at),
     updatedAt: toIso(dto.updated_at),
   });

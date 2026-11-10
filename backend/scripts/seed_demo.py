@@ -178,19 +178,6 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
     return added
 
 
-def _snake(key: str) -> str:
-    return "".join(f"_{ch.lower()}" if ch.isupper() else ch for ch in key)
-
-
-def _snake_keys(value):
-    """The mocks' camelCase JSON (the answer bank) as the API sends it: snake_case keys, ids mapped."""
-    if isinstance(value, list):
-        return [_snake_keys(item) for item in value]
-    if isinstance(value, dict):
-        return {_snake(k): _snake_keys(v) for k, v in value.items()}
-    return value
-
-
 def _form_base(db, candidate, c: dict) -> None:
     """The demo candidate's résumé (07 Q58: no candidate without one): a file generated from their details, kept like
     an upload, and its UPLOAD base, whose v1 holds the name, contact details and location (07 Q57)."""
@@ -228,7 +215,6 @@ def _candidate_fields(c: dict) -> dict:
         years_experience=c["yearsExperience"], primary_role=c["primaryRole"], target_roles=c["targetRoles"],
         work_settings=c["workSettings"], preferred_locations=c["preferredLocations"], contact_notes=c["contactNotes"],
         preferred_industries=c["preferredIndustries"], deal_breakers=c["dealBreakers"],
-        qa_bank=_snake_keys(c["qaBank"]),
         created_at=_when(c["createdAt"]), updated_at=_when(c["updatedAt"]))
 
 
