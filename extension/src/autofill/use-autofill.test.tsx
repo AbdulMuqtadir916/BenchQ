@@ -1006,3 +1006,60 @@ describe("picking another résumé (07 Q24)", () => {
     expect(onPage.b).toBe("Tempe");
   });
 });
+
+describe("a site BenchQ may not read yet", () => {
+  const employer = "https://careers.employer.test/job/1";
+  const onFrames = () => fake.webNavigation.getAllFrames.mockResolvedValue([
+    { frameId: 0, url: employer }, { frameId: 5, url: "https://ads.tracker.test/frame" },
+  ]);
+  const allowed = new Set<string>();
+  beforeEach(() => {
+    allowed.clear();
+    fake.permissions.contains.mockImplementation(async ({ origins }) => origins.every((origin) => allowed.has(origin)));
+    fake.permissions.request.mockImplementation(async ({ origins }) => { origins.forEach((origin) => allowed.add(origin)); return true; });
+  });
+
+  it("asks about the page's own site only, and doesn't scan until it's allowed", async () => {
+    onFrames();
+    await mount();
+    expect(hook.needsAccess).toEqual({ origins: ["https://careers.employer.test/*"], host: "careers.employer.test" });
+    expect(scanTab).not.toHaveBeenCalled();
+    expect(hook.error).toBe("");
+    expect(fake.permissions.request).not.toHaveBeenCalled();
+  });
+
+  it("scans the page once the BDE allows it", async () => {
+    onFrames();
+    await mount();
+    await run(() => hook.allowAccess());
+    expect(fake.permissions.request).toHaveBeenCalledWith({ origins: ["https://careers.employer.test/*"] });
+    expect(hook.needsAccess).toBeNull();
+    expect(scanTab).toHaveBeenCalledTimes(1);
+    expect(hook.rows).not.toBeNull();
+  });
+
+  it("says so, and scans nothing, when the BDE says no", async () => {
+    onFrames();
+    fake.permissions.request.mockResolvedValue(false);
+    await mount();
+    await run(() => hook.allowAccess());
+    expect(hook.isAccessDenied).toBe(true);
+    expect(hook.needsAccess).not.toBeNull();
+    expect(scanTab).not.toHaveBeenCalled();
+  });
+
+  it("never asks about a site it is already allowed on, as for every site before", async () => {
+    onFrames();
+    allowed.add("https://careers.employer.test/*");
+    await mount();
+    expect(hook.needsAccess).toBeNull();
+    expect(scanTab).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a page that isn't https alone", async () => {
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "http://careers.employer.test/job" }]);
+    await mount();
+    expect(hook.needsAccess).toBeNull();
+    expect(fake.permissions.contains).not.toHaveBeenCalled();
+  });
+});

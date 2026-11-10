@@ -1,0 +1,10 @@
+{
+  "boards": [
+    "linkedin.com", "indeed.com", "ziprecruiter.com", "glassdoor.com", "dice.com", "monster.com", "careerbuilder.com",
+    "simplyhired.com", "wellfound.com", "builtin.com", "jobright.ai", "levels.fyi"
+  ],
+  "applicationSystems": [
+    "greenhouse.io", "lever.co", "ashbyhq.com", "smartrecruiters.com", "myworkdayjobs.com", "oraclecloud.com",
+    "icims.com", "taleo.net", "jobvite.com", "workable.com", "bamboohr.com"
+  ]
+}

@@ -6,6 +6,7 @@ import { checkJob, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
 import { answersFromResume } from "./resume-answers";
 import { buildReview, suggestedRow } from "./review";
+import { missingAccess, requestAccess, type SiteAccess } from "./site-access";
 import {
   chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills,
   type TabScan,
@@ -178,6 +179,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [scanning, setScanning] = useState(true);
   const [error, setError] = useState("");
+  // The site this tab is on, while Chrome hasn't been told BenchQ may read it (a site outside the built-in list).
+  const [access, setAccess] = useState<SiteAccess | null>(null);
+  const [isAccessDenied, setIsAccessDenied] = useState(false);
+  const [isAsking, setIsAsking] = useState(false);
   const [bankEmpty, setBankEmpty] = useState(false);
   const [unreadableFrames, setUnreadableFrames] = useState(0);
   const [signals, setSignals] = useState<PageSignals | null>(null);
@@ -238,6 +243,12 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
 
   const readPage = useCallback(async (isCurrent: () => boolean) => {
     try {
+      const missing = await missingAccess(tabId);
+      if (isCurrent()) {
+        setAccess((was) => (was?.origins.join() === missing?.origins.join() ? was : missing));
+        if (!missing) setIsAccessDenied(false);
+      }
+      if (missing) return null;
       return { ...await scanTab(tabId), pending: await undoCount(tabId) };
     } catch (e) {
       if (isCurrent()) setError(explain(PAGE_UNREADABLE, e));
@@ -324,6 +335,17 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       chrome.webNavigation.onHistoryStateUpdated.removeListener(onNavigated);
     };
   }, [scan, tabId]);
+
+  /** The BDE's click on Allow: Chrome's own prompt, which needs this click, so the request comes before anything is awaited.
+   * Once allowed, the page is scanned as if it had been on the list all along. */
+  const allowAccess = useCallback(async () => {
+    if (!access) return;
+    setIsAsking(true);
+    const granted = await requestAccess(access).catch(() => false);
+    setIsAsking(false);
+    setIsAccessDenied(!granted);
+    if (granted) await scan();
+  }, [access, scan]);
 
   /** A look at the form between scans: what the BDE has filled since, and whether fields came or went. The page has no
    * way to message the extension, so the panel asks. */
@@ -663,7 +685,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, [applicationId, watchForm]);
 
   return {
-    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, reviewedFor, attachment, attachedFile, step,
+    rows, scanning, error, needsAccess: access, isAccessDenied, isAsking, allowAccess, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, reviewedFor, attachment, attachedFile, step,
     needsConfirmation, fillCount: targets.length, staleCount: (rows ?? []).filter((row) => row.isStale).length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
   };
 }

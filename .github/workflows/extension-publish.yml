@@ -1,0 +1,65 @@
+# Publishes the Chrome extension to the Chrome Web Store. It runs only when something under extension/ changes on main
+# (or by hand), so a backend or frontend change never re-uploads it. The store reviews each upload before it goes live.
+name: Publish extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "extension/**"
+      - ".github/workflows/extension-publish.yml"
+  workflow_dispatch:
+
+# One upload at a time; a newer push waits instead of cancelling an upload in progress.
+concurrency:
+  group: extension-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Create an environment named chrome-web-store in the repository settings to require an approval before each upload.
+    environment: chrome-web-store
+    env:
+      # Repository secrets (Settings, Secrets and variables, Actions). Without them the job builds and keeps the zip, and
+      # uploads nothing.
+      EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci --prefix extension
+      - run: npm --prefix extension run test
+      # The store build: https://www.benchq.io from extension/.env.store, no local address, no all-sites access.
+      - run: npm --prefix extension run build:store
+      # The store refuses a version it already has, so each upload gets the next one: the manifest's major.minor, then this run's number.
+      - name: Stamp the version
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = "extension/dist/manifest.json";
+            const manifest = JSON.parse(fs.readFileSync(path, "utf8"));
+            const [major, minor] = manifest.version.split(".");
+            manifest.version = `${major}.${minor}.${process.env.GITHUB_RUN_NUMBER}`;
+            fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + "\n");
+            console.log("version", manifest.version);
+          '
+      - name: Zip
+        run: cd extension/dist && zip -r ../benchq-extension.zip . -x "*.map"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchq-extension
+          path: extension/benchq-extension.zip
+      - name: Upload to the Chrome Web Store and submit for review
+        if: ${{ env.EXTENSION_ID != '' && env.REFRESH_TOKEN != '' }}
+        run: npx --yes chrome-webstore-upload-cli@3 upload --source extension/benchq-extension.zip --auto-publish
+      - name: No store credentials
+        if: ${{ env.EXTENSION_ID == '' || env.REFRESH_TOKEN == '' }}
+        run: echo "No Chrome Web Store secrets are set, so nothing was uploaded. The built zip is attached to this run."
