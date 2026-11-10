@@ -14,7 +14,9 @@ the job lives in one `content` JSONB column (decided 2026-11-09). No status colu
 `request`/`pending` rows. `state` is success (jobs came back), empty (the source answered with none) or error (it
 failed); `error` holds the failure detail and is set exactly when `state = 'error'`. `metadata` holds the rest of
 the source's response (request id, parameters, totals): everything but the jobs. `batch_id` is unique, and
-`job_postings.batch_id` references it: on success the batch row and its postings are written in one transaction.
+`job_postings (firm_id, candidate_id, batch_id)` references the same three on `scrape_jobs` (unique together), so a
+posting can't name another candidate's or another firm's batch. On success the batch row and its postings are
+written in one transaction.
 
 Tenancy: both tables reference `candidates (firm_id, id)` with `(firm_id, candidate_id)`, so a row can't carry a
 firm other than its candidate's. That needs `UNIQUE (firm_id, id)` on `candidates`, added here.
@@ -53,8 +55,8 @@ def upgrade() -> None:
                                 name='fk_scrape_jobs_firm_candidate', ondelete='RESTRICT'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('batch_id'),
+        sa.UniqueConstraint('firm_id', 'candidate_id', 'batch_id', name='uq_scrape_jobs_firm_candidate_batch'),
     )
-    op.create_index('ix_scrape_jobs_firm_candidate', 'scrape_jobs', ['firm_id', 'candidate_id'], unique=False)
 
     op.create_table(
         'job_postings',
@@ -74,18 +76,18 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['firm_id'], ['firms.id'], ondelete='RESTRICT'),
         sa.ForeignKeyConstraint(['firm_id', 'candidate_id'], ['candidates.firm_id', 'candidates.id'],
                                 name='fk_job_postings_firm_candidate', ondelete='RESTRICT'),
-        sa.ForeignKeyConstraint(['batch_id'], ['scrape_jobs.batch_id'], ondelete='RESTRICT'),
+        sa.ForeignKeyConstraint(['firm_id', 'candidate_id', 'batch_id'],
+                                ['scrape_jobs.firm_id', 'scrape_jobs.candidate_id', 'scrape_jobs.batch_id'],
+                                name='fk_job_postings_batch', ondelete='RESTRICT'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('candidate_id', 'job_id', name='uq_job_postings_candidate_job'),
     )
-    op.create_index(op.f('ix_job_postings_batch_id'), 'job_postings', ['batch_id'], unique=False)
-    op.create_index('ix_job_postings_firm_candidate', 'job_postings', ['firm_id', 'candidate_id'], unique=False)
+    op.create_index('ix_job_postings_firm_candidate_batch', 'job_postings', ['firm_id', 'candidate_id', 'batch_id'],
+                    unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index('ix_job_postings_firm_candidate', table_name='job_postings')
-    op.drop_index(op.f('ix_job_postings_batch_id'), table_name='job_postings')
+    op.drop_index('ix_job_postings_firm_candidate_batch', table_name='job_postings')
     op.drop_table('job_postings')
-    op.drop_index('ix_scrape_jobs_firm_candidate', table_name='scrape_jobs')
     op.drop_table('scrape_jobs')
     op.drop_constraint('uq_candidates_firm_id', 'candidates', type_='unique')

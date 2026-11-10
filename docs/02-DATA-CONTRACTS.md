@@ -1187,12 +1187,16 @@ export const JobMarkSchema = z.object({
     an application row), so a copy here can't drift from it. Hiding a job (dismissed) isn't built.
   - **Tenancy:** `(firm_id, candidate_id)` references `candidates (firm_id, id)` (on `scrape_jobs` too), so a row
     can't carry a firm other than its candidate's; `candidates` gets `UNIQUE (firm_id, id)` for it.
-  - **`batch_id` references `scrape_jobs.batch_id`.** On a successful batch the ingestion code writes the
-    `scrape_jobs` row and the postings in one transaction, the batch row first, so a crash leaves neither.
+  - **`(firm_id, candidate_id, batch_id)` references the same three on `scrape_jobs`** (unique together there), so
+    a posting can only name a batch run for its own candidate in its own firm, never another candidate's or another
+    firm's (Abdul's review, 2026-11-10). On a successful batch the ingestion code writes the `scrape_jobs` row and
+    the postings in one transaction, the batch row first, so a crash leaves neither.
   - **`job_id` is checked:** `CHECK (job_id ~ '^[0-9a-f]{64}$')`, lower-case SHA256 hex, so a raw board id or a
     truncated or upper-case hash is refused instead of silently breaking dedup.
-  - **Indexes:** the unique `(candidate_id, job_id)` (dedup, and lookups by candidate), `(firm_id, candidate_id)`
-    (one candidate's list in a firm), `batch_id` (the foreign key). Nothing looks up by the hash alone.
+  - **Indexes:** the unique `(candidate_id, job_id)` (dedup, and lookups by candidate) and
+    `(firm_id, candidate_id, batch_id)` (one candidate's list in a firm, a firm's list, and the batch key, by its
+    leading columns). Nothing looks up by the hash alone. On `scrape_jobs`, the unique `(firm_id, candidate_id,
+    batch_id)` serves a candidate's batches the same way.
 - **Identity (revised 2026-11-09):** `job_id` (SHA256 of normalized company + title + full job description; a
   content hash, not an id from the job board, and not the row's primary key `id`)
   is the only identity key. A content change is treated as a new posting by design, so the board's own job id adds

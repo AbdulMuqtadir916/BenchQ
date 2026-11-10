@@ -21,7 +21,8 @@ No status column (decided 2026-11-10): whether a job was saved or applied to liv
 drift from a copy here. Hiding a job (dismissed) isn't built.
 
 Tenancy: `(firm_id, candidate_id)` references `candidates (firm_id, id)` on both tables, so a row can't carry a
-firm other than its candidate's.
+firm other than its candidate's; and `job_postings (firm_id, candidate_id, batch_id)` references the same three on
+`scrape_jobs`, so a posting can't name another candidate's or another firm's batch.
 """
 from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKeyConstraint, Index, String, Text, \
     UniqueConstraint, event, text
@@ -55,7 +56,8 @@ class ScrapeJob(Base):
                              name="fk_scrape_jobs_firm_candidate", ondelete="RESTRICT"),
         CheckConstraint("state IN ('success', 'empty', 'error')", name="ck_scrape_jobs_state"),
         CheckConstraint("(state = 'error') = (error IS NOT NULL)", name="ck_scrape_jobs_error_iff_error"),
-        Index("ix_scrape_jobs_firm_candidate", "firm_id", "candidate_id"),
+        # The target of job_postings' batch key: a posting can only name a batch run for its own candidate and firm.
+        UniqueConstraint("firm_id", "candidate_id", "batch_id", name="uq_scrape_jobs_firm_candidate_batch"),
     )
 
 
@@ -66,7 +68,8 @@ class JobPosting(Base):
     firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False)
     candidate_id = Column(UUID(as_uuid=True), nullable=False)
     # The last batch that found this job: a repeat match updates it in place, so it is not the batch history.
-    batch_id = Column(UUID(as_uuid=True), _restrict("scrape_jobs.batch_id"), nullable=False, index=True)
+    # References scrape_jobs with (firm_id, candidate_id, batch_id), so it can't name another candidate's batch.
+    batch_id = Column(UUID(as_uuid=True), nullable=False)
 
     source = Column(String, nullable=False)          # freehire | jsearch | coresignal | ...
     job_id = Column(String(64), nullable=False)      # SHA256 hex of normalized company + title + full JD
@@ -83,12 +86,15 @@ class JobPosting(Base):
     __table_args__ = (
         ForeignKeyConstraint(["firm_id", "candidate_id"], ["candidates.firm_id", "candidates.id"],
                              name="fk_job_postings_firm_candidate", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["firm_id", "candidate_id", "batch_id"],
+                             ["scrape_jobs.firm_id", "scrape_jobs.candidate_id", "scrape_jobs.batch_id"],
+                             name="fk_job_postings_batch", ondelete="RESTRICT"),
         # The dedup scope: content seen before for this candidate is updated in place, never duplicated. Also the
         # index for lookups by candidate_id alone (its leading column).
         UniqueConstraint("candidate_id", "job_id", name="uq_job_postings_candidate_job"),
         CheckConstraint("job_id ~ '^[0-9a-f]{64}$'", name="ck_job_postings_job_id_sha256"),
-        # The list screen: one candidate's jobs in a firm. Also covers firm_id alone.
-        Index("ix_job_postings_firm_candidate", "firm_id", "candidate_id"),
+        # The list screen (one candidate's jobs in a firm, or a firm's) and the batch key, by its leading columns.
+        Index("ix_job_postings_firm_candidate_batch", "firm_id", "candidate_id", "batch_id"),
     )
 
 

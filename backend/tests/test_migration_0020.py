@@ -108,6 +108,60 @@ def test_both_tables_refuse_a_firm_other_than_the_candidates(scratch_db):
                                         "batch_id": batch_id, "job_id": _HASH, "content": "{}"})
 
 
+def _second_candidate(engine, firm_id):
+    with engine.connect() as conn:
+        manager_id, owner_id = conn.execute(text(
+            "SELECT manager_id, created_by_user_id FROM candidates WHERE firm_id = :f LIMIT 1"), {"f": firm_id}).one()
+    candidate_id = uuid.uuid4()
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO candidates (id, firm_id, manager_id, created_by_user_id, work_auth, needs_sponsorship, "
+            "rate_target, rate_min, contact_notes) VALUES (:id, :firm_id, :manager_id, :owner_id, 'H1B', true, 85, "
+            "70, 'internal')"),
+            {"id": candidate_id, "firm_id": firm_id, "manager_id": manager_id, "owner_id": owner_id})
+    return candidate_id
+
+
+def _other_firm_candidate(engine, other_firm_id):
+    with Session(engine) as db:
+        from backend.models.tenancy import Firm
+        other = db.get(Firm, other_firm_id)
+        owner = make_user(db, other, email="o@globex.test", role="OWNER")
+        manager = make_user(db, other, email="m@globex.test", role="MANAGER")
+        db.commit()
+        owner_id, manager_id = owner.id, manager.id
+    candidate_id = uuid.uuid4()
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO candidates (id, firm_id, manager_id, created_by_user_id, work_auth, needs_sponsorship, "
+            "rate_target, rate_min, contact_notes) VALUES (:id, :firm_id, :manager_id, :owner_id, 'H1B', true, 85, "
+            "70, 'internal')"),
+            {"id": candidate_id, "firm_id": other_firm_id, "manager_id": manager_id, "owner_id": owner_id})
+    return candidate_id
+
+
+def test_a_posting_cannot_name_another_candidates_batch(scratch_db):
+    """Both rows pass their own (firm_id, candidate_id) check; the batch is someone else's in the same firm."""
+    name, engine = scratch_db
+    _ok(_alembic(name, "upgrade", "0020"))
+    firm_id, candidate_x, _ = _firm_and_candidate(engine)
+    candidate_y = _second_candidate(engine, firm_id)
+    batch_of_x = _scrape(engine, firm_id, candidate_x)
+    assert _rejected(engine, _POSTING, {"id": uuid.uuid4(), "firm_id": firm_id, "candidate_id": candidate_y,
+                                        "batch_id": batch_of_x, "job_id": _HASH, "content": "{}"})
+
+
+def test_a_posting_cannot_name_another_firms_batch(scratch_db):
+    """The posting's own firm and candidate agree; the batch belongs to a candidate of another firm."""
+    name, engine = scratch_db
+    _ok(_alembic(name, "upgrade", "0020"))
+    firm_id, candidate_id, other_firm_id = _firm_and_candidate(engine)
+    other_candidate = _other_firm_candidate(engine, other_firm_id)
+    batch_of_other_firm = _scrape(engine, other_firm_id, other_candidate)
+    assert _rejected(engine, _POSTING, {"id": uuid.uuid4(), "firm_id": firm_id, "candidate_id": candidate_id,
+                                        "batch_id": batch_of_other_firm, "job_id": _HASH, "content": "{}"})
+
+
 def test_scrape_jobs_states_error_detail_and_one_row_per_batch(scratch_db):
     name, engine = scratch_db
     _ok(_alembic(name, "upgrade", "0020"))
