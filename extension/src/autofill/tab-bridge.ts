@@ -194,7 +194,8 @@ export async function takeBackField(tabId: number, frameId: number, target: Fiel
   return answer?.result ?? false;
 }
 
-/** Takes a file BenchQ attached off the page by its name, in whichever frame shows it: true when one was removed. */
+/** Takes a file BenchQ attached off the page by its name: each frame removes it only if it attached it there, beside the
+ * upload it went to. True when one was removed. */
 export async function removeFileOnPage(tabId: number, name: string): Promise<boolean> {
   const answers = await inFrames<boolean>({ tabId, allFrames: true }, "removeFile", [name]);
   return answers.some(({ result }) => result);

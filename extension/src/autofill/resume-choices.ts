@@ -11,25 +11,29 @@ const newest = (versions: ResumeVersion[]) =>
 
 /** This job's tailored résumés first, then every base the candidate keeps, each at its newest version; the base the
  * workflow uses is `isActive`, which the picker tags Active, as the website does. A hidden base isn't offered, as on the
- * website. */
-export function resumeChoices(listing: ResumeListing, jobId: string | null): ResumeChoice[] {
+ * website. An older version the application names (`namedId`) is offered too, after its résumé's newest, so the picker
+ * can start on it: the application's own résumé, not another one's answers. */
+export function resumeChoices(listing: ResumeListing, jobId: string | null, namedId: string | null = null): ResumeChoice[] {
   const numbers = new Map(listing.bases.map(({ id, number }) => [id, number]));
+  // A résumé's newest version, then the one the application names when that's an older one.
+  const offered = (versions: ResumeVersion[]) => {
+    const latest = newest(versions);
+    const named = versions.find(({ id }) => id === namedId);
+    return !latest ? [] : named && named !== latest ? [latest, named] : [latest];
+  };
   const tailored = (jobId ? listing.tailored.filter((shelf) => shelf.job_id === jobId) : []).flatMap((shelf) => {
-    const version = newest(shelf.versions);
     const base = numbers.get(shelf.base_resume_id);
-    return version ? [{
-      id: version.id, label: `Tailored for this job${base ? ` · from Base ${base}` : ""} · v${version.version}`,
-      meta: `Tailored for this job${base ? ` · from Base ${base}` : ""} · v${version.version}`, isTailored: true, isActive: false,
-      title: version.title?.trim() || null,
-    }] : [];
+    return offered(shelf.versions).map((version) => {
+      const meta = `Tailored for this job${base ? ` · from Base ${base}` : ""} · v${version.version}`;
+      return { id: version.id, label: meta, meta, isTailored: true, isActive: false, title: version.title?.trim() || null };
+    });
   });
-  const bases = listing.bases.filter(({ archived_at }) => !archived_at).flatMap((base) => {
-    const version = newest(base.versions);
-    if (!version) return [];
+  const bases = listing.bases.filter(({ archived_at }) => !archived_at).flatMap((base) => offered(base.versions).map((version, index) => {
     const title = version.title?.trim();
     const label = `Base ${base.number}${title ? ` · ${title}` : ""} · v${version.version}`;
-    return [{ id: version.id, label, meta: `Base ${base.number} · v${version.version}`, isTailored: false, isActive: base.is_active, title: title || null }];
-  });
+    // Active is the base in use at its newest version: an older one of it isn't tagged too.
+    return { id: version.id, label, meta: `Base ${base.number} · v${version.version}`, isTailored: false, isActive: base.is_active && index === 0, title: title || null };
+  }));
   return [...tailored, ...bases];
 }
 

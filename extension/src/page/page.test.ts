@@ -267,20 +267,77 @@ describe("a résumé upload behind a styled button (07 Q53)", () => {
 });
 
 describe("taking a file off through the page's own control (07 Q51)", () => {
-  it("clicks the remove control beside the chip that names the file", async () => {
-    const { filler } = setup(`<div class="upload"><div class="chip"><span>Priya - Java Developer.pdf</span><button type="button" aria-label="Remove file">×</button></div></div>`);
-    const removed = vi.fn();
-    element("button").addEventListener("click", removed);
-    expect(await filler.removeFile("Priya - Java Developer.pdf")).toBe(true);
-    expect(removed).toHaveBeenCalledTimes(1);
+  /** jsdom has no DataTransfer, and its upload takes only a FileList: the page's own list stands in for both. */
+  class FakeTransfer {
+    files: File[] = [];
+    items = { add: (file: File) => { this.files.push(file); } };
+  }
+
+  const NAME = "Priya - Java Developer.pdf";
+  const UPLOAD = `<div class="upload"><input id="r" type="file" aria-label="Resume/CV"><div><span>${NAME}</span><button id="mine" type="button" aria-label="Remove file">×</button></div></div>`;
+
+  /** The page in `html`, once BenchQ attached its file to the upload `#r` the way the panel does. */
+  async function attached(html: string) {
+    vi.stubGlobal("DataTransfer", FakeTransfer);
+    const { filler, rescan } = setup(html);
+    let held: File[] = [];
+    Object.defineProperty(element("#r"), "files", { configurable: true, get: () => held, set: (next: File[]) => { held = [...next]; } });
+    const { scanId, fields } = rescan();
+    const upload = fields.find(({ kind }) => kind === "file")!;
+    const write = { type: "file" as const, name: NAME, mimeType: "application/pdf", data: btoa("%PDF-1.7") };
+    expect((await filler.fill({ scanId, fieldId: upload.id, write, current: upload.current })).status).toBe("filled");
+    return filler;
+  }
+
+  /** A spy on the clicks the element `selector` gets. */
+  const clicksOn = (selector: string) => {
+    const clicked = vi.fn();
+    element(selector).addEventListener("click", clicked);
+    return clicked;
+  };
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("clicks the remove control beside the chip of the file it attached", async () => {
+    const filler = await attached(UPLOAD);
+    const mine = clicksOn("#mine");
+    expect(await filler.removeFile(NAME)).toBe(true);
+    expect(mine).toHaveBeenCalledTimes(1);
   });
 
-  it("removes nothing when no chip names that file, or it has no remove control", async () => {
-    const { filler } = setup(`<div><span>someone-else.pdf</span><button type="button">Remove</button></div><div><span>Priya - Java Developer.pdf</span><button type="button">Replace</button></div>`);
+  it("leaves a file of the same name the BDE attached to another upload", async () => {
+    const filler = await attached(`${UPLOAD}<div class="upload"><input id="o" type="file" aria-label="Other documents"><div><span>${NAME}</span><button id="theirs" type="button" aria-label="Remove file">×</button></div></div>`);
+    const mine = clicksOn("#mine");
+    const theirs = clicksOn("#theirs");
+    expect(await filler.removeFile(NAME)).toBe(true);
+    expect([mine.mock.calls.length, theirs.mock.calls.length]).toEqual([1, 0]);
+  });
+
+  it("removes nothing in a frame that didn't attach the file, though a chip there has its name", async () => {
+    const { filler } = setup(`<div><span>${NAME}</span><button id="theirs" type="button" aria-label="Remove file">×</button></div>`);
+    const theirs = clicksOn("#theirs");
+    expect(await filler.removeFile(NAME)).toBe(false);
+    expect(theirs).not.toHaveBeenCalled();
+  });
+
+  it("once the page swapped out the upload it filled, takes off the only chip with the name, never one of two", async () => {
+    const filler = await attached(UPLOAD);
+    element("#r").remove();
+    document.body.insertAdjacentHTML("beforeend", `<div><span>${NAME}</span><button id="theirs" type="button" aria-label="Remove file">×</button></div>`);
+    const mine = clicksOn("#mine");
+    const theirs = clicksOn("#theirs");
+    expect(await filler.removeFile(NAME)).toBe(false);
+    element("#theirs").parentElement!.remove();
+    expect(await filler.removeFile(NAME)).toBe(true);
+    expect([mine.mock.calls.length, theirs.mock.calls.length]).toEqual([1, 0]);
+  });
+
+  it("removes nothing when its chip has no remove control, or BenchQ attached no file of that name", async () => {
+    const filler = await attached(`<div class="upload"><input id="r" type="file" aria-label="Resume/CV"><div><span>${NAME}</span><button type="button">Replace</button></div></div><div><span>someone-else.pdf</span><button type="button">Remove</button></div>`);
     const clicks = vi.fn();
     document.querySelectorAll("button").forEach((button) => button.addEventListener("click", clicks));
+    expect(await filler.removeFile(NAME)).toBe(false);
     expect(await filler.removeFile("Priya - Data Engineer.pdf")).toBe(false);
-    expect(await filler.removeFile("Priya - Java Developer.pdf")).toBe(false);
     expect(clicks).not.toHaveBeenCalled();
   });
 });

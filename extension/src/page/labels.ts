@@ -233,7 +233,7 @@ export const isFileInput = (element: Element): element is HTMLInputElement =>
   element.tagName === "INPUT" && (element as HTMLInputElement).type === "file";
 
 /** The boxes an upload sits in, nearest first: its button, drop zone and chip live there. */
-function* uploadBoxes(input: HTMLInputElement) {
+export function* uploadBoxes(input: HTMLInputElement) {
   let box = input.parentElement;
   for (let depth = 0; box && depth < 3; depth += 1, box = box.parentElement) yield box;
 }

@@ -43,7 +43,7 @@ export function useResumes({ firmId, candidateId, jobId, namedId, onSessionExpir
   }, [firmId, candidateId, request, onSessionExpired, onAccessLost]);
 
   const listing = loaded?.request === request ? loaded.listing : undefined;
-  const choices = useMemo(() => (listing ? resumeChoices(listing, jobId) : []), [listing, jobId]);
+  const choices = useMemo(() => (listing ? resumeChoices(listing, jobId, namedId) : []), [listing, jobId, namedId]);
   const pickedId = chosen && choices.some(({ id }) => id === chosen) ? chosen : defaultResume(choices, namedId);
   const resumes: Resumes = !firmId || listing === null ? { status: "error" }
     : listing === undefined ? { status: "loading" }

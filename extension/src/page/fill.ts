@@ -1,7 +1,7 @@
 import type { ChoiceList, ChoiceRequest, FieldTarget, FieldWrite, FillRequest, FillResult, PickRequest, UndoResult } from "../autofill/types";
 import { clearList, closeList, isMultiple, openList, pickOption, searchList } from "./choice";
 import { fireEvents, pause, setText } from "./events";
-import { ariaChecked, collapse, isAriaChoice, isOn, isVisible, textOf } from "./labels";
+import { ariaChecked, collapse, isAriaChoice, isOn, isVisible, textOf, uploadBoxes } from "./labels";
 import { readCurrent, type Entry, type Registry } from "./scan";
 
 const SETTLE_MS = 80;
@@ -75,13 +75,29 @@ function showsOtherFile(box: HTMLElement, name: string): boolean {
   return false;
 }
 
-/** The element whose text names a file the page took: the chip it shows for it (the name, perhaps with its size). */
-function chipNamed(name: string): HTMLElement | null {
+/** The elements whose text names a file the page took: the chips it shows for it (the name, perhaps with its size). */
+function chipsNamed(name: string): HTMLElement[] {
+  const chips: HTMLElement[] = [];
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = collapse(node.textContent ?? "");
     const parent = node.parentElement;
-    if (parent && text.includes(name) && text.length <= name.length + 40 && isVisible(parent)) return parent;
+    if (parent && text.includes(name) && text.length <= name.length + 40 && isVisible(parent) && !chips.includes(parent)) chips.push(parent);
+  }
+  return chips;
+}
+
+/** Which of `chips` shows the file BenchQ put on `uploads`: the one in the nearest box an upload sits in, the way the
+ * scan reads an upload's file (07 Q53). Once the page has swapped those uploads out, the only chip with the name. A
+ * name alone doesn't say whose file it is, so two chips that can't be told apart are both left. */
+function ownChip(uploads: HTMLInputElement[], chips: HTMLElement[]): HTMLElement | null {
+  const connected = uploads.filter((upload) => upload.isConnected);
+  if (connected.length === 0) return chips.length === 1 ? chips[0]! : null;
+  for (const upload of connected) {
+    for (const box of uploadBoxes(upload)) {
+      const inBox = chips.filter((chip) => box.contains(chip));
+      if (inBox.length > 0) return inBox.length === 1 ? inBox[0]! : null;
+    }
   }
   return null;
 }
@@ -327,9 +343,13 @@ export function createFiller(registry: () => Registry | null) {
 
     /** Takes a file BenchQ attached off the page through the page's own remove control, found beside the chip that
      * names it (07 Q51): a page such as Greenhouse shows a taken file as a chip and ignores a new one put under it. Only
-     * the file of that name is ever removed. True once its control was clicked. */
+     * a file this frame attached is removed, and only its own chip, beside the upload it went to: a file of the same
+     * name the BDE attached elsewhere, here or in another frame, stays. True once its control was clicked. */
     async removeFile(name: string): Promise<boolean> {
-      for (let box = chipNamed(name), depth = 0; box && depth < 4; depth += 1, box = box.parentElement) {
+      const uploads = filled.filter(({ write }) => write.type === "file" && write.name === name)
+        .map(({ entry }) => entry.controls[0] as HTMLInputElement);
+      if (uploads.length === 0) return false;
+      for (let box = ownChip(uploads, chipsNamed(name)), depth = 0; box && depth < 4; depth += 1, box = box.parentElement) {
         if (showsOtherFile(box, name)) break;
         const control = Array.from(box.querySelectorAll<HTMLElement>("button, a, [role='button']"))
           .find((element) => isVisible(element) && !element.matches(":disabled") && REMOVE_CONTROL.test(controlWords(element)));
