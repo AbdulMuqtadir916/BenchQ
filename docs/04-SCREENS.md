@@ -262,6 +262,18 @@ filtered (`status`, `bench`, `manager`, `bde`, `role`, `assignment`). The lists 
 **Clear all**, and use the dashboard's own counting rules (`lib/derive/list-filters.ts`), so the list always shows the
 number that was clicked. People open their own level of the dashboard; candidates open their profile.
 
+### 3.5b A manager's dashboard (07 Q62)
+
+A MANAGER's dashboard is the Activity dashboard only: no floor, no tab buttons. Next to the BDE cards is a bar chart of
+how far each BDE's applications of the period got (applied, shortlisted, interview, placed, counted like the pipeline:
+each is the applications that reached that stage). Opening a card or a bar goes to that BDE's dashboard.
+
+### 3.6b `/bdes` — MANAGER (07 Q62)
+
+The manager's own BDEs as a table (workload, candidates, applications, responses, interviews, placements for the
+period), with a name search (`?q=`) and the period (`?period=`). A row opens that BDE on the dashboard. Skeleton, empty
+(none yet / no match) and error states.
+
 ### 3.6 `/managers` — OWNER (07 Q60)
 
 Search by name (`?q=`), and **Table** or **Cards** (`?view=`). Each manager: active or not, BDEs, candidates, the queue

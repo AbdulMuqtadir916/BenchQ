@@ -30,7 +30,7 @@ const TITLE: Record<"MANAGER" | "OWNER" | "VIEWER", string> = { OWNER: "The busi
  */
 export function ManagerDashboard({ role = "MANAGER" }: { role?: "MANAGER" | "OWNER" | "VIEWER" }) {
   return (
-    <DashboardTabs overview={{ label: "The floor", title: TITLE[role], subtitle: "Who is working on what, at which stage, right now." }}
+    <DashboardTabs activityOnly={role === "MANAGER"} overview={{ label: "The floor", title: TITLE[role], subtitle: "Who is working on what, at which stage, right now." }}
       activity={role === "MANAGER"
         ? { title: "Team activity", subtitle: "Follow your team from your BDEs to their candidates." }
         : { title: "Firm activity", subtitle: "Follow activity from the firm to managers, BDEs, and their candidates." }}>

@@ -10,7 +10,7 @@ import type { Candidate } from "@/lib/schemas/candidate";
 import type { User } from "@/lib/schemas/session";
 import { Hint, plural } from "./activity-firm-cards";
 import { linkSurface, type ListLinks } from "./activity-links";
-import type { BdeRow, StackedBin } from "./activity-numbers";
+import type { BdeRow, BdeStageRow, StackedBin } from "./activity-numbers";
 
 /**
  * Fixed order, never cycled: past six BDEs, the rest share one grey "Others" (colour follows the person, not the rank),
@@ -65,10 +65,10 @@ export function StackedTrendCard({ bdes, bins, onSelectBde }: { bdes: User[]; bi
 }
 
 /** One card per BDE: their load against the firm's capacity and their period, opening their level. */
-export function BdeCards({ rows, capacity, onSelectBde }: { rows: BdeRow[]; capacity: number; onSelectBde: (bdeId: string) => void }) {
+export function BdeCards({ rows, capacity, onSelectBde, columns = "sm:grid-cols-2 xl:grid-cols-3" }: { rows: BdeRow[]; capacity: number; onSelectBde: (bdeId: string) => void; columns?: string }) {
   if (rows.length === 0) return <Card><p className="text-sm text-[var(--color-text-3)]">No BDEs on this team yet. They show up here once they report to this manager.</p></Card>;
   return (
-    <ul aria-label="BDEs" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <ul aria-label="BDEs" className={cn("grid gap-3", columns)}>
       {rows.map((row) => {
         const full = row.working >= capacity;
         return (
@@ -114,6 +114,46 @@ export function QueueCard({ waiting, now, links, canAssign }: { waiting: Candida
                 <span className="min-w-0 truncate text-[var(--color-text)]">{candidate.fullName}<span className="text-[var(--color-text-3)]"> · {plural(days, "day")} on the bench</span></span>
                 <span className="inline-flex shrink-0 items-center gap-1 text-[var(--color-primary)]">{canAssign ? <><UserPlus size={14} aria-hidden />Assign</> : "Open"}</span>
               </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+const STAGES = [
+  { key: "applied", label: "Applied", fill: "bg-[var(--color-chart-1)]" },
+  { key: "shortlisted", label: "Shortlisted", fill: "bg-[var(--color-chart-2)]" },
+  { key: "interview", label: "Interview", fill: "bg-[var(--color-chart-3)]" },
+  { key: "placed", label: "Placed", fill: "bg-[var(--color-chart-4)]" },
+] as const;
+
+/** Each BDE's applications of the period and how many reached shortlisted, interview and placed. Each BDE opens their dashboard. */
+export function BdeStageBars({ rows, onSelectBde }: { rows: BdeStageRow[]; onSelectBde: (bdeId: string) => void }) {
+  const max = Math.max(1, ...rows.map((row) => row.applied));
+  return (
+    <Card>
+      <CardHeader><div><CardTitle>How far each BDE&apos;s applications got</CardTitle><Hint>Applications submitted this period, and how many reached each stage</Hint></div></CardHeader>
+      <ul aria-label="Stages" className="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-caption text-[var(--color-text-3)]">
+        {STAGES.map((stage) => <li key={stage.key} className="flex items-center gap-1.5"><span aria-hidden className={cn("size-2 rounded-full", stage.fill)} />{stage.label}</li>)}
+      </ul>
+      {rows.length === 0 ? <p className="text-sm text-[var(--color-text-3)]">No BDEs on this team yet.</p> : (
+        <ul className="space-y-1">
+          {rows.map((row) => (
+            <li key={row.id}>
+              <button type="button" onClick={() => onSelectBde(row.id)} className={cn("block w-full px-2 py-1.5 text-left", linkSurface)}
+                aria-label={`${row.name}: ${row.applied} applied, ${row.shortlisted} shortlisted, ${row.interview} interview, ${row.placed} placed. Open their dashboard`}>
+                <span className="block truncate text-sm text-[var(--color-text)]">{row.name}</span>
+                {STAGES.map((stage) => (
+                  <span key={stage.key} className="mt-0.5 grid grid-cols-[1fr_2rem] items-center gap-2" aria-hidden>
+                    <span className="h-2 overflow-hidden rounded-full bg-[var(--color-surface-3)]">
+                      <span className={cn("block h-full rounded-full", stage.fill)} style={{ width: `${Math.max(row[stage.key] ? 2 : 0, (row[stage.key] / max) * 100)}%` }} />
+                    </span>
+                    <span className="text-right text-mono-sm tabular text-[var(--color-text-2)]">{row[stage.key]}</span>
+                  </span>
+                ))}
+              </button>
             </li>
           ))}
         </ul>

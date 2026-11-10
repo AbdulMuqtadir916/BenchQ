@@ -86,9 +86,9 @@ export function ManagerTable({ rows, onOpen, emptyState }: { rows: ManagerRow[];
     emptyState={emptyState ?? <EmptyState icon={Users} title="No managers yet" description="Managers show up here once the owner invites them." />} />;
 }
 
-export function BdeTable({ rows, capacity, onOpen }: { rows: BdeRow[]; capacity: number; onOpen: (row: BdeRow) => void }) {
+export function BdeTable({ rows, capacity, onOpen, emptyState }: { rows: BdeRow[]; capacity: number; onOpen: (row: BdeRow) => void; emptyState?: ReactNode }) {
   return <DataTable columns={bdeColumns(capacity)} data={rows} getRowId={(row) => row.id} onRowClick={onOpen} hasToolbar={false} isRowSelectable={false} label="BDEs"
-    emptyState={<EmptyState icon={Users} title="No BDEs on this team" description="BDEs show up here once they report to this manager." />} />;
+    emptyState={emptyState ?? <EmptyState icon={Users} title="No BDEs on this team" description="BDEs show up here once they report to this manager." />} />;
 }
 
 export function CandidateTable({ rows, onOpen }: { rows: CandidateRow[]; onOpen: (row: CandidateRow) => void }) {

@@ -16,9 +16,9 @@ import { AttentionChips, BenchAgingCard, FunnelCard, plural, RankedBars, SpeedSt
 import { averageDaysToPlace, benchHealth, type BenchHealth, candidateProgress, compareActivity, needsAttention, ratios, roleDemand, sourceEffectiveness, stageSpeeds } from "./activity/activity-insights";
 import { useListLinks, type ListLinks } from "./activity/activity-links";
 import { DemandCard, SourceCard, type JobsState } from "./activity/activity-market-cards";
-import { bdeRows, countActivity, eventBins, managerRows, paceOf, periodLabel, stackedByBde, submittedIn, type Period, type Window } from "./activity/activity-numbers";
+import { bdeRows, bdeStageRows, countActivity, eventBins, managerRows, paceOf, periodLabel, stackedByBde, submittedIn, type Period, type Window } from "./activity/activity-numbers";
 import { BdeTable } from "./activity/activity-tables";
-import { BdeCards, QueueCard, StackedTrendCard } from "./activity/activity-team-cards";
+import { BdeCards, BdeStageBars, QueueCard, StackedTrendCard } from "./activity/activity-team-cards";
 import { KpiTile, MeterTile } from "./activity/activity-tiles";
 
 interface ViewProps {
@@ -128,7 +128,10 @@ export function ManagerView({ user, bdes, candidates, applications, period, wind
     </div>
     <section aria-label="BDEs" className="space-y-3">
       <h2 className="text-h3 text-[var(--color-text)]">BDEs <span className="text-caption text-[var(--color-text-3)]">busiest first · workload against a capacity of {capacity}</span></h2>
-      <BdeCards rows={rows} capacity={capacity} onSelectBde={onSelectBde} />
+      <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+        <BdeCards rows={rows} capacity={capacity} onSelectBde={onSelectBde} columns="sm:grid-cols-2" />
+        <BdeStageBars rows={bdeStageRows(bdes, candidates, applications, window).sort((a, b) => b.applied - a.applied || a.name.localeCompare(b.name))} onSelectBde={onSelectBde} />
+      </div>
     </section>
     <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
       <FunnelCard applications={submittedIn(applications, window)} ratios={ratios(applications, window)} period={period} links={links} />

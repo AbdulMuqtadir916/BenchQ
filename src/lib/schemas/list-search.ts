@@ -51,6 +51,12 @@ export type CandidatesSearchState = z.infer<typeof CandidatesSearch>;
 
 export const isReachedStage = (status: string): status is ReachedStage => (REACHED_STAGES as readonly string[]).includes(status);
 
+/** A manager's BDEs page: the name search and the period its numbers cover. */
+export const BdesSearch = z.object({
+  q: z.string().catch(""),
+  period: z.enum(LIST_PERIODS).catch("30d"),
+});
+
 /** The Managers page: table or cards, the name search, and the period its numbers cover. */
 export const ManagersSearch = z.object({
   view: z.enum(["table", "cards"]).catch("table"),

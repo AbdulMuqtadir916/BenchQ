@@ -15,11 +15,11 @@ interface Tab {
 
 /**
  * The dashboard's two tabs, kept in the URL (`?view=`): the role's own overview first, then Activity. Activity is the
- * same drill-down for everyone who has it; who sees which part of it is the scope's business (07 Q47).
+ * same drill-down for everyone who has it (a manager has only Activity: `activityOnly`); who sees which part of it is the scope's business (07 Q47).
  */
-export function DashboardTabs({ overview, activity, children }: { overview: Tab; activity: Omit<Tab, "label">; children: ReactNode }) {
+export function DashboardTabs({ overview, activity, activityOnly = false, children }: { overview: Tab; activity: Omit<Tab, "label">; activityOnly?: boolean; children: ReactNode }) {
   const [query, setQuery] = useUrlState(DashboardSearch);
-  const isOverview = query.view === "finance";
+  const isOverview = !activityOnly && query.view === "finance";
   const tab = (view: DashboardSearchState["view"], label: string) => (
     <button type="button" aria-pressed={query.view === view} onClick={() => setQuery({ view })}
       className={cn("rounded-[var(--radius-sm)] px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
@@ -30,12 +30,12 @@ export function DashboardTabs({ overview, activity, children }: { overview: Tab;
   return (
     <div className="bq-page">
       <PageHeader title={isOverview ? overview.title : activity.title} subtitle={isOverview ? overview.subtitle : activity.subtitle}
-        actions={
+        actions={activityOnly ? undefined : (
           <div role="group" aria-label="Dashboard views" className="inline-flex rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-1">
             {tab("finance", overview.label)}
             {tab("activity", "Activity dashboard")}
           </div>
-        } />
+        )} />
       <div aria-label={isOverview ? overview.label : "Activity dashboard"}>
         {isOverview ? children : <OwnerActivityDashboard />}
       </div>

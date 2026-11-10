@@ -66,7 +66,7 @@ whole firm to a manager's team to one BDE, now drawn as charts (funnel, ranked b
 bench, stage speeds, job sources, BDE workload, a today ring), and every number opens the Applications or Candidates
 list filtered to the same records. Managers and viewers have the tab too (a manager sees only their team). New
 Owner-only Managers page; Analytics removed, its numbers moved to the tab (07 Q60). Follow-ups removed, agreed with
-Abdul (07 Q61). Details in
+Abdul (07 Q61). A manager now has only the Activity dashboard, with a per-BDE stage chart, and a BDEs page (07 Q62). Details in
 [pr-changes/pr8-owner-dashboard.md](./pr-changes/pr8-owner-dashboard.md).
 
 ## 1. Notifications inbox

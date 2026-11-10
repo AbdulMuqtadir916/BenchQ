@@ -47,7 +47,7 @@ describe("route registry", () => {
   it("keeps every URL when pages sit in route groups ((workspace), (manage), (app), (studio))", () => {
     const pages = pagePaths();
     expect(pages.some((path) => path.includes("(") || path.includes(")"))).toBe(false);
-    for (const url of ["/dashboard", "/candidates", "/candidates/[id]", "/jobs", "/applications", "/resumes", "/resumes/[id]", "/outreach", "/managers", "/ledger", "/settings/team", "/focus", "/welcome"]) {
+    for (const url of ["/dashboard", "/candidates", "/candidates/[id]", "/jobs", "/applications", "/resumes", "/resumes/[id]", "/outreach", "/managers", "/bdes", "/ledger", "/settings/team", "/focus", "/welcome"]) {
       expect(pages, url).toContain(`/[firm]${url}`);
     }
   });
@@ -105,6 +105,9 @@ describe("route registry", () => {
   it("only shows nav items a role can open", () => {
     expect(navFor(asRole("BDE"), "workspace").map((r) => r.id)).not.toContain("managers");
     expect(navFor(asRole("MANAGER"), "workspace").map((r) => r.id)).not.toContain("managers");
+    expect(navFor(asRole("MANAGER"), "workspace").map((r) => r.id).slice(0, 2)).toEqual(["dashboard", "bdes"]);
+    expect(navFor(asRole("OWNER"), "workspace").map((r) => r.id)).not.toContain("bdes");
+    expect(navFor(asRole("BDE"), "workspace").map((r) => r.id)).not.toContain("bdes");
     expect(navFor(asRole("OWNER"), "workspace").map((r) => r.id).slice(0, 3)).toEqual(["dashboard", "managers", "candidates"]);
     expect(navFor(asRole("OWNER"), "workspace").map((r) => r.id)).not.toContain("followups"); // removed (07 Q61)
     expect(navFor(asRole("MANAGER"), "settings").map((r) => r.id)).toEqual(["settings.team", "settings.templates", "settings.preferences"]);
@@ -181,6 +184,7 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["candidates.new", "full", "full", "none", "none"], // 07 Q41: a BDE no longer adds candidates
   ["candidates.detail", "full", "team", "assigned", "read"],
   ["managers", "full", "none", "none", "none"],
+  ["bdes", "none", "team", "none", "none"], // a manager's own BDEs
   ["jobs", "full", "full", "full", "read"],
   ["jobs.detail", "full", "full", "full", "read"],
   ["jobs.capture", "full", "full", "full", "none"],
@@ -363,7 +367,7 @@ const SUPPORT_TABLE: ReadonlyArray<readonly [RouteId, Access]> = [
   ["welcome", "none"], ["dashboard", "read"], ["candidates", "read"], ["candidates.new", "none"], ["candidates.detail", "read"],
   ["jobs", "read"], ["jobs.detail", "read"], ["jobs.capture", "none"], ["applications", "read"], ["applications.detail", "read"],
   ["resumes", "read"], ["resumes.studio", "read"], ["outreach", "read"], ["focus", "none"],
-  ["managers", "read"], ["ledger", "read"], ["settings", "read"], ["settings.firm", "read"], ["settings.team", "read"],
+  ["managers", "read"], ["bdes", "none"], ["ledger", "read"], ["settings", "read"], ["settings.firm", "read"], ["settings.team", "read"],
   ["settings.templates", "read"], ["settings.preferences", "none"], ["notifications", "none"], ["notifications.requests", "none"],
 ];
 

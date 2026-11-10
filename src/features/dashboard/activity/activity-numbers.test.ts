@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { User } from "@/lib/schemas/session";
-import { bdeRows, candidateRows, countActivity, managerRows, stackedByBde, trendBins, windowOf } from "./activity-numbers";
+import { bdeRows, bdeStageRows, candidateRows, countActivity, managerRows, stackedByBde, trendBins, windowOf } from "./activity-numbers";
 
 const NOW = new Date("2026-11-09T12:00:00Z");
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * 86_400_000).toISOString();
@@ -40,6 +40,18 @@ describe("the activity numbers", () => {
     const [row] = bdeRows([person("bea", "BDE", "mira")], [candidate("c1", "mira", "bea"), candidate("c2", "mira", null)],
       [app({ candidateId: "c1" }), app({ candidateId: "c2" })], window);
     expect(row).toMatchObject({ candidates: 1, counts: { applications: 1 } });
+  });
+
+  it("counts how far each BDE's applications of the period got, by the stages they reached", () => {
+    const step = (toStatus: Application["status"]) => ({ toStatus }) as Application["events"][number];
+    const [row] = bdeStageRows([person("bea", "BDE", "mira")], [candidate("c1", "mira", "bea"), candidate("c2", "mira", "zed")], [
+      app({ id: "1", candidateId: "c1" }),
+      app({ id: "2", candidateId: "c1", status: "INTERVIEW", events: [step("SCREENING"), step("INTERVIEW")] }),
+      app({ id: "3", candidateId: "c1", status: "PLACED", events: [step("SCREENING"), step("INTERVIEW"), step("OFFER"), step("PLACED")] }),
+      app({ id: "4", candidateId: "c1", appliedAt: daysAgo(60), status: "PLACED", events: [step("PLACED")] }), // submitted before the period
+      app({ id: "5", candidateId: "c2" }),                                                                     // another BDE's candidate
+    ], window);
+    expect(row).toMatchObject({ applied: 3, shortlisted: 2, interview: 2, placed: 1 });
   });
 
   it("dates a candidate by the latest thing that happened, whenever it was", () => {

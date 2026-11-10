@@ -72,11 +72,20 @@ describe("the Activity tab (07 Q47)", { timeout: 20_000 }, () => {
     expect(html).not.toContain(">Assign<");
   });
 
-  it("keeps the floor as the first tab for a manager", async () => {
+  it("gives a manager only the activity dashboard: no floor, no tabs, whatever the URL says", async () => {
     search.value = "";
     await as("user_fatima");
     const html = await render(() => createElement(ManagerDashboard, { role: "MANAGER" }));
-    expect(html).toContain("The floor");
-    expect(html).toContain("Activity dashboard");
+    expect(html).toContain("Team activity");
+    expect(html).not.toContain("The floor");
+    expect(html).not.toContain(">Activity dashboard<"); // the tab button; the region is still labelled
+    expect(html).not.toContain("Dashboard views");
+  });
+
+  it("shows a manager how far each BDE's applications got, each opening that BDE", async () => {
+    search.value = "view=activity";
+    await as("user_fatima");
+    const html = await render(() => createElement(ManagerDashboard, { role: "MANAGER" }));
+    for (const text of ["How far each BDE", "Shortlisted", "Open their dashboard"]) expect(html, text).toContain(text);
   });
 });

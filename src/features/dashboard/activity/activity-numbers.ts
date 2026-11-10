@@ -1,5 +1,6 @@
 import { isBde } from "@/lib/auth/roles";
 import { maxDate } from "@/lib/derive";
+import { reachedStatuses } from "@/lib/derive/funnel";
 import { applicationDate, happenedIn } from "@/lib/derive/list-filters";
 import type { ApplicationDate } from "@/lib/schemas/list-search";
 import { isWorkingCandidate } from "@/lib/derive/tenancy";
@@ -175,4 +176,23 @@ export function paceOf(applications: readonly Application[], now: Date, days = 1
   const today = submittedIn(applications, { start: end - DAY_MS, end }).length;
   const before = submittedIn(applications, { start: end - (days + 1) * DAY_MS, end: end - DAY_MS - 1 }).length;
   return { today, usual: Math.round((10 * before) / days) / 10 };
+}
+
+/** How far one BDE's applications of the period got: each count is the applications that reached that stage (like the pipeline). */
+export interface BdeStageRow {
+  id: string;
+  name: string;
+  applied: number;
+  shortlisted: number;
+  interview: number;
+  placed: number;
+}
+
+export function bdeStageRows(bdes: readonly User[], candidates: readonly Candidate[], applications: readonly Application[], window: Window): BdeStageRow[] {
+  return bdes.map((bde) => {
+    const mine = submittedIn(forCandidates(applications, candidates.filter((candidate) => candidate.bdeId === bde.id)), window);
+    const reached = mine.map(reachedStatuses);
+    const count = (status: "SCREENING" | "INTERVIEW" | "PLACED") => reached.filter((set) => set.has(status)).length;
+    return { id: bde.id, name: bde.name, applied: mine.length, shortlisted: count("SCREENING"), interview: count("INTERVIEW"), placed: count("PLACED") };
+  });
 }

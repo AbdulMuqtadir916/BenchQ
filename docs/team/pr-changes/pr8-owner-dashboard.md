@@ -126,6 +126,18 @@ saved nothing, and nobody was building it (Samad's plan only named it, as open d
 **Layout:** on the Activity tab the level you are on is plain text and only the levels above it are buttons ("Whole
 firm" becomes a button once a manager is open). The Finance / Activity tabs sit at the top right, on the heading's line.
 
+## A manager's dashboard and the BDEs page (2026-11-10, decision 07 Q62)
+
+- **Why the board and the dashboard differ:** the Applications board counts where each application is now (Applied 50,
+  Shortlisted 16 ...). The dashboard pipeline counts how far each one got in the period (Applied 143 = everything
+  submitted; Shortlisted counts every one that was ever shortlisted, including those now at Interview or Placed). Both
+  are right; nothing changed.
+- **Manager dashboard:** no floor and no tab buttons, only the Activity dashboard. The OWNER and VIEWER keep their tabs.
+- **New chart** beside the BDE cards: per BDE, applied / shortlisted / interview / placed (`bdeStageRows`); each opens
+  that BDE's dashboard.
+- **New page** `/[firm]/bdes` (MANAGER only, `g b`, sidebar after Dashboard): the manager's BDE table; a row opens the
+  BDE's dashboard.
+
 ## Files changed
 
 | File | Changes and reason |

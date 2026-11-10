@@ -15,6 +15,7 @@ import {
   SlidersHorizontal,
   SwatchBook,
   UserCog,
+  UserRound,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -86,6 +87,8 @@ const ROUTE_DEFS = [
   { id: "dashboard", path: "/[firm]/dashboard", title: "Dashboard", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 1, icon: LayoutDashboard }, shortcut: "d", palette: true },
   // docs/07 Q60: the owner's managers, with their teams' numbers; a manager opens at their level of the dashboard.
   { id: "managers", path: "/[firm]/managers", title: "Managers", area: "firm", shell: "app", access: firm(roles("full", "none", "none", "none")), nav: { section: "workspace", order: 2, icon: UserCog }, shortcut: "m", palette: true },
+  // A manager's BDEs: the team, with its numbers; each opens that BDE on the dashboard.
+  { id: "bdes", path: "/[firm]/bdes", title: "BDEs", area: "firm", shell: "app", access: firm(roles("none", "team", "none", "none")), nav: { section: "workspace", order: 2, icon: UserRound }, shortcut: "b", palette: true },
   { id: "candidates", path: "/[firm]/candidates", title: "Candidates", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 3, icon: Users }, shortcut: "c", palette: true },
   { id: "candidates.new", path: "/[firm]/candidates/new", title: "New candidate", area: "firm", shell: "studio", access: firm(roles("full", "full", "none", "none"), "none") },
   { id: "candidates.detail", path: "/[firm]/candidates/[id]", title: "Candidate", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")) },
