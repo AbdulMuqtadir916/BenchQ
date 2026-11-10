@@ -1,0 +1,93 @@
+import { useLayoutEffect, useRef, useState } from "react";
+import { button, FITTED_BUTTONS, MOTION, SOFT_TEXT, WARNING } from "../ui";
+import { fieldLabel } from "./form-memory";
+import { CHECK } from "./icons";
+import type { ReviewRow } from "./types";
+
+type MarkAppliedProps = {
+  isPrimary: boolean;
+  isSaving: boolean;
+  isDisabled: boolean;
+  /** Which job and whose: "Java Developer at Acme · for Priya". */
+  jobLine: string;
+  emptyRequired: ReviewRow[];
+  onConfirm: () => void;
+  onGoTo: (row: ReviewRow) => void;
+};
+
+const DIALOG = "m-auto max-h-[calc(100dvh-var(--dialog-gutter))] w-[min(var(--dialog-width),calc(100vw-var(--dialog-gutter)))] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--color-glass-edge)] bg-[var(--color-surface)] p-6 text-[var(--color-text)] shadow-[var(--shadow-lg)] backdrop:bg-[var(--color-overlay)] backdrop:backdrop-blur-[var(--blur-overlay)]";
+/** One empty field, on one line (its whole label on hover): a way back to it. */
+const FIELD_LINK = "block w-full truncate text-left font-[550] underline-offset-2 hover:text-[var(--color-text)] hover:underline";
+const MORE = "mt-1 text-caption font-[550] underline underline-offset-2 hover:text-[var(--color-text)]";
+/** The empty fields the dialog lists before "Show all". */
+const SHOWN_EMPTY = 3;
+/** Mark applied while fields are still left to fill: Autofill keeps the primary look, and this one reads as "done", in
+ * the success colours, so it's never mistaken for a quiet extra. */
+const DONE = `inline-flex min-h-[var(--control-lg)] items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-success-fg)_40%,transparent)] bg-[var(--color-success-bg)] px-3 py-1 text-body-strong text-[var(--color-success-fg)] transition-[border-color,box-shadow] ${MOTION} hover:border-[var(--color-success-fg)] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none`;
+const HINT = "text-center text-caption text-[var(--color-text-2)]";
+
+/** Marking the job applied, behind a modal dialog: the panel waits behind it, focus starts on Yes, and Cancel or Esc
+ * brings it back to the button. Required fields left empty are a warning, not a block, because the BDE may have filled
+ * them where BenchQ can't see; each one is a way back to its field. */
+export default function MarkApplied({ isPrimary, isSaving, isDisabled, jobLine, emptyRequired, onConfirm, onGoTo }: MarkAppliedProps) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const markButton = useRef<HTMLButtonElement>(null);
+  const yesButton = useRef<HTMLButtonElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isAllShown, setIsAllShown] = useState(false);
+
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    if (!isOpen || !element || element.open) return;
+    element.showModal();
+    yesButton.current?.focus();
+  }, [isOpen]);
+
+  const close = () => dialog.current?.close();
+  // However it closes (a button, Esc), the dialog empties and focus goes back to where the BDE was.
+  const onClose = () => {
+    setIsOpen(false);
+    setIsAllShown(false);
+    markButton.current?.focus();
+  };
+  const confirm = () => {
+    close();
+    onConfirm();
+  };
+  const goTo = (row: ReviewRow) => {
+    close();
+    onGoTo(row);
+  };
+  const count = emptyRequired.length;
+  const shown = isAllShown ? emptyRequired : emptyRequired.slice(0, SHOWN_EMPTY);
+
+  return <>
+    <button ref={markButton} type="button" data-slot="mark-applied" className={isPrimary ? button("primary", "large") : DONE} disabled={isSaving || isDisabled}
+      aria-describedby="mark-applied-hint" onClick={() => setIsOpen(true)}>
+      {CHECK}{isSaving ? "Saving…" : "Mark applied"}
+    </button>
+    <p id="mark-applied-hint" data-slot="mark-applied-hint" className={HINT}>Submitted the form? Mark the job applied in BenchQ.</p>
+    <dialog ref={dialog} data-slot="autofill-confirm" className={DIALOG} aria-labelledby="autofill-confirm-title" aria-describedby="autofill-confirm-job" onClose={onClose}>
+      {isOpen && <div className="grid animate-rise-in gap-3">
+        <div>
+          <h2 id="autofill-confirm-title" className="text-h3">Mark this job as applied?</h2>
+          <p id="autofill-confirm-job" className={`mt-0.5 wrap-anywhere ${SOFT_TEXT}`}>{jobLine}</p>
+        </div>
+        {count > 0 && <div data-slot="autofill-confirm-note" className={WARNING}>
+          <p>{count === 1 ? "1 required field is still empty:" : `${count} required fields are still empty:`}</p>
+          <ul className="mt-1 grid gap-0.5">
+            {shown.map((row) => <li key={row.key} className="min-w-0">
+              <button type="button" className={FIELD_LINK} title={fieldLabel(row.field)} onClick={() => goTo(row)}>{fieldLabel(row.field)}</button>
+            </li>)}
+          </ul>
+          {count > SHOWN_EMPTY && <button type="button" data-slot="autofill-confirm-more" className={MORE} aria-expanded={isAllShown}
+            onClick={() => setIsAllShown(!isAllShown)}>{isAllShown ? "Show fewer" : `Show all ${count}`}</button>}
+        </div>}
+        <div className={FITTED_BUTTONS}>
+          <button ref={yesButton} type="button" data-slot="mark-applied-confirm" className={button("primary", "large")} disabled={isDisabled} onClick={confirm}>Mark applied</button>
+          <button type="button" className={button("secondary", "large")} onClick={close}>Cancel</button>
+        </div>
+      </div>}
+    </dialog>
+  </>;
+}

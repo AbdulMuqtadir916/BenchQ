@@ -335,6 +335,19 @@ def kept_file(db, candidate, sha256: str) -> ResumeParse | None:
                                                              ResumeParse.content_sha256 == sha256).first()
 
 
+def uploaded_file(db, candidate, row: Resume) -> ResumeParse | None:
+    """The kept upload `row` is: an uploaded base's version 1 is its file as read (§4.6), so the file can stand for it
+    on a form. A later version, a tailored one or a promoted base's has no file of its own (07 Q49)."""
+    if row.category != "BASE" or row.version != 1 or row.job_id is not None:
+        return None
+    base = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.id == row.base_resume_id,
+                                                            BaseResume.deleted_at.is_(None)).first()
+    if base is None or base.source != "UPLOAD" or base.resume_parse_id is None:
+        return None
+    return scoped(db, ResumeParse, candidate.firm_id).filter(ResumeParse.id == base.resume_parse_id,
+                                                             ResumeParse.candidate_id == candidate.id).first()
+
+
 def deleted_base_for(db, candidate, parse_row: ResumeParse) -> BaseResume | None:
     """The deleted base this kept upload made, if any: uploading the same file again brings it back (§4.7)."""
     return scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.resume_parse_id == parse_row.id,

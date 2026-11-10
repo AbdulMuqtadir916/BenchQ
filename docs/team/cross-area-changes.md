@@ -3,6 +3,18 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Extension autofill — the form behind an application, and the extension's own tests (`feat/apply-extension-autofill`)
+
+Not agreed yet: Samad reviews the applications change before merge. The branch's earlier `/config` change, its removal
+of the AI answer routes and their `access.py` rows are undone (2026-11-09): the extension reads the picked résumé's
+`GET …/resumes/{id}?autofill=true` instead, and removing the AI answer routes is a later PR of its own.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `backend/models/db.py`, `backend/migrations/versions/0021_application_form_data.py`, `backend/applications/tracking.py`, `backend/api/routes_applications.py`, `test_candidate_application_status.py`, `docs/02-DATA-CONTRACTS.md` §9 | `applications.form_data`: `PATCH .../candidate-status` takes an optional `form_data` on a move to `applied`, a move back to `saved` clears it, and no response returns it. It also takes an optional `resume_id`, the résumé version the form was sent with (this candidate's, not deleted), which becomes the application's `resume_id` (docs/02 §9). | Marking a job applied from the extension keeps what the form held, and which résumé answered it. Talked through with Samad and Abdul before it was built. |
+| Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
+| Candidates / résumés (Zuhair) | `backend/api/routes_candidate_resumes.py`, `backend/candidates/versions.py` (`uploaded_file`), `backend/auth/access.py` (one `F` row, approved by Arbaz), `isolation_cases.py`, `test_resume_file.py`, `docs/02-DATA-CONTRACTS.md` §8.2 | `GET …/resumes/{rid}/file`: an uploaded base's version 1 as its file, as uploaded; 404 for any other version. | The extension attaches the picked résumé to the form's résumé upload (07 Q49–Q52). A file for every version is asked of Zuhair (Q25). |
+
 ## Job search tables (`feat/jobs-table`, Zuhair)
 
 `job_postings` and `scrape_jobs`, migration 0020 ([docs/02](../02-DATA-CONTRACTS.md) §6.y).
