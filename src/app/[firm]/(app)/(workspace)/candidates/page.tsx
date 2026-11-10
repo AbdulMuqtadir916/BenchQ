@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useMemo, useState, useSyncExternalStore } from "react";
+import { Suspense, useMemo, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, Plus, Table2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CandidateCardGrid } from "@/components/app/candidate/candidate-card-grid";
-import { AssignmentToggle, CandidateListQuery, NeedsBdeTag } from "@/components/app/candidate/assignment-filter";
+import { AssignmentToggle, NeedsBdeTag } from "@/components/app/candidate/assignment-filter";
+import { FilterChips, type FilterChip } from "@/components/app/filter-chips";
+import { filterCandidates } from "@/lib/derive/list-filters";
+import { useNow } from "@/lib/hooks/use-now";
+import { CandidatesSearch, type BenchBand } from "@/lib/schemas/list-search";
 import { isWaitingForBde } from "@/lib/derive/assignment";
 import { useUrlState } from "@/lib/routes/use-url-state";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -26,7 +30,7 @@ import { WorkAuthChip } from "@/components/app/work-auth-chip";
 import { Tag, type TagTone } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/format/timezone";
-import { CandidateStatusSelect, type CandidateStatusFilter } from "@/components/app/candidate-status-select";
+import { CandidateStatusSelect } from "@/components/app/candidate-status-select";
 import { useHref } from "@/lib/routes/use-href";
 
 const STATUS_TONE: Record<CandidateStatus, TagTone> = {
@@ -45,6 +49,10 @@ const STATUS_LABEL: Record<CandidateStatus, string> = {
   PLACED: "Placed",
   PAUSED: "Paused",
   INACTIVE: "Inactive",
+};
+
+const BENCH_LABEL: Record<BenchBand, string> = {
+  under30: "On the bench under 30 days", "30to60": "On the bench 30 to 60 days", over60: "On the bench over 60 days", over30: "On the bench 30 days or more",
 };
 
 type View = "table" | "cards";
@@ -97,8 +105,9 @@ function CandidatesList() {
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
   const teamQuery = useTeam();
-  const [statusFilter, setStatusFilter] = useState<CandidateStatusFilter>("ALL");
-  const [{ assignment }, setQuery] = useUrlState(CandidateListQuery);
+  const now = useNow();
+  const [search, setQuery] = useUrlState(CandidatesSearch);
+  const { assignment, status: statusFilter } = search;
   const view = useSyncExternalStore(subscribeView, readView, () => "table" as View);
 
 
@@ -107,8 +116,7 @@ function CandidatesList() {
     const applications = applicationsQuery.data ?? [];
     const team = teamQuery.data ?? [];
     const visible = scopeCandidates(principal, candidates);
-    return visible
-      .filter((c) => statusFilter === "ALL" || c.status === statusFilter)
+    return filterCandidates(visible, search, now)
       .filter((c) => assignment === "all" || isWaitingForBde(c))
       .map((c) => {
         const stats = deriveCandidateStats(c, applications.filter((a) => a.candidateId === c.id));
@@ -122,7 +130,7 @@ function CandidatesList() {
           lastActivity: stats.lastActivityAt,
         };
       });
-  }, [candidatesQuery.data, applicationsQuery.data, teamQuery.data, principal, statusFilter, assignment]);
+  }, [candidatesQuery.data, applicationsQuery.data, teamQuery.data, principal, search, assignment, now]);
   const waiting = useMemo(() => scopeCandidates(principal, candidatesQuery.data ?? []).filter(isWaitingForBde).length, [principal, candidatesQuery.data]);
 
   const columns = useMemo<ColumnDef<Row, unknown>[]>(() => {
@@ -173,11 +181,19 @@ function CandidatesList() {
   }, [isOwnScope]);
 
   const canCreate = can(principal, "candidate.create");
+  const personName = (id: string) => (teamQuery.data ?? []).find((user) => user.id === id)?.name ?? "someone no longer on the team";
+  const chips: FilterChip[] = [
+    search.bench ? { key: "bench", label: BENCH_LABEL[search.bench], onRemove: () => setQuery({ bench: "" }) } : null,
+    search.manager ? { key: "manager", label: `Team: ${personName(search.manager)}`, onRemove: () => setQuery({ manager: "" }) } : null,
+    search.bde ? { key: "bde", label: `BDE: ${personName(search.bde)}`, onRemove: () => setQuery({ bde: "" }) } : null,
+    search.role ? { key: "role", label: `Role: ${search.role.replaceAll("-", " ")}`, onRemove: () => setQuery({ role: "" }) } : null,
+  ].filter((chip): chip is FilterChip => chip !== null);
+  const clearFilters = () => setQuery({ assignment: "all", status: "ALL", bench: "", manager: "", bde: "", role: "" });
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
       {isOwnScope ? null : <AssignmentToggle value={assignment} waiting={waiting} onChange={(next) => setQuery({ assignment: next })} />}
-      <CandidateStatusSelect className="w-40" value={statusFilter} onValueChange={setStatusFilter} />
+      <CandidateStatusSelect className="w-40" value={statusFilter} onValueChange={(status) => setQuery({ status })} />
       <div role="group" aria-label="View" className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5">
         {([["table", "Table", Table2], ["cards", "Cards", LayoutGrid]] as const).map(([id, label, Icon]) => (
           <button key={id} type="button" aria-pressed={view === id} onClick={() => chooseView(id)} className={cn("inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 text-sm", view === id ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
@@ -199,6 +215,7 @@ function CandidatesList() {
       />
 
       <div className="mt-4">
+        <FilterChips chips={chips} onClear={clearFilters} />
         {view === "cards" ? (
           <CandidateCardGrid
             rows={rows}

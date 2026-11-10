@@ -2,47 +2,27 @@
 
 import { isBde } from "@/lib/auth/roles";
 import { useMemo } from "react";
-import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
+import { useApplications } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useMemberInvites, useTeam } from "@/lib/hooks/use-team";
 import { daysBetween, deriveFirmUsage } from "@/lib/derive";
 import { StatCard } from "@/components/app/stat-card";
-import { PageHeader } from "@/components/app/page-header";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { ErrorState } from "@/components/app/error-state";
 import { GroupRowError } from "@/components/app/card-group";
 import { hasPageFailed, queryGroup } from "@/lib/query/query-group";
 import { useFirm } from "@/lib/tenancy/firm-context";
 import { FloorContent } from "./manager-dashboard";
-import { OwnerActivityDashboard } from "./owner-activity-dashboard";
-import { useUrlState } from "@/lib/routes/use-url-state";
-import { DashboardSearch } from "@/lib/schemas/dashboard-search";
+import { DashboardTabs } from "./dashboard-tabs";
 
 const EMPTY: never[] = [];
 
 export function OwnerDashboard() {
-  const [query, setQuery] = useUrlState(DashboardSearch);
-
   return (
-    <div className="bq-page">
-      <PageHeader
-        title={query.view === "finance" ? "The business" : "Firm activity"}
-        subtitle={query.view === "finance" ? "Placements, throughput, and plan usage at a glance." : "Follow activity from the firm to managers, BDEs, and their candidates."}
-      />
-      <div role="group" aria-label="Dashboard views" className="mb-6 inline-flex rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-1">
-        <button type="button" aria-pressed={query.view === "finance"} onClick={() => setQuery({ view: "finance" })}
-          className={`rounded-[var(--radius-sm)] px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${query.view === "finance" ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
-          Finance dashboard
-        </button>
-        <button type="button" aria-pressed={query.view === "activity"} onClick={() => setQuery({ view: "activity" })}
-          className={`rounded-[var(--radius-sm)] px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${query.view === "activity" ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
-          Activity dashboard
-        </button>
-      </div>
-      <div aria-label={query.view === "finance" ? "Finance dashboard" : "Activity dashboard"}>
-        {query.view === "finance" ? <FinanceDashboardContent /> : <OwnerActivityDashboard />}
-      </div>
-    </div>
+    <DashboardTabs overview={{ label: "Finance dashboard", title: "The business", subtitle: "Placements, throughput, and plan usage at a glance." }}
+      activity={{ title: "Firm activity", subtitle: "Follow activity from the firm to managers, BDEs, and their candidates." }}>
+      <FinanceDashboardContent />
+    </DashboardTabs>
   );
 }
 
@@ -51,11 +31,9 @@ function FinanceDashboardContent() {
   const candidatesQuery = useCandidates();
   const teamQuery = useTeam();
   const invitesQuery = useMemberInvites();
-  // FloorContent reads the follow-ups too (same cache entry): needed to know if the whole page failed.
-  const followupsQuery = useFollowups();
   const firm = useFirm();
   const rollups = queryGroup(applicationsQuery, candidatesQuery, teamQuery, invitesQuery);
-  const page = queryGroup(applicationsQuery, candidatesQuery, teamQuery, invitesQuery, followupsQuery);
+  const page = queryGroup(applicationsQuery, candidatesQuery, teamQuery, invitesQuery);
 
   const applications = applicationsQuery.data ?? EMPTY;
   const candidates = candidatesQuery.data ?? EMPTY;
@@ -88,7 +66,7 @@ function FinanceDashboardContent() {
   const pendingInvites = usage.seatsUsed - activeBdes;
   const seatDetail = `${activeBdes} BDE${activeBdes === 1 ? "" : "s"} + ${pendingInvites} pending`;
 
-  if (hasPageFailed(applicationsQuery, candidatesQuery, teamQuery, invitesQuery, followupsQuery)) {
+  if (hasPageFailed(applicationsQuery, candidatesQuery, teamQuery, invitesQuery)) {
     return <ErrorState variant="page" error={page.error ?? new Error("The request failed.")} onRetry={page.retry} />;
   }
 
