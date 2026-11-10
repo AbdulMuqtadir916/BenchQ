@@ -43,11 +43,14 @@ Live source right now: freehire.me. **Built so far:** both tables (0020), and th
 behind one contract, freehire.me first; `content` is the provider's job as sent, read through its `read()`), the
 background search (`POST …/candidates/{id}/job-searches`, the candidate's BDE only; its `scrape_jobs` row is
 `running` until it finishes), the caps (100 new jobs per
-candidate, 20 attempts per BDE, per 6:30 PM IST day) and the reads (`GET …/job-searches`, `…/job-postings`). **Not yet
-built:** the frontend (PR 2: show the jobs, Apply/Tailor off for them, the Search button frozen while one runs), and
-(PR 3) repointing `applications.job_id` and `job_runs.target_job_id` off the old `jobs` table, retiring
-`jobs`/`job_locations`/`firm_jobs` once nothing points at them. Until that repoint lands, the flow described below
-(steps 1–5) is still what's actually running; treat it as the current production path, not the forward plan.
+candidate, 20 attempts per BDE, per 6:30 PM IST day) and the reads (`GET …/job-searches`, `…/job-postings`). **PR 2**
+(`feat/job-postings-repoint`, migration 0023): tailored résumés, cover letters and the two logs point at
+`job_postings`; captures (`POST …/job-postings`, manual and extension); a repeated search continues; the old pool's
+scheduled scrape and write routes retired (410). **Not yet built:** Samad's `applications` repoint, the frontend
+(PR 3: show the jobs, the Search button frozen while one runs), and the clean-up PR: delete the old pool (`jobs`,
+`job_locations`, `firm_jobs`, `candidate_jobs`, its routes and scrapers) once `applications` no longer points at it.
+The flow described below (steps 1–5) is the old pool's: its scheduled scrape and write routes are retired (PR 2), its
+reads still answer until the clean-up.
 
 The scraper runs firm searches into the shared pool (`jobs`, `firm_jobs`, 07 Q37). From 0007 a search belongs to a
 candidate (`searches.candidate_id`) and what it finds is recorded per candidate (`candidate_jobs`).

@@ -21,7 +21,7 @@ import uuid
 from backend.auth import ledger
 from backend.job_monitor import mark_run_failed
 from backend.job_search import limits
-from backend.job_search.providers import REGISTRY, JobFields, ProviderError, SearchResult
+from backend.job_search.providers import READERS, REGISTRY, JobFields, ProviderError, SearchResult
 from backend.job_search.providers.base import ERROR_MESSAGES
 from backend.job_search.text import clean_json
 from backend.models.candidates import Candidate
@@ -43,8 +43,30 @@ def job_id(fields: JobFields) -> str:
                           .encode("utf-8")).hexdigest()
 
 
-def _request(query: str, country: str, provider: str) -> dict:
-    return {"query": query, "country": country, "provider": provider, "limit": limits.JOBS_PER_SEARCH}
+def _request(query: str, country: str, provider: str, cursor: str | None = None, exhausted: bool = False) -> dict:
+    return {"query": query, "country": country, "provider": provider, "limit": limits.JOBS_PER_SEARCH,
+            "cursor": cursor, "exhausted": exhausted}
+
+
+def _same_role(query: str) -> str:
+    return re.sub(r"\s+", " ", query or "").strip().lower()
+
+
+def _continue_from(db, firm_id, candidate_id, query: str, country: str, provider: str) -> tuple[str | None, bool]:
+    """Where a search of this role continues today (decided 2026-11-10, Q11 (A)): after the last finished search of
+    the same role, country and provider since 6:30 PM IST. (None, False) to start from the top; (None, True) when the
+    source had nothing more. A failed search doesn't move it, so a retry asks for the same page."""
+    rows = db.query(ScrapeJob).filter(
+        ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate_id, ScrapeJob.kind == "search",
+        ScrapeJob.state.in_(("success", "empty")), ScrapeJob.created_at >= limits.day_start(),
+    ).order_by(ScrapeJob.created_at.desc()).all()
+    for row in rows:
+        request = (row.meta or {}).get("request") or {}
+        if (_same_role(request.get("query")) == _same_role(query) and request.get("country") == country
+                and request.get("provider") == provider):
+            next_cursor = (row.meta or {}).get("next_cursor")
+            return (next_cursor, False) if next_cursor else (None, True)
+    return None, False
 
 
 def _ledger(db, *, firm_id, candidate_id, user_id, batch_id, query, country, summary):
@@ -55,9 +77,12 @@ def _ledger(db, *, firm_id, candidate_id, user_id, batch_id, query, country, sum
 
 
 def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider) -> ScrapeJob:
-    """The search's row, `running`, written when the BDE starts it (the caller holds the candidate row). Flushed."""
+    """The search's row, `running`, written when the BDE starts it (the caller holds the candidate row), with where
+    it continues from. Flushed."""
+    cursor, exhausted = _continue_from(db, firm_id, candidate_id, query, country, provider)
     batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=uuid.uuid4(),
-                      state="running", meta={"request": _request(query, country, provider)})
+                      kind="search", state="running",
+                      meta={"request": _request(query, country, provider, cursor, exhausted)})
     db.add(batch)
     db.flush()
     return batch
@@ -81,7 +106,7 @@ def _save_error(*, firm_id, candidate_id, user_id, batch_id, query, country, pro
         if batch is None:
             return
         batch.state, batch.error, batch.finished_at = "error", f"{code}: {ERROR_MESSAGES[code]}", utcnow()
-        batch.meta = {**(batch.meta or {}), "request": _request(query, country, provider), "error_code": code}
+        batch.meta = {**(batch.meta or {}), "error_code": code}
         _ledger(db, firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
                 country=country, summary=f"Searched jobs for '{query}': failed ({code})")
         db.commit()
@@ -126,8 +151,8 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
             JobPosting.candidate_id == candidate_id, JobPosting.job_id.in_([k for k, _ in picked]))} if picked else {}
 
         batch.state, batch.finished_at = ("success" if result.jobs else "empty"), now
-        kept = {k: v for k, v in (batch.meta or {}).items() if k == "run_id"}     # the run → batch link
-        batch.meta = {**clean_json(result.metadata), **kept, "request": _request(query, country, provider.name)}
+        kept = {k: v for k, v in (batch.meta or {}).items() if k in ("run_id", "request")}   # the run link, the ask
+        batch.meta = {**clean_json(result.metadata), **kept, "next_cursor": result.next_cursor}
         db.flush()
         for key, content in picked:
             row = existing.get(key)
@@ -148,16 +173,52 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
     return counts
 
 
+def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict) -> tuple[JobPosting, bool]:
+    """One job the BDE captured (job search PR 2): its own batch (`kind = 'capture'`, finished at once) with its one
+    posting, and a ledger entry. The caller holds the candidate row and has checked the cap. A job the candidate
+    already has (same `job_id`) is returned as it is, with nothing written: (posting, False). Not committed."""
+    content = clean_json({k: v for k, v in job.items() if v is not None})
+    fields = READERS[source].read(content)
+    key = job_id(fields)
+    existing = db.query(JobPosting).filter(JobPosting.candidate_id == candidate_id, JobPosting.job_id == key).first()
+    if existing is not None:
+        return existing, False
+    now = utcnow()
+    batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=uuid.uuid4(),
+                      kind="capture", state="success", finished_at=now, meta={"request": {"source": source}})
+    db.add(batch)
+    db.flush()
+    posting = JobPosting(firm_id=firm_id, candidate_id=candidate_id, batch_id=batch.batch_id, source=source,
+                         job_id=key, content=content, discovered_at=now, last_seen_at=now)
+    db.add(posting)
+    db.flush()
+    actor = db.get(User, user_id)
+    ledger.record(db, actor=actor, action="CREATE", entity_type="job_posting", entity_id=posting.id,
+                  entity_label=f"{fields.title} at {fields.company}"[:200], firm_id=firm_id, candidate_id=candidate_id,
+                  summary=f"Captured a job ({source})")
+    return posting, True
+
+
+def _request_of(batch_id) -> dict:
+    with SessionLocal() as db:
+        meta = db.query(ScrapeJob.meta).filter(ScrapeJob.batch_id == batch_id).scalar() or {}
+    return meta.get("request") or {}
+
+
 async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uuid.UUID, batch_id: uuid.UUID,
                      query: str, country: str, provider_name: str) -> str:
     """The background task: finishes the `running` batch `batch_id`. Returns the run's summary; a failed search also
     marks its `job_runs` row failed."""
     provider = REGISTRY[provider_name]
     started = time.monotonic()
+    request = await asyncio.to_thread(_request_of, batch_id)
+    cursor, exhausted = request.get("cursor"), bool(request.get("exhausted"))
     ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
                country=country)
     try:
-        result = await provider.search(query, country, limits.JOBS_PER_SEARCH)
+        # The source had nothing more for this role today: finish empty without asking again.
+        result = SearchResult(jobs=[], metadata={"exhausted": True}) if exhausted else \
+            await provider.search(query, country, limits.JOBS_PER_SEARCH, cursor)
     except ProviderError as error:
         code = error.code
     except Exception as error:          # the provider's own bug: its message may hold a URL, so only its type is logged

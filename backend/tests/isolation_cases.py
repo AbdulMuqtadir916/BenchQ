@@ -32,6 +32,9 @@ class Case:
     as_bde: bool = False
     # Optional action preconditions, applied independently to each tenant before assertions.
     prepare: Callable | None = None
+    # The old job pool's write routes, retired (job search PR 2, backend/job_search/retired.py): every caller gets the
+    # same 410 and nothing changes, until the clean-up PR deletes the route and this case.
+    retired: bool = False
 
 
 def _classification_ready(state):
@@ -113,6 +116,9 @@ CASES: dict[str, Case] = {
         as_bde=True, body=lambda i: {"query": "Java Developer"}, prepare=_resume_country_us),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": Case(shows_rows=True),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": Case(
+        as_bde=True, body=lambda i: {"source": "manual", "title": "Java Developer", "company": "Example Corp",
+                                     "description": f"Captured job {uuid.uuid4()}", "url": "https://jobs.example.test/c"}),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": Case(),
@@ -129,17 +135,17 @@ CASES: dict[str, Case] = {
     "GET /api/jobs/verdicts/list": Case(),
     "GET /api/jobs/facets": Case(),
     "GET /api/jobs/{job_id}": Case(),
-    "PATCH /api/jobs/{job_id}": Case(body=lambda i: {"status": "saved"}),
+    "PATCH /api/jobs/{job_id}": Case(retired=True, body=lambda i: {"status": "saved"}),
     "GET /api/jobs/{job_id}/cached-page": Case(),
     "GET /api/jobs/{job_id}/frame-check": Case(),
     "GET /api/jobs/{job_id}/live-page": Case(),
     "POST /api/jobs/bulk-update": Case(body=lambda i: {"job_ids": [str(i["job"])], "updates": {"status": "saved"}},
                                        body_ids=True, bulk=True),
-    "POST /api/jobs/manual": Case(body=lambda i: {"title": "Manual role", "company": "Manual Co", "url": _new("manual")}),
-    "POST /api/jobs/save-from-extension": Case(body=lambda i: {"title": "Captured role", "company": "Captured Co",
+    "POST /api/jobs/manual": Case(retired=True, body=lambda i: {"title": "Manual role", "company": "Manual Co", "url": _new("manual")}),
+    "POST /api/jobs/save-from-extension": Case(retired=True, body=lambda i: {"title": "Captured role", "company": "Captured Co",
                                                                 "url": _new("captured")}),
     "POST /api/jobs/cache-applied": Case(),
-    "POST /api/analyze/{job_id}": Case(body=lambda i: {}),
+    "POST /api/analyze/{job_id}": Case(retired=True, body=lambda i: {}),
 
     # ── Applications (track 03) ──────────────────────────────────────────────
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
@@ -173,12 +179,12 @@ CASES: dict[str, Case] = {
 
     # ── Cover letters (track 04) ─────────────────────────────────────────────
     "GET /api/cover-letters": Case(shows_rows=True),
-    "POST /api/cover-letters": Case(body=lambda i: {"name": "New letter", "job_id": str(i["job"]),
+    "POST /api/cover-letters": Case(retired=True, body=lambda i: {"name": "New letter", "job_id": str(i["job"]),
                                                     "resume_id": str(i["resume"])}, body_ids=True),
-    "POST /api/cover-letters/generate": Case(body=lambda i: {"resume_id": str(i["resume"]), "job_id": str(i["job"])},
+    "POST /api/cover-letters/generate": Case(retired=True, body=lambda i: {"resume_id": str(i["resume"]), "job_id": str(i["job"])},
                                              body_ids=True),
     "GET /api/cover-letters/{cl_id}": Case(),
-    "PATCH /api/cover-letters/{cl_id}": Case(body=lambda i: {"name": "Renamed letter", "job_id": str(i["job"]),
+    "PATCH /api/cover-letters/{cl_id}": Case(body=lambda i: {"name": "Renamed letter", "job_id": str(i["posting"]),
                                                              "resume_id": str(i["resume"])}, body_ids=True),
     "DELETE /api/cover-letters/{cl_id}": Case(),
     "GET /api/cover-letters/{cl_id}/pdf": Case(),
@@ -217,7 +223,6 @@ KNOWN_GAPS: dict[str, Gap] = {
 # Routes that are isolated (they're in CASES), except on a job both firms link to. test_isolation checks the gap is
 # still there, so the entry fails once the Jobs track closes it.
 SHARED_JOB_GAPS: dict[str, Gap] = {
-    "PATCH /api/jobs/{job_id}": _SHARED_JOB,
     "POST /api/jobs/bulk-update": _SHARED_JOB,
 }
 

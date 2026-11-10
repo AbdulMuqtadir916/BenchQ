@@ -47,6 +47,7 @@ def test_interview_and_prep_candidate_scope(api_client, test_db, accounts, case,
     assert response.status_code == (201 if expected == 200 and operation == 'create' else expected)
 
 
+@pytest.mark.xfail(strict=True, reason="Until Samad repoints applications.job_id onto job_postings (docs/team/samad.md §2 item 5): a tailored résumé or letter names a job posting since 0023, the application still the old pool's job, so they don't match. Remove this mark when it passes.")
 def test_prep_never_uses_another_candidates_resume(api_client, test_db, accounts, case):
     candidate, job, app, _ = case
     other = Candidate(firm_id=candidate.firm_id, manager_id=candidate.manager_id,

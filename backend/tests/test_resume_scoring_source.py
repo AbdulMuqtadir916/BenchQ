@@ -2,7 +2,7 @@
 import pytest
 
 from backend.models.tenancy import DEFAULT_FIRM_ID
-from backend.tests.resume_support import make_version
+from backend.tests.resume_support import make_posting, make_version
 
 pytestmark = pytest.mark.usefixtures("default_firm")
 
@@ -32,12 +32,9 @@ def test_get_resume_texts_skips_tailored_and_later_versions(test_db):
     """Only the workflow résumé (the active base's v1) is scored: not a tailored résumé, not an unpicked edit."""
     from backend.analyzer.cv_scorer import _get_resume_texts
     from backend.models.candidates import Candidate
-    from backend.models.db import Job
     base = _seed_resume(test_db, "PM", "summary")
-    job = Job(external_id="t1", title="PM", company="Acme", url="https://jobs.example.test/t1", source="manual")
-    test_db.add(job)
-    test_db.flush()
     candidate = test_db.get(Candidate, base.candidate_id)
+    job = make_posting(test_db, DEFAULT_FIRM_ID, candidate.id, candidate.created_by_user_id)   # 0023: a posting
     make_version(test_db, DEFAULT_FIRM_ID, candidate=candidate, category="TAILORED", job_id=job.id, summary="tailored")
     make_version(test_db, DEFAULT_FIRM_ID, candidate=candidate, version=2, summary="an edit")
     test_db.commit()

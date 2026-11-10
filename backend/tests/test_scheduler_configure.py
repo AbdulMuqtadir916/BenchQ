@@ -52,7 +52,7 @@ def test_configure_scheduler_adds_interval_job(test_db, monkeypatch):
     sched_mod.configure_scheduler()
 
     job_ids = {j.id for j in fresh.get_jobs()}
-    assert "scrape_all" in job_ids
+    assert "scrape_all" not in job_ids          # the old pool's scrape is retired (job search PR 2)
 
 
 def test_configure_scheduler_empty_cron_skips(test_db, monkeypatch):
@@ -212,7 +212,7 @@ def test_unparseable_cron_does_not_break_the_other_jobs(test_db, monkeypatch, ca
     job_ids = {j.id for j in fresh.get_jobs()}
     assert "db_backup" not in job_ids
     assert "daily_digest" in job_ids
-    assert "scrape_all" in job_ids
+    assert "scrape_all" not in job_ids          # the old pool's scrape is retired (job search PR 2)
 
 
 def test_pending_google_grants_cleanup_runs_when_mailbox_polling_disabled(test_db, monkeypatch):

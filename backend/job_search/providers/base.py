@@ -1,8 +1,10 @@
 """The contract every job source implements (job search PR 1, decided 2026-11-10).
 
 A provider does two things:
-- `search(query, country, limit)`: ask the source for jobs, return them as it sent them (`SearchResult.jobs`, each a
-  JSON object) with the rest of its response (`SearchResult.metadata`), or raise `ProviderError` with a fixed code.
+- `search(query, country, limit, cursor)`: ask the source for jobs, return them as it sent them (`SearchResult.jobs`,
+  each a JSON object) with the rest of its response (`SearchResult.metadata`), or raise `ProviderError` with a fixed
+  code. `cursor` is where to continue (None: from the top); `SearchResult.next_cursor` is where the next search of the
+  same role continues, None when the source has no more (job search PR 2: a repeated search brings the next page).
 - `read(content)`: one stored job (`job_postings.content`, the object exactly as `search` returned it) into the
   common fields everything else reads (`JobFields`). Pure: no I/O.
 
@@ -54,11 +56,12 @@ class JobFields:
 class SearchResult:
     jobs: list[dict]
     metadata: dict = field(default_factory=dict)
+    next_cursor: str | None = None      # JSON-safe; stored in the batch's metadata
 
 
 class Provider(Protocol):
     name: str           # stored in job_postings.source; never renamed once rows carry it
 
-    async def search(self, query: str, country: str, limit: int) -> SearchResult: ...
+    async def search(self, query: str, country: str, limit: int, cursor: str | None = None) -> SearchResult: ...
 
     def read(self, content: dict) -> JobFields: ...

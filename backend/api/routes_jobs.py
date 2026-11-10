@@ -17,6 +17,7 @@ from backend.analyzer.salary_extractor import apply_salary_to_job
 from backend.analyzer.work_arrangement import apply_arrangement_to_job
 from backend.analyzer.location import apply_location_to_job
 from backend.job_monitor import launch_background, JobAlreadyRunningError
+from backend.job_search.retired import retired
 # LinkedIn extension enrichment — see sources/linkedin_extension.py
 from backend.scraper.sources.linkedin_extension import (
     enrich as _scrape_linkedin_ids,  # noqa: F401
@@ -41,6 +42,7 @@ def _score_resume_names(db, job, firm_id) -> list[str]:
 @router.post("/linkedin-import")
 async def linkedin_import(request: Request, db: Session = Depends(get_db)):
     """Accept LinkedIn job IDs from the Chrome Extension, scrape via Voyager API in background."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     # The extension can send a truncated or non-JSON body; a bare request.json()
     # makes that an unhandled JSONDecodeError (R4-T1-13).
     try:
@@ -691,6 +693,7 @@ def job_facets(
 async def save_from_extension(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id),
                               principal: Principal = Depends(current_principal)):
     """Save a job from the Chrome Extension to the Job Feed (no application created), running the same enrichment as LinkedIn passive capture: Extension search title/company filters, salary extraction, H-1B/body-exclusion scan, and auto-score when configured."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     from backend.analyzer.h1b_checker import check_job_h1b
     from backend.models.db import Search
     import uuid as _uuid
@@ -858,6 +861,7 @@ MANUAL_JOB_STATUSES = {"new", "saved"}
 def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db),
                       firm_id=Depends(writer_firm_id), principal: Principal = Depends(current_principal)):
     """Add one job to the feed by hand (Log-application modal, statuses new/saved), with no application attached; an already-known posting keeps the status it has and is returned with created=false."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     title = str_field(body, "title")
     company = str_field(body, "company")
     url = str_field(body, "url")
@@ -998,6 +1002,7 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
                      firm_id=Depends(writer_firm_id)):
     # Must be async — launch_background() uses asyncio.create_task(), which needs a running
     # event loop; a sync endpoint's threadpool has none, so the task would silently never start.
+    retired()  # job search PR 2: the old pool's write routes answer 410
     job = scoped_jobs(db, firm_id).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")

@@ -1171,7 +1171,7 @@ export const JobMarkSchema = z.object({
 - Endpoints: `GET /api/job-marks` (the signed-in user's), `PUT /api/job-marks/:jobId/:kind`,
   `DELETE /api/job-marks/:jobId/:kind`.
 
-### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migrations 0020, 0022; backend only, no frontend schema/screen yet)
+### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migrations 0020, 0022, 0023; backend only, no frontend schema/screen yet)
 
 > Zuhair's track. Deliberately **not** `jobs`: this is a separate, candidate+batch-scoped table
 > (`backend/models/job_search.py`), not the existing shared-pool `jobs` table above (`backend/models/db.py`) or its
@@ -1214,6 +1214,15 @@ export const JobMarkSchema = z.object({
   characters stripped). Each provider's `read(content)` (`backend/job_search/providers/`) gives the common fields
   (title, company, plain-text description, http(s) apply link, location, countries, posted date, employment type,
   skills, closed), picked by `source`; nothing else looks inside `content`, and the API never returns it.
+- **Repointed (migration 0023, job search PR 2, decided 2026-11-10):** `resumes (firm_id, candidate_id, job_id)` →
+  `job_postings (firm_id, candidate_id, id)` ON DELETE CASCADE (a tailored résumé names its own candidate's job, and
+  goes with it); `cover_letters.job_id`, `job_runs.target_job_id`, `llm_call_log.job_id` → `job_postings.id` ON
+  DELETE SET NULL. `job_postings` has `UNIQUE (firm_id, candidate_id, id)` as the target. Nothing was copied (no real
+  firm yet): the upgrade stops while a tailored résumé or a cover letter names an old job; the two logs are only
+  unlinked. **The column names are kept, so `resumes.job_id` is a posting's `id`, while `job_postings.job_id` is
+  the content hash.** `applications.job_id` moves in Samad's own PR (docs/team/samad.md §2 item 5); until then an
+  application's job and its tailored résumé's job are in different tables, so the prep page and the tracker can't
+  pair them (nothing creates a tailored résumé today; those tests are strict xfails).
 - **Not yet built:** repointing
   `applications.job_id` / `job_runs.target_job_id` off the old `jobs` table onto this one. The old `jobs` table and
   everything still pointing at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`, `job_runs`) is
@@ -1233,7 +1242,8 @@ export const JobMarkSchema = z.object({
   automatic signal and stays visible until something else catches it — accepted for now, revisit with a staleness
   rule if it becomes a real problem.
 - **`scrape_jobs` (migration 0020, with `job_postings`):** one row per batch — `firm_id`, `candidate_id`,
-  `user_id` (migration 0022: who ran it, the candidate's BDE; FK `users.id`, NOT NULL), `batch_id` (unique),
+  `user_id` (migration 0022: who ran it, the candidate's BDE; FK `users.id`, NOT NULL), `kind` (migration 0023:
+  `search` | `capture`), `batch_id` (unique),
   `state` (revised 2026-11-10: `success`, the source answered with at least one job | `empty`, it answered with
   none | `error`, it failed), `error` (text, the failure detail, set exactly when `state = 'error'`: a real failure
   and an empty result never look the same), `metadata` (JSONB, `{}` by
@@ -1275,6 +1285,20 @@ export const JobMarkSchema = z.object({
     `POST /job-searches`, `GET /job-searches` (`running`, `searches` newest first, `usage`: `jobs_saved_today`,
     `jobs_cap`, `attempts_today`, `attempts_cap`, `resets_at`), `GET /job-postings?page=&size=` (newest first,
     common fields, no description), `GET /job-postings/{posting_id}` (with the description).
+  - **Captures (job search PR 2):** `POST /job-postings` `{source: manual | extension, title, company,
+    description, url, location?}` (title and company 1–300 characters, description 1–100,000, an http(s) link): the
+    candidate's BDE only, 20 per BDE per day. A capture is its own batch (`scrape_jobs.kind = 'capture'`, finished at
+    once) with one posting and a ledger entry; the same job again (same hash) returns the posting the candidate has
+    (200). An `extension` description is read as HTML. Captures aren't search attempts and don't use the 100-new cap.
+    A search that finds a captured job merges into that row (`source` and `content` become the provider's).
+  - **A repeated search continues (job search PR 2):** a provider returns `next_cursor`; the same role (case and
+    spacing ignored), country and provider searched again since 6:30 PM IST asks from there (freehire.me: `offset`).
+    A failed search doesn't move it. When the source has no more, the next search of that role ends `empty` without
+    asking (`metadata.request.exhausted`). The next day starts from the top.
+  - **The old pool (job search PR 2):** its scheduled scrape is no longer scheduled, and its write routes answer 410
+    (`backend/job_search/retired.py`): manual / extension / LinkedIn job saves, PATCH a job, analyze, the scrape and
+    backfill triggers, a search's run and test, a company's test scrape, cover letter create and generate. Its read
+    routes still answer. The clean-up PR deletes it.
   - **Known limit:** the search runs in the API process. A restart loses a search in flight (its batch shows as an
     `internal` error after 15 minutes and the BDE searches again); a real job queue is the deployment work's.
 

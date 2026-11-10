@@ -20,13 +20,17 @@ class FakeProvider:
     def __init__(self):
         self.jobs: list[dict] = []
         self.error: str | None = None
+        self.next_cursor: str | None = "more"      # the source has more by default; None: it ran out
         self.calls: list[tuple] = []
+        self.cursors: list = []
 
-    async def search(self, query, country, limit):
+    async def search(self, query, country, limit, cursor=None):
         self.calls.append((query, country, limit))
+        self.cursors.append(cursor)
         if self.error:
             raise ProviderError(self.error)
-        return SearchResult(jobs=list(self.jobs), metadata={"meta": {"total": len(self.jobs)}})
+        return SearchResult(jobs=list(self.jobs), metadata={"meta": {"total": len(self.jobs)}},
+                            next_cursor=self.next_cursor)
 
     def read(self, content):
         return JobFields(title=content.get("t", ""), company=content.get("c", ""), description=content.get("d", ""),
@@ -248,7 +252,8 @@ def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, a
     assert (batch.state, batch.error, batch.user_id) == ("success", None, world["people"]["adnan"].id)
     assert batch.meta["counts"] == {"found": 5, "saved": 2, "refreshed": 0, "skipped_closed": 1,
                                     "skipped_unreadable": 1, "skipped_duplicate": 1, "skipped_over_cap": 0}
-    assert batch.meta["request"] == {"query": "Java Developer", "country": "us", "provider": "fake", "limit": 100}
+    assert batch.meta["request"] == {"query": "Java Developer", "country": "us", "provider": "fake", "limit": 100,
+                                     "cursor": None, "exhausted": False}
     assert batch.meta["meta"] == {"total": 5}
     assert sorted(p.content["t"] for p in postings) == ["Java Developer 1", "Java Developer 2"]
     assert {p.batch_id for p in postings} == {batch.batch_id} and {p.source for p in postings} == {"fake"}

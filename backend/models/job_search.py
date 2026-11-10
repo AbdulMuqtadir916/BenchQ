@@ -53,6 +53,8 @@ class ScrapeJob(Base):
     # running: started, not finished | success: the source answered with at least one job | empty: it answered with
     # none | error: it failed
     state = Column(String, nullable=False)
+    # search: a BDE's search | capture: one job the BDE captured by hand or from the extension, its own batch (0023)
+    kind = Column(String, nullable=False, default="search", server_default=text("'search'"))
     error = Column(Text, nullable=True)      # the failure detail; set exactly when state = 'error'
     # Everything in the source's response except the jobs themselves (those are job_postings rows): request id,
     # parameters, totals, pagination. `metadata` is reserved on a declarative model, hence the attribute name.
@@ -65,6 +67,7 @@ class ScrapeJob(Base):
                              name="fk_scrape_jobs_firm_candidate", ondelete="RESTRICT"),
         CheckConstraint("state IN ('success', 'empty', 'error', 'running')", name="ck_scrape_jobs_state"),
         CheckConstraint("(state = 'running') = (finished_at IS NULL)", name="ck_scrape_jobs_finished_iff_done"),
+        CheckConstraint("kind IN ('search', 'capture')", name="ck_scrape_jobs_kind"),
         CheckConstraint("(state = 'error') = (error IS NOT NULL)", name="ck_scrape_jobs_error_iff_error"),
         # The target of job_postings' batch key: a posting can only name a batch run for its own candidate and firm.
         UniqueConstraint("firm_id", "candidate_id", "batch_id", name="uq_scrape_jobs_firm_candidate_batch"),
@@ -106,6 +109,8 @@ class JobPosting(Base):
         # index for lookups by candidate_id alone (its leading column).
         UniqueConstraint("candidate_id", "job_id", name="uq_job_postings_candidate_job"),
         CheckConstraint("job_id ~ '^[0-9a-f]{64}$'", name="ck_job_postings_job_id_sha256"),
+        # The target of the candidate-safe keys pointing here: `resumes` (0023) and `applications` (Samad's PR).
+        UniqueConstraint("firm_id", "candidate_id", "id", name="uq_job_postings_firm_candidate_id"),
         # The list screen (one candidate's jobs in a firm, or a firm's) and the batch key, by its leading columns.
         Index("ix_job_postings_firm_candidate_batch", "firm_id", "candidate_id", "batch_id"),
         # A candidate's jobs newest first, and the new jobs saved since the last 6:30 PM IST (migration 0022).

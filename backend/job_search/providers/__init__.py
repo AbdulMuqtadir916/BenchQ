@@ -3,12 +3,15 @@
 `search` and `read` (providers/base.py) and a line here. A provider stays registered after it stops being active, so
 its old rows still read (`reader_for(job_postings.source)`)."""
 from backend.job_search.providers.base import JobFields, Provider, ProviderError, SearchResult  # noqa: F401
+from backend.job_search.providers.capture import CAPTURE_SOURCES, Capture
 from backend.job_search.providers.freehire import Freehire
 
 DEFAULT_PROVIDER = "freehire"
 SETTING_KEY = "job_search_provider"
 
 REGISTRY: dict[str, Provider] = {p.name: p for p in (Freehire(),)}
+# Everything that can have written a posting, search providers and captures, by `job_postings.source`.
+READERS = {**REGISTRY, **{name: Capture(name) for name in CAPTURE_SOURCES}}
 
 
 def active(db) -> Provider:
@@ -20,5 +23,6 @@ def active(db) -> Provider:
     return REGISTRY.get(name) or REGISTRY[DEFAULT_PROVIDER]
 
 
-def reader_for(source: str) -> Provider | None:
-    return REGISTRY.get(source)
+def reader_for(source: str):
+    """Whatever reads a posting written by `source` (a search provider or a capture), or None."""
+    return READERS.get(source) or REGISTRY.get(source)

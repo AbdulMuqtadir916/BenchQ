@@ -18,6 +18,7 @@ from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 from backend.api.render_shared import _get_browser, _rewrite_urls_with_tracers, _resolve_tailoring_jd
 from backend.candidates.resume_text import resume_text as version_text
+from backend.job_search.retired import retired
 
 logger = logging.getLogger("jobnavigator.cover_letters")
 
@@ -183,6 +184,7 @@ def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_d
 @router.post("", status_code=201)
 def create_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
     # See R4-T1-20: a non-string name used to raise AttributeError -> 500.
+    retired()  # job search PR 2: the old pool's write routes answer 410
     name = str_field(body, "name", required=True)
     if "template" in body:
         _validate_template(body["template"])
@@ -220,7 +222,9 @@ def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db), f
         _validate_template(body["template"])
     # A linked job or résumé must be the firm's own (07 F7); checked before anything is set.
     if "job_id" in body:
-        body["job_id"] = firm_ref(db, firm_id, Job, body["job_id"], "Job")
+        # A letter's job is one of the firm's job postings (migration 0023), not the old pool's.
+        from backend.models.job_search import JobPosting
+        body["job_id"] = firm_ref(db, firm_id, JobPosting, body["job_id"], "Job")
     if "resume_id" in body:
         body["resume_id"] = firm_ref(db, firm_id, Resume, body["resume_id"], "Resume")
     for k, v in body.items():
@@ -335,6 +339,7 @@ async def export_pdf(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(
 @router.post("/generate", status_code=202)
 async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id)):
     """Generate a cover letter for a (resume, job) pair in the background; returns 202 + run_id, and with cover_letter_id rewrites that existing letter in place instead of creating a new one."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     resume_id = body.get("resume_id")
     job_id = body.get("job_id")
     if not resume_id or not job_id:

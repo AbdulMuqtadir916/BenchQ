@@ -7,7 +7,7 @@ from backend.candidates import versions
 from backend.models.candidates import BaseResume, Candidate
 from backend.models.db import Application, Job, Resume
 from backend.models.tenancy import DEFAULT_FIRM_ID, User
-from backend.tests.resume_support import make_version
+from backend.tests.resume_support import make_posting, make_version
 
 pytestmark = pytest.mark.usefixtures("default_firm")
 
@@ -32,6 +32,9 @@ def _world(db):
         db.add(job)
         jobs.append(job)
     db.flush()
+    # A tailored résumé names one of the candidate's job postings (0023); an application still names the old pool's
+    # job until Samad's repoint (docs/team/samad.md §2 item 5).
+    postings = [make_posting(db, DEFAULT_FIRM_ID, candidate.id, bde.id, n) for n in range(2)]
 
     def version(number, category="BASE", job=None):
         row = Resume(firm_id=DEFAULT_FIRM_ID, candidate_id=candidate.id, base_resume_id=base2.id, category=category,
@@ -42,7 +45,7 @@ def _world(db):
         return row
 
     world = dict(candidate=candidate, bde=bde, base1=first, base2=base2, jobs=jobs, v1=version(1), v2=version(2),
-                 t1=version(1, "TAILORED", jobs[0]), t2=version(1, "TAILORED", jobs[1]))
+                 t1=version(1, "TAILORED", postings[0]), t2=version(1, "TAILORED", postings[1]))
     db.commit()
     return world
 

@@ -4,6 +4,8 @@ candidate's is the same 404 as a missing one.
 - POST …/job-searches              start a search `{query}`: its batch is written `running`, the search runs in the
                                    background: 202 `{batch_id, run_id}`
 - GET  …/job-searches              the running search, the finished ones (newest first), today's usage and caps
+- POST …/job-postings              capture one job `{source: manual | extension, title, company, description, url,
+                                   location?}`: 201, or 200 with the job the candidate already has (job search PR 2)
 - GET  …/job-postings?page=&size=  the candidate's jobs, newest first, in the common fields
 - GET  …/job-postings/{posting_id} one job, with its description
 Who (decided 2026-11-10): a search, only the candidate's assigned BDE (`job.search` + `can_search_jobs`); reads,
@@ -11,10 +13,10 @@ anyone who can see the candidate. A support view reads only (backend/auth/access
 résumé country (`Candidate.country`), never a request field.
 """
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, StringConstraints
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import AfterValidator, BaseModel, StringConstraints
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
@@ -25,6 +27,7 @@ from backend.auth.sessions import Principal
 from backend.job_monitor import JobAlreadyRunningError, launch_background
 from backend.job_search import limits, pipeline, providers
 from backend.job_search.country import search_country
+from backend.job_search.text import safe_url
 from backend.models.db import get_db, utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
 
@@ -36,6 +39,24 @@ PAGE_SIZE_MAX = 100
 
 class SearchBody(BaseModel):
     query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+def _http_url(value: str) -> str:
+    if safe_url(value) is None:
+        raise ValueError("an http(s) link")
+    return value.strip()
+
+
+Line = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
+
+
+class CaptureBody(BaseModel):
+    source: Literal["manual", "extension"]
+    title: Line
+    company: Line
+    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100_000)]
+    url: Annotated[str, StringConstraints(max_length=2048), AfterValidator(_http_url)]
+    location: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
 
 
 def _too_many(detail: str) -> HTTPException:
@@ -92,7 +113,8 @@ def _search_json(row: ScrapeJob, now=None) -> dict:
     meta = row.meta or {}
     request = meta.get("request") or {}
     lost = limits.is_lost(row, now)            # shown as the error it becomes; a read writes nothing
-    return {"batch_id": str(row.batch_id), "run_id": meta.get("run_id"), "state": "error" if lost else row.state,
+    return {"batch_id": str(row.batch_id), "kind": row.kind, "run_id": meta.get("run_id"),
+            "state": "error" if lost else row.state,
             "error_code": "internal" if lost else meta.get("error_code"), "query": request.get("query"), "country": request.get("country"),
             "provider": request.get("provider"), "counts": meta.get("counts"), "user_id": str(row.user_id),
             "started_at": row.created_at.isoformat(),
@@ -109,10 +131,30 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
     query = db.query(ScrapeJob).filter(ScrapeJob.firm_id == firm_id, ScrapeJob.candidate_id == candidate.id)
     if run is not None:
         query = query.filter(ScrapeJob.id != run.id)
-    rows = query.order_by(ScrapeJob.created_at.desc()).limit(HISTORY).all()
+    rows = query.order_by(ScrapeJob.created_at.desc()).limit(HISTORY).all()     # searches and captures
     return {"running": _search_json(run, now) if run is not None else None,
             "searches": [_search_json(r, now) for r in rows],
             "usage": limits.usage(db, firm_id, candidate.id, candidate.bde_id, now)}
+
+
+@router.post("/job-postings", status_code=201, summary="Capture one job for a candidate (by hand or the extension)")
+def capture_job(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: CaptureBody, response: Response,
+                principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    """The candidate's BDE only, like a search (decided 2026-11-10); 20 captures per BDE per day. The same job again
+    is the posting the candidate already has (200), not a second one."""
+    _member_of(firm_id, principal)
+    candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
+    if not can_search_jobs(principal, candidate):
+        raise HTTPException(status_code=403, detail="Only this candidate's BDE adds jobs for them.")
+    now = utcnow()
+    if limits.captures_today(db, firm_id, principal.user_id, now) >= limits.CAPTURES_PER_BDE_PER_DAY:
+        raise _too_many(f"You've captured {limits.CAPTURES_PER_BDE_PER_DAY} jobs today; {_resets(now)}.")
+    posting, created = pipeline.capture(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
+                                        source=body.source, job=body.model_dump(exclude={"source"}))
+    db.commit()
+    if not created:
+        response.status_code = 200
+    return _posting_json(posting, with_description=True)
 
 
 def _posting_json(row: JobPosting, with_description: bool) -> dict:

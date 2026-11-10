@@ -164,6 +164,7 @@ app.add_middleware(BodySizeLimit)
 app.add_middleware(statement_timeout.WebRequestMarker)
 
 from backend.api import routes_inbox
+from backend.job_search.retired import retired
 
 
 @app.middleware("http")
@@ -375,6 +376,7 @@ async def trigger_all_scrapes():
     """Run all active JobSpy keyword searches + all active Playwright career page scrapes.
     Returns immediately with a run_id. Check progress via /api/monitor/active.
     """
+    retired()  # job search PR 2: the old pool's write routes answer 410
     async def _do():
         from datetime import datetime as _dt, timezone as _tz
         from backend.scheduler import _scrape_summary
@@ -457,6 +459,7 @@ async def trigger_h1b_refresh():
 @app.post("/api/analyze/{job_id}", tags=["triggers"], summary="Analyze a single job", status_code=202)
 async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, firm_id=Depends(reader_firm_id)):
     """Re-run resume scoring for a specific job. depth: 'light' or 'full' (default)."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     import uuid as _uuid
     # uuid.UUID(job_id) used to be evaluated inside the launch_background(...)
     # call, so a malformed id raised ValueError instead of answering the way
@@ -588,6 +591,7 @@ async def trigger_auto_reject():
 @app.post("/api/jobs/backfill-descriptions", tags=["triggers"], summary="Fetch descriptions for jobs missing them", status_code=202)
 async def trigger_backfill_descriptions():
     """Fetch job descriptions for new/saved/applied jobs that have a URL but no description."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     async def _do():
         from backend.models.db import Job
         from backend.scraper.ats._descriptions import _fetch_job_description
@@ -710,6 +714,7 @@ async def trigger_company_scrape(company_id: str, auto_score: bool = None):
     """Run Playwright career page scrape for one company. Returns immediately with a run_id.
     auto_score: True/False override, null=use company.auto_scoring_depth setting.
     """
+    retired()  # job search PR 2: the old pool's write routes answer 410
     from backend.models.db import Company
     db = SessionLocal()
     try:

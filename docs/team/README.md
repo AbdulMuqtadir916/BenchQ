@@ -115,4 +115,5 @@ it. Everyone else reads it.
 | 0020 | Zuhair | Job-search tables: `job_postings` and `scrape_jobs` | PR #122 |
 | 0021 | Arbaz | `applications.form_data`: the form the extension saw when a job was marked applied. Follows 0020 (Zuhair's) | `feat/apply-extension-autofill` |
 | 0022 | Zuhair | Job search: `scrape_jobs.user_id` (who ran the search, for the BDE's daily attempts) and the indexes for the caps and the history. Follows 0021 (Arbaz's) | `feat/job-search-pipeline` |
-| 0023+ | — | Claim the next number here in your PR | — |
+| 0023 | Zuhair | Job search PR 2: `resumes` / `cover_letters` / `job_runs` / `llm_call_log` point at `job_postings`; `scrape_jobs.kind`; `UNIQUE (firm_id, candidate_id, id)` on `job_postings`. Follows 0022 | `feat/job-postings-repoint` |
+| 0024+ | — | Claim the next number here in your PR | — |

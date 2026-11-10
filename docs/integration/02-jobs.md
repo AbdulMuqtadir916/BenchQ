@@ -8,7 +8,9 @@
 > first; each item `id, candidate_id, batch_id, source, job_id, discovered_at, last_seen_at, title, company,
 > apply_url, location, countries, posted_at, employment_type, skills, is_closed`), `…/job-postings/{posting_id}`
 > (the same plus `description`, plain text), `GET …/job-searches` (`running`, `searches`, `usage`) and
-> `POST …/job-searches` `{query}` (202 `{batch_id, run_id}`; the batch is `running` until it finishes; the candidate's BDE only; 403 / 404 / 409 / 422 / 429). docs/02
+> `POST …/job-postings` (a capture, job search PR 2: `{source: manual | extension, title, company, description,
+> url, location?}`, 201, or 200 with the job the candidate already has), `POST …/job-searches` `{query}` (202
+> `{batch_id, run_id}`; the batch is `running` until it finishes; a repeat of the same role continues from the last; the candidate's BDE only; 403 / 404 / 409 / 422 / 429). docs/02
 > §6.y has the rules. Showing them in the screens, with Apply and Tailor off for them until PR 3 repoints
 > `applications`, is PR 2. The rest of this page still describes the old pool.
 
