@@ -5,12 +5,12 @@ listed here: what changed, in whose area, and why. Newest PR first.
 
 ## Job search tables (`feat/jobs-table`, Zuhair)
 
-`job_postings` and `scrape_jobs`, migration 0020 ([docs/02](../02-DATA-CONTRACTS.md) §6.y). Agreed with Zuhair
-2026-11-10.
+`job_postings` and `scrape_jobs`, migration 0020 ([docs/02](../02-DATA-CONTRACTS.md) §6.y).
 
-| Area (owner) | File | What changed | Why |
-|---|---|---|---|
-| Logging checks (Uzair) | `backend/tests/route_sweep.py` `SEED_OVERRIDES` | `"scrape_jobs": {"error": None}` | The sweep seeds one row per table from its columns: `state` takes the first allowed value (`success`) and every text column gets text, so `error` broke `ck_scrape_jobs_error_only_on_error` and `test_every_table_is_seeded` failed. The override gives the row a valid shape, as for `invites` or `notifications`. Test data only; no check is loosened. |
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Logging checks (Uzair) | `backend/tests/route_sweep.py` `SEED_OVERRIDES` | `SEED_BATCH`; `"scrape_jobs": {"error": None, "batch_id": SEED_BATCH}`; `"job_postings": {"job_id": "0" * 64, "batch_id": SEED_BATCH}` | The sweep seeds one row per table from its columns. `scrape_jobs`: `state` takes the first allowed value (`success`) and every text column gets text, so `error` broke `ck_scrape_jobs_error_iff_error`. `job_postings`: its text `job_id` isn't a SHA256 hex digest (`ck_job_postings_job_id_sha256`), and its `batch_id` references `scrape_jobs.batch_id`, not its `id`, which the seed's key lookup assumes. The overrides give both rows a valid shape, as for `invites` or `notifications`. Test data only; no check is loosened. | **Pending: Uzair** |
+| Candidates (Abdul) | `backend/models/candidates.py`, migration 0020 | `UNIQUE (firm_id, id)` on `candidates` (`uq_candidates_firm_id`) | The target of the `(firm_id, candidate_id)` foreign key on `job_postings` and `scrape_jobs`, so a row can't carry a firm other than its candidate's. `id` is already unique, so no existing row can break it. | Abdul, who suggested it in review (2026-11-10) |
 
 ## Résumé autofill (`feat/resume-autofill`, Zuhair; finished by Arbaz)
 

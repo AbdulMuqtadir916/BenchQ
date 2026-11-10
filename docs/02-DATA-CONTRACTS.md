@@ -1177,8 +1177,22 @@ export const JobMarkSchema = z.object({
 > (`backend/models/job_search.py`), not the existing shared-pool `jobs` table above (`backend/models/db.py`) or its
 > `JobSchema`/`JobMarkSchema` frontend contracts. One row per job a search found for one candidate — `(candidate_id,
 > job_id)` is unique, so the same posting content found again for the same candidate updates the existing row
-> (`batch_id`, `last_seen_at`) instead of inserting a duplicate.
+> (`batch_id`, `last_seen_at`) instead of inserting a duplicate. So `batch_id` is **the last batch that found the
+> job**, not its batch history; "which jobs did batch X find" leaves out jobs a later batch found again. A
+> membership table is the answer if a screen ever needs that history.
 
+- **Columns (revised 2026-11-10, from Abdul's review):** `id`, `firm_id`, `candidate_id`, `batch_id`, `source`,
+  `job_id`, `content`, `discovered_at`, `last_seen_at`, `created_at`, `updated_at`.
+  - **No `status` column.** Whether a job was saved or applied to lives in `applications` (its `saved` status, and
+    an application row), so a copy here can't drift from it. Hiding a job (dismissed) isn't built.
+  - **Tenancy:** `(firm_id, candidate_id)` references `candidates (firm_id, id)` (on `scrape_jobs` too), so a row
+    can't carry a firm other than its candidate's; `candidates` gets `UNIQUE (firm_id, id)` for it.
+  - **`batch_id` references `scrape_jobs.batch_id`.** On a successful batch the ingestion code writes the
+    `scrape_jobs` row and the postings in one transaction, the batch row first, so a crash leaves neither.
+  - **`job_id` is checked:** `CHECK (job_id ~ '^[0-9a-f]{64}$')`, lower-case SHA256 hex, so a raw board id or a
+    truncated or upper-case hash is refused instead of silently breaking dedup.
+  - **Indexes:** the unique `(candidate_id, job_id)` (dedup, and lookups by candidate), `(firm_id, candidate_id)`
+    (one candidate's list in a firm), `batch_id` (the foreign key). Nothing looks up by the hash alone.
 - **Identity (revised 2026-11-09):** `job_id` (SHA256 of normalized company + title + full job description; a
   content hash, not an id from the job board, and not the row's primary key `id`)
   is the only identity key. A content change is treated as a new posting by design, so the board's own job id adds
@@ -1192,8 +1206,7 @@ export const JobMarkSchema = z.object({
   a migration every time another aggregator is added or a source changes its response shape. `content`'s internal
   shape is the ingestion/adapter code's decision (not yet written), not this table's — so filtering/ranking on its
   fields (location, salary, seniority, skills) is a JSON-path query, not a plain `WHERE` on a column, and no CHECK
-  constraint can cover anything inside it. `status` (new/saved/dismissed/applied) stays a real column — it's the
-  BDE's own interaction with the row, not job content, and the app filters on it directly.
+  constraint can cover anything inside it.
 - **Not yet built:** the ingestion/adapter code itself, and repointing
   `applications.job_id` / `job_runs.target_job_id` off the old `jobs` table onto this one. The old `jobs` table and
   everything still pointing at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`, `job_runs`) is
@@ -1214,7 +1227,9 @@ export const JobMarkSchema = z.object({
   automatic signal and stays visible until something else catches it — accepted for now, revisit with a staleness
   rule if it becomes a real problem.
 - **`scrape_jobs` (migration 0020, with `job_postings`):** one row per finished batch — `firm_id`, `candidate_id`, `batch_id` (unique),
-  `state` (`success` | `error`), `error` (text, only set when `state = 'error'`), `metadata` (JSONB, `{}` by
+  `state` (revised 2026-11-10: `success`, the source answered with at least one job | `empty`, it answered with
+  none | `error`, it failed), `error` (text, the failure detail, set exactly when `state = 'error'`: a real failure
+  and an empty result never look the same), `metadata` (JSONB, `{}` by
   default: everything in the source's response except the jobs themselves, such as request id, parameters and
   totals, stored once per batch rather than on every job row), `created_at`. Written once the
   batch completes; there is no `request`/`pending` row, so this is a log, not a queue — any "search in progress"
