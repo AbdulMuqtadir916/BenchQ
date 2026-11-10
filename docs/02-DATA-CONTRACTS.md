@@ -1214,7 +1214,9 @@ export const JobMarkSchema = z.object({
   automatic signal and stays visible until something else catches it — accepted for now, revisit with a staleness
   rule if it becomes a real problem.
 - **`scrape_jobs` (migration 0020, with `job_postings`):** one row per finished batch — `firm_id`, `candidate_id`, `batch_id` (unique),
-  `state` (`success` | `error`), `error` (text, only set when `state = 'error'`), `created_at`. Written once the
+  `state` (`success` | `error`), `error` (text, only set when `state = 'error'`), `metadata` (JSONB, `{}` by
+  default: everything in the source's response except the jobs themselves, such as request id, parameters and
+  totals, stored once per batch rather than on every job row), `created_at`. Written once the
   batch completes; there is no `request`/`pending` row, so this is a log, not a queue — any "search in progress"
   UI state is the frontend's own, not backed by a row here. One row per batch, not per source: freehire.me is the
   only live source, so there's nothing to break down yet; a per-source breakdown becomes a real question again

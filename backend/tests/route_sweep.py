@@ -48,6 +48,7 @@ SEED_OVERRIDES = {
     "base_resumes": {"is_active": True, "deleted_at": None, "archived_at": None},
     "resumes": {"category": "BASE", "job_id": None, "deleted_at": None},
     "support_views": {"ended_at": None},
+    "scrape_jobs": {"error": None},             # error only on an error row; the seed's state is 'success'
 }
 # Path and body ids by name, when the name isn't `<table, singular>_id`.
 ID_ALIASES = {"app": "applications", "cl": "cover_letters", "base": "base_resumes", "message": "inbox_messages",

@@ -3,6 +3,15 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Job search tables (`feat/jobs-table`, Zuhair)
+
+`job_postings` and `scrape_jobs`, migration 0020 ([docs/02](../02-DATA-CONTRACTS.md) §6.y). Agreed with Zuhair
+2026-11-10.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Logging checks (Uzair) | `backend/tests/route_sweep.py` `SEED_OVERRIDES` | `"scrape_jobs": {"error": None}` | The sweep seeds one row per table from its columns: `state` takes the first allowed value (`success`) and every text column gets text, so `error` broke `ck_scrape_jobs_error_only_on_error` and `test_every_table_is_seeded` failed. The override gives the row a valid shape, as for `invites` or `notifications`. Test data only; no check is loosened. |
+
 ## Résumé autofill (`feat/resume-autofill`, Zuhair; finished by Arbaz)
 
 Decided by Zuhair 2026-11-07 (Abdul and Samad OK); finished 2026-11-08 from Abdul's review: every non-id fact about the

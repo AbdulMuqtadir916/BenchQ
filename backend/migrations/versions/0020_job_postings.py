@@ -10,7 +10,8 @@ hash, not the board's id. Everything about the job lives in one `content` JSONB 
 set of sources isn't fixed, and typed columns built around one source would need a migration per new source.
 
 `scrape_jobs`: one row per finished batch. Logging, not a queue — written once a batch completes (success or
-error), so there are no `request`/`pending` rows. `error` is the failure detail, only set when `state = 'error'`.
+error), so there are no `request`/`pending` rows. `error` is the failure detail, only set when `state = 'error'`. `metadata` holds the rest of the source's response
+(request id, parameters, totals): everything but the jobs, which are `job_postings` rows.
 `batch_id` is unique: one row logs the whole batch, not per source (freehire.me is the only live source).
 
 Follows 0019.
@@ -61,6 +62,8 @@ def upgrade() -> None:
         sa.Column('batch_id', sa.UUID(), nullable=False),
         sa.Column('state', sa.String(), nullable=False),
         sa.Column('error', sa.Text(), nullable=True),
+        sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"),
+                  nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.CheckConstraint("state IN ('success', 'error')", name='ck_scrape_jobs_state'),
         sa.CheckConstraint("state = 'error' OR error IS NULL", name='ck_scrape_jobs_error_only_on_error'),

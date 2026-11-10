@@ -75,6 +75,17 @@ def test_scrape_jobs_error_only_on_error_and_one_row_per_batch(scratch_db):
         conn.execute(text(_SCRAPE), {**base, "id": uuid.uuid4(), "batch_id": uuid.uuid4(), "state": "error",
                                      "error": "timeout"})
 
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT metadata FROM scrape_jobs WHERE batch_id = :b"),
+                            {"b": batch_id}).scalar_one() == {}
+    meta_batch = uuid.uuid4()
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO scrape_jobs (firm_id, candidate_id, batch_id, state, metadata) VALUES "
+                          "(:firm_id, :candidate_id, :batch_id, 'success', CAST(:meta AS jsonb))"),
+                     {**base, "batch_id": meta_batch, "meta": json.dumps({"total": 161, "limit": 100})})
+        assert conn.execute(text("SELECT metadata FROM scrape_jobs WHERE batch_id = :b"),
+                            {"b": meta_batch}).scalar_one() == {"total": 161, "limit": 100}
+
     assert _rejected(engine, _SCRAPE, {**base, "id": uuid.uuid4(), "batch_id": uuid.uuid4(), "state": "success",
                                        "error": "boom"})
     assert _rejected(engine, _SCRAPE, {**base, "id": uuid.uuid4(), "batch_id": batch_id, "state": "success",

@@ -70,6 +70,9 @@ class ScrapeJob(Base):
     batch_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
     state = Column(String, nullable=False)   # success | error
     error = Column(Text, nullable=True)      # only set when state='error'
+    # Everything in the source's response except the jobs themselves (those are job_postings rows): request id,
+    # parameters, totals, pagination. `metadata` is reserved on a declarative model, hence the attribute name.
+    meta = Column("metadata", JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     created_at = _created_at()
 
     __table_args__ = (
