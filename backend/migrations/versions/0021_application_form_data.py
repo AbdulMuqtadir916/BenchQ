@@ -1,7 +1,7 @@
 """The form behind an application: `applications.form_data` (docs/02 §9).
 
 Revision ID: 0021
-Revises: 0019
+Revises: 0020
 Create Date: 2026-11-07 12:00:00.000000
 
 What the employer's form held when the BDE marked the job applied from the extension. Null on every existing row: an
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 
 revision = '0021'
-down_revision = '0019'
+down_revision = '0020'
 branch_labels = None
 depends_on = None
 
