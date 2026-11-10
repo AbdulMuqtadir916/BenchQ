@@ -59,7 +59,7 @@ jobs:
           path: extension/benchq-extension.zip
       - name: Upload to the Chrome Web Store and submit for review
         if: ${{ env.EXTENSION_ID != '' && env.REFRESH_TOKEN != '' }}
-        run: npx --yes chrome-webstore-upload-cli@3 upload --source extension/benchq-extension.zip --auto-publish
+        run: npx --yes chrome-webstore-upload-cli@3.5.0 upload --source extension/benchq-extension.zip --auto-publish
       - name: No store credentials
         if: ${{ env.EXTENSION_ID == '' || env.REFRESH_TOKEN == '' }}
         run: echo "No Chrome Web Store secrets are set, so nothing was uploaded. The built zip is attached to this run."

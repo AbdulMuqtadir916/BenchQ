@@ -23,6 +23,7 @@ describe("the extension's manifest", () => {
     expect(manifest.side_panel).toEqual({ default_path: "index.html" });
     expect(Object.keys(manifest.commands)).toEqual(["run-autofill", "mark-applied"]);
     expect(manifest.background.service_worker).toBe("background.js");
+    expect(Number(manifest.minimum_chrome_version)).toBeGreaterThanOrEqual(114); // the side panel API
   });
 
   it("lets a local build call its own BenchQ", () => {

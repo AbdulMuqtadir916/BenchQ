@@ -81,7 +81,8 @@ Uses React, TypeScript, Vite, Tailwind v4 (through PostCSS, as the website does)
   hand), never for backend or frontend changes. It tests, runs `build:store`, stamps the version as `major.minor.<run number>`
   (the store refuses a version it already has), zips, and uploads and submits through the Chrome Web Store API when the
   secrets `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and `CHROME_REFRESH_TOKEN` exist. Without them
-  it only keeps the zip. The first upload and the listing are done by hand in the store dashboard.
+  it only keeps the zip. The first upload and the listing are done by hand in the store dashboard. The listing text, permission justifications, privacy draft, reviewer instructions and secret setup are in
+  [../extension-store.md](../extension-store.md).
 - Load unpacked in Chrome: run the build, open `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose `extension/dist/`.
 
 The extension calls the BenchQ origin directly with browser-managed cookies. Backend CORS and unsafe-request origin checks use `ALLOWED_ORIGINS`; the deployment must include the installed extension's `chrome-extension://<extension-id>` origin. This is an environment setup dependency, not changed by this implementation. The manifest's HTTPS host access is also what lets the page script run on employer sites, in connected tabs only; API calls stay limited to the configured `BENCHQ_URL`.
