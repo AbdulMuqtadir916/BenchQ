@@ -42,6 +42,7 @@ it. Everyone else reads it.
 | `candidates` | **Abdul approves**, Zuhair changes | Every change to `candidates` is confirmed with Abdul first, whoever makes it |
 | `resume_parses` | Zuhair | |
 | `searches` (candidate columns), `candidate_jobs`, `jobs`, `companies`, `job_locations`, `firm_jobs` | Zuhair | `jobs` is the shared pool (07 Q37) |
+| `job_postings`, `scrape_jobs` (new, 0020) | Zuhair | The job-search module's own tables, separate from `jobs`; see [zuhair.md](./zuhair.md) |
 | `favorite_jobs` | Samad | Written by the BDE in the app and read by the extension |
 | `resumes`, `cover_letters`, `tracer_links`, `tracer_click_events` | Zuhair | |
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
@@ -111,4 +112,5 @@ it. Everyone else reads it.
 | 0017 | Zuhair | The résumé's fields leave `candidates` (`full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`; 07 Q57): a MANUAL base for every candidate without one, empty header fields filled, then the drop | `integrate/resumes` |
 | 0018 | Zuhair | No MANUAL bases (07 Q58): each becomes an UPLOAD base with a generated résumé file; a placeholder next to a real upload is removed; the checks allow UPLOAD and PROMOTED only | `integrate/resumes` |
 | 0019 | Zuhair | Résumé autofill: `resumes.autofill`, the entries the user typed (`{}` on every version; the built answers aren't stored), `candidates.qa_bank` dropped | `feat/resume-autofill` |
-| 0020+ | — | Claim the next number here in your PR | — |
+| 0020 | Zuhair | Job-search tables: `job_postings` and `scrape_jobs` | PR #122 |
+| 0021+ | — | Claim the next number here in your PR | — |

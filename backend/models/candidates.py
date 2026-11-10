@@ -96,6 +96,8 @@ class Candidate(Base):
         CheckConstraint("char_length(btrim(full_name)) > 0", name="ck_candidates_full_name_not_blank"),
         Index("ix_candidates_firm_manager", "firm_id", "manager_id"),
         Index("ix_candidates_firm_bde", "firm_id", "bde_id"),
+        # The target of a (firm_id, candidate_id) foreign key, so a child row can't carry another firm (0020).
+        UniqueConstraint("firm_id", "id", name="uq_candidates_firm_id"),
     )
 
 

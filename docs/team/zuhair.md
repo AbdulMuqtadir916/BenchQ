@@ -30,6 +30,20 @@ Built already (onboarding 06): the parser (`backend/candidates/parse.py`, your r
 
 ## 2. Job scraping — per candidate (Q53b)
 
+**Reworked, in progress (decided 2026-11-09):** the shared-pool design below (`jobs` + `candidate_jobs` +
+`firm_jobs`) is being replaced for new scraping by two separate tables (`backend/models/job_search.py`, docs/02
+§6.y): `job_postings` (migration 0020) — one row per job a search finds for one candidate, deduped per candidate
+by content hash, with everything about the job itself (title, description, location, salary, etc.) in one
+`content` JSONB column rather than typed columns, since the set of sources isn't fixed to any one aggregator — and
+`scrape_jobs` (same migration), a log of finished batches (`success`/`empty`/`error`, the error detail only on
+`error`), not a queue. A successful batch's row and its postings are written in one transaction, batch row first
+(`job_postings.batch_id` references it). `job_postings` has no status: saved/applied live in `applications`.
+Live source right now: freehire.me. **Built so far:** both tables. **Not yet built:** the ingestion/adapter code
+(field mapping into `content`, the `job_id` (content hash) dedup rule, the country-by-search-target rule for multi-country
+postings), and repointing `applications.job_id` and `job_runs.target_job_id` off the old `jobs` table, retiring
+`jobs`/`job_locations`/`firm_jobs` once nothing points at them. Until that repoint lands, the flow described below
+(steps 1–5) is still what's actually running; treat it as the current production path, not the forward plan.
+
 The scraper runs firm searches into the shared pool (`jobs`, `firm_jobs`, 07 Q37). From 0007 a search belongs to a
 candidate (`searches.candidate_id`) and what it finds is recorded per candidate (`candidate_jobs`).
 
