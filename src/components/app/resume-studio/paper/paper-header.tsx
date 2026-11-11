@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+import { isProfileLinkField, normalizeProfileLink, PROFILE_LINK_ERROR } from "@/lib/resume-doc/profile-link";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { EditableText } from "../editable-text";
 import { useDocActions } from "../use-doc-actions";
@@ -25,6 +26,19 @@ const PRINTED = [
   { key: "github", label: "GitHub" },
 ] as const;
 
+function PaperContact({ value, label, editable, isLink, onChange }: { value: string; label: string; editable: boolean; isLink: boolean; onChange: (value: string) => void }) {
+  const id = useId();
+  const normalized = isLink && editable ? normalizeProfileLink(value) : value;
+  return (
+    <span className="rt-contact">
+      <EditableText value={value} onChange={onChange} editable={editable} label={label} placeholder={label}
+        invalidDescriptionId={normalized === null ? id : undefined}
+        onBlur={() => { if (normalized !== null && normalized !== value) onChange(normalized); }} />
+      {normalized === null ? <span id={id} className="ml-1 text-caption text-[var(--color-danger-fg)]">{PROFILE_LINK_ERROR}</span> : null}
+    </span>
+  );
+}
+
 /** The contact line: the location (city, state, country), then phone, email, LinkedIn, GitHub. Work authorization is not printed. */
 export function PaperContacts({ doc, editable }: { doc: ResumeDocument; editable: boolean }) {
   const a = useDocActions();
@@ -44,9 +58,8 @@ export function PaperContacts({ doc, editable }: { doc: ResumeDocument; editable
         </span>
       ) : place.length ? <span className="rt-contact">{place.join(", ")}</span> : null}
       {shown.map((f) => (
-        <span key={f.key} className="rt-contact">
-          <EditableText value={h[f.key]} onChange={(v) => a.setHeader(f.key, v)} editable={editable} label={f.label} placeholder={f.label} />
-        </span>
+        <PaperContact key={f.key} value={h[f.key]} label={f.label} editable={editable} isLink={isProfileLinkField(f.key)}
+          onChange={(v) => a.setHeader(f.key, v)} />
       ))}
     </div>
   );

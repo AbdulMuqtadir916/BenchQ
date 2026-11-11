@@ -71,7 +71,7 @@ export function filterApplications(applications: readonly Application[], filters
   });
 }
 
-type CandidateFilters = Omit<CandidatesSearchState, "assignment">;
+type CandidateFilters = Omit<CandidatesSearchState, "assignment" | "page">;
 
 export function filterCandidates(candidates: readonly Candidate[], filters: CandidateFilters, now: Date): Candidate[] {
   return candidates.filter((candidate) =>
@@ -84,7 +84,7 @@ export function filterCandidates(candidates: readonly Candidate[], filters: Cand
 
 /** Query strings for links into the lists: only the keys that filter, so the URL stays short. */
 export type ApplicationsLink = Partial<Omit<ApplicationsSearchState, "view">>;
-export type CandidatesLink = Partial<Omit<CandidatesSearchState, "assignment">> & { assignment?: "needs-bde" };
+export type CandidatesLink = Partial<Omit<CandidatesSearchState, "assignment" | "page">> & { assignment?: "needs-bde" };
 
 export const linkQuery = (filters: Record<string, string | undefined>): Record<string, string> =>
   Object.fromEntries(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));

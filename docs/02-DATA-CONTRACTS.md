@@ -1484,6 +1484,11 @@ export const ResumeSchema = z.object({
 
 ### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off); the version's `autofill` (`?autofill=true`) APPROVED 2026-11-08 (Abdul, issue 119), BUILT (PR 118)
 
+**Profile links (BUG-014, link policy approved 2026-11-11).** Candidate creation and résumé version saves accept
+optional HTTP and HTTPS links. A bare LinkedIn or GitHub URL with a path gains `https://`. Blank links are stored as
+null. An invalid link entered by the user returns 422 naming the field. An invalid link from the parser is dropped,
+and a malformed stored LinkedIn link is treated as absent by the candidate list and detail mapper.
+
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
 
