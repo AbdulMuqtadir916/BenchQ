@@ -627,19 +627,21 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
    * button makes the rest (at most MAX_ENTRIES), and they fill from the next records. A form with no such block, or no
    * Add button, is left as it is. */
   const addEntries = useCallback(async () => {
+    const blocksOf = (type: string) => (shownRows.current ?? []).filter((row) => typeOf(row.field) === type).length;
     let added = false;
     for (const [kind, type] of [["education", "education-school"], ["work", "current-company"]] as const) {
-      const blocks = (shownRows.current ?? []).filter((row) => typeOf(row.field) === type).length;
       const wanted = Math.min(history.current[kind].length, MAX_ENTRIES);
-      for (let count = blocks; blocks > 0 && count < wanted; count += 1) {
-        if (!(await addEntryIn(tabId, kind).catch(() => false))) break;
-        added = true;
+      let blocks = blocksOf(type);
+      while (blocks > 0 && blocks < wanted && await addEntryIn(tabId, kind).catch(() => false)) {
         await new Promise((resolve) => setTimeout(resolve, ENTRY_MS));
+        await scan(undefined, true);
+        const now = blocksOf(type);
+        if (now <= blocks) break;      // The click made no block: the form wants this one finished first.
+        blocks = now;
+        added = true;
       }
     }
-    if (!added) return;
-    await scan(undefined, true);
-    await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
+    if (added) await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
   }, [fillRows, scan, tabId]);
 
   const autofill = useCallback(async () => {

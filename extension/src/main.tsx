@@ -364,9 +364,9 @@ function App() {
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId) ?? null;
   // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then the tab connects.
   const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
-    <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} candidateId={selectedCandidate.id}
+    <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} candidateId={selectedCandidate.id}
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
-      onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job) void connectThisTab(job); }}
+      onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
       onAdded={(application) => {
         void loadJobs(selectedCandidate.id);
         void openJob(application);

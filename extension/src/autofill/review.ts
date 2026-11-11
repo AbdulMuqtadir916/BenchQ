@@ -173,19 +173,46 @@ const FROM_RECORD: Partial<Record<string, [keyof HistoryRecords, (record: Record
   "current-title": ["work", (record) => recordText(record.title)],
 };
 
+const REPEATS_ON_FORM = "This question appears more than once on the form.";
+
+/** A row a school or job record may answer: one the review would fill, or held back only because its question repeats
+ * (as a repeated block's questions do). A row held back for any other reason keeps that decision. */
+const takesRecord = (row: ReviewRow) => row.status === "ready" || row.status === "same" || (row.status === "manual" && row.reason === REPEATS_ON_FORM);
+
+const sameText = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
+
 /** A form that repeats a school or job block (or grew one with "Add another", #132) asks for the next school or job in
- * each: the n-th "School" takes the résumé's n-th school, not the first one again. A block past the résumé's last one
- * is left to the BDE. The first block keeps what it was given. */
+ * each. The first block keeps the school or job it was given or already holds; the next blocks take the résumé's other
+ * records in order. A block past the résumé's last one is left to the BDE. */
 export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewRow[] {
+  // Each kind's records in the order the blocks take them: the one the first block holds or was given, then the rest.
+  const anchors = new Map<keyof HistoryRecords, { type: string; value: string }>();
+  for (const row of rows) {
+    const type = typeOf(row.field);
+    const from = type ? FROM_RECORD[type] : undefined;
+    const value = row.proposed || row.field.current;
+    if (type && from && takesRecord(row) && value && !anchors.has(from[0])) anchors.set(from[0], { type, value });
+  }
+  const ordered = new Map<keyof HistoryRecords, Record<string, unknown>[]>();
+  const recordsOf = (kind: keyof HistoryRecords) => {
+    const known = ordered.get(kind);
+    if (known) return known;
+    const records = history[kind];
+    const anchor = anchors.get(kind);
+    const at = anchor ? records.findIndex((record) => sameText(FROM_RECORD[anchor.type]![1](record), anchor.value)) : -1;
+    const next = at > 0 ? [records[at]!, ...records.filter((_, n) => n !== at)] : records;
+    ordered.set(kind, next);
+    return next;
+  };
   const seen = new Map<string, number>();
   return rows.map((row) => {
     const type = typeOf(row.field);
     const from = type ? FROM_RECORD[type] : undefined;
-    if (!type || !from) return row;
+    if (!type || !from || !takesRecord(row)) return row;
     const index = seen.get(type) ?? 0;
     seen.set(type, index + 1);
-    if (index === 0) return row;
-    const record = history[from[0]][index];
+    if (index === 0 && row.status !== "manual") return row;
+    const record = recordsOf(from[0])[index];
     const value = record ? from[1](record) : "";
     const base = { key: row.key, field: row.field, isUnsaved: row.isUnsaved };
     return value ? rowFor(base, value) : { ...base, status: "manual", reason: "The résumé has no entry for this block." };

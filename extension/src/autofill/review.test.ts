@@ -538,10 +538,17 @@ describe("a school or job block that repeats (#132)", () => {
 
   it("fills the n-th block from the résumé's n-th school, and leaves a block past the last one to the BDE", () => {
     const fields = ["School", "School", "School"].map((label, n) => field(label, { id: `f${n}` }));
-    const base = buildReview(fields, [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]);
-    const rows = withHistory(base, history);
-    expect(rows[0]).toEqual(base[0]);
-    expect(rows.slice(1).map((row) => [row.status, row.proposed ?? null])).toEqual([["ready", "JNTU"], ["manual", null]]);
+    const rows = withHistory(buildReview(fields, [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]), history);
+    expect(rows.map((row) => [row.status, row.proposed ?? null])).toEqual([["ready", "Osmania University"], ["ready", "JNTU"], ["manual", null]]);
+  });
+
+  it("starts from the school the first block already holds, and keeps a row the review held back for another reason", () => {
+    const fields = [field("School", { id: "f0", current: "JNTU" }), field("School", { id: "f1" })];
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }];
+    const rows = withHistory(buildReview(fields, bank), history);
+    expect(rows.map((row) => row.proposed ?? null)).toEqual(["JNTU", "Osmania University"]);
+    const held = { ...rows[1]!, status: "blocked" as const, reason: "A reference's employer." };
+    expect(withHistory([rows[0]!, held], history)[1]).toEqual(held);
   });
 
   it("leaves a form with one block as it was", () => {

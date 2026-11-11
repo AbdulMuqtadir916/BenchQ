@@ -141,7 +141,7 @@ def test_only_the_candidates_bde_adds_a_job_for_them(anonymous_client, world):
 
 def test_saving_names_one_of_the_candidates_own_postings(anonymous_client, test_db, world):
     mine, theirs = _candidate(anonymous_client, world), _candidate(anonymous_client, world, bde="sneha")
-    added = _add(anonymous_client, world, theirs, who="fatima").json()
+    added = _add(anonymous_client, world, theirs, who="sneha").json()
     r = anonymous_client.post("/api/applications", json={"candidate_id": mine["id"], "job_id": added["job_id"],
                                                          "status": "saved"}, headers=world["as"]["adnan"])
     assert r.status_code == 404, r.text

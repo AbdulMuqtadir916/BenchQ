@@ -6,7 +6,7 @@ import { sameCompany, sameListing } from "./job-check";
 import { readJobPage } from "./tab-bridge";
 import type { PageJob } from "./types";
 
-type KnownJob = { id?: string; title: string | null; company: string | null; location: string | null; url?: string | null };
+type KnownJob = { id?: string; status?: string; title: string | null; company: string | null; location: string | null; url?: string | null };
 
 type AddJobCardProps = {
   /** The tab the BDE is looking at. */
@@ -31,13 +31,20 @@ const sameUrl = (url: string) => url.split("#")[0]!.replace(/\/+$/, "").toLowerC
 /** Query keys that name a job. Other keys (tracking, the source of a click) don't tell two jobs apart. */
 const JOB_KEYS = /^(gh_jid|jk|vjk|jobid|job_id|id|req|reqid|req_id|requisitionid|pid|currentjobid)$/i;
 
+/** A host's site: its last two labels, or three under a country's second-level domain (`acme.co.uk`, `acme.com.au`). */
+function siteOf(hostname: string): string {
+  const labels = hostname.toLowerCase().split(".");
+  const isCountrySecondLevel = labels.length >= 3 && labels.at(-1)!.length === 2 && /^(co|com|org|net|gov|ac|edu)$/.test(labels.at(-2)!);
+  return labels.slice(isCountrySecondLevel ? -3 : -2).join(".");
+}
+
 /** What names a link's job: its site without the subdomain (Greenhouse sends `boards.` to `job-boards.`), its path, and
  * the query keys that name a job. */
 function jobKeyOf(url: string) {
   try {
     const link = new URL(url);
     return {
-      site: link.hostname.toLowerCase().split(".").slice(-2).join("."),
+      site: siteOf(link.hostname),
       path: link.pathname.toLowerCase().replace(/\/+$/, ""),
       ids: new Map([...link.searchParams].filter(([key]) => JOB_KEYS.test(key)).map(([key, value]) => [key.toLowerCase(), value])),
     };
@@ -95,21 +102,25 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   useEffect(() => {
     if (tabId === null) return;
     let timers: ReturnType<typeof setTimeout>[] = [];
+    let isLive = true;
     const look = () => void readJobPage(tabId).then((found) => {
-      if (!found?.isJobPage || !found.title || !found.company || !found.description) return;
+      if (!isLive || !found?.isJobPage || !found.title || !found.company || !found.description) return;
       timers.forEach(clearTimeout);
       setJob(found);
     }, () => undefined);
     look();
     timers = LOOK_AGAIN_MS.map((wait) => setTimeout(look, wait));
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      isLive = false;
+      timers.forEach(clearTimeout);
+    };
   }, [tabId]);
 
   const isWebPage = Boolean(tab && /^https?:\/\//i.test(tab.url) && !tab.url.startsWith(BENCHQ_URL));
   const saved = (isWebPage && knownJobs.find((known) => known.url && isSameJob(tab!.url, known.url)))
     || (job ? knownJobs.find((known) => sameListing(job, known) || sharesJobId(job, known)) : undefined);
   if (saved) {
-    return onUseTab ? <section data-slot="use-tab" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="use-tab-title">
+    return onUseTab && (saved.status ?? "saved") === "saved" ? <section data-slot="use-tab" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="use-tab-title">
       <h2 id="use-tab-title" className="text-sm font-[550]">{candidateName}&apos;s job is on this page</h2>
       <p className={SOFT_TEXT}>{[saved.title, saved.company].filter(Boolean).join(" · ")}</p>
       <button type="button" data-slot="use-tab-run" className={button("primary")} onClick={() => onUseTab(saved)}>Use this tab for Autofill</button>

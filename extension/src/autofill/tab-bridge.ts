@@ -68,8 +68,12 @@ export async function scanTab(tabId: number): Promise<TabScan> {
 /** The job the tab's page shows (its top frame), for adding it to a candidate's jobs. */
 /** Clicks the form's "Add another" for a kind of history entry (#132) in the frame that has one: whether one was found. */
 export async function addEntryIn(tabId: number, kind: "education" | "work"): Promise<boolean> {
-  const results = await inFrames<boolean>({ tabId, allFrames: true }, "addEntry", [kind]);
-  return results.some(({ result }) => result === true);
+  const frames = (await chrome.webNavigation.getAllFrames({ tabId })) ?? [];
+  for (const { frameId } of frames.length > 0 ? frames : [{ frameId: MAIN_FRAME }]) {
+    const [found] = await inFrames<boolean>({ tabId, frameIds: [frameId] }, "addEntry", [kind]).catch(() => []);
+    if (found?.result === true) return true;
+  }
+  return false;
 }
 
 export async function readJobPage(tabId: number): Promise<PageJob | null> {
