@@ -93,6 +93,10 @@ NOT_PERSONAL = {
     ("scheduler.py", "run_auto_reject"): "a scheduler setting's error",
     ("scheduler.py", "run_db_backup"): "pg_dump's error; the password is in its environment, not its output",
     ("scraper/ats/phenom.py", "scrape"): "a job board's endpoint and fields",
+    # The résumé tailor's steps (docs/team/tailoring.md): a step's name ("analyse") and fixed reasons ("not in the
+    # CV", "dropped"), counted; never the CV, the résumé or the model's reply.
+    ("resume_tailor/pipeline.py", "_ask"): "a step's name",
+    ("resume_tailor/pipeline.py", "tailor"): "counts and fixed reasons of the edits and the fact gate",
 }
 
 # (file, function) -> who was told. Found by Abdul's review of #107, a search of every log call (2026-11-03) and this

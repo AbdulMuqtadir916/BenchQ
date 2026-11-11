@@ -560,8 +560,8 @@ base is named "Base" (§4.2).
 - Deleting: by creator and by use, hidden when used, "Show again" not active (§4.7).
 - One candidate per person per firm: the email is required and unique within the firm, never checked across firms;
   one BDE per candidate, for all their target roles (Abdul's `candidates` table; not in PR 5).
-- Later, in the tailoring module: one active base but several target roles; whether tailoring may choose the base
-  per job is decided there.
+- In the tailoring module: one active base but several target roles. Decided 2026-11-12: tailoring starts from the
+  active base by default and the BDE may pick another ([tailoring.md](./tailoring.md) Q1).
 
 **Still to decide (Abdul):**
 - **The nightly clean-up** (`scheduler.py`, "skip" jobs older than `job_archive_after_days`) deletes shared jobs
@@ -585,8 +585,8 @@ base is named "Base" (§4.2).
   candidate). PR 5's routes replace list, open, save and delete; tailoring and the ATS score (`score-check`) are
   rebuilt in the tailoring module. JobNavigator's tailoring pipeline and score-check are kept, unwired, in
   `backend/analyzer/legacy_tailoring.py` for it to port (they still read the dropped `json_data`).
-- **Tailoring prompts** allow content not in the base; there is no claim state to hold it (§4.5), so the prompts
-  are worth tightening in §3.
+- **Tailoring prompts** (the old ones) allowed content not in the base. The tailoring module replaces them with the
+  handoff's workflow, whose rules and code gate keep every bullet to its own role's lines ([tailoring.md](./tailoring.md)).
 - **`personas`** (a singleton without `firm_id` on firm routes) is a firm-isolation gap, flagged to Abdul; not
   touched here. Kept for now (Abdul, 2026-11-05); its readers move to the candidate first
   ([persona-to-candidates.md](./persona-to-candidates.md)).

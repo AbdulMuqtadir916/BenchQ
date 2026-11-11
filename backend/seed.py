@@ -10,6 +10,7 @@ from backend.candidates.parse_defaults import (DEFAULT_PROMPT as RESUME_PARSE_PR
                                                DEFAULT_RESPONSE_FORMAT as RESUME_PARSE_RESPONSE_FORMAT,
                                                DEFAULT_SYSTEM_PROMPT as RESUME_PARSE_SYSTEM_PROMPT,
                                                OLD_DEFAULT_PROMPT as OLD_RESUME_PARSE_PROMPT)
+from backend.resume_tailor import settings as resume_tailor_settings
 
 logger = logging.getLogger("jobnavigator.seed")
 
@@ -28,6 +29,9 @@ DEFAULT_SETTINGS = {
     "resume_parse_llm_model": ("openai/gpt-6-luna", "Résumé parser model (required)"),
     "resume_parse_llm_api_key": ("", "OpenRouter API key for the résumé parser (required; until set, every parse "
                                  "fails naming this row)"),
+    # The résumé tailor (docs/team/tailoring.md), as an AI preset like the parser: its own model (three rows, all
+    # required, the key seeded empty), its nine prompts and four strict response formats.
+    **resume_tailor_settings.DEFAULT_SETTINGS,
     "fit_score_threshold": ("60", "Minimum fit score to trigger Telegram alert"),
     "scrape_interval_minutes": ("60", "How often the job checker runs"),
     "email_check_interval_minutes": ("30", "How often Gmail is polled"),
@@ -449,6 +453,8 @@ ENUM_SETTING_VALUES = {
     "autofill_llm_provider": _LLM_PROVIDERS,
     # The parser sends a strict format and reasoning-off, which only its openrouter call carries.
     "resume_parse_llm_provider": {"openrouter"},
+    # The tailor too (backend/resume_tailor/settings.py).
+    resume_tailor_settings.PROVIDER_ROW: {resume_tailor_settings.PROVIDER},
     "llm_effort": _EFFORTS,
     "llm_fallback_effort": _EFFORTS,
     "scoring_llm_effort": _EFFORTS,
@@ -516,8 +522,9 @@ def invalid_setting_values(updates: dict) -> list:
             if not isinstance(value, str) or value.strip().lower() not in allowed:
                 shown = ", ".join(sorted(v for v in allowed if v)) or "(empty)"
                 problems.append(f"{key}: must be one of {shown} (got {value!r})")
-    # The parser's response format and prompt: a broken one would fail every parse (candidates/parse.py).
-    return problems + resume_parse.setting_problems(updates)
+    # The parser's response format and prompt: a broken one would fail every parse (candidates/parse.py); the
+    # tailor's prompts and formats would fail every tailoring (resume_tailor/settings.py).
+    return problems + resume_parse.setting_problems(updates) + resume_tailor_settings.setting_problems(updates)
 
 
 SEED_COMPANIES = [

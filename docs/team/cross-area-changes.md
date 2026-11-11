@@ -3,6 +3,17 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé tailoring (`feat/resume-tailoring`, Zuhair; part 1, the package)
+
+The tailor's backend package ([tailoring.md](./tailoring.md)). Built 2026-11-12; these rows were not asked about
+before the change, so each waits for its owner.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Settings (Abdul, F2c) | `backend/seed.py` (`DEFAULT_SETTINGS`, `ENUM_SETTING_VALUES`, `invalid_setting_values`), `backend/settings_scope.py` | 16 `resume_tailor_*` rows seeded (the tailor's model, nine prompts, four formats; the key empty), all AI presets; its provider limited to `openrouter`; the save check refuses a broken tailor prompt or format. The rows come from `backend/resume_tailor/settings.py`. | Decided 2026-11-12 (Q6, Q6b): the tailor keeps its prompts and formats in settings the way the résumé parser does. | **Pending: Abdul** |
+| AI presets (Abdul, 08) | `backend/ai/config.py` | A `resume_tailor` module in `AI_MODULES` (its prompts and formats). The old `tailoring` module stays until tailoring's part 2 deletes it with `legacy_tailoring.py`. | The same; the presets take the tailor's prompts later without a rewrite. | **Pending: Abdul** |
+| Shared AI helpers | `backend/analyzer/prompt_fence.py` | `without_fake_markers` added (the file is now JobNavigator's, unchanged); `fence` is untouched. New files beside it: `keyword_match.py`, `known_skills.py`, `job_requirements.py` (only `clean_job_text`), `data/skills_dictionary.json`. | The tailoring handoff takes fake fence markers out of a posting first, and its claim checks read the skills dictionary (Q5). Nothing else calls them yet. | Informational |
+
 ## Job screens on the backend (`integrate/jobs`, Zuhair; job search PR 3)
 
 Decided 2026-11-11 (grilling rounds 1–3). In progress; rows are added as the work lands. Opened as a PR only after

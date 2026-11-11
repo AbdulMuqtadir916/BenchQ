@@ -15,6 +15,8 @@ that isn't, so a new setting has to say whose it is.
 """
 from enum import Enum
 
+from backend.resume_tailor import settings as tailor_settings
+
 
 class Scope(str, Enum):
     PLATFORM = "platform"
@@ -90,6 +92,8 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "resume_parse_llm_provider": (AI, "AI presets"),
     "resume_parse_llm_model": (AI, "AI presets"),
     "resume_parse_llm_api_key": (AI, "AI presets"),
+    # The résumé tailor's model, prompts and formats (backend/resume_tailor/settings.py).
+    **{key: (AI, "AI presets") for key in tailor_settings.DEFAULT_SETTINGS},
     "cover_letter_voice_presets": (AI, "AI presets"),
     "email_llm_enabled": (AI, "AI presets"),
     "email_llm_provider": (AI, "AI presets"),
