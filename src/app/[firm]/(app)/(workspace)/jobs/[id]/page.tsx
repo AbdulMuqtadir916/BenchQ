@@ -14,6 +14,7 @@ import type { Candidate } from "@/lib/schemas/candidate";
 import { PageHeader } from "@/components/app/page-header";
 import { VerificationBadge } from "@/components/app/verification-badge";
 import { SourceChip } from "@/components/app/source-chip";
+import { JobDescription } from "@/components/app/jobs/job-description";
 import { MatchScore } from "@/components/app/match-score";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
@@ -25,6 +26,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { isNotFoundError } from "@/lib/api/client";
 import { useHref } from "@/lib/routes/use-href";
+import { jobLocation } from "@/lib/format/job";
 
 const ANALYSIS_STAGES = [
   "Reading the job description",
@@ -70,6 +72,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   if (jobQuery.error || !jobQuery.data) return <div className="bq-page"><ErrorState error={jobQuery.error as Error} onRetry={() => void jobQuery.refetch()} /></div>;
 
   const job: Job = jobQuery.data;
+  // The candidates this job was found or captured for, among the ones this person sees (docs/02 §6.z).
+  const foundFor = myCandidates.filter((candidate) => job.candidateIds.includes(candidate.id));
   const score = context ? deriveMatchScore(context, job) : null;
   const analysisReady = run.status === "complete";
 
@@ -81,20 +85,30 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
       <PageHeader
         title={job.title}
-        subtitle={`${job.company.name} · ${job.remoteMode === "REMOTE" ? "Remote" : `${job.city}, ${job.state}`}${job.rateMax ? ` · $${job.rateMin}–${job.rateMax}/hr` : ""}`}
+        subtitle={`${job.company.name} · ${jobLocation(job)}${job.rateMax ? ` · $${job.rateMin}–${job.rateMax}/hr` : ""}`}
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <VerificationBadge verification={job.company.verification} />
+        {job.company.h1b?.sponsorsH1b ? <Tag tone="green">H-1B sponsor</Tag> : null}
         <SourceChip sourceType={job.provenance.sourceType} legalBasis={job.provenance.legalBasis} showBasis />
         {job.postedAt ? <span className="text-caption text-[var(--color-text-3)]">Posted <DualTimestamp iso={job.postedAt} format="relative" /></span> : null}
         <span className="text-caption text-[var(--color-text-3)]">· Captured <DualTimestamp iso={job.provenance.ingestedAt} format="relative" /></span>
       </div>
 
+      {foundFor.length > 0 ? (
+        <p className="-mt-2 mb-5 text-sm text-[var(--color-text-2)]">
+          <span className="text-[var(--color-text-3)]">Found for </span>
+          {foundFor.map((candidate, index) => (
+            <span key={candidate.id}>{index > 0 ? ", " : null}<Link href={toHref("candidates.detail", { id: candidate.id })} className="font-[550] text-[var(--color-text)] hover:underline">{candidate.fullName}</Link></span>
+          ))}
+        </p>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card>
           <CardHeader><CardTitle>Description</CardTitle></CardHeader>
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text-2)]">{job.description}</div>
+          {job.description ? <JobDescription text={job.description} /> : <p className="text-sm text-[var(--color-text-3)]">This job has no description.</p>}
           {job.requirements.length > 0 ? (
             <div className="mt-5">
               <h3 className="text-label mb-2 text-[var(--color-text-3)]">Requirements</h3>
@@ -130,8 +144,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
             {analysisReady && context ? (
               <div className="mt-3 space-y-1.5">
-                <div className="mb-1 flex items-center gap-2 text-caption text-[var(--color-unverified-fg)]">
-                  <Sparkles size={12} aria-hidden /> AI draft — verified once you confirm evidence
+                <div className="mb-1 flex items-center gap-2 text-caption text-[var(--color-text-3)]">
+                  <Sparkles size={12} aria-hidden /> AI draft — read it over before you rely on it
                 </div>
                 {job.requirements.map((r) => {
                   const m = matchRequirement(r, context);

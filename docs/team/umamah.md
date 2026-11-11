@@ -10,7 +10,7 @@ contract changes and the migration number with Abdul.
 ## Status
 
 **Activity logs (from 2026-11-05):** the ledger plan, agreed with Abdul, runs as one branch per PR named `activity/…`.
-PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q56).
+PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q59).
 Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
 Next: PR 2, the ledger rules as tests.
 
@@ -65,6 +65,14 @@ duplicate adapter, the reset pages on hooks, and one token-based count badge. Ne
 
 **Known local issue:** `src/mocks/db.test.ts` (fixture fingerprint) fails on this Windows checkout only, because Git
 checks the fixture JSON out with CRLF. CI (Linux) is unaffected; `.gitattributes` would fix it for Windows.
+
+**PR 8 (2026-11-10):** `pr8-dashboards-managers-bdes-remove-analytics-followups`, built on main, not pushed yet. The dashboard's Activity tab goes from the
+whole firm to a manager's team to one BDE, now drawn as charts (funnel, ranked bars, bench aging, demand against the
+bench, stage speeds, job sources, BDE workload, a today ring), and every number opens the Applications or Candidates
+list filtered to the same records. Managers and viewers have the tab too (a manager sees only their team). New
+Owner-only Managers page; Analytics removed, its numbers moved to the tab (07 Q60). Follow-ups removed, agreed with
+Abdul (07 Q61). A manager now has only the Activity dashboard, with a per-BDE stage chart, and a BDEs page (07 Q62). Details in
+[pr-changes/pr8-owner-dashboard.md](./pr-changes/pr8-owner-dashboard.md).
 
 **Activity logs PR 2 (2026-11-05):** `activity/pr2-ledger-rules-as-tests`. CI now fails a route that changes data and
 writes no ledger entry (unless listed in `NOT_LOGGED` with a reason), a ledger write without `candidate_id`, and a ledger

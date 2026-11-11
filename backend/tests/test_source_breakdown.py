@@ -160,51 +160,11 @@ def test_google_that_returned_rows_records_no_error(test_db, monkeypatch):
     assert google["returned"] == 1
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("rows", [
-    [],  # every board failed: the early return
-    [_row("indeed", "Program Manager", "Acme", "https://indeed.test/a")],
-])
-async def test_the_test_run_reports_each_failed_board(test_db, rows):
-    """Before this, a failed board simply disappeared from the Test run result."""
-    from backend.api.routes_searches import test_search
-    from backend.scraper.sources.jobspy import GOOGLE_BLOCKED, ZIP_RECRUITER_BLOCKED
-
-    _fake_jobspy(rows, log_errors=[
-        ("JobSpy:ZipRecruiter", ZIP_FORBIDDEN_AA, logging.ERROR),
-        ("JobSpy:Google", GOOGLE_CURSOR_WARNING, logging.WARNING),
-    ])
-    search = _search(test_db, ["indeed", "zip_recruiter", "google"])
-
-    out = await test_search(str(search.id), db=test_db)
-
-    assert out["source_errors"] == {
-        "zip_recruiter": ZIP_RECRUITER_BLOCKED,
-        "google": GOOGLE_BLOCKED,
-    }
-    assert out["source_breakdown"] == ({"indeed": 1} if rows else {})
-
-
 # The capture handler attaches to every JobSpy logger in the process. The
 # scheduler runs in the same process, so another run's board failure can reach
 # this run's capture. Only the boards this search uses may be reported.
-
-@pytest.mark.asyncio
-async def test_the_test_run_ignores_a_failure_of_a_board_it_does_not_use(test_db):
-    from backend.api.routes_searches import test_search
-    from backend.scraper.sources.jobspy import ZIP_RECRUITER_BLOCKED, _capture_source_errors
-
-    # The ZipRecruiter record stands for the overlapping scheduled run.
-    _fake_jobspy([_row("indeed", "Program Manager", "Acme", "https://indeed.test/a")],
-                 log_errors=[("JobSpy:ZipRecruiter", ZIP_FORBIDDEN_AA, logging.ERROR)])
-    search = _search(test_db, ["linkedin", "indeed"])
-
-    with _capture_source_errors(["zip_recruiter"]) as scheduled:
-        out = await test_search(str(search.id), db=test_db)
-
-    assert scheduled.errors == {"zip_recruiter": ZIP_RECRUITER_BLOCKED}
-    assert out["source_errors"] == {}
-    assert out["source_breakdown"] == {"indeed": 1}
+# (The Test run and the run-summary tests went with their routes: the old pool's search triggers answer 410 since job
+# search PR 2, backend/job_search/retired.py.)
 
 
 def test_a_run_ignores_a_failure_of_a_board_it_does_not_use(test_db, monkeypatch):
@@ -479,33 +439,6 @@ def test_a_board_that_returned_nothing_is_still_reported_empty(test_db, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_run_summary_names_a_board_that_returned_nothing(test_db, monkeypatch):
-    import backend.api.routes_searches as rs
-    import backend.scraper.orchestrator as orch
-
-    search = _search(test_db, ["indeed", "linkedin"])
-
-    async def fake_run(search_id, auto_score=None):
-        return {
-            "jobs_found": 40, "new_jobs": 12, "error": None, "duration": 1.0,
-            "source_breakdown": {
-                "indeed": {"seen": 0, "new": 0, "returned": 0},
-                "linkedin": {"seen": 40, "new": 12, "returned": 40},
-            },
-        }
-
-    monkeypatch.setattr(orch, "_run_search_by_id", fake_run)
-
-    captured = {}
-    monkeypatch.setattr("backend.job_monitor.launch_background",
-                        lambda job_type, coro_func, **kw: captured.setdefault("coro", coro_func) and "r")
-    await rs.trigger_search(str(search.id), db=test_db)
-
-    summary = await captured["coro"]()
-    assert "no rows from indeed" in summary
-
-
-@pytest.mark.asyncio
 async def test_scrape_log_unchanged_when_every_source_is_fine(test_db, monkeypatch):
     import backend.scraper.orchestrator as orch
 
@@ -527,62 +460,6 @@ async def test_scrape_log_unchanged_when_every_source_is_fine(test_db, monkeypat
     assert log.is_warning is False
     assert log.error is None
     assert log.source_breakdown["indeed"]["new"] == 2
-
-
-# ── the run summary ─────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_run_summary_names_the_failed_sources(test_db, monkeypatch):
-    import backend.api.routes_searches as rs
-    import backend.scraper.orchestrator as orch
-
-    search = _search(test_db, ["indeed", "zip_recruiter", "google"])
-
-    async def fake_run(search_id, auto_score=None):
-        return {
-            "jobs_found": 9, "new_jobs": 0, "error": None, "duration": 1.0,
-            "source_breakdown": {
-                "indeed": {"seen": 9, "new": 0},
-                "zip_recruiter": {"seen": 0, "new": 0, "error": "403"},
-                "google": {"seen": 0, "new": 0, "error": "initial cursor not found"},
-            },
-        }
-
-    monkeypatch.setattr(orch, "_run_search_by_id", fake_run)
-
-    captured = {}
-
-    def fake_launch(job_type, coro_func, **kw):
-        captured["coro"] = coro_func
-        return "run-1"
-
-    monkeypatch.setattr("backend.job_monitor.launch_background", fake_launch)
-    await rs.trigger_search(str(search.id), db=test_db)
-
-    summary = await captured["coro"]()
-    assert summary.startswith("ZZ Search - 9 seen, +0 new · ")
-    assert "zip_recruiter: 403" in summary
-    assert "google: initial cursor not found" in summary
-
-
-@pytest.mark.asyncio
-async def test_run_summary_unchanged_when_sources_are_clean(test_db, monkeypatch):
-    import backend.api.routes_searches as rs
-    import backend.scraper.orchestrator as orch
-
-    search = _search(test_db, ["indeed"])
-
-    async def fake_run(search_id, auto_score=None):
-        return {"jobs_found": 12, "new_jobs": 4, "error": None, "duration": 1.0,
-                "source_breakdown": {"indeed": {"seen": 12, "new": 4}}}
-
-    monkeypatch.setattr(orch, "_run_search_by_id", fake_run)
-
-    captured = {}
-    monkeypatch.setattr("backend.job_monitor.launch_background",
-                        lambda job_type, coro_func, **kw: captured.setdefault("coro", coro_func) and "r")
-    await rs.trigger_search(str(search.id), db=test_db)
-    assert await captured["coro"]() == "ZZ Search - 12 seen, +4 new"
 
 
 # ── the API surface the Searches screen reads ───────────────────────────────

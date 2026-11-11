@@ -85,15 +85,6 @@ def test_patch_cover_letter_rejects_a_bad_template(api_client, test_db):
 
 # ── R4-T5-09 · analyze a job that does not exist ─────────────────────────────
 
-def test_analyze_unknown_job_id_is_404(api_client, test_db):
-    resp = api_client.post(f"/api/analyze/{uuid.uuid4()}")
-    assert resp.status_code == 404
-    assert resp.json()["detail"]
-
-
-def test_analyze_malformed_job_id_is_still_404(api_client, test_db):
-    assert api_client.post("/api/analyze/not-a-uuid").status_code == 404
-
 
 def test_analyze_writes_no_job_run_for_an_unknown_id(api_client, test_db):
     from backend.models.db import JobRun

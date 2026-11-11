@@ -178,9 +178,11 @@ def make_resume(db, name="Base", is_base=True, **kw):
     """A résumé version of a new candidate named `name` (a base's v1, or a tailored résumé when `is_base` is False and
     a `job_id` is given); `json_data` in the old shape is converted to the columns (résumé versioning PR 6)."""
     from backend.tests.resume_support import columns_from_json, make_version
-    content = columns_from_json(kw.pop("json_data", {"header": {"name": "A"}}))
+    data = kw.pop("json_data", {"header": {"name": "A"}})
+    content = columns_from_json(data)
     kw.pop("parent_id", None)                                  # no lineage since PR 6
-    r = make_version(db, default_firm_id(db), name=name, candidate_name=name,
+    # An explicitly empty résumé stays empty: no name either (07 Q57: the candidate's name is the résumé's).
+    r = make_version(db, default_firm_id(db), name=name, candidate_name=name if data else None,
                      category="BASE" if is_base else "TAILORED", **content, **kw)
     db.commit()
     db.refresh(r)

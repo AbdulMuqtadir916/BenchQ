@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApplicationStatus, FollowUpKind, FollowUpState, OutreachChannel, OutreachResult } from "./enums";
+import { ApplicationStatus, OutreachChannel, OutreachResult } from "./enums";
 
 export const ApplicationEventSchema = z.object({
   id: z.string(),
@@ -69,20 +69,3 @@ export const OutreachTouchSchema = z.object({
 });
 export type OutreachTouch = z.infer<typeof OutreachTouchSchema>;
 
-export const FollowUpTaskSchema = z.object({
-  id: z.string(),
-  firmId: z.string(),
-  applicationId: z.string(),
-  assignedToUserId: z.string(),
-  kind: FollowUpKind,
-  dueAt: z.string().datetime(),
-  state: FollowUpState,
-  completedAt: z.string().datetime().nullable(),
-  snoozedUntil: z.string().datetime().nullable(),
-  note: z.string().nullable(),
-
-  candidateName: z.string(),
-  companyName: z.string(),
-  jobTitle: z.string(),
-});
-export type FollowUpTask = z.infer<typeof FollowUpTaskSchema>;

@@ -12,20 +12,9 @@ import { toIso, toIsoOrNull } from "./shared";
 /**
  * backend/candidates/serialize.py `candidate_json` (docs/candidate-onboarding/06-backend.md §5): the frontend's
  * `CandidateSchema` in snake_case. Seeded ids are UUIDv5 of the fixture ids and come back as `cand_01` etc., so the
- * modules still on mocks (applications, résumés…) keep finding their candidates. The skills and the summary are the Record's
- * claims and the base résumé's, not the candidate's (migration 0015).
+ * modules still on mocks (applications, résumés…) keep finding their candidates. The skills and the summary are the base résumé's,
+ * not the candidate's (migration 0015).
  */
-const QaEntryDto = z.object({
-  id: z.string(),
-  question: z.string(),
-  answer: z.string(),
-  category: z.string(),
-  use_count: z.number().int(),
-  last_used_at: z.string().nullable(),
-  state: z.string(),
-  evidence_id: z.string().nullable(),
-});
-
 export const CandidateDto = z.object({
   id: z.string(),
   firm_id: z.string(),
@@ -37,7 +26,7 @@ export const CandidateDto = z.object({
   linkedin_url: z.string().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
-  country: z.string(),
+  country: z.string().nullable(),
   willing_to_relocate: z.boolean(),
   work_auth: z.string(),
   work_auth_expiry: z.string().nullable(),
@@ -58,26 +47,31 @@ export const CandidateDto = z.object({
   contact_notes: z.string().nullable(),
   preferred_industries: z.array(z.string()),
   deal_breakers: z.array(z.string()),
-  qa_bank: z.array(QaEntryDto),
   created_at: z.string(),
   updated_at: z.string(),
 });
 export type CandidateDto = z.infer<typeof CandidateDto>;
 
-/** Backend candidate → `Candidate`. Throws on a VERIFIED answer without evidence (Truth Guard, 07 §2). */
+// A malformed LinkedIn value on the active résumé should not make the candidate unreadable (07 Q57, BUG-014).
+const linkRule = CandidateSchema.shape.linkedinUrl;
+function readableLink(candidateId: string, link: string | null): string | null {
+  if (link === null || linkRule.safeParse(link).success) return link;
+  console.warn(`[api] candidate ${candidateId}: ignoring a malformed linkedin_url`);
+  return null;
+}
+
+/** Backend candidate → `Candidate`. */
 export function toCandidate(dto: CandidateDto): Candidate {
-  for (const entry of dto.qa_bank) {
-    if (entry.state === "VERIFIED" && !entry.evidence_id) throw new Error(`Candidate ${dto.id}: answer ${entry.id} is VERIFIED without evidence.`);
-  }
+  const id = fromBackendId(dto.id);
   return CandidateSchema.parse({
-    id: fromBackendId(dto.id),
+    id,
     firmId: fromBackendId(dto.firm_id),
     managerId: fromBackendId(dto.manager_id),
     bdeId: dto.bde_id === null ? null : fromBackendId(dto.bde_id),
     fullName: dto.full_name,
     email: dto.email,
     phone: dto.phone,
-    linkedinUrl: dto.linkedin_url,
+    linkedinUrl: readableLink(id, dto.linkedin_url),
     city: dto.city,
     state: dto.state,
     country: dto.country,
@@ -101,16 +95,10 @@ export function toCandidate(dto: CandidateDto): Candidate {
     contactNotes: dto.contact_notes,
     preferredIndustries: dto.preferred_industries,
     dealBreakers: dto.deal_breakers,
-    qaBank: dto.qa_bank.map((entry) => ({
-      id: entry.id,
-      question: entry.question,
-      answer: entry.answer,
-      category: entry.category,
-      useCount: entry.use_count,
-      lastUsedAt: toIsoOrNull(entry.last_used_at),
-      state: entry.state,
-      evidenceId: entry.evidence_id,
-    })),
+    // The backend has no answer bank on the candidate since migration 0019 (each résumé version holds its own
+    // `autofill`). The Documents tab's Screening answers panel shows its empty state until that section is removed
+    // (planned, docs/team/abdul.md §3).
+    qaBank: [],
     createdAt: toIso(dto.created_at),
     updatedAt: toIso(dto.updated_at),
   });
@@ -143,7 +131,7 @@ export function toBackendCreateCandidate(body: CreateCandidate) {
     preferred_locations: body.preferredLocations,
     contact_notes: body.contactNotes,
     summary: body.summary,
-    skills: body.skills.map((skill) => ({ name: skill.name, family: skill.family, source: skill.source })),
+    skills: body.skills.map((skill) => ({ name: skill.name, family: skill.family })),
     preferred_industries: body.preferredIndustries,
     deal_breakers: body.dealBreakers,
     resume_parse_id: body.resumeParseId,
@@ -156,7 +144,8 @@ export function toBackendCreateCandidate(body: CreateCandidate) {
 /** `UpdateCandidate` → UpdateCandidateBody: only the fields being changed (the backend reads unset as "leave it"). */
 export function toBackendUpdateCandidate(patch: UpdateCandidate) {
   const names: Record<keyof UpdateCandidate, string> = {
-    workAuth: "work_auth", workAuthExpiry: "work_auth_expiry", rateTarget: "rate_target", rateMin: "rate_min",
+    workAuth: "work_auth", needsSponsorship: "needs_sponsorship", needsTransfer: "needs_transfer",
+    workAuthExpiry: "work_auth_expiry", rateTarget: "rate_target", rateMin: "rate_min",
     availableFrom: "available_from", noticePeriodDays: "notice_period_days", willingToRelocate: "willing_to_relocate",
     employmentTypes: "employment_types",
   };

@@ -36,7 +36,7 @@ const EMPTY: Form = { name: "", slug: "", planId: "", primaryTimezone: "Asia/Kol
 
 /**
  * /admin/firms/new (docs/04 §14.4). Creates the firm (ONBOARDING) with the plan's limits copied, and
- * the OWNER's 7-day invite. Truth Guard mode and application expiry take their defaults: the OWNER
+ * the OWNER's 7-day invite. Application expiry takes its default: the OWNER
  * changes them in settings/firm. Esc or Cancel goes back to the list, confirming if anything was typed.
  */
 export function CreateFirm() {

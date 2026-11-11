@@ -161,7 +161,8 @@ def _versions(db, firm_id, *filters) -> list:
     LLM or the job's scores."""
     from backend.models.candidates import Candidate
     from backend.models.db import Resume
-    return (db.query(Resume, Candidate.full_name).join(Candidate, Candidate.id == Resume.candidate_id)
+    # The name on the version itself (07 Q57: the candidate's name lives in the résumé).
+    return (db.query(Resume, Resume.full_name).join(Candidate, Candidate.id == Resume.candidate_id)
             .filter(Resume.firm_id == firm_id, Resume.deleted_at.is_(None), *filters).order_by(Resume.id).all())
 
 

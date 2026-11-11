@@ -5,6 +5,7 @@ import { ledgerApi, type LedgerFilters, type LedgerQuery } from "@/lib/api/analy
 import { queryKeys } from "@/lib/query/keys";
 import { useFirmId } from "@/lib/tenancy/firm-context";
 
+/** One page of the ledger (a count, a record's history): `params` carries `limit` and `offset`. */
 export function useLedger(params?: LedgerQuery, options?: { isEnabled?: boolean }) {
   const firmId = useFirmId();
   return useQuery({

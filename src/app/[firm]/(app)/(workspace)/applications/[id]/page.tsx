@@ -146,7 +146,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
             <dl className="space-y-3">
               <Detail label="Candidate">{candidate ? <Link href={toHref("candidates.detail", { id: candidate.id })} className="hover:underline">{candidate.fullName}</Link> : "—"}</Detail>
               <Detail label="Job">
-                <Link href={toHref("jobs.detail", { id: app.jobId })} className="hover:underline">{app.jobTitleAtApply}</Link>
+                {/* Until applications name job postings (Arbaz's repoint), an application's job may not be found: then no link. */}
+                {job ? <Link href={toHref("jobs.detail", { id: app.jobId })} className="hover:underline">{app.jobTitleAtApply}</Link> : <span>{app.jobTitleAtApply}</span>}
                 <span className="block text-sm text-[var(--color-text-3)]">{app.companyNameAtApply}</span>
               </Detail>
               <Detail label="Match score">{candidate && job ? <MatchScore score={deriveMatchScore(candidate, job)} /> : "—"}</Detail>

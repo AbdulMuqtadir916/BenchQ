@@ -1,16 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { can } from "@/lib/auth/policy";
 import { agentsMock } from "./agents";
-import { applicationsMock, followupsMock } from "./applications";
-import { candidatesMock } from "./candidates";
-import { createCandidateBody } from "./create-candidate-body";
+import { applicationsMock } from "./applications";
+import { stubCandidateReads } from "./fixture-backend";
 import { documentsMock } from "./documents";
 import { inboxMock } from "./inbox";
-import { jobsMock } from "./jobs";
 import { jobMarksMock } from "./job-marks";
 import { FIRM_SCOPED_RESOURCES, WRITE_ACTIONS, isReadMethod } from "./membership";
 import { recordsMock } from "./records";
-import { resumesMock } from "./resumes";
 import { signInAs, signInAsSupportView, signOutForTest } from "./sign-in-as";
 
 /**
@@ -22,7 +19,7 @@ import { signInAs, signInAsSupportView, signOutForTest } from "./sign-in-as";
 
 type AnyMethod = (firmId: string, ...args: unknown[]) => Promise<unknown>;
 const MOCKS: Record<string, Record<string, AnyMethod>> = {
-  candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock, records: recordsMock,
+  applications: applicationsMock, records: recordsMock,
   documents: documentsMock, inbox: inboxMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
 } as unknown as Record<string, Record<string, AnyMethod>>;
 
@@ -30,12 +27,6 @@ const FIRM = "firm_hts";
 /** Arguments that would make each write succeed for a member who may act (so a refusal can only be the policy). */
 const ARGS: Record<string, unknown[]> = {
   "applications.updateStatus": ["app_001", { status: "WITHDRAWN", note: null }],
-  "candidates.update": ["cand_01", { headline: "Senior Java Developer" }],
-  "candidates.create": [createCandidateBody({ fullName: "Policy Check", primaryRole: "QA", workAuth: "USC" })],
-  "candidates.followBde": ["user_adnan", "user_fatima"],
-  "candidates.reassign": ["cand_01", { managerId: "user_priya", bdeId: "user_vikram", note: null }],
-  "candidates.parseResume": [{ fileName: "Ravi_Teja_Java_FullStack.pdf", sizeBytes: 1000, mimeType: "application/pdf" }],
-  "jobs.capture": [{ sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", remoteMode: "REMOTE", employmentType: null, payPeriod: "HOUR", payMin: null, payMax: null, sponsorsVisa: false, excludesC2C: false, experience: "", skills: [], description: "Policy check" }],
   "documents.upload": ["cand_01", { kind: "OTHER", title: "Note", fileName: "note.pdf", sizeBytes: 1000, expiresAt: null }],
   "documents.remove": ["doc_none"],
   "inbox.connect": ["cand_01"],
@@ -51,6 +42,7 @@ const call = (resource: string, name: string) => MOCKS[resource]![name]!(FIRM, .
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_MOCK_DELAY_MS = "0";
+  stubCandidateReads(); // candidates are the backend's: the mocks that check one read the test fixture
 });
 afterAll(async () => {
   signOutForTest();
@@ -65,14 +57,11 @@ describe("the write inventory", () => {
       }
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
-      "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture",
+      "agents.tailorResume", "applications.updateStatus", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark",
     ]);
   });
 
   it("the Phase B writes name their own actions (fix PRs 1, 2)", () => {
-    expect(WRITE_ACTIONS.candidates?.create).toBe("candidate.create");
-    expect(WRITE_ACTIONS.candidates?.parseResume).toBe("candidate.create"); // reading a résumé is part of adding one
-    expect(WRITE_ACTIONS.jobs?.capture).toBe("job.capture");
     expect(WRITE_ACTIONS.jobMarks).toEqual({ mark: "job.apply", unmark: "job.apply" });
   });
 });
@@ -92,7 +81,7 @@ describe("a VIEWER is refused every write (403), with the UI's table", () => {
   });
 
   it("still reads (the refusal is about writing, not membership)", async () => {
-    expect((await candidatesMock.list(FIRM)).length).toBeGreaterThan(0);
+    expect((await applicationsMock.list(FIRM)).length).toBeGreaterThan(0);
   });
 });
 
@@ -124,3 +113,5 @@ describe("control: an OWNER is not refused by the policy", () => {
     expect(outcome).not.toBe(403);
   });
 });
+
+// The BDE-only résumé writes (07 Q55) are the backend's now (no résumé mock): backend/tests/test_resume_*.

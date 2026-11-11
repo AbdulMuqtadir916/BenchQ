@@ -1,9 +1,7 @@
 import { z } from "zod";
 import {
   CandidateStatus,
-  ClaimState,
   EmploymentType,
-  FieldSource,
   RemoteMode,
   WorkAuth,
 } from "./enums";
@@ -23,8 +21,6 @@ export const QaBankEntrySchema = z.object({
   ]),
   useCount: z.number().int(),
   lastUsedAt: z.string().datetime().nullable(),
-  state: ClaimState,
-  evidenceId: z.string().nullable(),
 });
 export type QaBankEntry = z.infer<typeof QaBankEntrySchema>;
 
@@ -37,7 +33,8 @@ export const CandidateSchema = z.object({
   linkedinUrl: z.string().url().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
-  country: z.string().default("US"),
+  /** From the active base résumé (07 Q57); null when it names none. Never defaulted. */
+  country: z.string().nullable(),
   willingToRelocate: z.boolean(),
   workAuth: WorkAuth,
   workAuthExpiry: z.string().datetime().nullable(),
@@ -93,9 +90,11 @@ export const CandidateStatsSchema = z.object({
 });
 export type CandidateStats = z.infer<typeof CandidateStatsSchema>;
 
-/** The submission facts a BDE edits from the candidate Overview. */
+/** The submission facts the owner or the candidate's manager edits from the candidate Overview (07 Q56). A new `workAuth` comes with the sponsorship and transfer it implies. */
 export const UpdateCandidateSchema = CandidateSchema.pick({
   workAuth: true,
+  needsSponsorship: true,
+  needsTransfer: true,
   workAuthExpiry: true,
   rateTarget: true,
   rateMin: true,
@@ -141,11 +140,12 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   primaryRole: z.string().trim().min(1, "Enter the title they're marketed as."),
   email: z.string().trim().email("Enter a valid email."),
   summary: z.string().trim().nullable(),
-  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable(), source: FieldSource })),
+  skills: z.array(z.object({ name: z.string().trim().min(1), family: z.string().nullable() })),
   preferredIndustries: z.array(z.string()),
   dealBreakers: z.array(z.string()),
-  /** The parse to keep: the backend holds the file until create (onboarding module 06). null = no résumé. */
-  resumeParseId: z.string().nullable(),
+  /** The parse to keep: the backend holds the file until create (onboarding module 06). Required: no candidate without
+   *  their résumé (07 Q58). */
+  resumeParseId: z.string().min(1),
   managerId: z.string().min(1, "Choose a manager."),
   bdeId: z.string().nullable(),
   handoffNote: z.string().trim().max(1000).nullable(),
