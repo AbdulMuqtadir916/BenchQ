@@ -10,7 +10,7 @@ Create Date: 2026-11-10 22:00:00.000000
 - `scrape_jobs.kind`: `search` (a BDE's search) or `capture` (one job the BDE captured by hand or from the
   extension: its own batch, with one posting). Existing rows are searches.
 - `job_postings`: `UNIQUE (firm_id, candidate_id, id)`, the target of the candidate-safe keys below and of
-  `applications`' key (Samad's own PR, docs/team/samad.md §2 item 5).
+  `applications`' key (Arbaz's own PR, docs/team/arbaz.md).
 - `resumes (firm_id, candidate_id, job_id)` → `job_postings (firm_id, candidate_id, id)` ON DELETE CASCADE: a
   tailored résumé names its own candidate's job, and deleting the job deletes the résumés tailored for it (Abdul,
   2026-11-01). A base résumé's `job_id` is NULL, so the key doesn't apply to it.

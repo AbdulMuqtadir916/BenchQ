@@ -8,7 +8,7 @@ def setup_application(test_db, accounts, firm_id):
     return _saved_candidate_application(test_db, accounts, firm_id, 'OWNER')
 
 
-@pytest.mark.xfail(strict=True, reason="Until Samad repoints applications.job_id onto job_postings (docs/team/samad.md §2 item 5): a tailored résumé or letter names a job posting since 0023, the application still the old pool's job, so they don't match. Remove this mark when it passes.")
+@pytest.mark.xfail(strict=True, reason="Until Arbaz repoints applications.job_id onto job_postings (docs/team/arbaz.md, 'Repoint applications.job_id'): a tailored résumé or letter names a job posting since 0023, the application still the old pool's job, so they don't match. Remove this mark when it passes.")
 @pytest.mark.parametrize("with_legacy", [False, True])
 def test_latest_tailored_resume_stays_with_its_candidate_or_legacy_application(
         api_client, test_db, accounts, jobs_in_default_firm, with_legacy):

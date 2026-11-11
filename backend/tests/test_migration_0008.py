@@ -35,7 +35,7 @@ def world(test_db, accounts):
     test_db.add(base)
     test_db.flush()
     # What a tailored résumé names since 0023: Asha's job postings. `jobs` (the old pool) is what an application
-    # still names until Samad's repoint.
+    # still names until Arbaz's repoint.
     postings = [make_posting(test_db, firm.id, people[0].id, owner.id, n) for n in (7, 8)]
     return {"firm": firm, "owner": owner, "asha": people[0], "ravi": people[1], "jobs": jobs, "postings": postings,
             "parse": parse, "base": base}
@@ -137,7 +137,7 @@ def test_deleting_a_job_deletes_the_resumes_tailored_for_it(test_db, world):
 
 
 def test_a_job_an_application_names_cannot_be_deleted(test_db, world):
-    job7 = world["jobs"][0]                    # the application's job: the old pool's until Samad's repoint
+    job7 = world["jobs"][0]                    # the application's job: the old pool's until Arbaz's repoint
     tailored = _version(world, category="TAILORED", job_id=world["postings"][0].id)
     test_db.add(tailored)
     test_db.flush()

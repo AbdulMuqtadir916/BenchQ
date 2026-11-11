@@ -33,7 +33,7 @@ def _world(db):
         jobs.append(job)
     db.flush()
     # A tailored résumé names one of the candidate's job postings (0023); an application still names the old pool's
-    # job until Samad's repoint (docs/team/samad.md §2 item 5).
+    # job until Arbaz's repoint (docs/team/arbaz.md).
     postings = [make_posting(db, DEFAULT_FIRM_ID, candidate.id, bde.id, n) for n in range(2)]
 
     def version(number, category="BASE", job=None):

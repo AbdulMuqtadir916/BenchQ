@@ -8,10 +8,8 @@ These decisions supersede the earlier five-PR split, blanket human-acceptance ru
 immediate Other-content removal and manual sender-approval proposals. This file is the reviewer’s current module
 plan. Historical proposals in local working documents are not approval to implement conflicting behavior.
 
-> **⚠ Action needed, Samad (added 2026-11-10 by Zuhair):** `applications.job_id` moves from the old `jobs` pool onto
-> `job_postings`, and that change is **yours** (decided 2026-11-10). See §2.5 below. It starts once Zuhair's job search
-> PR 2 (`feat/job-postings-repoint`) is merged. Until it lands, a job found by a candidate's search can't be Saved or
-> applied to.
+> **Update 2026-11-11 (Zuhair):** the `applications.job_id` → `job_postings` repoint, first given to you on 2026-11-10,
+> is now **Arbaz's** (§2 item 5 points to it). `applications` stays your table: Arbaz confirms his change with you.
 
 ## PR raise rules
 
@@ -179,27 +177,11 @@ proposed access log. These are future scope, not hidden dependencies for PR 3.
 4. **Frontend live** behind `applications`: the board, the candidate's Applications tab, the dashboards' numbers
    (they are derived from applications: never store a count).
 
-5. **Repoint `applications.job_id` onto `job_postings` (yours; decided 2026-11-10, job search grilling Q2, Q5–Q7,
-   Q16).** The old `jobs` pool is being retired: jobs now come from a candidate's search (`job_postings`, docs/02
-   §6.y). Zuhair's PR 2 repoints his own tables (`resumes`, `cover_letters`, `job_runs`, `llm_call_log`) and adds
-   `UNIQUE (firm_id, candidate_id, id)` on `job_postings` as your key's target. Your PR, from main **after** his PR 2
-   merges (no stacking):
-   - **Migration** (the next free number; recheck the head): `applications (firm_id, candidate_id, job_id)` →
-     `job_postings (firm_id, candidate_id, id)` ON DELETE RESTRICT, so an application can only name its own
-     candidate's job. `applications.candidate_id` becomes NOT NULL (rows from before 0007 are gone). No data is
-     copied: no real firm uses BenchQ yet, so the migration refuses to run while any application still points at
-     `jobs` ("clear your local test applications first").
-   - **The column keeps its name** `job_id`, now meaning `job_postings.id`. Careful: `job_postings.job_id` is the
-     posting's content hash, not a row id (docs/02 §6.y).
-   - **Reading the job:** a posting's fields come from its provider:
-     `providers.reader_for(posting.source).read(posting.content)` (`backend/job_search/providers/`) gives `title`,
-     `company`, `description` (plain text), `apply_url`, `location`. Never read `content` directly.
-   - **Keep the application JSON the same** (`title`, `company`, `url`, …) so Arbaz's extension (saved and applied
-     lists, mark applied) works unchanged. Saving a job is `POST /api/applications` with `job_id` = the posting's
-     `id`.
-   - **Also yours:** the ledger labels, the prep page and `inbox/application_matching.py`, which read `app.job`; and
-     `favorite_jobs` (also points at `jobs`): repoint it or retire it in favour of a Saved application, your call.
-   - Log what you change outside your area in `cross-area-changes.md`.
+5. **Moved to Arbaz (decided 2026-11-11 by Zuhair):** repointing `applications.job_id` from the old `jobs` pool onto
+   `job_postings` is Arbaz's PR, not yours: [arbaz.md](./arbaz.md), "Repoint `applications.job_id` onto
+   `job_postings`". `applications` stays your table; that PR changes it, so Arbaz confirms the change with you first. **Still
+   yours:** `favorite_jobs` also points at the old `jobs` pool: repoint it onto `job_postings` or retire it in favour of
+   a Saved application, your call.
 
 ## 3. The Extension (capture + autofill)
 

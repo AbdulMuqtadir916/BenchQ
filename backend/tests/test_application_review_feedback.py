@@ -80,7 +80,7 @@ def test_saved_applied_round_trip_keeps_first_submission_and_actor(api_client, t
     assert test_db.query(FavoriteJob).filter_by(candidate_id=candidate.id, job_id=job.id).count() == 0
 
 
-@pytest.mark.xfail(strict=True, reason="Until Samad repoints applications.job_id onto job_postings (docs/team/samad.md §2 item 5): a tailored résumé or letter names a job posting since 0023, the application still the old pool's job, so they don't match. Remove this mark when it passes.")
+@pytest.mark.xfail(strict=True, reason="Until Arbaz repoints applications.job_id onto job_postings (docs/team/arbaz.md, 'Repoint applications.job_id'): a tailored résumé or letter names a job posting since 0023, the application still the old pool's job, so they don't match. Remove this mark when it passes.")
 @pytest.mark.parametrize('own_letter', [False, True])
 def test_candidate_responses_share_scoped_resume_and_letter_metadata(api_client, test_db, accounts, submission, own_letter):
     from datetime import timedelta
@@ -120,7 +120,7 @@ def test_candidate_responses_share_scoped_resume_and_letter_metadata(api_client,
     }))
 
 
-@pytest.mark.xfail(strict=True, reason="Until Samad repoints applications.job_id onto job_postings (docs/team/samad.md §2 item 5): a tailored résumé or letter names a job posting since 0023, the application still the old pool's job, so they don't match. Remove this mark when it passes.")
+@pytest.mark.xfail(strict=True, reason="Until Arbaz repoints applications.job_id onto job_postings (docs/team/arbaz.md, 'Repoint applications.job_id'): a tailored résumé or letter names a job posting since 0023, the application still the old pool's job, so they don't match. Remove this mark when it passes.")
 def test_legacy_detail_and_update_match_list_document_metadata(api_client, test_db, submission):
     """An application from before candidates has no tailored résumé (every résumé has a candidate since 0013); an
     unattributed letter still describes it."""

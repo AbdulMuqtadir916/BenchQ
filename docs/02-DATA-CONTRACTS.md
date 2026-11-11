@@ -1221,7 +1221,7 @@ export const JobMarkSchema = z.object({
   DELETE SET NULL. `job_postings` has `UNIQUE (firm_id, candidate_id, id)` as the target. Nothing was copied (no real
   firm yet): the upgrade stops while a tailored résumé or a cover letter names an old job; the two logs are only
   unlinked. **The column names are kept, so `resumes.job_id` is a posting's `id`, while `job_postings.job_id` is
-  the content hash.** `applications.job_id` moves in Samad's own PR (docs/team/samad.md §2 item 5); until then an
+  the content hash.** `applications.job_id` moves in Arbaz's own PR (docs/team/arbaz.md, "Repoint `applications.job_id`"); until then an
   application's job and its tailored résumé's job are in different tables, so the prep page and the tracker can't
   pair them (nothing creates a tailored résumé today; those tests are strict xfails).
 - **Not yet built:** repointing
