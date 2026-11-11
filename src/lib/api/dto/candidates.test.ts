@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CandidateSchema } from "@/lib/schemas/candidate";
 import { createCandidateBody } from "@/mocks/create-candidate-body";
 import sample from "./__samples__/candidates.json";
@@ -27,6 +27,56 @@ describe("the backend candidate → Candidate", () => {
 
   it("refuses a value the frontend doesn't know (a contract change is a stop-and-ask, 07 §2)", () => {
     expect(() => toCandidate(CandidateDto.parse({ ...sample.list[0], status: "ON_HOLD" }))).toThrow();
+  });
+});
+
+/**
+ * BUG-014: one malformed optional link (the candidate's LinkedIn comes from the active résumé) used to fail `toCandidate`,
+ * and so every list and detail read, for every role. The mapper's input is the backend shape (`linkedin_url`).
+ */
+describe("a malformed optional link", () => {
+  const withLink = (link: string | null) => CandidateDto.parse({ ...sample.list[0], linkedin_url: link });
+  const silenceWarnings = () => vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("becomes null instead of failing the read, and everything else is kept", () => {
+    silenceWarnings();
+    const candidate = toCandidate(withLink("aghajrgng;knga"));
+    expect(candidate.linkedinUrl).toBeNull();
+    expect(candidate).toEqual({ ...assigned!, linkedinUrl: null });
+    expect(CandidateSchema.parse(candidate)).toEqual(candidate);
+  });
+
+  it("is logged without the typed value, naming the field and the candidate", () => {
+    const warn = silenceWarnings();
+    toCandidate(withLink("aghajrgng;knga"));
+    expect(warn).toHaveBeenCalledTimes(1);
+    const message = String(warn.mock.calls[0]?.[0]);
+    expect(message).toContain("linkedin_url");
+    expect(message).toContain(assigned!.id);
+    expect(message).not.toContain("aghajrgng");
+  });
+
+  it("recovers for every row of a list: one bad row no longer fails the others", () => {
+    silenceWarnings();
+    const mapped = [withLink("aghajrgng;knga"), CandidateDto.parse(sample.list[1])].map(toCandidate);
+    expect(mapped).toHaveLength(2);
+    expect(mapped[0]!.linkedinUrl).toBeNull();
+    expect(mapped[1]).toEqual(queued);
+  });
+
+  it("keeps a well-formed link, and a null one, without logging", () => {
+    const warn = silenceWarnings();
+    expect(toCandidate(withLink("https://linkedin.com/in/meera-k")).linkedinUrl).toBe("https://linkedin.com/in/meera-k");
+    expect(toCandidate(withLink(null)).linkedinUrl).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("does not hide a different problem: a bad link beside an unknown status still throws", () => {
+    silenceWarnings();
+    const row = CandidateDto.parse({ ...sample.list[0], linkedin_url: "aghajrgng;knga", status: "ON_HOLD" });
+    expect(() => toCandidate(row)).toThrow();
   });
 });
 

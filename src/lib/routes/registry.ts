@@ -101,7 +101,7 @@ const ROUTE_DEFS = [
   { id: "resumes.studio", path: "/[firm]/resumes/[id]", title: "Resume", area: "firm", shell: "studio", access: firm(roles("full", "team", "assigned", "read")) },
   { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 7, icon: Mail }, palette: true },
   { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 8, icon: ScrollText }, palette: true },
-  { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", access: firm(roles("full", "full", "full", "none"), "none") },
+  { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", palette: true, access: firm(roles("full", "full", "full", "none"), "none") },
 
   // Preferences
   // Super Admin only, and only when NEXT_PUBLIC_SHOW_DEV_ROUTES=true (devOnly): in the admin sidebar's Preferences.

@@ -1,31 +1,35 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+import type { ShortcutHint } from "@/lib/list-shortcuts";
 import { useUiStore } from "@/lib/stores/ui-store";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { shortcutsFor } from "@/lib/routes/registry";
 import { cn } from "@/lib/cn";
 
 /**
- * KeyboardHintSheet — opened by `?`. Lists every global shortcut.
+ * KeyboardHintSheet — opened by `?`. Lists global shortcuts and those registered by the current page.
  * Keep it accurate — the docs (04 §1.3) call this "the cheapest documentation
  * in the product" and an out-of-date sheet is worse than none. The `g` entries come
  * from the route registry, so they match exactly what the current role can use.
  */
-
-type Shortcut = { keys: string[]; label: string };
 
 export function KeyboardHintSheet({ area }: { area: "firm" | "platform" }) {
   const isOpen = useUiStore((s) => s.hintSheetOpen);
   const close = useUiStore((s) => s.closeHintSheet);
   const principal = useSignedInPrincipal();
 
+  const pathname = usePathname();
+  const page = useUiStore((s) => s.pageShortcuts);
+
   if (!isOpen) return null;
 
-  const shortcuts: Shortcut[] = [
+  const shortcuts: ShortcutHint[] = [
     { keys: ["⌘", "K"], label: "Open command palette" },
     ...shortcutsFor(principal, area).map(({ key, route }) => ({ keys: ["g", key], label: `Go to ${route.title}` })),
     { keys: ["?"], label: "Open this shortcut sheet" },
     { keys: ["Esc"], label: "Close panel / clear selection" },
+    ...(page?.pathname === pathname ? page.hints : []),
   ];
 
   return (
@@ -40,7 +44,7 @@ export function KeyboardHintSheet({ area }: { area: "firm" | "platform" }) {
       <div
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "relative w-full max-w-md",
+          "relative max-h-[85vh] w-full max-w-md overflow-y-auto",
           "rounded-[var(--radius-xl)] border border-[var(--color-border)]",
           "bg-[var(--color-surface)] shadow-[var(--shadow-lg)]",
           "p-5",

@@ -7,6 +7,7 @@ import { fieldAria, StepSection, WizardField } from "./field";
 import { PrefixedInput, ReviewStrip } from "./parts";
 import { TagInput } from "./tag-input";
 import type { Errors, WizardSkill } from "./model";
+import { normalizeProfileLink } from "@/lib/resume-doc/profile-link";
 import type { Wizard } from "./use-wizard";
 
 const FIELDS = ["fullName", "primaryRole", "yearsExperience", "email", "phone", "linkedinUrl", "city", "state", "country", "skills", "summary"] as const;
@@ -54,7 +55,11 @@ export function StepBasic({ wizard, errors }: { wizard: Wizard; errors: Errors }
           </WizardField>
         </div>
         <WizardField id="cw-linkedin" label="LinkedIn" error={errors.linkedinUrl} isDrafted={drafted.has("linkedinUrl")}>
-          <PrefixedInput icon={Link2}><input {...fieldAria("cw-linkedin", errors.linkedinUrl)} {...text("linkedinUrl")} type="url" placeholder="https://www.linkedin.com/in/…" className="w-full bg-transparent outline-none" /></PrefixedInput>
+          <PrefixedInput icon={Link2}><input {...fieldAria("cw-linkedin", errors.linkedinUrl)} {...text("linkedinUrl")}
+            inputMode="url" onBlur={() => {
+              const link = normalizeProfileLink(values.linkedinUrl);
+              if (link !== null && link !== values.linkedinUrl) set("linkedinUrl", link);
+            }} placeholder="https://www.linkedin.com/in/…" className="w-full bg-transparent outline-none" /></PrefixedInput>
         </WizardField>
         <div className="grid gap-4 sm:grid-cols-3">
           <WizardField id="cw-city" label="City" isDrafted={drafted.has("city")}>

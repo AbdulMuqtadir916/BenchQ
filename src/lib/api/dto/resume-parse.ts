@@ -1,3 +1,4 @@
+import { normalizeProfileLink } from "@/lib/resume-doc/profile-link";
 import { z } from "zod";
 import { WorkAuth } from "@/lib/schemas/enums";
 import { ResumeDraftSchema, type ResumeDraft } from "@/lib/schemas/resume-draft";
@@ -79,10 +80,7 @@ export function matchWorkAuth(printed: string): WorkAuth | null {
 
 /** A LinkedIn link as a URL: "linkedin.com/in/x" gains https://; anything that still isn't a URL is dropped. */
 export function toLinkedinUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  return z.string().url().safeParse(withScheme).success ? withScheme : null;
+  return normalizeProfileLink(value) || null;
 }
 
 /** "2024-05" (or a year alone) as a month count; a month is 01–12. In step with backend/candidates/autofill.py `_MONTH`. */
