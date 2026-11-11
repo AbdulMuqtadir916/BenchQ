@@ -45,7 +45,7 @@ const TOPIC_OF_KEY: Record<string, AutofillTopicId> = {
   "preferred-name": "contact", "middle-name": "contact", "portfolio-url": "contact",
   "address-line1": "location", "address-line2": "location", "address-postal": "location",
   citizenship: "authorization", nationality: "authorization",
-  "current-pay": "preferences", "salary-expectation": "preferences", "onsite-work": "preferences",
+  "current-pay": "preferences", "salary-expectation": "preferences", "floor-rate": "preferences", "onsite-work": "preferences",
   "willing-to-travel": "preferences", commute: "preferences",
   "over-18": "screening", "criminal-history": "screening", "background-check": "screening", "drug-test": "screening",
   "security-clearance": "screening", "non-compete": "screening", "government-work": "screening",
@@ -59,7 +59,7 @@ const TOPIC_OF_KEY: Record<string, AutofillTopicId> = {
  * answer for this version. */
 const ASKED = new Set([
   "preferred-name", "middle-name", "portfolio-url", "address-line1", "address-line2", "address-postal", "nationality",
-  "current-pay", "salary-expectation", "onsite-work", "willing-to-travel", "commute", "over-18", "criminal-history",
+  "current-pay", "salary-expectation", "floor-rate", "onsite-work", "willing-to-travel", "commute", "over-18", "criminal-history",
   "background-check", "drug-test", "security-clearance", "non-compete", "government-work", "relative-at-company",
   "former-employee", "accommodations", "essential-functions",
 ]);

@@ -394,7 +394,8 @@ SELF_ID = ("gender", "pronouns", "race", "hispanic-latino", "veteran-status", "d
 
 
 PERSONAL = ("preferred-name", "middle-name", "address-line1", "address-line2", "address-postal", "portfolio-url",
-            "nationality", "current-pay", "salary-expectation", "onsite-work", "willing-to-travel", "commute", "over-18",
+            "nationality", "current-pay", "salary-expectation", "floor-rate", "onsite-work", "willing-to-travel", "commute",
+            "over-18",
             "criminal-history", "background-check", "drug-test", "security-clearance", "non-compete", "government-work",
             "relative-at-company", "former-employee", "accommodations", "essential-functions")
 
@@ -407,6 +408,18 @@ def test_personal_questions_wait_for_the_bdes_answer_and_citizenship_is_the_prof
     assert built["Are you a US citizen?"] is False                                  # H1B
     assert build({**CANDIDATE, "work_auth": "USC"}, VERSION, TODAY)["Are you a US citizen?"] is True
     assert "Are you a US citizen?" not in build({**CANDIDATE, "work_auth": None}, VERSION, TODAY)
+
+
+def test_the_floor_rate_is_the_bdes_answer_and_never_the_profiles_rate_min():
+    """Decided 2026-11-12: the Autofill screen asks a floor rate for the BDE to answer; `rate_min` is the firm's own."""
+    candidate = {**CANDIDATE, "rate_min": 55}
+    assert QUESTIONS["floor-rate"] not in build(candidate, VERSION, TODAY)
+    listed = {entry["key"]: entry for entry in merged(candidate, VERSION, TODAY, editor=True) if entry.get("key")}
+    assert (listed["floor-rate"]["answer"], listed["floor-rate"]["type"]) == (None, "number")
+    version = {**VERSION, "autofill": {"edited": {"floor-rate": {"answer": 60, "over": None}}}}
+    read = {entry["key"]: entry for entry in merged(candidate, version, TODAY) if entry.get("key")}
+    assert (read["floor-rate"]["answer"], read["floor-rate"]["kind"]) == (60, "EDITED")
+    assert "Minimum acceptable rate" in read["floor-rate"]["also"]          # how forms ask it
 
 
 def test_self_identification_is_never_built_and_the_screen_lists_it_to_answer():

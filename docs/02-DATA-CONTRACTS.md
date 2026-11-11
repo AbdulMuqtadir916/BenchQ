@@ -1617,12 +1617,13 @@ The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`,
 `primary-role`, `target-roles`, `pay-rate`, `start-date`, `notice-period-days`, `relocation-willing`,
 `employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`, `preferred-name`, `middle-name`,
 `address-line1`, `address-line2`, `address-postal`, `portfolio-url`, `citizenship`, `nationality`, `current-pay`,
-`salary-expectation`, `onsite-work`, `willing-to-travel`, `commute`, `over-18`, `criminal-history`, `background-check`,
+`salary-expectation`, `floor-rate`, `onsite-work`, `willing-to-travel`, `commute`, `over-18`, `criminal-history`, `background-check`,
 `drug-test`, `security-clearance`, `non-compete`, `government-work`, `relative-at-company`, `former-employee`,
 `accommodations`, `essential-functions`, `gender`, `pronouns`, `race`, `hispanic-latino`, `veteran-status`,
 `disability-status`, `sexual-orientation`, `transgender`. The fixed questions come first in that order, then the
 user's. From `preferred-name` on (decided 2026-11-11) are the personal and screening questions forms ask: nothing holds
-them, so they're never built, except `citizenship` (true exactly when the profile's status is USC); the Autofill screen
+them, so they're never built, except `citizenship` (true exactly when the profile's status is USC); `floor-rate` (a
+number, decided 2026-11-12) is the BDE's own answer, never the profile's `rate_min`, which stays the firm's own; the Autofill screen
 lists them to answer and the BDE adds the candidate's answer to that version, as an edit over no built answer. The last
 eight are voluntary self-identification: never logged, and the extension leaves them out of `form_data`. Never a date
 of birth, an ID number or a password: the extension never fills those. `education-field` is the subject the highest degree's line names after the degree, as

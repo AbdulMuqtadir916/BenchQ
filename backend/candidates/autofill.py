@@ -35,7 +35,8 @@ Autofill screen) it also lists the fixed questions with no answer, as null, and 
 
 Never in it: ids (candidate, firm, BDE, manager, base, job), and what is the firm's own: the floor rate (`rate_min`),
 the notes for the BDE (`contact_notes`), `deal_breakers`, `status`, `bench_start_date`. A fact that is missing leaves
-its question out (no empty answers).
+its question out (no empty answers). The Autofill screen asks a floor rate of its own (`floor-rate`, decided
+2026-11-12): the BDE answers it for the version, and `rate_min` never fills it.
 """
 import json
 import re
@@ -111,6 +112,8 @@ QUESTIONS: dict[str, str] = {
     "nationality": "What is your nationality?",
     "current-pay": "What is your current pay rate?",
     "salary-expectation": "What is your expected annual salary?",
+    # The lowest rate the candidate takes (decided 2026-11-12): the BDE's own answer, never the profile's `rate_min`.
+    "floor-rate": "What is your floor rate?",
     "onsite-work": "Are you willing to work on-site?",
     "willing-to-travel": "Are you willing to travel for work?",
     "commute": "Can you commute to the job's location?",
@@ -155,8 +158,9 @@ ANSWER_TYPES: dict[str, str] = {
     "work-settings": "texts", "preferred-locations": "texts", "preferred-industries": "texts",
     "preferred-name": "text", "middle-name": "text", "address-line1": "text", "address-line2": "text",
     "address-postal": "text", "portfolio-url": "text", "citizenship": "boolean", "nationality": "text",
-    "current-pay": "text", "salary-expectation": "number", "onsite-work": "boolean", "willing-to-travel": "text",
-    "commute": "boolean", "over-18": "boolean", "criminal-history": "boolean", "background-check": "boolean",
+    "current-pay": "text", "salary-expectation": "number", "floor-rate": "number", "onsite-work": "boolean",
+    "willing-to-travel": "text", "commute": "boolean", "over-18": "boolean", "criminal-history": "boolean",
+    "background-check": "boolean",
     "drug-test": "boolean", "security-clearance": "text", "non-compete": "boolean", "government-work": "boolean",
     "relative-at-company": "boolean", "former-employee": "boolean", "accommodations": "boolean",
     "essential-functions": "boolean",
@@ -181,6 +185,9 @@ ALSO: dict[str, list[str]] = {
     "education-field": ["Field of study", "What is your field of study?", "Major", "What was your major?", "Area of study",
                         "Discipline", "Specialization", "Concentration"],
     "education-grade": ["GPA", "What is your GPA?", "Cumulative GPA", "Overall GPA", "Overall result (GPA)", "CGPA"],
+    # How forms ask the floor rate (2026-11-12).
+    "floor-rate": ["Floor rate", "What is the lowest rate you would accept?", "Minimum acceptable rate", "Minimum rate",
+                   "Lowest acceptable rate", "Minimum hourly rate"],
 }
 # How much one version keeps (docs/02 §8.3): a question, a text answer, a list's items and each item, the questions
 # the user adds.

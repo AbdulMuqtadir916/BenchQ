@@ -24,7 +24,7 @@ const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const PLACE_LISTS = new Set(["preferred-locations"]);
 const CATEGORIES: Record<string, string> = {
   "work-auth-status": "WORK_AUTH", "work-auth-expiry": "WORK_AUTH", "visa-sponsorship": "WORK_AUTH", "visa-transfer": "WORK_AUTH",
-  [WORK_AUTHORIZED]: "WORK_AUTH", "pay-rate": "COMPENSATION", "start-date": "AVAILABILITY", "notice-period-days": "AVAILABILITY",
+  [WORK_AUTHORIZED]: "WORK_AUTH", "pay-rate": "COMPENSATION", "floor-rate": "COMPENSATION", "start-date": "AVAILABILITY", "notice-period-days": "AVAILABILITY",
   "relocation-willing": "RELOCATION", "work-settings": "RELOCATION", "preferred-locations": "RELOCATION", "years-experience": "EXPERIENCE",
 };
 const US = new Set(["us", "usa", "united states", "united states of america", "america"]);
@@ -38,7 +38,7 @@ function textOf(key: string | null, answer: unknown): string | null {
   if (typeof answer === "boolean") return answer ? "Yes" : "No";
   if (typeof answer === "number") {
     if (!Number.isFinite(answer)) return null;
-    if (key === "pay-rate") return `$${answer}/hr`;
+    if (key === "pay-rate" || key === "floor-rate") return `$${answer}/hr`;
     if (key === "notice-period-days") return answer === 0 ? "Immediately" : `${answer} day${answer === 1 ? "" : "s"}`;
     return String(answer);
   }

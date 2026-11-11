@@ -41,6 +41,7 @@ const entries = [
   edited("address-line1", "What is your street address?", "12 Peachtree St"), edited("address-postal", "What is your ZIP or postal code?", "30301"),
   edited("portfolio-url", "What is your portfolio or personal website?", "https://lakshmi.dev"), edited("nationality", "What is your nationality?", "Indian"),
   edited("current-pay", "What is your current pay rate?", "$80/hr"), edited("salary-expectation", "What is your expected annual salary?", 150000),
+  { ...edited("floor-rate", "What is your floor rate?", 70), also: ["Floor rate", "What is the lowest rate you would accept?", "Minimum acceptable rate", "Minimum rate", "Lowest acceptable rate", "Minimum hourly rate"] },
   edited("onsite-work", "Are you willing to work on-site?", true), { ...edited("willing-to-travel", "Are you willing to travel for work?", "Up to 25%"), also: ["Willingness to travel", "Are you open to travel?"] },
   edited("commute", "Can you commute to the job's location?", true), edited("over-18", "Are you at least 18 years old?", true),
   edited("criminal-history", "Have you ever been convicted of a crime?", false), edited("background-check", "Are you willing to undergo a background check?", true),
@@ -71,7 +72,7 @@ const LABELS = [
   "Are you a U.S. citizen?", "What is your current visa status?", "Do you require visa transfer?", "Do you need H1B transfer?", "Citizenship", "Nationality",
   "Current Company", "Current Title", "Years of Experience", "Highest level of education", "School", "Degree", "Discipline", "Field of Study", "Major", "GPA",
   "Graduation Date", "Graduation Year",
-  "Desired Salary", "Expected hourly rate", "Current Salary", "Current hourly rate", "When can you start?", "Earliest start date", "Notice period",
+  "Desired Salary", "Expected hourly rate", "Current Salary", "Current hourly rate", "Minimum acceptable hourly rate", "When can you start?", "Earliest start date", "Notice period",
   "Are you willing to relocate?", "Are you open to working on-site?", "Are you willing to travel up to 25%?", "Willingness to travel", "Can you reliably commute to Atlanta, GA?",
   "Preferred work arrangement", "Employment type", "Languages",
   "Are you at least 18 years of age?", "Are you 18 years or older?", "Have you ever been convicted of a felony?", "Are you willing to submit to a background check?",
@@ -100,13 +101,13 @@ describe("common application questions", () => {
     expect(Object.fromEntries(["Zip/Postal Code", "Middle Name", "Are you a U.S. citizen?", "Are you at least 18 years of age?",
       "Have you ever been convicted of a felony?", "Are you a current or former government employee?", "Do you have any relatives employed at Acme?",
       "Security clearance", "Willingness to travel", "Languages", "Preferred work arrangement", "Field of Study", "GPA", "Race/Ethnicity",
-      "Veteran Status", "Disability Status", "Pronouns"].map((label) => [label, answer.get(label)]))).toEqual({
+      "Veteran Status", "Disability Status", "Pronouns", "Minimum acceptable hourly rate", "Expected hourly rate"].map((label) => [label, answer.get(label)]))).toEqual({
       "Zip/Postal Code": "30301", "Middle Name": "Devi", "Are you a U.S. citizen?": "No", "Are you at least 18 years of age?": "Yes",
       "Have you ever been convicted of a felony?": "No", "Are you a current or former government employee?": "No",
       "Do you have any relatives employed at Acme?": "No", "Security clearance": "No", "Willingness to travel": "Up to 25%",
       Languages: "English, Telugu", "Preferred work arrangement": "Remote, Hybrid", "Field of Study": "Computer Science", GPA: "3.8",
       "Race/Ethnicity": "Asian", "Veteran Status": "I am not a protected veteran", "Disability Status": "No, I don't have a disability",
-      Pronouns: "She/her",
+      Pronouns: "She/her", "Minimum acceptable hourly rate": "$70/hr", "Expected hourly rate": "$85/hr",
     });
   });
 });

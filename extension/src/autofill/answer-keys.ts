@@ -74,6 +74,7 @@ export const KEY_TYPES: Record<string, EngineFieldType | null> = {
   nationality: "nationality",
   "current-pay": "current-pay",
   "salary-expectation": "salary-expectation",
+  "floor-rate": "floor-rate",
   "onsite-work": "onsite-work",
   "willing-to-travel": "willing-to-travel",
   commute: "commute",
