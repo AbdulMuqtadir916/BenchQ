@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import { Bell, BriefcaseBusiness, KeyRound, MessageSquareText, TimerReset, type LucideIcon } from "lucide-react";
+import { Bell, BriefcaseBusiness, KeyRound, MessageSquareText, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { CountBadge } from "@/components/ui/count-badge";
@@ -33,15 +33,6 @@ function relativeTime(iso: string): string {
 }
 
 const NOTIFICATIONS: Notification[] = [
-  {
-    id: "followups-overdue",
-    title: "4 follow-ups are overdue",
-    detail: "Start with Priya Raman and Amit Patel.",
-    time: "Now",
-    route: "followups",
-    icon: TimerReset,
-    tone: "amber",
-  },
   {
     id: "new-job-match",
     title: "New 98% job match",

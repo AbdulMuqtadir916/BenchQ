@@ -32,6 +32,7 @@ NEUTRAL_FIELDS = re.compile(r"(^|_)(url|urls|link|href|domain|company|companies|
                             r"currency|lang|language|format|sort|order|kind|type|view|tab)($|_)")
 # Rules across columns that the seed can't read from a CHECK constraint, by table: the values that meet them.
 LATER = datetime(2099, 1, 1, tzinfo=timezone.utc)
+SEED_BATCH = uuid.UUID("00000000-0000-4000-8000-000000000020")   # the seeded scrape_jobs batch, named by job_postings
 SEED_OVERRIDES = {
     "invites": {"invited_by_platform_user_id": None, "token_hash": "0" * 64, "email": "zorvath.invite@canary-mail.test",
                 "manager_id": None, "expires_at": LATER},
@@ -44,15 +45,22 @@ SEED_OVERRIDES = {
                                 "decided_by_platform_user_id": None, "decided_at": None, "reset_token_hash": None,
                                 "reset_token_expires_at": None, "expires_at": LATER},
     "resume_parses": {"expires_at": None},
-    "resumes": {"category": "BASE", "job_id": None},
+    # 07 Q57: a candidate's name lives in its active base's newest version, so the seeded base is that one.
+    "base_resumes": {"is_active": True, "deleted_at": None, "archived_at": None},
+    "resumes": {"category": "BASE", "job_id": None, "deleted_at": None},
     "support_views": {"ended_at": None},
+    # error only on an error row, finished_at on every row but a running one; the seed's is 'success'
+    "scrape_jobs": {"error": None, "batch_id": SEED_BATCH, "finished_at": datetime.now(timezone.utc)},
+    # job_id is a SHA256 hex digest (ck_job_postings_job_id_sha256), and batch_id references scrape_jobs.batch_id,
+    # not its id, so the seeded posting names the seeded batch.
+    "job_postings": {"job_id": "0" * 64, "batch_id": SEED_BATCH},
 }
 # Path and body ids by name, when the name isn't `<table, singular>_id`.
 ID_ALIASES = {"app": "applications", "cl": "cover_letters", "base": "base_resumes", "message": "inbox_messages",
               "attempt": "candidate_google_oauth_attempts", "interview": "interviews", "manager": "users",
               "bde": "users", "user": "users", "owner": "users", "firm": "firms", "plan": "plans",
               "resume": "resumes", "base_resume": "base_resumes", "notification": "notifications", "run": "job_runs",
-              "review": "application_reviews"}
+              "review": "application_reviews", "posting": "job_postings"}
 JOB_URL = "https://jobs.example.test/posting/1"
 # Values the routes check in code, not in their schema, by field name.
 FIELD_VALUES = {"role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",

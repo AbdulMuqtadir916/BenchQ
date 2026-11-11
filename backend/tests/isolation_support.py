@@ -115,6 +115,21 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                           full_name=f"{tag} candidate", primary_role=f"{tag} Java Developer", work_auth="H1B")
     db.add(candidate)
     db.flush()
+    # Job search (PRs 1, 2): one finished search by the candidate's BDE and the job it found, `tag` in its title. Before
+    # the résumés: a tailored résumé and a cover letter name a job posting (migration 0023).
+    import hashlib
+    from backend.models.job_search import JobPosting, ScrapeJob
+    batch = ScrapeJob(firm_id=firm.id, candidate_id=candidate.id, user_id=bde.id, batch_id=uuid.uuid4(),
+                      state="success", finished_at=utcnow(),
+                      meta={"request": {"query": f"{tag} Java Developer", "country": "us"}})
+    db.add(batch)
+    db.flush()
+    posting = JobPosting(firm_id=firm.id, candidate_id=candidate.id, batch_id=batch.batch_id, source="freehire",
+                         job_id=hashlib.sha256(tag.encode()).hexdigest(),
+                         content={"title": f"{tag} Java Developer", "company": f"{tag} Corp",
+                                  "description": f"{tag} job description", "url": "https://jobs.example.test/search"})
+    db.add(posting)
+    db.flush()
     # Résumé versioning (PRs 5, 6): the candidate's upload, its active base (the owner's, at onboarding: v1 is
     # "resume") with a BDE's v2 and a tailored résumé for the job ("tailored"); and a second base the BDE made from
     # v2, unused, so a delete of it or of v2 goes through.
@@ -133,7 +148,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                     created_by_user_id=owner.id, **{**RESUME_COLUMNS, "summary": f"{tag} {RESUME_COLUMNS['summary']}"})
     v2 = Resume(**versioned, base_resume_id=first.id, category="BASE", version=2, name=f"{tag} base résumé",
                 created_by_user_id=bde.id, **RESUME_COLUMNS)
-    tailored = Resume(**versioned, base_resume_id=first.id, category="TAILORED", job_id=job.id, version=1,
+    tailored = Resume(**versioned, base_resume_id=first.id, category="TAILORED", job_id=posting.id, version=1,
                       name=f"{tag} tailored résumé", created_by_user_id=bde.id, **RESUME_COLUMNS)
     db.add_all([resume, v2, tailored])
     db.flush()
@@ -143,7 +158,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.flush()
     db.add(Resume(**versioned, base_resume_id=second.id, category="BASE", version=1, name=f"{tag} base résumé",
                   created_by_user_id=bde.id, **RESUME_COLUMNS))
-    letter = CoverLetter(firm_id=firm.id, name=f"{tag} cover letter", job_id=job.id, resume_id=resume.id,
+    letter = CoverLetter(firm_id=firm.id, name=f"{tag} cover letter", job_id=posting.id, resume_id=resume.id,
                          json_data={"header": RESUME_JSON["header"], "body": f"{tag} letter body"})
     db.add(letter)
     db.flush()
@@ -198,9 +213,15 @@ def build_firm(db, firm, owner, tag: str) -> dict:
         expires_at=utcnow() + timedelta(minutes=10))
     db.add(attempt)
     db.flush()
+    # A résumé read waiting for its create (07 Q58: no candidate is added without one).
+    pending = ResumeParse(firm_id=firm.id, uploaded_by_user_id=owner.id, file_name=f"{tag} new.pdf",
+                          mime_type="application/pdf", size_bytes=len(tag), content=f"{tag} new file".encode(),
+                          parse={"header": {}}, expires_at=utcnow() + timedelta(minutes=30))
+    db.add(pending)
+    db.flush()
 
-    return {"oauth_attempt": attempt.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
-            "version": v2.id, "base": second.id,
+    return {"oauth_attempt": attempt.id, "pending_parse": pending.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
+            "version": v2.id, "base": second.id, "posting": posting.id,
 
             "firm": firm.id, "slug": firm.slug, "job": job.id,
             "app": app.id, "legacy_app": legacy_app.id, "inbox_message": candidate_message.id, "interview": interview.id,

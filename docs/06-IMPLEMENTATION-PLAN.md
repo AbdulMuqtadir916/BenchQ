@@ -1,5 +1,7 @@
 # 06 — Implementation Plan
 
+> **Claim states dropped (2026-11-05).** BenchQ no longer has Verified / Unverified / Contradicted states, an evidence record or an export gate. Where this document describes them, read it as history.
+
 **Project:** BenchQ · frontend only
 **Version:** 1.0 · September 2026
 **Status:** complete. Every phase below is done; foundation and integration status is in `docs/integration/README.md`.

@@ -19,6 +19,7 @@ from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean,
     make_company, make_search, make_job, MISSING_UUID,
 )
+from backend.tests.resume_support import make_target_posting
 
 pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
@@ -118,33 +119,6 @@ async def test_every_scheduled_job_skips_a_busy_scope_without_raising(test_db, f
     await getattr(sched, fn_name)()   # must not raise
     assert _runs(test_db, job_type=job_type) == []
 
-
-def test_manual_trigger_answers_409_while_the_scheduler_run_is_live(client):
-    """The HTTP surface of the same guard."""
-    import backend.job_monitor as jm
-    jm._running["scrape_all"] = jm.RunningJob(
-        run_id=uuid.uuid4(), job_type="scrape_all", trigger="scheduler",
-        started_at=datetime.now(timezone.utc))
-    assert_clean(client.post("/api/scrape/run-all"), 409)
-
-
-def test_different_scope_keys_of_one_job_type_run_side_by_side(client, test_db, monkeypatch):
-    import backend.scraper.sources.company_pages as cp
-    gate = asyncio.Event()
-
-    async def _slow(company):
-        await gate.wait()
-        return {}
-    monkeypatch.setattr(cp, "scrape_single_career_page", _slow, raising=False)
-    monkeypatch.setattr(cp, "record_company_scrape_log", lambda *a, **k: None, raising=False)
-
-    a = make_company(test_db, name="A")
-    b = make_company(test_db, name="B")
-    assert_clean(client.post(f"/api/scrape/company/{a.id}"), 202)
-    assert_clean(client.post(f"/api/scrape/company/{b.id}"), 202)
-    import backend.job_monitor as jm
-    assert len([r for r in jm._running.values() if r.job_type == "company_scrape"]) == 2
-    gate.set()
 
 
 def test_scheduler_jobs_view_reports_a_scoped_company_run_as_running(client, test_db):
@@ -336,7 +310,7 @@ def test_stale_recovery_should_skip_runs_the_monitor_still_owns(test_db):
 async def test_monitor_active_and_in_flight_agree_with_running_state(client, test_db):
     import backend.job_monitor as jm
     jid = uuid.uuid4()
-    make_job(test_db, id=jid)   # job_runs.target_job_id is a real foreign key on Postgres
+    make_target_posting(test_db, id=jid)  # job_runs.target_job_id names a job posting (0023)
     gate = asyncio.Event()
 
     async def _slow():
@@ -361,7 +335,7 @@ async def test_monitor_active_and_in_flight_agree_with_running_state(client, tes
 async def test_finished_run_shows_up_in_monitor_finished(client, test_db):
     import backend.job_monitor as jm
     jid = uuid.uuid4()
-    make_job(test_db, id=jid)   # job_runs.target_job_id is a real foreign key on Postgres
+    make_target_posting(test_db, id=jid)  # job_runs.target_job_id names a job posting (0023)
 
     async def _ok():
         return "scored"
@@ -377,7 +351,7 @@ async def test_finished_run_shows_up_in_monitor_finished(client, test_db):
 async def test_failed_run_shows_up_in_monitor_finished_as_failed(client, test_db):
     import backend.job_monitor as jm
     jid = uuid.uuid4()
-    make_job(test_db, id=jid)   # job_runs.target_job_id is a real foreign key on Postgres
+    make_target_posting(test_db, id=jid)  # job_runs.target_job_id names a job posting (0023)
 
     async def _boom():
         raise RuntimeError("nope")

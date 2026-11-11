@@ -1,8 +1,7 @@
 import type { Candidate, CandidateStats } from "@/lib/schemas/candidate";
 import type { Application } from "@/lib/schemas/application";
+import { OPEN_STATUSES, isSubmitted } from "./application-counts";
 import { daysBetween, maxDate, minDate, round1 } from "./dates";
-
-const OPEN_STATUSES = ["APPLIED", "RESPONSE", "SCREENING", "INTERVIEW", "OFFER"];
 
 /**
  * Derive per-candidate stats from the application + event arrays.
@@ -12,7 +11,7 @@ export function deriveCandidateStats(
   candidate: Candidate,
   applications: Application[],
 ): CandidateStats {
-  const submitted = applications.filter((a) => a.status !== "SAVED");
+  const submitted = applications.filter((a) => isSubmitted(a.status));
   const lastActivity = maxDate([
     ...submitted.map((a) => a.appliedAt),
     ...submitted.map((a) => a.firstResponseAt),

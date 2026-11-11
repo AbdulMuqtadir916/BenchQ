@@ -6,6 +6,7 @@ import { LoaderCircle, Pencil } from "lucide-react";
 import type { Candidate } from "@/lib/schemas/candidate";
 import { EmploymentType, WorkAuth } from "@/lib/schemas/enums";
 import { useUpdateCandidate } from "@/lib/hooks/use-candidates";
+import { workAuthChange } from "@/lib/constants/work-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -90,7 +91,7 @@ function FactsForm({ candidate, onCancel, onSaved }: { candidate: Candidate; onC
   function save() {
     if (error) return;
     update.mutate(
-      { workAuth: form.workAuth, workAuthExpiry: fromDate(form.workAuthExpiry), rateTarget: target, rateMin: floor, availableFrom: fromDate(form.availableFrom), noticePeriodDays: toNumber(form.noticePeriodDays), willingToRelocate: form.willingToRelocate, employmentTypes: form.employmentTypes },
+      { ...workAuthChange(candidate.workAuth, form.workAuth), workAuthExpiry: fromDate(form.workAuthExpiry), rateTarget: target, rateMin: floor, availableFrom: fromDate(form.availableFrom), noticePeriodDays: toNumber(form.noticePeriodDays), willingToRelocate: form.willingToRelocate, employmentTypes: form.employmentTypes },
       { onSuccess: onSaved },
     );
   }

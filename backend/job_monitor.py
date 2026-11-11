@@ -77,6 +77,9 @@ _LIMIT_SOURCES: dict[str, tuple[Optional[str], int]] = {
     # Chromium. Four at a time is the difference between ~300 MB and the 2.5 GB
     # the box hit; it is deliberately not user-tunable.
     "page_cache": (None, 4),
+    # A BDE's job search (backend/job_search/): one HTTP call to the source and a short write. Four at once per
+    # worker; the rest queue here (decided 2026-11-10).
+    "job_search": (None, 4),
 }
 
 # Which gate a launch_background job_type belongs to. Anything absent runs
@@ -87,6 +90,7 @@ _JOB_TYPE_LIMITER: dict[str, str] = {
     "tailor_resume": "tailoring",
     "generate_cover_letter": "tailoring",
     "cache_job_page": "page_cache",
+    "job_search": "job_search",
 }
 
 _limiters: dict[str, TaskLimiter] = {}

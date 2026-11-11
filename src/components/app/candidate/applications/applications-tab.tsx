@@ -8,7 +8,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
-import { STATUS_LABEL, isClosed } from "@/components/app/applications/status-meta";
+import { STATUS_LABEL } from "@/components/app/applications/status-meta";
+import { applicationsInScope, countApplications, describeApplicationCounts } from "@/lib/derive/application-counts";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { ApplicationList } from "./application-list";
@@ -21,13 +22,14 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
   const [view, setView] = useState<View>("board");
   const [scope, setScope] = useState<Scope>("active");
   const all = ws.applications;
-  const visible = scope === "active" ? all.filter((a) => !isClosed(a.status)) : all;
-  const closedCount = all.filter((a) => isClosed(a.status)).length;
+  // One Active rule for the count, the board and the list (PR #128): Saved and Placed are not active; All shows them.
+  const visible = applicationsInScope(all, scope);
+  const [activePart = "", ...otherParts] = describeApplicationCounts(countApplications(all)).split(" · ");
 
   if (ws.applicationsQuery.error) return <ErrorState error={ws.applicationsQuery.error} onRetry={() => void ws.applicationsQuery.refetch()} />;
   if (ws.applicationsQuery.isLoading) return <SkeletonList rows={6} />;
   if (all.length === 0) {
-    return <EmptyState icon={Send} title="No applications yet" description="Find matching jobs and submit — every application shows up here with its status." action={canAct ? <button type="button" onClick={actions.findJobs} className="text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:underline">Find jobs</button> : undefined} />;
+    return <EmptyState icon={Send} title="No applications yet" description="Find matching jobs and submit — every application shows up here with its status." action={actions.findJobs ? <button type="button" onClick={actions.findJobs} className="text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:underline">Find jobs</button> : undefined} />;
   }
 
   const toggle = "inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 text-sm";
@@ -35,7 +37,7 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--color-text-3)]">
-          <span className="text-body-strong text-[var(--color-text)]">{all.length - closedCount} active</span> · {closedCount} closed · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
+          <span className="text-body-strong text-[var(--color-text)]">{activePart}</span> · {otherParts.join(" · ")} · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
         </p>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">

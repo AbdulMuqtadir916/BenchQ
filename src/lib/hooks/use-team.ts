@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { candidatesApi } from "@/lib/api/candidates";
 import { sessionApi } from "@/lib/api/session";
 import { teamApi, type InviteMemberInput } from "@/lib/api/team";
 import { useCan } from "@/lib/auth/permissions";
@@ -50,9 +49,8 @@ export function useChangeManager() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, managerId }: { userId: string; managerId: string }) => {
-      const user = await teamApi.changeManager(firmId, userId, managerId);
-      await candidatesApi.followBde(firmId, userId, managerId);
-      return user;
+      // The backend moves the BDE's candidates to the new manager itself; the candidates are read again below.
+      return teamApi.changeManager(firmId, userId, managerId);
     },
     onSettled: () => {
       for (const key of [queryKeys.team.all(firmId), queryKeys.candidates.all(firmId), queryKeys.ledger.all(firmId)]) {

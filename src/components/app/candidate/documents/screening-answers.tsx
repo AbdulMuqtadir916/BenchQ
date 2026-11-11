@@ -5,7 +5,6 @@ import { Check, Copy, CopyCheck, MessageSquareQuote } from "lucide-react";
 import type { QaBankEntry } from "@/lib/schemas/candidate";
 import { Card } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
-import { ClaimChip } from "@/components/app/claim-chip";
 
 const CATEGORY: Record<QaBankEntry["category"], string> = {
   WORK_AUTH: "Visa",
@@ -54,7 +53,6 @@ export function ScreeningAnswers({ entries }: { entries: QaBankEntry[] }) {
               <p className="mt-0.5 text-sm text-[var(--color-text-2)]">{e.answer}</p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <Tag>{CATEGORY[e.category]}</Tag>
-                {e.state !== "VERIFIED" ? <ClaimChip state={e.state} /> : null}
               </div>
             </li>
           ))}

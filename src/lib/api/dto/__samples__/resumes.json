@@ -1,0 +1,54 @@
+{
+  "_source": "Written by hand from backend/candidates/versions.py (version_json, base_json, listing_many) for résumé versioning PR 7; not captured from a running backend",
+  "listing": {
+    "bases": [
+      {
+        "id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "number": 1,
+        "source": "UPLOAD", "is_active": false, "resume_parse_id": "5b0d8a0e-9999-4c1a-9a51-000000000009",
+        "promoted_from_resume_id": null, "archived_at": null,
+        "created_by_user_id": "dec7c04c-1552-5cb0-b081-cb4ddf9fa5dc", "created_at": "2026-11-01T10:00:00+00:00",
+        "versions": [
+          { "id": "6c1e9b1f-0001-4d2b-8b62-000000000001", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "category": "BASE", "job_id": null, "version": 1, "name": "Base", "template": null, "page_format": "letter", "created_by_user_id": "dec7c04c-1552-5cb0-b081-cb4ddf9fa5dc", "created_at": "2026-11-01T10:00:00+00:00", "promoted_to_base_id": null },
+          { "id": "6c1e9b1f-0002-4d2b-8b62-000000000002", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "category": "BASE", "job_id": null, "version": 2, "name": "Base", "title": "Java Developer", "template": "template_classic", "page_format": "letter", "created_by_user_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63", "created_at": "2026-11-02T10:00:00+00:00", "promoted_to_base_id": "5b0d8a0e-2222-4c1a-9a51-000000000002" }
+        ]
+      },
+      {
+        "id": "5b0d8a0e-2222-4c1a-9a51-000000000002", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "number": 2,
+        "source": "PROMOTED", "is_active": true, "resume_parse_id": null,
+        "promoted_from_resume_id": "6c1e9b1f-0002-4d2b-8b62-000000000002", "archived_at": null,
+        "created_by_user_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63", "created_at": "2026-11-02T11:00:00",
+        "versions": [
+          { "id": "6c1e9b1f-0003-4d2b-8b62-000000000003", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-2222-4c1a-9a51-000000000002", "category": "BASE", "job_id": null, "version": 1, "name": "Base", "template": "template_classic", "page_format": "letter", "created_by_user_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63", "created_at": "2026-11-02T11:00:00", "promoted_to_base_id": null }
+        ]
+      },
+      {
+        "id": "5b0d8a0e-3333-4c1a-9a51-000000000003", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "number": 3,
+        "source": "UPLOAD", "is_active": false, "resume_parse_id": "5b0d8a0e-4444-4c1a-9a51-000000000003",
+        "promoted_from_resume_id": null, "archived_at": "2026-11-03T09:00:00+00:00",
+        "created_by_user_id": "dec7c04c-1552-5cb0-b081-cb4ddf9fa5dc", "created_at": "2026-11-03T08:00:00+00:00",
+        "versions": []
+      }
+    ],
+    "tailored": [
+      {
+        "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "job_id": "7d2f0c20-0000-4e3c-9c73-000000000001",
+        "versions": [
+          { "id": "6c1e9b1f-0005-4d2b-8b62-000000000005", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "category": "TAILORED", "job_id": "7d2f0c20-0000-4e3c-9c73-000000000001", "version": 2, "name": "Java role", "template": "template_modern", "page_format": "letter", "created_by_user_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63", "created_at": "2026-11-04T10:00:00+00:00", "promoted_to_base_id": null },
+          { "id": "6c1e9b1f-0004-4d2b-8b62-000000000004", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-1111-4c1a-9a51-000000000001", "category": "TAILORED", "job_id": "7d2f0c20-0000-4e3c-9c73-000000000001", "version": 1, "name": "Java role", "template": "template_modern", "page_format": "letter", "created_by_user_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63", "created_at": "2026-11-03T10:00:00+00:00", "promoted_to_base_id": null }
+        ]
+      }
+    ]
+  },
+  "version": {
+    "id": "6c1e9b1f-0003-4d2b-8b62-000000000003", "candidate_id": "daea7708-33cf-52fe-9da5-44db9eb5b22c", "base_resume_id": "5b0d8a0e-2222-4c1a-9a51-000000000002", "category": "BASE", "job_id": null, "version": 1, "name": "Base", "template": "template_classic", "page_format": "letter", "created_by_user_id": "2cc07c2c-59c5-5d0b-b823-1fa9fc838e63", "created_at": "2026-11-02T11:00:00",
+    "full_name": "Candidate Name", "title": "Java Developer", "city": "Dallas", "state": "TX", "country": "US",
+    "email": "candidate@example.com", "phone": "+1-214-555-0100", "work_authorization": "H-1B", "github": null,
+    "linkedin": "https://www.linkedin.com/in/candidate", "summary": "Nine years of Java & Spring.", "summary_id": "s-1",
+    "skills": [{ "id": "k-1", "category": "Languages", "name": "Java" }, { "id": "k-2", "category": "Languages", "name": "Kotlin" }, { "id": "k-3", "category": "", "name": "Docker" }],
+    "experiences": [{ "id": "e-1", "job_title": "Senior Developer", "company": "A Company", "location": "Dallas, TX", "dates": "", "start": "Jan 2020", "end": "", "current": true, "bullets": [{ "id": "b-1", "text": "Cut build time <50%>." }] }],
+    "projects": [{ "id": "p-1", "name": "Tool", "url": "https://example.com", "dates": "2023", "technologies": "Go", "bullets": [{ "id": "pb-1", "text": "Line one" }, { "id": "pb-2", "text": "Line two" }] }],
+    "educations": [{ "id": "d-1", "degree": "B.Tech", "institution": "A University", "graduation_date": "2016", "grade": "" }],
+    "certifications": [{ "id": "c-1", "name": "AWS SAA", "issuer": "AWS", "date": "2022", "detail": "" }],
+    "awards": [], "languages": [{ "id": "l-1", "name": "English" }]
+  }
+}

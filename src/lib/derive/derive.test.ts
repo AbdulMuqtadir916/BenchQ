@@ -1,19 +1,15 @@
 import { describe, expect, it } from "vitest";
-import candidatesSeed from "@/mocks/data/candidates.json";
+import candidatesSeed from "@/test/fixtures/candidates.json";
 import applicationsSeed from "@/mocks/data/applications.json";
-import resumesSeed from "@/mocks/data/resumes.json";
 import { arrayOf } from "@/lib/api/client";
 import { CandidateSchema } from "@/lib/schemas/candidate";
 import { ApplicationSchema } from "@/lib/schemas/application";
-import { ResumeSchema } from "@/lib/schemas/resume";
 import { deriveCandidateStats } from "./candidate-stats";
-import { deriveExportGate } from "./export-gate";
 import { newestDate } from "./match";
 import { deriveFunnel } from "./funnel";
 
 const candidatesFixture = arrayOf(CandidateSchema).parse(candidatesSeed);
 const applicationsFixture = arrayOf(ApplicationSchema).parse(applicationsSeed);
-const resumesFixture = arrayOf(ResumeSchema).parse(resumesSeed);
 
 describe("deriveCandidateStats", () => {
   it("derives counts from applications instead of stored summary values", () => {
@@ -43,39 +39,6 @@ describe("deriveCandidateStats", () => {
     expect(stats.applicationsSubmitted).toBe(0);
     expect(stats.responseRatePct).toBe(0);
     expect(stats.firstApplicationAt).toBeNull();
-  });
-});
-
-describe("deriveExportGate", () => {
-  const version = resumesFixture[0]!.versions[0]!;
-
-  it("blocks export when any claim remains as unverified", () => {
-    const result = deriveExportGate({
-      ...version,
-      claims: version.claims.map((claim, index) => ({
-        ...claim,
-        state: index === 0 ? "UNVERIFIED" : "VERIFIED",
-        evidenceId: index === 0 ? null : claim.evidenceId,
-      })),
-    });
-
-    expect(result.canExport).toBe(false);
-    expect(result.unverifiedCount).toBe(1);
-    expect(result.blockingClaimIds).toHaveLength(1);
-  });
-
-  it("allows export when contradicted claims are excluded and no unverified remains", () => {
-    const result = deriveExportGate({
-      ...version,
-      claims: version.claims.map((claim, index) => ({
-        ...claim,
-        state: index === 0 ? "CONTRADICTED" : "VERIFIED",
-      })),
-    });
-
-    expect(result.canExport).toBe(true);
-    expect(result.contradictedCount).toBe(1);
-    expect(result.blockingClaimIds).toEqual([]);
   });
 });
 

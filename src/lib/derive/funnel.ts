@@ -17,7 +17,7 @@ const STAGE_ORDER: Array<{ status: ApplicationStatus; label: string }> = [
   { status: "PLACED", label: "Placed" },
 ];
 
-function reachedStatuses(app: Application): Set<ApplicationStatus> {
+export function reachedStatuses(app: Application): Set<ApplicationStatus> {
   const reached = new Set<ApplicationStatus>();
   for (const e of app.events) reached.add(e.toStatus);
   reached.add(app.status);

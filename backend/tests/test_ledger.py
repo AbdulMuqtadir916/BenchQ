@@ -1,5 +1,5 @@
 """A firm's ledger (backend/api/routes_ledger.py; docs/integration/01-ledger.md): the firm's own entries, newest
-first; a MANAGER's team only (07 Q56); a BDE's own entries only; another firm's ledger and a Super Admin get no
+first; a MANAGER's team only (07 Q59); a BDE's own entries only; another firm's ledger and a Super Admin get no
 answer."""
 from datetime import timedelta
 
@@ -141,6 +141,64 @@ def _assign(firm_id, actor, candidate, summary, minutes_ago, note=None):
     return entry
 
 
+def test_manager_scope_excludes_non_assignment_events_on_managed_candidates(anonymous_client, accounts, ledger, test_db):
+    from backend.models.tenancy import User
+    firm = test_db.get(Firm, accounts.firm_id)
+    owner = test_db.get(User, accounts.user_id)
+    first = make_user(test_db, firm, email="first@acme.test", role="MANAGER")
+    second = make_user(test_db, firm, email="second@acme.test", role="MANAGER")
+    bea = ledger["bde_user"]
+    bea.manager_id = first.id
+    ben = test_db.query(User).filter(User.email == "bde2@acme.test").one()
+    ben.manager_id = second.id
+    candidate = _candidate(test_db, firm, second, ben, "Ravi")
+    assignment = _assign(firm.id, owner, candidate, "Assigned Ravi", 4)
+    edit = _entry(firm.id, owner, "Owner edited Ravi", 1)
+    edit.entity_id, edit.candidate_id = str(candidate.id), candidate.id
+    test_db.add_all([assignment, edit])
+    test_db.commit()
+
+    def entries(manager, query=""):
+        response = anonymous_client.get(_url(firm.id, query), headers=_session_for(test_db, manager))
+        assert response.status_code == 200
+        return response.json()
+
+    first_entries = entries(first)
+    second_entries = entries(second)
+    assert [row["summary"] for row in first_entries] == ["Bea edit"]
+    assert [row["summary"] for row in second_entries] == ["Ben edit", "Assigned Ravi"]
+    assert {row["id"] for row in first_entries}.isdisjoint(row["id"] for row in second_entries)
+    assert str(assignment.id) == second_entries[1]["id"]
+
+
+def test_ledger_cursor_stays_stable_after_insert(anonymous_client, accounts, test_db):
+    """A newer insert cannot repeat the boundary row, including when older rows share a timestamp."""
+    import uuid
+    from urllib.parse import urlencode
+
+    firm = test_db.get(Firm, accounts.firm_id)
+    stamp = utcnow() - timedelta(minutes=2)
+    first, second = [_entry(firm.id, None, label, 2) for label in ("First", "Second")]
+    for number, row in enumerate((first, second), start=1):
+        row.id = uuid.UUID(int=number)
+        row.created_at = stamp
+    test_db.add_all([first, second])
+    test_db.commit()
+    headers = _cookie(accounts.firm_token)
+    path = _url(firm.id)
+    head = anonymous_client.get(f"{path}?limit=1", headers=headers)
+    assert head.status_code == 200
+    boundary = head.json()[0]
+    assert boundary["id"] == str(first.id)
+
+    test_db.add(_entry(firm.id, None, "Newer insert", 0))
+    test_db.commit()
+    query = urlencode({"limit": 1, "cursor_at": boundary["created_at"], "cursor_id": boundary["id"]})
+    tail = anonymous_client.get(f"{path}?{query}", headers=headers)
+    assert tail.status_code == 200
+    assert [entry["id"] for entry in tail.json()] == [str(second.id)]
+
+
 @pytest.fixture
 def assignments(test_db, accounts, ledger):
     """Bea works Asha (assigned by a manager); Ben works Ravi; Kiran is in the manager's queue. Plus a manager's
@@ -206,7 +264,7 @@ def test_filters_by_candidate_their_whole_activity(api_client, accounts, ledger,
         ["Applied for Asha", "Mira edited Asha", "Assigned Asha to Bea"]
 
 
-# 07 Q56: a MANAGER reads their own team, not the firm.
+# 07 Q59: a MANAGER reads their own team, not the firm.
 
 @pytest.fixture
 def teams(test_db, accounts, ledger, assignments):
@@ -283,3 +341,18 @@ def test_the_owner_and_a_viewer_still_see_every_team(anonymous_client, api_clien
     owner = _summaries(api_client.get(_url(accounts.firm_id)))
     assert "Zed edit" in owner and "Cara edit" in owner and "System sync" in owner
     assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=ledger["viewer"])) == owner
+
+
+def test_ledger_cursor_accepts_an_offset_and_still_needs_both_fields(anonymous_client, accounts, ledger, test_db):
+    """An offset after a cursor skips rows past it; a half cursor or a cursor without a timezone is refused."""
+    firm = test_db.get(Firm, accounts.firm_id)
+    headers = _cookie(accounts.firm_token)
+    path = _url(firm.id)
+    newest = anonymous_client.get(f"{path}?limit=1", headers=headers).json()[0]
+    pair = {"cursor_at": newest["created_at"], "cursor_id": newest["id"]}
+    after = anonymous_client.get(path, params=pair, headers=headers).json()
+    skipped = anonymous_client.get(path, params={**pair, "offset": 1}, headers=headers)
+    assert skipped.status_code == 200
+    assert [e["id"] for e in skipped.json()] == [e["id"] for e in after[1:]]
+    assert anonymous_client.get(path, params={"cursor_at": newest["created_at"]}, headers=headers).status_code == 422
+    assert anonymous_client.get(path, params={**pair, "cursor_at": "2026-01-01T00:00:00"}, headers=headers).status_code == 422

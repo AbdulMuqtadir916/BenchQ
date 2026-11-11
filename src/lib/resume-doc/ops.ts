@@ -1,5 +1,4 @@
-import type { ResumeDocument, ResumeListKey, RichClaim } from "@/lib/schemas/resume-document";
-import type { ClaimState } from "@/lib/schemas/enums";
+import type { BulletSection, ResumeDocument, ResumeListKey, RichText } from "@/lib/schemas/resume-document";
 
 /** Pure, immutable edits on the builder document. The store wires these to state. */
 
@@ -27,54 +26,42 @@ export function moveEntry(doc: ResumeDocument, key: ResumeListKey, id: string, d
   return { ...doc, [key]: list };
 }
 
-/** Every claim in the document, in reading order. */
-export function allClaims(doc: ResumeDocument): Array<{ claim: RichClaim; section: "summary" | "experience" | "projects"; entryId: string | null }> {
+/** Every rich-text field in the document (summary, then every bullet of a job or a project), in reading order. */
+export function allText(doc: ResumeDocument): Array<{ text: RichText; section: "summary" | BulletSection; entryId: string | null }> {
   return [
-    { claim: doc.summary, section: "summary" as const, entryId: null },
-    ...doc.experience.flatMap((e) => e.bullets.map((claim) => ({ claim, section: "experience" as const, entryId: e.id }))),
-    ...doc.projects.map((p) => ({ claim: p.description, section: "projects" as const, entryId: p.id })),
+    { text: doc.summary, section: "summary" as const, entryId: null },
+    ...doc.experience.flatMap((e) => e.bullets.map((text) => ({ text, section: "experience" as const, entryId: e.id }))),
+    ...doc.projects.flatMap((p) => p.bullets.map((text) => ({ text, section: "projects" as const, entryId: p.id }))),
   ];
 }
 
-/** Apply `fn` to the claim with this id, wherever it lives. */
-export function updateClaim(doc: ResumeDocument, claimId: string, fn: (c: RichClaim) => RichClaim): ResumeDocument {
-  if (doc.summary.id === claimId) return { ...doc, summary: fn(doc.summary) };
-  return {
-    ...doc,
-    experience: doc.experience.map((e) =>
-      e.bullets.some((b) => b.id === claimId) ? { ...e, bullets: e.bullets.map((b) => (b.id === claimId ? fn(b) : b)) } : e,
-    ),
-    projects: doc.projects.map((p) => (p.description.id === claimId ? { ...p, description: fn(p.description) } : p)),
-  };
+function mapBullets<E extends { bullets: RichText[] }>(entries: E[], fn: (bullets: RichText[], entry: E) => RichText[]): E[] {
+  return entries.map((e) => {
+    const bullets = fn(e.bullets, e);
+    return bullets === e.bullets ? e : { ...e, bullets };
+  });
 }
 
-export function setClaimState(doc: ResumeDocument, claimId: string, state: ClaimState, note: string | null): ResumeDocument {
-  return updateClaim(doc, claimId, (c) => ({
-    ...c,
-    state,
-    note,
-    // A claim is only VERIFIED with evidence attached — never without an id.
-    evidenceId: state === "VERIFIED" ? (c.evidenceId ?? `ev_manual_${c.id}`) : c.evidenceId,
-  }));
+/** Apply `fn` to the rich-text field with this id, wherever it lives. */
+export function updateText(doc: ResumeDocument, textId: string, fn: (t: RichText) => RichText): ResumeDocument {
+  if (doc.summary.id === textId) return { ...doc, summary: fn(doc.summary) };
+  const each = (bullets: RichText[]) => (bullets.some((b) => b.id === textId) ? bullets.map((b) => (b.id === textId ? fn(b) : b)) : bullets);
+  return { ...doc, experience: mapBullets(doc.experience, each), projects: mapBullets(doc.projects, each) };
 }
 
-/** Append a bullet, or insert it right after `afterId` (Enter in the inline editor). */
-export function addBullet(doc: ResumeDocument, experienceId: string, bullet: RichClaim, afterId?: string): ResumeDocument {
-  return {
-    ...doc,
-    experience: doc.experience.map((e) => {
-      if (e.id !== experienceId) return e;
-      const at = afterId ? e.bullets.findIndex((b) => b.id === afterId) + 1 : e.bullets.length;
-      const bullets = [...e.bullets];
-      bullets.splice(at > 0 ? at : bullets.length, 0, bullet);
-      return { ...e, bullets };
-    }),
+/** Append a bullet to a job or project, or insert it right after `afterId` (Enter in the inline editor). */
+export function addBullet(doc: ResumeDocument, section: BulletSection, entryId: string, bullet: RichText, afterId?: string): ResumeDocument {
+  const add = (bullets: RichText[], entry: { id: string }) => {
+    if (entry.id !== entryId) return bullets;
+    const at = afterId ? bullets.findIndex((b) => b.id === afterId) + 1 : bullets.length;
+    const next = [...bullets];
+    next.splice(at > 0 ? at : next.length, 0, bullet);
+    return next;
   };
+  return section === "experience" ? { ...doc, experience: mapBullets(doc.experience, add) } : { ...doc, projects: mapBullets(doc.projects, add) };
 }
 
-export function removeBullet(doc: ResumeDocument, experienceId: string, bulletId: string): ResumeDocument {
-  return {
-    ...doc,
-    experience: doc.experience.map((e) => (e.id === experienceId ? { ...e, bullets: e.bullets.filter((b) => b.id !== bulletId) } : e)),
-  };
+export function removeBullet(doc: ResumeDocument, section: BulletSection, entryId: string, bulletId: string): ResumeDocument {
+  const drop = (bullets: RichText[], entry: { id: string }) => (entry.id === entryId ? bullets.filter((b) => b.id !== bulletId) : bullets);
+  return section === "experience" ? { ...doc, experience: mapBullets(doc.experience, drop) } : { ...doc, projects: mapBullets(doc.projects, drop) };
 }

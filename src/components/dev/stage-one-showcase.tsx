@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Play, Square } from "lucide-react";
-import { AgentRunPanel, UnverifiedToVerified, TypewriterText } from "@/components/app/ai";
+import { AgentRunPanel, TypewriterText } from "@/components/app/ai";
 import { DataTable } from "@/components/app/data-table";
 import { Button } from "@/components/ui/button";
 import { useTailorResume } from "@/lib/hooks/use-agents";
@@ -47,7 +47,7 @@ const COLUMNS: ColumnDef<DemoRow, unknown>[] = [
 const AGENT_STAGES = [
   "Reading the candidate record",
   "Extracting job requirements",
-  "Matching evidence",
+  "Matching experience",
   "Drafting tailored claims",
 ] as const;
 
@@ -56,7 +56,6 @@ export function StageOneShowcase() {
   const [activeStage, setActiveStage] = React.useState(0);
   const [elapsedMs, setElapsedMs] = React.useState(0);
   const [draft, setDraft] = React.useState("");
-  const [claimState, setClaimState] = React.useState<"UNVERIFIED" | "VERIFIED">("UNVERIFIED");
   const tailorMutation = useTailorResume();
   const abortRef = React.useRef<AbortController | null>(null);
   const timersRef = React.useRef<number[]>([]);
@@ -77,7 +76,6 @@ export function StageOneShowcase() {
     setActiveStage(0);
     setElapsedMs(0);
     setDraft("");
-    setClaimState("UNVERIFIED");
 
     const startedAt = performance.now();
     timersRef.current.push(
@@ -96,7 +94,7 @@ export function StageOneShowcase() {
       clearTimers();
       setStatus("complete");
       setActiveStage(AGENT_STAGES.length);
-      setDraft(result.claims[0]?.text ?? "Draft ready for review.");
+      setDraft(result.lines[0]?.text ?? "Draft ready for review.");
     } catch (error) {
       clearTimers();
       if (controller.signal.aborted) {
@@ -168,23 +166,10 @@ export function StageOneShowcase() {
 
         <div className="space-y-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-h3 text-[var(--color-text)]">Generated claim</h3>
-            {draft ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setClaimState((current) => current === "UNVERIFIED" ? "VERIFIED" : "UNVERIFIED")}
-              >
-                {claimState === "UNVERIFIED" ? "Preview verified style" : "Preview unverified style"}
-              </Button>
-            ) : null}
+            <h3 className="text-h3 text-[var(--color-text)]">Generated draft</h3>
           </div>
           {draft ? (
-            <UnverifiedToVerified
-              state={claimState}
-              reason="AI output requires evidence review"
-              text={draft}
-            />
+            <p className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-body text-[var(--color-text)]">{draft}</p>
           ) : (
             <p className="text-body text-[var(--color-text-3)]">
               Run the demo to stream a deterministic draft here.
@@ -192,7 +177,7 @@ export function StageOneShowcase() {
           )}
           {draft && status === "complete" ? (
             <p className="text-caption text-[var(--color-text-3)]">
-              <TypewriterText text="Draft complete. Review the wording, attach evidence, then verify the claim." />
+              <TypewriterText text="Draft complete. Read the wording over before you send it." />
             </p>
           ) : null}
         </div>

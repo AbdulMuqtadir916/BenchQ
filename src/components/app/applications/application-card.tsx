@@ -13,12 +13,11 @@ export interface CardFaceProps {
   /** Candidate name — shown on the firm-wide board, omitted on a candidate's own page. */
   candidateName?: string;
   owner: string;
-  followUpDue?: string;
   signal?: InboxMessage;
 }
 
 /** The content of one application card. Shared by the draggable card and its drag overlay. */
-export function ApplicationCardFace({ app, candidateName, owner, followUpDue, signal }: CardFaceProps) {
+export function ApplicationCardFace({ app, candidateName, owner, signal }: CardFaceProps) {
   const days = daysBetween(stageEnteredAt(app), new Date());
   const Icon = STATUS_ICON[app.status];
   const meta = signal ? mailSignalMeta(signal.signal) : null;
@@ -48,11 +47,7 @@ export function ApplicationCardFace({ app, candidateName, owner, followUpDue, si
           <Clock3 size={12} aria-hidden />
           {days === 0 ? "Today" : `${days}d in stage`}
         </span>
-        {followUpDue ? (
-          <span className="truncate text-caption text-[var(--color-text-3)]">Follow-up {formatRelative(followUpDue)}</span>
-        ) : (
-          <AvatarStack people={[{ name: owner }]} />
-        )}
+        <AvatarStack people={[{ name: owner }]} />
       </div>
     </>
   );

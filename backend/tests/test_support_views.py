@@ -230,6 +230,7 @@ def test_the_view_lasts_across_requests(anonymous_client, world):
     "/api/firms/{acme}/ledger", "/api/firms/{acme}/members", "/api/firms/{acme}/invites", "/api/applications",
     "/api/firms/{acme}/candidates/{candidate}/resumes", "/api/firms/{acme}/candidates/{candidate}/resumes/{resume}",
     "/api/jobs", "/api/cover-letters", "/api/stats", "/api/companies",
+    "/api/firms/{acme}/job-postings",                       # the job screens' list (job search PR 3)
 ])
 def test_the_viewed_firms_reads_answer(anonymous_client, world, path):
     _start(anonymous_client, world)
@@ -353,7 +354,7 @@ def test_a_password_reset_ends_the_view(anonymous_client, world, test_db):
 # ── Expiry is settled once, wherever it is noticed ──────────────────────────
 
 def test_a_support_view_reads_the_whole_firms_ledger(anonymous_client, world):
-    """As the OWNER does (07 Q56): no role limit narrows it."""
+    """As the OWNER does (07 Q59): no role limit narrows it."""
     assert _start(anonymous_client, world).status_code == 200
     path = f"/api/firms/{world['acme']}/ledger"
     ids = lambda headers: [entry["id"] for entry in anonymous_client.get(path, headers=headers).json()]

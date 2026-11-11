@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { deriveDocumentGate } from "@/lib/derive";
 import { EASE_OUT } from "@/lib/motion";
 import { BuilderPanel } from "./builder/builder-panel";
 import { PreviewPane } from "./preview/preview-pane";
@@ -14,6 +14,9 @@ import { useTailorRun } from "./tailor-run";
 import { usePrintExport } from "./print-export";
 import { stepTemplate } from "./templates";
 import { useStudio } from "./studio-store";
+import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { normalizeProfileLink } from "@/lib/resume-doc/profile-link";
+import { resumeFileName } from "@/lib/derive/resume-name";
 
 /** True when a key press belongs to a text field rather than to the studio. */
 function isTyping(target: EventTarget | null): boolean {
@@ -26,19 +29,33 @@ function isTyping(target: EventTarget | null): boolean {
  * gets all the room. Builder mode: section forms left, live page right.
  * Viewer mode: the page itself, editable in place.
  */
-export function ResumeStudio({ subtitle, canEdit, onClose }: { subtitle: string; canEdit: boolean; onClose: () => void }) {
+export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSave, isSaving = false }: { name: string; subtitle: string; canEdit: boolean; canTailor: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
   const doc = useStudio((s) => s.doc);
   const mode = useStudio((s) => s.mode);
   const rootRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion() ?? false;
   const tailor = useTailorRun();
-  const exporter = usePrintExport(doc);
-  const gate = useMemo(() => (doc ? deriveDocumentGate(doc) : null), [doc]);
+  const exporter = usePrintExport(doc, resumeFileName(name));
+  const [isConfirmingClose, setConfirmingClose] = useState(false);
+  // Closing with unsaved edits asks first: a save is explicit (no autosave), so closing would lose them.
+  const close = useCallback(() => (useStudio.getState().isDirty && onSave ? setConfirmingClose(true) : onClose()), [onClose, onSave]);
+
+  const hasInvalidLinks = !!doc && [doc.header.linkedin, doc.header.github].some((value) => normalizeProfileLink(value) === null);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.defaultPrevented || isTyping(e.target)) return;
-      if (e.key === "Escape") onClose();
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (canEdit && onSave && !hasInvalidLinks && !isSaving && useStudio.getState().isDirty) onSave();
+        return;
+      }
+      // A dialog on top (discard, "Use this as the base?") answers its own Esc; the studio stays open.
+      if (e.defaultPrevented || isTyping(e.target) || document.querySelector("dialog[open]")) return;
+      if (e.key === "Escape") {
+        // Claim the key: the browser would otherwise take this same Esc as "cancel" for the discard dialog it opens.
+        e.preventDefault();
+        close();
+      }
       if (e.key === "[" || e.key === "]") {
         const { doc: current, setTemplate } = useStudio.getState();
         if (current) setTemplate(stepTemplate(current.templateId, e.key === "]" ? 1 : -1).id);
@@ -46,9 +63,9 @@ export function ResumeStudio({ subtitle, canEdit, onClose }: { subtitle: string;
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [close, canEdit, onSave, hasInvalidLinks, isSaving]);
 
-  if (!doc || !gate) return null;
+  if (!doc) return null;
   const isEditable = canEdit && mode === "view";
 
   return (
@@ -56,7 +73,7 @@ export function ResumeStudio({ subtitle, canEdit, onClose }: { subtitle: string;
       ref={rootRef}
       role="dialog"
       aria-modal="true"
-      aria-label={`${doc.name} — ${doc.fullName}`}
+      aria-label={name}
       initial={reduce ? false : { opacity: 0, scale: 0.985, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.26, ease: EASE_OUT }}
@@ -64,11 +81,15 @@ export function ResumeStudio({ subtitle, canEdit, onClose }: { subtitle: string;
     >
       <StudioTopbar
         doc={doc}
+        name={name}
         subtitle={subtitle}
-        gate={gate}
         canEdit={canEdit}
+        canTailor={canTailor}
         isTailoring={tailor.isRunning}
-        onClose={onClose}
+        onSave={onSave}
+        isSaving={isSaving}
+        isSaveBlocked={hasInvalidLinks}
+        onClose={close}
         onTailor={tailor.start}
         onExport={exporter.print}
       />
@@ -91,10 +112,14 @@ export function ResumeStudio({ subtitle, canEdit, onClose }: { subtitle: string;
         )}
       </div>
 
-      <StatusBar doc={doc} gate={gate} />
+      <StatusBar doc={doc} />
       {isEditable || (canEdit && mode === "build") ? <SelectionToolbar scopeRef={rootRef} /> : null}
       {tailor.panel}
       {exporter.portal}
+      <ConfirmDialog open={isConfirmingClose} title="Discard unsaved changes?" confirmLabel="Discard" tone="danger" cancelLabel="Keep editing"
+        onCancel={() => setConfirmingClose(false)} onConfirm={() => { setConfirmingClose(false); onClose(); }}>
+        <p>Your edits since the last save are lost. Save first to keep them as the next version.</p>
+      </ConfirmDialog>
     </motion.div>
   );
 }
