@@ -2,12 +2,13 @@
 
 import { ChevronRight } from "lucide-react";
 import type { ExperienceEntry, ResumeDocument } from "@/lib/schemas/resume-document";
-import { newClaim, newId } from "@/lib/resume-doc/build";
+import { newText, newId } from "@/lib/resume-doc/build";
 import { cn } from "@/lib/cn";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useDocActions } from "../use-doc-actions";
 import { useStudio } from "../studio-store";
-import { AddButton, EmptyHint, FieldLabel, RowControls, TextField, moveHandlers } from "./fields";
-import { ClaimField } from "./claim-field";
+import { AddButton, EmptyHint, RowControls, TextField, moveHandlers } from "./fields";
+import { BulletFields } from "./bullet-fields";
 
 export function ExperienceFields({ doc }: { doc: ResumeDocument }) {
   const a = useDocActions();
@@ -15,7 +16,7 @@ export function ExperienceFields({ doc }: { doc: ResumeDocument }) {
 
   function addExperience() {
     const id = newId("exp");
-    a.add("experience", { id, company: "", title: "", location: "", dates: "", description: "", bullets: [newClaim()] });
+    a.add("experience", { id, company: "", title: "", location: "", dates: "", start: "", end: "", current: false, bullets: [newText()] });
     toggleEntry(id, true);
   }
 
@@ -34,14 +35,7 @@ function ExperienceItem({ entry: e, controls }: { entry: ExperienceEntry; contro
   const a = useDocActions();
   const isOpen = useStudio((s) => !!s.openEntries[e.id]);
   const toggleEntry = useStudio((s) => s.toggleEntry);
-  const requestFocus = useStudio((s) => s.requestFocus);
   const label = e.title || e.company || "new role";
-
-  function addBulletAfter(afterId?: string) {
-    const bullet = newClaim();
-    a.addBullet(e.id, bullet, afterId);
-    requestFocus(bullet.id);
-  }
 
   return (
     <div className={cn("rounded-[var(--radius-md)] border", isOpen ? "border-[var(--color-border-strong)]" : "border-[var(--color-border)]")}>
@@ -68,24 +62,15 @@ function ExperienceItem({ entry: e, controls }: { entry: ExperienceEntry; contro
             <TextField label="Location" value={e.location} onChange={(v) => a.patch("experience", e.id, { location: v })} placeholder="City, State or Remote" />
             <TextField label="Dates" value={e.dates} onChange={(v) => a.patch("experience", e.id, { dates: v })} placeholder="Jan 2022 – Present" />
           </div>
-          <TextField label="Description" value={e.description} onChange={(v) => a.patch("experience", e.id, { description: v })} placeholder="One line about the company or stack (optional)" />
-          <div>
-            <FieldLabel hint="Enter adds the next bullet">Bullets</FieldLabel>
-            <div className="space-y-3">
-              {e.bullets.map((b, i) => (
-                <ClaimField
-                  key={b.id}
-                  claim={b}
-                  label={`Bullet ${i + 1}`}
-                  placeholder="Start with an action verb and end with the result"
-                  onRemove={() => a.removeBullet(e.id, b.id)}
-                  onEnter={() => addBulletAfter(b.id)}
-                  onBackspaceEmpty={() => a.removeBullet(e.id, b.id)}
-                />
-              ))}
-            </div>
+          <div className="grid items-end gap-3 sm:grid-cols-3">
+            <TextField label="Start" value={e.start} onChange={(v) => a.patch("experience", e.id, { start: v })} placeholder="2022-01" />
+            <TextField label="End" value={e.end} onChange={(v) => a.patch("experience", e.id, { end: v })} placeholder="2024-06" />
+            <label className="flex min-h-9 items-center gap-2 text-sm text-[var(--color-text-2)]">
+              <Checkbox checked={e.current} onChange={(ev) => a.patch("experience", e.id, { current: ev.target.checked, end: ev.target.checked ? "" : e.end })} />
+              Current role
+            </label>
           </div>
-          <AddButton onClick={() => addBulletAfter()}>Add bullet</AddButton>
+          <BulletFields section="experience" entryId={e.id} bullets={e.bullets} />
         </div>
       ) : null}
     </div>

@@ -5,7 +5,7 @@ Base: `origin/main` at `3f8be61`.
 
 ## Scope and dependencies
 
-07 Q56: a MANAGER could read the whole firm's ledger through the API, because the server limited only BDEs. It now
+07 Q59: a MANAGER could read the whole firm's ledger through the API, because the server limited only BDEs. It now
 reads the entries they and the BDEs who report to them made, plus the `ASSIGN` entries about the candidates they
 manage (the handoff note). The OWNER, a VIEWER and a support view still read the firm; a BDE is unchanged (Q52). A
 filter sits on top of the limit, so it can't widen it.
@@ -20,7 +20,7 @@ Reads only: no table, migration, contract or dependency changes. The Super Admin
 | `backend/tests/test_ledger.py` | Replaces the test that asserted a MANAGER sees the firm. New: a MANAGER's team, nothing of another team or the firm, each filter stays inside the team, the handoff note still reads, a BDE never sees a teammate's work, the OWNER and a VIEWER still see every team. |
 | `src/lib/auth/policy.ts`, `src/lib/auth/permissions.test.ts` | `scopeLedger` applies the same MANAGER rule as UX. |
 | `src/app/[firm]/(app)/(manage)/ledger/page.tsx` | Comment only: the backend now scopes a MANAGER too. |
-| `docs/07-ROUTES-AND-RBAC.md`, `CLAUDE.md`, `docs/integration/01-ledger.md` | Records Q56. |
+| `docs/07-ROUTES-AND-RBAC.md`, `CLAUDE.md`, `docs/integration/01-ledger.md` | Records Q59. |
 | `docs/team/umamah.md`, this file | Status and change document. |
 
 ## Known limits, closed by later Activity logs PRs
@@ -42,4 +42,4 @@ candidate-based line is a separate change: `teamMemberIds` is shared with follow
 ## Release note
 
 A MANAGER's candidate activity no longer shows the OWNER's edits or the AI and system rows on the candidates they
-manage. This is intended under Q56, and it is a visible change for MANAGERs on the live backend.
+manage. This is intended under Q59, and it is a visible change for MANAGERs on the live backend.

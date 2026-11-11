@@ -19,7 +19,6 @@ interface State {
 type Action =
   | { type: "set"; field: keyof WizardValues; value: WizardValues[keyof WizardValues] }
   | { type: "draft"; draft: ResumeDraft }
-  | { type: "reviewed"; fields: readonly DraftableField[] }
   | { type: "start" }
   | { type: "reset" };
 
@@ -35,13 +34,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, values: { ...state.values, [action.field]: action.value }, drafted };
     }
     case "draft": {
+      // A second résumé replaces every résumé field, so only the new file's markers remain.
       const { values, drafted } = applyDraft(state.values, action.draft);
-      return { values, drafted: new Set([...state.drafted, ...drafted]), hasStarted: true };
-    }
-    case "reviewed": {
-      const drafted = new Set(state.drafted);
-      for (const field of action.fields) drafted.delete(field);
-      return { ...state, drafted };
+      const kept = state.values.resume === null ? [...state.drafted] : [];
+      return { values, drafted: new Set([...kept, ...drafted]), hasStarted: true };
     }
     case "start":
       return state.hasStarted ? state : { ...state, hasStarted: true };
@@ -70,7 +66,6 @@ export function useWizard() {
 
   const set = useCallback(<K extends keyof WizardValues>(field: K, value: WizardValues[K]) => dispatch({ type: "set", field, value }), []);
   const applyResume = useCallback((draft: ResumeDraft) => dispatch({ type: "draft", draft }), []);
-  const markReviewed = useCallback((fields: readonly DraftableField[]) => dispatch({ type: "reviewed", fields }), []);
   const reset = useCallback(() => dispatch({ type: "reset" }), []);
 
   const index = STEPS.findIndex((item) => item.id === step);
@@ -83,9 +78,8 @@ export function useWizard() {
     goTo,
     set,
     applyResume,
-    markReviewed,
     reset,
-  }), [state, step, index, goTo, set, applyResume, markReviewed, reset]);
+  }), [state, step, index, goTo, set, applyResume, reset]);
 }
 
 export type Wizard = ReturnType<typeof useWizard>;

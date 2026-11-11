@@ -27,7 +27,7 @@ Each decision: what the frontend needs → what the backend has → options → 
   3. Interim: every live application/resume belongs to one configured mock candidate
      (`NEXT_PUBLIC_DEFAULT_CANDIDATE_ID`). That's what Modules 03/04 do today.
 - **Recommendation:** 3 now, plan 1. Candidates screens stay mocked.
-- **Mock stays:** `src/mocks/candidates.ts`, `candidates.json`.
+- **Mock stays:** ~~`src/mocks/candidates.ts`, `candidates.json`~~ Superseded 2026-11-11 (job search PR 3): the candidates mock is deleted; its fixture is test-only (`src/test/fixtures/`).
 
 ## D2 — Users, roles and firms (auth)
 
@@ -61,7 +61,9 @@ are complete; it makes no application-status writes.
 - **Remaining sign-off:** Abdul confirms the exact vocabulary, legacy mapping/read policy and any adapter/schema
   details in docs/02 before PR 4. No code, migration or production data is changed by closing the old design options.
 
-## D4 — Claim evidence and verification (the core product rule)
+## D4 — Claim evidence and verification (the core product rule) — WITHDRAWN 2026-11-05
+
+> BenchQ dropped claim states, the evidence record and the export gate. D4 no longer applies. What follows is history.
 
 - **Frontend needs:** a per-candidate evidence record; claims marked VERIFIED only with an
   `evidenceId`; the export gate blocks while any claim is UNVERIFIED; verifications persist.
@@ -76,7 +78,9 @@ are complete; it makes no application-status writes.
   ledger too).
 - **Mock stays:** `src/mocks/records.ts`, `records.json`.
 
-## D5 — Follow-ups
+## D5 — Follow-ups — closed: removed (07 Q61, 2026-11-10)
+
+Decided with Abdul: the feature is removed rather than built. What follows is kept for the record.
 
 - **Frontend needs:** follow-up tasks per application (kind, due, state, assignee) for
   `/followups` and the dashboards.

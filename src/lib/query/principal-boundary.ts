@@ -1,11 +1,12 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { Principal } from "@/lib/schemas/tenancy";
+import { clearReadVersions } from "@/lib/api/resumes";
 import { useSession } from "@/lib/stores/session-store";
 
 /** Who is signed in, as one string: a change means a different person (or firm) is looking. */
 export function principalKey(principal: Principal | null): string {
   if (!principal) return "signed-out";
-  return principal.kind === "firm" ? `firm:${principal.firmId}:${principal.userId}` : `platform:${principal.userId}:${principal.support?.firmId ?? "-"}`;
+  return principal.kind === "firm" ? `firm:${principal.firmId}:${principal.userId}:${principal.role}` : `platform:${principal.userId}:${principal.support?.id ?? "-"}`;
 }
 
 /**
@@ -14,10 +15,15 @@ export function principalKey(principal: Principal | null): string {
  * the store update, before React renders the new principal, so no screen can read the previous
  * person's data. (Same-firm switches matter most: OWNER → BDE keeps the same firm keys.) The provider
  * also remounts the app under the new principal, so mounted queries start from this empty cache.
+ *
+ * Any other in-memory copy of firm data kept outside the query cache must be emptied here too: today, the résumé
+ * versions the studio read (src/lib/api/resumes.ts).
  * Returns the unsubscribe function.
  */
 export function clearCacheOnPrincipalChange(client: QueryClient): () => void {
   return useSession.subscribe((state, previous) => {
-    if (principalKey(state.principal) !== principalKey(previous.principal)) client.clear();
+    if (principalKey(state.principal) === principalKey(previous.principal)) return;
+    client.clear();
+    clearReadVersions();
   });
 }

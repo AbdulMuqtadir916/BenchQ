@@ -38,6 +38,8 @@ from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
 from backend.api.routes_candidates import router as candidates_router
 from backend.api.routes_candidate_resumes import router as candidate_resumes_router
+from backend.api.routes_job_search import router as job_search_router
+from backend.api.routes_firm_resumes import router as firm_resumes_router
 from backend.api.routes_ledger import router as ledger_router
 from backend.api.routes_support import router as support_router
 from backend.api.routes_notifications import router as notifications_router
@@ -163,6 +165,7 @@ app.add_middleware(BodySizeLimit)
 app.add_middleware(statement_timeout.WebRequestMarker)
 
 from backend.api import routes_inbox
+from backend.job_search.retired import retired
 
 
 @app.middleware("http")
@@ -194,6 +197,8 @@ app.include_router(invites_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
 app.include_router(candidates_router, prefix="/api")
 app.include_router(candidate_resumes_router, prefix="/api")
+app.include_router(job_search_router, prefix="/api")
+app.include_router(firm_resumes_router, prefix="/api")
 app.include_router(ledger_router, prefix="/api")
 app.include_router(support_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
@@ -372,6 +377,7 @@ async def trigger_all_scrapes():
     """Run all active JobSpy keyword searches + all active Playwright career page scrapes.
     Returns immediately with a run_id. Check progress via /api/monitor/active.
     """
+    retired()  # job search PR 2: the old pool's write routes answer 410
     async def _do():
         from datetime import datetime as _dt, timezone as _tz
         from backend.scheduler import _scrape_summary
@@ -471,6 +477,7 @@ def _log_analysis(principal: Principal, job_id) -> None:
 async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, firm_id=Depends(reader_firm_id),
                            principal: Principal = Depends(current_principal)):
     """Re-run resume scoring for a specific job. depth: 'light' or 'full' (default)."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     import uuid as _uuid
     # uuid.UUID(job_id) used to be evaluated inside the launch_background(...)
     # call, so a malformed id raised ValueError instead of answering the way
@@ -603,6 +610,7 @@ async def trigger_auto_reject():
 @app.post("/api/jobs/backfill-descriptions", tags=["triggers"], summary="Fetch descriptions for jobs missing them", status_code=202)
 async def trigger_backfill_descriptions():
     """Fetch job descriptions for new/saved/applied jobs that have a URL but no description."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     async def _do():
         from backend.models.db import Job
         from backend.scraper.ats._descriptions import _fetch_job_description
@@ -725,6 +733,7 @@ async def trigger_company_scrape(company_id: str, auto_score: bool = None):
     """Run Playwright career page scrape for one company. Returns immediately with a run_id.
     auto_score: True/False override, null=use company.auto_scoring_depth setting.
     """
+    retired()  # job search PR 2: the old pool's write routes answer 410
     from backend.models.db import Company
     db = SessionLocal()
     try:

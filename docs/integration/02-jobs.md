@@ -1,135 +1,70 @@
-# Module 02 — Jobs (and companies)
+# Module 02 — Jobs
 
-**Difficulty:** Medium · **Depends on:** 00 · **Module names:** `jobs`, `companies` (enable together)
+**Status:** built (job search PRs 1–3: #123, #124, #135) · **Depends on:** 00 · **Owner:** Zuhair · **Contracts:**
+docs/02 §6.y (the tables and routes), §6.z (the screens)
 
-## Why companies are folded in
+A candidate's jobs come from a **job search** run by the candidate's BDE (freehire.me first), or a job **captured** by
+hand or from the extension. They live in `job_postings` (one row per candidate per job) and `scrape_jobs` (one row
+per search or capture). The old shared `jobs` pool that this page used to describe is retired: its write routes
+answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR (see "Not in this module").
 
-No screen calls `useCompanies`. Company data reaches the UI only as the `company` object nested
-inside every `Job`. The backend sends a job's company as a plain name string, so this module joins
-jobs to `GET /api/companies` to build that object.
+## Decisions (2026-11-09 to 2026-11-11)
+
+- **Connect the existing screens; don't redesign them.** A DTO mapper (`src/lib/api/dto/jobs.ts`) turns a posting
+  into the existing `Job`. What a posting doesn't know stays empty: no pay, work authorization unknown (shown, never
+  filtered out), a company with only its name.
+- **Jobs come only from the backend.** The jobs mock, its fixture and its `NEXT_PUBLIC_LIVE_MODULES` switch are
+  deleted, and so are the candidates and résumé mocks and the seed's demo candidates: a candidate is made only by
+  onboarding, from a real résumé.
+- **No companies module.** No screen reads companies; a job carries its company's name, and freehire.me's H-1B mark
+  (`us-h1b-sponsor`) shows as the "H-1B sponsor" tag. No mark means not known, never "doesn't sponsor". A company
+  nobody checked shows no verification badge. The old `companies` table and its routes go with the old pool. Real
+  company data (H-1B filings, client vs vendor) is a later feature.
+- **Only the candidate's BDE searches or captures** (`canSearchJobs`, `job.search`). Owners, managers and viewers
+  read; a support view reads only.
+- **Daily limits** (since 6:30 PM IST): 100 new jobs per candidate, 20 searches and 20 captures per BDE. The same role
+  searched again continues where the last search stopped.
+- **The whole posting:** freehire.me's search cuts descriptions at about 1,000 characters, so a searched job's first
+  open fetches the whole posting from freehire.me once and keeps it. Postings freehire.me itself only has a preview
+  of (an Adzuna listing ends in "…") stay a preview; "Open original" has the rest.
 
 ## Frontend surface
 
 | Kind | Path |
 |---|---|
-| Screens | `src/app/(app)/jobs/page.tsx` (feed), `src/app/(app)/jobs/[id]/page.tsx` (detail), plus job lists in `dashboard` (BDE), `analytics`, `focus`, the candidate workspace (`use-candidate-workspace.ts`), `applications/[id]`, and the command palette |
-| Hooks | `src/lib/hooks/use-jobs.ts`, `use-companies.ts` (unused today) |
-| Adapters | `src/lib/api/jobs.ts`, `src/lib/api/companies.ts` |
-| Frontend types | `JobSchema` in `src/lib/schemas/job.ts`, `CompanySchema` in `src/lib/schemas/company.ts`, enums in `enums.ts` |
-| Mocks to delete | `src/mocks/jobs.ts`, `src/mocks/companies.ts`, `src/mocks/data/jobs.json` (53k lines), `src/mocks/data/companies.json` |
+| Screens | `/[firm]/jobs` (the explorer), `/[firm]/jobs/[id]`, `/[firm]/jobs/capture` (BDE only); the candidate's Jobs tab, "Find jobs" in the candidate header, Best new matches; the BDE dashboard queue, Focus, the ⌘K job search |
+| Adapter | `src/lib/api/jobs.ts`: `list`, `byId`, `capture`, `searches`, `startSearch`; the mapper `src/lib/api/dto/jobs.ts` |
+| Hooks | `src/lib/hooks/use-jobs.ts`: `useJobs`, `useJob`, `useCaptureJob`, `useJobSearches` (polls while a search runs), `useStartJobSearch` |
+| Types | `JobSchema` (+ `candidateIds`), `CaptureJobSchema` (per candidate) in `src/lib/schemas/job.ts`; `JobSearch*` in `src/lib/schemas/job-search.ts` |
+| Layout of a posting | `src/lib/format/job-description.ts` (facts, headings, bullets from plain paragraphs), `src/components/app/jobs/job-description.tsx` |
 
 ## Backend endpoints
 
-| Call | Endpoint | Source | Response |
-|---|---|---|---|
-| list | `GET /api/jobs?limit=<0..200>&offset=<n>&sort_by=date` (+ many filters) | `list_jobs` in `backend/api/routes_jobs.py` | `{ "total": n, "jobs": [Job] }` |
-| detail | `GET /api/jobs/{job_id}` | `get_job`, same file | `Job` |
-| companies | `GET /api/companies?active=<bool>&tier=<int>` | `list_companies` in `backend/api/routes_companies.py` | `[Company]` (bare array) |
-
-The backend job shape comes from `_job_to_dict`: `id, external_id, company (string), title, url,
-source, search_id, description, location, remote, arr_remote, arr_hybrid, arr_onsite, salary_min,
-salary_max, salary_source, h1b_company_lca_count, h1b_company_approval_rate, h1b_jd_flag,
-h1b_jd_snippet, h1b_verdict, cv_scores, best_cv, scoring_report, best_score, has_cached_page,
-page_cached_at, seen, saved, status, discovered_at, has_tailored_resume, tailored_resume_id,
-in_flight, in_flight_detail`.
-
-The backend company shape comes from `_company_to_dict`: `id, name, aliases, active, scrape_urls,
-tier, detected_scrape_types, application_count, open_jobs, h1b_lca_count, h1b_approval_rate,
-h1b_median_salary, h1b_last_checked, last_scraped_at, notes, …`.
-
-Job `status` is one of `new | saved | applied | skip`. `source` is free text: `manual`,
-`linkedin_extension`, `playwright_url`, `jobspy`, `jobspy_linkedin`, `jobspy_indeed`, `indeed`,
-`levels_fyi`, `jobright`, ….
-
-> ⚠️ **The limit trap.** Screens ask for `limit: 300` and `400`, but the backend rejects
-> `limit > 200` with a 422. `jobsApi.list` must fetch pages of 200 (`offset += 200`) until it has
-> `limit` rows or reaches `total`. Never pass `brief=1`: it drops `description`.
-
-## Field mapping → `Company`
-
-Build a lookup once per `jobsApi` call: lower-cased `name` and every alias → company.
-
-| Frontend | Source | Rule |
-|---|---|---|
-| `id` | `id` | as is |
-| `name` | `name` | as is |
-| `normalisedName` | `name` | trimmed, lower-case |
-| `domain` | `scrape_urls[0]` | hostname without `www.`, else `null` |
-| `websiteUrl`, `linkedinUrl`, `employeeBand`, `hasUsPresence` | — | `null` |
-| `clientType` | — | `"UNKNOWN"` (staffing-specific; not in the backend) |
-| `atsProvider` | `detected_scrape_types` | first value, else `null` |
-| `h1b` | `h1b_*` | `null` if `h1b_lca_count` is null; else `{ sponsorsH1b: lca_count > 0, lcaCount, lcaYear: null, medianLcaWage: h1b_median_salary, topLcaTitles: [], dataSource: "JobNavigator", lastCheckedAt: toIsoOrNull(h1b_last_checked) }` |
-| `verification` | — | `null` |
-
-**A job whose company isn't in `/api/companies`** (common for aggregator jobs) gets a synthesized
-company: `id: "company:" + slug(name)`, the name fields filled in, `h1b` built from the job's own
-`h1b_company_lca_count`, and everything else null / `"UNKNOWN"`. A job with `company: null` uses the
-name `"Unknown company"`.
-
-## Field mapping → `Job`
-
-| Frontend | Source | Rule |
-|---|---|---|
-| `id` | `id` | as is |
-| `companyId`, `company` | `company` | from the lookup above |
-| `title` | `title` | as is |
-| `normalisedTitle` | `title` | trimmed, lower-case, whitespace collapsed |
-| `description` | `description` | `?? ""` |
-| `city`, `state`, `country` | `location` | parse `"City, ST"` → city/state; `"Remote"` or unparseable → both `null`; country `"US"` unless the string clearly names another country |
-| `remoteMode` | `arr_*`, `remote` | `arr_remote` and not `arr_onsite` → `"REMOTE"`; `arr_hybrid` → `"HYBRID"`; `remote === true` → `"REMOTE"`; else `"ONSITE"` |
-| `employmentType` | — | `null` |
-| `rateMin`, `rateMax` | — | `null` (hourly C2C rates aren't in the backend) |
-| `salaryMin`, `salaryMax` | `salary_min`, `salary_max` | as is |
-| `allowedWorkAuth` | — | `[]` — see Gaps |
-| `excludesC2C` | — | `false` |
-| `postedAt` | `discovered_at` | `toIsoOrNull` (backend has no posting date) |
-| `applicantCount` | — | `null` |
-| `applyUrl` | `url` | as is if it's a valid URL, else `null` |
-| `requirements` | — | `[]` — see Gaps |
-| `dedupe` | `external_id`, `url` | `{ urlHash: external_id ?? id, contentHash: id, canonicalUrl: url, duplicateOfJobId: null }` |
-| `provenance.sourceType` | `source` | `manual` → `"MANUAL"`; `linkedin_extension` → `"USER_SUBMITTED"`; `playwright_url` and career-page scrapes → `"CONNECTOR"`; `jobspy*`, `indeed`, `levels_fyi`, `jobright`, anything else → `"AGGREGATOR"` |
-| `provenance.sourceId` | `external_id` | `?? id` |
-| `provenance.sourceUrl` | `url` | as is |
-| `provenance.legalBasis` | `source` | `MANUAL`/`USER_SUBMITTED` → `"USER_SESSION"`; else `"PUBLIC_DOCUMENTED"` — **confirm with product** |
-| `provenance.capturedByUserId` | — | `null` |
-| `provenance.ingestedAt` | `discovered_at` | `toIso`; fall back to "now" only if missing, and log it |
-| `isActive` | `status` | `status !== "skip"` |
-
-## Tasks
-
-- [ ] Samples: `/api/jobs?limit=20`, one `/api/jobs/{id}`, `/api/companies` → `__samples__/jobs.json`
-- [ ] `dto/jobs.ts`: `BackendJobSchema`, `BackendJobListSchema` (`{total, jobs}`),
-      `BackendCompanySchema`, `buildCompanyLookup`, `toCompany`, `toJob(job, lookup)`
-- [ ] Tests: location parsing table (`"San Francisco, CA"`, `"Remote"`, `"New York, NY, USA"`,
-      `null`), `remoteMode` truth table, source → provenance table, the unknown-company path; every
-      sample row passes `JobSchema.parse`
-- [ ] `jobsApi.list` pages through 200 at a time; `jobsApi.byId` fetches the job plus the companies
-      lookup. Cache the lookup per call; don't add global state
-- [ ] `companiesApi.list/byId` go live via `toCompany`
-- [ ] With `NEXT_PUBLIC_LIVE_MODULES=jobs,companies`: jobs feed, job detail, BDE dashboard "queue",
-      command palette search
-- [ ] Delete mocks/JSON for both; remove `isLive` branches
-
-## Gaps (write new ones here)
-
-- **No requirements or work-authorization rules.** Match scoring and the job-detail requirement
-  matrix depend on `requirements` and `allowedWorkAuth`; with both empty, every candidate matches
-  every job equally, and the work-auth hard filter never fires. The backend's `scoring_report` and
-  `h1b_jd_flag` / `h1b_verdict` hold related signal, but turning them into structured requirements
-  is a product decision. Ship with empty arrays and raise it.
-- **Backend-native scores aren't surfaced.** `cv_scores`, `best_score` and `scoring_report` are
-  LLM fit scores per resume. The frontend computes its own match score. Showing the backend's
-  instead is a product call; don't wire it silently.
-- **No hourly rates.** C2C rate fields stay null; the salary fields carry annual numbers.
-- **Job capture** (`/jobs/capture`) still simulates extraction locally. Its backend is
-  `POST /api/jobs/manual`. Do it as a follow-up PR once this module is live.
-- **Mixed mode breaks joins:** with `jobs` live but `applications` / `resumes` mocked, mock
-  applications point at mock job IDs that no longer exist, so application → job lookups show
-  "not found". That's expected until Modules 03 and 04 land.
+| Call | Endpoint |
+|---|---|
+| the firm's jobs (one per job, the visible `candidate_ids`, ≤ 400) | `GET /api/firms/{firm}/job-postings?candidate_id=&limit=` |
+| one job (with the whole posting) | `GET /api/firms/{firm}/job-postings/{id}` |
+| a candidate's jobs / one | `GET …/candidates/{id}/job-postings`, `…/job-postings/{posting_id}` |
+| start a search (BDE) | `POST …/candidates/{id}/job-searches` `{query}` → 202 `{batch_id, run_id}` |
+| searches and today's usage | `GET …/candidates/{id}/job-searches` |
+| capture a job (BDE) | `POST …/candidates/{id}/job-postings` → 201, or 200 with `created: false` for the job the candidate has |
 
 ## Acceptance criteria
 
-- [ ] Jobs feed shows backend jobs with correct company, location, remote mode and salary
-- [ ] Job detail opens for a backend UUID; unknown id → not-found state
-- [ ] A screen asking for 400 jobs gets up to 400 (several 200-row pages), not a 422
-- [ ] Empty / error / skeleton states verified; no `SCHEMA_MISMATCH`; mocks deleted; checks green
+- [x] The job screens show the backend's jobs: company, location, remote / hybrid / on-site, source, posted date
+- [x] A job opens from its id; a missing or malformed id is "Job not found"
+- [x] A screen asking for up to 400 jobs gets them (the adapter never asks for more than the backend gives)
+- [x] Skeleton, empty and error-with-Retry states on the job list, the candidate's Jobs tab, Best new matches, "Find
+      jobs" and the capture form; no `SCHEMA_MISMATCH`
+- [x] No jobs mock; checks green (CI runs the full suite on each PR)
+- [x] Owner, manager, BDE, viewer, a second firm, Super Admin and a support view checked in the browser
+
+## Not in this module
+
+- **Saving and applying to a job:** `applications.job_id` still names the old pool. Arbaz repoints it onto
+  `job_postings` (docs/team/arbaz.md); until then an application's job title links only when its job is found.
+- **The clean-up PR (Zuhair):** delete the old pool (`jobs`, `job_locations`, `firm_jobs`, `candidate_jobs`,
+  `companies`, their routes and scrapers) once applications no longer point at it.
+- **The extension's capture** calls the capture route with `source: "extension"` (Arbaz).
+- **Known limit:** a search runs in the API process; a restart loses one in flight (it shows as an error after 15
+  minutes). A job queue is the deployment work's.

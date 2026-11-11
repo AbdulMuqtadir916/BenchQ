@@ -5,7 +5,7 @@ import { inFirm, mockResult, notFound } from "./_shared";
 import { table } from "./db";
 import { firmScoped } from "./membership";
 
-/** Every firm's candidate records; a new candidate's is added by `candidatesMock.create`. */
+/** Every firm's candidate records (mock data; candidates themselves are the backend's since 2026-11-11). */
 export const allRecords: Record_[] = table("records", RecordSchema, () => arrayOf(RecordSchema).parse(recordsSeed));
 
 export const recordsMock = firmScoped("records", {

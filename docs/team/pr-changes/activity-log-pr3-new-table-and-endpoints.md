@@ -11,7 +11,7 @@ Backend only: the screen (PR 4) is unchanged, and the route stays `/ledger`. No 
 - **New table, `activity_logs`** (model `ActivityEntry`; `ActivityLog` stays the old system log, `activity_log_v2`).
   It has every `ledger_entries` column, plus: `on_behalf_of_user_id`, `actor_role`, `team_manager_id`,
   `candidate_manager_id`, `candidate_bde_id`, `changes`, `request_id`.
-- **Old data copied:** migration 0016 copies every `ledger_entries` row, with its id and date. Their stamps come from
+- **Old data copied:** migration 0026 copies every `ledger_entries` row, with its id and date. Their stamps come from
   today's roles and assignments. `ledger_entries` itself is left as it was; nothing writes or reads it now, and the demo
   reset only clears it. Removing it is Abdul's call. A downgrade puts new rows back into it.
 - **Can't be rewritten:** a database trigger refuses UPDATE and DELETE. The one way past it is the local demo reset, which
@@ -42,11 +42,11 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 | `backend/tests/test_activity_logs.py` | New: stamps, the trigger, each role, time-based history, filters, paging, people, candidates, the migration. |
 | `backend/tests/test_ledger_rules.py` | The rules now watch the new table, and nothing may use the old one but the demo reset. |
 | Other `backend/tests/*` | Read the new model's name. No expectation changed except the entry's shape. |
-| `docs/integration/01-ledger.md`, `docs/team/README.md`, `docs/team/umamah.md` | The new table, migration number 0016, status. |
+| `docs/integration/01-ledger.md`, `docs/team/README.md`, `docs/team/umamah.md` | The new table, migration number 0026, status. |
 
 ## Migration number
 
-0016, following Zuhair's 0015 (#112). 0015 dropped the ledger's `claim_state` and `evidence_ids`, so `activity_logs`
+0026 (renumbered 2026-11-12, after main's 0023 and PR #129's 0024–0025; it was 0016, following Zuhair's 0015, #112). 0015 dropped the ledger's `claim_state` and `evidence_ids`, so `activity_logs`
 doesn't have them either.
 
 ## Known limit

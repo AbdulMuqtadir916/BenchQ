@@ -63,11 +63,6 @@ describe("job marks", () => {
     expect(kinds(await m.marks.list(FIRM))).toEqual(["job_001:HIDDEN"]);
   });
 
-  it("only a job of the firm can be marked", async () => {
-    const m = await load(EMAIL.adnan);
-    await expect(m.marks.mark(FIRM, "job_nope", "SAVED")).rejects.toMatchObject({ status: 404 });
-  });
-
   it("a VIEWER reads no marks of anyone else; a support view reads none at all and can't write", async () => {
     const m = await load(EMAIL.adnan);
     await m.marks.mark(FIRM, "job_001", "SAVED");

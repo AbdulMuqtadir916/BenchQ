@@ -25,7 +25,7 @@ failure — not three rows of `Lorem Ipsum Inc.`
    mirrors the real backend contract.
 4. **Dates are relative to now.** Generated as offsets from `new Date()` so "posted 3 days ago"
    and "due today" stay true whenever someone opens it.
-5. **Every state is represented.** If a status, verdict or claim state exists in the enums, at
+5. **Every state is represented.** If a status or verdict exists in the enums, at
    least one fixture has it. Empty states get their own fixture set.
 
 ---
@@ -86,14 +86,13 @@ src/mocks/fixtures/
 ├── _seed.ts           seeded RNG + date helpers
 ├── firm.ts            1 firm, 5 users (one per role + 2 BDEs)
 ├── candidates.ts      24 candidates
-├── records.ts         Records + evidence for all 24
+├── records.ts         Records (plain résumé content) for all 24
 ├── companies.ts       60 companies with verification + H-1B data
 ├── jobs.ts            400 jobs across all 4 source types
 ├── matches.ts         computed per candidate
 ├── resumes.ts         ~40 resumes, ~90 versions
 ├── applications.ts    ~320 applications with full event history
 ├── outreach.ts        contacts + touches
-├── followups.ts       derived from applications
 ├── ledger.ts          generated from all mutations above
 └── empty.ts           the empty-state variant of every collection
 ```
@@ -270,8 +269,7 @@ rejected. Tested in `db.test.ts` ("relative fixture dates"): seeded on day 0, re
 
 ### 4.1 Firm and users
 
-One firm, `Hyderabad Tech Staffing LLC`, IST primary / America/New_York client, Truth Guard
-`BALANCED`.
+One firm, `Hyderabad Tech Staffing LLC`, IST primary / America/New_York client.
 
 | Name | Role | Notes |
 |---|---|---|
@@ -313,6 +311,9 @@ Rejection reasons must be real and varied: `NO_FUNCTIONING_WEBSITE`,
 
 ### 4.4 Jobs — 400
 
+> **Removed 2026-11-11 (job search PR 3):** jobs come only from the backend (`job_postings`, docs/02 §6.z). The
+> fixture below no longer exists; it is kept here as the record of what it held.
+
 | Field | Spread |
 |---|---|
 | `provenance.sourceType` | 180 CONNECTOR · 90 AGGREGATOR · 95 USER_SUBMITTED · 35 MANUAL |
@@ -347,18 +348,11 @@ Every application carries the `ApplicationEvent[]` chain that produced its statu
 gaps — 2–5 days to response, 3–10 more to screening. **The funnel chart and every stat block are
 computed from these events**, so the numbers must be internally consistent.
 
-### 4.6 Resumes and claims — the important one
+### 4.6 Résumés
 
-Roughly 40 resumes, ~90 versions. Claim state distribution across all versions:
-
-- **~78% VERIFIED** — each with a real `evidenceId` pointing at an actual `RecordEvidence` row
-- **~18% UNVERIFIED** — each with a plain-English `reason`: *"No evidence on record for team size —
-  needs candidate confirmation"*
-- **~4% CONTRADICTED** — each with a contradiction reason: *"No certificate on file; candidate confirmed
-  not held"*
-
-**At least 6 resume versions must have unverified claims blocking export.** That gate is a core
-interaction and it needs fixtures that exercise it.
+Roughly 40 résumés, ~90 versions. Each tailored résumé carries `baseResumeId` (the base it was made from) and
+`targetJobId`, so the base → versions → tailored tree can be shown from the mocks. The text of a version is in
+`versions[].lines`. There are no claim states (dropped 2026-11-05).
 
 ATS scores: 12 versions below 75 (failing), the rest 75–96. `atsIssues` populated with real
 checks — semantic headings, tables detected, font count, image text, contact block.
@@ -366,16 +360,7 @@ checks — semantic headings, tables detected, font count, image text, contact b
 Two versions should carry a `tracer` with non-zero `openCount`, so the "recruiter opened your
 submission" signal has something to render.
 
-### 4.7 Follow-ups
-
-Derived from applications in `APPLIED` or later:
-
-- **7 overdue** — drives the red section on the dashboard
-- **11 due today**
-- **26 upcoming**
-- 4 snoozed, 3 cancelled
-
-Split across the three BDEs so the role switcher shows different queues.
+### 4.7 Follow-ups — removed, 07 Q61
 
 ---
 
@@ -409,8 +394,7 @@ Rules for every simulated agent surface:
    state, and the waiting state is most of the UX.
 2. **5% failure.** Every agent surface must degrade to its manual path with an inline note — never
    a blank screen, never a 500 page. This is a hard product requirement, not a nicety.
-3. **Output always lands in `UNVERIFIED`.** No simulated agent ever returns an `VERIFIED` claim. A human
-   verifies it with evidence attached.
+3. **Output is a draft.** A person reads it over before it is sent.
 4. **Progress is real.** Multi-step agents (record extraction) emit staged progress:
    *Reading document → Extracting experience → Matching skills → Building draft.* Fake it on a
    timer, but show it — the real one will do the same.
@@ -452,7 +436,7 @@ A parallel set in `fixtures/empty.ts`, reachable via `?state=empty` on any route
 Empty states are half the screens in a new firm's first week and they are routinely shipped broken.
 
 Cover: no candidates · no jobs · no applications · candidate with no Record · candidate with no
-resumes · no follow-ups due · analytics with no data in the period · ledger with no entries.
+resumes · analytics with no data in the period · ledger with no entries.
 
 ---
 

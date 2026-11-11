@@ -18,7 +18,7 @@ const VIEW = "5e1f0000-0000-4000-8000-000000000001";
 const REASON = "Customer reported a missing application";
 
 const firmDto = { id: HTS, name: "Hyderabad Tech Staffing", slug: "hyderabad-tech-staffing", logo_url: null,
-  primary_timezone: "Asia/Kolkata", client_timezone: "America/New_York", truth_guard_mode: "BALANCED",
+  primary_timezone: "Asia/Kolkata", client_timezone: "America/New_York",
   application_expiry_days: 30, status: "ACTIVE", plan_id: demoIds.plan_starter, seat_limit: 10, candidate_limit: 100,
   contact_phone: null, created_at: "2026-10-01T09:00:00+00:00" };
 const platformSessionDto = (support: Record<string, unknown> | null) => ({

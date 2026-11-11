@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { Play, Sparkles, Send, Mail, ArrowRight, BellRing, MailCheck, CircleHelp } from "lucide-react";
+import { Play, Sparkles, Send, Mail, ArrowRight, CalendarDays, MailCheck } from "lucide-react";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { scopeCandidates } from "@/lib/auth/permissions";
+import { scopeApplications, scopeCandidates } from "@/lib/auth/permissions";
 import { useCandidates } from "@/lib/hooks/use-candidates";
-import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
+import { useApplications } from "@/lib/hooks/use-applications";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { deriveCandidateStats, deriveBdeDashboard, rankJobsForCandidate } from "@/lib/derive";
 import { StatCard } from "@/components/app/stat-card";
@@ -36,17 +36,15 @@ export function BdeDashboard() {
   const userId = principal.userId;
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
-  const followupsQuery = useFollowups(userId);
   const jobsQuery = useJobs({ limit: 300 });
   // docs/04 §13: one group per set of cards that read the same queries.
-  const numbers = queryGroup(candidatesQuery, applicationsQuery, followupsQuery);
+  const numbers = queryGroup(candidatesQuery, applicationsQuery);
   const mine = queryGroup(candidatesQuery, applicationsQuery);
   const queueGroup = queryGroup(candidatesQuery, applicationsQuery, jobsQuery);
-  const page = queryGroup(candidatesQuery, applicationsQuery, followupsQuery, jobsQuery);
+  const page = queryGroup(candidatesQuery, applicationsQuery, jobsQuery);
 
   const candidates = candidatesQuery.data ?? EMPTY;
   const applications = applicationsQuery.data ?? EMPTY;
-  const followups = followupsQuery.data ?? EMPTY;
   const jobs = jobsQuery.data ?? EMPTY;
 
   const myCandidates = useMemo(
@@ -55,17 +53,8 @@ export function BdeDashboard() {
   );
 
   const dash = useMemo(
-    () => deriveBdeDashboard(userId, candidates, applications, followups),
-    [userId, candidates, applications, followups],
-  );
-
-  const unverifiedToReview = useMemo(
-    () =>
-      myCandidates.reduce(
-        (sum, c) => sum + c.qaBank.filter((q) => q.state === "UNVERIFIED").length,
-        0,
-      ),
-    [myCandidates],
+    () => deriveBdeDashboard(userId, candidates, scopeApplications(principal, applications, candidates)),
+    [userId, principal, candidates, applications],
   );
 
   const topCandidate = useMemo(
@@ -84,7 +73,7 @@ export function BdeDashboard() {
   const header = (
     <PageHeader
       title="Tonight"
-      subtitle="Your queue, your candidates, what needs a nudge before the shift ends."
+      subtitle="Your queue, your candidates, and what to work on before the shift ends."
       actions={
         <Button asChild>
           <Link href={toHref("focus")}>
@@ -96,7 +85,7 @@ export function BdeDashboard() {
     />
   );
 
-  if (hasPageFailed(candidatesQuery, applicationsQuery, followupsQuery, jobsQuery)) {
+  if (hasPageFailed(candidatesQuery, applicationsQuery, jobsQuery)) {
     return (
       <div className="bq-page">
         {header}
@@ -119,9 +108,9 @@ export function BdeDashboard() {
         ) : (
           <>
             <StatCard icon={Send} label="Applications" value={`${dash.applicationsThisWeek}`} delta={`of ${NIGHTLY_TARGET} target`} trend="neutral" window="this week" />
-            <StatCard icon={BellRing} iconTone={dash.followUpsOverdue ? "danger" : "success"} label="Follow-ups" value={`${dash.followUpsDueToday + dash.followUpsOverdue}`} delta={dash.followUpsOverdue ? `${dash.followUpsOverdue} overdue` : "on track"} trend={dash.followUpsOverdue ? "down" : "up"} window="due" />
+            <StatCard icon={CalendarDays} label="Interviews" value={`${dash.interviewsScheduled}`} trend="neutral" window="at the interview stage now" />
             <StatCard icon={MailCheck} iconTone="success" label="Responses" value={`${dash.responsesThisWeek}`} trend="up" window="this week" />
-            <StatCard icon={CircleHelp} iconTone="warning" label="Unverified claims" value={`${unverifiedToReview}`} delta="to review" trend="neutral" window="needs evidence" />
+            <StatCard icon={Users} label="Candidates" value={`${myCandidates.length}`} trend="neutral" window="assigned to you" />
           </>
         )}
       </section>

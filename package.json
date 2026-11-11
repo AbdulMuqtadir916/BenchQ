@@ -11,7 +11,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ext:build": "npm --prefix extension run build",
+    "ext:watch": "npm --prefix extension run watch",
+    "ext:test": "npm --prefix extension run test"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

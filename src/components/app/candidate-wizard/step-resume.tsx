@@ -1,12 +1,11 @@
 "use client";
 
 import { useRef, useState, type DragEvent } from "react";
-import { CloudUpload, FileText, LoaderCircle, PencilLine, WandSparkles } from "lucide-react";
+import { CloudUpload, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { RESUME_FILE, resumeFileProblem } from "@/lib/constants/candidate-intake";
-import { useParseResume, useSampleResumes } from "@/lib/hooks/use-resume-parse";
-import { cn } from "@/lib/cn";
+import { useParseResume } from "@/lib/hooks/use-resume-parse";
 import type { Wizard } from "./use-wizard";
 
 /**
@@ -16,7 +15,6 @@ import type { Wizard } from "./use-wizard";
  */
 export function StepResume({ wizard }: { wizard: Wizard }) {
   const parse = useParseResume();
-  const samples = useSampleResumes();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -90,31 +88,12 @@ export function StepResume({ wizard }: { wizard: Wizard }) {
       {problem ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{problem}</p> : null}
       {parse.error && !problem ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-danger-fg)] bg-[var(--color-danger-bg)] p-3">
-          <p className="flex-1 text-sm text-[var(--color-danger-fg)]">Couldn&apos;t read this résumé. Try another file, or enter the details yourself.</p>
+          <p className="flex-1 text-sm text-[var(--color-danger-fg)]">Couldn&apos;t read this résumé. Try again, or upload another file.</p>
           {lastFile ? <Button size="sm" variant="secondary" onClick={() => read(lastFile)}>Try again</Button> : null}
-          <Button size="sm" variant="ghost" onClick={() => wizard.goTo("basic")}>Skip</Button>
         </div>
       ) : null}
 
-      {samples.data && samples.data.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Sample résumés">
-          <span className="inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><WandSparkles size={12} aria-hidden />Try a sample</span>
-          {samples.data.map((name) => (
-            <button key={name} type="button" onClick={() => read(new File([], name, { type: name.endsWith(".pdf") ? "application/pdf" : RESUME_FILE.mimeTypes[2] }))} className="bq-choice items-center gap-1.5 px-2 py-1 font-mono text-caption">
-              <FileText size={12} aria-hidden />
-              {name}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <div className={cn("flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] pt-4")}>
-        <p className="inline-flex items-center gap-2 text-sm text-[var(--color-text-2)]">
-          <PencilLine size={14} aria-hidden />
-          No resume yet? You can add one later from the candidate&apos;s Resumes tab.
-        </p>
-        <Button variant="ghost" onClick={() => wizard.goTo("basic")}>Skip, enter manually</Button>
-      </div>
+      {/* 07 Q58 (Abdul, 2026-11-06): no candidate without their résumé, so there is no way past this step without one. */}
     </div>
   );
 }
