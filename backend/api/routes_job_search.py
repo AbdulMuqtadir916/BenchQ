@@ -114,8 +114,10 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, query: st
 
 
 def _link_run(db: DbSession, firm_id: uuid.UUID, batch_id: uuid.UUID, run_id: str) -> None:
-    """The run → batch link, both ways: the batch names its run. Committed."""
-    batch = scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.batch_id == batch_id).one()
+    """The run → batch link, both ways: the batch names its run. Committed. The row is locked first: the search is
+    already launched, and if it saves while this runs, this waits for that save and keeps what it wrote (the cursor,
+    the counts) instead of writing back what it read before (CodeRabbit on #123)."""
+    batch = scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.batch_id == batch_id).with_for_update().one()
     batch.meta = {**(batch.meta or {}), "run_id": str(run_id)}
     db.commit()
 

@@ -241,3 +241,35 @@ def test_a_search_waiting_for_the_bdes_lock_does_not_stall_other_requests(anonym
     searcher.join(20)
     assert results["search"].status_code == 202
     assert answered_in < 1.5, f"another request waited {answered_in:.1f}s behind the search's lock wait"
+
+
+# ── CodeRabbit on #123: linking the run never writes back stale metadata ──
+
+def test_linking_the_run_keeps_what_a_search_saving_at_that_moment_wrote(world, adnans):
+    """The search is launched before its run id is written on the batch. If the search saves (its cursor, its counts)
+    while the run id is being written, both stay (before: the run id was written over the metadata read before the
+    save, and the cursor was lost)."""
+    import time
+
+    from backend.api.routes_job_search import _link_run
+    from backend.models.db import SessionLocal
+    from backend.models.job_search import ScrapeJob
+    batch_id, saving = _open(world, adnans), threading.Event()
+
+    def save_meanwhile():
+        with SessionLocal() as db:
+            batch = db.query(ScrapeJob).filter(ScrapeJob.batch_id == batch_id).with_for_update().one()
+            saving.set()
+            time.sleep(1)
+            batch.meta = {**batch.meta, "next_cursor": "page-2"}
+            db.commit()
+
+    saver = threading.Thread(target=save_meanwhile)
+    saver.start()
+    saving.wait(10)
+    with SessionLocal() as db:
+        _link_run(db, world["firm"].id, batch_id, "run-1")
+    saver.join(10)
+    with SessionLocal() as db:
+        meta = db.query(ScrapeJob.meta).filter(ScrapeJob.batch_id == batch_id).scalar()
+    assert meta["run_id"] == "run-1" and meta["next_cursor"] == "page-2"
