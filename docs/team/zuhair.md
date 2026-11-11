@@ -72,7 +72,8 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
 ## 3. Résumé tailoring (+ ATS score) — design and plan in [tailoring.md](./tailoring.md)
 
 1. Designed (grilling, 2026-11-11 and 2026-11-12): one PR, `feat/resume-tailoring`, in three commits (the backend
-   package, the wiring, the frontend), decisions in [tailoring.md](./tailoring.md) §1. Part 1 built 2026-11-12.
+   package, the wiring, the frontend), decisions in [tailoring.md](./tailoring.md) §1 and §7. Parts 1 and 2 built
+   2026-11-12; part 3 (the frontend) next.
 2. **Tailored résumés** from a base's version 1 for one job (`category = 'TAILORED'`, `base_resume_id`,
    `job_id`; [resume-versioning.md](./resume-versioning.md) §4), many per candidate.
    Tailoring creates them; editing one is résumé versioning PR 5's save (the next version), and only the

@@ -133,7 +133,7 @@ def test_every_cron_setting_is_validated(client, key):
 
 @pytest.mark.parametrize("key", ["llm_provider", "llm_fallback_provider",
                                  "scoring_llm_provider", "email_llm_provider",
-                                 "cv_tailor_llm_provider", "cover_letter_llm_provider",
+                                 "cover_letter_llm_provider",
                                  "autofill_llm_provider"])
 def test_patch_settings_rejects_an_unknown_provider(client, key):
     r = assert_clean(client.patch("/api/settings", json={key: "skynet"}), 400)

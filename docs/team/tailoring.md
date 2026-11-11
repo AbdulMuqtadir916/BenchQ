@@ -12,7 +12,8 @@ number or employer the résumé doesn't state. The source is Zuhair's tailoring 
 are used as written; section 9 there says how they were measured.
 
 **Status:** one branch and one PR, `feat/resume-tailoring`, in three commits, each tested on its own as a PR would be
-(decided 2026-11-12): part 1 (the package) built; parts 2 and 3 not started. Committed, not pushed.
+(decided 2026-11-12): part 1 (the package) and part 2 (the wiring) committed, `main` merged in after part 1; part 3
+not started. Committed, not pushed.
 
 ---
 
@@ -114,18 +115,30 @@ before the run starts.
 From the handoff, measured on 6 pairs (2026-10-27): 55–73 s per tailoring, 31,000–39,000 input tokens and 5,500–8,000
 output tokens across the five calls. It runs in the background (part 2), never inside a request.
 
-## 7. Parts 2 and 3 (to plan, each grilled first)
+## 7. Part 2: the wiring (grilled and built 2026-11-12)
 
-**Part 2, the backend wiring:**
-- the route on the candidate and the job, with an optional base: `can_manage_resume`, the firm's scope, the support
-  view refused;
-- the 422 and the 409s (Q10);
-- the background run (`launch_background`) and its `job_runs` row with the counts;
-- the `TAILORED` version: `_with_ids`, then v1 or the next version of base + job (`versions._group`); its `name`;
-- its autofill entries copied from the source version (`autofill.entries_of`), as a save and a promote do
-  (`cross-area-changes.md`, the autofill PR's note for the tailoring module);
-- the ledger entry, and the run's status read;
-- deleting the old tailoring (Q10).
+**Decisions** (part 2 grilling, Zuhair, 2026-11-12):
+
+| # | Decision |
+|---|---|
+| Record | The run's `job_runs` row is its record: `firm_id` (new on `launch_background`), `target_job_id` (the posting), `meta` `{candidate_id, base_resume_id, job_posting_id, user_id}`, then `resume_id` + `counts` or `error_code`, and the heartbeat `seen_at`. No table, no migration. Every check reads these rows, so it holds on any number of workers. |
+| Routes | `POST …/candidates/{c}/resumes/tailor` `{job_posting_id, base_resume_id?}` → 202 `{run_id}`; `GET …/resumes/tailorings` (newest first; `?running=true`); `GET …/resumes/tailorings/{run_id}` → `{status: running\|completed\|failed, resume_id, error_code, …}`. |
+| Who | Starting: the candidate's BDE (`can_manage_resume`, 07 Q55). Reading: anyone who can see the candidate; a support view reads. |
+| Refusals | 404 a posting or base that isn't the candidate's; 409 a hidden base, no active base, no v1, or the same base and job running; 422 a job with no description; 429 the BDE has 5 running (queued ones count); 500 naming the setting when the tailor isn't set up. Checked with the candidate row locked, held across the launch. |
+| Limits | The tailor's own gate `resume_tailor`: `resume_tailor_max_concurrent`, 40 per worker (a Super Admin setting). 10 was too few: the gate is per worker and every firm shares it. Before real use, set it under the OpenRouter account's rate limit. Fairness between firms is Uzair's per-firm cap. |
+| Lost | Each worker stamps its running and queued tailorings every 30 s (`runs.keep_stamping`, started with the app). Not stamped for 2 minutes, or running 30 minutes: failed as `lost`, and its 409 lifts. A row the startup clean-up failed (one worker today) reads as lost too. |
+| Finish | With the candidate locked: the firm suspended, the candidate, base (deleted or hidden) or posting gone → `gone`, no version; a run already marked lost → stays lost, no version. A candidate handed to another BDE meanwhile still gets the version, credited to the BDE who started it. |
+| Version | `versions._with_ids` against the base's v1, then v1 or the next version of base + job; name "Tailored"; the base v1's template and page format; autofill entries from the newest tailored version of that base and job (what the BDE typed for it), else the base v1's. |
+| Ledger | On success only: `CREATE`, `resume`, "Tailored Base N for <job title>", by the BDE, `model_id` the model. |
+| Failures | `provider_failed`, `unreadable_reply`, `gone`, `lost`, `setup`, and `internal` for an unexpected error (logged by its type only: a database error's text carries the résumé). |
+| Deleted | `legacy_tailoring.py`, `call_cv_tailor_llm`, the six old settings (`cv_tailor_llm_*`, `cv_tailor_prompt`, `persona_tailor_prompt`) and the old `tailoring` AI module; rows a database already holds stay. |
+
+**Files:** `backend/resume_tailor/runs.py` (admission, the run, lost runs, the heartbeat, the status),
+`backend/api/routes_resume_tailoring.py` (registered before the résumé routes, so `…/tailorings` is never a résumé
+id), `backend/job_monitor.py` (`firm_id`, the gate), `backend/main.py` (the router, the heartbeat). Tests:
+`test_resume_tailor_routes.py`; the isolation and log sweeps know the three routes.
+
+## 8. Part 3 and later
 
 **Part 3, the frontend:**
 - the studio's tailoring (`tailor-run.tsx`, `useAgentRun`) and the job pane run the real thing;

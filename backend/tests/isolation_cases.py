@@ -58,7 +58,7 @@ def _resume_country_us(db, ids):
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
          "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt", "base_id": "base",
-         "posting_id": "posting"}
+         "posting_id": "posting", "run_id": "tailoring"}
 
 
 
@@ -110,6 +110,11 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/removal": Case(),
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}": Case(as_bde=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/show": Case(as_bde=True),
+    # Résumé tailoring: the BDE starts one on the candidate's posting; anyone who sees the candidate reads them.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailor": Case(
+        as_bde=True, body=lambda i: {"job_posting_id": str(i["posting"])}, body_ids=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings": Case(),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings/{run_id}": Case(),
     # Job search (job search PR 1): a search is the candidate's BDE's, with the résumé country it searches in.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(
         as_bde=True, body=lambda i: {"query": "Java Developer"}, prepare=_resume_country_us),

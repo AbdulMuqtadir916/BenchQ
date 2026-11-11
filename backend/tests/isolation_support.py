@@ -152,6 +152,14 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                       name=f"{tag} tailored résumé", created_by_user_id=bde.id, **RESUME_COLUMNS)
     db.add_all([resume, v2, tailored])
     db.flush()
+    from backend.models.db import JobRun
+    # A finished tailoring (docs/team/tailoring.md): its job_runs row is the firm's record of it.
+    tailoring = JobRun(firm_id=firm.id, job_type="resume_tailor", trigger="manual", status="completed",
+                       target_job_id=posting.id,
+                       meta={"candidate_id": str(candidate.id), "base_resume_id": str(first.id),
+                             "job_posting_id": str(posting.id), "user_id": str(bde.id), "resume_id": str(tailored.id)})
+    db.add(tailoring)
+    db.flush()
     second = BaseResume(firm_id=firm.id, candidate_id=candidate.id, source="PROMOTED", promoted_from_resume_id=v2.id,
                         created_by_user_id=bde.id)
     db.add(second)
@@ -221,7 +229,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.flush()
 
     return {"oauth_attempt": attempt.id, "pending_parse": pending.id, "review_app": review_app.id, "review": review.id, "review_message": review_message.id,
-            "version": v2.id, "base": second.id, "posting": posting.id,
+            "version": v2.id, "base": second.id, "posting": posting.id, "tailoring": tailoring.id,
 
             "firm": firm.id, "slug": firm.slug, "job": job.id,
             "app": app.id, "legacy_app": legacy_app.id, "inbox_message": candidate_message.id, "interview": interview.id,
@@ -237,8 +245,7 @@ def make_world(db, accounts) -> World:
 
     firm_a = db.get(Firm, accounts.firm_id)
     owner_a = db.get(User, accounts.user_id)
-    # The tailor and letter routes refuse to run without their prompts (platform settings, seeded in production).
-    db.merge(Setting(key="cv_tailor_prompt", value="Tailor the résumé to the job."))
+    # The letter route refuses to run without its prompt (a platform setting, seeded in production).
     db.merge(Setting(key="cover_letter_prompt", value="Write a cover letter for the job."))
     shared = Job(external_id="shared-job", title="Shared pool job", company="Pool Inc",
                  url="https://jobs.example.test/shared", source="manual", description=JOB_TEXT)
@@ -356,6 +363,11 @@ def offline(monkeypatch):
 
     monkeypatch.setattr(routes_candidates, "extract_text", lambda kind, content: "isolation résumé text")
     monkeypatch.setattr(routes_candidates, "read_resume", read_resume)
+    # The résumé tailor (docs/team/tailoring.md): set up, and its run never launched.
+    from backend.api import routes_resume_tailoring
+    from backend.resume_tailor.settings import default_setup
+    monkeypatch.setattr(routes_resume_tailoring, "read_setup", lambda db: default_setup(api_key="isolation"))
+    monkeypatch.setattr(routes_resume_tailoring, "launch_background", no_launch)
 
     # Provider I/O is synthetic in F7; Google and mailbox secrets are never contacted.
     from backend import config

@@ -105,7 +105,6 @@ KNOWN = {
     ("analyzer/cover_letter_generator.py", "generate_cover_letter_body"): "Zuhair: raw AI reply",
     ("analyzer/cv_scorer.py", "_score_job_inner"): "Zuhair: raw AI reply",
     ("analyzer/cv_scorer.py", "analyze_unscored_jobs"): "Zuhair: a résumé's name",
-    ("analyzer/legacy_tailoring.py", "_tailor_impl"): "Zuhair: raw AI reply (moved from routes_resumes.py)",
     ("api/routes_searches.py", "test_search"): "Zuhair: search name",
     ("scraper/orchestrator.py", "run_all"): "Zuhair: search name",
     ("scraper/orchestrator.py", "_run_search_by_id"): "Zuhair: search name",

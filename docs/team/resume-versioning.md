@@ -583,8 +583,8 @@ base is named "Base" (§4.2).
   tailoring module or the extension.
 - **The old `/api/resumes` routes are removed in PR 6** (they took the firm from the session and didn't check the
   candidate). PR 5's routes replace list, open, save and delete; tailoring and the ATS score (`score-check`) are
-  rebuilt in the tailoring module. JobNavigator's tailoring pipeline and score-check are kept, unwired, in
-  `backend/analyzer/legacy_tailoring.py` for it to port (they still read the dropped `json_data`).
+  rebuilt in the tailoring module ([tailoring.md](./tailoring.md)), whose part 2 deleted JobNavigator's old pipeline
+  (`backend/analyzer/legacy_tailoring.py`) on 2026-11-12.
 - **Tailoring prompts** (the old ones) allowed content not in the base. The tailoring module replaces them with the
   handoff's workflow, whose rules and code gate keep every bullet to its own role's lines ([tailoring.md](./tailoring.md)).
 - **`personas`** (a singleton without `firm_id` on firm routes) is a firm-isolation gap, flagged to Abdul; not
