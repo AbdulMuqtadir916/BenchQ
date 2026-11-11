@@ -33,6 +33,19 @@ def safe_url(value) -> str | None:
     return value if re.match(r"(?i)^https?://[^\s/]+", value) and len(value) <= 2048 else None
 
 
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+_CONTROL_BUT_LINES = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+def typed_text(value: str, multiline: bool = False) -> str:
+    """Text a person typed into a request (a search's role): refused when it holds a control character, NUL included,
+    so the request is a 422 before anything is written (Postgres refuses \\u0000; Abdul's review, P2). Accents and
+    other scripts pass. `multiline` lets tab and line breaks through."""
+    if (_CONTROL_BUT_LINES if multiline else _CONTROL).search(value):
+        raise ValueError("no control characters")
+    return value
+
+
 def clean_str(value) -> str | None:
     if not isinstance(value, str):
         return None

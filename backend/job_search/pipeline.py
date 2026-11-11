@@ -1,6 +1,7 @@
 """One job search (job search PR 1, decided 2026-11-10). The route writes the batch `running` (`open_batch`, in the
 request), then runs `run_search` in the background through `job_monitor.launch_background` (job type `job_search`):
 
+    the batch still `running`? no (never saved, or already finished) → nothing, the source isn't asked
     provider.search(query, country, 100)
       fails  → the batch finished as error (code) + ledger entry
       answers → read each job; drop closed and unreadable ones; job_id = sha256(company | title | description)
@@ -64,6 +65,51 @@ def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider) 
     return batch
 
 
+def discard_batch(db, firm_id, batch_id) -> None:
+    """A search whose launch failed: it never started, so its `running` row is deleted (not one of the BDE's attempts,
+    nothing to show). Committed."""
+    db.rollback()
+    scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.batch_id == batch_id, ScrapeJob.state == "running").delete(
+        synchronize_session=False)
+    db.commit()
+
+
+def _fail(db, batch: ScrapeJob, *, code: str, user_id, query: str, country: str, at) -> None:
+    """Finish a running batch as an error: the code in its metadata (what the history shows, before and after) and
+    its ledger entry. Not committed."""
+    batch.state, batch.error, batch.finished_at = "error", f"{code}: {ERROR_MESSAGES[code]}", at
+    batch.meta = {**(batch.meta or {}), "error_code": code}
+    _ledger(db, firm_id=batch.firm_id, candidate_id=batch.candidate_id, user_id=user_id, batch_id=batch.batch_id,
+            query=query, country=country, summary=f"Searched jobs for '{query}': failed ({code})")
+
+
+def expire_lost(db, firm_id, candidate_id, now=None) -> int:
+    """Finish the candidate's lost searches (`running` for longer than `limits.RUNNING_FOR_AT_MOST`: a restart, a dead
+    worker) as `internal` errors, each like any failed search: `error_code` in its metadata and a ledger entry
+    credited to the BDE who started it (Abdul's review, P3). Called by the next search's admission, which holds the
+    candidate row. Flushed, not committed. Returns how many."""
+    now = now or utcnow()
+    lost = scoped(db, ScrapeJob, firm_id).filter(
+        ScrapeJob.candidate_id == candidate_id, ScrapeJob.state == "running",
+        ScrapeJob.created_at < now - limits.RUNNING_FOR_AT_MOST,
+    ).with_for_update().all()
+    for batch in lost:
+        request = (batch.meta or {}).get("request") or {}
+        _fail(db, batch, code="internal", user_id=batch.user_id, query=request.get("query") or "",
+              country=request.get("country") or "", at=now)
+    db.flush()
+    return len(lost)
+
+
+def _still_running(firm_id, candidate_id, batch_id) -> bool:
+    """Whether the task's batch exists and is `running` (a scoped read). False when the route never committed it, or
+    it already finished (marked lost): the task then never asks the source (Abdul's review, P2)."""
+    with SessionLocal() as db:
+        return scoped(db, ScrapeJob, firm_id, ScrapeJob.id).filter(
+            ScrapeJob.candidate_id == candidate_id, ScrapeJob.batch_id == batch_id,
+            ScrapeJob.state == "running").first() is not None
+
+
 def _running_batch(db, firm_id, candidate_id, batch_id) -> ScrapeJob | None:
     """The batch to finish, with its candidate locked; None when it was already finished (marked lost after 15
     minutes), so a late task writes nothing."""
@@ -81,10 +127,7 @@ def _save_error(*, firm_id, candidate_id, user_id, batch_id, query, country, pro
         batch = _running_batch(db, firm_id, candidate_id, batch_id)
         if batch is None:
             return
-        batch.state, batch.error, batch.finished_at = "error", f"{code}: {ERROR_MESSAGES[code]}", utcnow()
-        batch.meta = {**(batch.meta or {}), "request": _request(query, country, provider), "error_code": code}
-        _ledger(db, firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
-                country=country, summary=f"Searched jobs for '{query}': failed ({code})")
+        _fail(db, batch, code=code, user_id=user_id, query=query, country=country, at=utcnow())
         db.commit()
 
 
@@ -155,6 +198,10 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
     marks its `job_runs` row failed."""
     provider = REGISTRY[provider_name]
     started = time.monotonic()
+    if not await asyncio.to_thread(_still_running, firm_id, candidate_id, batch_id):
+        logger.warning("job search batch=%s candidate=%s not running at start; source not asked", batch_id,
+                       candidate_id)
+        return "dropped: the search was no longer running"
     ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
                country=country)
     try:

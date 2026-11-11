@@ -6,8 +6,9 @@
   ones included.
 
 A search's row is `running` while it runs (migration 0022). One left `running` by a restart or a dead worker is marked
-`error` (`internal`) once it is older than `RUNNING_FOR_AT_MOST`: written when the BDE next starts a search
-(`expire_stale`); a read only shows it as that error (`is_lost`), since reads write nothing (a support view reads too).
+`error` (`internal`) once it is older than `RUNNING_FOR_AT_MOST`: written, with its error code and ledger entry, when
+the BDE next starts a search (`pipeline.expire_lost`); a read only shows it as that error (`is_lost`), since reads write
+nothing (a support view reads too).
 It never blocks the candidate.
 
 The day starts at 6:30 PM IST, the start of the BDE's shift, so one night's work is one day."""
@@ -16,7 +17,6 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, text
 
-from backend.job_search.providers.base import ERROR_MESSAGES
 from backend.auth.scoping import scoped
 from backend.models.db import utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
@@ -45,17 +45,6 @@ def next_reset(now: datetime | None = None) -> datetime:
 def jobs_saved_today(db, firm_id, candidate_id, now: datetime | None = None) -> int:
     return scoped(db, JobPosting, firm_id, func.count(JobPosting.id)).filter(
         JobPosting.candidate_id == candidate_id, JobPosting.discovered_at >= day_start(now)).scalar()
-
-
-def expire_stale(db, firm_id, candidate_id, now: datetime | None = None) -> int:
-    """Mark the candidate's lost searches (`running` for longer than RUNNING_FOR_AT_MOST) as `error`. Flushed, not
-    committed. Returns how many."""
-    now = now or utcnow()
-    return scoped(db, ScrapeJob, firm_id).filter(
-        ScrapeJob.candidate_id == candidate_id, ScrapeJob.state == "running",
-        ScrapeJob.created_at < now - RUNNING_FOR_AT_MOST,
-    ).update({ScrapeJob.state: "error", ScrapeJob.error: f"internal: {ERROR_MESSAGES['internal']}",
-              ScrapeJob.finished_at: now}, synchronize_session=False)
 
 
 def is_lost(batch: ScrapeJob, now: datetime | None = None) -> bool:

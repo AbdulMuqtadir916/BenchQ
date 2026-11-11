@@ -1,12 +1,19 @@
 """Abdul's review of job search PR 1 (2026-11-10): a search's run names nothing of the firm's (P1); one BDE's searches
 are admitted one at a time (P2); the provider is a registered platform setting (P2); the demo reset survives a
-search (P3). The `scoped()` reads (P3) are checked by test_firm_scoping_lint.py. A fake provider: no network."""
+search (P3). The `scoped()` reads (P3) are checked by test_firm_scoping_lint.py. His second review (2026-11-11): the
+platform audit shows no search text (P2), a query with a control character is a 422 (P2), a search is committed before
+it is launched and the source is asked only for a running one (P2), a lost search keeps its error code and gets its
+ledger entry (P3); 0022 running again after a downgrade is in test_migration_0022.py. A fake provider: no network."""
+import asyncio
 import threading
 import uuid
 
+import pytest
+
 from backend.job_search import pipeline
 from backend.tests.test_candidates_api import _create, world  # noqa: F401  (the fixture)
-from backend.tests.test_job_search_api import _post, _run, _url, adnans, fake, launched  # noqa: F401
+from backend.tests.test_job_search_api import (_job, _lose, _open, _post, _rows, _run, _url, adnans, fake,  # noqa: F401
+                                               launched)
 
 
 def _at_once(calls):
@@ -93,3 +100,106 @@ def test_the_demo_reset_works_after_a_search(test_db):
     test_db.commit()
     assert test_db.query(ScrapeJob).count() == 0 and test_db.query(JobPosting).count() == 0
     assert test_db.query(Candidate).filter(Candidate.id == candidate_id).first() is None
+
+
+# ── Abdul's second review of PR 1 ────────────────────────────────────────────
+
+def test_the_platform_audit_shows_no_search_text_and_the_firms_ledger_does(api_client, anonymous_client, world, adnans,
+                                                                          fake):
+    """P2: a platform admin reads that a search happened, never its role or country; the firm reads both."""
+    fake.jobs = [_job(1)]
+    batch_id = _open(world, adnans, query="Very Private Role")
+    _run(world, adnans, query="Very Private Role", batch_id=batch_id)
+    audit = api_client.get("/api/admin/audit")
+    assert audit.status_code == 200 and "Very Private Role" not in audit.text and "(US)" not in audit.text
+    entry = next(e for e in audit.json() if e["entity_id"] == str(batch_id))
+    assert (entry["entity_type"], entry["entity_label"]) == ("job_search", "Job search")
+    assert entry["summary"] == "Searched jobs (content restricted)." and entry["actor_user_id"]
+    own = anonymous_client.get(f"/api/firms/{world['firm'].id}/ledger?entity_type=job_search",
+                               headers=world["as"]["owner"]).json()
+    assert any("Very Private Role" in e["summary"] for e in own)
+
+
+@pytest.mark.parametrize("query", ["Java\x00Developer", "Java\nDeveloper", "Java\tDeveloper", "\x07Java", "Java\x7f",
+                                   "Java\u0085Developer"])
+def test_a_query_with_a_control_character_is_a_422_with_nothing_written(anonymous_client, world, adnans, fake,
+                                                                         launched, test_db, query):
+    """P2: NUL (which Postgres refuses in JSONB) and every other control character: 422, no batch, no launch."""
+    r = _post(anonymous_client, world, adnans, query=query)
+    assert r.status_code == 422, r.text
+    batches, _ = _rows(test_db, adnans)
+    assert batches == [] and launched == []
+
+
+@pytest.mark.parametrize("query", ["Développeur Java", "Java/C++ (Senior) – Remote", "डेटा इंजीनियर"])
+def test_ordinary_text_in_any_script_still_searches(anonymous_client, world, adnans, fake, launched, query):
+    assert _post(anonymous_client, world, adnans, query=query).status_code == 202
+
+
+def test_the_search_is_committed_before_it_is_launched(anonymous_client, world, adnans, fake, monkeypatch):
+    """P2: when the launcher is called, another session already reads the batch `running`."""
+    from backend.api import routes_job_search
+    from backend.models.db import SessionLocal
+    from backend.models.job_search import ScrapeJob
+    seen = []
+
+    def launch(job_type, func, scope_key=None, func_kwargs=None, **kw):
+        with SessionLocal() as db:
+            seen.append(db.query(ScrapeJob.state).filter(ScrapeJob.batch_id == func_kwargs["batch_id"]).scalar())
+        return str(uuid.uuid4())
+    monkeypatch.setattr(routes_job_search, "launch_background", launch)
+    assert _post(anonymous_client, world, adnans).status_code == 202
+    assert seen == ["running"]
+
+
+def test_a_launch_that_fails_leaves_no_search_behind(anonymous_client, world, adnans, fake, monkeypatch, test_db):
+    """P2: the launcher failing is a 503; the row is gone, so it isn't an attempt and doesn't block the next one."""
+    from backend.api import routes_job_search
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the job_runs insert failed")
+    monkeypatch.setattr(routes_job_search, "launch_background", broken)
+    assert _post(anonymous_client, world, adnans).status_code == 503
+    batches, _ = _rows(test_db, adnans)
+    assert batches == []
+    monkeypatch.setattr(routes_job_search, "launch_background", lambda *a, **k: str(uuid.uuid4()))
+    assert _post(anonymous_client, world, adnans).status_code == 202
+
+
+def test_a_task_whose_search_was_never_saved_does_not_ask_the_source(world, adnans, fake):
+    """P2: the task checks its batch (a scoped read) before calling the provider."""
+    result = asyncio.run(pipeline.run_search(
+        firm_id=world["firm"].id, candidate_id=uuid.UUID(adnans["id"]), user_id=world["people"]["adnan"].id,
+        batch_id=uuid.uuid4(), query="Java Developer", country="us", provider_name="fake"))
+    assert result == "dropped: the search was no longer running" and fake.calls == []
+
+
+def test_a_task_whose_search_was_marked_lost_does_not_ask_the_source(anonymous_client, world, adnans, fake, launched,
+                                                                     test_db):
+    lost = _open(world, adnans)
+    _lose(test_db, lost)
+    assert _post(anonymous_client, world, adnans).status_code == 202          # marks it lost
+    assert _run(world, adnans, batch_id=lost) == "dropped: the search was no longer running"
+    assert fake.calls == []
+
+
+def test_a_lost_search_keeps_its_error_code_and_gets_its_ledger_entry(anonymous_client, world, adnans, fake, launched,
+                                                                      test_db):
+    """P3: before and after it is written, the history says `error` / `internal`; one ledger entry, credited to the
+    BDE who started it."""
+    from backend.models.tenancy import LedgerEntry
+    lost = _open(world, adnans)
+    _lose(test_db, lost)
+
+    def shown():
+        body = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["owner"]).json()
+        row = next(s for s in body["searches"] if s["batch_id"] == str(lost))
+        return row["state"], row["error_code"]
+    assert shown() == ("error", "internal")
+    assert _post(anonymous_client, world, adnans).status_code == 202          # writes it
+    assert shown() == ("error", "internal")
+    test_db.expire_all()
+    (entry,) = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "job_search",
+                                                 LedgerEntry.entity_id == str(lost)).all()
+    assert entry.actor_user_id == world["people"]["adnan"].id and "failed (internal)" in entry.summary
+    assert entry.candidate_id == uuid.UUID(adnans["id"])

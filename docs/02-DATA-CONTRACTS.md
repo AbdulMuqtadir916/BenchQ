@@ -1256,7 +1256,8 @@ export const JobMarkSchema = z.object({
 - **The search pipeline (job search PR 1, decided 2026-11-10):**
   - **Who:** only the candidate's assigned BDE (`job.search`, BDE role, plus `bde_id` = the user: `can_search_jobs`);
     nobody while the candidate has no BDE. Reads: anyone who can see the candidate.
-  - **Input:** `query` (1–100 characters, one role per search). The country is the candidate's résumé country
+  - **Input:** `query` (1–100 characters, one role per search, no control characters: NUL, tab or a line break
+    inside it is 422 with nothing written; Abdul's second review, P2). The country is the candidate's résumé country
     (`Candidate.country`: the active base, newest version) mapped to `us` / `ca` / `in`; empty or anything else is
     422, never a default.
   - **Provider:** a registry by name; the active one is the global setting `job_search_provider` (default
@@ -1264,8 +1265,10 @@ export const JobMarkSchema = z.object({
     provider. Every search asks for 100 jobs. One call: 20 s limit, one retry after 2 s on a timeout, a dropped
     connection, 5xx or 429; 5 MB cap; no redirects. Error codes: `timeout`, `provider_unavailable`,
     `provider_rejected`, `bad_response`, `too_large`, `internal`.
-  - **Background:** `POST` writes the batch `running` and returns 202 `{batch_id, run_id}`; the search runs through
-    `job_monitor.launch_background` (four at once per worker) and finishes the batch. One search per candidate at a
+  - **Background:** `POST` commits the batch `running`, then launches the search through
+    `job_monitor.launch_background` (four at once per worker) and returns 202 `{batch_id, run_id}`; a launch that
+    fails deletes the batch (503, not an attempt). The task asks the source only while its batch exists and is
+    `running` (Abdul's second review, P2), and finishes it. One search per candidate at a
     time (409), checked from the `running` row with the candidate row locked, so it holds across workers. The BDE
     is locked too (a Postgres advisory lock on their id, after the candidate), so two of their searches for
     different candidates count the 20 attempts in turn (Abdul's review, P2).
@@ -1275,7 +1278,10 @@ export const JobMarkSchema = z.object({
   - **Saving:** closed and unreadable jobs (no title, company or description) and repeats within the reply are
     dropped. One transaction with the candidate row locked: the `scrape_jobs` row, then each job — one the candidate
     has gets `batch_id`, `last_seen_at`, `content` and `source` replaced (`discovered_at` kept); a new one is inserted
-    while there is room — then one ledger entry (`CREATE`, entity `job_search`, every outcome).
+    while there is room — then one ledger entry (`CREATE`, entity `job_search`, every outcome: success, empty,
+    error, and a lost search when it is written as `internal`, with its `error_code`, credited to the BDE who started
+    it). The firm's ledger shows the role and country; a platform admin's (the audit, a support view) shows
+    "Searched jobs (content restricted)." (`ledger_entry_json`, Abdul's second review, P2).
   - **Routes** (`backend/api/routes_job_search.py`, under `/api/firms/{firm_id}/candidates/{candidate_id}`):
     `POST /job-searches`, `GET /job-searches` (`running`, `searches` newest first, `usage`: `jobs_saved_today`,
     `jobs_cap`, `attempts_today`, `attempts_cap`, `resets_at`), `GET /job-postings?page=&size=` (newest first,
