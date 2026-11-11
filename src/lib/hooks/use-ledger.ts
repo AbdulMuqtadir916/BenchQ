@@ -45,15 +45,3 @@ export function useLedgerDays(filters: LedgerFilters, options: { isEnabled: bool
     enabled: options.isEnabled,
   });
 }
-
-/**
- * The whole ledger, for the screen that shows all of it (BUG-022): `data.items`, newest first, and `data.hasMore` when entries
- * remain beyond the cap (see `ledgerApi.listAll`).
- */
-export function useLedgerAll(params?: Omit<LedgerQuery, "limit" | "offset">) {
-  const firmId = useFirmId();
-  return useQuery({
-    queryKey: queryKeys.ledger.whole(firmId, params),
-    queryFn: () => ledgerApi.listAll(firmId, params),
-  });
-}
