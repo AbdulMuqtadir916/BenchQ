@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import hosts from "./hosts.json" with { type: "json" };
-import { buildManifest, KNOWN_SITES, storeProblem } from "./manifest.ts";
+import { buildManifest, KNOWN_SITES, storeProblem } from "./manifest";
 
 const STORE = { benchqUrl: "https://app.benchq.test", isStore: true };
 

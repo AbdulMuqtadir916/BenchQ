@@ -41,7 +41,10 @@ export function fakeChrome() {
       onActivated: new FakeEvent(), onUpdated: new FakeEvent(), onRemoved: new FakeEvent(), onReplaced: new FakeEvent(),
     },
     // Every site is allowed unless a test says otherwise.
-    permissions: { contains: vi.fn(async (_: { origins: string[] }) => true), request: vi.fn(async (_: { origins: string[] }) => true) },
+    permissions: {
+      contains: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(async () => true),
+      request: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(async () => true),
+    },
     windows: { getCurrent: vi.fn(async () => ({ id: 1 })), update: vi.fn(async () => undefined) },
     scripting: { executeScript: vi.fn(async (): Promise<unknown[]> => []) },
     storage: {
