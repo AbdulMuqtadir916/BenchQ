@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getResumeAnswers, getResumeFile, saveResumeAnswers } from "../api";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
+import { confirmationKey } from "./job-check";
 import { fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills, type TabScan } from "./tab-bridge";
 import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, TabField } from "./types";
 import { forgetTabs, useAutofill } from "./use-autofill";
@@ -295,12 +296,21 @@ describe("the job check", () => {
     expect(fillField).not.toHaveBeenCalled();
   });
 
-  it("lets the BDE carry on after confirming the host", async () => {
+  it("lets the BDE carry on after confirming the job", async () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")], elsewhere));
-    await mount({ ...connection, confirmedHosts: ["other.test"] });
+    await mount({ ...connection, confirmedHosts: [confirmationKey(elsewhere.url, "Data Analyst")] });
     expect(hook.needsConfirmation).toBe(false);
+    expect(hook.confirmKey).toBe("other.test · Data Analyst");
     await run(() => hook.autofill());
     expect(fillField).toHaveBeenCalled();
+  });
+
+  it("asks again for another job on a site where the BDE confirmed one", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")], elsewhere));
+    await mount({ ...connection, confirmedHosts: [confirmationKey(elsewhere.url, "Product Manager")] });
+    expect(hook.needsConfirmation).toBe(true);
+    await run(() => hook.autofill());
+    expect(fillField).not.toHaveBeenCalled();
   });
 });
 
@@ -721,6 +731,27 @@ describe("the next page of a form (07 Q4)", () => {
     await moveOn(page([field("a", "Email", "text", "priya@example.test"), field("b", "City", "text", "Phoenix"), field("n", "Nickname"), field("s", "Do you need sponsorship?")]));
     await wait(50);
     expect(fillField).not.toHaveBeenCalled();
+  });
+
+  it("fills the next page of a job the BDE confirmed", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City")], elsewhere));
+    await mount({ ...connection, confirmedHosts: [confirmationKey(elsewhere.url, "Data Analyst")] });
+    await run(() => hook.autofill());
+    vi.mocked(fillField).mockClear();
+    await moveOn(page(nextPage.fields, elsewhere));
+    await wait(50);
+    expect(filledIds()).toEqual(["s"]);
+  });
+
+  it("waits for the BDE when the next page shows another job on a site where they confirmed one", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City")], elsewhere));
+    await mount({ ...connection, confirmedHosts: [confirmationKey(elsewhere.url, "Data Analyst")] });
+    await run(() => hook.autofill());
+    vi.mocked(fillField).mockClear();
+    await moveOn(page(nextPage.fields, { ...elsewhere, heading: "Product Manager" }));
+    await wait(50);
+    expect(fillField).not.toHaveBeenCalled();
+    expect(hook.needsConfirmation).toBe(true);
   });
 
   it("stops after Undo, until the BDE runs Autofill again", async () => {

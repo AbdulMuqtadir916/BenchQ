@@ -158,7 +158,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     if (select.getAttribute("aria-expanded") === "true") select.focus();
     else select.click();
   };
-  const confirmHost = () => void sendToBackground({ type: "confirm-host", tabId, host: state.host });
+  const confirmHost = () => void sendToBackground({ type: "confirm-host", tabId, host: state.confirmKey });
   const apply = async () => {
     setIsCollecting(true);
     const form = await state.finalForm();

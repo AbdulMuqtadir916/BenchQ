@@ -125,6 +125,8 @@ export type Connection = {
   candidateId: string;
   userId: string;
   job: JobSummary;
+  /** The jobs the BDE confirmed with "It's the right job", each as its site and the job the page showed
+   * (`confirmationKey`). */
   confirmedHosts: string[];
 };
 
@@ -136,6 +138,7 @@ export type PanelMessage =
   | { type: "connect-tab"; connection: NewConnection; tabId: number }
   | { type: "disconnect-tab"; tabId: number }
   | { type: "disconnect-job"; applicationId: string }
+  /** `host`: the confirmed job's `confirmationKey`, its site and the job the page showed. */
   | { type: "confirm-host"; tabId: number; host: string }
   | { type: "clear-connections" };
 

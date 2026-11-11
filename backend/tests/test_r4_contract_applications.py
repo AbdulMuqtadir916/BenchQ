@@ -1,93 +1,45 @@
-"""R4-T1 · /api/applications contract: bad input, duplicate submits, status order.
+"""R4-T1 · /api/applications contract: bad input, the retired hand log, status order.
 
-The status machine is the interesting part: transitions are recorded by
-`record_transition()` and drive the Stats funnel + Sankey, so an out-of-order or
-backwards move writes a real edge into the chart.
+The status machine is the interesting part: every application is a candidate's since migration 0025, so a move is the
+candidate status command (`backend/applications/tracking.py`), whose transitions drive the Stats funnel + Sankey: an
+out-of-order or backwards move writes a real edge into the chart.
 """
 import pytest
 
+from backend.tests.firm_support import default_firm_id
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
     make_job, big_string, EMOJI, MISSING_UUID,
 )
 
-VALID = ["applied", "interview", "offer", "rejected"]
-
-
-def _create(client, **kw):
-    body = {"title": "Senior PM", "company": "Acme", "url": "https://x.com/jobs/1"}
-    body.update(kw)
-    return client.post("/api/applications", json=body)
-
-
 # ── POST /api/applications ───────────────────────────────────────────────────
+# Logging a job with no candidate (the old pool's hand log) is retired (the add-job plan, 2026-11-11): its body is still
+# read, so an old client gets 410 and the reason, never a 500 and never a row. Adding a job for a candidate is
+# test_applications_on_postings.py's.
 
 @pytest.mark.parametrize("body", [
     {}, {"title": "T"}, {"title": "T", "company": "C"},
     {"company": "C", "url": "u"}, {"title": "T", "url": "u"},
     {"title": None, "company": "C", "url": "u"},
+    {"title": "", "company": "", "url": ""},
+    {"title": EMOJI, "company": "Señor 中文", "url": "https://x.com/jobs/1"},
+    {"title": "T", "company": "C", "url": "https://x.com/1?utm_source=li#top", "status": "banana",
+     "applied_at": "2026-13-45", "id": MISSING_UUID, "status_transitions": [{"from": "offer", "to": "applied"}]},
+])
+def test_the_retired_hand_log_is_410_and_writes_nothing(client, test_db, body):
+    from backend.models.db import Application, Job
+    r = assert_clean(client.post("/api/applications", json=body), 410)
+    assert "retired" in r.json()["detail"]
+    assert test_db.query(Application).count() == 0
+    assert test_db.query(Job).count() == 0
+
+
+@pytest.mark.parametrize("body", [
     {"title": 5, "company": "C", "url": "u"},
     {"title": ["T"], "company": "C", "url": "u"},
 ])
-def test_create_application_requires_the_three_fields(client, body):
+def test_create_application_wrong_field_types_are_422(client, body):
     assert_clean(client.post("/api/applications", json=body), 422)
-
-
-def test_create_application_accepts_empty_strings(client):
-    """Current contract: `str` with no min_length, so "" is a legal title."""
-    r = assert_clean(client.post("/api/applications",
-                                json={"title": "", "company": "", "url": ""}), 200)
-    assert r.json()["title"] == ""
-
-
-def test_create_application_unicode_round_trips(client):
-    r = assert_clean(_create(client, title=EMOJI, company="Señor 中文"), 200)
-    assert r.json()["title"] == EMOJI
-
-
-def test_create_application_duplicate_is_409_with_the_existing_id(client):
-    first = assert_clean(_create(client), 200)
-    dup = assert_clean(_create(client), 409)
-    detail = dup.json()["detail"]
-    assert detail["application_id"] == first.json()["id"]
-
-
-def test_create_application_duplicate_via_a_different_url_spelling_is_409(client):
-    """Dedup runs on the normalised URL, so tracking noise must not open a second row."""
-    assert_clean(_create(client, url="https://x.com/jobs/1"), 200)
-    assert_clean(_create(client, url="https://x.com/jobs/1?utm_source=li#top"), 409)
-
-
-def test_create_application_duplicate_does_not_leave_a_half_written_job(client, test_db):
-    from backend.models.db import Job, Application
-    _create(client)
-    _create(client)
-    assert test_db.query(Job).count() == 1
-    assert test_db.query(Application).count() == 1
-
-
-@pytest.mark.parametrize("status", VALID)
-def test_create_application_seeds_the_first_funnel_edge(client, test_db, status):
-    from backend.models.db import Application
-    r = assert_clean(_create(client, status=status, url=f"https://x.com/jobs/{status}"), 200)
-    app = test_db.query(Application).filter(Application.id == r.json()["id"]).first()
-    assert app.status_transitions[0] == {
-        "from": None, "to": status,
-        "at": app.status_transitions[0]["at"], "source": "ui",
-    }
-
-
-def test_create_application_unknown_status_falls_back_to_applied(client):
-    r = assert_clean(_create(client, status="banana"), 200)
-    assert r.json()["status"] == "applied"
-
-
-@pytest.mark.parametrize("value", ["", "not-a-date", "2026-13-45", "99999-01-01", 12345])
-def test_create_application_unparseable_applied_at_is_ignored(client, value):
-    r = client.post("/api/applications", json={
-        "title": "T", "company": "C", "url": f"https://x.com/{value}", "applied_at": value,
-    })
-    assert_clean(r, 200, 422)
 
 
 def test_create_application_ten_megabyte_notes(client):
@@ -102,19 +54,32 @@ def test_create_application_non_object_body_is_422(client, body):
     assert_clean(client.post("/api/applications", json=body), 422)
 
 
-def test_create_application_ignores_unknown_fields(client):
-    """Pydantic default is extra='ignore' — a stray key must not reach the model."""
-    r = assert_clean(client.post("/api/applications", json={
-        "title": "T", "company": "C", "url": "https://x.com/1", "id": MISSING_UUID,
-        "status_transitions": [{"from": "offer", "to": "applied"}],
-    }), 200)
-    assert r.json()["id"] != MISSING_UUID
-
-
 # ── PATCH /api/applications/{id} ─────────────────────────────────────────────
 
 def _app_id(client):
-    return _create(client).json()["id"]
+    """A candidate's Applied application on a posting of theirs (what an application is since migration 0025), with
+    its first funnel edge."""
+    from backend.models.db import Application, SessionLocal, utcnow
+    from backend.tests.posting_support import posting_for
+    from backend.tests.r4_support import make_resume
+    db = SessionLocal()
+    try:
+        candidate_id = make_resume(db, name="Contract candidate").candidate_id
+        firm_id = default_firm_id(db)
+        posting = posting_for(db, firm_id, candidate_id, title="Senior PM", company="Acme", url="https://x.com/jobs/1")
+        app = Application(firm_id=firm_id, candidate_id=candidate_id, job_id=posting.id, status="applied",
+                          status_transitions=[{"from": None, "to": "applied", "at": utcnow().isoformat(),
+                                               "source": "ui"}])
+        db.add(app)
+        db.commit()
+        return str(app.id)
+    finally:
+        db.close()
+
+
+def _move(client, aid, status, revision):
+    """The candidate status command: a move names the revision it was decided on."""
+    return client.patch(f"/api/applications/{aid}", json={"status": status, "expected_revision": revision})
 
 
 def test_patch_application_missing_id_is_404(client):
@@ -128,37 +93,34 @@ def test_patch_application_rejects_an_unknown_status(client, bad):
 
 
 @pytest.mark.parametrize("bad", [["applied"], {"to": "applied"}])
-@pytest.mark.xfail(strict=True, reason="R4-T1-16")
 def test_patch_application_rejects_an_unhashable_status(client, bad):
-    """`updates["status"] not in VALID_STATUSES` raises TypeError for a list/dict."""
+    """A list or object status is a 400, not a TypeError (R4-T1-16): the candidate status command checks its type."""
     aid = _app_id(client)
     assert client.patch(f"/api/applications/{aid}", json={"status": bad}).status_code == 400
 
 
-def test_patch_application_error_lists_the_legal_statuses(client):
+def test_patch_application_unknown_status_error_says_so(client):
     aid = _app_id(client)
-    r = client.patch(f"/api/applications/{aid}", json={"status": "banana"})
-    assert sorted(VALID) == sorted(
-        [s.strip(" '") for s in r.json()["detail"].split("[")[1].split("]")[0].split(",")]
-    )
+    r = _move(client, aid, "banana", 0)
+    assert r.json()["detail"] == "Unsupported candidate application status."
 
 
 def test_patch_application_forward_transition_records_an_edge(client, test_db):
     from backend.models.db import Application
     aid = _app_id(client)
-    assert_clean(client.patch(f"/api/applications/{aid}", json={"status": "interview"}), 200)
+    assert_clean(_move(client, aid, "interview_scheduled", 0), 200)
     app = test_db.query(Application).filter(Application.id == aid).first()
     test_db.refresh(app)
-    assert app.status == "interview"
+    assert app.status == "interview_scheduled"
     assert app.status_transitions[-1]["from"] == "applied"
-    assert app.status_transitions[-1]["to"] == "interview"
+    assert app.status_transitions[-1]["to"] == "interview_scheduled"
 
 
 def test_patch_application_same_status_twice_records_one_edge(client, test_db):
     from backend.models.db import Application
     aid = _app_id(client)
-    client.patch(f"/api/applications/{aid}", json={"status": "interview"})
-    client.patch(f"/api/applications/{aid}", json={"status": "interview"})
+    _move(client, aid, "interview_scheduled", 0)
+    _move(client, aid, "interview_scheduled", 1)
     app = test_db.query(Application).filter(Application.id == aid).first()
     test_db.refresh(app)
     assert len(app.status_transitions) == 2   # seed edge + one move
@@ -168,21 +130,20 @@ def test_patch_application_backwards_transition_is_allowed_and_logged(client, te
     """Current contract: the funnel has no ordering guard — offer -> applied is legal."""
     from backend.models.db import Application
     aid = _app_id(client)
-    client.patch(f"/api/applications/{aid}", json={"status": "offer"})
-    assert_clean(client.patch(f"/api/applications/{aid}", json={"status": "applied"}), 200)
+    _move(client, aid, "offer", 0)
+    assert_clean(_move(client, aid, "applied", 1), 200)
     app = test_db.query(Application).filter(Application.id == aid).first()
     test_db.refresh(app)
-    assert app.status_transitions[-1] == {
-        "from": "offer", "to": "applied",
-        "at": app.status_transitions[-1]["at"], "source": "ui",
-    }
+    last = app.status_transitions[-1]
+    assert {key: last[key] for key in ("from", "to", "source")} == {"from": "offer", "to": "applied", "source": "ui"}
+    assert last["at"]
 
 
 def test_patch_application_out_of_order_skips_a_stage(client, test_db):
     """applied -> offer with no interview: allowed, and one edge, not two."""
     from backend.models.db import Application
     aid = _app_id(client)
-    client.patch(f"/api/applications/{aid}", json={"status": "offer"})
+    _move(client, aid, "offer", 0)
     app = test_db.query(Application).filter(Application.id == aid).first()
     test_db.refresh(app)
     assert [t["to"] for t in app.status_transitions] == ["applied", "offer"]
@@ -190,25 +151,27 @@ def test_patch_application_out_of_order_skips_a_stage(client, test_db):
 
 @pytest.mark.xfail(strict=True, reason="R4-T1-15")
 def test_patch_application_cannot_leave_a_terminal_rejected_state_silently(client):
-    """Reviving a rejected application should be an explicit reopen, not a plain PATCH.
+    """Reviving a closed application should be an explicit reopen, not a plain PATCH.
 
-    Today it just writes a rejected -> interview edge into the Sankey.
+    Today it just writes a move_on -> interview_scheduled edge into the Sankey.
     """
     aid = _app_id(client)
-    client.patch(f"/api/applications/{aid}", json={"status": "rejected"})
-    r = client.patch(f"/api/applications/{aid}", json={"status": "interview"})
+    _move(client, aid, "move_on", 0)
+    r = _move(client, aid, "interview_scheduled", 1)
     assert r.status_code == 409
 
 
-def test_patch_application_drops_keys_outside_the_allow_list(client, test_db):
+def test_patch_application_refuses_keys_outside_the_status_command(client, test_db):
+    """A candidate's application changes only through its status command or its notes: any other key is a 400, and
+    nothing is written."""
     from backend.models.db import Application
     aid = _app_id(client)
     assert_clean(client.patch(f"/api/applications/{aid}",
                              json={"job_id": MISSING_UUID, "id": MISSING_UUID,
-                                   "status_transitions": [], "notes": "kept"}), 200)
+                                   "status_transitions": [], "notes": "kept"}), 400)
     app = test_db.query(Application).filter(Application.id == aid).first()
     test_db.refresh(app)
-    assert app.notes == "kept"
+    assert app.notes is None
     assert str(app.id) == aid
     assert app.status_transitions != []
 
@@ -236,19 +199,13 @@ def test_delete_application_missing_id_is_404(client):
     assert_clean(client.delete(f"/api/applications/{MISSING_UUID}"), 404)
 
 
-def test_delete_application_releases_the_job(client, test_db):
-    from backend.models.db import Job
+def test_delete_application_is_refused_for_a_candidates_application(client, test_db):
+    """A candidate's application leaves through Saved (unfavorite) or a status move, never a delete."""
+    from backend.models.db import Application
     aid = _app_id(client)
-    assert_clean(client.delete(f"/api/applications/{aid}"), 200)
-    job = test_db.query(Job).first()
-    test_db.refresh(job)
-    assert job.status == "saved"
-
-
-def test_delete_application_twice_is_404_the_second_time(client):
-    aid = _app_id(client)
-    assert_clean(client.delete(f"/api/applications/{aid}"), 200)
-    assert_clean(client.delete(f"/api/applications/{aid}"), 404)
+    assert_clean(client.delete(f"/api/applications/{aid}"), 409)
+    assert_clean(client.delete(f"/api/applications/{aid}"), 409)
+    assert test_db.query(Application).filter(Application.id == aid).count() == 1
 
 
 # ── Listing ──────────────────────────────────────────────────────────────────

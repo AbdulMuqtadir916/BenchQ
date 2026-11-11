@@ -30,6 +30,9 @@ class Case:
     upload: bool = False
     # Only the candidate's BDE takes it (07 Q55): firm B's own call is made as its BDE, not its OWNER.
     as_bde: bool = False
+    # Refused even for the firm's own rows, with this status (a candidate's application is never deleted: 409). Firm
+    # B's own call gets it rather than getting through; still not the 404 firm A gets, so that one is isolation.
+    refused: int | None = None
     # Optional action preconditions, applied independently to each tenant before assertions.
     prepare: Callable | None = None
 
@@ -147,14 +150,17 @@ CASES: dict[str, Case] = {
     "GET /api/applications": Case(shows_rows=True),
     "GET /api/applications/{app_id}": Case(),
     "PATCH /api/applications/{app_id}/review": Case(path={"app_id": "review_app"}, body=lambda i: {"review_id": str(i["review"]), "status": "assessment", "expected_revision": 0, "expected_review_revision": 0}),
-    "POST /api/applications": Case(body=lambda i: {"title": "Logged role", "company": "Logged Co", "url": _new("logged")}),
+    "POST /api/applications": Case(body=lambda i: {"candidate_id": str(i["candidate"]), "job": {
+        "source": "manual", "title": "Added role", "company": "Added Co", "description": "The added role's text.",
+        "url": _new("added")}}, body_ids=True, as_bde=True),
     "POST /api/applications/extract": Case(body=lambda i: {"url": _new("posting")}),
     "PATCH /api/applications/{app_id}/candidate-status": Case(body=lambda i: {"status": "saved", "expected_revision": 0}),
     "PATCH /api/applications/{app_id}": Case(body=lambda i: {"notes": "Edited"}),
-    "DELETE /api/applications/{app_id}": Case(path={"app_id": "legacy_app"}),
+    "DELETE /api/applications/{app_id}": Case(path={"app_id": "legacy_app"}, refused=409),
     "POST /api/applications/bulk-update": Case(body=lambda i: {"ids": [str(i["app"])], "status": "interview_scheduled", "expected_revisions": {str(i["app"]): 0}},
                                                body_ids=True, bulk=True),
-    "POST /api/applications/bulk-delete": Case(body=lambda i: {"ids": [str(i["legacy_app"])]}, body_ids=True, bulk=True),
+    "POST /api/applications/bulk-delete": Case(body=lambda i: {"ids": [str(i["legacy_app"])]}, body_ids=True, bulk=True,
+                                               refused=409),
     "GET /api/applications/{app_id}/prep": Case(),
     "POST /api/applications/{app_id}/interviews": Case(body=lambda i: {"what": "Panel"}),
     "PATCH /api/applications/interviews/{interview_id}": Case(body=lambda i: {"what": "Panel two"}),

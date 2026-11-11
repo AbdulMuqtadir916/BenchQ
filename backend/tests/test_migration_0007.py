@@ -8,6 +8,7 @@ from backend.models.db import Application, Job, Search, utcnow
 from backend.models.tenancy import Firm, LedgerEntry, User
 from backend.tests.auth_support import make_user
 from backend.tests.resume_support import make_version
+from backend.tests.posting_support import posting_for
 
 
 @pytest.fixture
@@ -45,13 +46,15 @@ def _ids(world):
 def test_one_application_per_candidate_per_job_with_the_tailored_resume(test_db, world):
     tailored = make_version(test_db, world["firm"].id, candidate=world["candidate"], category="TAILORED",
                             job_id=world["job"].id, name="Tailored")
-    app = dict(firm_id=world["firm"].id, job_id=world["job"].id, candidate_id=world["candidate"].id)
+    posting = posting_for(test_db, world["firm"].id, world["candidate"].id,
+                         title=world["job"].title, company=world["job"].company,
+                         url=world["job"].url, old_job_id=world["job"].id)
+    app = dict(firm_id=world["firm"].id, job_id=posting.id, candidate_id=world["candidate"].id)
     test_db.add(Application(**app, resume_id=tailored.id, submitted_by_user_id=world["bde"].id))
     test_db.flush()
     _refused(test_db, Application(**app), "uq_applications_candidate_job")
-    # Rows from before 0007 have no candidate and aren't held to it.
-    test_db.add_all([Application(firm_id=world["firm"].id, job_id=world["job"].id) for _ in range(2)])
-    test_db.flush()
+    # Since 0025 every application has a candidate; old rows are handled by the migration, not written at head.
+    _refused(test_db, Application(firm_id=world["firm"].id, job_id=posting.id), "candidate_id")
 
 
 def test_jobs_found_and_favorites_are_per_candidate(test_db, world):

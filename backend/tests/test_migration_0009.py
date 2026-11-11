@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.tests.auth_support import seed_accounts
 from backend.tests.isolation_support import make_world
+from backend.tests.migration_support import down_to_0024
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401
 
 
@@ -32,7 +33,8 @@ def test_tracking_upgrade_and_rollback_preserve_legacy_status_and_history(scratc
                      {"id": application_id, "firm": DEFAULT_FIRM_ID, "job": job_id, "history": json.dumps(history)})
 
     for _ in range(2):
-        _ok(_alembic(name, "upgrade", "head"))
+        # A row from before 0007 has no candidate, so it goes no higher than 0024: 0025 refuses an application without.
+        _ok(_alembic(name, "upgrade", "0024"))
         with engine.connect() as conn:
             app = conn.execute(text("SELECT status, status_transitions, status_revision, last_manual_change_at "
                                     "FROM applications WHERE id=:id"), {"id": application_id}).mappings().one()
@@ -64,6 +66,7 @@ def test_tracking_downgrade_refuses_to_discard_pending_reviews(scratch_db):
         from backend.models.candidates import CandidateGoogleOAuthAttempt
         db.query(CandidateGoogleOAuthAttempt).delete()
         db.commit()
+    down_to_0024(name, engine)      # past 0024 the applications name their old jobs again
     with engine.connect() as conn:
         count = conn.execute(text("SELECT count(*) FROM application_reviews")).scalar_one()
         starting_revision = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getResumeAnswers, getResumeFile, isSessionExpired, saveResumeAnswers } from "../api";
 import { withResumeFile } from "./documents";
 import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./form-memory";
-import { checkJob, hostOf } from "./job-check";
+import { checkJob, confirmationKey, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
 import { answersFromResume, historyOf, type HistoryRecords } from "./resume-answers";
 import { buildReview, suggestedRow, typeOf, withHistory } from "./review";
@@ -414,7 +414,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
 
   const check = useMemo(() => checkJob(job, signals), [job, signals]);
   const host = signals ? hostOf(signals.url) : "";
-  const needsConfirmation = check.conflict && !confirmedHosts.includes(host);
+  const confirmKey = signals ? confirmationKey(signals.url, check.detected) : "";
+  const needsConfirmation = check.conflict && !confirmedHosts.includes(confirmKey);
 
   const targets = useMemo(() => (rows ?? []).filter((row): row is FillableRow =>
     row.status === "ready" && Boolean(row.write)), [rows]);
@@ -684,7 +685,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     }
     await scan(undefined, true);
     const page = latestSignals.current;
-    const isOtherJob = page !== null && checkJob(job, page).conflict && !confirmedHosts.includes(hostOf(page.url));
+    const pageCheck = page === null ? null : checkJob(job, page);
+    const isOtherJob = page !== null && pageCheck !== null && pageCheck.conflict
+      && !confirmedHosts.includes(confirmationKey(page.url, pageCheck.detected));
     if (isOtherJob) return;
     if (memory.current.autoSteps && !busy.current && (shownRows.current ?? []).some(isFillable)) await autofill();
   }, [autofill, confirmedHosts, job, scan, settle]);
@@ -795,7 +798,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
 
   return {
     rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, reviewedFor, attachment, attachedFile, step, isFollowingSteps,
-    needsConfirmation, fillCount: targets.length, staleCount: (rows ?? []).filter((row) => row.isStale).length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
+    needsConfirmation, confirmKey, fillCount: targets.length, staleCount: (rows ?? []).filter((row) => row.isStale).length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
     saveAnswer,
   };
 }

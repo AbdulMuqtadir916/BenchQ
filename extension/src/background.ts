@@ -1,5 +1,5 @@
 import { connectionKey } from "./autofill/connection-store";
-import { hostOf } from "./autofill/job-check";
+import { hostOf, isConfirmedHost } from "./autofill/job-check";
 import type { Connection, NewConnection, PanelMessage, PanelReply, ShortcutCommand, ShortcutMessage } from "./autofill/types";
 
 /** The one writer of tab connections. It keeps them in session storage, because Chrome can stop this worker at any
@@ -124,6 +124,6 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, frameId, url, transitionT
   void readConnection(tabId).then((connection) => {
     if (!connection) return;
     const host = hostOf(url);
-    if (host !== hostOf(connection.job.url) && !connection.confirmedHosts.includes(host)) void removeConnection(tabId);
+    if (host !== hostOf(connection.job.url) && !isConfirmedHost(connection.confirmedHosts, host)) void removeConnection(tabId);
   });
 });

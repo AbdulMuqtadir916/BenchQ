@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from backend.auth.scoping import writer_firm_id
 from backend.auth.sessions import Principal
-from backend.models.db import Application, CoverLetter, Job, Resume, Search
+from backend.models.db import CoverLetter, Job, Resume, Search
 from backend.models.tenancy import DEFAULT_FIRM_ID, FirmJob
 
 
@@ -21,16 +21,6 @@ def test_a_platform_admin_cannot_write_firm_data():
     with pytest.raises(HTTPException) as err:
         writer_firm_id(admin)
     assert err.value.status_code == 403
-
-
-def test_a_logged_application_belongs_to_the_users_firm(api_client, accounts, test_db):
-    resp = api_client.post("/api/applications", json={"title": "Engineer", "company": "Acme",
-                                                      "url": "https://acme.test/jobs/1"})
-    assert resp.status_code in (200, 201), resp.text
-    app = test_db.query(Application).one()
-    assert app.firm_id == accounts.firm_id
-    [link] = _links(test_db, app.job_id)
-    assert (link.firm_id, link.origin, link.captured_by_user_id) == (accounts.firm_id, "CAPTURED", accounts.user_id)
 
 
 def test_a_hand_added_job_is_captured_by_the_user(api_client, accounts, test_db):

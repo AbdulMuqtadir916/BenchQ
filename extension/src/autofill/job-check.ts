@@ -17,6 +17,14 @@ function parsed(url: string): URL | null {
 export const hostOf = (url: string) => parsed(url)?.hostname.replace(/^www\./, "") ?? "";
 const pathOf = (url: string) => parsed(url)?.pathname ?? "";
 
+/** What "It's the right job" confirms: the job a page shows (`JobCheck.detected`), on its site. Another job on that
+ * site, as on a job board many employers share, asks again. */
+export const confirmationKey = (url: string, detected: string) => `${hostOf(url)} · ${detected}`;
+
+/** Whether the BDE confirmed a job on `host`: an address they type there doesn't take the tab from its job. */
+export const isConfirmedHost = (confirmed: string[], host: string) =>
+  confirmed.some((key) => key.startsWith(`${host} · `));
+
 function companyWords(company: string | null): string[] {
   return canonical(company ?? "").split(" ").filter((word) => word && !COMPANY_SUFFIXES.has(word));
 }

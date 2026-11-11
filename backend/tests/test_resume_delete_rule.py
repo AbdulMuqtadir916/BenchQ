@@ -48,7 +48,12 @@ def _world(db):
 
 
 def _apply(db, world, resume, status="applied", job=0):
-    app = Application(firm_id=DEFAULT_FIRM_ID, job_id=world["jobs"][job].id, candidate_id=world["candidate"].id,
+    """An application for the candidate's copy of `world["jobs"][job]` (its posting since 0025), sent with `resume`."""
+    from backend.tests.posting_support import posting_for
+    old = world["jobs"][job]
+    posting = posting_for(db, DEFAULT_FIRM_ID, world["candidate"].id, title=old.title, company=old.company, url=old.url,
+                          source="legacy", old_job_id=old.id)
+    app = Application(firm_id=DEFAULT_FIRM_ID, job_id=posting.id, candidate_id=world["candidate"].id,
                       status=status, resume_id=resume.id)
     db.add(app)
     db.commit()

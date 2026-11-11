@@ -168,7 +168,10 @@ def test_firm_data_never_crosses_firms(key, anonymous_client, world):
 
     # Firm B's own OWNER (or its BDE, for what only a candidate's BDE does) gets through, for real.
     own = _call(client, key, case, b.ids, b.bde_cookie if case.as_bde else b.cookie)
-    assert own.status_code < 400, own.text
+    if case.refused is not None:
+        assert own.status_code == case.refused, own.text
+    else:
+        assert own.status_code < 400, own.text
     if case.shows_rows:
         assert CANARY in own.text, "firm B's own answer should list its rows"
 
@@ -246,6 +249,8 @@ def test_a_shared_jobs_status_is_still_one_row_for_both_firms(key, anonymous_cli
 
 
 def test_known_gaps_match_07_auth_f4(world):
-    """The Persona routes are exactly the Persona and autofill ones; each names its track."""
-    assert sorted(KNOWN_GAPS) == sorted(k for k in FIRM if "/persona" in k or "/autofill" in k)
+    """The Persona routes are exactly the Persona and autofill ones; each names its track. (A résumé's own autofill,
+    `…/resumes/{resume_id}/autofill`, is the candidate's and has a case.)"""
+    assert sorted(KNOWN_GAPS) == sorted(k for k in FIRM if k.split(" ", 1)[1].startswith(("/api/persona",
+                                                                                          "/api/autofill")))
     assert json.dumps([gap.removed_by for gap in KNOWN_GAPS.values()]).count("D1") == len(KNOWN_GAPS)

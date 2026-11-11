@@ -400,7 +400,9 @@ def list_applications(
     from sqlalchemy.orm import selectinload
     from backend.api.routes_candidates import _candidate
 
-    q = scoped(db, Application, firm_id).options(selectinload(Application.interviews), selectinload(Application.reviews))
+    # The posting too: every row reads its job (`posting_job`) and its documents' job (`_document_job_id`).
+    q = scoped(db, Application, firm_id).options(selectinload(Application.interviews), selectinload(Application.reviews),
+                                                 selectinload(Application.posting))
     from backend.api.routes_candidates import _visible
     from backend.models.candidates import Candidate
     from backend.auth.scoping import own_scope, team_scope
@@ -1073,8 +1075,8 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
         add("- My notes on this application: " + " ".join(app.notes.split()))
 
     # ── 2. my résumé, flattened to plain text ────────────────────────────────
-    tailored = None
-    if app.job_id:
+    tailored = scoped(db, Resume, firm_id).filter(Resume.id == app.resume_id).first() if app.resume_id else None
+    if tailored is None and app.job_id:
         tailored = (scoped(db, Resume, firm_id)
                     .filter(Resume.job_id == _document_job_id(app), Resume.category == "TAILORED",
                             Resume.candidate_id == app.candidate_id, Resume.deleted_at.is_(None))
@@ -1117,7 +1119,8 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
 def _document_job_id(app):
     """The job a candidate's documents (tailored résumés, cover letters) name for `app`. They still name the old `jobs`
     row until they move onto postings (#124); a posting moved from one keeps its id as `old_job_id`."""
-    old = (app.posting.content or {}).get("old_job_id") if app.posting is not None else None
+    content = app.posting.content if app.posting is not None else None
+    old = content.get("old_job_id") if isinstance(content, dict) else None
     try:
         return uuid.UUID(str(old)) if old else app.job_id
     except ValueError:

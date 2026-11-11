@@ -177,7 +177,8 @@ const REPEATS_ON_FORM = "This question appears more than once on the form.";
 
 /** A row a school or job record may answer: one the review would fill, or held back only because its question repeats
  * (as a repeated block's questions do). A row held back for any other reason keeps that decision. */
-const takesRecord = (row: ReviewRow) => row.status === "ready" || row.status === "same" || (row.status === "manual" && row.reason === REPEATS_ON_FORM);
+const takesRecord = (row: ReviewRow) => row.status === "ready" || row.status === "same"
+  || (row.status === "manual" && (row.reason === REPEATS_ON_FORM || row.reason === REPEATED));
 
 const sameText = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
 
@@ -208,10 +209,10 @@ export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewR
   return rows.map((row) => {
     const type = typeOf(row.field);
     const from = type ? FROM_RECORD[type] : undefined;
-    if (!type || !from || !takesRecord(row)) return row;
+    if (!type || !from) return row;
     const index = seen.get(type) ?? 0;
     seen.set(type, index + 1);
-    if (index === 0 && row.status !== "manual") return row;
+    if (!takesRecord(row) || (index === 0 && row.status !== "manual")) return row;
     const record = recordsOf(from[0])[index];
     const value = record ? from[1](record) : "";
     const base = { key: row.key, field: row.field, isUnsaved: row.isUnsaved };

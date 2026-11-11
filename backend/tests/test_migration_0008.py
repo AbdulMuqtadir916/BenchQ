@@ -132,16 +132,20 @@ def test_deleting_a_job_deletes_the_resumes_tailored_for_it(test_db, world):
     assert sorted(left, key=str) == sorted([("BASE", None), ("TAILORED", job8.id)], key=str)
 
 
-def test_a_job_an_application_names_cannot_be_deleted(test_db, world):
+def test_a_posting_an_application_names_cannot_be_deleted(test_db, world):
+    from backend.models.job_search import JobPosting
+    from backend.tests.posting_support import posting_for
     job7 = world["jobs"][0]
     tailored = _version(world, category="TAILORED", job_id=job7.id)
     test_db.add(tailored)
     test_db.flush()
-    test_db.add(Application(firm_id=world["firm"].id, candidate_id=world["asha"].id, job_id=job7.id,
+    posting = posting_for(test_db, world["firm"].id, world["asha"].id, title=job7.title,
+                          company=job7.company, url=job7.url, old_job_id=job7.id)
+    test_db.add(Application(firm_id=world["firm"].id, candidate_id=world["asha"].id, job_id=posting.id,
                             resume_id=tailored.id, submitted_by_user_id=world["owner"].id))
     test_db.commit()
     with pytest.raises(IntegrityError):
-        test_db.delete(job7)
+        test_db.delete(test_db.get(JobPosting, posting.id))
         test_db.commit()
     test_db.rollback()
     assert test_db.get(Resume, tailored.id) is not None                # the résumé that was sent stays

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { connectionKey } from "./autofill/connection-store";
+import { confirmationKey } from "./autofill/job-check";
 import type { Connection, NewConnection, PanelMessage, PanelReply } from "./autofill/types";
 import { fakeChrome, type FakeChrome } from "./test/fake-chrome";
 
@@ -109,10 +110,11 @@ describe("ending a connection", () => {
     expect(stored(other)?.applicationId).toBe("app-2");
   });
 
-  it("remembers a host the BDE confirmed", async () => {
+  it("remembers a job the BDE confirmed", async () => {
     connect(5);
-    await send({ type: "confirm-host", tabId: 5, host: "boards.example.test" });
-    expect(stored(5)?.confirmedHosts).toEqual(["boards.example.test"]);
+    const confirmed = confirmationKey("https://boards.example.test/1", "Java Developer · Acme");
+    await send({ type: "confirm-host", tabId: 5, host: confirmed });
+    expect(stored(5)?.confirmedHosts).toEqual([confirmed]);
   });
 
   it("clears every connection, for a sign-out", async () => {
@@ -177,9 +179,9 @@ describe("following a tab", () => {
     expect(stored(tabId)).toBeDefined();
   });
 
-  it("keeps the connection on the job's own site and a confirmed one", async () => {
+  it("keeps the connection on the job's own site and one where the BDE confirmed the job", async () => {
     const tabId = await open();
-    await send({ type: "confirm-host", tabId, host: "boards.example.test" });
+    await send({ type: "confirm-host", tabId, host: confirmationKey("https://boards.example.test/1", "Java Developer · Acme") });
     fake.webNavigation.onCommitted.fire({ tabId, frameId: 0, url: "https://jobs.acme.test/2", transitionType: "typed" });
     fake.webNavigation.onCommitted.fire({ tabId, frameId: 0, url: "https://boards.example.test/2", transitionType: "typed" });
     await settle();

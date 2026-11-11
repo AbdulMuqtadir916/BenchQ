@@ -1,6 +1,7 @@
 """Classification upgrade/downgrade does not rewrite historical application states."""
 from sqlalchemy import text
 from backend.db_schema import head_revision
+from backend.tests.migration_support import down_to_0024, downgrade_to, upgrade_head
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db
 
 
@@ -19,11 +20,12 @@ def test_downgrade_refuses_live_classification_claim(scratch_db):
     populated(scratch_db)
     with engine.begin() as conn:
         conn.execute(text("UPDATE inbox_messages SET classification_state='PROCESSING', classification_attempts=1"))
+    down_to_0024(name, engine)      # past 0024 the applications name their old jobs again
     result=_alembic(name,'downgrade','0013')
     assert result.returncode!=0
     assert 'Refusing to discard email classification' in result.stderr
     with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one()==head_revision()
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one()=='0024'
         assert conn.execute(text("SELECT count(*) FROM inbox_messages WHERE classification_state='PROCESSING'")).scalar_one()>0
 
 
@@ -31,10 +33,10 @@ def test_existing_mail_upgrades_unqueued_and_roundtrips(scratch_db):
     from backend.tests.test_migration_0012 import populated
     name, engine = scratch_db
     populated(scratch_db)
-    _ok(_alembic(name, 'downgrade', '0013'))
-    _ok(_alembic(name, 'upgrade', 'head'))
+    downgrade_to(name, engine, '0013')
+    upgrade_head(name, engine)
     with engine.connect() as conn:
         states = conn.execute(text('SELECT classification_state FROM inbox_messages')).scalars().all()
         assert states and set(states) == {'NOT_QUEUED'}
-    _ok(_alembic(name, 'downgrade', '0013'))
-    _ok(_alembic(name, 'upgrade', 'head'))
+    downgrade_to(name, engine, '0013')
+    upgrade_head(name, engine)

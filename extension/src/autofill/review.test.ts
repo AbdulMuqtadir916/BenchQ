@@ -548,7 +548,19 @@ describe("a school or job block that repeats (#132)", () => {
     const rows = withHistory(buildReview(fields, bank), history);
     expect(rows.map((row) => row.proposed ?? null)).toEqual(["JNTU", "Osmania University"]);
     const held = { ...rows[1]!, status: "blocked" as const, reason: "A reference's employer." };
+    expect(withHistory([{ ...rows[0]!, status: "manual", reason: "This asks the same thing again, for another entry, so it's yours to fill." }, held], history)
+      .map((row) => [row.status, row.proposed ?? null])).toEqual([["same", "JNTU"], ["blocked", "Osmania University"]]);
     expect(withHistory([rows[0]!, held], history)[1]).toEqual(held);
+  });
+
+  it("counts a block whose row the review held back, so the blocks after it keep their own records", () => {
+    const fields = ["School", "School", "School"].map((label, n) => field(label, { id: `f${n}` }));
+    const [first, second, third] = buildReview(fields, [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]);
+    const held = { ...second!, status: "manual" as const, reason: "None of the options is the saved answer." };
+    const three = { education: [...history.education, { school: "IIT Bombay", degree: "PhD" }], work: [] };
+    const rows = withHistory([first!, held, third!], three);
+    expect(rows[1]).toEqual(held);
+    expect(rows[2]).toMatchObject({ status: "ready", proposed: "IIT Bombay" });
   });
 
   it("leaves a form with one block as it was", () => {

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from backend.models.candidates import Candidate, FavoriteJob
-from backend.models.db import Application, ApplicationStatusEvent, CoverLetter, Resume, utcnow
+from backend.models.db import ApplicationStatusEvent, CoverLetter, Resume, utcnow
 from backend.models.tenancy import LedgerEntry
 from backend.tests.test_application_tracker import add_review
 from backend.tests.resume_support import make_version
@@ -117,22 +117,3 @@ def test_candidate_responses_share_scoped_resume_and_letter_metadata(api_client,
     check(api_client.patch(path + '/review', headers=headers, json={
         'review_id': str(review.id), 'status': 'offer', 'expected_revision': 2, 'expected_review_revision': 0,
     }))
-
-
-def test_legacy_detail_and_update_match_list_document_metadata(api_client, test_db, submission):
-    """An application from before candidates has no tailored résumé (every résumé has a candidate since 0013); an
-    unattributed letter still describes it."""
-    _, job, app, _, headers, _ = submission
-    legacy = Application(firm_id=app.firm_id, job_id=job.id, status='applied')
-    test_db.add(legacy)
-    test_db.flush()
-    test_db.add(CoverLetter(firm_id=legacy.firm_id, job_id=job.id, resume_id=None, name='Legacy letter'))
-    test_db.commit()
-    expected = {'tailored_resume_id': None, 'tailored_resume_name': None, 'has_cover_letter': True}
-    listed = api_client.get('/api/applications', headers=headers).json()['applications']
-    row = next(row for row in listed if row['id'] == str(legacy.id))
-    assert {key: row[key] for key in expected} == expected
-    for response in [api_client.get(f'/api/applications/{legacy.id}', headers=headers),
-                     api_client.patch(f'/api/applications/{legacy.id}', headers=headers, json={'status': 'offer'})]:
-        assert response.status_code == 200, response.text
-        assert {key: response.json()[key] for key in expected} == expected

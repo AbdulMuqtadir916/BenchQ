@@ -66,8 +66,13 @@ def test_prep_never_uses_another_candidates_resume(api_client, test_db, accounts
 def test_protected_delete_is_an_atomic_conflict(api_client, test_db, case, bulk):
     candidate, job, _, _ = case
     job.status = 'applied'
-    protected = Application(firm_id=candidate.firm_id, job_id=job.id, status='applied')
-    unprotected = Application(firm_id=candidate.firm_id, job_id=job.id, status='applied')
+    from backend.tests.posting_support import posting_for
+    protected_posting = posting_for(test_db, candidate.firm_id, candidate.id, title='Protected role', company=job.company)
+    unprotected_posting = posting_for(test_db, candidate.firm_id, candidate.id, title='Unprotected role', company=job.company)
+    protected = Application(firm_id=candidate.firm_id, candidate_id=candidate.id,
+                            job_id=protected_posting.id, status='applied')
+    unprotected = Application(firm_id=candidate.firm_id, candidate_id=candidate.id,
+                              job_id=unprotected_posting.id, status='applied')
     test_db.add_all([protected, unprotected])
     test_db.flush()
     test_db.add(ApplicationStatusEvent(firm_id=candidate.firm_id, application_id=protected.id,
@@ -82,22 +87,29 @@ def test_protected_delete_is_an_atomic_conflict(api_client, test_db, case, bulk)
     assert test_db.get(Application, unprotected_id) is not None
     assert job.status == 'applied'
     assert test_db.query(ApplicationStatusEvent).filter_by(application_id=protected_id).count() == 1
-    assert api_client.delete(f'/api/applications/{unprotected_id}').status_code == 200
+    # Candidate applications are removed through the Saved/favorite action, not legacy delete routes.
+    assert api_client.delete(f'/api/applications/{unprotected_id}').status_code == 409
+    assert test_db.get(Application, unprotected_id) is not None
 
 @pytest.mark.parametrize('role,expected_read,expected_write', [('OWNER',200,200),('VIEWER',200,403),('BDE',404,404),('MANAGER',404,404)])
-def test_legacy_detail_and_write_use_the_same_scope(api_client, test_db, accounts, case, role, expected_read, expected_write):
+def test_detail_and_write_use_the_same_scope(api_client, test_db, accounts, case, role, expected_read, expected_write):
     candidate, job, _, _ = case
-    legacy=Application(firm_id=candidate.firm_id,job_id=job.id,status='applied')
-    test_db.add(legacy)
+    from backend.tests.posting_support import posting_for
+    posting = posting_for(test_db, candidate.firm_id, candidate.id, title='Scope role', company=job.company)
+    application = Application(firm_id=candidate.firm_id, candidate_id=candidate.id, job_id=posting.id,
+                              status='applied')
+    test_db.add(application)
     test_db.get(User,accounts.user_id).role=role
     test_db.commit()
-    path=f'/api/applications/{legacy.id}'
+    path=f'/api/applications/{application.id}'
     assert api_client.get(path).status_code==expected_read
-    assert api_client.patch(path,json={'status':'offer','notes':'Synthetic notes'}).status_code==expected_write
-    response=api_client.post('/api/applications/bulk-update',json={'ids':[str(legacy.id)],'status':'offer'})
+    # A candidate's application: notes on their own, a move through the status command with its revision.
+    assert api_client.patch(path,json={'notes':'Synthetic notes'}).status_code==expected_write
+    response=api_client.post('/api/applications/bulk-update',json={'ids':[str(application.id)],'status':'offer',
+                                                                    'expected_revisions':{str(application.id):0}})
     assert response.status_code==expected_write
-    test_db.refresh(legacy)
-    assert legacy.status==('offer' if expected_write==200 else 'applied')
+    test_db.refresh(application)
+    assert application.status==('offer' if expected_write==200 else 'applied')
 
 
 def test_changed_application_notes_are_audited_once(api_client,test_db,accounts,case):
@@ -117,26 +129,22 @@ def test_changed_application_notes_are_audited_once(api_client,test_db,accounts,
 
 
 def test_create_saved_draft_is_unsubmitted_idempotent_and_removable(api_client, test_db, accounts, case):
-    from backend.models.candidates import CandidateJob, FavoriteJob
-    from backend.models.db import Job
-    from backend.models.tenancy import link_job_to_firm
+    from backend.models.db import Application
+    from backend.tests.posting_support import posting_for
     candidate, _, _, _ = case
-    job = Job(external_id='foundation-save', title='Saved Engineer', company='Synthetic Corp', source='manual')
-    test_db.add(job)
-    test_db.flush()
-    link_job_to_firm(test_db, candidate.firm_id, job.id, 'CAPTURED', captured_by_user_id=accounts.user_id)
-    test_db.add(CandidateJob(firm_id=candidate.firm_id, candidate_id=candidate.id, job_id=job.id))
-    test_db.commit()
-    body = dict(title=job.title, company=job.company, url='', candidate_id=str(candidate.id), job_id=str(job.id), status='saved')
+    posting = posting_for(test_db, candidate.firm_id, candidate.id, title='Saved Engineer',
+                          company='Synthetic Corp', source='manual')
+    test_db.commit()     # the route locks the candidate, which this session's uncommitted posting holds
+    body = dict(candidate_id=str(candidate.id), job_id=str(posting.id), status='saved')
     first = api_client.post('/api/applications', json=body)
     assert first.status_code == 200, first.text
     again = api_client.post('/api/applications', json=body)
     assert again.json()['id'] == first.json()['id']
-    app = test_db.query(Application).filter_by(candidate_id=candidate.id, job_id=job.id).one()
+    app = test_db.query(Application).filter_by(candidate_id=candidate.id, job_id=posting.id).one()
     test_db.refresh(app)
     assert app.applied_at is None
     assert app.submitted_by_user_id is None
-    assert test_db.query(FavoriteJob).filter_by(candidate_id=candidate.id, job_id=job.id).count() == 1
+    assert app.status == 'saved'  # Saved is the candidate's favorite; there is no parallel favorite_jobs row.
     removed = api_client.patch(f'/api/applications/{app.id}', json={'unfavorite': True})
     assert removed.status_code == 200, removed.text
     assert removed.json()['application_preserved'] is False
@@ -156,14 +164,17 @@ def test_unfavorite_keeps_application_with_status_history(api_client, test_db, a
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("runner", ["scheduled", "manual"])
-async def test_legacy_auto_reject_cannot_bypass_candidate_status_history(test_db, accounts, case, monkeypatch, runner):
+async def test_auto_reject_cannot_bypass_candidate_status_history(test_db, accounts, case, monkeypatch, runner):
     from datetime import timedelta
     from backend.models.db import Setting
     from backend.scheduler import run_auto_reject
     candidate, job, app, _ = case
     app.applied_at = utcnow() - timedelta(days=90)
-    legacy = Application(firm_id=candidate.firm_id, job_id=job.id, status='applied', applied_at=app.applied_at)
-    test_db.add_all([legacy, Setting(key='auto_reject_after_days', value='30')])
+    from backend.tests.posting_support import posting_for
+    posting = posting_for(test_db, candidate.firm_id, candidate.id, title='Old application', company=job.company)
+    second = Application(firm_id=candidate.firm_id, candidate_id=candidate.id, job_id=posting.id,
+                         status='applied', applied_at=app.applied_at)
+    test_db.add_all([second, Setting(key='auto_reject_after_days', value='30')])
     test_db.commit()
     if runner == 'scheduled':
         await run_auto_reject()
@@ -177,10 +188,11 @@ async def test_legacy_auto_reject_cannot_bypass_candidate_status_history(test_db
         await main.trigger_auto_reject()
         await captured[0]()
     test_db.refresh(app)
-    test_db.refresh(legacy)
+    test_db.refresh(second)
     assert app.status == 'applied'
     assert app.status_revision == 0
-    assert legacy.status == 'rejected'
+    # Automatic rejection deliberately excludes candidate-owned applications, which need a human decision.
+    assert second.status == 'applied'
 
 
 @pytest.mark.parametrize('revisions', [None, [], 'invalid', 1])

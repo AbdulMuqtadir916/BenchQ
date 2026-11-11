@@ -549,13 +549,11 @@ def test_an_unexpected_on_save_score_failure_does_not_fail_the_save(client, test
     assert job.saved is True
 
 
-def test_applying_reuses_an_existing_application_and_company(client, test_db, accounts):
-    """The compound "applied" action reports what it created; when both already
-    exist it creates neither and says so with two nulls."""
-    from backend.models.db import Application
+def test_applying_reuses_an_existing_company_and_creates_no_application(client, test_db, accounts):
+    """The compound "applied" action reports what it created: never an application on an old pool job (one names a
+    candidate's posting since 2026-11-11), and no company when it already exists, so two nulls."""
     job = make_job(test_db, company="Acme")
     make_company(test_db, name="Acme")
-    test_db.add(Application(firm_id=accounts.firm_id, job_id=job.id, status="applied"))   # the signed-in firm's
     test_db.commit()
     body = assert_clean(client.patch(f"/api/jobs/{job.id}",
                                      json={"status": "applied"}), 200).json()

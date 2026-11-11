@@ -111,11 +111,20 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.flush()
     # Applications name one of their candidate's postings (migration 0025): the job, as the candidate's.
     from backend.tests.posting_support import posting_for
-    posted = dict(title=job.title, company=job.company, url=job.url, description=JOB_TEXT)
+    posted = dict(title=job.title, company=job.company, url=job.url, description=JOB_TEXT,
+                  source="legacy", old_job_id=job.id)
     app = Application(firm_id=firm.id, candidate_id=candidate.id, status="applied", notes=f"{tag} application notes",
                       job_id=posting_for(db, firm.id, candidate.id, **posted).id)
+    # The second application is on an old job of its own, as on a moved database (one application per candidate per
+    # job), so the move's undo can point each back at its job.
+    legacy_job = Job(external_id=f"{tag}-legacy", title=f"{tag} legacy role", company=f"{tag} Corp", source="manual")
+    db.add(legacy_job)
+    db.flush()
     legacy_app = Application(firm_id=firm.id, candidate_id=candidate.id, status="applied",
-                             notes=f"{tag} legacy application", job_id=posting_for(db, firm.id, candidate.id, **posted).id)
+                             notes=f"{tag} legacy application",
+                             job_id=posting_for(db, firm.id, candidate.id, title=legacy_job.title,
+                                                company=legacy_job.company, source="legacy",
+                                                old_job_id=legacy_job.id).id)
     db.add_all([app, legacy_app])
     db.flush()
     interview = Interview(firm_id=firm.id, application_id=app.id, what=f"{tag} phone screen")
@@ -183,7 +192,9 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.add(review_job)
     db.flush()
     review_app = Application(firm_id=firm.id, candidate_id=candidate.id, status="applied",
-                             job_id=posting_for(db, firm.id, candidate.id, title=review_job.title, company=review_job.company).id)
+                             job_id=posting_for(db, firm.id, candidate.id, title=review_job.title,
+                                                company=review_job.company, source="legacy",
+                                                old_job_id=review_job.id).id)
     db.add(review_app)
     db.flush()
     review_message = InboxMessage(firm_id=firm.id, candidate_id=candidate.id, mailbox_id=mailbox.id,

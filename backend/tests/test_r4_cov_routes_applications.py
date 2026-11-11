@@ -87,18 +87,32 @@ def _break_commit(monkeypatch):
 
 
 def _own(db, app, resume):
-    """The application becomes the résumé's candidate's (every résumé has a candidate since résumé versioning PR 6);
-    returns that candidate."""
+    """Point the application at a posting owned by the résumé's candidate."""
     from backend.models.candidates import Candidate
+    from backend.tests.posting_support import posting_for
+    content = app.posting.content or {}
+    posting = posting_for(db, app.firm_id, resume.candidate_id,
+                          title=content.get("title") or "Java Developer",
+                          company=content.get("company") or "Acme Corp",
+                          url=content.get("url"), description=content.get("description") or "",
+                          location=content.get("location"), old_job_id=content.get("old_job_id"))
     app.candidate_id = resume.candidate_id
+    app.job_id = posting.id
     db.commit()
     return db.get(Candidate, resume.candidate_id)
 
 
 def _make_app(db, **job_kw):
     from backend.models.db import Application
+    from backend.tests.posting_support import posting_for
+    from backend.tests.r4_support import make_resume
     job = make_job(db, **job_kw)
-    app = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status="applied")
+    resume = make_resume(db, name="Application candidate")
+    posting = posting_for(db, DEFAULT_FIRM_ID, resume.candidate_id, title=job.title, company=job.company,
+                          url=job.url, description=job.description or "", location=job.location,
+                          old_job_id=job.id)
+    app = Application(firm_id=DEFAULT_FIRM_ID, candidate_id=resume.candidate_id, job_id=posting.id,
+                      status="applied")
     db.add(app)
     db.commit()
     db.refresh(app)
@@ -445,16 +459,6 @@ async def test_cache_job_page_rolls_back_when_recording_an_unexpected_failure_fa
 
 # ── POST "" — the back-dated applied_at ──────────────────────────────────────
 
-def test_create_application_back_dates_a_parseable_applied_at(client, test_db):
-    from backend.models.db import Application
-    r = assert_clean(client.post("/api/applications", json={
-        "title": "PM", "company": "Acme", "url": "https://e.com/j",
-        "applied_at": "2026-01-02T03:04:05+00:00"}), 200)
-    app = test_db.query(Application).filter(
-        Application.id == _uuid.UUID(r.json()["id"])).first()
-    assert app.applied_at.year == 2026 and app.applied_at.month == 1
-
-
 # ── GET "" — the tailored-résumé join ────────────────────────────────────────
 
 def test_list_applications_reports_the_latest_tailored_resume(client, test_db):
@@ -472,9 +476,11 @@ def test_list_applications_reports_the_latest_tailored_resume(client, test_db):
 
 
 def test_list_applications_flags_a_cover_letter(client, test_db):
-    from backend.models.db import CoverLetter
+    """A letter from one of the candidate's résumés, for the job: an application is always a candidate's."""
+    from backend.models.db import CoverLetter, Resume
     app, job = _make_app(test_db)
-    test_db.add(CoverLetter(firm_id=DEFAULT_FIRM_ID, name="CL", job_id=job.id, json_data={}))
+    own = test_db.query(Resume).filter(Resume.candidate_id == app.candidate_id).first()
+    test_db.add(CoverLetter(firm_id=DEFAULT_FIRM_ID, name="CL", job_id=job.id, resume_id=own.id, json_data={}))
     test_db.commit()
     row = assert_clean(client.get("/api/applications"), 200).json()["applications"][0]
     assert row["has_cover_letter"] is True
@@ -743,8 +749,7 @@ def test_prep_bundle_assembles_role_resume_posting_and_ask(client, test_db):
     set_setting(test_db, "prep_ask", "Give me five questions.")
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert text.startswith("# Senior PM at Acme")
-    assert "- Location: London (remote)" in text
-    assert "- Listed salary: $100K–$140K" in text
+    assert "- Location: London" in text            # the posting's, which holds no remote flag and no salary
     assert "- Posting: https://e.com/j" in text
     assert "- Stage: Applied" in text
     assert "- My notes on this application: referred by Dana" in text
@@ -778,6 +783,30 @@ def test_prep_bundle_prefers_the_tailored_copy_over_the_base(client, test_db):
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert "## My résumé — PM — Acme" in text
     assert "the tailored copy" in text
+
+
+def test_prep_bundle_uses_the_resume_the_application_was_sent_with(client, test_db):
+    """The résumé sent with the application (`resume_id`) comes first: a tailored résumé names an old job, never an
+    added job's posting, so an added job's prep would otherwise say the résumé is unavailable."""
+    app, _ = _make_app(test_db)
+    sent = make_resume(test_db, name="PM sent", json_data={"summary": "the sent copy"})
+    _own(test_db, app, sent)
+    app.resume_id = sent.id
+    test_db.commit()
+    text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
+    assert "## My résumé — PM sent" in text
+    assert "the sent copy" in text
+
+
+def test_list_and_prep_survive_a_posting_whose_content_is_not_an_object(client, test_db):
+    """`job_postings.content` is any JSON: a row that isn't an object reads as an empty job, never a 500."""
+    app, _ = _make_app(test_db)
+    app.posting.content = ["not", "an", "object"]
+    test_db.commit()
+    listed = assert_clean(client.get("/api/applications"), 200).json()["applications"]
+    assert [row["id"] for row in listed] == [str(app.id)]
+    text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
+    assert text.startswith("# Unknown Role at Unknown Company")
 
 
 def test_prep_bundle_demotes_the_resume_headings(client, test_db):
@@ -819,13 +848,15 @@ def test_prep_bundle_says_so_when_no_posting_text_was_captured(client, test_db):
     assert "[no posting text was captured]" in text
 
 
-def test_prep_bundle_prefers_the_cached_page_over_the_description(client, test_db):
+def test_prep_bundle_reads_the_posting_not_the_old_job(client, test_db):
+    """The application's job is its posting (2026-11-11): its description is the posting text, whatever the old job's
+    cached page says."""
     app, job = _make_app(test_db, description="the short description")
     job.cached_page_text = "the full cached posting"
     test_db.commit()
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
-    assert "the full cached posting" in text
-    assert "the short description" not in text
+    assert "the short description" in text
+    assert "the full cached posting" not in text
 
 
 def test_prep_include_setting_drops_the_optional_sections(client, test_db):
@@ -866,19 +897,7 @@ def test_prep_bundle_names_an_untitled_posting_unknown(client, test_db):
     assert text.startswith("# Unknown Role at Unknown Company")
 
 
-@pytest.mark.parametrize("lo,hi,expected", [
-    (100000, 140000, "$100K–$140K"),
-    (120000, 120000, "$120K"),
-    (None, 90000, "$90K"),
-    (90000, None, "$90K"),
-])
-def test_prep_bundle_formats_the_salary_band(client, test_db, lo, hi, expected):
-    app, _ = _make_app(test_db, salary_min=lo, salary_max=hi)
-    text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
-    assert "- Listed salary: " + expected in text
-
-
-def test_prep_bundle_omits_the_salary_line_when_there_is_none(client, test_db):
-    app, _ = _make_app(test_db, salary_min=None, salary_max=None)
+def test_prep_bundle_has_no_salary_line_since_a_posting_holds_no_salary(client, test_db):
+    app, _ = _make_app(test_db, salary_min=100000, salary_max=140000)
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert "Listed salary" not in text

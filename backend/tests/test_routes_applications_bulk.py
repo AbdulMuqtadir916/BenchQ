@@ -2,64 +2,73 @@
 
 The Applications screen's selection bar moves or deletes a whole batch in one
 call. Both endpoints must behave exactly like the single-row paths they stand in
-for (record_transition with source "ui"; the job released back to 'saved' on a
-delete) and must answer 400 — never 500 — for any malformed body.
+for (the candidate status command, source "ui"; a candidate's application is
+never deleted) and must answer 400 — never 500 — for any malformed body.
 """
 import uuid
 
-from backend.models.db import Application, Interview, Job
+from backend.models.db import Application, Interview
 import pytest
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
 pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
-def _make_app(test_db, title="Bulk Role", status="applied", company="Bulk Co", job_status="applied"):
-    """One job + one application on it, committed; returns the Application."""
-    job = Job(external_id=uuid.uuid4().hex, company=company, title=title,
-              url=f"https://example.com/{uuid.uuid4().hex}", status=job_status)
-    test_db.add(job)
-    test_db.flush()
-    app = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status=status, status_transitions=[])
+def _make_app(test_db, title="Bulk Role", status="applied", company="Bulk Co"):
+    """One candidate's application on a posting of theirs (every application is one since migration 0025),
+    committed; returns the Application."""
+    from backend.tests.posting_support import posting_for
+    from backend.tests.resume_support import make_version
+    candidate_id = make_version(test_db, DEFAULT_FIRM_ID).candidate_id
+    posting = posting_for(test_db, DEFAULT_FIRM_ID, candidate_id, title=title, company=company,
+                          url=f"https://example.com/{uuid.uuid4().hex}")
+    app = Application(firm_id=DEFAULT_FIRM_ID, candidate_id=candidate_id, job_id=posting.id, status=status,
+                      status_transitions=[])
     test_db.add(app)
     test_db.commit()
     return app
 
 
+def _revisions(*apps):
+    """What the selection bar sends with a move: each row's status revision as the screen last read it."""
+    return {str(app.id): app.status_revision for app in apps}
+
+
 # ── bulk-update ──────────────────────────────────────────────────────────────
 def test_bulk_update_moves_every_row(api_client, test_db):
-    """Happy path: two applied rows → interview, both counted as updated."""
+    """Happy path: two applied rows → interview scheduled, both counted as updated."""
     a = _make_app(test_db, "Bulk A")
     b = _make_app(test_db, "Bulk B")
     resp = api_client.post("/api/applications/bulk-update",
-                           json={"ids": [str(a.id), str(b.id)], "status": "interview"})
+                           json={"ids": [str(a.id), str(b.id)], "status": "interview_scheduled",
+                                 "expected_revisions": _revisions(a, b)})
     assert resp.status_code == 200, resp.text
     assert resp.json() == {"updated": 2, "skipped": 0, "not_found": []}
     test_db.expire_all()
-    assert test_db.query(Application).filter(Application.id == a.id).first().status == "interview"
-    assert test_db.query(Application).filter(Application.id == b.id).first().status == "interview"
+    assert test_db.query(Application).filter(Application.id == a.id).first().status == "interview_scheduled"
+    assert test_db.query(Application).filter(Application.id == b.id).first().status == "interview_scheduled"
 
 
-def test_bulk_update_skips_rows_already_in_that_status(api_client, test_db):
-    """A row already in the target status is skipped, not re-transitioned."""
+def test_bulk_update_leaves_a_row_already_in_that_status_as_it_was(api_client, test_db):
+    """A row already in the target status is not re-transitioned: it was only caught in the selection."""
     a = _make_app(test_db, "Bulk Applied", status="applied")
-    b = _make_app(test_db, "Bulk Interview", status="interview")
+    b = _make_app(test_db, "Bulk Interview", status="interview_scheduled")
     before = len(b.status_transitions or [])
     resp = api_client.post("/api/applications/bulk-update",
-                           json={"ids": [str(a.id), str(b.id)], "status": "interview"})
+                           json={"ids": [str(a.id), str(b.id)], "status": "interview_scheduled",
+                                 "expected_revisions": _revisions(a, b)})
     assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["updated"] == 1 and body["skipped"] == 1
     test_db.expire_all()
     kept = test_db.query(Application).filter(Application.id == b.id).first()
-    assert len(kept.status_transitions or []) == before, "a skipped row logged a transition"
+    assert len(kept.status_transitions or []) == before, "a row already there logged a transition"
+    assert kept.status_revision == 0
 
 
 def test_bulk_update_records_transitions_with_ui_source(api_client, test_db):
-    """Every move goes through record_transition(), like the single-row PATCH."""
+    """Every move goes through the candidate status command, like the single-row PATCH."""
     a = _make_app(test_db, "Bulk Transitions", status="applied")
     resp = api_client.post("/api/applications/bulk-update",
-                           json={"ids": [str(a.id)], "status": "offer"})
+                           json={"ids": [str(a.id)], "status": "offer", "expected_revisions": _revisions(a)})
     assert resp.status_code == 200, resp.text
     test_db.expire_all()
     row = test_db.query(Application).filter(Application.id == a.id).first()
@@ -101,13 +110,14 @@ def test_bulk_update_reports_bad_and_missing_ids_without_aborting(api_client, te
     a = _make_app(test_db, "Bulk Survivor")
     ghost = str(uuid.uuid4())
     resp = api_client.post("/api/applications/bulk-update",
-                           json={"ids": ["not-a-uuid", ghost, str(a.id)], "status": "interview"})
+                           json={"ids": ["not-a-uuid", ghost, str(a.id)], "status": "interview_scheduled",
+                                 "expected_revisions": _revisions(a)})
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["updated"] == 1
     assert set(body["not_found"]) == {"not-a-uuid", ghost}
     test_db.expire_all()
-    assert test_db.query(Application).filter(Application.id == a.id).first().status == "interview"
+    assert test_db.query(Application).filter(Application.id == a.id).first().status == "interview_scheduled"
 
 
 def test_bulk_update_empty_ids_is_a_no_op(api_client, test_db):
@@ -118,90 +128,31 @@ def test_bulk_update_empty_ids_is_a_no_op(api_client, test_db):
 
 
 # ── bulk-delete ──────────────────────────────────────────────────────────────
-def test_bulk_delete_removes_rows_and_cascades_interviews(api_client, test_db):
-    """Deleting a batch takes each row's interviews with it (delete-orphan)."""
+def test_bulk_delete_refuses_candidate_applications_and_deletes_nothing(api_client, test_db):
+    """A candidate's application leaves through Saved (unfavorite) or a status move, never a delete. The batch is
+    checked whole before anything goes, so no row and no interview is lost."""
     a = _make_app(test_db, "Bulk Del A")
     b = _make_app(test_db, "Bulk Del B")
-    a_id, b_id = a.id, b.id       # read before the delete — the instances expire with it
+    a_id, b_id = a.id, b.id
     test_db.add(Interview(firm_id=DEFAULT_FIRM_ID, application_id=a_id, what="Screen"))
-    test_db.add(Interview(firm_id=DEFAULT_FIRM_ID, application_id=a_id, what="Onsite"))
     test_db.commit()
-    assert test_db.query(Interview).filter(Interview.application_id == a_id).count() == 2
 
     resp = api_client.post("/api/applications/bulk-delete", json={"ids": [str(a_id), str(b_id)]})
-    assert resp.status_code == 200, resp.text
-    assert resp.json() == {"deleted": 2, "not_found": []}
+    assert resp.status_code == 409, resp.text
     test_db.expire_all()
-    assert test_db.query(Application).count() == 0
-    assert test_db.query(Interview).filter(Interview.application_id == a_id).count() == 0
+    assert test_db.query(Application).filter(Application.id.in_([a_id, b_id])).count() == 2
+    assert test_db.query(Interview).filter(Interview.application_id == a_id).count() == 1
 
 
-def test_bulk_delete_releases_the_job_back_to_saved(api_client, test_db):
-    """The rail's Applications count drops and the job returns to the feed as Saved."""
-    a = _make_app(test_db, "Bulk Del Job", job_status="applied")
-    job_id = a.job_id
-    resp = api_client.post("/api/applications/bulk-delete", json={"ids": [str(a.id)]})
-    assert resp.status_code == 200, resp.text
-    test_db.expire_all()
-    assert test_db.query(Job).filter(Job.id == job_id).first().status == "saved"
-    listing = api_client.get("/api/applications")
-    assert listing.status_code == 200 and listing.json()["total"] == 0
-
-
-def test_bulk_delete_reports_bad_ids_and_keeps_going(api_client, test_db):
-    """Same not_found contract as bulk-update; the valid row is still deleted."""
-    a = _make_app(test_db, "Bulk Del Survivor")
+def test_bulk_delete_reports_bad_ids(api_client, test_db):
+    """Same not_found contract as bulk-update."""
     ghost = str(uuid.uuid4())
-    resp = api_client.post("/api/applications/bulk-delete",
-                           json={"ids": ["nope", ghost, str(a.id)]})
+    resp = api_client.post("/api/applications/bulk-delete", json={"ids": ["nope", ghost]})
     assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["deleted"] == 1
-    assert set(body["not_found"]) == {"nope", ghost}
-    test_db.expire_all()
-    assert test_db.query(Application).count() == 0
+    assert resp.json() == {"deleted": 0, "not_found": ["nope", ghost]}
 
 
 def test_bulk_delete_rejects_non_list_ids(api_client, test_db):
     """A malformed body is a 400 here too."""
     resp = api_client.post("/api/applications/bulk-delete", json={"ids": {"id": 1}})
     assert resp.status_code == 400, resp.text
-
-
-# ── undo leaves no trace ─────────────────────────────────────────────────────
-
-def _transitions(db, app_id):
-    from backend.models.db import Application
-    db.expire_all()
-    return list(db.query(Application).filter(Application.id == app_id).one().status_transitions or [])
-
-
-def test_patch_undo_pops_the_transition_it_reverses(api_client, test_db):
-    app = _make_app(test_db, status="applied")
-    api_client.patch(f"/api/applications/{app.id}", json={"status": "interview"})
-    assert [t["to"] for t in _transitions(test_db, app.id)][-1:] == ["interview"]
-    r = api_client.patch(f"/api/applications/{app.id}", json={"status": "applied", "undo": True})
-    assert r.status_code == 200
-    ts = _transitions(test_db, app.id)
-    assert not any(t["to"] == "interview" for t in ts)
-    test_db.expire_all()
-    assert test_db.get(type(app), app.id).status == "applied"
-
-
-def test_patch_undo_falls_back_to_a_normal_transition_when_history_differs(api_client, test_db):
-    app = _make_app(test_db, status="applied")
-    api_client.patch(f"/api/applications/{app.id}", json={"status": "interview"})
-    api_client.patch(f"/api/applications/{app.id}", json={"status": "offer"})
-    # an "undo" back to applied is not the reverse of the last move (offer <- interview)
-    api_client.patch(f"/api/applications/{app.id}", json={"status": "applied", "undo": True})
-    tos = [t["to"] for t in _transitions(test_db, app.id)]
-    assert tos[-3:] == ["interview", "offer", "applied"]
-
-
-def test_bulk_undo_pops_transitions(api_client, test_db):
-    a, b = _make_app(test_db, status="applied"), _make_app(test_db, status="applied")
-    api_client.post("/api/applications/bulk-update", json={"ids": [str(a.id), str(b.id)], "status": "rejected"})
-    r = api_client.post("/api/applications/bulk-update", json={"ids": [str(a.id), str(b.id)], "status": "applied", "undo": True})
-    assert r.status_code == 200 and r.json()["updated"] == 2
-    for app in (a, b):
-        assert not any(t["to"] == "rejected" for t in _transitions(test_db, app.id))
