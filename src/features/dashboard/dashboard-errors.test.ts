@@ -5,6 +5,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 // renderToString reads a zustand store through its server snapshot, the store's *initial* state
 // (signed out: in the app the gates wait for the client). The BDE dashboard needs the signed-in principal,
 // so in this server render it reads the live store instead. Everything else is real.
+// The owner's dashboard keeps its tab and level in the URL; a server render has no app router, so it gets a still one.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/hyderabad-tech-staffing/dashboard",
+}));
 vi.mock("@/lib/stores/session-store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/stores/session-store")>();
   return { ...actual, useSignedInUser: () => actual.useSession.getState().user!, useSignedInPrincipal: () => actual.useSession.getState().principal! };
@@ -25,24 +32,23 @@ import { BdeDashboard } from "./bde-dashboard";
  * the real hooks and the mock backend; failures come from the dev fault switch.
  */
 
-type Resource = "candidates" | "applications" | "followups" | "team" | "memberInvites" | "jobs";
+type Resource = "candidates" | "applications" | "team" | "memberInvites" | "jobs";
 /** `as`: the seeded account the dashboard is rendered for (the OWNER one reads invites, which needs `team.view`). */
 type Dashboard = { name: string; as: string; component: ComponentType; queries: Resource[]; groups: Record<string, { reads: Resource[]; labels: string[] }> };
 
 const floorGroups = {
   throughput: { reads: ["candidates", "applications", "team"] as Resource[], labels: ["Applied today", "Active BDEs", "Candidates on bench"] },
-  performance: { reads: ["team", "candidates", "applications", "followups"] as Resource[], labels: ["Interviews"] },
+  performance: { reads: ["team", "candidates", "applications"] as Resource[], labels: ["Interviews"] },
   pipeline: { reads: ["applications"] as Resource[], labels: [] },
   risk: { reads: ["candidates", "applications"] as Resource[], labels: [] },
   needsBde: { reads: ["candidates", "team"] as Resource[], labels: [] }, // the "Needs a BDE" card (onboarding 05 §5)
 };
 
 const DASHBOARDS: Dashboard[] = [
-  { name: "OWNER", as: "user_imran", component: OwnerDashboard, queries: ["candidates", "applications", "followups", "team", "memberInvites"], groups: { rollups: { reads: ["applications", "candidates", "team", "memberInvites"], labels: ["Time to place", "BDE seats used", "Assigned candidates"] }, ...floorGroups } },
-  { name: "MANAGER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "MANAGER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
-  { name: "VIEWER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
-  { name: "BDE", as: "user_adnan", component: BdeDashboard, queries: ["candidates", "applications", "followups", "jobs"], groups: {
-    numbers: { reads: ["candidates", "applications", "followups"], labels: ["Candidates", "Responses"] },
+  { name: "OWNER", as: "user_imran", component: OwnerDashboard, queries: ["candidates", "applications", "team", "memberInvites"], groups: { rollups: { reads: ["applications", "candidates", "team", "memberInvites"], labels: ["Time to place", "BDE seats used", "Assigned candidates"] }, ...floorGroups } },
+  { name: "VIEWER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "team"], groups: floorGroups },
+  { name: "BDE", as: "user_adnan", component: BdeDashboard, queries: ["candidates", "applications", "jobs"], groups: {
+    numbers: { reads: ["candidates", "applications"], labels: ["Candidates", "Responses"] },
     mine: { reads: ["candidates", "applications"], labels: ["apps</span>"] }, // per-candidate app counts in the list body
     queue: { reads: ["candidates", "applications", "jobs"], labels: ["Tailor resume"] }, // the queue rows' action
     newAssignments: { reads: ["candidates"], labels: ["No new candidates this week."] }, // its empty state: no ASSIGN entries on mocks (05 §7)

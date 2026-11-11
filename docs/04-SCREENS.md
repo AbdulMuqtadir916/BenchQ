@@ -51,12 +51,12 @@ supplies a count.
 ├────────────┬─────────────────────────────────────────────────────────────────┤
 │  Sidebar   │                                                                 │
 │  Dashboard │                     route content                               │
+│  Managers  │  (OWNER)                                                        │
+│  BDEs      │  (MANAGER)                                                      │
 │  Candidates│                                                                 │
 │  Jobs      │                                                                 │
 │  Apps      │                                                                 │
 │  Outreach  │                                                                 │
-│  Follow-ups│                                                                 │
-│  Analytics │                                                                 │
 │  Ledger    │                                                                 │
 │  ───────   │                                                                 │
 │  Settings  │                                                                 │
@@ -69,7 +69,7 @@ shows who is signed in — name, role, firm — and holds **Sign out**. In the a
 shows the Super Admin, and the topbar has no notifications and no shift clock.
 
 Sidebar: 208px expanded, 60px collapsed, 48px mobile icon rail, state in `localStorage`. Items carry live badge counts
-(follow-ups due today). Badges are derived, and a badge of zero is
+(pending notification requests). Badges are derived, and a badge of zero is
 hidden, not rendered as "0".
 
 **Shift clock** in the topbar is not decoration. It shows current US Eastern time alongside IST and
@@ -81,12 +81,12 @@ Sidebar visibility by role:
 | Item | OWNER | MANAGER | BDE | VIEWER |
 |---|---|---|---|---|
 | Dashboard | ✓ | ✓ | ✓ | ✓ |
+| Managers | ✓ | — | — | — |
+| BDEs | — | ✓ | — | — |
 | Candidates | all | all | assigned only | all, read-only |
 | Jobs | ✓ | ✓ | ✓ | ✓ |
 | Applications | all | all | own only | all, read-only |
 | Outreach | ✓ | ✓ | own only | ✓ read-only |
-| Follow-ups | ✓ | ✓ | own only | — |
-| Analytics | ✓ | ✓ | — | ✓ read-only |
 | Ledger | ✓ | ✓ | own actions | ✓ read-only |
 | Settings → Firm | ✓ | — | — | — |
 | Settings → Team | ✓ | ✓ | — | — |
@@ -111,10 +111,11 @@ gets built in Phase 1, not as a nice-to-have at the end.
 |---|---|---|
 | `⌘K` | Command palette | Global |
 | `g` then `d` | Go to dashboard | Global |
+| `g` then `m` | Go to managers (OWNER) | Global |
+| `g` then `b` | Go to BDEs (MANAGER) | Global |
 | `g` then `c` | Go to candidates | Global |
 | `g` then `j` | Go to jobs | Global |
 | `g` then `a` | Go to applications | Global |
-| `g` then `f` | Go to follow-ups | Global |
 | `J` / `↓` | Next row | Any list |
 | `K` / `↑` | Previous row | Any list |
 | `Enter` | Open focused row | Any list |
@@ -184,7 +185,7 @@ them. Nothing is verified or unverified: the person reads them over and creates 
 
 ## 3. `/dashboard`
 
-Role-dependent. Same route, three compositions.
+Role-dependent. Same route, four compositions; OWNER, MANAGER and VIEWER also have the Activity tab (§3.5).
 
 ### 3.1 BDE view — "tonight"
 
@@ -194,7 +195,7 @@ The BDE's dashboard answers one question: *what do I do next?*
 ┌─────────────────────────────────────────────────────────────┐
 │ Tonight · 4h 12m left in shift          [Start a run ▸]     │
 ├──────────────┬──────────────┬──────────────┬────────────────┤
-│ Applications │ Follow-ups   │ Responses    │ Candidates         │
+│ Applications │ Interviews   │ Responses    │ Candidates         │
 │ 23 / 40      │ 7 due        │ 3 new        │ 6 assigned     │
 │ ████████░░   │              │              │                │
 ├──────────────┴──────────────┴──────────────┴────────────────┤
@@ -222,7 +223,7 @@ illustration and a "capture jobs" action.
 ### 3.2 MANAGER view — "the floor"
 
 Same shell, different content. Team throughput today versus the trailing seven-day average, a
-per-BDE strip (applications, responses, interviews, follow-ups overdue), candidates with no
+per-BDE strip (applications, responses, interviews, placements), candidates with no
 applications in 48 hours flagged in amber, and the pipeline funnel. Every per-BDE row clicks
 through to that BDE's filtered application tracker.
 
@@ -241,6 +242,47 @@ invites and candidates, the function `/admin` uses, so the firm number never dis
 ### 3.4 VIEWER view
 
 Manager view with every action stripped. No buttons in the DOM, not disabled buttons.
+
+### 3.5 The Activity tab (07 Q60)
+
+The OWNER and a VIEWER have two tabs, kept in the URL (`?view=finance|activity`): their overview (§3.2, §3.4) and
+**Activity**. A MANAGER has the Activity dashboard only (§3.5b). Activity drills from the firm to a manager's team to one BDE (`?manager=`, `?bde=`; `Esc` goes up a
+level), with a period of 24 hours, 7, 30 or 90 days (`?period=`). The OWNER and a VIEWER start at the firm; a MANAGER
+starts and stays at their own team, with no way up.
+
+- **Firm:** what needs attention (chips); applications, interviews and placements with their shape and change against
+  the period before; bench placed as a meter; the pipeline funnel with the share that made each step; managers ranked;
+  bench aging in three bands with the longest waits; open jobs by role against the bench; time between stages; job
+  sources (from Analytics); every BDE in one table.
+- **Manager's team:** the same tiles; submissions by BDE, stacked; the queue waiting for a BDE; one card per BDE with
+  their workload against the firm's capacity; the funnel, bench aging, stage speeds and demand for the team.
+- **BDE:** the last 24 hours against an ordinary day (a ring); where their applications are now; each candidate's
+  furthest stage, today's count and a quiet flag; the funnel and bench aging.
+
+**Every count opens its records**: a tile, funnel stage or stage count opens `/applications` filtered (`status`,
+`reached`, `period` with `by`, `manager`, `bde`, `candidate`); a bench band, a role or a queue opens `/candidates`
+filtered (`status`, `bench`, `manager`, `bde`, `role`, `assignment`). The lists show the filters as removable chips with
+**Clear all**, and use the dashboard's own counting rules (`src/lib/derive/list-filters.ts`), so the list always shows the
+number that was clicked. People open their own level of the dashboard; candidates open their profile. Two cards do not
+link: **job sources** (the lists have no source filter) and **time between stages** (a duration, not a set of records).
+
+### 3.5b A manager's dashboard (07 Q62)
+
+A MANAGER's dashboard is the Activity dashboard only: no floor, no tab buttons. Next to the BDE cards is a bar chart of
+how far each BDE's applications of the period got (applied, shortlisted, interview, placed, counted like the pipeline:
+each is the applications that reached that stage). Opening a card or a bar goes to that BDE's dashboard.
+
+### 3.6b `/bdes` — MANAGER (07 Q62)
+
+The manager's own BDEs as a table (workload, candidates, applications, responses, interviews, placements for the
+period), with a name search (`?q=`) and the period (`?period=`). A row opens that BDE on the dashboard. Skeleton, empty
+(none yet / no match) and error states.
+
+### 3.6 `/managers` — OWNER (07 Q60)
+
+Search by name (`?q=`), and **Table** or **Cards** (`?view=`). Each manager: active or not, BDEs, candidates, the queue
+waiting for a BDE, and their team's applications, interviews and placements in the last 30 days. Opening one goes to
+the dashboard's Activity tab at that manager's level. Skeleton, empty (none yet / no match) and error states.
 
 ---
 
@@ -306,7 +348,7 @@ There is no separate Profile/Record tab: it duplicated the base résumé and lef
 
 #### Overview
 Left: **Needs your attention** — upcoming recruiter calls and interviews, recruiter emails whose
-stage the pipeline hasn't caught up with (one-click *Move to …*), follow-ups due within a day,
+stage the pipeline hasn't caught up with (one-click *Move to …*), 
 "connect the inbox" when it isn't, and visa / ID / certificate files expiring within 60 days. Five show, the rest behind
 *Show more*; resolving one animates it out. Then **Pipeline** (current count per stage, animated
 bars, each row opens the board) and **Latest from recruiters** (four newest emails, or the connect
@@ -319,7 +361,7 @@ Toolbar: *Active / All* and *Board / List*, plus a one-line summary. When emails
 violet strip lists them as one-click chips. **Board** — the shared `ApplicationBoard`: one column
 per stage, drag one stage forward (anything else snaps back with the reason), a read-only *Closed*
 column under *All*. Cards show role, company, the latest recruiter email as a chip, days in stage
-(amber at 3, red at 7) and the next follow-up. **List** — role, company, status, six-dot stage
+(amber at 3, red at 7) and the owner. **List** — role, company, status, six-dot stage
 progress, latest email, applied date. Enter or click opens the **application drawer**: stage
 progress with dates, the suggested update, *Move to next stage* / *Mark not selected*, the
 **resume sent** (the exact version the client received — master or tailored, template, ATS, with a
@@ -483,7 +525,7 @@ A close button (and `Esc`) returns to wherever it was opened from. `?mode=view` 
 Three views over one dataset, toggled in the toolbar, selection preserved across the switch.
 
 ### 7.1 Kanban
-Columns per `ApplicationStatus`. Cards: candidate, job, company, days in stage, next follow-up,
+Columns per `ApplicationStatus`. Cards: candidate, job, company, days in stage, owner,
 owning BDE. Drag between columns transitions status optimistically and writes a ledger event; an
 invalid transition snaps back with a toast naming why. Column headers carry derived counts and
 column WIP is visible at a glance.
@@ -506,7 +548,7 @@ Status changes happen here or on the kanban; both write the same ledger event.
 
 ---
 
-## 8. Outreach, follow-ups, analytics, ledger
+## 8. Outreach and ledger
 
 ### 8.1 `/outreach`
 Left: contact list per application. Right: composer with template
@@ -514,23 +556,12 @@ selection and merge-field preview. Sent items show channel, timestamp, and resul
 
 There is no sending in this repo. "Send" logs the outreach locally and advances the mock thread.
 
-### 8.2 `/followups`
-Grouped: overdue (red), today, this week, later. Row: candidate, job, kind, due, owner. Actions:
-done, snooze (1d / 3d / 1w / custom), cancel, open application. Bulk complete from the selection
-bar. Overdue count feeds the sidebar badge.
+### 8.2 `/followups` — removed (removed, 07 Q61, 2026-11-10)
+It ran on demo data only and its actions saved nothing. The page, its sidebar item, `g f`, the dashboard
+numbers and the board's "Follow-up in" line are gone.
 
-The default rhythm is day-3 LinkedIn, day-7 email — generated when an application moves to
-`APPLIED` and visible here immediately.
-
-### 8.3 `/analytics` — MANAGER+
-Date range and comparison period across the top. Sections: funnel (applied → response → screening →
-interview → offer → placed, with conversion between each), throughput over time by BDE, per-BDE
-table with submissions / response rate / interviews / placements, per-candidate performance,
-company response rates, and source effectiveness.
-
-Every chart is Recharts, every chart has a table equivalent behind a toggle, and every chart has an
-empty state for ranges with no data. Charts must be readable in both themes — check the axis and
-grid colours, not just the series.
+### 8.3 `/analytics` — removed (07 Q60, 2026-11-10)
+Its funnel, per-BDE numbers and job sources moved to the dashboard's Activity tab (§3.5). The route is gone.
 
 ### 8.4 `/ledger`
 Append-only, immutable, virtualised. Filters: actor, entity type, action, date range. Row: dual
@@ -571,7 +602,7 @@ the knowledge that it exists.
 | Route | Role | Content |
 |---|---|---|
 | `/settings` | all | No content: redirects to the first section the role may open (docs/07 Q1) |
-| `/settings/firm` | OWNER | Firm name, logo, timezone, shift window, default follow-up cadence |
+| `/settings/firm` | OWNER | Firm name, logo, timezone, shift window |
 | `/settings/team` | OWNER, MANAGER | Member table and candidate assignment matrix. **OWNER** invites, removes and deactivates members and changes roles; **MANAGER** sees the team read-only and assigns candidates to BDEs (docs/07 Q15). BDE and VIEWER don't see it |
 | `/settings/templates` | OWNER, MANAGER | Resume templates and outreach templates, with preview and merge-field reference |
 | `/settings/preferences` | all | Theme, density, keyboard shortcut sheet, notification preferences, timezone display |
@@ -588,7 +619,7 @@ It never appears in the sidebar for any other role.
 | ≥ 1440px | Full layout, all panes, peek panels |
 | 1024–1439px | Sidebar auto-collapses, three-pane becomes two with a preview toggle |
 | 768–1023px | Sidebar becomes a drawer, tables scroll horizontally with a pinned first column |
-| < 768px | Read-mostly: dashboard, candidate detail, application detail, follow-ups. Kanban becomes a status-filtered list. The resume builder stacks: Builder mode shows the section forms full width; Viewer mode fits the page to the screen. |
+| < 768px | Read-mostly: dashboard, candidate detail, application detail. Kanban becomes a status-filtered list. The resume builder stacks: Builder mode shows the section forms full width; Viewer mode fits the page to the screen. |
 
 Mobile is for checking, not for working. Be honest about that in the UI rather than shipping a
 cramped builder nobody can use.
@@ -636,9 +667,9 @@ overview in Phase P) follow one pattern. Code: `src/lib/query/query-group.ts` (`
    next to the failed ones; a Retry that fixes a shared query recovers every group that reads it.
 
 Groups on today's dashboards: OWNER — rollups (applications, candidates, team) + the floor groups;
-MANAGER / VIEWER — throughput (candidates, applications, team), per-BDE performance (+ follow-ups),
+MANAGER / VIEWER — throughput (candidates, applications, team), per-BDE performance,
 pipeline funnel (applications), at-risk (candidates, applications); BDE — tonight's numbers
-(candidates, applications, follow-ups), my candidates (candidates, applications), queue
+(candidates, applications), my candidates (candidates, applications), queue
 (candidates, applications, jobs).
 
 ---
@@ -686,7 +717,7 @@ Nav order: Overview · Firms · Plans · Audit · System · Team.
 | `n` | New firm (on Firms)|
 | `⌘K` | Firm search by name or slug; "View workspace of {firm}"; admin nav. No firm-scoped commands outside a support view (P5) |
 
-`g f` and `g a` mean Follow-ups and Applications in the firm area (§1.3). Inside a support view the admin
+`g a` means Applications in the firm area (§1.3). Inside a support view the admin
 is in the firm's UI, so the firm map applies there; the admin map applies only under `/admin`. The `?`
 sheet always shows the map for where you are.
 

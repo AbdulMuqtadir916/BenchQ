@@ -78,7 +78,9 @@ are complete; it makes no application-status writes.
   ledger too).
 - **Mock stays:** `src/mocks/records.ts`, `records.json`.
 
-## D5 — Follow-ups
+## D5 — Follow-ups — closed: removed (07 Q61, 2026-11-10)
+
+Decided with Abdul: the feature is removed rather than built. What follows is kept for the record.
 
 - **Frontend needs:** follow-up tasks per application (kind, due, state, assignee) for
   `/followups` and the dashboards.
