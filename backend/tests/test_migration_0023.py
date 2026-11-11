@@ -87,3 +87,36 @@ def test_upgrade_runs_again_after_a_downgrade_that_kept_searches(scratch_db):
         with engine.connect() as conn:
             assert conn.execute(text("SELECT batch_id, kind FROM scrape_jobs")).all() == [(search, "search")]
             assert conn.execute(text("SELECT count(*) FROM job_postings")).scalar() == 1
+
+
+def test_downgrade_unlinks_what_names_a_posting_and_upgrades_again(scratch_db):
+    """Decided 2026-11-11 (a): with a full world at head (tailored résumés and letters naming postings), the downgrade
+    doesn't stop: the letters are unlinked, the tailored résumés go, everything else stays; then up again."""
+    from sqlalchemy.orm import Session
+
+    from backend.tests.auth_support import seed_accounts
+    from backend.tests.isolation_support import make_world
+    name, engine = scratch_db
+    _ok(_alembic(name, "upgrade", "head"))
+    with Session(engine) as db:
+        make_world(db, seed_accounts(db))
+        db.commit()
+
+    def counts():
+        with engine.connect() as conn:
+            return {sql: conn.execute(text(sql)).scalar() for sql in (
+                "SELECT count(*) FROM resumes WHERE job_id IS NOT NULL",
+                "SELECT count(*) FROM resumes WHERE job_id IS NULL",
+                "SELECT count(*) FROM cover_letters WHERE job_id IS NOT NULL",
+                "SELECT count(*) FROM cover_letters")}
+    before = counts()
+    assert before["SELECT count(*) FROM resumes WHERE job_id IS NOT NULL"] > 0
+    assert before["SELECT count(*) FROM cover_letters WHERE job_id IS NOT NULL"] > 0
+    _ok(_alembic(name, "downgrade", "0022"))
+    after = counts()
+    assert after["SELECT count(*) FROM resumes WHERE job_id IS NOT NULL"] == 0
+    assert after["SELECT count(*) FROM cover_letters WHERE job_id IS NOT NULL"] == 0
+    assert after["SELECT count(*) FROM resumes WHERE job_id IS NULL"] == before[
+        "SELECT count(*) FROM resumes WHERE job_id IS NULL"]                       # base résumés untouched
+    assert after["SELECT count(*) FROM cover_letters"] == before["SELECT count(*) FROM cover_letters"]
+    _ok(_alembic(name, "upgrade", "head"))

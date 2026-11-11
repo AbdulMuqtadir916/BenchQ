@@ -14,7 +14,8 @@ Create Date: 2026-11-10 22:00:00.000000
 - `cover_letters.job_id`, `job_runs.target_job_id`, `llm_call_log.job_id` → `job_postings.id` ON DELETE SET NULL.
 
 No data is copied (decided 2026-11-10: no real firm uses BenchQ yet). A tailored résumé or a cover letter still naming
-an old job stops the upgrade: clear your local test rows first. The two logs (`job_runs`, `llm_call_log`) are only
+an old job stops the upgrade: clear your local test rows first. The downgrade unlinks the other way instead of stopping
+(decided 2026-11-11): a cover letter loses its posting, a tailored résumé naming one is deleted, and captures go. The two logs (`job_runs`, `llm_call_log`) are only
 unlinked from old jobs, as deleting those jobs would do (their rule is SET NULL). `applications.job_id` stays on `jobs`
 until Samad's PR. Follows 0022.
 """
@@ -61,10 +62,12 @@ def upgrade():
 
 
 def downgrade():
-    _refuse_if("SELECT count(*) FROM resumes WHERE job_id IS NOT NULL",
-               "tailored résumé(s) name a job posting, which 0022 can't point at")
-    _refuse_if("SELECT count(*) FROM cover_letters WHERE job_id IS NOT NULL",
-               "cover letter(s) name a job posting, which 0022 can't point at")
+    # 0022 can't point at a posting, and nothing is copied (no real firm uses BenchQ yet; decided 2026-11-11, (a)):
+    # a cover letter is only unlinked from its job (its rule is SET NULL); a tailored résumé can't exist without its
+    # job (`ck_resumes_category_job`), so it goes, as deleting its job would take it (CASCADE). What points at a
+    # résumé lets go of it (applications, letters, base résumés SET NULL) or goes with it (tracer links CASCADE).
+    op.execute("UPDATE cover_letters SET job_id = NULL WHERE job_id IS NOT NULL")
+    op.execute("DELETE FROM resumes WHERE job_id IS NOT NULL")
     for table, column, name in _LOGS:
         op.execute(f"UPDATE {table} SET {column} = NULL WHERE {column} IS NOT NULL")
         op.drop_constraint(name, table, type_='foreignkey')
