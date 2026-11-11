@@ -90,7 +90,7 @@ export function FindJobs({ candidate, resumeHref, onFindJobs }: FindJobsProps) {
         {isSearching ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
         {isSearching ? "Searching…" : "Find jobs"}
       </Button>
-      <p id={`find-jobs-${candidate.id}`} className="max-w-xs text-caption text-[var(--color-text-3)] sm:text-right" aria-live="polite">
+      <p id={`find-jobs-${candidate.id}`} className="max-w-xs text-caption text-[var(--color-text-3)] sm:max-w-none sm:text-right" aria-live="polite">
         {blocked ? (
           !candidate.country?.trim() && resumeHref && searchRole(candidate) ? <Link href={resumeHref} className="underline">{blocked}</Link> : blocked
         ) : refusal ? (
@@ -100,7 +100,7 @@ export function FindJobs({ candidate, resumeHref, onFindJobs }: FindJobsProps) {
         ) : last && searches ? (
           searchOutcome(last, searches.usage.jobsCap)
         ) : null}
-        {searches && !blocked ? <span className="block">{usageLine(searches)}</span> : null}
+        {searches && !blocked ? <span className="block sm:whitespace-nowrap">{usageLine(searches)}</span> : null}
       </p>
     </div>
   );
