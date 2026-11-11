@@ -427,7 +427,6 @@ button:disabled { cursor: not-allowed; }
 .bq-rich-field[data-placeholder]:empty::before { content: attr(data-placeholder); color: var(--color-text-3); }
 .bq-flash { animation: bq-flash 1.6s var(--ease-out); }
 @keyframes bq-flash { 0% { background: color-mix(in srgb, var(--color-violet-fg) 26%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-violet-fg) 22%, transparent); } 100% { background: transparent; box-shadow: 0 0 0 0 transparent; } }
-::highlight(bq-ai-pending) { background-color: color-mix(in srgb, var(--color-violet-fg) 30%, transparent); }
 .rs-desk { background: var(--color-paper-desk); background-image: radial-gradient(color-mix(in srgb, var(--color-text-3) 16%, transparent) 1px, transparent 1px); background-size: 18px 18px; }
 .rt-print-portal { display: none; }
 }

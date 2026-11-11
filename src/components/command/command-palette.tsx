@@ -6,7 +6,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Settings,
   Plus,
-  Zap,
+  Mail,
+  Briefcase,
   Search,
   UserCircle,
   Building2,
@@ -16,7 +17,9 @@ import {
 import { useUiStore } from "@/lib/stores/ui-store";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import type { Principal } from "@/lib/schemas/tenancy";
-import { can } from "@/lib/auth/policy";
+import { useOptionalFirm } from "@/lib/tenancy/firm-context";
+import { paletteResults, type PaletteGroup } from "./palette-results";
+import { can, scopeCandidates, type FirmAction } from "@/lib/auth/policy";
 import { paletteRoutesFor, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
 import { usePaletteRecords } from "@/lib/hooks/use-palette-records";
@@ -34,11 +37,12 @@ import { CONTENT_EXIT, EASE_OUT, SPRING_PANEL } from "@/lib/motion";
 interface Command {
   id: string;
   label: string;
-  group: "Actions" | "Navigation" | "Candidates" | "Jobs" | "Firms";
+  group: PaletteGroup;
   icon: LucideIcon;
   keywords?: string;
   /** Registry id of the page this command opens; hidden from principals that can't open it. */
   routeId?: RouteId;
+  permission?: FirmAction;
   run: (router: ReturnType<typeof useRouter>, toHref: ReturnType<typeof useHref>) => void;
 }
 
@@ -62,19 +66,33 @@ const STATIC_COMMANDS: Command[] = [
     run: (r, toHref) => r.push(toHref("jobs.capture")),
   },
   {
-    id: "action-focus-mode",
+    id: "action-new-application",
     group: "Actions",
-    label: "Start a run — focus mode",
-    icon: Zap,
-    keywords: "queue run",
-    routeId: "focus",
-    run: (r, toHref) => r.push(toHref("focus")),
+    label: "New application",
+    icon: Briefcase,
+    keywords: "submit apply",
+    routeId: "jobs",
+    permission: "job.apply",
+    run: (r, toHref) => r.push(toHref("jobs")),
+  },
+  {
+    id: "action-start-outreach",
+    group: "Actions",
+    label: "Start outreach",
+    icon: Mail,
+    keywords: "compose email",
+    routeId: "outreach",
+    permission: "outreach.act",
+    run: (r, toHref) => r.push(toHref("outreach")),
   },
 ];
 
 /** Actions the principal can open plus one Navigation entry per palette route in the registry. */
 function staticCommandsFor(principal: Principal, area: "firm" | "platform"): Command[] {
-  const actions = area === "firm" ? STATIC_COMMANDS.filter((command) => !command.routeId || can(principal, "route.view", routeById(command.routeId))) : [];
+  const actions = area === "firm" ? STATIC_COMMANDS.filter((command) =>
+    (!command.routeId || can(principal, "route.view", routeById(command.routeId))) &&
+    (!command.permission || can(principal, command.permission)),
+  ) : [];
   const navigation = paletteRoutesFor(principal, area).map<Command>((route) => ({
     id: `nav-${route.id}`,
     group: "Navigation",
@@ -98,6 +116,7 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
   const close = useUiStore((s) => s.closeCommandPalette);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [recentByScope, setRecentByScope] = useState<Record<string, string[]>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -113,6 +132,9 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
   const records = usePaletteRecords();
   const reduceMotion = useReducedMotion() ?? false;
   const principal = useSignedInPrincipal();
+  const firmId = useOptionalFirm()?.id;
+  const scopeKey = `${area}:${principal.userId}:${firmId ?? ""}`;
+  const recentIds = recentByScope[scopeKey];
   const openSupportDialog = useUiStore((s) => s.openSupportDialog);
   const firms = usePlatformFirms({ enabled: area === "platform" && principal.kind === "platform" });
 
@@ -139,13 +161,13 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
       });
     }
     
-    records.candidates.forEach(c => {
+    scopeCandidates(principal, records.candidates).forEach(c => {
       dynamicCommands.push({
         id: `candidate-${c.id}`,
         group: "Candidates",
         label: c.fullName,
         icon: UserCircle,
-        keywords: c.primaryRole ?? "",
+        keywords: [c.primaryRole, ...c.targetRoles].join(" "),
         run: (r, toHref) => r.push(toHref("candidates.detail", { id: c.id }))
       });
     });
@@ -161,14 +183,8 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
       });
     });
 
-    const allCommands = [...staticCommandsFor(principal, area), ...dynamicCommands];
-    
-    const q = query.trim().toLowerCase();
-    if (!q) return allCommands.slice(0, 50); // limit empty state
-    return allCommands.filter((c) =>
-      `${c.label} ${c.keywords ?? ""}`.toLowerCase().includes(q),
-    ).slice(0, 50);
-  }, [query, principal, area, records.candidates, records.jobs, firms.data, openSupportDialog]);
+    return paletteResults([...staticCommandsFor(principal, area), ...dynamicCommands], query, recentIds ?? []);
+  }, [query, recentIds, principal, area, records.candidates, records.jobs, firms.data, openSupportDialog]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, Command[]> = {};
@@ -181,6 +197,12 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
   const safeActiveIndex = Math.min(activeIndex, Math.max(0, results.length - 1));
 
   function run(command: Command) {
+    if (command.group !== "Actions") {
+      setRecentByScope((previous) => ({
+        ...previous,
+        [scopeKey]: [command.id, ...(previous[scopeKey] ?? []).filter((id) => id !== command.id)].slice(0, 5),
+      }));
+    }
     close();
     command.run(router, toHref);
   }
@@ -188,7 +210,7 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, results.length - 1));
+      setActiveIndex((i) => Math.min(i + 1, Math.max(0, results.length - 1)));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, 0));
@@ -234,7 +256,7 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
           <input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
             placeholder="Search or jump to…"
             className="flex-1 bg-transparent outline-none text-body text-[var(--color-text)] placeholder:text-[var(--color-text-3)]"
             aria-label="Command palette input"

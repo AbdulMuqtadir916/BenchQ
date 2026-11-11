@@ -16,6 +16,8 @@ interface EditableTextProps {
   placeholder?: string;
   className?: string;
   fieldId?: string;
+  invalidDescriptionId?: string;
+  onBlur?: () => void;
   /** Enter (without Shift) in a rich field — e.g. start the next bullet. */
   onEnter?: () => void;
   /** Backspace in an already-empty field — e.g. drop the bullet. */
@@ -37,6 +39,8 @@ export function EditableText({
   placeholder,
   className,
   fieldId,
+  invalidDescriptionId,
+  onBlur,
   onEnter,
   onBackspaceEmpty,
 }: EditableTextProps) {
@@ -78,6 +82,9 @@ export function EditableText({
       tabIndex={0}
       aria-label={label}
       aria-multiline={rich}
+      aria-invalid={invalidDescriptionId ? true : undefined}
+      aria-describedby={invalidDescriptionId}
+      onBlur={onBlur}
       spellCheck
       data-editable=""
       data-rich-field={rich ? "" : undefined}

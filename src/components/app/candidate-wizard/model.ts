@@ -1,3 +1,4 @@
+import { normalizeProfileLink, PROFILE_LINK_ERROR } from "@/lib/resume-doc/profile-link";
 import { z } from "zod";
 import type { CreateCandidate } from "@/lib/schemas/candidate";
 import type { EmploymentType, RemoteMode, WorkAuth } from "@/lib/schemas/enums";
@@ -152,7 +153,7 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
     if (!values.email.trim()) errors.email = "Enter their email.";
     else if (!z.string().email().safeParse(values.email.trim()).success) errors.email = "Enter a valid email, like name@example.com.";
     if (asNumber(values.yearsExperience) === null || !isWhole(asNumber(values.yearsExperience), 0, 60)) errors.yearsExperience = "Years of experience is a whole number from 0 to 60.";
-    if (values.linkedinUrl.trim() && !z.string().url().safeParse(values.linkedinUrl.trim()).success) errors.linkedinUrl = "Enter the full link, starting with https://.";
+    if (normalizeProfileLink(values.linkedinUrl) === null) errors.linkedinUrl = PROFILE_LINK_ERROR;
   }
   if (step === "work") {
     if (values.workAuth === null) errors.workAuth = "Choose their work authorization.";
@@ -205,7 +206,7 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     primaryRole: values.primaryRole.trim(),
     email: values.email.trim(),
     phone: values.phone.trim(),
-    linkedinUrl: orNull(values.linkedinUrl),
+    linkedinUrl: normalizeProfileLink(values.linkedinUrl) || null,
     city: orNull(values.city),
     state: orNull(values.state),
     country: isUs(values.country) ? US : values.country.trim(),
