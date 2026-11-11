@@ -93,7 +93,6 @@ src/mocks/fixtures/
 ├── resumes.ts         ~40 resumes, ~90 versions
 ├── applications.ts    ~320 applications with full event history
 ├── outreach.ts        contacts + touches
-├── followups.ts       derived from applications
 ├── ledger.ts          generated from all mutations above
 └── empty.ts           the empty-state variant of every collection
 ```
@@ -109,7 +108,7 @@ Every BDE reports to a MANAGER (07 Q40), and every candidate has a manager and a
 | Firm | Status | Plan (BDE seats / candidates) | Users | Candidates (active) | Notes |
 |---|---|---|---|---|---|
 | `firm_hts` Hyderabad Tech Staffing LLC | ACTIVE | Growth (10 / 100) | 7 (OWNER, two MANAGERs, 3 BDEs, VIEWER) | 24 (21) | the original firm. Two teams: Fatima Reddy (Adnan, Sneha) and Priya Shah (Vikram). Two candidates wait for a BDE in Fatima's queue. BDE seats 4/10 (3 BDEs + 1 pending BDE invite) |
-| `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 6 (OWNER, MANAGER, 3 BDEs, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 BDEs + 1 pending BDE invite): can't add a BDE, not over. One candidate waits in Arjun Varma's queue. `bdeCapacity` 3, so Kiran is at capacity |
+| `firm_stl` Secunderabad Talent Labs | ACTIVE | Starter (4 / 25) | 6 (OWNER, MANAGER, 3 BDEs, VIEWER) | 5 (3) | exactly **at** its seat limit, 4/4 (3 BDEs + 1 pending BDE invite): can't add a BDE, not over. One candidate waits in Arjun Varma's queue. |
 | `firm_cbw` Cyberabad Bench Works | SUSPENDED | Starter (4 / 25), downgraded from Growth | 8 (OWNER, MANAGER, 5 BDEs, VIEWER) | 1 (1) | **over** its seat limit, 6/4 (5 BDEs + 1 pending BDE invite), and over on BDEs alone (5/4), so it stays over whatever Phase S decides about a suspended firm's pending invites: the `isOverLimit` fixture. Ledger: created, owner accepted, plan changed, suspended |
 | `firm_gsc` Gachibowli Staffing Co | ONBOARDING | Starter (4 / 25) | 0 | 0 | the owner's invite is pending, sent by the Super Admin; nothing in the UI accepts it until `/invite/[token]` arrives in P4 (docs/07 Q26), where `/welcome` gets its browser check (the mock backend's acceptance is unit-tested, `invites.test.ts`) |
 
@@ -358,16 +357,7 @@ checks — semantic headings, tables detected, font count, image text, contact b
 Two versions should carry a `tracer` with non-zero `openCount`, so the "recruiter opened your
 submission" signal has something to render.
 
-### 4.7 Follow-ups
-
-Derived from applications in `APPLIED` or later:
-
-- **7 overdue** — drives the red section on the dashboard
-- **11 due today**
-- **26 upcoming**
-- 4 snoozed, 3 cancelled
-
-Split across the three BDEs so the role switcher shows different queues.
+### 4.7 Follow-ups — removed, 07 Q61
 
 ---
 
@@ -443,7 +433,7 @@ A parallel set in `fixtures/empty.ts`, reachable via `?state=empty` on any route
 Empty states are half the screens in a new firm's first week and they are routinely shipped broken.
 
 Cover: no candidates · no jobs · no applications · candidate with no Record · candidate with no
-resumes · no follow-ups due · analytics with no data in the period · ledger with no entries.
+resumes · analytics with no data in the period · ledger with no entries.
 
 ---
 

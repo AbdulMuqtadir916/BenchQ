@@ -105,8 +105,7 @@ export const OutreachChannel = z.enum([
 
 export const OutreachResult = z.enum(['SENT', 'OPENED', 'REPLIED', 'BOUNCED', 'NO_RESPONSE']);
 
-export const FollowUpKind = z.enum(['DAY_3_LINKEDIN', 'DAY_7_EMAIL', 'CUSTOM']);
-export const FollowUpState = z.enum(['PENDING', 'DONE', 'SNOOZED', 'CANCELLED']);
+// FollowUpKind and FollowUpState: removed, 07 Q61 (2026-11-10), with FollowUpTask.
 
 /** JobNavigator-aligned: two scoring depths for cost control. */
 export const ScoringDepth = z.enum(['LIGHT', 'FULL']);
@@ -480,7 +479,7 @@ Approval permissions are `notification.approve` (OWNER/MANAGER; request recipien
 | Record | Change | Note |
 |---|---|---|
 | Candidate, User | none | already have `firmId` |
-| Job, Application, Resume, Record (candidate record), Document, Inbox (`CandidateInbox`, `InboxMessage`, `MailboxConnection`), Followup (`FollowUpTask`) | add `firmId: z.string()` | required; every fixture gets one in Phase T (T3) |
+| Job, Application, Resume, Record (candidate record), Document, Inbox (`CandidateInbox`, `InboxMessage`, `MailboxConnection`) | add `firmId: z.string()` | required; every fixture gets one in Phase T (T3) |
 | **Agent and tailoring runs** | add `firmId: z.string()` | **required** (A17): `/admin/system` needs AI spend by firm, and deriving it through joins is fragile |
 | LedgerEntry | add `firmId: z.string().nullable()` | rule below |
 | Company (and `CompanyVerification`) | none | global reference data (07 Q13) |
@@ -730,25 +729,17 @@ shiftWindow: z.object({
   end: ClockTime,                         // default "00:30"; end earlier than start = crosses midnight
 }),                                       // read in the firm's primaryTimezone (no timezone of its own)
 
-followUpCadence: z.array(z.object({
-  dayOffset: z.number().int().min(1).max(30),   // days after the application is submitted
-  channel: OutreachChannel,                      // §2 enum
-})).min(1).max(5),                               // ascending dayOffset, no duplicates
-// default: [{ dayOffset: 3, channel: 'LINKEDIN_MESSAGE' }, { dayOffset: 7, channel: 'EMAIL' }]
+// followUpCadence: dropped with follow-ups (removed, 07 Q61).
 ```
 
 | Value | Default | Rules |
 |---|---|---|
 | `shiftWindow` | 18:30 – 00:30 in `primaryTimezone` | Times only; the window may cross midnight; start ≠ end. Shown with the timezone's abbreviation (IST for the beachhead) |
-| `followUpCadence` | day 3 LinkedIn message, day 7 email | 1–5 steps, ascending, offsets 1–30 days; one channel per step |
 
 **Questions with this draft** (proposed answers in brackets):
 
-1. **Existing follow-ups when the cadence changes.** *(Proposed: only follow-ups created after the change
-   use the new cadence; existing ones keep their dates.)*
-2. **`FollowUpKind` (`DAY_3_LINKEDIN`, `DAY_7_EMAIL`, `CUSTOM`).** *(Proposed: keep the enum; a step that
-   matches a default kind uses it, any other step creates `CUSTOM`. No enum change.)*
-3. **What the shift window drives.** *(Proposed: display only for now — the focus-mode timer and the
+1. ~~Follow-up cadence questions~~: dropped with follow-ups (removed, 07 Q61).
+2. **What the shift window drives.** *(Proposed: display only for now — the focus-mode timer and the
    "shift" range on dashboards read it; nothing is blocked outside the window.)*
 4. **Ledger.** *(Proposed: editing either logs `UPDATE` with `entityType: "firm"`, as other firm edits do.)*
 
@@ -768,9 +759,6 @@ managerId: z.string().nullable(),      // the MANAGER this BDE reports to. null 
 // src/lib/schemas/tenancy.ts — InviteBaseSchema gains:
 managerId: z.string().nullable(),      // the BDE's manager-to-be (Q40). null for non-BDE invites. A new BDE invite
                                        // always names one (checked when sent); an older one may be null (Q51)
-
-// src/lib/schemas/session.ts — FirmSchema gains:
-bdeCapacity: z.number().int().positive().default(10),   // comfortable load per BDE: a warning, never a block (Q46)
 ```
 
 `UserSchema` and `InviteSchema` are refined like `InviteSchema` already is (a base object plus `superRefine`):
@@ -784,7 +772,6 @@ MANAGER of the same firm, is a store/backend check: users and invites from befor
 | `seatsUsed` | active users **with role BDE** + pending, unexpired invites **with role BDE** (Q44). OWNER, MANAGER and VIEWER are free and unlimited; `seatLimit` means BDE seats |
 | working statuses | `ON_BENCH`, `INTERVIEWING`, `OFFER` (Q45). One list in `src/lib/derive/tenancy.ts` |
 | assigned candidates | candidates with a BDE (`bdeId` not null) **and** a working status. What `candidateLimit` counts (Q45). Creating a candidate is never blocked; assigning a BDE is, at the limit |
-| BDE load | a BDE's candidates in a working status, against `Firm.bdeCapacity` (Q46) |
 
 Ledger: `ASSIGN` (`entityType: "candidate"`) whenever a candidate's manager or BDE is set or changed, summary
 "Assigned to {BDE} ({manager})" or "Handed to {manager}", with "(from {previous})" on a move; its `note` is the
@@ -851,7 +838,8 @@ export const CandidateSchema = z.object({
   preferredIndustries: z.array(z.string()), // step 4 (was inside `persona`, dropped in 0015)
   dealBreakers: z.array(z.string()),     // step 4 (same)
 
-  qaBank: z.array(QaBankEntrySchema),
+  qaBank: z.array(QaBankEntrySchema),     // always [] on the backend since 0019 (no `candidates.qa_bank`; each résumé
+                                         // version's `autofill` instead, §8.1); kept for the Documents tab until it goes
 
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -1170,6 +1158,76 @@ export const JobMarkSchema = z.object({
 - Endpoints: `GET /api/job-marks` (the signed-in user's), `PUT /api/job-marks/:jobId/:kind`,
   `DELETE /api/job-marks/:jobId/:kind`.
 
+### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migration 0020; backend only, no frontend schema/screen yet)
+
+> Zuhair's track. Deliberately **not** `jobs`: this is a separate, candidate+batch-scoped table
+> (`backend/models/job_search.py`), not the existing shared-pool `jobs` table above (`backend/models/db.py`) or its
+> `JobSchema`/`JobMarkSchema` frontend contracts. One row per job a search found for one candidate — `(candidate_id,
+> job_id)` is unique, so the same posting content found again for the same candidate updates the existing row
+> (`batch_id`, `last_seen_at`) instead of inserting a duplicate. So `batch_id` is **the last batch that found the
+> job**, not its batch history; "which jobs did batch X find" leaves out jobs a later batch found again. A
+> membership table is the answer if a screen ever needs that history.
+
+- **Columns (revised 2026-11-10, from Abdul's review):** `id`, `firm_id`, `candidate_id`, `batch_id`, `source`,
+  `job_id`, `content`, `discovered_at`, `last_seen_at`, `created_at`, `updated_at`.
+  - **No `status` column.** Whether a job was saved or applied to lives in `applications` (its `saved` status, and
+    an application row), so a copy here can't drift from it. Hiding a job (dismissed) isn't built.
+  - **Tenancy:** `(firm_id, candidate_id)` references `candidates (firm_id, id)` (on `scrape_jobs` too), so a row
+    can't carry a firm other than its candidate's; `candidates` gets `UNIQUE (firm_id, id)` for it.
+  - **`(firm_id, candidate_id, batch_id)` references the same three on `scrape_jobs`** (unique together there), so
+    a posting can only name a batch run for its own candidate in its own firm, never another candidate's or another
+    firm's (Abdul's review, 2026-11-10). On a successful batch the ingestion code writes the `scrape_jobs` row and
+    the postings in one transaction, the batch row first, so a crash leaves neither.
+  - **`job_id` is checked:** `CHECK (job_id ~ '^[0-9a-f]{64}$')`, lower-case SHA256 hex, so a raw board id or a
+    truncated or upper-case hash is refused instead of silently breaking dedup.
+  - **Indexes:** the unique `(candidate_id, job_id)` (dedup, and lookups by candidate) and
+    `(firm_id, candidate_id, batch_id)` (one candidate's list in a firm, a firm's list, and the batch key, by its
+    leading columns). Nothing looks up by the hash alone. On `scrape_jobs`, the unique `(firm_id, candidate_id,
+    batch_id)` serves a candidate's batches the same way.
+- **Identity (revised 2026-11-09):** `job_id` (SHA256 of normalized company + title + full job description; a
+  content hash, not an id from the job board, and not the row's primary key `id`)
+  is the only identity key. A content change is treated as a new posting by design, so the board's own job id adds
+  nothing to dedup and isn't stored (`source_id` was dropped before anything shipped). `source` records which
+  provider the row came from.
+- **Content (revised 2026-11-09): one `content` JSONB column, not separate typed columns.** Everything about the
+  job — title, description, location, salary, seniority, skills, apply link, whatever a source sends — lives
+  inside it. The original design (migration 0020, first cut) had a normalized core of typed columns plus a `raw`
+  fallback, modeled on JSearch's `job-details` response; that's been replaced before anything shipped, because the
+  set of sources isn't fixed to JSearch/freehire.me, and typed columns built around one source's fields would need
+  a migration every time another aggregator is added or a source changes its response shape. `content`'s internal
+  shape is the ingestion/adapter code's decision (not yet written), not this table's — so filtering/ranking on its
+  fields (location, salary, seniority, skills) is a JSON-path query, not a plain `WHERE` on a column, and no CHECK
+  constraint can cover anything inside it.
+- **Not yet built:** the ingestion/adapter code itself, and repointing
+  `applications.job_id` / `job_runs.target_job_id` off the old `jobs` table onto this one. The old `jobs` table and
+  everything still pointing at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`, `job_runs`) is
+  unchanged for now; retiring it and reclaiming the `jobs` name is a later migration once those are repointed.
+- **Frontend contract:** none yet — this table has no adapter, DTO mapper, or screen. `JobSchema`/`CompanySchema`
+  above describe the existing mock-backed job explorer, not this table; reconciling (or replacing) that contract
+  is separate, later work once this module starts serving real screens.
+- **Second source, freehire.me (decided 2026-11-09, still applies under the `content` design):** target markets
+  are US, Canada and India, so a posting can legitimately list more than one country/city (e.g. a remote NA role
+  open to `["us", "ca"]`). Rather than a multi-location child table (the old `job_locations` pattern, dropped), the
+  ingestion/adapter code (not yet written) should set `content`'s location fields to whichever country the search
+  itself targeted — not the first entry in the provider's array — while keeping the full array somewhere in
+  `content` too. Cross-market queries ("all jobs open to India OR Canada at once") are out of scope; a candidate's
+  search is always scoped to one target market. freehire.me's own `source` response field names the underlying ATS
+  (e.g. `"successfactors"`) and maps to a publisher field inside `content`, the same role JSearch's `job_publisher`
+  plays — not to this table's own `source` column, which holds the literal provider name (`"freehire"`). A closed
+  posting is filtered out before it reaches this table; a posting that closes *after* being stored has no
+  automatic signal and stays visible until something else catches it — accepted for now, revisit with a staleness
+  rule if it becomes a real problem.
+- **`scrape_jobs` (migration 0020, with `job_postings`):** one row per finished batch — `firm_id`, `candidate_id`, `batch_id` (unique),
+  `state` (revised 2026-11-10: `success`, the source answered with at least one job | `empty`, it answered with
+  none | `error`, it failed), `error` (text, the failure detail, set exactly when `state = 'error'`: a real failure
+  and an empty result never look the same), `metadata` (JSONB, `{}` by
+  default: everything in the source's response except the jobs themselves, such as request id, parameters and
+  totals, stored once per batch rather than on every job row), `created_at`. Written once the
+  batch completes; there is no `request`/`pending` row, so this is a log, not a queue — any "search in progress"
+  UI state is the frontend's own, not backed by a row here. One row per batch, not per source: freehire.me is the
+  only live source, so there's nothing to break down yet; a per-source breakdown becomes a real question again
+  once a second source goes live alongside it.
+
 ## 7. Matching & scoring
 
 ```ts
@@ -1342,7 +1400,12 @@ export const ResumeSchema = z.object({
 });
 ```
 
-### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off)
+### 8.1 Résumé versioning — APPROVED 2026-10-31 (Abdul; `promotedFromResumeId`, `archivedAt` and `summaryId` 2026-11-02, versioning PR 5); `ResumeDraftSchema.country` BUILT (versioning PR 2); `BaseResume`, `baseResumeId`, `ResumeShelf`, `OpenedResume` BUILT (versioning PR 7); the studio's document in the parser's shape and `ResumeRemoval` BUILT (PR 7, for Abdul's sign-off); the version's `autofill` (`?autofill=true`) APPROVED 2026-11-08 (Abdul, issue 119), BUILT (PR 118)
+
+**Profile links (BUG-014, link policy approved 2026-11-11).** Candidate creation and résumé version saves accept
+optional HTTP and HTTPS links. A bare LinkedIn or GitHub URL with a path gains `https://`. Blank links are stored as
+null. An invalid link entered by the user returns 422 naming the field. An invalid link from the parser is dropped,
+and a malformed stored LinkedIn link is treated as absent by the candidate list and detail mapper.
 
 Bases and versions (`docs/team/resume-versioning.md`). The backend keeps many bases per candidate, one active, and
 every edit as a new row; the frontend keeps its `Resume.versions[]` model, filled by the DTO mapper.
@@ -1351,6 +1414,56 @@ every edit as a new row; the frontend keeps its `Resume.versions[]` model, fille
 rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateId` ← `template`, `name` ← `name`,
 `versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
 `ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
+
+**`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK; this contract signed off
+by Abdul 2026-11-08 in issue 119, the `key` added with his OK):** `GET …/resumes/{id}?autofill=true`, on the
+candidate's route and on
+`GET /firms/{firm}/resumes/{id}`, adds `autofill`: every question an application form can ask, each once. Two parts:
+
+- **Fixed answers**, built from the version and the profile for that read (`backend/candidates/autofill.py` `build()`)
+  and never stored as answers (an edit keeps a copy of the one it replaced, below): this version's header, summary,
+  skills, every job with its dates and bullets, its education (the highest degree by the rules written in
+  `autofill._level`, with that degree's school and year; a certificate listed under education isn't a degree),
+  projects, awards, certifications and languages; and the profile's facts:
+  work authorization (the profile's status, which every candidate has), its expiry, sponsorship, transfer,
+  target rate, availability, notice, relocation, engagement types, work settings, preferred locations and industries,
+  primary and target roles. Years of experience come from the version's own jobs, counted to today (the New candidate
+  form's rule), else `years_experience`. A profile edit shows in every version at once; nothing is rewritten.
+- **The user's entries**, stored in `resumes.autofill` (`{}` by default) as
+  `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit to a fixed answer is kept by
+  its question's key, so rewording a question never loses it, with `over`: a copy of the built answer it replaced (for
+  a list such as the work history, the whole list). An edit applies while `over` is still the built answer, compared
+  as JSON (85.0 is 85, but `true` isn't 1): once the version's own text or the profile changes that answer, the new
+  built answer shows (so a yearly step in the years worked out ends an edit of the years too). So does a change to how
+  the backend writes an answer (a label, a field of the jobs, the date format), unless that change also rewrites the
+  stored `over` values. A question they added can't take a fixed question's wording; one whose words a fixed question
+  takes later (a new question, or a reworded one) is kept and copied, and shows only while that fixed question has no
+  answer. A save, a promote and tailoring (a tailored v1, 07 Q55) copy the entries, and on the new version an edit
+  applies only where its built answer is still `over`; a new upload starts with none. Anything else stored (a value
+  that isn't an object, or the first 0019's `{question: answer}` of built answers) reads as no entries.
+
+Each entry is `{question, answer, kind, key?, built?}`:
+
+| Field | What |
+|---|---|
+| `question` | As written once in `autofill.py`, or as the user typed it |
+| `answer` | Its JSON type kept: text, a number, `true`/`false`, a list, a list of objects (jobs, education, projects, awards), a date as `"YYYY-MM-DD"` |
+| `kind` | `FIXED` (built), `EDITED` (the user's entry for a fixed question), `CUSTOM` (a question the user added) |
+| `key` | On `FIXED` and `EDITED`: what the question asks, a fixed name that doesn't change with the wording, so a reader (the extension) matches by it. A new question gets a new key |
+| `built` | On `EDITED`: the built answer a reset gives back; `null` when the version and the profile don't answer it |
+
+The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`, `address-city`, `address-region`,
+`address-country`, `professional-title`, `summary`, `work-auth-status`, `skills`, `current-company`, `current-title`,
+`work-history`, `education-degree`, `education-school`, `graduation-year`, `education-history`, `projects`, `awards`,
+`certifications`, `languages`, `work-auth-expiry`, `visa-sponsorship`, `visa-transfer`, `years-experience`,
+`primary-role`, `target-roles`, `pay-rate`, `start-date`, `notice-period-days`, `relocation-willing`,
+`employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`. The fixed questions come first in
+that order, then the user's. A missing fact leaves its question out. Never in it: ids, `rate_min`, `contact_notes`,
+`deal_breakers`, `status`, `bench_start_date`. Not in the list, a save, or a read without `?autofill=true`. Writing the
+user's entries (a route) is planned: it takes `over` from its own build, never from the request, and the request
+carries the built answer the user was shown, so the route answers 409 when its own build differs (an edit is never
+saved over an answer the user didn't see). Its contract goes here first. The frontend doesn't map `autofill` (no screen
+shows it yet); the extension reads it (Arbaz).
 
 ```ts
 // src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker
@@ -1418,9 +1531,18 @@ export const ResumeSaveResultSchema = z.object({ opened: OpenedResumeSchema, not
 - Change `src/lib/schemas/` to match this only in the PR that builds it (versioning PR 2 for `country`, PR 7 for
   the rest).
 
+### 8.2 A résumé version's file — PROPOSED 2026-11-09 (07 Q49; Zuhair's area, for his sign-off), BUILT (PR 121)
+
+`GET /api/firms/{firm}/candidates/{cid}/resumes/{rid}/file` answers the PDF or Word file an uploaded base was read
+from, as uploaded (`resume_parses.content`, its `mime_type`, `Content-Disposition: attachment` with the uploaded file's
+name, `Cache-Control: no-store`). Only an uploaded base's version 1 has one: that version is the file as read. Any later
+version, a tailored one or a promoted base's answers 404 ("This version has no uploaded file."), as does a version out
+of the principal's scope. The read follows the version's own access (§8.1). The extension attaches it to a form's
+résumé upload (07 Q50–Q52); a file for every version (rendered by the backend) is asked of Zuhair (Q25).
+
 ---
 
-## 9. Application, outreach, follow-up
+## 9. Application, outreach
 
 ### Applications backend foundation — PR 1 (2026-11-01)
 
@@ -1443,8 +1565,20 @@ unchanged in this PR; their live DTO integration and display changes belong to l
 - `GET /api/applications` accepts `candidate_id` and `tracked_only`. Candidate visibility applies to list, detail,
   edits, interviews and preparation; legacy rows are visible to firm-wide readers only.
 - `PATCH /api/applications/{id}/candidate-status` accepts
-  `{status, expected_revision, command_id?, note?}`. A changed revision returns 409. A matching command replay
-  creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+  `{status, expected_revision, command_id?, note?, form_data?, resume_id?}`. A changed revision returns 409. A matching
+  command replay creates no duplicate event. Reusing a command ID with different content or actor returns 409.
+- `resume_id` on that move is the résumé version the form was sent with: the one the extension's answers came from.
+  Only a move to `applied` may send it, and it must be one of the application's candidate's versions, not deleted;
+  anything else returns 400 and changes nothing. It becomes the application's `resume_id`, the résumé the application
+  shows as sent. A move back to Saved leaves it.
+- `applications.form_data` (migration 0021, nullable JSONB) is what the employer's form held when the BDE marked the
+  job applied from the extension: `{fields: [{label, value, required, source}]}`, `source` being `autofill` or `bde`.
+  Only a move to `applied` may send it; at most 200 fields, labels up to 500 characters, values up to 4000; anything
+  else returns 400. It stays null on a Saved job and on an applied job with no form to send, and a move back to Saved
+  clears it. An empty form (`{fields: []}`) is valid: the page couldn't be read. It holds the candidate's answers, so
+  no response returns it, the ledger and status events don't copy it, and logs never carry it. The extension leaves
+  out passwords, government IDs, payment details, dates of birth, signatures and EEO answers, and an upload is its
+  file name only.
 - `PATCH /api/applications/{id}/review` also requires `review_id` and `expected_review_revision`. Only a pending
   persisted review for this application can be confirmed; another route cannot bypass it with a normal status move.
   Review resolution and status/event/ledger writes commit together. Model classification and review queue creation
@@ -1532,22 +1666,7 @@ export const OutreachTouchSchema = z.object({
   repliedAt: z.string().datetime().nullable(),
 });
 
-export const FollowUpTaskSchema = z.object({
-  id: z.string(),
-  applicationId: z.string(),
-  assignedToUserId: z.string(),
-  kind: FollowUpKind,
-  dueAt: z.string().datetime(),
-  state: FollowUpState,
-  completedAt: z.string().datetime().nullable(),
-  snoozedUntil: z.string().datetime().nullable(),
-  note: z.string().nullable(),
-
-  // denormalised for the queue view
-  candidateName: z.string(),
-  companyName: z.string(),
-  jobTitle: z.string(),
-});
+// FollowUpTaskSchema: removed, 07 Q61 (2026-11-10). Follow-ups are gone.
 ```
 
 ---
@@ -1570,6 +1689,8 @@ Status changes go through `PATCH /api/applications/:id/status` (`{ status, note 
 an `ApplicationEvent` — the same write the kanban makes.
 
 ### 9.y Candidate documents (`src/lib/schemas/document.ts`)
+
+> **Planned to be dropped (Abdul, relayed by Zuhair 2026-11-07):** the candidate's Documents section — uploading visa copies, ID, certificates and other files, and the Screening answers panel. It may come back in a later version, not now. Nothing is removed yet: its owners remove it, with this contract (`docs/team/abdul.md` §3). Don't build on it.
 
 - `CandidateDocument` — `kind` (`WORK_AUTH | IDENTITY | RESUME | CERTIFICATION | EDUCATION |
   EMPLOYMENT | OTHER`), `title`, `fileName`, `mimeType`, `sizeKb`, `uploadedAt`, `uploadedByUserId`,
@@ -1649,8 +1770,6 @@ export const FirmDashboardSchema = z.object({
 
 export const BdeDashboardSchema = z.object({
   queueCount: z.number().int(),
-  followUpsDueToday: z.number().int(),
-  followUpsOverdue: z.number().int(),
   applicationsThisWeek: z.number().int(),
   responsesThisWeek: z.number().int(),
   interviewsScheduled: z.number().int(),
@@ -1682,7 +1801,7 @@ export const LedgerEntrySchema = z.object({
 /** Merged activity stream for a candidate. */
 export const TimelineEventSchema = z.object({
   id: z.string(),
-  kind: z.enum(['STATUS', 'APPLICATION', 'RESUME', 'OUTREACH', 'FOLLOWUP', 'NOTE', 'RECORD']),
+  kind: z.enum(['STATUS', 'APPLICATION', 'RESUME', 'OUTREACH', 'NOTE', 'RECORD']),
   occurredAt: z.string().datetime(),
   actorName: z.string().nullable(),
   title: z.string(),
@@ -1703,7 +1822,7 @@ export const TimelineEventSchema = z.object({
    have schemas so they can be typed — but they're produced by pure functions in
    `src/lib/derive/`, which are unit-tested against fixtures.
 4. **Denormalised fields are deliberate.** `Match.job`, `Application.companyNameAtApply`,
-   `FollowUpTask.candidateName` — these exist so list views render without N+1 lookups, and so
+   (`FollowUpTask.candidateName` was one, until follow-ups were removed) — these exist so list views render without N+1 lookups, and so
    history survives upstream edits.
 5. **No claim states (2026-11-05).** Nothing on a candidate, a résumé or an answer is Verified, Unverified or Contradicted.
 

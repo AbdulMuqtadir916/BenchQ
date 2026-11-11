@@ -151,7 +151,7 @@ in this market is fatal.
 | **Assigned BDE** | The one BDE who markets a candidate. Never call this the candidate's "owner" — OWNER is the firm's owner. |
 | **Needs a BDE** | A candidate handed to a manager who hasn't picked a BDE yet. Doesn't count toward the candidate limit. |
 | **Working statuses** | On bench, interviewing, offer: the statuses that count toward the plan's candidate limit and a BDE's load (07 Q45). |
-| **Load / BDE capacity** | A BDE's candidates in a working status, against the firm's comfortable number per BDE (default 10). Over capacity is a warning, never a block. |
+| **Load** | A BDE's candidates in a working status. There is no per-BDE cap: the plan's BDE seats and candidate limit are the only limits (07 Q63). |
 | **Seat** | One BDE, or one pending BDE invite. Owners, managers and viewers don't take seats (07 Q44). |
 | **Handoff note** | The note written when a candidate is assigned. Context that isn't on the résumé. |
 

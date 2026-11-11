@@ -1,0 +1,4 @@
+/* Served directly because the CSS optimizer warns on custom highlight selectors. */
+::highlight(bq-ai-pending) {
+  background-color: color-mix(in srgb, var(--color-violet-fg) 30%, transparent);
+}

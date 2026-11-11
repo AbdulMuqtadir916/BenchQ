@@ -1,5 +1,7 @@
 # 05 — Assign, done screen and reassigning
 
+> **Superseded in part (2026-11-11, 07 Q63):** BDE capacity (Q46) was removed: no `bdeCapacity`, no `firmSettings.edit`, no capacity form, no "At capacity" figure, no `deriveBdeLoad`. Read the capacity parts below as history.
+
 **Owner:** — · **Depends on:** 02, 03, 04 · **Branch:** `feat/onboarding-05-assign`
 
 Finishes the flow: step 5, creating the candidate, the done screen, the "Needs a BDE" queue, reassigning, and the BDE's

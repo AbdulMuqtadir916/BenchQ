@@ -1,13 +1,12 @@
 "use client";
 
 import { UserX } from "lucide-react";
-import { z } from "zod";
+import type { CandidatesSearchState } from "@/lib/schemas/list-search";
 import { cn } from "@/lib/cn";
 import { Tag } from "@/components/ui/tag";
 
-/** The candidates list's `?assignment=` filter (docs/candidate-onboarding/05 §5), parsed with Zod. */
-export const CandidateListQuery = z.object({ assignment: z.enum(["all", "needs-bde"]).catch("all") });
-export type AssignmentFilter = z.infer<typeof CandidateListQuery>["assignment"];
+/** The candidates list's `?assignment=` filter (docs/candidate-onboarding/05 §5), parsed with the list's other filters. */
+export type AssignmentFilter = CandidatesSearchState["assignment"];
 
 /** "All · Needs a BDE (n)": the manager's queue (07 Q42). Not shown to a BDE, who has no queue. */
 export function AssignmentToggle({ value, waiting, onChange }: { value: AssignmentFilter; waiting: number; onChange: (next: AssignmentFilter) => void }) {

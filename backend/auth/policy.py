@@ -14,9 +14,9 @@ from fastapi import Depends, HTTPException
 from backend.auth.sessions import Principal
 
 FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply",
-                "application.move", "resume.edit", "outreach.act", "followup.act", "email.retry", "email.reclassify")
+                "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
-                "candidate.assign", "firmSettings.edit", "notification.approve")
+                "candidate.assign", "notification.approve")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
                     "invite.revoke", "platformTeam.manage", "platform.notification.approve")
 ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + ("team.view",) + PLATFORM_ACTIONS
@@ -37,14 +37,12 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "application.move": _ALL_ACTING,
     "resume.edit": _ALL_ACTING,
     "outreach.act": _ALL_ACTING,
-    "followup.act": _ALL_ACTING,
     "member.invite": _OWNER_ONLY,
     "member.remove": _OWNER_ONLY,
     "member.changeRole": _OWNER_ONLY,
     "member.deactivate": _OWNER_ONLY,
     "member.changeManager": _OWNER_ONLY,          # 07 Q40
     "candidate.assign": _OWNER_AND_MANAGER,
-    "firmSettings.edit": _OWNER_ONLY,             # 07 Q46
     "notification.approve": _OWNER_AND_MANAGER,   # 07 Q54; recipient check remains request-specific
     "team.view": _OWNER_AND_MANAGER,
 }

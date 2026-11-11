@@ -57,6 +57,7 @@ function refreshAfterResumeWrite(client: QueryClient, firmId: string, freshCandi
   return Promise.all([
     client.invalidateQueries({ queryKey: queryKeys.resumes.all(firmId), predicate: (query) => JSON.stringify(query.queryKey) !== fresh }),
     client.invalidateQueries({ queryKey: queryKeys.candidates.all(firmId) }),
+    client.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) }),
   ]);
 }
 

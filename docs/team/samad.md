@@ -170,7 +170,7 @@ proposed access log. These are future scope, not hidden dependencies for PR 3.
    values; `status_transitions` → a proper history the frontend's `ApplicationEvent` reads.
 2. **Routes:** list (by candidate, in scope: a MANAGER's team, a BDE's own), create (candidate + job + **tailored
    résumé** `resume_id`; one per candidate per job), move status, notes. `submitted_by_user_id` is the signed-in user.
-3. **Follow-ups** (D5) as that doc says.
+3. ~~**Follow-ups** (D5)~~: dropped, the feature is removed (07 Q61, 2026-11-10, agreed with Abdul).
 4. **Frontend live** behind `applications`: the board, the candidate's Applications tab, the dashboards' numbers
    (they are derived from applications: never store a count).
 
@@ -185,7 +185,8 @@ Not in this repo yet (`backend/UPSTREAM.md`: JobNavigator's `extension/` was not
    `JobMark` is per user today: its contract change (per candidate) goes in `docs/02` with Abdul's sign-off.
 3. Then the extension itself.
 4. **Autofill reads the candidate, not the shared persona** (decided 2026-11-05, Abdul): fixed answers from
-   `candidates` and the candidate's résumé, drafted answers from `candidates.qa_bank`; the extension names the candidate.
+   `candidates` and the candidate's résumé, drafted answers from the résumé version's `autofill` (migration 0019,
+   `GET …/resumes/{id}?autofill=true`; `candidates.qa_bank` is gone); the extension names the candidate.
    Field-by-field mapping and the two open points (an H1B transfer and sponsorship; self-ID defaults):
    [persona-to-candidates.md](./persona-to-candidates.md) §4–§5 (a suggestion; the facts are §1–§2).
 

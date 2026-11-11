@@ -1,5 +1,7 @@
 # 06 — Backend: candidates, hierarchy, parser
 
+> **Superseded in part (2026-11-11, 07 Q63):** BDE capacity (Q46) was removed: no `bdeCapacity`, no `firmSettings.edit`, no capacity form, no "At capacity" figure, no `deriveBdeLoad`. Read the capacity parts below as history.
+
 **Owner:** Abdul (taken over from Zuhair on 2026-10-27; Zuhair's own parser prompt can replace ours later) · **Depends on:** 01's docs (the contracts in docs/02); foundation F1–F7 (done) ·
 **Branch:** one per PR below, e.g. `feat/candidates-1-tables`
 

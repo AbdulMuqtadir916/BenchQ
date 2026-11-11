@@ -19,7 +19,7 @@ def firm_json(firm: Firm) -> dict:
         "application_expiry_days": firm.application_expiry_days,
         "status": firm.status, "plan_id": str(firm.plan_id), "seat_limit": firm.seat_limit,
         "candidate_limit": firm.candidate_limit, "contact_phone": firm.contact_phone,
-        "bde_capacity": firm.bde_capacity, "created_at": _iso(firm.created_at),
+        "created_at": _iso(firm.created_at),
     }
 
 

@@ -24,7 +24,7 @@ from sqlalchemy.orm import load_only
 from backend.auth import ledger
 from backend.auth.policy import is_lead_role
 from backend.auth.scoping import scoped
-from backend.candidates import profile
+from backend.candidates import autofill, profile
 from backend.candidates.first_base import first_base
 from backend.models.candidates import BaseResume, ResumeParse
 from backend.models.db import Application, Resume, utcnow
@@ -159,6 +159,13 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
     return {**out, **content_of(row)} if with_content else out
 
 
+def opened_json(row: Resume, candidate, *, with_autofill: bool = False) -> dict:
+    """One version as it is opened: its content and, with `with_autofill` (`?autofill=true`), its autofill, built
+    for this read (`autofill.merged`: nothing is written). Only these answers carry it, never the list or a save."""
+    out = version_json(row, with_content=True)
+    return {**out, "autofill": autofill.merged(candidate, row)} if with_autofill else out
+
+
 def base_json(base: BaseResume, number: int) -> dict:
     return {"id": str(base.id), "candidate_id": str(base.candidate_id), "number": number, "source": base.source,
             "is_active": base.is_active,
@@ -266,9 +273,12 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
     if content == before:
         raise _bad("No changes to save.")
     latest = _group(db, source).with_entities(func.max(Resume.version)).scalar() or source.version
+    # The autofill entries the user typed go to the next version with the résumé (the built answers aren't stored). An
+    # edit applies there only while its built answer is the one it replaced, so the new text still shows.
     row = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=source.base_resume_id,
                  category=source.category, job_id=source.job_id, version=latest + 1, name=source.name,
-                 template=source.template, page_format=source.page_format, created_by_user_id=actor.id, **content)
+                 template=source.template, page_format=source.page_format, created_by_user_id=actor.id,
+                 autofill=copy.deepcopy(autofill.entries_of(source)), **content)
     db.add(row)
     db.flush()
     profile.refresh(candidate)              # a new newest version may change the name (07 Q57; review #3)
@@ -307,9 +317,10 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     db.add(base)
     db.flush()
     _activate(db, candidate, base)
-    db.add(Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
-                  job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                  created_by_user_id=actor.id, **content_of(row)))
+    copied = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
+                    job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
+                    created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)), **content_of(row))
+    db.add(copied)
     db.flush()
     number = len(numbers) + 1
     source = f"Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version}"
@@ -322,6 +333,19 @@ def kept_file(db, candidate, sha256: str) -> ResumeParse | None:
     """The candidate's kept upload of this exact file, if any (§4.6)."""
     return scoped(db, ResumeParse, candidate.firm_id).filter(ResumeParse.candidate_id == candidate.id,
                                                              ResumeParse.content_sha256 == sha256).first()
+
+
+def uploaded_file(db, candidate, row: Resume) -> ResumeParse | None:
+    """The kept upload `row` is: an uploaded base's version 1 is its file as read (§4.6), so the file can stand for it
+    on a form. A later version, a tailored one or a promoted base's has no file of its own (07 Q49)."""
+    if row.category != "BASE" or row.version != 1 or row.job_id is not None:
+        return None
+    base = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.id == row.base_resume_id,
+                                                            BaseResume.deleted_at.is_(None)).first()
+    if base is None or base.source != "UPLOAD" or base.resume_parse_id is None:
+        return None
+    return scoped(db, ResumeParse, candidate.firm_id).filter(ResumeParse.id == base.resume_parse_id,
+                                                             ResumeParse.candidate_id == candidate.id).first()
 
 
 def deleted_base_for(db, candidate, parse_row: ResumeParse) -> BaseResume | None:

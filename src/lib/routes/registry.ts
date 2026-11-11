@@ -1,6 +1,5 @@
 import {
   Activity,
-  BarChart3,
   Bell,
   Briefcase,
   Building2,
@@ -15,6 +14,8 @@ import {
   Settings,
   SlidersHorizontal,
   SwatchBook,
+  UserCog,
+  UserRound,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -84,21 +85,23 @@ const ROUTE_DEFS = [
 
   // Workspace
   { id: "dashboard", path: "/[firm]/dashboard", title: "Dashboard", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 1, icon: LayoutDashboard }, shortcut: "d", palette: true },
-  { id: "candidates", path: "/[firm]/candidates", title: "Candidates", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 2, icon: Users }, shortcut: "c", palette: true },
+  // docs/07 Q60: the owner's managers, with their teams' numbers; a manager opens at their level of the dashboard.
+  { id: "managers", path: "/[firm]/managers", title: "Managers", area: "firm", shell: "app", access: firm(roles("full", "none", "none", "none")), nav: { section: "workspace", order: 2, icon: UserCog }, shortcut: "m", palette: true },
+  // A manager's BDEs: the team, with its numbers; each opens that BDE on the dashboard.
+  { id: "bdes", path: "/[firm]/bdes", title: "BDEs", area: "firm", shell: "app", access: firm(roles("none", "team", "none", "none")), nav: { section: "workspace", order: 2, icon: UserRound }, shortcut: "b", palette: true },
+  { id: "candidates", path: "/[firm]/candidates", title: "Candidates", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 3, icon: Users }, shortcut: "c", palette: true },
   { id: "candidates.new", path: "/[firm]/candidates/new", title: "New candidate", area: "firm", shell: "studio", access: firm(roles("full", "full", "none", "none"), "none") },
   { id: "candidates.detail", path: "/[firm]/candidates/[id]", title: "Candidate", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")) },
-  { id: "jobs", path: "/[firm]/jobs", title: "Jobs", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 3, icon: Briefcase }, shortcut: "j", palette: true },
+  { id: "jobs", path: "/[firm]/jobs", title: "Jobs", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 4, icon: Briefcase }, shortcut: "j", palette: true },
   { id: "jobs.capture", path: "/[firm]/jobs/capture", title: "Capture job", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "none"), "none") },
   { id: "jobs.detail", path: "/[firm]/jobs/[id]", title: "Job", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")) },
-  { id: "applications", path: "/[firm]/applications", title: "Applications", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 4, icon: Send }, shortcut: "a", palette: true },
+  { id: "applications", path: "/[firm]/applications", title: "Applications", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 5, icon: Send }, shortcut: "a", palette: true },
   { id: "applications.detail", path: "/[firm]/applications/[id]", title: "Application", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")) },
-  { id: "resumes", path: "/[firm]/resumes", title: "Resume Builder", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 5, icon: FileText }, palette: true },
+  { id: "resumes", path: "/[firm]/resumes", title: "Resume Builder", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 6, icon: FileText }, palette: true },
   { id: "resumes.studio", path: "/[firm]/resumes/[id]", title: "Resume", area: "firm", shell: "studio", access: firm(roles("full", "team", "assigned", "read")) },
-  { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 6, icon: Mail }, palette: true },
-  { id: "followups", path: "/[firm]/followups", title: "Follow-ups", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "none")), nav: { section: "workspace", order: 7, icon: Bell }, shortcut: "f", palette: true },
-  { id: "analytics", path: "/[firm]/analytics", title: "Analytics", area: "firm", shell: "app", access: firm(roles("full", "team", "none", "read")), nav: { section: "workspace", order: 8, icon: BarChart3 }, palette: true },
-  { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 9, icon: ScrollText }, palette: true },
-  { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", access: firm(roles("full", "full", "full", "none"), "none") },
+  { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 7, icon: Mail }, palette: true },
+  { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 8, icon: ScrollText }, palette: true },
+  { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", palette: true, access: firm(roles("full", "full", "full", "none"), "none") },
 
   // Preferences
   // Super Admin only, and only when NEXT_PUBLIC_SHOW_DEV_ROUTES=true (devOnly): in the admin sidebar's Preferences.
@@ -115,8 +118,8 @@ const ROUTE_DEFS = [
   { id: "notifications.requests", path: "/[firm]/notifications/requests", title: "Requests", area: "firm", shell: "app", access: firm(everyone("full"), "none"), nav: { section: "notifications", order: 1, icon: KeyRound }, palette: true },
 
   // Platform tier (docs/07 §2.3): PLATFORM_ADMIN only; everyone else gets not-found from the admin layout.
-  // `g` keys here are the admin map (docs/04 §14.1): they apply only in the admin shell, so `g f` / `g a`
-  // can mean Follow-ups / Applications in the firm area (shortcutsFor takes the area).
+  // `g` keys here are the admin map (docs/04 §14.1): they apply only in the admin shell, so `g a`
+  // can mean Applications in the firm area (shortcutsFor takes the area).
   { id: "admin", path: "/admin", title: "Overview", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 1, icon: ShieldCheck }, shortcut: "o", palette: true },
   { id: "admin.firms", path: "/admin/firms", title: "Firms", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 2, icon: Building2 }, shortcut: "f", palette: true },
   { id: "admin.firms.new", path: "/admin/firms/new", title: "New firm", area: "platform", shell: "admin", access: PLATFORM },

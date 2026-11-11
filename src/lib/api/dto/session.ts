@@ -35,7 +35,6 @@ export const FirmDto = z.object({
   seat_limit: z.number(),
   candidate_limit: z.number(),
   contact_phone: z.string().nullable(),
-  bde_capacity: z.number().optional(),
   created_at: z.string(),
 });
 
@@ -152,7 +151,6 @@ export function toFirm(dto: z.infer<typeof FirmDto>): Firm {
     seatLimit: dto.seat_limit,
     candidateLimit: dto.candidate_limit,
     contactPhone: dto.contact_phone,
-    bdeCapacity: dto.bde_capacity,
     createdAt: toIso(dto.created_at),
   });
 }

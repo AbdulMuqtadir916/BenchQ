@@ -3,6 +3,43 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Extension autofill — the form behind an application, and the extension's own tests (`feat/apply-extension-autofill`)
+
+Not agreed yet: Samad reviews the applications change before merge. The branch's earlier `/config` change, its removal
+of the AI answer routes and their `access.py` rows are undone (2026-11-09): the extension reads the picked résumé's
+`GET …/resumes/{id}?autofill=true` instead, and removing the AI answer routes is a later PR of its own.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `backend/models/db.py`, `backend/migrations/versions/0021_application_form_data.py`, `backend/applications/tracking.py`, `backend/api/routes_applications.py`, `test_candidate_application_status.py`, `docs/02-DATA-CONTRACTS.md` §9 | `applications.form_data`: `PATCH .../candidate-status` takes an optional `form_data` on a move to `applied`, a move back to `saved` clears it, and no response returns it. It also takes an optional `resume_id`, the résumé version the form was sent with (this candidate's, not deleted), which becomes the application's `resume_id` (docs/02 §9). | Marking a job applied from the extension keeps what the form held, and which résumé answered it. Talked through with Samad and Abdul before it was built. |
+| Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
+| Candidates / résumés (Zuhair) | `backend/api/routes_candidate_resumes.py`, `backend/candidates/versions.py` (`uploaded_file`), `backend/auth/access.py` (one `F` row, approved by Arbaz), `isolation_cases.py`, `test_resume_file.py`, `docs/02-DATA-CONTRACTS.md` §8.2 | `GET …/resumes/{rid}/file`: an uploaded base's version 1 as its file, as uploaded; 404 for any other version. | The extension attaches the picked résumé to the form's résumé upload (07 Q49–Q52). A file for every version is asked of Zuhair (Q25). |
+
+## Job search tables (`feat/jobs-table`, Zuhair)
+
+`job_postings` and `scrape_jobs`, migration 0020 ([docs/02](../02-DATA-CONTRACTS.md) §6.y).
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Logging checks (Uzair) | `backend/tests/route_sweep.py` `SEED_OVERRIDES` | `SEED_BATCH`; `"scrape_jobs": {"error": None, "batch_id": SEED_BATCH}`; `"job_postings": {"job_id": "0" * 64, "batch_id": SEED_BATCH}` | The sweep seeds one row per table from its columns. `scrape_jobs`: `state` takes the first allowed value (`success`) and every text column gets text, so `error` broke `ck_scrape_jobs_error_iff_error`. `job_postings`: its text `job_id` isn't a SHA256 hex digest (`ck_job_postings_job_id_sha256`), and its `batch_id` references `scrape_jobs.batch_id`, not its `id`, which the seed's key lookup assumes. The overrides give both rows a valid shape, as for `invites` or `notifications`. Test data only; no check is loosened. | **Pending: Uzair** |
+| Candidates (Abdul) | `backend/models/candidates.py`, migration 0020 | `UNIQUE (firm_id, id)` on `candidates` (`uq_candidates_firm_id`) | The target of the `(firm_id, candidate_id)` foreign key on `job_postings` and `scrape_jobs`, so a row can't carry a firm other than its candidate's. `id` is already unique, so no existing row can break it. | Abdul, who suggested it in review (2026-11-10) |
+
+## Résumé autofill (`feat/resume-autofill`, Zuhair; finished by Arbaz)
+
+Decided by Zuhair 2026-11-07 (Abdul and Samad OK); finished 2026-11-08 from Abdul's review: every non-id fact about the
+candidate is built from the résumé version and the profile each time one version is read with `?autofill=true`, each
+answer with its `key`, and each version stores only the entries the user typed ([docs/02](../02-DATA-CONTRACTS.md)
+§8.1, `backend/candidates/autofill.py`).
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Candidates table (Abdul) | `backend/models/candidates.py`, migration `0019_resume_autofill.py` (+ test) | `candidates.qa_bank` is dropped. The downgrade puts it back empty. | The answers live on each résumé version now. Only the demo seed ever filled it; the persona's own `qa_bank` stays with the persona. **One-way for the demo answers.** |
+| Candidate JSON (Abdul) | `backend/candidates/serialize.py` | `qa_bank` leaves the candidate JSON. The edit route is unchanged: a profile edit writes nothing to the résumés. | The profile answers are built on each read, so the next read shows the edit. |
+| Demo seed (Abdul) | `backend/scripts/seed_demo.py` | No `qa_bank` on the demo candidates; the unused camelCase helpers go. | The column is gone. |
+| Candidate DTO (shared) | `src/lib/api/dto/candidates.ts`, its sample and test | The backend sends no `qa_bank`; the mapper gives `qaBank: []`. `CandidateSchema.qaBank` stays. | The Documents tab's Screening answers panel reads it and shows its empty state until the Documents section is removed (planned, [abdul.md](./abdul.md) §3). Mock mode still shows the fixtures' answers. |
+| Autofill and the extension (Arbaz) | none | Nothing changed. **For you:** read the selected résumé's `GET …/resumes/{id}?autofill=true` instead of `persona.qa_bank`, and match each entry by its `key` before its wording. A hand-saved answer becomes one of the version's own entries (`resumes.autofill`); the route that writes them is planned ([persona-to-candidates.md](./persona-to-candidates.md) §5). | This PR builds the answers; switching the extension is your PR. |
+| Old tailoring (JobNavigator leftover) | `backend/analyzer/legacy_tailoring.py` | Not changed. It isn't wired to anything and can't make versions (it reads columns 0013 dropped). | **For the tailoring module (Zuhair):** a tailored v1 copies its source version's typed entries (`autofill.entries_of`), as a save and a promote do (docs/02 §8.1, Abdul's third review). Its fixed answers are built from its own text, and an edit applies only where that text still gives the answer it replaced. |
+
 ## Résumé screens live — no claim states, the tree (`integrate/resumes`, Zuhair)
 
 Design: [resume-versioning.md](./resume-versioning.md) §5 and §7. Decided 2026-11-05: BenchQ has no Verified / Unverified /

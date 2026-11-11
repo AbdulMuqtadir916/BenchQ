@@ -345,6 +345,10 @@ class Application(Base):
     last_email_received = Column(DateTime(timezone=True), nullable=True)
     last_email_snippet = Column(Text, nullable=True)
     status_transitions = Column(JSON, default=[])  # [{from, to, at, source}]
+    # What the employer's form held when the BDE marked the job applied from the extension (docs/02 §9). Null while
+    # Saved. It is the candidate's answers, so no response carries it and nothing logs it. Deferred so a list never
+    # loads it; `none_as_null` so None is SQL NULL, not a JSON null. Owner: Samad.
+    form_data = deferred(Column(JSONB(none_as_null=True), nullable=True))
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     __table_args__ = (
@@ -636,6 +640,12 @@ class Resume(Base):
     certifications = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     awards = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     languages = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    # The autofill entries the user typed for this version (migration 0019, docs/02 §8.1): {"edited": {key: {"answer",
+    # "over"}}, "custom": {question: answer}}, an edit to a built answer by its key, or a question they added. The built
+    # answers aren't stored as answers (backend/candidates/autofill.py builds them on read), but an edit keeps a copy of
+    # the one it replaced as `over`: for the work history, the whole list.
+    # Not content: a save never compares it, and copies it to the next version.
+    autofill = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
 
     __table_args__ = (
         CheckConstraint("category IN ('BASE', 'TAILORED')", name="ck_resumes_category_values"),

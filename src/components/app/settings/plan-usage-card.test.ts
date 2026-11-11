@@ -7,6 +7,13 @@ vi.mock("@/lib/stores/session-store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/stores/session-store")>();
   return { ...actual, useSignedInUser: () => actual.useSession.getState().user!, useSignedInPrincipal: () => actual.useSession.getState().principal! };
 });
+// The owner's dashboard keeps its tab in the URL; a server render has no app router, so it gets a still one.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/hyderabad-tech-staffing/dashboard",
+}));
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firms } from "@/mocks/team";
@@ -19,7 +26,7 @@ import { PlanUsageCard } from "./plan-usage-card";
 
 /**
  * settings/firm: the Plan and usage card shows the same seats and candidates as the OWNER dashboard (one function,
- * deriveFirmUsage, on the same records), and the page invents nothing: no shift window, no follow-up cadence (07 Q59).
+ * deriveFirmUsage, on the same records), and the page invents nothing: no shift window, no follow-up cadence (07 Q59, Q63).
  */
 
 const firm = firms.find((item) => item.id === "firm_hts")!;
@@ -41,7 +48,7 @@ afterEach(() => {
   signOutForTest();
 });
 
-describe("settings/firm (07 Q59)", { timeout: 20_000 }, () => {
+describe("settings/firm (07 Q59, Q63)", { timeout: 20_000 }, () => {
   it("the Plan and usage card shows the dashboard's seats and candidates", async () => {
     const dashboard = await textAs("user_imran", OwnerDashboard);
     const card = await textAs("user_imran", PlanUsageCard);
@@ -53,12 +60,11 @@ describe("settings/firm (07 Q59)", { timeout: 20_000 }, () => {
     expect(card).toContain(`Candidates ${candidates}`);
   });
 
-  it("the OWNER sees the firm facts, the BDE capacity form and the usage card, and no invented rhythm", async () => {
+  it("the OWNER sees the firm facts and the usage card, and no capacity form or invented rhythm", async () => {
     const page = await textAs("user_imran", FirmSettingsPage);
     expect(page).toContain(firm.name);
     expect(page).toContain("Ask BenchQ to change the firm name or timezones.");
     expect(page).toContain("Plan and usage");
-    expect(page).toContain("candidates per BDE"); // the capacity form's unit
-    expect(page).not.toMatch(/shift window|follow-up cadence|18:30|Day-3|Day-7/i);
+    expect(page).not.toMatch(/capacity|per BDE|shift window|follow-up cadence|18:30|Day-3|Day-7/i);
   });
 });

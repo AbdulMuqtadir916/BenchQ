@@ -19,8 +19,6 @@ export const FirmSchema = z.object({
   candidateLimit: z.number().int().positive(),
   /** The only profile addition (A6). The OWNER is the primary contact, derived. */
   contactPhone: z.string().nullable(),
-  /** 07 Q46: a BDE's comfortable load (working candidates). A warning when assigning, never a block. Edited by the OWNER. */
-  bdeCapacity: z.number().int().positive().default(10),
   createdAt: z.string().datetime(),
 });
 export type Firm = z.infer<typeof FirmSchema>;

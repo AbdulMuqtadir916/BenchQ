@@ -25,7 +25,7 @@ For everyone on the team. Decided 2026-11-05 (Abdul).
 | Availability | `status`, `bench_start_date`, `available_from`, `notice_period_days` |
 | Role | `primary_role` ("Marketed as"), `target_roles`, `years_experience` |
 | Preferences | `work_settings` (onsite, hybrid, remote), `preferred_locations`, `preferred_industries`, `deal_breakers`, `contact_notes` |
-| Saved answers | `qa_bank`: a list of `{id, question, answer, category, …}` |
+| Saved answers | None since 0019 (`qa_bank` is dropped): each résumé version keeps its own (`resumes.autofill`, [docs/02](../02-DATA-CONTRACTS.md) §8.1) |
 | Ownership | `firm_id`, `manager_id`, `bde_id` (read through `scoped()`, 07 Q47) |
 
 **`resumes`** (`backend/models/db.py`; Zuhair's table). What the candidate did. Each row is one version of one
@@ -105,7 +105,7 @@ The `autofill_prompt` setting keeps its placeholders. They are filled from the c
 
 | Placeholder | Was | Now |
 |---|---|---|
-| `{qa_bank}` | `persona.qa_bank` | `candidates.qa_bank`. It is already a list of `{question, answer, …}` objects, the shape `_qa_pair` reads |
+| `{qa_bank}` | `persona.qa_bank` | **The résumé version's `autofill`** (migration 0019: `candidates.qa_bank` is gone): one version's `{question, answer, kind, key}` entries from `GET …/resumes/{id}?autofill=true` ([docs/02](../02-DATA-CONTRACTS.md) §8.1). `_qa_pair` already reads the `{question, answer, …}` shape |
 | `{persona}` (the profile) | `persona.contact`, `work_auth`, `preferences`, `resume_content` as JSON | **From `candidates`:** the §4 facts, plus `primary_role`, `target_roles`, `years_experience`, `employment_types`, `preferred_locations`, `preferred_industries`, `deal_breakers`. **From the résumé:** `resume_text(version)` (`backend/candidates/resume_text.py`), see below |
 
 **Which résumé version:**
@@ -117,8 +117,11 @@ The `autofill_prompt` setting keeps its placeholders. They are filled from the c
 `answer`), and the routes check that candidate is in the user's scope (`_visible`, 07 Q47: a BDE's own candidates).
 That belongs in Samad's extension proposal ([samad.md](./samad.md) §3).
 
-**Saving an answer.** "Save this answer to the bank" was `POST /api/persona/qa-bank`. It becomes an append to
-`candidates.qa_bank` through a candidates route. A new `candidates` route is confirmed with Abdul.
+**Saving an answer.** "Save this answer to the bank" was `POST /api/persona/qa-bank`. `candidates.qa_bank` is gone
+(0019). A hand-saved answer becomes one of the résumé version's own entries (`resumes.autofill`, docs/02 §8.1): an
+edit of a fixed answer by its key, which wins while the built answer is still the one it replaced, or a question of
+its own. Entries go with the résumé to its next version, and to a version tailored from it. The route that writes
+them is planned; its contract goes in docs/02 first.
 
 ## 6. Cover letters (Zuhair)
 

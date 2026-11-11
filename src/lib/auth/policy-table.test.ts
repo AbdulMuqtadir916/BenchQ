@@ -30,7 +30,6 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["application.move", "Y Y Y - - -"],
   ["resume.edit", "Y Y Y - - -"],
   ["outreach.act", "Y Y Y - - -"],
-  ["followup.act", "Y Y Y - - -"],
   // team (Q15)
   ["member.invite", "Y - - - - -"],
   ["member.remove", "Y - - - - -"],
@@ -38,7 +37,6 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["member.deactivate", "Y - - - - -"],
   ["member.changeManager", "Y - - - - -"],   // 07 Q40
   ["candidate.assign", "Y Y - - - -"],
-  ["firmSettings.edit", "Y - - - - -"],      // 07 Q46
   ["notification.approve", "Y Y - - - -"],  // 07 Q54; only the routed approver acts
   ["team.view", "Y Y - - - Y"],
   // platform (07 §2.3)
