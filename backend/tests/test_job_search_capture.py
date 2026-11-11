@@ -177,3 +177,56 @@ def test_a_tailored_resume_names_only_its_own_candidates_job_and_goes_with_it(an
     test_db.query(JobPosting).filter(JobPosting.id == uuid.UUID(mine["id"])).delete()
     test_db.commit()
     assert test_db.get(Resume, tailored_id) is None                     # deleting the job deletes its tailored résumé
+
+
+# ── Abdul's comments on PR 2 (#124) ──────────────────────────────────────────
+
+def test_a_captured_job_a_search_refreshes_stays_out_of_the_100(anonymous_client, world, adnans, fake, launched,
+                                                                test_db):
+    """99 jobs saved by search; a capture; a search whose page has the captured job and one new job: 100, not 101.
+    The cap counts how a job was first saved (`first_source`), not its latest `source`."""
+    fake.jobs = [_job(n) for n in range(100, 199)]
+    assert _run(world, adnans) == "99 new, 0 seen again"
+    captured = _capture(anonymous_client, world, adnans, title="Java Developer 1", company="Example 1",
+                        description="Made-up description 1.").json()
+    fake.jobs = [_job(1), _job(2)]
+    assert _run(world, adnans, query="Spring Developer") == "1 new, 1 seen again"
+    _, postings = _rows(test_db, adnans)
+    merged = next(p for p in postings if str(p.id) == captured["id"])
+    assert (merged.source, merged.first_source) == ("fake", "manual")          # refreshed, still a capture
+    assert limits.jobs_saved_today(test_db, world["firm"].id, uuid.UUID(adnans["id"])) == 100
+    assert _post(anonymous_client, world, adnans).status_code == 429
+
+
+def test_a_capture_retried_at_the_cap_returns_its_posting(anonymous_client, world, adnans):
+    """The 20th capture's response is lost and the client retries: 200 with the same posting, not 429. Only a capture
+    that would create a posting counts against the 20."""
+    for n in range(limits.CAPTURES_PER_BDE_PER_DAY):
+        last = _capture(anonymous_client, world, adnans, description=f"Captured job {n}.")
+        assert last.status_code == 201
+    again = _capture(anonymous_client, world, adnans, description=f"Captured job {limits.CAPTURES_PER_BDE_PER_DAY - 1}.")
+    assert again.status_code == 200 and again.json()["id"] == last.json()["id"]
+    assert _capture(anonymous_client, world, adnans, description="A new one.").status_code == 429
+
+
+def test_a_capture_refused_at_the_cap_and_a_search_at_once_do_not_stall(anonymous_client, world, adnans, fake,
+                                                                        launched):
+    """A capture for one candidate holds the BDE's lock and answers 429 while a search for another of their candidates
+    waits for that lock: the search waits in a worker thread, so the capture's clean-up (which lets the lock go) runs
+    and neither stalls until the statement timeout."""
+    import time
+
+    from backend.tests.test_job_search_contract import _at_once, _poster
+    other = _create(anonymous_client, world, bde="adnan").json()
+    for n in range(limits.CAPTURES_PER_BDE_PER_DAY):
+        assert _capture(anonymous_client, world, adnans, description=f"Captured job {n}.").status_code == 201
+    for round_ in range(5):
+        capture = _poster(anonymous_client, world, adnans, "job-postings",
+                          {"source": "manual", "title": "Java Developer", "company": "Example Corp",
+                           "description": f"Over the cap {round_}.", "url": "https://jobs.example.test/over"})
+        search = _poster(anonymous_client, world, other, "job-searches", {"query": f"Role {round_}"})
+        started = time.monotonic()
+        captured, searched = _at_once([capture, search])
+        took = time.monotonic() - started
+        assert captured.status_code == 429 and searched.status_code in (202, 409)
+        assert took < 5, f"round {round_} took {took:.1f}s"

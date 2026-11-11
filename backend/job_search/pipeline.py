@@ -207,7 +207,8 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
                 counts["refreshed"] += 1
             elif counts["saved"] < room:
                 db.add(JobPosting(firm_id=firm_id, candidate_id=candidate_id, batch_id=batch_id, source=provider.name,
-                                  job_id=key, content=content, discovered_at=now, last_seen_at=now))
+                                  first_source=provider.name, job_id=key, content=content, discovered_at=now,
+                                  last_seen_at=now))
                 counts["saved"] += 1
             else:
                 counts["skipped_over_cap"] += 1
@@ -219,10 +220,12 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
     return counts
 
 
-def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict) -> tuple[JobPosting, bool]:
+def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict, admit=None) -> tuple[JobPosting, bool]:
     """One job the BDE captured (job search PR 2): its own batch (`kind = 'capture'`, finished at once) with its one
-    posting, and a ledger entry. The caller holds the candidate row and has checked the cap. A job the candidate
-    already has (same `job_id`) is returned as it is, with nothing written: (posting, False). Not committed."""
+    posting, and a ledger entry. The caller holds the candidate row. A job the candidate already has (same `job_id`) is
+    returned as it is, with nothing written: (posting, False), whatever the cap says, so a retry after a lost response
+    gets its posting back (Abdul's comment on PR 2). Only a capture that would create a posting calls `admit()` first,
+    which raises to refuse it (the daily cap). Not committed."""
     content = clean_json({k: v for k, v in job.items() if v is not None})
     fields = READERS[source].read(content)
     key = job_id(fields)
@@ -230,13 +233,15 @@ def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict) -> tu
                                                       JobPosting.job_id == key).first()
     if existing is not None:
         return existing, False
+    if admit is not None:
+        admit()
     now = utcnow()
     batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=uuid.uuid4(),
                       kind="capture", state="success", finished_at=now, meta={"request": {"source": source}})
     db.add(batch)
     db.flush()
     posting = JobPosting(firm_id=firm_id, candidate_id=candidate_id, batch_id=batch.batch_id, source=source,
-                         job_id=key, content=content, discovered_at=now, last_seen_at=now)
+                         first_source=source, job_id=key, content=content, discovered_at=now, last_seen_at=now)
     db.add(posting)
     db.flush()
     actor = db.get(User, user_id)

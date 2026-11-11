@@ -77,8 +77,8 @@ def test_upgrade_runs_again_after_a_downgrade_that_kept_searches(scratch_db):
                 {"id": uuid.uuid4(), "firm_id": firm_id, "candidate_id": candidate_id,
                  "user_id": _owner_id(engine, firm_id), "batch_id": batch_id, "kind": kind})
             conn.execute(text(
-                "INSERT INTO job_postings (id, firm_id, candidate_id, batch_id, source, job_id, content) VALUES "
-                "(:id, :firm_id, :candidate_id, :batch_id, 'freehire', :job_id, '{}'::jsonb)"),
+                "INSERT INTO job_postings (id, firm_id, candidate_id, batch_id, source, first_source, job_id, content) "
+                "VALUES (:id, :firm_id, :candidate_id, :batch_id, 'freehire', 'freehire', :job_id, '{}'::jsonb)"),
                 {"id": uuid.uuid4(), "firm_id": firm_id, "candidate_id": candidate_id, "batch_id": batch_id,
                  "job_id": n * 64})
     for down in ("0022", "0021"):
@@ -120,3 +120,26 @@ def test_downgrade_unlinks_what_names_a_posting_and_upgrades_again(scratch_db):
         "SELECT count(*) FROM resumes WHERE job_id IS NULL"]                       # base résumés untouched
     assert after["SELECT count(*) FROM cover_letters"] == before["SELECT count(*) FROM cover_letters"]
     _ok(_alembic(name, "upgrade", "head"))
+
+
+def test_a_posting_remembers_how_it_was_first_saved(scratch_db):
+    """Abdul's comment on PR 2: `first_source`, filled from `source` for rows already there, required after."""
+    name, engine = scratch_db
+    _ok(_alembic(name, "upgrade", "0022"))
+    firm_id, candidate_id, _ = _firm_and_candidate(engine)
+    batch_id = uuid.uuid4()
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO scrape_jobs (id, firm_id, candidate_id, user_id, batch_id, state, finished_at) VALUES "
+            "(:id, :firm_id, :candidate_id, :user_id, :batch_id, 'success', now())"),
+            {"id": uuid.uuid4(), "firm_id": firm_id, "candidate_id": candidate_id,
+             "user_id": _owner_id(engine, firm_id), "batch_id": batch_id})
+        conn.execute(text(
+            "INSERT INTO job_postings (id, firm_id, candidate_id, batch_id, source, job_id, content) VALUES "
+            "(:id, :firm_id, :candidate_id, :batch_id, 'manual', :job_id, '{}'::jsonb)"),
+            {"id": uuid.uuid4(), "firm_id": firm_id, "candidate_id": candidate_id, "batch_id": batch_id,
+             "job_id": "d" * 64})
+    _ok(_alembic(name, "upgrade", "0023"))
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT first_source FROM job_postings")).scalar() == "manual"
+    assert _rejected(engine, "UPDATE job_postings SET first_source = NULL", {})

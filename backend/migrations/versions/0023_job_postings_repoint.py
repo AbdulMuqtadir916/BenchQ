@@ -4,6 +4,9 @@ Revision ID: 0023
 Revises: 0022
 Create Date: 2026-11-10 22:00:00.000000
 
+- `job_postings.first_source`: how the job was first saved (a provider, or `manual` / `extension` for a capture), never
+  changed: the 100-new-jobs cap counts by it, so a captured job a search later refreshes stays out of it (Abdul's
+  comment on PR 2). Existing rows: their `source`.
 - `scrape_jobs.kind`: `search` (a BDE's search) or `capture` (one job the BDE captured by hand or from the
   extension: its own batch, with one posting). Existing rows are searches.
 - `job_postings`: `UNIQUE (firm_id, candidate_id, id)`, the target of the candidate-safe keys below and of
@@ -48,6 +51,9 @@ def upgrade():
     op.add_column('scrape_jobs', sa.Column('kind', sa.String(), server_default=sa.text("'search'"), nullable=False))
     op.create_check_constraint('ck_scrape_jobs_kind', 'scrape_jobs', "kind IN ('search', 'capture')")
     op.create_unique_constraint('uq_job_postings_firm_candidate_id', 'job_postings', ['firm_id', 'candidate_id', 'id'])
+    op.add_column('job_postings', sa.Column('first_source', sa.String(), nullable=True))
+    op.execute("UPDATE job_postings SET first_source = source")
+    op.alter_column('job_postings', 'first_source', nullable=False)
 
     op.drop_constraint('resumes_job_id_fkey', 'resumes', type_='foreignkey')
     op.create_foreign_key('fk_resumes_job_posting', 'resumes', 'job_postings', ['firm_id', 'candidate_id', 'job_id'],
@@ -79,6 +85,7 @@ def downgrade():
     # Captures have no place in 0022: their postings and batches go (nothing else can point at them by now).
     op.execute("DELETE FROM job_postings WHERE batch_id IN (SELECT batch_id FROM scrape_jobs WHERE kind = 'capture')")
     op.execute("DELETE FROM scrape_jobs WHERE kind = 'capture'")
+    op.drop_column('job_postings', 'first_source')
     op.drop_constraint('uq_job_postings_firm_candidate_id', 'job_postings', type_='unique')
     op.drop_constraint('ck_scrape_jobs_kind', 'scrape_jobs', type_='check')
     op.drop_column('scrape_jobs', 'kind')

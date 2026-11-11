@@ -1182,7 +1182,8 @@ export const JobMarkSchema = z.object({
 > membership table is the answer if a screen ever needs that history.
 
 - **Columns (revised 2026-11-10, from Abdul's review):** `id`, `firm_id`, `candidate_id`, `batch_id`, `source`,
-  `job_id`, `content`, `discovered_at`, `last_seen_at`, `created_at`, `updated_at`.
+  `first_source` (0023: how the job was first saved, never changed), `job_id`, `content`, `discovered_at`,
+  `last_seen_at`, `created_at`, `updated_at`.
   - **No `status` column.** Whether a job was saved or applied to lives in `applications` (its `saved` status, and
     an application row), so a copy here can't drift from it. Hiding a job (dismissed) isn't built.
   - **Tenancy:** `(firm_id, candidate_id)` references `candidates (firm_id, id)` (on `scrape_jobs` too), so a row
@@ -1302,8 +1303,10 @@ export const JobMarkSchema = z.object({
     control characters, the description keeping its tabs and line breaks): the candidate's BDE only, 20 per BDE per
     day. A capture is its own batch (`scrape_jobs.kind = 'capture'`, finished at once) with one posting and a ledger
     entry (entity `job_posting`, restricted for a platform admin like a search's); the same job again (same hash) returns the posting the candidate has
-    (200). An `extension` description is read as HTML. Captures aren't search attempts and don't use the 100-new cap.
-    A search that finds a captured job merges into that row (`source` and `content` become the provider's).
+    (200), even at the cap: only a capture that would create a posting counts against the 20 (Abdul's comment on PR
+    2). An `extension` description is read as HTML. Captures aren't search attempts and don't use the 100-new cap.
+    A search that finds a captured job merges into that row (`source` and `content` become the provider's), and it
+    still stays out of the 100: the cap counts `first_source`, which never changes (Abdul's comment on PR 2).
   - **A repeated search continues (job search PR 2):** a provider returns `next_cursor`; the same role (case and
     spacing ignored), country and provider searched again since 6:30 PM IST asks from there (freehire.me: `offset`).
     A failed search doesn't move it. When the source has no more, the next search of that role ends `empty` without

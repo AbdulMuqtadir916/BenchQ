@@ -179,17 +179,21 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
 def capture_job(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: CaptureBody, response: Response,
                 principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     """The candidate's BDE only, like a search (decided 2026-11-10); 20 captures per BDE per day. The same job again
-    is the posting the candidate already has (200), not a second one."""
+    is the posting the candidate already has (200), not a second one, even at the cap: only a new posting counts
+    against the 20 (Abdul's comment on PR 2). Sync, so its lock waits run in a worker thread."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     if not can_search_jobs(principal, candidate):
         raise HTTPException(status_code=403, detail="Only this candidate's BDE adds jobs for them.")
     limits.lock_bde(db, principal.user_id)          # one BDE's captures count the 20 in turn (Abdul's review, P2)
     now = utcnow()
-    if limits.captures_today(db, firm_id, principal.user_id, now) >= limits.CAPTURES_PER_BDE_PER_DAY:
-        raise _too_many(f"You've captured {limits.CAPTURES_PER_BDE_PER_DAY} jobs today; {_resets(now)}.")
+
+    def under_the_cap():
+        if limits.captures_today(db, firm_id, principal.user_id, now) >= limits.CAPTURES_PER_BDE_PER_DAY:
+            raise _too_many(f"You've captured {limits.CAPTURES_PER_BDE_PER_DAY} jobs today; {_resets(now)}.")
     posting, created = pipeline.capture(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
-                                        source=body.source, job=body.model_dump(exclude={"source"}))
+                                        source=body.source, job=body.model_dump(exclude={"source"}),
+                                        admit=under_the_cap)
     db.commit()
     if not created:
         response.status_code = 200

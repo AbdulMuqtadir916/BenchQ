@@ -1,8 +1,9 @@
 """The job search's daily caps (decided 2026-11-10), counted from rows, never stored:
 
 - 100 **new** jobs per candidate per day: `job_postings` rows discovered since the day started, captures left out
-  (`source` manual / extension). A job seen again only refreshes its row and doesn't count. (A job captured today and
-  found by a search the same day then counts once: its `source` becomes the provider's.)
+  by how they were first saved (`first_source` manual / extension). A job seen again only refreshes its row and
+  doesn't count; a captured job a search later refreshes stays a capture (Abdul's comment on PR 2: counting the
+  latest `source` let it take a search's place, 101).
 - 20 search attempts per BDE per day, any outcome: their `scrape_jobs` search rows started since the day started,
   running ones included.
 - 20 captures per BDE per day (job search PR 2): their `scrape_jobs` capture rows since the day started.
@@ -49,7 +50,7 @@ def next_reset(now: datetime | None = None) -> datetime:
 def jobs_saved_today(db, firm_id, candidate_id, now: datetime | None = None) -> int:
     return scoped(db, JobPosting, firm_id, func.count(JobPosting.id)).filter(
         JobPosting.candidate_id == candidate_id, JobPosting.discovered_at >= day_start(now),
-        JobPosting.source.notin_(CAPTURE_SOURCES)).scalar()
+        JobPosting.first_source.notin_(CAPTURE_SOURCES)).scalar()
 
 
 def is_lost(batch: ScrapeJob, now: datetime | None = None) -> bool:

@@ -87,7 +87,12 @@ class JobPosting(Base):
     # References scrape_jobs with (firm_id, candidate_id, batch_id), so it can't name another candidate's batch.
     batch_id = Column(UUID(as_uuid=True), nullable=False)
 
-    source = Column(String, nullable=False)          # freehire | jsearch | coresignal | ...
+    source = Column(String, nullable=False)          # freehire | jsearch | coresignal | manual | extension | ...
+    # How the job was first saved, never changed (0023; Abdul's comment on PR 2): a search that finds a captured job
+    # replaces its `source` and `content`, but the job stays a capture here, so it never counts toward the
+    # candidate's 100 new jobs a day. Filled from `source` on insert unless given.
+    first_source = Column(String, nullable=False,
+                          default=lambda context: context.get_current_parameters()["source"])
     job_id = Column(String(64), nullable=False)      # SHA256 hex of normalized company + title + full JD
 
     # Everything about the job: title, description, location, salary, seniority, skills, apply link, etc. Shape is
