@@ -121,8 +121,8 @@ export function ActivityPage() {
             search={{ value: search, onChange: setSearch }}
             page={{ index: params.page - 1, onChange: (index) => update({ page: index + 1 }), count: Math.max(1, Math.ceil(matching / PAGE_SIZE)) }}
             sort={{
-              value: [{ id: params.sort, desc: params.dir === "desc" }],
-              onChange: ([first]) => update({ sort: (first?.id ?? "when") as typeof params.sort, dir: first?.desc === false ? "asc" : "desc" }),
+              value: { id: params.sort, desc: params.dir === "desc" },
+              onChange: (next) => update({ sort: (next?.id ?? "when") as typeof params.sort, dir: next?.desc === false ? "asc" : "desc" }),
             }}
             emptyState={
               <EmptyState

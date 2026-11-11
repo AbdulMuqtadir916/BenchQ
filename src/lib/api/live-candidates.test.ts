@@ -48,17 +48,19 @@ describe("candidates on the live backend", () => {
 
   it("reads one by its backend id", async () => {
     answer.body = sample.list[1];
-    const candidate = await candidatesApi.byId("firm_hts", "cand_01");
-    expect(calls[0]!.url).toBe(`${BASE}/${demoIds.cand_01}`);
-    expect(candidate.id).toBe("cand_01");
+    const id = (sample.list[1] as { id: string }).id; // a candidate keeps its backend id: none is seeded
+    const candidate = await candidatesApi.byId("firm_hts", id);
+    expect(calls[0]!.url).toBe(`${BASE}/${id}`);
+    expect(candidate.id).toBe(id);
   });
 
   it("creates, edits and reassigns with snake_case bodies", async () => {
     answer.body = sample.list[0];
     await candidatesApi.create("firm_hts", createCandidateBody({ bdeId: "user_adnan" }));
-    await candidatesApi.update("firm_hts", "cand_01", { rateTarget: 90 });
-    await candidatesApi.reassign("firm_hts", "cand_01", { managerId: "user_priya", bdeId: null, note: "Over to you." });
-    expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([`POST ${BASE}`, `PATCH ${BASE}/${demoIds.cand_01}`, `POST ${BASE}/${demoIds.cand_01}/assign`]);
+    const id = (sample.list[0] as { id: string }).id;
+    await candidatesApi.update("firm_hts", id, { rateTarget: 90 });
+    await candidatesApi.reassign("firm_hts", id, { managerId: "user_priya", bdeId: null, note: "Over to you." });
+    expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([`POST ${BASE}`, `PATCH ${BASE}/${id}`, `POST ${BASE}/${id}/assign`]);
     expect(calls[0]!.body).toMatchObject({ manager_id: demoIds.user_fatima, bde_id: demoIds.user_adnan });
     expect(calls[1]!.body).toEqual({ rate_target: 90 });
     expect(calls[2]!.body).toEqual({ manager_id: demoIds.user_priya, bde_id: null, note: "Over to you." });
@@ -67,11 +69,6 @@ describe("candidates on the live backend", () => {
   it("a backend refusal rejects with its message, for the screen's error", async () => {
     answer = { status: 409, body: { detail: "Your plan allows 1 assigned candidate; 1 is assigned. Hand this candidate to a manager instead, or free a slot." } };
     await expect(candidatesApi.create("firm_hts", createCandidateBody({ bdeId: "user_adnan" }))).rejects.toThrow(/Your plan allows 1/);
-  });
-
-  it("the BDE-follows-manager move is the backend's: the adapter does nothing", async () => {
-    await expect(candidatesApi.followBde("firm_hts", "user_adnan", "user_priya")).resolves.toBe(0);
-    expect(calls).toEqual([]);
   });
 });
 
@@ -82,6 +79,5 @@ describe("the résumé parser on the live backend", () => {
     expect(calls[0]).toMatchObject({ url: `${BASE}/parse-resume`, method: "POST", contentType: null });
     expect((calls[0]!.body as FormData).get("file")).toBeInstanceOf(File);
     expect(draft).toMatchObject({ parseId: parseAnswer.parse_id, fileName: "Asha.pdf", fullName: "Asha Rao", email: "asha@example.com" });
-    await expect(resumeParseApi.sampleNames()).resolves.toEqual([]);
   });
 });

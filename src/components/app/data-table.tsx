@@ -23,6 +23,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonTable } from "@/components/app/skeleton-table";
 import { cn } from "@/lib/cn";
+import { listKeyAction } from "@/lib/list-keys";
+import { readKeyInput } from "@/lib/list-keys-dom";
 
 type Density = "compact" | "default" | "comfortable";
 
@@ -53,11 +55,19 @@ interface DataTableProps<TData, TValue> {
    * page index is the caller's.
    */
   search?: { value: string; onChange: (value: string) => void };
-  page?: { index: number; onChange: (index: number) => void; /** The caller pages on the server: how many pages there are. */ count?: number };
-  /** The caller sorts on the server: `data` arrives sorted, and the headers only say which way. */
-  sort?: { value: SortingState; onChange: (value: SortingState) => void };
+  page?: { index: number; onChange: (index: number) => void; /** The caller pages on the server: how many pages there are. It then sorts there too. */ count?: number };
+  /**
+   * Controlled sort, for lists that keep it in the URL (CLAUDE.md): one column at a time, `null` for none. A header click
+   * calls `onChange`; the caller resets its own page (so that one change updates the URL once).
+   */
+  sort?: { value: { id: string; desc: boolean } | null; onChange: (value: { id: string; desc: boolean } | null) => void };
   /** Replaces "n rows" in the toolbar, for a list whose `data` is one page of many. */
   countLabel?: string;
+  /**
+   * The list this screen is about: `J`/`K`/`x` (and `/` for the search box) then work from anywhere on the page, not only
+   * once focus is inside the table (BUG-003). Set on at most one table per screen; see `src/lib/list-keys.ts`.
+   */
+  pageKeys?: boolean;
   /** false: no search / columns toolbar (a short list whose filters would otherwise not be in the URL). */
   hasToolbar?: boolean;
   /** Accessible name of the table region. */
@@ -100,13 +110,23 @@ export function DataTable<TData, TValue>({
   page,
   sort,
   countLabel,
+  pageKeys = false,
   hasToolbar = true,
   label = "Data table",
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [ownSorting, setOwnSorting] = React.useState<SortingState>([]);
+  const sorting: SortingState = sort ? (sort.value ? [sort.value] : []) : ownSorting;
   const [ownFilter, setOwnFilter] = React.useState("");
   const globalFilter = search ? search.value : ownFilter;
-  const setGlobalFilter = React.useCallback((value: string) => (search ? search.onChange(value) : setOwnFilter(value)), [search]);
+  // With the page in the URL, the table's own search starts over at page 1 itself (a controlled `search` leaves that to its caller).
+  const setGlobalFilter = React.useCallback(
+    (value: string) => {
+      if (search) return search.onChange(value);
+      setOwnFilter(value);
+      if (page && page.index !== 0) page.onChange(0);
+    },
+    [search, page],
+  );
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [ownPagination, setOwnPagination] = React.useState({ pageIndex: 0, pageSize });
@@ -156,13 +176,25 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
-    state: { sorting: sort?.value ?? sorting, globalFilter, rowSelection, columnVisibility, ...(pagination ? { pagination: paginationState } : {}) },
-    onSortingChange: sort ? (updater) => sort.onChange(typeof updater === "function" ? updater(sort.value) : updater) : setSorting,
-    manualSorting: Boolean(sort),
+    state: { sorting, globalFilter, rowSelection, columnVisibility, ...(pagination ? { pagination: paginationState } : {}) },
+    onSortingChange: (updater) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      if (sort) {
+        sort.onChange(next[0] ?? null);
+        return;
+      }
+      setOwnSorting(next);
+      if (page && page.index !== 0) page.onChange(0);
+    },
+    // A caller that pages on the server (`page.count`) also sorts there: `data` arrives as one sorted page.
+    manualSorting: page?.count !== undefined,
     manualPagination: page?.count !== undefined,
     pageCount: page?.count,
-    autoResetPageIndex: page?.count === undefined,
     onGlobalFilterChange: (value: string) => setGlobalFilter(value),
+    // TanStack's default is to start over at page 1 whenever `data` changes. With the page in the URL that wiped `?page=2`
+    // on a reload (the rows arrive after the first render) and on every refetch (BUG-002). The caller owns the page: it
+    // resets it when its filters change, and the table does it for its own sort and search.
+    autoResetPageIndex: !page,
     manualFiltering: Boolean(search),
     onRowSelectionChange: setRowSelection,
     onColumnVisibilityChange: setColumnVisibility,
@@ -194,6 +226,22 @@ export function DataTable<TData, TValue>({
     },
     [rows.length, virtualise, virtualizer],
   );
+
+  // The list's keys from anywhere on the page (BUG-003). While focus is inside the table its own handler below does the work
+  // (and has already prevented the default, so this one skips it); here the first press only "enters" the list.
+  React.useEffect(() => {
+    if (!pageKeys) return;
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target;
+      const action = listKeyAction({ ...readKeyInput(event), insideTable: target instanceof Node && Boolean(viewportRef.current?.contains(target)) });
+      if (!action) return;
+      event.preventDefault();
+      if (action === "filter") filterRef.current?.focus();
+      else focusRow(safeFocusedIndex);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pageKeys, focusRow, safeFocusedIndex]);
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (isTypingTarget(event.target) || (event.target as HTMLElement).closest("button, a, summary")) return;
@@ -283,8 +331,10 @@ export function DataTable<TData, TValue>({
             className="pl-9"
           />
         </div>
-        <span className="ml-auto text-mono-sm text-[var(--color-text-3)]" aria-live="polite">{countLabel ?? <>{rows.length} rows · {table.getFilteredSelectedRowModel().rows.length} selected</>}</span>
-        <details className="relative">
+        <span className="ml-auto text-mono-sm text-[var(--color-text-3)]" aria-live="polite">
+          {countLabel ?? <>{table.getFilteredRowModel().rows.length} rows{isRowSelectable ? ` · ${table.getFilteredSelectedRowModel().rows.length} selected` : ""}</>}
+        </span>
+        <details data-column-chooser className="relative">
           <summary className="bq-secondary inline-flex h-7 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm list-none">
                 <Columns3 size={16} aria-hidden="true" />
                 Columns

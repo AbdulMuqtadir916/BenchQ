@@ -1,6 +1,7 @@
+import { normalizeProfileLink, PROFILE_LINK_ERROR } from "@/lib/resume-doc/profile-link";
 import { z } from "zod";
 import type { CreateCandidate } from "@/lib/schemas/candidate";
-import type { EmploymentType, FieldSource, RemoteMode, WorkAuth } from "@/lib/schemas/enums";
+import type { EmploymentType, RemoteMode, WorkAuth } from "@/lib/schemas/enums";
 import type { ResumeDraft } from "@/lib/schemas/resume-draft";
 import { needsSponsorship, needsTransfer } from "@/lib/constants/work-auth";
 
@@ -23,8 +24,8 @@ export const StepIdSchema = z.enum(STEPS.map((step) => step.id) as [StepId, ...S
 export interface WizardSkill {
   name: string;
   family: string | null;
-  /** Where it came from: the résumé, or typed in (07 Q49: stored UNVERIFIED with this source). */
-  source: Extract<FieldSource, "RESUME_UPLOAD" | "MANUAL">;
+  /** Where it came from, for the "filled from the résumé" hint only; it is not sent. */
+  source: "RESUME_UPLOAD" | "MANUAL";
 }
 
 export interface WizardValues {
@@ -37,7 +38,7 @@ export interface WizardValues {
   linkedinUrl: string;
   city: string;
   state: string;
-  /** Any country, "US" until the person or the résumé says otherwise (a TN candidate may be from Canada or Mexico). */
+  /** Any country (a TN candidate may be from Canada or Mexico). Starts empty: filled from the résumé, else typed. */
   country: string;
   skills: WizardSkill[];
   summary: string;
@@ -63,29 +64,42 @@ export interface WizardValues {
   handoffNote: string;
 }
 
-/** The fields the parser can fill, and so can carry the "Drafted from résumé" marker. */
+/** The fields the parser can fill, and so can carry the "Filled from résumé" marker. */
 export const DRAFTABLE = ["fullName", "primaryRole", "yearsExperience", "email", "phone", "linkedinUrl", "city", "state", "country", "skills", "summary", "workAuth"] as const;
 export type DraftableField = (typeof DRAFTABLE)[number];
 
 export const EMPTY_VALUES: WizardValues = {
   resume: null, fullName: "", primaryRole: "", yearsExperience: "", email: "", phone: "", linkedinUrl: "", city: "", state: "",
-  country: "US", skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
+  country: "", skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
   rateMin: "", availableFrom: "", noticePeriodDays: "", targetRoles: [], workSettings: [], preferredLocations: [],
   willingToRelocate: false, preferredIndustries: [], dealBreakers: [], contactNotes: "", managerId: "", bdeId: null,
   handoffNote: "",
 };
 
-/** The default country, and the ways a résumé prints it ("USA", "United States"), which all mean the default. */
+/** The ways a résumé prints the US ("USA", "United States"), all sent as "US". */
 const US = "US";
 const isUs = (country: string) => /^(u\.?s\.?a?\.?|united states( of america)?|america)$/i.test(country.trim());
 
 const isBlank = (value: unknown) => value === "" || value === null || (Array.isArray(value) && value.length === 0);
 
+/** The form with every résumé field back to empty (the next résumé fills them); the rest is kept. */
+function clearResumeFields(values: WizardValues): WizardValues {
+  const out: WizardValues = { ...values, workAuthText: EMPTY_VALUES.workAuthText };
+  for (const field of DRAFTABLE) Object.assign(out, { [field]: EMPTY_VALUES[field] });
+  return out;
+}
+
 /**
  * Fill the form from a résumé draft. Only empty fields are filled, so nothing typed is overwritten; the filled ones
  * are returned as drafted. Skills are merged (new names only).
+ *
+ * Another résumé uploaded after one (the first was the wrong file): every résumé field (`DRAFTABLE`: name, Marketed
+ * as, years, contact, location, summary, skills, work authorization) is cleared first, edited or not, so the new file
+ * fills them all; one it doesn't have stays empty. Rates, availability, preferences and the
+ * assignment are the person's and stay.
  */
 export function applyDraft(values: WizardValues, draft: ResumeDraft): { values: WizardValues; drafted: DraftableField[] } {
+  if (values.resume !== null) values = clearResumeFields(values);
   const next: WizardValues = { ...values, resume: { parseId: draft.parseId, fileName: draft.fileName } };
   const drafted: DraftableField[] = [];
   const fill = <K extends Exclude<DraftableField, "skills">>(field: K, value: WizardValues[K] | null) => {
@@ -101,11 +115,7 @@ export function applyDraft(values: WizardValues, draft: ResumeDraft): { values: 
   fill("linkedinUrl", draft.linkedinUrl);
   fill("city", draft.city);
   fill("state", draft.state);
-  // The country starts as US, so "only empty fields" can't apply: the résumé's country replaces the untouched default.
-  if (draft.country && !isUs(draft.country) && isUs(values.country)) {
-    next.country = draft.country.trim();
-    drafted.push("country");
-  }
+  fill("country", draft.country === null ? null : isUs(draft.country) ? US : draft.country.trim());
   fill("summary", draft.summary);
   fill("workAuth", draft.workAuth);
   if (values.workAuth === null) next.workAuthText = draft.workAuthText;
@@ -129,6 +139,8 @@ const isWhole = (value: number | null, min: number, max: number) => value === nu
  */
 export function validateStep(step: StepId, values: WizardValues, context: { requiresBde?: boolean } = {}): Errors {
   const errors: Errors = {};
+  // 07 Q58 (Abdul, 2026-11-06): no candidate without their résumé, so step 1 can't be passed without one.
+  if (step === "resume" && values.resume === null) errors.resume = "Upload the candidate's résumé.";
   if (step === "assign") {
     if (!values.managerId) errors.managerId = "Choose the manager.";
     else if (context.requiresBde && values.bdeId === null) errors.bdeId = "Choose the BDE who will work this candidate.";
@@ -141,7 +153,7 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
     if (!values.email.trim()) errors.email = "Enter their email.";
     else if (!z.string().email().safeParse(values.email.trim()).success) errors.email = "Enter a valid email, like name@example.com.";
     if (asNumber(values.yearsExperience) === null || !isWhole(asNumber(values.yearsExperience), 0, 60)) errors.yearsExperience = "Years of experience is a whole number from 0 to 60.";
-    if (values.linkedinUrl.trim() && !z.string().url().safeParse(values.linkedinUrl.trim()).success) errors.linkedinUrl = "Enter the full link, starting with https://.";
+    if (normalizeProfileLink(values.linkedinUrl) === null) errors.linkedinUrl = PROFILE_LINK_ERROR;
   }
   if (step === "work") {
     if (values.workAuth === null) errors.workAuth = "Choose their work authorization.";
@@ -161,7 +173,7 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
 
 /**
  * The first step that can't be passed yet, at or before `requested` (a reload starts empty: no drafts, Q48). A flow
- * not yet started (a reload, or just after creating one) starts on the résumé; "Skip, enter manually" starts it empty.
+ * not yet started (a reload, or just after creating one) starts on the résumé, and so does any flow without one (07 Q58).
  */
 export function firstOpenStep(requested: StepId, values: WizardValues, hasStarted = true): StepId {
   if (!hasStarted && !isDirty(values)) return "resume";
@@ -188,12 +200,13 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
   // Required on step 3 (validateStep), so it is always set here.
   const workAuth = values.workAuth;
   if (workAuth === null) throw new Error("toCreateCandidate needs a work authorization (step 3).");
+  if (values.resume === null) throw new Error("toCreateCandidate needs the résumé (step 1; 07 Q58).");
   return {
     fullName: values.fullName.trim(),
     primaryRole: values.primaryRole.trim(),
     email: values.email.trim(),
     phone: values.phone.trim(),
-    linkedinUrl: orNull(values.linkedinUrl),
+    linkedinUrl: normalizeProfileLink(values.linkedinUrl) || null,
     city: orNull(values.city),
     state: orNull(values.state),
     country: isUs(values.country) ? US : values.country.trim(),
@@ -213,10 +226,10 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     preferredLocations: values.preferredLocations,
     contactNotes: orNull(values.contactNotes),
     summary: orNull(values.summary),
-    skills: values.skills,
+    skills: values.skills.map(({ name, family }) => ({ name, family })),
     preferredIndustries: values.preferredIndustries,
     dealBreakers: values.dealBreakers,
-    resumeParseId: values.resume?.parseId ?? null,
+    resumeParseId: values.resume.parseId,
     managerId: values.managerId,
     bdeId: values.bdeId,
     handoffNote: orNull(values.handoffNote),

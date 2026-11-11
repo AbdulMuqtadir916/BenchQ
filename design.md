@@ -21,8 +21,7 @@ are not copied. BenchQ's existing brand assets and staffing workflows remain.
   with an even deeper canvas (#030A16) behind the frame. All surface shades
   step upward from this navy: borders, insets, and glass tones are derived
   from the same hue family for a cohesive, deeply saturated night mode.
-- Evidence semantics are unchanged: VERIFIED is verified, UNVERIFIED is unverified,
-  CONTRADICTED is contradicted and omitted from export. UNVERIFIED blocks export.
+- There are no claim states (dropped 2026-11-05): no Verified / Unverified / Contradicted chips, no export block.
 
 ## 2. Layout and density
 
@@ -90,20 +89,12 @@ All size and visual constants belong in global tokens, not screen-level CSS.
 | Action blue | --color-primary | #3458E5 | #4D82F7 |
 
 Foreground/background pairs: success (green), warning (amber), danger (rose),
-info (blue), violet, teal, and a neutral grey for unverified claims. Use `Tag` with a named tone:
+info (blue), violet, teal, and a neutral grey (`--color-neutral-*`). Use `Tag` with a named tone:
 `neutral | blue | green | amber | red | violet | teal`. Dark counterparts are
 defined in the same CSS file. Never apply a light tag background in dark mode.
 Muted text is for secondary information, not disabled essential instructions.
 Use text and icons with status; color is never the only signal.
 
-Claim colors are reserved for their domain semantics:
-
-- VERIFIED: blue, check-circle, solid fine border.
-- UNVERIFIED: neutral, question-mark icon, dashed border.
-- CONTRADICTED: rose, ban icon, line-through.
-
-Use `ClaimChip`, not a generic tag, for these states. An interactive style
-preview must explicitly say it is a preview; it cannot imply evidence was saved.
 Template placeholders use `MergeField`: amber monospace with curly-brace notation.
 
 ## 5. Gradients and glass
@@ -200,8 +191,7 @@ ease-in-out `[0.77, 0, 0.175, 1]` for movement, linear timing for progress, and
 springs only for press feedback, gestures, and layout continuity.
 
 Use 100–160ms for press feedback, 125–200ms for tooltips and popovers,
-150–250ms for dropdowns, 200–500ms for large panels, and 350ms for the
-claim-verification transition. Most interface motion completes under 300ms.
+150–250ms for dropdowns, and 200–500ms for large panels. Most interface motion completes under 300ms.
 Content reveals may use a restrained 8px lift and 4px blur. Small content swaps
 travel no more than 4px, with the outgoing content leaving faster than the new
 content enters. Shared surfaces move before their labels appear.
@@ -235,5 +225,4 @@ Sample data and preview preferences are not production records.
 
 New product screens must reuse this system. Unbuilt product routes are still
 unbuilt; this visual update does not implement recruitment workflows.
-Architecture, data contracts, role permissions, mock boundaries, and the
-product's claims/evidence model remain governed by their existing documents.
+Architecture, data contracts, role permissions and mock boundaries remain governed by their existing documents.

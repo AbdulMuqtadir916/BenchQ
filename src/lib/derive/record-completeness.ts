@@ -12,9 +12,8 @@ const CHECKS: Check[] = [
   { field: "headline", label: "Headline", severity: "IMPORTANT", weight: 10, present: (r) => !!r.headline },
   { field: "summary", label: "Professional summary", severity: "IMPORTANT", weight: 15, present: (r) => !!r.summary },
   { field: "experiences", label: "Work experience", severity: "BLOCKER", weight: 30, present: (r) => r.experiences.length > 0 },
-  { field: "skills", label: "Skills", severity: "BLOCKER", weight: 20, present: (r) => r.skills.length >= 3 },
-  { field: "educations", label: "Education", severity: "IMPORTANT", weight: 15, present: (r) => r.educations.length > 0 },
-  { field: "evidence", label: "Evidence attached", severity: "MINOR", weight: 10, present: (r) => r.evidence.length > 0 },
+  { field: "skills", label: "Skills", severity: "BLOCKER", weight: 25, present: (r) => r.skills.length >= 3 },
+  { field: "educations", label: "Education", severity: "IMPORTANT", weight: 20, present: (r) => r.educations.length > 0 },
 ];
 
 /**

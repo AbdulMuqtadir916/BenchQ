@@ -14,6 +14,7 @@ import { MatchScore } from "@/components/app/match-score";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { useHref } from "@/lib/routes/use-href";
+import { jobLocation } from "@/lib/format/job";
 
 export default function FocusModePage() {
   const toHref = useHref();
@@ -121,7 +122,7 @@ export default function FocusModePage() {
               <div className="mb-1 flex items-center gap-2 text-caption text-[var(--color-text-3)]">
                 <span>{current.job.company.name}</span>
                 <span>·</span>
-                <span>{current.job.remoteMode === "REMOTE" ? "Remote" : `${current.job.city}, ${current.job.state}`}</span>
+                <span>{jobLocation(current.job)}</span>
                 {current.job.rateMax ? <><span>·</span><span className="tabular">${current.job.rateMin}–{current.job.rateMax}/hr</span></> : null}
               </div>
               <h1 className="text-h1">{current.job.title}</h1>

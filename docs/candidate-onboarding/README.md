@@ -34,7 +34,7 @@ Why it matters (`product.md` §2): the OWNER and MANAGER must see who works whic
 | Q46 | **BDE capacity is a warning, not a block:** one firm-wide number (`bdeCapacity`, default 10) the OWNER edits in `settings/firm`. Each BDE row shows its load, e.g. "8 / 10", amber at or over capacity. |
 | Q47 | **A MANAGER's scope is their team on every firm page** (dashboard, candidates, applications, resumes, outreach, follow-ups, analytics, ledger, `settings/team`): their BDEs' work plus their queue. OWNER and VIEWER see the whole firm; a BDE sees their own (unchanged). |
 | Q48 | **The flow:** replaces `/[firm]/candidates/new` at the same URL, full page; the intercepted modal and the old form are deleted. No drafts: closing with anything entered asks "Discard this candidate?". Required: full name, "Marketed as", email, and the assignment. The screens say **"Assigned BDE"** / **"BDE"**, never "Owner". |
-| Q49 | **Resume parsing and Truth Guard:** the backend parses the file and returns a draft without saving anything ("Nothing is saved until you create the candidate"). Onboarding never produces a `VERIFIED` claim: profile fields are plain facts; skills, summary, experience and education land in the candidate's Record as `UNVERIFIED` with their `FieldSource`; fields filled from the resume show a "Drafted from resume" marker until edited or confirmed. docs/04 §4.2's "typed fields are VERIFIED" is withdrawn. |
+| Q49 | **Resume parsing and Truth Guard:** the backend parses the file and returns a draft without saving anything ("Nothing is saved until you create the candidate"). Onboarding never produces a `VERIFIED` claim: profile fields are plain facts; skills, summary, experience and education land in the candidate's Record as `UNVERIFIED` with their `FieldSource`; fields filled from the resume show a "Drafted from resume" marker until edited or confirmed. docs/04 §4.2's "typed fields are VERIFIED" is withdrawn. **Superseded 2026-11-05:** claim states are dropped, so the `UNVERIFIED` and reviewed parts no longer apply; fields filled from the résumé show "Filled from résumé" until edited. |
 | Q50 | **No notifications.** The "Notify the BDE" toggle is dropped. The handoff note is saved with the assignment and shown on the candidate page; the BDE sees **"New assignments"** on their dashboard (derived from `ASSIGN` entries of the last 7 days). The new candidate fields are **provisional**: the frontend uses them on mocks; **Zuhair** owns the production contract and the backend Candidates track. Deactivating a MANAGER or BDE is out of scope (rule for later in §8). |
 | Q51 | **BDEs from before the hierarchy** keep no manager ("No manager") until the OWNER sets one in `settings/team`; they can't be given candidates until then. The database enforces only "a non-BDE has no manager" until every BDE has one (06 §2). |
 | Q52 | **A BDE's ledger** also has the `ASSIGN` entries about the candidates they work now (for "New assignments" and the handoff note); the ledger takes `entity_type`, `entity_id` and `action` filters. |
@@ -60,12 +60,12 @@ filled in; its "Owner" row becomes **"Assigned BDE"** (Q48).
 
 | # | Screen | What happens | Module |
 |---|---|---|---|
-| 1 | [Resume](./screens/1-resume.webp) | Drop a PDF or Word file (≤ 10 MB) or "Skip, enter manually". The parser fills steps 2–4. Sample resumes show only on mocks (§7 A1). | 04 |
+| 1 | [Resume](./screens/1-resume.webp) | Drop a PDF or Word file (≤ 10 MB); required (07 Q58). The parser fills steps 2–4. Sample resumes show only on mocks (§7 A1). | 04 |
 | 2 | [Basic details](./screens/2-basic-details.webp) | Identity (full name\*, "Marketed as"\*, years), contact (email\*, phone, LinkedIn, city, state), profile (skills, summary). | 04 |
 | 3 | [Work and rate](./screens/3-work-and-rate.webp) | Work authorization (one of nine), valid until, engagement types (C2C / W2 / 1099 / Full-time), target rate, walk-away floor, available from, notice period. | 04 |
 | 4 | [Preferences](./screens/4-preferences.webp) | Target roles, work setting, preferred locations, willing to relocate, industries, deal breakers, notes for the BDE. "Skip for now" allowed. | 04 |
 | 5 | [Assign](./screens/5-assign.webp) | MANAGER: pick one of their BDEs. OWNER: pick a manager, then optionally a BDE. Load per BDE, capacity warning, handoff note. **Create candidate.** The "Notify the BDE" toggle is removed (Q50). | 05 |
-| 6 | [Done](./screens/6-done.webp) | "{name} is on the bench." Open profile · Find jobs · Add another. Copy in module 05. | 05 |
+| 6 | [Done](./screens/6-done.webp) | "{name} is on the bench." Open profile · Add another (Find jobs removed 2026-11-11: only the candidate's BDE searches). Copy in module 05. | 05 |
 
 ## 5. Modules
 
@@ -117,12 +117,12 @@ tailored claim can point back to the original résumé text as evidence.
 
 | # | Assumption |
 |---|---|
-| A1 | The "Try a sample" résumés on step 1 appear only when the module runs on mocks (demo). |
+| A1 | ~~The "Try a sample" résumés on step 1 appear only when the module runs on mocks (demo).~~ Removed 2026-11-11 with the candidates mock: a candidate is only made from a real résumé. |
 | A2 | A new candidate starts `ON_BENCH`, `benchStartDate` = creation time. |
 | A3 | `needsSponsorship` and `needsTransfer` are derived from the work authorization card (H-1B → transfer; H-1B, H4 EAD, OPT, CPT, TN → sponsorship). The screen has no separate checkboxes. The flow works them out and sends them; the backend only checks they were sent (decided 2026-11-05). |
 | A4 | "Works N similar profiles" on step 5 = the BDE's candidates in a working status whose "Marketed as" matches, ignoring case. |
 | A5 | "New assignments" on the BDE dashboard = candidates whose latest `ASSIGN` entry names this BDE and is under 7 days old. |
-| A6 | The done screen's "Find jobs" opens `/[firm]/jobs` filtered to the new candidate (an existing URL filter). |
+| A6 | ~~The done screen's "Find jobs" opens `/[firm]/jobs` filtered to the new candidate.~~ Removed 2026-11-11 (job search PR 3): only owners and managers add a candidate, and only the candidate's BDE searches jobs. |
 
 ## 8. Later, not in this plan
 
@@ -158,5 +158,4 @@ Sign in as each seeded account and walk it:
 - [ ] OWNER moves a candidate from manager A's BDE to manager B without a BDE → B's queue; one ledger entry.
 - [ ] At the candidate limit, assigning a BDE is disabled with the reason; adding to a queue still works.
 - [ ] At the BDE seat limit, inviting a BDE is blocked; inviting a MANAGER or VIEWER isn't.
-- [ ] Nothing on the candidate is `VERIFIED` after onboarding.
 - [ ] Support view: read-only on every page above, no "New candidate", no "Reassign".

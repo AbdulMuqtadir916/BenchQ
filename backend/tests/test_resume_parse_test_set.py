@@ -118,7 +118,8 @@ def test_a_real_parse_becomes_a_first_base_version_with_every_item(path):
     header = parse["header"]
     candidate = SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), full_name=header["name"] or "Unnamed",
                                 primary_role=header["title"] or "Role", email=header["email"], phone=header["phone"],
-                                linkedin_url=header["linkedin"], city=header["city"], state=header["state"])
+                                linkedin_url=header["linkedin"], city=header["city"], state=header["state"],
+                                country=header["country"] or "US")
     body = SimpleNamespace(work_auth="USC", summary=parse["professional_summary"], skills=[])
     _, v1 = first_base(SimpleNamespace(id=uuid.uuid4(), parse=parse), candidate, body, uuid.uuid4())
     assert [len(r["bullets"]) for r in v1.experiences] == [len(r["bullets"]) for r in parse["work_experience"]]

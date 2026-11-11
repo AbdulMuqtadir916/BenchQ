@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Principal } from "@/lib/schemas/tenancy";
-import { can, canAssignTo, canChangeResume, canManageResume, dashboardFor, hasOwnScope, hasTeamScope, isSupportView, scopeApplications, scopeByCandidate, scopeCandidates, scopeFollowups, scopeFollowupsUserId, scopeLedger, scopeOf, scopeTeam, type FirmAction } from "./permissions";
+import { can, canAssignTo, canChangeResume, canManageResume, dashboardFor, hasOwnScope, hasTeamScope, isSupportView, scopeApplications, scopeByCandidate, scopeCandidates, scopeLedger, scopeOf, scopeTeam, type FirmAction } from "./permissions";
 
 const firmUser = (role: "OWNER" | "MANAGER" | "BDE" | "VIEWER"): Principal => ({ kind: "firm", userId: `u_${role}`, firmId: "f", role });
 const admin: Principal = { kind: "platform", userId: "padm", role: "PLATFORM_ADMIN", support: null };
 const support: Principal = { ...admin, support: { id: "sv", firmId: "f", reason: "Checking a report", startedAt: "2026-10-19T09:00:00.000Z", expiresAt: "2026-10-19T10:00:00.000Z" } };
 
-const ACTIONS: FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act"];
+const ACTIONS: FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act"];
 
 describe("can() (07 Phase C slice, Q32)", () => {
   it("OWNER and MANAGER take every firm action; a BDE every one but adding a candidate (07 Q41); VIEWER none", () => {
@@ -62,7 +62,6 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     { id: "l3", actorUserId: null, entityType: "firm", entityId: "f", action: "UPDATE" },
     { id: "l4", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c3", action: "UPDATE" },
   ];
-  const followups = [{ id: "f1", assignedToUserId: "u_BDE" }, { id: "f2", assignedToUserId: "b2" }];
   const ids = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
 
   it("a BDE sees their own", () => {
@@ -78,8 +77,6 @@ describe("scope helpers (07 §2.2, Q47)", () => {
       { id: "l7", actorUserId: "u_MANAGER", entityType: "candidate", entityId: "c2", action: "ASSIGN" },
     ];
     expect(ids(scopeLedger(bde, [...ledger, ...assigns], context))).toEqual(["l1", "l5"]);
-    expect(ids(scopeFollowups(bde, followups, context))).toEqual(["f1"]);
-    expect(scopeFollowupsUserId(bde)).toBe("u_BDE");
     expect(hasOwnScope(bde)).toBe(true);
   });
 
@@ -97,15 +94,13 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     expect(ids(scopeCandidates(manager, candidates))).toEqual(["c1", "c3"]);
     expect(ids(scopeApplications(manager, applications, candidates))).toEqual(["a1", "a3"]);
     expect(ids(scopeByCandidate(manager, [{ id: "r1", candidateId: "c1" }, { id: "r2", candidateId: "c2" }], candidates))).toEqual(["r1"]);
-    // 07 Q56: what their team did, plus who assigned the candidates they manage; never the firm's other work on them.
+    // 07 Q59: what their team did, plus who assigned the candidates they manage; never the firm's other work on them.
     const managed = [
       { id: "l8", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c3", action: "ASSIGN" },
       { id: "l9", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c2", action: "ASSIGN" },
     ];
     expect(ids(scopeLedger(manager, [...ledger, ...managed], context))).toEqual(["l1", "l8"]);
-    expect(ids(scopeFollowups(manager, followups, context))).toEqual(["f1"]);
     expect(ids(scopeTeam(manager, users, candidates))).toEqual(["u_MANAGER", "u_BDE"]);
-    expect(scopeFollowupsUserId(manager)).toBeUndefined();
     expect([hasTeamScope(manager), hasOwnScope(manager)]).toEqual([true, false]);
   });
 
@@ -120,9 +115,7 @@ describe("scope helpers (07 §2.2, Q47)", () => {
       expect(scopeCandidates(principal, candidates)).toHaveLength(3);
       expect(scopeApplications(principal, applications, candidates)).toHaveLength(3);
       expect(scopeLedger(principal, ledger, context)).toHaveLength(4);
-      expect(scopeFollowups(principal, followups, context)).toHaveLength(2);
       expect(scopeTeam(principal, users, candidates)).toHaveLength(5);
-      expect(scopeFollowupsUserId(principal)).toBeUndefined();
       expect([hasOwnScope(principal), hasTeamScope(principal)]).toEqual([false, false]);
     }
   });
