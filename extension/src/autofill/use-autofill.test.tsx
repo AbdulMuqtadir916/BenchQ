@@ -1122,6 +1122,20 @@ describe("a site BenchQ may not read yet", () => {
     expect(hook.isAsking).toBe(false);
   });
 
+  it("doesn't mark a newer site denied when an older site's prompt is declined", async () => {
+    onFrames();
+    let answer: (granted: boolean) => void = () => undefined;
+    fake.permissions.request.mockImplementation(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+    await mount();
+    await act(async () => { void hook.allowAccess(); });
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "https://jobs.other.test/2" }]);
+    await run(() => hook.rescan());
+    await act(async () => { answer(false); });
+    await wait(5);
+    expect(hook.needsAccess?.host).toBe("jobs.other.test");
+    expect(hook.isAccessDenied).toBe(false);
+  });
+
   it("leaves a page that isn't https alone", async () => {
     fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "http://careers.employer.test/job" }]);
     await mount();

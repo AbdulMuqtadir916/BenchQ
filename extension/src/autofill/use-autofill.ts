@@ -362,7 +362,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     setIsAsking(true);
     try {
       const granted = await requestAccess(access).catch(() => false);
-      setIsAccessDenied(!granted);
+      // A "no" belongs to the site asked about: if the tab has moved to another one, that one was never asked.
+      if (accessKey.current === requested) setIsAccessDenied(!granted);
       if (granted) {
         // Allowed now: this site's notice goes at once, whatever the scan finds, but not the notice of another site the
         // tab moved to while Chrome's prompt was open. The scan is the latest one, not the one this click began with:

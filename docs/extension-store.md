@@ -70,10 +70,14 @@ Draft answers, to be confirmed by the owner:
   has saved to self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay
   questions (salary or rate expectations). It also collects *website content* (the text of the form fields on a
   connected application page, to fill them and to record what was submitted) and *authentication information* (the
-  user's BenchQ session, kept by the browser as a cookie and sent only to BenchQ). Self-identification answers are
-  filled into the form but are never included in the form recorded with the application; salary and rate answers are.
-- **Not collected:** health, financial, location, web history (beyond the address of the connected tab), user activity
-  such as keystrokes or clicks, or personal communications.
+  user's BenchQ session, kept by the browser as a cookie and sent only to BenchQ). Answers to questions the extension
+  recognises as self-identification (gender, race or ethnicity, veteran status, disability, sexual orientation) are
+  filled into the form but left out of the form recorded with the application. Everything else filled or typed on the
+  page is recorded, including salary and rate answers, accommodation questions, and any self-identification question
+  worded in a way the extension does not recognise, so **health-related answers can be recorded** when a question like
+  that is filled.
+- **Not collected:** financial account details, location, web history (beyond the address of the connected tab), user
+  activity such as keystrokes or clicks, or personal communications.
 - **Certify:** data is not sold; not used for anything unrelated to the single purpose; not used for creditworthiness or
   lending.
 - **Where it goes:** to the user's own BenchQ account (www.benchq.io), and, when the user presses Autofill, into the
@@ -95,8 +99,10 @@ Draft answers, to be confirmed by the owner:
 > if attached) are written into the employer's application page in that tab: the page can read them and may save or
 > upload them before you submit, as with anything typed into a form. That can include answers a candidate has saved to
 > self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay questions. When you
-> mark the application applied, BenchQ records the form as filled, including salary and rate answers but never the
-> self-identification answers. Nothing is sent anywhere else, sold, or used for advertising.
+> mark the application applied, BenchQ records the form as filled. Answers to questions BenchQ recognises as
+> self-identification are left out of that record; everything else is kept, including salary and rate answers,
+> accommodation questions, and any self-identification question worded in a way BenchQ does not recognise. Nothing is
+> sent anywhere else, sold, or used for advertising.
 >
 > *What it keeps.* For the current browser session: which tab is connected to which job, erased when the browser
 > closes. In the extension's own storage on this device, until you uninstall it: your light or dark theme, the last
