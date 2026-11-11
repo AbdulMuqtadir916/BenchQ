@@ -94,10 +94,12 @@ export function OwnerActivityDashboard() {
   // A BDE with no manager of their own opens under the manager whose candidate they hold.
   const openBde = (bdeId: string) => {
     const person = users.find((user) => user.id === bdeId);
-    setQuery({ manager: person?.managerId ?? allCandidates.find((candidate) => candidate.bdeId === bdeId)?.managerId ?? "", bde: bdeId });
+    setQuery({ manager: person?.managerId ?? allCandidates.find((candidate) => candidate.bdeId === bdeId)?.managerId ?? "", bde: bdeId }, "push");
   };
 
-  useEscapeBack(bde ? () => setQuery({ bde: "" }) : manager && !ownTeam ? () => setQuery({ manager: "", bde: "" }) : null);
+  const openTeam = () => setQuery({ bde: "" }, "push");
+  const openFirm = () => setQuery({ manager: "", bde: "" }, "push");
+  useEscapeBack(bde ? openTeam : manager && !ownTeam ? openFirm : null);
 
   if (group.status === "error") {
     return <ErrorState variant="page" error={group.error ?? new Error("The request failed.")} onRetry={group.retry} />;
@@ -111,10 +113,10 @@ export function OwnerActivityDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Dashboard level" className="flex min-w-0 items-center gap-2 text-sm text-[var(--color-text-3)]">
           {ownTeam ? null : manager
-            ? <button type="button" onClick={() => setQuery({ manager: "", bde: "" })} className={crumb}>Whole firm</button>
+            ? <button type="button" onClick={openFirm} className={crumb}>Whole firm</button>
             : <span aria-current="page" className={current}>Whole firm</span>}
           {manager ? <>{ownTeam ? null : <ChevronRight size={14} aria-hidden />}{bde
-            ? <button type="button" onClick={() => setQuery({ bde: "" })} className={cn(crumb, "truncate")}>{manager.name}</button>
+            ? <button type="button" onClick={openTeam} className={cn(crumb, "truncate")}>{manager.name}</button>
             : <span aria-current="page" className={cn(current, "truncate")}>{manager.name}</span>}</> : null}
           {bde ? <><ChevronRight size={14} aria-hidden /><span aria-current="page" className={cn(current, "truncate")}>{bde.name}</span></> : null}
         </nav>
@@ -124,13 +126,13 @@ export function OwnerActivityDashboard() {
       {group.status === "pending" ? (
         <div aria-busy="true" className="space-y-6"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div><div className="grid gap-6 lg:grid-cols-2"><SkeletonCard /><SkeletonCard /></div></div>
       ) : bde && manager ? (
-        <BdeView user={bde} managerName={manager.name} candidates={bdeCandidates} applications={applicationsOf(bdeCandidates)} period={query.period} window={window} now={now} />
+        <BdeView user={bde} manager={manager} candidates={bdeCandidates} applications={applicationsOf(bdeCandidates)} period={query.period} window={window} now={now} />
       ) : manager ? (
         <ManagerView user={manager} bdes={teamBdes} candidates={teamCandidates} applications={applicationsOf(teamCandidates)} period={query.period} window={window}
-          now={now} capacity={firm.bdeCapacity} jobs={jobs} canAssign={can(principal, "candidate.assign")} onSelectBde={(bdeId) => setQuery({ bde: bdeId })} />
+          now={now} capacity={firm.bdeCapacity} jobs={jobs} canAssign={can(principal, "candidate.assign")} onSelectBde={(bdeId) => setQuery({ bde: bdeId }, "push")} />
       ) : (
         <FirmView managers={managers} users={users} candidates={candidates} applications={applications} period={query.period} window={window}
-          now={now} jobs={jobs} capacity={firm.bdeCapacity} onSelectManager={(managerId) => setQuery({ manager: managerId, bde: "" })} onSelectBde={openBde} />
+          now={now} jobs={jobs} capacity={firm.bdeCapacity} onSelectManager={(managerId) => setQuery({ manager: managerId, bde: "" }, "push")} onSelectBde={openBde} />
       )}
     </div>
   );

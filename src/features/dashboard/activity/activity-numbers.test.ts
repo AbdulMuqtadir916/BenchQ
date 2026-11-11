@@ -31,9 +31,13 @@ describe("the activity numbers", () => {
 
   it("gives each manager their team, their active BDEs and their queue", () => {
     const users = [person("mira", "MANAGER"), person("bea", "BDE", "mira"), { ...person("old", "BDE", "mira"), isActive: false }];
-    const candidates = [candidate("c1", "mira", "bea"), candidate("c2", "mira", null), candidate("c3", "zed", "cara")];
+    const candidates = [
+      candidate("c1", "mira", "bea"), candidate("c2", "mira", null), candidate("c3", "zed", "cara"),
+      { ...candidate("c4", "mira", null), status: "PAUSED" as const },
+      { ...candidate("c5", "mira", null), status: "PLACED" as const },
+    ];
     const [row] = managerRows([users[0]], users, candidates, [app({ candidateId: "c1" }), app({ candidateId: "c3" })], window);
-    expect(row).toMatchObject({ bdes: 1, candidates: 2, withoutBde: 1, counts: { applications: 1 } });
+    expect(row).toMatchObject({ bdes: 1, candidates: 4, withoutBde: 1, counts: { applications: 1 } });
   });
 
   it("counts a BDE holding the manager's candidate in the team, even with no manager of their own", () => {

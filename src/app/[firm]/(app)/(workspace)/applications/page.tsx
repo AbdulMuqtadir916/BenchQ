@@ -6,7 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { useApplications, useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
-import { can, scopeApplications } from "@/lib/auth/permissions";
+import { can, scopeApplications, scopeTeam } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { PageHeader } from "@/components/app/page-header";
@@ -77,7 +77,9 @@ function ApplicationsList() {
   }, [applicationsQuery.data, candidatesQuery.data, principal, search, now]);
 
   // Until the team arrives there is no name to show, so the chip says nothing rather than "no longer on the team".
-  const personName = (id: string) => teamQuery.data ? (teamQuery.data.find((user) => user.id === id)?.name ?? "someone no longer on the team") : "…";
+  const scopedTeam = teamQuery.data && scopeTeam(principal, teamQuery.data, candidatesQuery.data ?? []);
+  const personName = (id: string) => scopedTeam?.find((user) => user.id === id)?.name
+    ?? (teamQuery.isLoading || candidatesQuery.isLoading ? "…" : "Unknown team member");
   const chips: FilterChip[] = [
     search.status ? { key: "status", label: `Now: ${STATUS_LABEL[search.status]}`, onRemove: () => setSearch({ status: "" }) } : null,
     search.reached ? { key: "reached", label: `Reached ${STATUS_LABEL[search.reached]}`, onRemove: () => setSearch({ reached: "" }) } : null,

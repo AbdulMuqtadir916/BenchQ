@@ -141,14 +141,15 @@ export function ManagerView({ user, bdes, candidates, applications, period, wind
       <SpeedStrip speeds={stageSpeeds(applications, window)} daysToPlace={averageDaysToPlace(applications, window)} />
       <DemandCard rows={roleDemand(jobs.jobs, candidates)} jobs={jobs} links={links} />
     </div>
+    <SourceCard rows={sourceEffectiveness(applications, jobs.jobs, window)} jobs={jobs} />
   </>;
 }
 
-export function BdeView({ user, managerName, candidates, applications, period, window, now }: ViewProps & { user: User; managerName: string }) {
-  const links = useListLinks({ bde: user.id });
+export function BdeView({ user, manager, candidates, applications, period, window, now }: ViewProps & { user: User; manager: User }) {
+  const links = useListLinks({ manager: manager.id, bde: user.id });
   const working = candidates.filter(isWorkingCandidate).length;
   return <>
-    <PersonHeader user={user} detail={`BDE · reports to ${managerName} · ${plural(candidates.length, "candidate")}, ${working} being worked`} />
+    <PersonHeader user={user} detail={`BDE · reports to ${manager.name} · ${plural(candidates.length, "candidate")}, ${working} being worked`} />
     <ActivityTiles applications={applications} period={period} window={window} links={links} first={<PaceRing pace={paceOf(applications, now)} links={links} />} />
     <StageCounts applications={applications} links={links} />
     <CandidateProgressCard rows={candidateProgress(candidates, applications, now)} links={links} />

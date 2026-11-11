@@ -19,6 +19,7 @@ import type { BdeRow, BdeStageRow, StackedBin } from "./activity-numbers";
 const SERIES = ["bg-[var(--color-chart-1)]", "bg-[var(--color-chart-2)]", "bg-[var(--color-chart-3)]", "bg-[var(--color-chart-4)]", "bg-[var(--color-chart-5)]", "bg-[var(--color-chart-6)]"];
 const OTHERS = "bg-[var(--color-text-3)]";
 const shortDay = (at: number) => new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(at));
+const intervalStart = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /** Submissions across the period, each column split by BDE: who carried the team, and when. */
 export function StackedTrendCard({ bdes, bins, onSelectBde }: { bdes: User[]; bins: StackedBin[]; onSelectBde: (bdeId: string) => void }) {
@@ -60,6 +61,36 @@ export function StackedTrendCard({ bdes, bins, onSelectBde }: { bdes: User[]; bi
         ))}
         {hasOthers ? <li className="flex items-center gap-1.5 px-1 text-[var(--color-text-2)]"><span aria-hidden className={cn("size-2 rounded-full", OTHERS)} />{bdes.length > named.length ? `${bdes.length - named.length} more BDEs, other BDEs or none` : "Other BDEs or none"}</li> : null}
       </ul>
+      <details className="mt-3 border-t border-[var(--color-border)] pt-3">
+        <summary className={cn("w-fit cursor-pointer text-sm text-[var(--color-text)]", linkSurface)}>View submission counts</summary>
+        <div role="region" aria-label="Submission counts by BDE and period" tabIndex={0} className={cn("mt-2 overflow-x-auto", linkSurface)}>
+          <table className="w-full text-sm tabular">
+            <caption className="sr-only">Submissions by BDE. Column headings show the start of each interval in local time.</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="px-2 py-1 text-left">BDE</th>
+                {bins.map((bin) => (
+                  <th key={bin.start} scope="col" className="whitespace-nowrap px-2 py-1 text-right">{intervalStart.format(bin.start)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bdes.map((bde, index) => (
+                <tr key={bde.id} className="border-t border-[var(--color-border)]">
+                  <th scope="row" className="whitespace-nowrap px-2 py-1 text-left font-medium">{bde.name}</th>
+                  {bins.map((bin) => <td key={bin.start} className="px-2 py-1 text-right">{bin.counts[index]}</td>)}
+                </tr>
+              ))}
+              {bins.some((bin) => bin.rest > 0) ? (
+                <tr className="border-t border-[var(--color-border)]">
+                  <th scope="row" className="whitespace-nowrap px-2 py-1 text-left font-medium">Other BDEs or unassigned</th>
+                  {bins.map((bin) => <td key={bin.start} className="px-2 py-1 text-right">{bin.rest}</td>)}
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </Card>
   );
 }

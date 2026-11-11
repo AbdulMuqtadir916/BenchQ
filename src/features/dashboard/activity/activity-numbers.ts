@@ -1,6 +1,7 @@
 import { teamMemberIds } from "@/lib/auth/policy";
 import { isBde } from "@/lib/auth/roles";
 import { maxDate } from "@/lib/derive";
+import { isWaitingForBde } from "@/lib/derive/assignment";
 import { reachedStatuses } from "@/lib/derive/funnel";
 import { applicationDate, happenedIn } from "@/lib/derive/list-filters";
 import type { ApplicationDate } from "@/lib/schemas/list-search";
@@ -85,7 +86,7 @@ export function managerRows(managers: readonly User[], users: readonly User[], c
       isActive: manager.isActive,
       bdes: users.filter((user) => isBde(user) && user.isActive && members.has(user.id)).length,
       candidates: team.length,
-      withoutBde: team.filter((candidate) => candidate.bdeId === null).length,
+      withoutBde: team.filter(isWaitingForBde).length,
       counts: countActivity(forCandidates(applications, team), window),
     };
   });

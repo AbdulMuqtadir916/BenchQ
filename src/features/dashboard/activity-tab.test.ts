@@ -16,12 +16,14 @@ vi.mock("@/lib/stores/session-store", async (importOriginal) => {
 });
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
-import { firms } from "@/mocks/team";
+import { allUsers, firms } from "@/mocks/team";
 import { stubBackendReads } from "@/mocks/fixture-backend";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "@/lib/stores/session-store";
 import { OwnerDashboard } from "./owner-dashboard";
 import { ManagerDashboard } from "./manager-dashboard";
+import ApplicationsPage from "@/app/[firm]/(app)/(workspace)/applications/page";
+import CandidatesPage from "@/app/[firm]/(app)/(workspace)/candidates/page";
 
 /** Render, let every query the tab created settle, render again: the loaded tab, on the mock backend. */
 async function render(component: ComponentType): Promise<string> {
@@ -47,7 +49,7 @@ describe("the Activity tab (07 Q47)", { timeout: 20_000 }, () => {
     await as("user_imran");
     const html = await render(OwnerDashboard);
     for (const text of ["Whole firm", "Pipeline", "Bench aging", "Managers", "Time between stages", "Every BDE", "Bench placed"]) expect(html, text).toContain(text);
-    expect(html).toContain("/hyderabad-tech-staffing/applications?period=30d&amp;by=applied");
+    expect(html).toContain("/hyderabad-tech-staffing/applications?period=30d&amp;by=applied&amp;view=table");
     expect(html).toContain("/hyderabad-tech-staffing/candidates?bench=under30");
     expect(html).not.toContain("Something didn’t load");
   });
@@ -59,8 +61,28 @@ describe("the Activity tab (07 Q47)", { timeout: 20_000 }, () => {
     expect(html).toContain("Fatima Reddy");
     expect(html).not.toContain("Whole firm");
     expect(html).not.toContain("Priya Shah");
-    for (const text of ["Submissions by BDE", "Waiting for a BDE", "Team activity"]) expect(html, text).toContain(text);
+    for (const text of ["Submissions by BDE", "View submission counts", "Waiting for a BDE", "Team activity", "Job sources"]) expect(html, text).toContain(text);
     expect(html).toContain("manager=user_fatima");
+  });
+
+  it("keeps both the manager and BDE in activity links from the BDE level", async () => {
+    const bde = allUsers.find((user) => user.role === "BDE" && user.managerId === "user_fatima")!;
+    search.value = `view=activity&manager=user_fatima&bde=${bde.id}`;
+    await as("user_imran");
+    const html = await render(OwnerDashboard);
+    const filters = `manager=user_fatima&amp;bde=${bde.id}`;
+    expect(html).toContain(`/hyderabad-tech-staffing/applications?${filters}&amp;period=1d&amp;view=table`);
+    expect(html).toContain(`/hyderabad-tech-staffing/candidates?${filters}&amp;bench=under30`);
+  });
+
+  it("does not resolve out-of-team names on a manager's drill-down links", async () => {
+    search.value = "manager=user_priya";
+    await as("user_fatima");
+    for (const page of [ApplicationsPage, CandidatesPage]) {
+      const html = await render(page);
+      expect(html).toContain("Unknown team member");
+      expect(html).not.toContain("Priya Shah");
+    }
   });
 
   it("shows a viewer the firm, with nothing to act on", async () => {

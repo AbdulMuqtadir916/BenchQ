@@ -21,7 +21,7 @@ import { NO_MANAGER_REASON } from "@/lib/derive/platform";
 import { isManager } from "@/lib/auth/roles";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
-import { can, hasOwnScope, hasTeamScope, scopeCandidates } from "@/lib/auth/permissions";
+import { can, hasOwnScope, hasTeamScope, scopeCandidates, scopeTeam } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { deriveCandidateStats } from "@/lib/derive";
 import { DataTable } from "@/components/app/data-table";
@@ -182,7 +182,9 @@ function CandidatesList() {
   }, [isOwnScope]);
 
   const canCreate = can(principal, "candidate.create");
-  const personName = (id: string) => teamQuery.data ? (teamQuery.data.find((user) => user.id === id)?.name ?? "someone no longer on the team") : "…";
+  const scopedTeam = teamQuery.data && scopeTeam(principal, teamQuery.data, candidatesQuery.data ?? []);
+  const personName = (id: string) => scopedTeam?.find((user) => user.id === id)?.name
+    ?? (teamQuery.isLoading || candidatesQuery.isLoading ? "…" : "Unknown team member");
   const chips: FilterChip[] = [
     search.bench ? { key: "bench", label: BENCH_LABEL[search.bench], onRemove: () => setQuery({ bench: "" }) } : null,
     search.manager ? { key: "manager", label: `Team: ${personName(search.manager)}`, onRemove: () => setQuery({ manager: "" }) } : null,

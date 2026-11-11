@@ -17,7 +17,7 @@ export interface LinkScope {
 export function useListLinks({ manager, bde }: LinkScope) {
   const toHref = useHref();
   return useMemo(() => ({
-    applications: (filters: ApplicationsLink = {}) => toHref("applications", {}, linkQuery({ manager, bde, ...filters })),
+    applications: (filters: ApplicationsLink = {}) => toHref("applications", {}, linkQuery({ manager, bde, ...filters, view: "table" })),
     candidates: (filters: CandidatesLink = {}) => toHref("candidates", {}, linkQuery({ manager, bde, ...filters })),
     candidate: (id: string) => toHref("candidates.detail", { id }),
   }), [toHref, manager, bde]);

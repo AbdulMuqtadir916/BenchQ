@@ -21,7 +21,7 @@ export function DashboardTabs({ overview, activity, activityOnly = false, childr
   const [query, setQuery] = useUrlState(DashboardSearch);
   const isOverview = !activityOnly && query.view === "finance";
   const tab = (view: DashboardSearchState["view"], label: string) => (
-    <button type="button" aria-pressed={query.view === view} onClick={() => setQuery({ view })}
+    <button type="button" aria-pressed={query.view === view} onClick={() => setQuery({ view }, "push")}
       className={cn("rounded-[var(--radius-sm)] px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
         query.view === view ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
       {label}
