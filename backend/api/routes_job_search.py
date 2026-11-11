@@ -35,7 +35,7 @@ from backend.job_monitor import JobAlreadyRunningError, launch_background
 from backend.job_search import limits, pipeline, providers
 from backend.job_search.country import search_country
 from backend.job_search.providers.base import ProviderError
-from backend.job_search.text import safe_url, typed_text
+from backend.job_search.text import clean_json, safe_url, typed_text
 from backend.models.candidates import Candidate
 from backend.models.db import get_db, utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
@@ -282,6 +282,9 @@ def _fill_full_posting(db: DbSession, row: JobPosting, principal: Principal) -> 
         full = asyncio.run(fetch(content))           # this sync route runs in a worker thread, outside the event loop
     except ProviderError:
         return
+    # The search's clean-up, before it is stored or shown: Postgres refuses \u0000 in JSONB, so an escaped NUL in the
+    # source's text would fail this job's every open (Abdul on #135).
+    full = clean_json(full) if isinstance(full, str) else None
     if principal.kind != "firm":
         row.content = {**content, **({"description": full} if full else {}), FULL_POSTING_KEY: True}
         return                                      # shown, never written (a support view)

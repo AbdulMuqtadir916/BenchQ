@@ -203,3 +203,34 @@ def test_the_whole_posting_does_not_overwrite_a_refresh_made_while_it_was_fetche
     assert content["location"] == "Refreshed City" and content["_full_posting"] is True
     assert content["description"].endswith("<p>The rest of the posting.</p>")
 
+
+
+def test_a_nul_in_the_whole_posting_is_cleaned_before_it_is_stored_or_shown(anonymous_client, world, adnans,
+                                                                            full_postings, test_db, monkeypatch):
+    """Postgres refuses \\u0000 in JSONB: an escaped NUL in the source's text would fail every open (Abdul on #135)."""
+    import types
+    import uuid as uuid_
+    from backend.api.routes_job_search import FULL_POSTING_KEY, _fill_full_posting
+    from backend.models.job_search import JobPosting
+
+    async def with_nul(content):
+        full_postings.calls += 1
+        return content["description"] + "<p>The rest\u0000 of the posting.</p>"
+    monkeypatch.setattr(full_postings, "full_description", with_nul)
+
+    # A support view: shown clean, nothing written.
+    supported = _searched(test_db, world, adnans, n=2)
+    row = test_db.get(JobPosting, uuid_.UUID(supported))
+    _fill_full_posting(test_db, row, types.SimpleNamespace(kind="platform"))
+    assert "\x00" not in row.content["description"] and row.content["description"].endswith("The rest of the posting.</p>")
+    test_db.rollback()
+    test_db.expire_all()
+    assert FULL_POSTING_KEY not in test_db.get(JobPosting, uuid_.UUID(supported)).content
+
+    # The firm: the open succeeds, and the row keeps the clean text.
+    posting_id = _searched(test_db, world, adnans)
+    r = _one(anonymous_client, world, "adnan", posting_id)
+    assert r.status_code == 200 and r.json()["description"] == "The start of the posting.\nThe rest of the posting."
+    test_db.expire_all()
+    stored = test_db.get(JobPosting, uuid_.UUID(posting_id)).content
+    assert stored[FULL_POSTING_KEY] is True and "\x00" not in stored["description"]

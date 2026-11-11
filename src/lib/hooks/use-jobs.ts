@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type Query, type QueryClient } from "@tanstack/react-query";
 import { jobsApi, type JobListParams } from "@/lib/api/jobs";
 import { queryKeys } from "@/lib/query/keys";
 import type { CaptureJob } from "@/lib/schemas/job";
+import type { JobSearches } from "@/lib/schemas/job-search";
 import { useFirmId } from "@/lib/tenancy/firm-context";
 
 /** While a search runs, how often its candidate's searches are read again (docs/02 §6.z). */
@@ -45,44 +45,48 @@ export function useCaptureJob() {
 const MAX_WAIT_MS = 60 * 60 * 1000;
 
 /**
- * A candidate's searches and today's usage. Read every 3 s while one runs, and while a search this tab started hasn't
- * been read back finished: a fast search can end before the first read sees it running (bot review on #135). When it
- * ends, the job lists are read again. Idle, it is read again just after the day resets (6:30 PM IST), so a limit
- * reached today lifts without a reload.
+ * A candidate's searches and today's usage, as query options (exported for its tests). Read every 3 s while one runs,
+ * and while a search this tab started hasn't been read back finished: a fast search can end before the first read
+ * sees it running (bot review on #135). When a search ends, the job lists and the ledger are read again. Idle, it is
+ * read again just after the day resets (6:30 PM IST), so a limit reached today lifts without a reload; a tab in the
+ * background then misses that timer, so coming back to it reads again once the reset has passed (Abdul on #135).
  */
-export function useJobSearches(candidateId: string, enabled = true) {
-  const firmId = useFirmId();
-  const queryClient = useQueryClient();
-  const started = useQuery<string | null>({
-    queryKey: queryKeys.jobs.startedSearch(firmId, candidateId),
-    queryFn: () => null,
-    enabled: false,
-    initialData: null,
-    staleTime: Infinity,
-  }).data;
-  const query = useQuery({
+export function jobSearchesQuery(queryClient: QueryClient, firmId: string, candidateId: string) {
+  const startedKey = queryKeys.jobs.startedSearch(firmId, candidateId);
+  const isPastReset = (data: JobSearches | undefined) => Boolean(data && Date.now() >= new Date(data.usage.resetsAt).getTime());
+  return {
     queryKey: queryKeys.jobs.searches(firmId, candidateId),
-    queryFn: () => jobsApi.searches(firmId, candidateId),
-    enabled: enabled && !!candidateId,
-    refetchInterval: (current) => {
-      const data = current.state.data;
+    queryFn: async (): Promise<JobSearches> => {
+      const before = queryClient.getQueryData<JobSearches>(queryKeys.jobs.searches(firmId, candidateId));
+      const data = await jobsApi.searches(firmId, candidateId);
+      const started = queryClient.getQueryData<string | null>(startedKey);
+      const isStartedDone = Boolean(started && data.searches.some((search) => search.id === started));
+      const isRunEnded = Boolean(before?.running && before.running.id !== data.running?.id);
+      if (isStartedDone || isRunEnded) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.jobs.lists(firmId) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
+        if (isStartedDone) queryClient.setQueryData(startedKey, null);
+      }
+      return data;
+    },
+    refetchInterval: (query: Query<JobSearches, Error, JobSearches, readonly unknown[]>) => {
+      const data = query.state.data;
+      const started = queryClient.getQueryData<string | null>(startedKey);
       if (data?.running || (started && !data?.searches.some((search) => search.id === started))) return SEARCH_POLL_MS;
       if (!data) return false;
       return Math.min(Math.max(new Date(data.usage.resetsAt).getTime() - Date.now() + 2000, 1000), MAX_WAIT_MS);
     },
-  });
-  const runningId = query.data?.running?.id ?? null;
-  const startedDone = Boolean(started && query.data?.searches.some((search) => search.id === started));
-  const wasRunning = useRef<string | null>(null);
-  useEffect(() => {
-    if ((wasRunning.current && runningId !== wasRunning.current) || startedDone) {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.jobs.lists(firmId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
-      if (startedDone) queryClient.setQueryData(queryKeys.jobs.startedSearch(firmId, candidateId), null);
-    }
-    wasRunning.current = runningId;
-  }, [runningId, startedDone, firmId, candidateId, queryClient]);
-  return query;
+    // The app reads nothing again on focus (the BDE alt-tabs all night); this query does, only once the reset passed.
+    refetchOnWindowFocus: (query: Query<JobSearches, Error, JobSearches, readonly unknown[]>) => (isPastReset(query.state.data) ? ("always" as const) : false),
+  };
+}
+
+export function useJobSearches(candidateId: string, enabled = true) {
+  const firmId = useFirmId();
+  const queryClient = useQueryClient();
+  // Observed so the started search's id stays cached (not garbage-collected) while the page is open.
+  useQuery<string | null>({ queryKey: queryKeys.jobs.startedSearch(firmId, candidateId), queryFn: () => null, enabled: false, initialData: null, staleTime: Infinity });
+  return useQuery({ ...jobSearchesQuery(queryClient, firmId, candidateId), enabled: enabled && !!candidateId });
 }
 
 /** "Find jobs": start a search for the candidate (their BDE only). The searches are read again at once, and the search
