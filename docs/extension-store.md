@@ -63,14 +63,17 @@ builds only. Do not ship a `key` in the store package.
 
 Draft answers, to be confirmed by the owner:
 
-- **Collects:** *Website content* (the text of the form fields on a connected application page, to fill them and to record
-  what was submitted) and *authentication information* (the user's BenchQ session, kept by the browser as a cookie and sent
-  only to BenchQ).
+- **Collects:** *Personally identifiable information* (the candidate's details from their BenchQ résumé: name, email,
+  phone, address, work history and saved answers, which Autofill puts into the form), *website content* (the text of the
+  form fields on a connected application page, to fill them and to record what was submitted) and *authentication
+  information* (the user's BenchQ session, kept by the browser as a cookie and sent only to BenchQ).
 - **Not collected:** health, financial, location, web history (beyond the address of the connected tab), user activity
   such as keystrokes or clicks, or personal communications.
 - **Certify:** data is not sold; not used for anything unrelated to the single purpose; not used for creditworthiness or
   lending.
-- **Where it goes:** only to the user's own BenchQ account (www.benchq.io). Nothing is sent to anyone else.
+- **Where it goes:** to the user's own BenchQ account (www.benchq.io), and, when the user presses Autofill, into the
+  employer's application page in the connected tab. That page can read the filled answers and any attached résumé file,
+  and may save or upload them before the user submits. Nothing is sent anywhere else.
 - **Privacy policy URL:** required. It must be a public page. Draft in section 4.
 
 ## 4. Privacy policy (draft; needs a public page and a responsible person's approval)
@@ -83,7 +86,10 @@ Draft answers, to be confirmed by the owner:
 >
 > *What it sends, and where.* The résumé answers it uses to fill a form come from your BenchQ account, and the recorded
 > form goes back to your BenchQ account, both over HTTPS to www.benchq.io. Your sign-in is the BenchQ session cookie, which
-> the browser keeps and the extension never reads. Nothing is sent to anyone else, sold, or used for advertising.
+> the browser keeps and the extension never reads. When you press Autofill, the candidate's answers (and the résumé file,
+> if attached) are written into the employer's application page in that tab: the page can read them and may save or
+> upload them before you submit, as with anything typed into a form. Nothing is sent anywhere else, sold, or used for
+> advertising.
 >
 > *What it keeps.* For the current browser session: which tab is connected to which job, erased when the browser
 > closes. In the extension's own storage on this device, until you uninstall it: your light or dark theme, the last
@@ -121,8 +127,12 @@ reviewer if you want an approval before each upload.
    **Publisher ID:** your developer account's ID (not the extension's), in the dashboard's address when signed in. V2
    needs it.
 2. In Google Cloud Console, create a project and **enable the Chrome Web Store API**.
-3. OAuth consent screen: External, add yourself as a test user. Credentials, Create OAuth client ID, type **Desktop app**.
-   The client ID and secret are `CHROME_CLIENT_ID` and `CHROME_CLIENT_SECRET`.
+3. OAuth consent screen: External, then set its publishing status to **In production**, not Testing. In Testing, Google
+   makes the refresh token expire after 7 days, so uploads would start failing a week later with every secret still set.
+   Google's API page says an unverified app can still use this API; expect an "unverified app" warning when you sign in
+   to create the token. If you keep it in Testing instead, create a new refresh token and update `CHROME_REFRESH_TOKEN`
+   every week. Then Credentials, Create OAuth client ID, type **Desktop app**. The client ID and secret are
+   `CHROME_CLIENT_ID` and `CHROME_CLIENT_SECRET`.
 4. Get a **refresh token** for the scope `https://www.googleapis.com/auth/chromewebstore` by signing in with the Google
    account that owns the developer account (the upload tool's own README describes the steps). That is
    `CHROME_REFRESH_TOKEN`.

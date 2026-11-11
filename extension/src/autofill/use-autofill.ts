@@ -327,6 +327,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       setScanning(false);
     }
   }, [applicationId, candidateId, resumeId, loadAnswers, loadFile, readPage, review]);
+  // The scan for the current résumé, for a click that started before the résumé changed (Allow, while Chrome asks).
+  const currentScan = useRef(scan);
+  useEffect(() => { currentScan.current = scan; }, [scan]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void scan(), 0);
@@ -359,12 +362,18 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     try {
       const granted = await requestAccess(access).catch(() => false);
       setIsAccessDenied(!granted);
-      if (granted) await scan();
+      if (granted) {
+        // Allowed now: the notice goes at once, whatever the scan finds. The scan is the latest one, not the one this
+        // click began with: the résumé may have changed while Chrome's prompt was open.
+        accessKey.current = "";
+        setAccess(null);
+        await currentScan.current();
+      }
     } finally {
       asking.current = false;
       setIsAsking(false);
     }
-  }, [access, scan]);
+  }, [access]);
 
   /** A look at the form between scans: what the BDE has filled since, and whether fields came or went. The page has no
    * way to message the extension, so the panel asks. */

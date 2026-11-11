@@ -1091,6 +1091,19 @@ describe("a site BenchQ may not read yet", () => {
     expect(hook.isAsking).toBe(false);
   });
 
+  it("clears the notice once allowed, even while the résumé was reloading, and scans when it arrives", async () => {
+    onFrames();
+    await mount();
+    expect(hook.needsAccess).not.toBeNull();
+    await pickResume(LOADING);
+    await run(() => hook.allowAccess());
+    expect(hook.needsAccess).toBeNull();
+    vi.mocked(scanTab).mockClear();
+    await pickResume("res-1");
+    expect(scanTab).toHaveBeenCalled();
+    expect(hook.rows).not.toBeNull();
+  });
+
   it("leaves a page that isn't https alone", async () => {
     fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "http://careers.employer.test/job" }]);
     await mount();
