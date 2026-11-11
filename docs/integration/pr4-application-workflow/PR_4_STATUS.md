@@ -103,6 +103,7 @@ Branch `feat/inbox-masking-and-review` (#127, supersedes #116 on `codex/pr4-code
 - [x] T11.2 Stage dates on live data (heard back, interview, offer from the history)
 - [x] T11.3 #128: one application count on the new stages
 - [x] T11.4 #135: job screens on `job_postings`; heart kept; migration → 0026
+- [x] T11.5 #120 and #126: migration → **0025**, after Abdul's 0024 (Arbaz's #129 takes 0026–0027)
 
 ## Phase 6 — Activation (after merge)
 - [ ] T6.1 Activation checklist signed off

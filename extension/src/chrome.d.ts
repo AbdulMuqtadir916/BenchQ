@@ -34,6 +34,10 @@ declare const chrome: {
     onRemoved: ChromeEvent<(tabId: number) => void>;
     onReplaced: ChromeEvent<(addedTabId: number, removedTabId: number) => void>;
   };
+  permissions: {
+    contains(permissions: { origins: string[] }): Promise<boolean>;
+    request(permissions: { origins: string[] }): Promise<boolean>;
+  };
   windows: {
     getCurrent(): Promise<{ id?: number }>;
     update(windowId: number, options: { focused: boolean }): Promise<unknown>;

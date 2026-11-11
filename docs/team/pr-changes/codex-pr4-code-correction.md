@@ -7,7 +7,7 @@ to "Phase 9"), plus Uzair's masking, Irrelevant and review-UI work, the date fix
 Authority: `docs/team/samad.md` §1.3–1.5, issue #110 (Abdul's decisions), PR #111 approval conditions. Plan, tracker and
 problem log: `docs/integration/pr4-application-workflow/` (`PR_4_IMPLEMENTATION_PLAN.md`, `PR_4_STATUS.md`, `DEBUG.md`).
 Base: main 3f8be61 (PR 3 merged), refreshed by merging main 09eb35b (#112 candidates final schema, #107 logging).
-One migration, now **0026** (was 0016, then 0022, as main took those numbers). Switches ship OFF.
+One migration, now **0025** (was 0016, then 0022, then 0026, as main took those numbers; it follows Abdul's 0024). Switches ship OFF.
 
 ## Backend
 
@@ -127,6 +127,13 @@ The job screens read `job_postings`; the candidates, résumés and jobs mocks ar
 (`GET /api/jobs`, its mapper and tests) is replaced by #135's. The heart keeps PR 4's save to Applications (Abdul's
 decision 1 on #135); the preview's Open original saves too. Migration renumbered **0022 → 0026** (main took 0022–0023;
 0024–0025 are Arbaz's #129); its test is `test_migration_0026.py`. CI's backend limit raised to 60 minutes (`adec998`).
+
+## Merge with main: #120 and #126, 2026-11-12
+
+Abdul's #120 added migration 0024 (drop `firms.bde_capacity`) after 0023, beside PR 4's 0026 (two heads). PR 4's
+migration is now **0025**, after 0024 (`test_migration_0025.py`); Arbaz's #129 takes 0026–0027. Other conflicts: the
+migration table and `FIXTURE_VERSION`. Umamah's #126 (extension) merged without conflicts.
+
 
 ## Remaining limits
 

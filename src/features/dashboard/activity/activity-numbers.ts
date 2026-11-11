@@ -97,7 +97,7 @@ export interface BdeRow {
   name: string;
   isActive: boolean;
   candidates: number;
-  /** Candidates being worked now (on the bench, interviewing, at offer): the load against the firm's BDE capacity. */
+  /** Candidates being worked now (on the bench, interviewing, at offer): how many a BDE is working. */
   working: number;
   counts: ActivityCounts;
 }

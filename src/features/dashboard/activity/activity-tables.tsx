@@ -6,7 +6,6 @@ import { ArrowRight, Users } from "lucide-react";
 import { DataTable } from "@/components/app/data-table";
 import { EmptyState } from "@/components/app/empty-state";
 import { Tag, type TagTone } from "@/components/ui/tag";
-import { cn } from "@/lib/cn";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { BdeRow, CandidateRow, ManagerRow } from "./activity-numbers";
 
@@ -41,14 +40,13 @@ const managerColumns: ColumnDef<ManagerRow, unknown>[] = [
   opens,
 ];
 
-const bdeColumns = (capacity: number): ColumnDef<BdeRow, unknown>[] => [
+const bdeColumns: ColumnDef<BdeRow, unknown>[] = [
   { id: "name", accessorFn: (row) => row.name, header: "BDE", cell: ({ row }) => <Person name={row.original.name} detail={row.original.isActive ? "Active" : "Inactive"} /> },
   {
     id: "load", accessorFn: (row) => row.working, header: "Workload",
     cell: ({ row }) => (
-      <span className={cn("tabular", row.original.working >= capacity ? "text-[var(--color-warning-fg)]" : "text-[var(--color-text)]")}
-        title={`${row.original.working} candidates being worked, of a capacity of ${capacity}`}>
-        {row.original.working} / {capacity}
+      <span className="tabular text-[var(--color-text)]" title={`${row.original.working} candidates being worked`}>
+        {row.original.working}
       </span>
     ),
   },
@@ -86,8 +84,8 @@ export function ManagerTable({ rows, onOpen, emptyState }: { rows: ManagerRow[];
     emptyState={emptyState ?? <EmptyState icon={Users} title="No managers yet" description="Managers show up here once the owner invites them." />} />;
 }
 
-export function BdeTable({ rows, capacity, onOpen, emptyState }: { rows: BdeRow[]; capacity: number; onOpen: (row: BdeRow) => void; emptyState?: ReactNode }) {
-  return <DataTable columns={bdeColumns(capacity)} data={rows} getRowId={(row) => row.id} onRowClick={onOpen} hasToolbar={false} isRowSelectable={false} label="BDEs"
+export function BdeTable({ rows, onOpen, emptyState }: { rows: BdeRow[]; onOpen: (row: BdeRow) => void; emptyState?: ReactNode }) {
+  return <DataTable columns={bdeColumns} data={rows} getRowId={(row) => row.id} onRowClick={onOpen} hasToolbar={false} isRowSelectable={false} label="BDEs"
     emptyState={emptyState ?? <EmptyState icon={Users} title="No BDEs on this team" description="BDEs show up here once they report to this manager." />} />;
 }
 

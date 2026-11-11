@@ -95,13 +95,12 @@ export function StackedTrendCard({ bdes, bins, onSelectBde }: { bdes: User[]; bi
   );
 }
 
-/** One card per BDE: their load against the firm's capacity and their period, opening their level. */
-export function BdeCards({ rows, capacity, onSelectBde, columns = "sm:grid-cols-2 xl:grid-cols-3" }: { rows: BdeRow[]; capacity: number; onSelectBde: (bdeId: string) => void; columns?: string }) {
+/** One card per BDE: how many candidates they are working and their period, opening their level. */
+export function BdeCards({ rows, onSelectBde, columns = "sm:grid-cols-2 xl:grid-cols-3" }: { rows: BdeRow[]; onSelectBde: (bdeId: string) => void; columns?: string }) {
   if (rows.length === 0) return <Card><p className="text-sm text-[var(--color-text-3)]">No BDEs on this team yet. They show up here once they report to this manager.</p></Card>;
   return (
     <ul aria-label="BDEs" className={cn("grid gap-3", columns)}>
       {rows.map((row) => {
-        const full = row.working >= capacity;
         return (
           <li key={row.id}>
             <button type="button" onClick={() => onSelectBde(row.id)} className={cn("bq-card block w-full p-4 text-left", linkSurface)}>
@@ -110,10 +109,7 @@ export function BdeCards({ rows, capacity, onSelectBde, columns = "sm:grid-cols-
                 {row.isActive ? null : <Tag tone="neutral">Inactive</Tag>}
               </span>
               <span className="mt-3 flex items-center justify-between text-caption text-[var(--color-text-3)]">
-                <span>Workload</span><span className={cn("tabular", full ? "text-[var(--color-warning-fg)]" : "text-[var(--color-text-2)]")}>{row.working} / {capacity}</span>
-              </span>
-              <span className="mt-1 block h-2 overflow-hidden rounded-full bg-[var(--color-surface-3)]" aria-hidden>
-                <span className={cn("block h-full rounded-full", full ? "bg-[var(--color-warning-fg)]" : "bg-[var(--color-chart-2)]")} style={{ width: `${Math.min(100, (row.working / Math.max(1, capacity)) * 100)}%` }} />
+                <span>Workload</span><span className="tabular text-[var(--color-text-2)]">{row.working} candidates</span>
               </span>
               <span className="mt-3 grid grid-cols-3 gap-2 text-caption text-[var(--color-text-3)]">
                 <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.applications}</span>applied</span>

@@ -100,12 +100,8 @@ def reset(db) -> None:
 
 
 def _sync_hierarchy(db, firm_data: dict) -> None:
-    """Demo rows seeded before the hierarchy (07 Q40) get the fixtures' managers and BDE capacity. Only empty or
-    default values are filled, so a manager changed in the app since stays as it is."""
-    for f in firm_data["firms"]:
-        firm = db.get(Firm, demo_id(f["id"]))
-        if firm is not None and firm.bde_capacity == 10 and f.get("bdeCapacity", 10) != 10:
-            firm.bde_capacity = f["bdeCapacity"]
+    """Demo rows seeded before the hierarchy (07 Q40) get the fixtures' managers. Only empty values are filled, so a
+    manager changed in the app since stays as it is."""
     for u in firm_data["users"]:
         user = db.get(User, demo_id(u["id"]))
         if user is not None and user.manager_id is None and u.get("managerId"):
@@ -145,7 +141,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             plan_id=demo_id(f["planId"]), seat_limit=f["seatLimit"], candidate_limit=f["candidateLimit"],
             contact_phone=f["contactPhone"], logo_url=f["logoUrl"], primary_timezone=f["primaryTimezone"],
             client_timezone=f["clientTimezone"],
-            application_expiry_days=f["applicationExpiryDays"], bde_capacity=f.get("bdeCapacity", 10),
+            application_expiry_days=f["applicationExpiryDays"],
             created_at=_when(f["createdAt"]))
     # Managers before the BDEs who point at them (07 Q40).
     for u in sorted(firm_data["users"], key=lambda user: user.get("managerId") is not None):

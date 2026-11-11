@@ -23,7 +23,6 @@ import { useHref } from "@/lib/routes/use-href";
 import { useUrlState } from "@/lib/routes/use-url-state";
 import { BdesSearch } from "@/lib/schemas/list-search";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { useFirm } from "@/lib/tenancy/firm-context";
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
@@ -33,7 +32,6 @@ export function BdesList() {
   const toHref = useHref();
   const router = useRouter();
   const now = useNow();
-  const firm = useFirm();
   const [{ q, period }, setQuery] = useUrlState(BdesSearch);
   const [text, setText] = useSearchText(q, (next) => setQuery({ q: next }));
   const teamQuery = useTeam();
@@ -67,7 +65,7 @@ export function BdesList() {
         : group.status === "pending" ? <div aria-busy="true" className="grid gap-3"><SkeletonCard /><SkeletonCard /></div>
           : (
             <div className="bq-card p-0">
-              <BdeTable rows={rows} capacity={firm.bdeCapacity} onOpen={open}
+              <BdeTable rows={rows} onOpen={open}
                 emptyState={q.trim()
                   ? <EmptyState variant="filtered" icon={Search} title="No BDE matches" description={`Nobody's name contains "${q}".`} />
                   : <EmptyState icon={Users} title="No BDEs on your team yet" description="BDEs show up here once they report to you." />} />
