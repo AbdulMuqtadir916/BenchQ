@@ -97,6 +97,23 @@ merges:
 - `npm run ext:watch` — rebuilds on source changes.
 - `pnpm ext:test` — runs the extension's tests, or in `extension/`: `npm test`, and `npm run test:watch` while working.
 - Vite loads `BENCHQ_URL` from `extension/.env`; copy `extension/.env.example` as a starting point. It is the BenchQ web-app origin used for the sign-in tab and all `/api/*` requests. In local development it is `http://localhost:3000`; Next.js rewrites those API paths to the backend at `BACKEND_URL`. For another environment, set it to that BenchQ web-app origin, rebuild, and ensure the backend `ALLOWED_ORIGINS` includes the extension's exact `chrome-extension://` origin.
+- **Site access (the manifest is built, not hand-written):** `extension/manifest.base.json` holds the fixed parts and
+  `extension/hosts.json` the job boards and application systems BenchQ may read without asking. `npm run build` writes
+  `dist/manifest.json` from them plus `BENCHQ_URL`: `host_permissions` is BenchQ's address and those sites only, and every
+  other https site is `optional_host_permissions`. For an employer's own careers page the panel says why it needs access
+  (`SiteAccessNotice`), then Chrome asks once, from the BDE's click on Allow. Only the tab's own site is asked about, so
+  a form framed from an unlisted domain is "unreadable" like any frame BenchQ can't reach. A store build is
+  `npm run build:store` (`ext:build:store` from the root is not added): it reads `extension/.env.store`, which holds the live
+  address `https://www.benchq.io`, and fails on a local address or all-sites access.
+- **Publishing:** `.github/workflows/extension-publish.yml` is **manual-only for now** (Actions, Publish extension, Run
+  workflow, from `main`): the first version is uploaded and approved by hand first. When that is done, add the `push`
+  trigger shown in the comment at its top, so a change under `extension/**` on `main` (never a backend or frontend
+  change) publishes by itself. It tests, runs `build:store`, stamps the version as
+  `major.minor.<run number>.<attempt>` (the store refuses a version it already has, and a re-run gets its own), zips, and
+  uploads and submits through the Chrome Web Store API V2 when all five secrets `CHROME_EXTENSION_ID`,
+  `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and `CHROME_REFRESH_TOKEN` exist as secrets of the
+  `chrome-web-store` environment (limited to `main`; not repository secrets); only the upload steps see them. Without them it only keeps the zip. The first upload and the listing are done by hand in the store dashboard. The listing text, permission justifications, privacy draft, reviewer instructions and secret setup are in
+  [../extension-store.md](../extension-store.md).
 - Load unpacked in Chrome: run the build, open `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose `extension/dist/`.
 
 The extension calls the BenchQ origin directly with browser-managed cookies. Backend CORS and unsafe-request origin checks use `ALLOWED_ORIGINS`; the deployment must include the installed extension's `chrome-extension://<extension-id>` origin. This is an environment setup dependency, not changed by this implementation. The manifest's HTTPS host access is also what lets the page script run on employer sites, in connected tabs only; API calls stay limited to the configured `BENCHQ_URL`.

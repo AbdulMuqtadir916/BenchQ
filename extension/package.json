@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b && vite build",
+    "build:store": "tsc -b && vite build --mode store",
     "watch": "vite build --watch",
     "test": "vitest run",
     "test:watch": "vitest"

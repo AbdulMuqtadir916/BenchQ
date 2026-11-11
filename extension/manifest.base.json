@@ -2,14 +2,34 @@
   "manifest_version": 3,
   "name": "BenchQ Apply",
   "version": "0.1.0",
+  "minimum_chrome_version": "116",
   "description": "Open saved BenchQ jobs, fill application forms from the candidate's answer bank, and track applications.",
-  "permissions": ["sidePanel", "scripting", "storage", "webNavigation"],
-  "host_permissions": ["http://localhost:3000/*", "https://*/*"],
-  "background": { "service_worker": "background.js", "type": "module" },
-  "side_panel": { "default_path": "index.html" },
+  "permissions": [
+    "sidePanel",
+    "scripting",
+    "storage",
+    "webNavigation"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
   "commands": {
-    "run-autofill": { "suggested_key": { "default": "Alt+Shift+F" }, "description": "Autofill the connected job's form" },
-    "mark-applied": { "suggested_key": { "default": "Alt+Shift+M" }, "description": "Mark the connected job applied" }
+    "run-autofill": {
+      "suggested_key": {
+        "default": "Alt+Shift+F"
+      },
+      "description": "Autofill the connected job's form"
+    },
+    "mark-applied": {
+      "suggested_key": {
+        "default": "Alt+Shift+M"
+      },
+      "description": "Mark the connected job applied"
+    }
   },
   "icons": {
     "16": "icons/icon16.png",
