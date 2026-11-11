@@ -103,14 +103,11 @@ class Firm(Base):
     primary_timezone = Column(String, nullable=False, server_default=text("'Asia/Kolkata'"))
     client_timezone = Column(String, nullable=False, server_default=text("'America/New_York'"))
     application_expiry_days = Column(Integer, nullable=False, server_default=text("30"))
-    # 07 Q46: a BDE's comfortable load. A warning when assigning, never a block; the OWNER edits it.
-    bde_capacity = Column(Integer, nullable=False, server_default=text("10"))
     created_at = _created_at()
     updated_at = _updated_at()
 
     __table_args__ = (
         CheckConstraint(f"slug ~ '{SLUG_PATTERN}'", name="ck_firms_slug_format"),
-        CheckConstraint("bde_capacity BETWEEN 1 AND 50", name="ck_firms_bde_capacity_range"),
         CheckConstraint(_in("status", FIRM_STATUSES), name="ck_firms_status"),
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_firms_limits_not_negative"),
         CheckConstraint("application_expiry_days > 0", name="ck_firms_application_expiry_days_positive"),

@@ -18,7 +18,7 @@ const READY = { isHydrated: true, isSettling: false };
 
 const firm = (status: "ACTIVE" | "SUSPENDED" | "ONBOARDING") => ({
   id: "firm_a", name: "Firm A", slug: "firm-a", logoUrl: null, primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York",
-  applicationExpiryDays: 30, status, planId: "plan_starter", seatLimit: 4, candidateLimit: 25, contactPhone: null, bdeCapacity: 10,
+  applicationExpiryDays: 30, status, planId: "plan_starter", seatLimit: 4, candidateLimit: 25, contactPhone: null,
   createdAt: "2026-10-01T00:00:00.000Z",
 });
 

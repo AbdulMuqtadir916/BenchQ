@@ -13,7 +13,6 @@
       "seatLimit": 10,
       "candidateLimit": 100,
       "contactPhone": "+91 40 6600 1200",
-      "bdeCapacity": 10,
       "createdAt": "2026-06-02T09:00:00.000Z"
     },
     {
@@ -29,7 +28,6 @@
       "seatLimit": 4,
       "candidateLimit": 25,
       "contactPhone": "+91 40 4012 7788",
-      "bdeCapacity": 3,
       "createdAt": "2026-08-12T06:30:00.000Z"
     },
     {
@@ -45,7 +43,6 @@
       "seatLimit": 4,
       "candidateLimit": 25,
       "contactPhone": null,
-      "bdeCapacity": 10,
       "createdAt": "2026-07-20T07:00:00.000Z"
     },
     {
@@ -61,7 +58,6 @@
       "seatLimit": 4,
       "candidateLimit": 25,
       "contactPhone": null,
-      "bdeCapacity": 10,
       "createdAt": "2026-10-15T10:00:00.000Z"
     }
   ],
