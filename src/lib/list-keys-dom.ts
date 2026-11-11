@@ -32,7 +32,7 @@ export function readKeyInput(event: KeyboardEvent): Omit<ListKeyInput, "insideTa
     overlayOpen:
       ui.commandPaletteOpen || ui.hintSheetOpen
       || Boolean(document.querySelector("dialog[open], [role='dialog'][aria-modal='true'], [role='alertdialog']"))
-      || (target instanceof Element && Boolean(target.closest("[role='listbox'], [role='menu']"))),
+      || (target instanceof Element && Boolean(target.closest("[role='listbox'], [role='menu'], details[data-column-chooser][open]"))),
     afterG,
   };
 }

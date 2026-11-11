@@ -3,7 +3,7 @@ import { CLOSED, isClosed } from "@/components/app/applications/status-meta";
 import { ApplicationStatus } from "@/lib/schemas/enums";
 import { allApplications } from "@/mocks/applications";
 import { allCandidates } from "@/mocks/candidates";
-import { CLOSED_STATUSES, OPEN_STATUSES, applicationsSubmittedWithin, countApplications, describeApplicationCounts, isSubmitted } from "./application-counts";
+import { CLOSED_STATUSES, OPEN_STATUSES, applicationsInScope, applicationsSubmittedWithin, countApplications, describeApplicationCounts, isSubmitted } from "./application-counts";
 import { deriveCandidateStats } from "./candidate-stats";
 import { deriveFunnel } from "./funnel";
 
@@ -58,7 +58,7 @@ describe("describeApplicationCounts, the line above the candidate's board", () =
 });
 
 describe("one definition across the candidate screen", () => {
-  it("for every candidate, the header's Applications and Active are the counts the tab shows", () => {
+  it("for every candidate, the header's Applications and Active use the shared counts", () => {
     expect(allCandidates.length).toBeGreaterThan(0);
     for (const candidate of allCandidates) {
       const mine = allApplications.filter((a) => a.candidateId === candidate.id);
@@ -89,10 +89,10 @@ describe("applicationsSubmittedWithin, an Analytics period", () => {
   });
 
   it("keeps submitted applications from inside the period and drops the older ones (the last day counts)", () => {
-    const apps = [app("APPLIED", 0), app("RESPONSE", 7), app("INTERVIEW", 8), app("OFFER", 29), app("PLACED", 31), app("REJECTED", 89), app("EXPIRED", 120)];
+    const apps = [app("APPLIED", 0), app("RESPONSE", 7), app("APPLIED", -0.01), app("APPLIED", 7.01), app("INTERVIEW", 8), app("OFFER", 29), app("PLACED", 31), app("REJECTED", 89), app("EXPIRED", 120)];
     expect(applicationsSubmittedWithin(apps, 7, NOW).map((a) => a.status)).toEqual(["APPLIED", "RESPONSE"]);
-    expect(applicationsSubmittedWithin(apps, 30, NOW).map((a) => a.status)).toEqual(["APPLIED", "RESPONSE", "INTERVIEW", "OFFER"]);
-    expect(applicationsSubmittedWithin(apps, 90, NOW)).toHaveLength(6);
+    expect(applicationsSubmittedWithin(apps, 30, NOW).map((a) => a.status)).toEqual(["APPLIED", "RESPONSE", "APPLIED", "INTERVIEW", "OFFER"]);
+    expect(applicationsSubmittedWithin(apps, 90, NOW)).toHaveLength(7);
   });
 
   it("a submitted application with no date cannot be placed in any period, so it is left out rather than counted everywhere", () => {
@@ -108,5 +108,24 @@ describe("applicationsSubmittedWithin, an Analytics period", () => {
       expect(inPeriod.length, `${days} days`).toBeGreaterThan(0);
       expect(deriveFunnel(inPeriod)[0]!.count, `${days} days: headline vs funnel Applied`).toBe(inPeriod.length);
     }
+  });
+});
+
+// PR #128 review: Active excludes Saved and Placed, and the count, the board and the list use the same rule; All keeps everything.
+describe("applicationsInScope", () => {
+  const list = some({ SAVED: 2, APPLIED: 3, INTERVIEW: 1, OFFER: 1, PLACED: 2, REJECTED: 1, EXPIRED: 1 });
+
+  it("Active keeps only the open stages, so Saved, Placed and the closed ones are left out", () => {
+    const active = applicationsInScope(list, "active");
+    expect(active).toHaveLength(5);
+    expect(active.every((a) => OPEN_STATUSES.includes(a.status))).toBe(true);
+  });
+
+  it("All keeps every application", () => {
+    expect(applicationsInScope(list, "all")).toHaveLength(list.length);
+  });
+
+  it("the Active count is exactly the number of Active rows", () => {
+    expect(countApplications(list).open).toBe(applicationsInScope(list, "active").length);
   });
 });

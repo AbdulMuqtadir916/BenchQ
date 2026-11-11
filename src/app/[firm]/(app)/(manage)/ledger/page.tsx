@@ -18,6 +18,7 @@ import { LedgerListQuery, LEDGER_SORT_COLUMNS } from "@/lib/routes/ledger-list-q
 import { useUrlState } from "@/lib/routes/use-url-state";
 import { pageIndexFor } from "@/lib/routes/page-index";
 import { formatSort, parseSort } from "@/lib/routes/sort-param";
+import { useSearchText } from "@/lib/hooks/use-search-text";
 import { matchesSearch } from "@/lib/search";
 
 const PAGE_SIZE = 15;
@@ -29,11 +30,12 @@ export default function LedgerPage() {
   const ledgerQuery = useLedgerAll();
   const isTeamScope = hasTeamScope(principal);
   const [{ actor, q, sort, page }, setQuery] = useUrlState(LedgerListQuery);
+  const [searchText, setSearchText] = useSearchText(q, (value) => setQuery({ q: value, page: 1 }));
 
   const scoped = ledgerQuery.data?.items ?? EMPTY_LEDGER;
   const rows = useMemo(
-    () => filterByActor(scoped, actor).filter((entry) => matchesSearch([entry.createdAt, entry.actorName, entry.action, entry.summary], q)),
-    [scoped, actor, q],
+    () => filterByActor(scoped, actor).filter((entry) => matchesSearch([entry.createdAt, entry.actorName, entry.action, entry.summary], searchText)),
+    [scoped, actor, searchText],
   );
   // Each option says how many rows it would show, so one that is empty (no AI agent has written an entry yet) reads as empty.
   const actorCounts = useMemo(() => countByActor(scoped), [scoped]);
@@ -97,9 +99,9 @@ export default function LedgerPage() {
           storageKey="ledger-list"
           pagination
           pageSize={PAGE_SIZE}
-          search={{ value: q, onChange: (value) => setQuery({ q: value, page: 1 }) }}
+          search={{ value: searchText, onChange: setSearchText }}
           sort={{ value: parseSort(sort, LEDGER_SORT_COLUMNS), onChange: (value) => setQuery({ sort: formatSort(value), page: 1 }) }}
-          page={{ index: pageIndexFor(page, rows.length, PAGE_SIZE), onChange: (index) => setQuery({ page: index + 1 }) }}
+          page={{ index: pageIndexFor(searchText === q ? page : 1, rows.length, PAGE_SIZE), onChange: (index) => setQuery({ page: index + 1 }) }}
           toolbarActions={
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-2 text-sm text-[var(--color-text-2)]">

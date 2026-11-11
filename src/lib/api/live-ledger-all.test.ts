@@ -3,7 +3,7 @@ import demoIds from "./dto/demo-ids.json";
 
 /**
  * `ledgerApi.listAll` on the live backend (BUG-022): the whole ledger, not the first page. The backend serves `limit` (1 to 500) and
- * `offset`, newest first; the adapter pages through them and reports whether entries remain beyond its cap.
+ * a cursor, newest first; the adapter pages through them and reports whether entries remain beyond its cap.
  */
 const { ledgerApi } = await import("./analytics");
 
@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", async (url: string) => {
     urls.push(url);
     const params = new URL(url, "http://x").searchParams;
-    const offset = Number(params.get("offset") ?? 0);
+    const offset = Number(params.get("cursor_id")?.slice(-12) ?? 0);
     const limit = Number(params.get("limit") ?? 50);
     const rows = Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, i) => wire(offset + i + 1));
     return new Response(JSON.stringify(rows), { status: 200 });
@@ -36,19 +36,19 @@ describe("ledgerApi.listAll", () => {
     const result = await ledgerApi.listAll("firm_hts");
     expect(result.items).toHaveLength(119);
     expect(result.hasMore).toBe(false);
-    expect(urls).toEqual([`/api/firms/${HTS}/ledger?limit=500&offset=0`]);
+    expect(urls).toEqual([`/api/firms/${HTS}/ledger?limit=500`]);
     expect(result.items[0]!.summary).toBe("Row 1");
     expect(result.items.at(-1)!.summary).toBe("Row 119");
   });
 
-  it("pages with the backend's own limit and offset, and keeps the order", async () => {
+  it("pages with the backend's limit and last-row cursor, and keeps the order", async () => {
     total = 1230;
     const result = await ledgerApi.listAll("firm_hts");
     expect(result.items).toHaveLength(1230);
     expect(urls).toEqual([
-      `/api/firms/${HTS}/ledger?limit=500&offset=0`,
-      `/api/firms/${HTS}/ledger?limit=500&offset=500`,
-      `/api/firms/${HTS}/ledger?limit=500&offset=1000`,
+      `/api/firms/${HTS}/ledger?limit=500`,
+      `/api/firms/${HTS}/ledger?limit=500&cursor_at=2026-10-23T10%3A00%3A00%2B00%3A00&cursor_id=6f1c0000-0000-4000-8000-000000000500`,
+      `/api/firms/${HTS}/ledger?limit=500&cursor_at=2026-10-23T10%3A00%3A00%2B00%3A00&cursor_id=6f1c0000-0000-4000-8000-000000001000`,
     ]);
     expect(result.items.map((e) => e.summary).slice(498, 502)).toEqual(["Row 499", "Row 500", "Row 501", "Row 502"]);
   });
@@ -64,8 +64,8 @@ describe("ledgerApi.listAll", () => {
     total = 700;
     await ledgerApi.listAll("firm_hts", { action: "ASSIGN" });
     expect(urls).toEqual([
-      `/api/firms/${HTS}/ledger?limit=500&offset=0&action=ASSIGN`,
-      `/api/firms/${HTS}/ledger?limit=500&offset=500&action=ASSIGN`,
+      `/api/firms/${HTS}/ledger?limit=500&action=ASSIGN`,
+      `/api/firms/${HTS}/ledger?limit=500&cursor_at=2026-10-23T10%3A00%3A00%2B00%3A00&cursor_id=6f1c0000-0000-4000-8000-000000000500&action=ASSIGN`,
     ]);
   });
 });

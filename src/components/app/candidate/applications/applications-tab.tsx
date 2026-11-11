@@ -8,8 +8,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
-import { STATUS_LABEL, isClosed } from "@/components/app/applications/status-meta";
-import { countApplications, describeApplicationCounts } from "@/lib/derive/application-counts";
+import { STATUS_LABEL } from "@/components/app/applications/status-meta";
+import { applicationsInScope, countApplications, describeApplicationCounts } from "@/lib/derive/application-counts";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { ApplicationList } from "./application-list";
@@ -22,9 +22,8 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
   const [view, setView] = useState<View>("board");
   const [scope, setScope] = useState<Scope>("active");
   const all = ws.applications;
-  const visible = scope === "active" ? all.filter((a) => !isClosed(a.status)) : all;
-  // One definition of the counts for the whole candidate screen (BUG-005): saved jobs are not applications, so they are
-  // counted on their own and never as active. "10 active · 2 closed · 3 saved", with the active part in bold.
+  // One Active rule for the count, the board and the list (PR #128): Saved and Placed are not active; All shows them.
+  const visible = applicationsInScope(all, scope);
   const [activePart = "", ...otherParts] = describeApplicationCounts(countApplications(all)).split(" · ");
 
   if (ws.applicationsQuery.error) return <ErrorState error={ws.applicationsQuery.error} onRetry={() => void ws.applicationsQuery.refetch()} />;

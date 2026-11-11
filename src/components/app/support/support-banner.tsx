@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/lib/stores/session-store";
 import { Eye, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatIst } from "@/lib/format/timezone";
@@ -48,4 +50,27 @@ export function SupportBanner({ view, firmName, adminName }: { view: SupportView
       </div>
     </div>
   );
+}
+
+
+/** A server-rendered 403 can outlive the support session that produced it. */
+export function ForbiddenSupportBanner({ banner }: { banner: Parameters<typeof SupportBanner>[0] | null }) {
+  const router = useRouter();
+  const bootstrapping = useSession((state) => state.bootstrapping);
+  const liveViewId = useSession((state) => state.principal?.kind === "platform" ? state.principal.support?.id : undefined);
+  const serverViewId = banner?.view.id;
+  const stale = !bootstrapping && liveViewId !== serverViewId;
+  const refreshed = useRef<{ live?: string; server?: string } | null>(null);
+
+  useEffect(() => {
+    if (!stale) {
+      refreshed.current = null;
+      return;
+    }
+    if (refreshed.current && refreshed.current.live === liveViewId && refreshed.current.server === serverViewId) return;
+    refreshed.current = { live: liveViewId, server: serverViewId };
+    router.refresh();
+  }, [liveViewId, router, serverViewId, stale]);
+
+  return banner && !stale ? <SupportBanner key={banner.view.id} {...banner} /> : null;
 }

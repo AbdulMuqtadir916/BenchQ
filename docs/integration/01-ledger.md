@@ -39,7 +39,9 @@ The ledger's DTO sits in `dto/session.ts` because `/admin/audit` uses it too. A 
 ### The route
 
 `GET /api/firms/{firm_id}/ledger` scopes the query to the session's firm, then applies the
-BDE or Manager scope before sorting by creation time and id and applying the requested offset and limit.
+BDE or Manager scope before ordering by `created_at` descending and `id` ascending. For the Ledger screen, pass the
+last row’s original `created_at` and `id` as `cursor_at` and `cursor_id` to continue the scan. Existing callers can still use
+`offset`. Cursor requests require both fields, a timestamp with a timezone, and zero offset.
 See [the route](../../backend/api/routes_ledger.py) for the optional filters and full query.
 
 The rules it follows, which every track follows:
@@ -51,10 +53,10 @@ The rules it follows, which every track follows:
   function truly must see every firm (a platform route, a background worker given ids its route already
   checked), add it to `ALLOWED` in the lint with the reason. The reviewer reads that list.
 - **Role scope is enforced on the server.** BDEs see their own entries plus ASSIGN entries about
-  candidates they currently handle (Q52). Managers see entries by themselves and their BDEs, plus
-  entries about candidates they manage (Q47). Owner, Viewer and an active support view get the firm scope.
+  candidates they currently handle (Q52). Managers see their own entries, entries by direct reports, and
+  ASSIGN entries for candidates they manage (Q47). Owner, Viewer and an active support view get the firm scope.
 - **Every new endpoint gets a `ROUTE_ACCESS` line.** `test_access.py` fails on a route without one.
-- **Ordering is stable:** a timestamp plus the id, so paging never repeats or skips a row.
+- **Cursor ordering is stable across newer inserts:** the last row’s timestamp and id identify the page boundary.
 
 ### Writes log to the ledger
 

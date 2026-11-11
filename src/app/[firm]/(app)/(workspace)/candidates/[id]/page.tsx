@@ -29,6 +29,7 @@ import { ResumesTab } from "@/components/app/candidate/resumes-tab";
 import { UploadResume } from "@/components/app/resumes/upload-resume";
 import { ActivityTab } from "@/components/app/candidate/activity-tab";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
+import { safeReturnTo } from "@/lib/routes/landing";
 import { useHref } from "@/lib/routes/use-href";
 import { BACK_SHORTCUT } from "@/lib/list-shortcuts";
 import { usePageShortcuts } from "@/lib/hooks/use-page-shortcuts";
@@ -40,7 +41,11 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const principal = useSignedInPrincipal();
   const router = useRouter();
   const pathname = usePathname();
-  const tabParam = useSearchParams().get("tab");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const listHref = toHref("candidates");
+  const requestedReturn = safeReturnTo(searchParams.get("returnTo"));
+  const returnTo = requestedReturn?.split(/[?#]/)[0] === listHref ? requestedReturn : null;
   const tab: CandidateTabId = isCandidateTab(tabParam) ? tabParam : "overview";
   const reduce = useReducedMotion() ?? false;
   const ws = useCandidateWorkspace(id);
@@ -52,9 +57,8 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   // Esc goes back (docs/04 §1.3, BUG-004): to where the person came from, which keeps the list's page, search and sort in its
   // URL, or to the candidates list when this page was opened directly. A drawer, dialog or field keeps its own Esc.
   const leave = useCallback(() => {
-    if (window.history.length > 1) router.back();
-    else router.push(toHref("candidates"));
-  }, [router, toHref]);
+    router.replace(returnTo ?? listHref);
+  }, [router, returnTo, listHref]);
   useEscapeBack(leave);
   usePageShortcuts(BACK_SHORTCUT);
 
@@ -75,13 +79,16 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   // The tab lives in the URL, so back/forward and shared links land on the same view.
   const setTab = useCallback(
     (next: CandidateTabId) => {
-      router.replace(next === "overview" ? pathname : `${pathname}?tab=${next}`, { scroll: false });
+      const query = new URLSearchParams();
+      if (next !== "overview") query.set("tab", next);
+      if (returnTo) query.set("returnTo", returnTo);
+      router.replace(query.size ? `${pathname}?${query}` : pathname, { scroll: false });
       requestAnimationFrame(() => {
         const bar = tabsRef.current;
         if (bar && bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
       });
     },
-    [router, pathname, reduce],
+    [router, pathname, reduce, returnTo],
   );
 
   const moveApplication = useCallback(

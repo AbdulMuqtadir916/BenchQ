@@ -1,5 +1,4 @@
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { daysBetween } from "./dates";
 
 /**
  * One definition of "how many applications", for every screen (BUG-005). A saved job is a draft or favourite, "not proof of
@@ -41,6 +40,11 @@ export function countApplications(applications: readonly { status: ApplicationSt
   return { saved, open, placed, closed, submitted: open + placed + closed };
 }
 
+/** The rows a candidate's applications tab shows: Active is `OPEN_STATUSES` only (Saved and Placed leave it), All keeps everything. */
+export function applicationsInScope<T extends { status: ApplicationStatus }>(applications: readonly T[], scope: "active" | "all"): T[] {
+  return scope === "active" ? applications.filter((a) => OPEN_STATUSES.includes(a.status)) : [...applications];
+}
+
 /** "10 active · 2 closed · 3 saved": the line above a candidate's board. Saved and placed appear only when there are some. */
 export function describeApplicationCounts(counts: ApplicationCounts): string {
   return [`${counts.open} active`, counts.placed > 0 ? `${counts.placed} placed` : null, `${counts.closed} closed`, counts.saved > 0 ? `${counts.saved} saved` : null]
@@ -58,5 +62,11 @@ export function applicationsSubmittedWithin<T extends { status: ApplicationStatu
   days: number,
   now: Date = new Date(),
 ): T[] {
-  return applications.filter((a) => isSubmitted(a.status) && a.appliedAt !== null && daysBetween(a.appliedAt, now) <= days);
+  const end = now.getTime();
+  const start = end - days * 86_400_000;
+  return applications.filter((application) => {
+    if (!isSubmitted(application.status) || application.appliedAt === null) return false;
+    const applied = Date.parse(application.appliedAt);
+    return applied >= start && applied <= end;
+  });
 }

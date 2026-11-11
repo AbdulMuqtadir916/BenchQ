@@ -328,7 +328,7 @@ export function DataTable<TData, TValue>({
           {table.getFilteredRowModel().rows.length} rows
           {isRowSelectable ? ` · ${table.getFilteredSelectedRowModel().rows.length} selected` : ""}
         </span>
-        <details className="relative">
+        <details data-column-chooser className="relative">
           <summary className="bq-secondary inline-flex h-7 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm list-none">
                 <Columns3 size={16} aria-hidden="true" />
                 Columns

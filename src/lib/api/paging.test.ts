@@ -3,13 +3,13 @@ import { loadAllPages } from "./paging";
 
 /**
  * BUG-022: the Ledger page asked for the latest 100 entries, so the 19 older ones of a 119-entry ledger could not be reached on
- * an audit screen. `loadAllPages` reads a list that the backend serves in pages (`offset` + `limit`) until it runs out, up to a cap
+ * an audit screen. `loadAllPages` reads a list that the backend serves in pages by cursor until it runs out, up to a cap
  * so that a huge ledger cannot freeze the page, and says whether more exist beyond the cap.
  */
 function source(total: number) {
   const all = Array.from({ length: total }, (_, i) => i + 1);
   const calls: Array<[number, number]> = [];
-  return { calls, fetchPage: async (offset: number, limit: number) => { calls.push([offset, limit]); return all.slice(offset, offset + limit); }, all };
+  return { calls, fetchPage: async (after: number | undefined, limit: number) => { const offset = after ?? 0; calls.push([offset, limit]); return all.slice(offset, offset + limit); }, all };
 }
 const options = { pageSize: 500, maxItems: 2000 };
 
@@ -59,9 +59,9 @@ describe("loadAllPages", () => {
 
   it("a failing page fails the whole read, so a partial list is never shown as if it were complete", async () => {
     let calls = 0;
-    const fetchPage = async (offset: number, limit: number) => {
+    const fetchPage = async (after: number | undefined, limit: number) => {
       if (++calls === 2) throw new Error("boom");
-      return Array.from({ length: limit }, (_, i) => offset + i);
+      return Array.from({ length: limit }, (_, i) => (after ?? 0) + i + 1);
     };
     await expect(loadAllPages(fetchPage, options)).rejects.toThrow("boom");
   });
