@@ -16,8 +16,10 @@ correct. The privacy text in particular needs a person who is responsible for it
    address, **before submitting**: the reviewer marks a job applied, and without it every write the extension makes is
    refused with 403 "Cross-origin request refused" (`backend/auth/access.py`). Never `chrome-extension://*`.
 6. Fill in the listing (sections 1 to 5 below) and submit for review.
-7. Add the five GitHub secrets (section 6). From then on a push to `main` that changes `extension/**` uploads the next
-   version by itself.
+7. Add the five GitHub secrets (section 6). Then, **after the first version is approved**, turn on automatic uploads:
+   the workflow starts as manual-only (Actions, Publish extension, Run workflow, from `main`), and the comment at the
+   top of `.github/workflows/extension-publish.yml` shows the `push` trigger to add. From then on a push to `main` that
+   changes `extension/**` uploads the next version by itself.
 
 A pinned `"key"` is **not** needed for the store: the store owns the ID. It only keeps the ID the same for people who load
 the folder unpacked: in the dashboard, Package, View public key, and put it in `extension/manifest.base.json` for dev
@@ -64,9 +66,12 @@ builds only. Do not ship a `key` in the store package.
 Draft answers, to be confirmed by the owner:
 
 - **Collects:** *Personally identifiable information* (the candidate's details from their BenchQ résumé: name, email,
-  phone, address, work history and saved answers, which Autofill puts into the form), *website content* (the text of the
-  form fields on a connected application page, to fill them and to record what was submitted) and *authentication
-  information* (the user's BenchQ session, kept by the browser as a cookie and sent only to BenchQ).
+  phone, address, work history and saved answers, which Autofill puts into the form). That includes answers a candidate
+  has saved to self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay
+  questions (salary or rate expectations). It also collects *website content* (the text of the form fields on a
+  connected application page, to fill them and to record what was submitted) and *authentication information* (the
+  user's BenchQ session, kept by the browser as a cookie and sent only to BenchQ). Self-identification answers are
+  filled into the form but are never included in the form recorded with the application; salary and rate answers are.
 - **Not collected:** health, financial, location, web history (beyond the address of the connected tab), user activity
   such as keystrokes or clicks, or personal communications.
 - **Certify:** data is not sold; not used for anything unrelated to the single purpose; not used for creditworthiness or
@@ -88,8 +93,10 @@ Draft answers, to be confirmed by the owner:
 > form goes back to your BenchQ account, both over HTTPS to www.benchq.io. Your sign-in is the BenchQ session cookie, which
 > the browser keeps and the extension never reads. When you press Autofill, the candidate's answers (and the résumé file,
 > if attached) are written into the employer's application page in that tab: the page can read them and may save or
-> upload them before you submit, as with anything typed into a form. Nothing is sent anywhere else, sold, or used for
-> advertising.
+> upload them before you submit, as with anything typed into a form. That can include answers a candidate has saved to
+> self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay questions. When you
+> mark the application applied, BenchQ records the form as filled, including salary and rate answers but never the
+> self-identification answers. Nothing is sent anywhere else, sold, or used for advertising.
 >
 > *What it keeps.* For the current browser session: which tab is connected to which job, erased when the browser
 > closes. In the extension's own storage on this device, until you uninstall it: your light or dark theme, the last

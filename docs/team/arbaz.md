@@ -77,8 +77,10 @@ Uses React, TypeScript, Vite, Tailwind v4 (through PostCSS, as the website does)
   a form framed from an unlisted domain is "unreadable" like any frame BenchQ can't reach. A store build is
   `npm run build:store` (`ext:build:store` from the root is not added): it reads `extension/.env.store`, which holds the live
   address `https://www.benchq.io`, and fails on a local address or all-sites access.
-- **Publishing:** `.github/workflows/extension-publish.yml` runs only when a push to `main` changes `extension/**` (or by
-  hand, from `main` only), never for backend or frontend changes. It tests, runs `build:store`, stamps the version as
+- **Publishing:** `.github/workflows/extension-publish.yml` is **manual-only for now** (Actions, Publish extension, Run
+  workflow, from `main`): the first version is uploaded and approved by hand first. When that is done, add the `push`
+  trigger shown in the comment at its top, so a change under `extension/**` on `main` (never a backend or frontend
+  change) publishes by itself. It tests, runs `build:store`, stamps the version as
   `major.minor.<run number>.<attempt>` (the store refuses a version it already has, and a re-run gets its own), zips, and
   uploads and submits through the Chrome Web Store API V2 when all five secrets `CHROME_EXTENSION_ID`,
   `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and `CHROME_REFRESH_TOKEN` exist; only the upload

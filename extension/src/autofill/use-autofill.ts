@@ -357,16 +357,20 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
    * Once allowed, the page is scanned as if it had been on the list all along. */
   const allowAccess = useCallback(async () => {
     if (!access || asking.current) return;
+    const requested = access.origins.join();
     asking.current = true;
     setIsAsking(true);
     try {
       const granted = await requestAccess(access).catch(() => false);
       setIsAccessDenied(!granted);
       if (granted) {
-        // Allowed now: the notice goes at once, whatever the scan finds. The scan is the latest one, not the one this
-        // click began with: the résumé may have changed while Chrome's prompt was open.
-        accessKey.current = "";
-        setAccess(null);
+        // Allowed now: this site's notice goes at once, whatever the scan finds, but not the notice of another site the
+        // tab moved to while Chrome's prompt was open. The scan is the latest one, not the one this click began with:
+        // the résumé may have changed meanwhile.
+        if (accessKey.current === requested) {
+          accessKey.current = "";
+          setAccess(null);
+        }
         await currentScan.current();
       }
     } finally {

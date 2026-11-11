@@ -1104,6 +1104,24 @@ describe("a site BenchQ may not read yet", () => {
     expect(hook.rows).not.toBeNull();
   });
 
+  it("keeps the notice of a newer site when an older site's prompt is answered", async () => {
+    onFrames();
+    let answer: (granted: boolean) => void = () => undefined;
+    fake.permissions.request.mockImplementation(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+    await mount();
+    await act(async () => { void hook.allowAccess(); });
+    expect(hook.isAsking).toBe(true);
+    // While Chrome asks about the first site, the tab moves to another one.
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "https://jobs.other.test/2" }]);
+    await run(() => hook.rescan());
+    expect(hook.needsAccess?.host).toBe("jobs.other.test");
+    allowed.add("https://careers.employer.test/*");
+    await act(async () => { answer(true); });
+    await wait(5);
+    expect(hook.needsAccess?.host).toBe("jobs.other.test");
+    expect(hook.isAsking).toBe(false);
+  });
+
   it("leaves a page that isn't https alone", async () => {
     fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "http://careers.employer.test/job" }]);
     await mount();

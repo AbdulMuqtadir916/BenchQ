@@ -1,14 +1,19 @@
-# Publishes the Chrome extension to the Chrome Web Store. It runs only when something under extension/ changes on main
-# (or by hand, from main only), so a backend or frontend change never re-uploads it. The store reviews each upload before
-# it goes live.
+# Publishes the Chrome extension to the Chrome Web Store. For now it runs only when started by hand (Actions, Run
+# workflow, from main): the first version is uploaded and approved by hand in the store dashboard first, and until then
+# there is nothing for an automatic upload to update. Run by hand without the store secrets, it just builds the store zip.
+# The store reviews each upload before it goes live.
+#
+# TO PUBLISH AUTOMATICALLY once the first version is live and the five secrets are set, add this under `on:` so that only a
+# change under extension/ on main runs it (a backend or frontend change never re-uploads it):
+#
+#   push:
+#     branches: [main]
+#     paths:
+#       - "extension/**"
+#       - ".github/workflows/extension-publish.yml"
 name: Publish extension
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "extension/**"
-      - ".github/workflows/extension-publish.yml"
   workflow_dispatch:
 
 # Read the code, nothing more: the upload talks to Google, not to GitHub.
