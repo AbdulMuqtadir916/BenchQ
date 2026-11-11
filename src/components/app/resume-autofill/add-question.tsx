@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { addChange, questionError } from "@/lib/derive/autofill";
 import type { AutofillEntry } from "@/lib/schemas/resume-autofill";
 import type { SaveAutofill } from "./autofill-row";
+import { useUnsavedAnswer } from "./use-unsaved-answers";
 
 const OWN = "";
 
@@ -29,6 +30,7 @@ export function AddQuestion({ entries, available, isSaving, onSave, onPickQuesti
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
+  useUnsavedAnswer(picked === OWN && Boolean(question.trim() || answer.trim()));
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();

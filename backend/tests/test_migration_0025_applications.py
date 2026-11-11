@@ -15,8 +15,9 @@ def _old_job_and_application(engine, firm_id, candidate_id):
     job_id, app_id = uuid.uuid4(), uuid.uuid4()
     with engine.begin() as conn:
         conn.execute(text(
-            "INSERT INTO jobs (id, external_id, title, company, url, description, source) VALUES (:id, :ext, "
-            "'Java Developer', 'Acme', 'https://jobs.acme.test/1', 'Build the API.', 'jobspy_linkedin')"),
+            "INSERT INTO jobs (id, external_id, title, company, url, description, source, salary_min, salary_max) "
+            "VALUES (:id, :ext, 'Java Developer', 'Acme', 'https://jobs.acme.test/1', 'Build the API.', "
+            "'jobspy_linkedin', 120000, 140000)"),
             {"id": job_id, "ext": uuid.uuid4().hex})
         conn.execute(text("INSERT INTO candidate_jobs (id, firm_id, candidate_id, job_id) VALUES (:id, :f, :c, :j)"),
                      {"id": uuid.uuid4(), "f": firm_id, "c": candidate_id, "j": job_id})
@@ -46,6 +47,7 @@ def test_0025_refuses_until_the_applications_are_moved_and_then_links_them(scrat
         assert posting.source == "legacy" and posting.content["old_job_id"] == str(job_id)
         assert {posting.content[k] for k in ("title", "company", "url", "old_source")} == {
             "Java Developer", "Acme", "https://jobs.acme.test/1", "jobspy_linkedin"}
+        assert (posting.content["salary_min"], posting.content["salary_max"]) == (120000, 140000)   # its listed pay
         assert conn.execute(text("SELECT job_id FROM applications WHERE id = :id"), {"id": app_id}).scalar() == posting.id
 
     _ok(_alembic(name, "upgrade", "0025"))

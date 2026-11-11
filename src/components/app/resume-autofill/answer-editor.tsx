@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { draftOf, parseDraft } from "@/lib/derive/autofill";
 import type { AutofillAnswer, AutofillAnswerType } from "@/lib/schemas/resume-autofill";
+import { useUnsavedAnswer } from "./use-unsaved-answers";
 
 type AnswerEditorProps = {
   /** The question, which names the field. */
@@ -26,6 +27,7 @@ export function AnswerEditor({ question, type, initial, isMultiline, suggestions
   const [draft, setDraft] = useState(() => draftOf(initial));
   const [error, setError] = useState<string | null>(null);
   const isBox = isMultiline || type === "texts";
+  useUnsavedAnswer(draft !== draftOf(initial));
 
   const submit = () => {
     const parsed = parseDraft(draft, type);

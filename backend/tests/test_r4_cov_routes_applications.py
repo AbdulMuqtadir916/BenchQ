@@ -475,6 +475,17 @@ def test_list_applications_reports_the_latest_tailored_resume(client, test_db):
     assert row["tailored_resume_id"] == str(newer.id)
 
 
+def test_list_applications_shows_a_moved_jobs_pay(client, test_db):
+    """A job moved from the old pool keeps the pay it listed: its posting's `salary_min` and `salary_max`."""
+    app, _ = _make_app(test_db)
+    posting = app.posting
+    posting.source = "legacy"
+    posting.content = {**posting.content, "salary_min": 120000, "salary_max": 140000}
+    test_db.commit()
+    row = assert_clean(client.get("/api/applications"), 200).json()["applications"][0]
+    assert (row["salary_min"], row["salary_max"]) == (120000, 140000)
+
+
 def test_list_applications_flags_a_cover_letter(client, test_db):
     """A letter from one of the candidate's résumés, for the job: an application is always a candidate's."""
     from backend.models.db import CoverLetter, Resume

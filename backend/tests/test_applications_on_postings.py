@@ -33,8 +33,11 @@ def test_a_posting_reads_the_one_way_whatever_wrote_it():
         "Senior QA Engineer", "Acme Bank", "https://boards.example.test/acme/123", "Atlanta, GA")
     assert added.description == "About\nTest the payments API & more."        # the employer's HTML as plain text
     legacy = read_content("legacy", {"title": "Java Developer", "company": "Acme", "url": "javascript:alert(1)",
-                                     "posted_at": "2026-10-01T00:00:00+00:00", "old_job_id": "x"})
+                                     "posted_at": "2026-10-01T00:00:00+00:00", "old_job_id": "x",
+                                     "salary_min": 120000, "salary_max": "lots"})
     assert (legacy.title, legacy.url, legacy.posted_at) == ("Java Developer", None, "2026-10-01T00:00:00+00:00")
+    assert (legacy.salary_min, legacy.salary_max) == (120000, None)          # a moved job's pay, when it's a number
+    assert read_content("manual", {"title": "QA", "salary_min": 1}).salary_min is None
     assert posting_job(None).title == "" and read_content("manual", None).title == ""
     assert job_hash("Acme", "QA  Lead", "Text") == job_hash(" acme", "qa lead", "text ")
     assert job_hash("Acme", "QA Lead", "Text") != job_hash("Acme", "QA Lead", "Other text")

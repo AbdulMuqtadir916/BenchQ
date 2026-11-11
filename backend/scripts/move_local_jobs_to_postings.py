@@ -8,8 +8,8 @@ For a developer's own database, between migrations 0024 and 0025 (0025 refuses u
 
 - Every old job a candidate has (an application, or a search result in `candidate_jobs`) becomes one of that
   candidate's `job_postings`, source `legacy`, in one batch per candidate (a finished capture, `metadata.kind =
-  'capture'`, `metadata.moved_locally = true`). Its `content` keeps the old job's title, company, description, link and
-  location, `posted_at` (the old `discovered_at`), `old_job_id` and `old_source`, read by
+  'capture'`, `metadata.moved_locally = true`). Its `content` keeps the old job's title, company, description, link,
+  location and salary bounds, `posted_at` (the old `discovered_at`), `old_job_id` and `old_source`, read by
   `backend/applications/postings.py`. Its identity is the job search rule over the old job's id as well, so two old
   jobs never fold into one posting. A copy already made is reused, so a second run changes nothing.
 - Each application then names its candidate's copy.
@@ -53,8 +53,8 @@ def move(conn) -> dict:
         if (candidate_id, str(old_id)) in copies:
             continue
         job = conn.execute(text(
-            "SELECT title, company, description, url, location, discovered_at, source FROM jobs WHERE id = :id"),
-            {"id": old_id}).one()
+            "SELECT title, company, description, url, location, salary_min, salary_max, discovered_at, source "
+            "FROM jobs WHERE id = :id"), {"id": old_id}).one()
         if (firm_id, candidate_id) not in batches:
             batches[(firm_id, candidate_id)] = batch_id = uuid.uuid4()
             conn.execute(text(
@@ -63,7 +63,8 @@ def move(conn) -> dict:
                 {"firm_id": firm_id, "candidate_id": candidate_id, "batch_id": batch_id, "meta": json.dumps(BATCH_META)})
         content = {key: value for key, value in {
             "title": job.title, "company": job.company, "description": job.description, "url": job.url,
-            "location": job.location, "posted_at": job.discovered_at.isoformat() if job.discovered_at else None,
+            "location": job.location, "salary_min": job.salary_min, "salary_max": job.salary_max,
+            "posted_at": job.discovered_at.isoformat() if job.discovered_at else None,
             "old_job_id": str(old_id), "old_source": job.source,
         }.items() if value not in (None, "")}
         copies[(candidate_id, str(old_id))] = conn.execute(text(

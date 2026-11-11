@@ -49,8 +49,8 @@ def test_bulk_update_moves_every_row(api_client, test_db):
     assert test_db.query(Application).filter(Application.id == b.id).first().status == "interview_scheduled"
 
 
-def test_bulk_update_leaves_a_row_already_in_that_status_as_it_was(api_client, test_db):
-    """A row already in the target status is not re-transitioned: it was only caught in the selection."""
+def test_bulk_update_skips_a_row_already_in_that_status(api_client, test_db):
+    """A row already in the target status is skipped, not re-transitioned: it was only caught in the selection."""
     a = _make_app(test_db, "Bulk Applied", status="applied")
     b = _make_app(test_db, "Bulk Interview", status="interview_scheduled")
     before = len(b.status_transitions or [])
@@ -58,6 +58,7 @@ def test_bulk_update_leaves_a_row_already_in_that_status_as_it_was(api_client, t
                            json={"ids": [str(a.id), str(b.id)], "status": "interview_scheduled",
                                  "expected_revisions": _revisions(a, b)})
     assert resp.status_code == 200, resp.text
+    assert resp.json() == {"updated": 1, "skipped": 1, "not_found": []}
     test_db.expire_all()
     kept = test_db.query(Application).filter(Application.id == b.id).first()
     assert len(kept.status_transitions or []) == before, "a row already there logged a transition"

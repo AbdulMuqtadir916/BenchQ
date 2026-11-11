@@ -563,6 +563,23 @@ describe("a school or job block that repeats (#132)", () => {
     expect(rows[2]).toMatchObject({ status: "ready", proposed: "IIT Bombay" });
   });
 
+  it("leaves a first-block answer from another entry to the BDE, so a block never mixes two schools", () => {
+    // The page's first school picks the résumé's entry (JNTU, BTech); the bank's degree is another entry's (MS).
+    const fields = [field("School", { id: "f0", current: "JNTU" }), field("Degree", { id: "f1" }), field("School", { id: "f2" })];
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" },
+      { ...entry("What is your highest degree?", "MS"), key: "education-degree" }];
+    const rows = withHistory(buildReview(fields, bank), history);
+    expect(rows.map((row) => [row.status, row.proposed ?? null])).toEqual([["same", "JNTU"], ["manual", null], ["ready", "Osmania University"]]);
+    expect(rows[1]!.reason).toBe("This block's other answers are from another entry on the résumé.");
+  });
+
+  it("keeps a first-block answer from the entry its block picked", () => {
+    const fields = [field("School", { id: "f0", current: "JNTU" }), field("Degree", { id: "f1" }), field("School", { id: "f2" })];
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" },
+      { ...entry("What is your highest degree?", "BTech"), key: "education-degree" }];
+    expect(withHistory(buildReview(fields, bank), history)[1]).toMatchObject({ status: "ready", proposed: "BTech" });
+  });
+
   it("leaves a form with one block as it was", () => {
     const rows = buildReview([field("School")], [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]);
     expect(withHistory(rows, history)).toEqual(rows);

@@ -591,7 +591,9 @@ function App() {
           </div>
           {connection ? (
             <AutofillPanel
-              key={connection.tabId}
+              // One panel per tab and job: a tab connected to another job starts afresh (its own form memory, next pages
+              // off until the BDE runs Autofill for that job).
+              key={`${connection.tabId}:${connection.applicationId}`}
               connection={connection}
               applicationStatus={applicationStatus}
               onRetryContext={() => void refresh()}

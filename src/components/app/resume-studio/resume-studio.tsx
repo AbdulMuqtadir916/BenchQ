@@ -17,6 +17,7 @@ import { stepTemplate } from "./templates";
 import { useStudio, type StudioTab } from "./studio-store";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { AutofillTab } from "@/components/app/resume-autofill/autofill-tab";
+import { hasUnsavedAnswers } from "@/components/app/resume-autofill/use-unsaved-answers";
 import type { ResumeSectionKey } from "@/lib/schemas/resume-document";
 import { normalizeProfileLink } from "@/lib/resume-doc/profile-link";
 import { resumeFileName } from "@/lib/derive/resume-name";
@@ -64,17 +65,27 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
   const tailor = useTailorRun();
   const exporter = usePrintExport(doc, resumeFileName(name));
   const [isConfirmingClose, setConfirmingClose] = useState(false);
+  // Leaving the Autofill tab (another tab, Close, Esc) drops an answer being written there, which isn't the document's,
+  // so the discard check below can't see it: ask first, then leave.
+  const [leaveAnswer, setLeaveAnswer] = useState<(() => void) | null>(null);
+  const leaveAutofill = useCallback((leave: () => void) => {
+    if (isAutofill && hasUnsavedAnswers()) setLeaveAnswer(() => leave);
+    else leave();
+  }, [isAutofill]);
   // Closing with unsaved edits asks first: a save is explicit (no autosave), so closing would lose them.
-  const close = useCallback(() => (useStudio.getState().isDirty && onSave ? setConfirmingClose(true) : onClose()), [onClose, onSave]);
+  const close = useCallback(() => leaveAutofill(() => (useStudio.getState().isDirty && onSave ? setConfirmingClose(true) : onClose())),
+    [leaveAutofill, onClose, onSave]);
   const selectTab = useCallback((next: StudioTab) => {
     if (next === tab) return;
     if (next === "autofill") {
       if (hrefs) router.replace(hrefs.autofill, { scroll: false });
       return;
     }
-    setMode(next);
-    if (isAutofill && hrefs) router.replace(next === "view" ? hrefs.view : hrefs.build, { scroll: false });
-  }, [tab, hrefs, isAutofill, router, setMode]);
+    leaveAutofill(() => {
+      setMode(next);
+      if (isAutofill && hrefs) router.replace(next === "view" ? hrefs.view : hrefs.build, { scroll: false });
+    });
+  }, [tab, hrefs, isAutofill, router, setMode, leaveAutofill]);
   // A list of records on the Autofill tab (the work history…) is changed in the Builder: its section opens there.
   const editInBuilder = useCallback((section: ResumeSectionKey) => {
     useStudio.getState().toggleSection(section, true);
@@ -165,6 +176,10 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
       <ConfirmDialog open={isConfirmingClose} title="Discard unsaved changes?" confirmLabel="Discard" tone="danger" cancelLabel="Keep editing"
         onCancel={() => setConfirmingClose(false)} onConfirm={() => { setConfirmingClose(false); onClose(); }}>
         <p>Your edits since the last save are lost. Save first to keep them as the next version.</p>
+      </ConfirmDialog>
+      <ConfirmDialog open={leaveAnswer !== null} title="Discard the unsaved answer?" confirmLabel="Discard" tone="danger" cancelLabel="Keep editing"
+        onCancel={() => setLeaveAnswer(null)} onConfirm={() => { const leave = leaveAnswer; setLeaveAnswer(null); leave?.(); }}>
+        <p>The answer you&apos;re writing on the Autofill tab isn&apos;t saved yet. Save it first to keep it.</p>
       </ConfirmDialog>
     </motion.div>
   );

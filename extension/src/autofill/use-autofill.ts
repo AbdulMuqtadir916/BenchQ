@@ -25,6 +25,12 @@ const PASSES = 2;
 /** "Add another" (#132): at most this many blocks a run adds, with a pause for each block to appear. */
 const MAX_ENTRIES = 5;
 const ENTRY_MS = 700;
+
+/** A résumé's answers with what came with them, kept together: its built answers by key (a save says which one the BDE
+ * was shown, docs/02 §8.3) and its school and job records (`withHistory`). */
+type Answers = { entries: BankEntry[]; built: Map<string, unknown>; history: HistoryRecords };
+const NO_HISTORY: HistoryRecords = { education: [], work: [] };
+const noAnswers = (): Answers => ({ entries: [], built: new Map(), history: NO_HISTORY });
 /** Once the résumé is attached, the form is read every 400 ms until it has been still for three looks, after five at
  * least (2 s) and 30 at most: a site that reads the file (Lever's "Analyzing resume…") fills fields of its own first. */
 const SETTLE = { every: 400, least: 5, still: 3, most: 30 };
@@ -237,10 +243,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const busy = useRef(false);
   const frames = useRef<Pick<TabScan, "scanIds" | "unreadableFrames">>({ scanIds: new Map(), unreadableFrames: 0 });
   const shownRows = useRef<ReviewRow[] | null>(null);
-  const bank = useRef<{ resumeId: string | null; entries: BankEntry[]; file: ResumeFile | null } | null>(null);
-  // The picked résumé's built answers by key, as it sent them: a save says which one the BDE was shown (docs/02 §8.3).
-  const built = useRef<Map<string, unknown>>(new Map());
-  const history = useRef<HistoryRecords>({ education: [], work: [] });
+  // The answers the latest scan took, with what came with them, and the file: always one résumé's, never a mix.
+  const bank = useRef<(Answers & { resumeId: string | null; file: ResumeFile | null }) | null>(null);
   /** The newest scan's page, for the check a next page runs between renders (followPage). */
   const latestSignals = useRef<Parameters<typeof checkJob>[1]>(null);
   // The picked résumé's file, by version: a version's file never changes, so it's fetched once. Null: it has none.
@@ -248,10 +252,11 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   // The name of the file Autofill attaches to the résumé upload, while the picked résumé has one.
   const [attachment, setAttachment] = useState<string | null>(null);
 
-  /** The picked résumé's answers, with "How did you hear about us?" from where BenchQ found the job. No résumé, no
-   * answers. A backend that sends no autofill for the version can't answer either. */
-  const loadAnswers = useCallback(async (): Promise<BankEntry[] | null> => {
-    if (!resumeId) return [];
+  /** The picked résumé's answers, with "How did you hear about us?" from where BenchQ found the job, and what came with
+   * them. No résumé, no answers. A backend that sends no autofill for the version can't answer either. Only the scan
+   * that asked keeps them, and only while it's the latest: a late answer for another résumé changes nothing. */
+  const loadAnswers = useCallback(async (): Promise<Answers | null> => {
+    if (!resumeId) return noAnswers();
     if (!firmId) {
       setError(ANSWERS_UNAVAILABLE);
       return null;
@@ -259,9 +264,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     try {
       const entries = await getResumeAnswers(firmId, candidateId, resumeId);
       if (entries) {
-        built.current = builtAnswers(entries);
-        history.current = historyOf(entries);
-        return withJobSite(answersFromResume(entries), job);
+        return { entries: withJobSite(answersFromResume(entries), job), built: builtAnswers(entries), history: historyOf(entries) };
       }
       setError(ANSWERS_UNAVAILABLE);
       return null;
@@ -301,8 +304,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, []);
 
   const review = useCallback((fields: TabField[], answers: BankEntry[], justFilled?: ReadonlySet<string>) => {
-    const withSaveOffer = withSaveOfferIn(memory.current, built.current);
-    const reviewed = withResumeFile(withHistory(buildReview(fields, answers, job), history.current), bank.current?.file ?? null);
+    const withSaveOffer = withSaveOfferIn(memory.current, bank.current?.built ?? new Map());
+    const reviewed = withResumeFile(withHistory(buildReview(fields, answers, job), bank.current?.history ?? NO_HISTORY), bank.current?.file ?? null);
     const next = withMemory(reviewed, memory.current, resume.current, justFilled).map((row) => withSaveOffer(row, answers));
     showRows(next);
     const { settled } = memory.current;
@@ -322,7 +325,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     isScanRunning.current = true;
     setScanning(true);
     const held = reuseBank && bank.current?.resumeId === resumeId ? bank.current : null;
-    const [answers, file] = held ? [held.entries, held.file] : await Promise.all([loadAnswers(), loadFile()]);
+    const [answers, file] = held ? [held, held.file] : await Promise.all([loadAnswers(), loadFile()]);
     const page = answers ? await readPage(isCurrent) : null;
     if (answers && page && isCurrent()) {
       try {
@@ -333,13 +336,13 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
           setAttachedFile(null);
         }
         memory.current.lastScan = topScan;
-        bank.current = { resumeId, entries: answers, file };
-        review(page.fields, answers, justFilled);
+        bank.current = { ...answers, resumeId, file };
+        review(page.fields, answers.entries, justFilled);
         setAttachment(file?.name ?? null);
         frames.current = page;
         setSignals(page.signals);
         latestSignals.current = page.signals;
-        setBankEmpty(answers.length === 0);
+        setBankEmpty(answers.entries.length === 0);
         setAnsweredFrom(resumeId);
         setReviewedFor({ applicationId, candidateId, resumeId });
         setUnreadableFrames(page.unreadableFrames);
@@ -634,7 +637,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     const blocksOf = (type: string) => (shownRows.current ?? []).filter((row) => typeOf(row.field) === type).length;
     let added = false;
     for (const [kind, type] of [["education", "education-school"], ["work", "current-company"]] as const) {
-      const wanted = Math.min(history.current[kind].length, MAX_ENTRIES);
+      const wanted = Math.min((bank.current?.history ?? NO_HISTORY)[kind].length, MAX_ENTRIES);
       let blocks = blocksOf(type);
       while (blocks > 0 && blocks < wanted && await addEntryIn(tabId, kind).catch(() => false)) {
         await new Promise((resolve) => setTimeout(resolve, ENTRY_MS));

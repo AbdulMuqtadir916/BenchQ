@@ -182,9 +182,12 @@ const takesRecord = (row: ReviewRow) => row.status === "ready" || row.status ===
 
 const sameText = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
 
+const OTHER_ENTRY = "This block's other answers are from another entry on the résumé.";
+
 /** A form that repeats a school or job block (or grew one with "Add another", #132) asks for the next school or job in
  * each. The first block keeps the school or job it was given or already holds; the next blocks take the résumé's other
- * records in order. A block past the résumé's last one is left to the BDE. */
+ * records in order. A block past the résumé's last one is left to the BDE. The first block's answers stay on one record:
+ * one the review would fill from another record than the one its block picked is left to the BDE. */
 export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewRow[] {
   // Each kind's records in the order the blocks take them: the one the first block holds or was given, then the rest.
   const anchors = new Map<keyof HistoryRecords, { type: string; value: string }>();
@@ -194,6 +197,8 @@ export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewR
     const value = row.proposed || row.field.current;
     if (type && from && takesRecord(row) && value && !anchors.has(from[0])) anchors.set(from[0], { type, value });
   }
+  // The record the first block's anchor picked, by kind: the block's other answers must be that record's too.
+  const picked = new Map<keyof HistoryRecords, { type: string; record: Record<string, unknown> }>();
   const ordered = new Map<keyof HistoryRecords, Record<string, unknown>[]>();
   const recordsOf = (kind: keyof HistoryRecords) => {
     const known = ordered.get(kind);
@@ -201,6 +206,7 @@ export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewR
     const records = history[kind];
     const anchor = anchors.get(kind);
     const at = anchor ? records.findIndex((record) => sameText(FROM_RECORD[anchor.type]![1](record), anchor.value)) : -1;
+    if (anchor && at >= 0) picked.set(kind, { type: anchor.type, record: records[at]! });
     const next = at > 0 ? [records[at]!, ...records.filter((_, n) => n !== at)] : records;
     ordered.set(kind, next);
     return next;
@@ -212,10 +218,17 @@ export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewR
     if (!type || !from) return row;
     const index = seen.get(type) ?? 0;
     seen.set(type, index + 1);
-    if (!takesRecord(row) || (index === 0 && row.status !== "manual")) return row;
+    if (!takesRecord(row)) return row;
+    const base = { key: row.key, field: row.field, isUnsaved: row.isUnsaved };
+    if (index === 0 && row.status !== "manual") {
+      recordsOf(from[0]);
+      const pick = picked.get(from[0]);
+      const theirs = pick && pick.type !== type && row.status === "ready" ? from[1](pick.record) : "";
+      const kept = row.proposed || row.field.current;
+      return theirs && kept && !sameText(theirs, kept) ? { ...base, status: "manual", reason: OTHER_ENTRY } : row;
+    }
     const record = recordsOf(from[0])[index];
     const value = record ? from[1](record) : "";
-    const base = { key: row.key, field: row.field, isUnsaved: row.isUnsaved };
     return value ? rowFor(base, value) : { ...base, status: "manual", reason: "The résumé has no entry for this block." };
   });
 }

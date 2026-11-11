@@ -699,8 +699,13 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=
             revisions = body.get("expected_revisions", {})
             if not isinstance(revisions, dict):
                 raise HTTPException(400, "expected_revisions must be an object keyed by application ID.")
+            revision = app.status_revision
             move(db, app, principal, status=status, expected_revision=revisions.get(str(app.id)))
-            updated += 1
+            # Checked like any move, but one already in that status changes nothing: it's skipped, not updated.
+            if app.status_revision == revision:
+                skipped += 1
+            else:
+                updated += 1
             continue
         if status not in VALID_STATUSES:
             raise HTTPException(400, "Legacy application does not support this status.")
@@ -1162,7 +1167,8 @@ def _application_responses(db, firm_id, apps):
 def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=False) -> dict:
     """Serialize an Application; pass lookup={lowercase: Company} (from build_company_lookup) to populate company_canonical for alias-aware grouping, else it falls back to the raw company name.
     The job is the application's posting (2026-11-11), read by `posting_job`: the keys stay as they were, so the
-    extension and the screens read the same JSON; what a posting doesn't hold (salary, scores, a cached page) is null."""
+    extension and the screens read the same JSON; what a posting doesn't hold (scores, a cached page; salary, except a
+    moved job's) is null."""
     posting = a.posting
     job = posting_job(posting)
     raw = job.company or None
@@ -1196,8 +1202,8 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
         "short_id": None,
         # posting details the detail pane shows, so it never has to re-fetch the job
         "location": job.location,
-        "salary_min": None,
-        "salary_max": None,
+        "salary_min": job.salary_min,
+        "salary_max": job.salary_max,
         "source": posting.source if posting else None,
         "has_cached_page": False,
         "discovered_at": posting.discovered_at.isoformat() if (posting and posting.discovered_at) else None,

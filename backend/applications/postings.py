@@ -4,7 +4,8 @@
 - `manual` / `extension`: a job the BDE added for the candidate, by hand or from the extension
   (`{title, company, description, url, location}`; the extension's description may be the employer's HTML);
 - `legacy`: a job copied from the old `jobs` pool when applications moved onto `job_postings` (migration 0024): the
-  same keys plus `posted_at`, `old_job_id` and `old_source`;
+  same keys plus `salary_min`, `salary_max` (whole dollars, when the old job had them), `posted_at`, `old_job_id` and
+  `old_source`;
 - a job search provider's own object (job search, Zuhair's #123), read by that provider's reader once it's here.
 
 `posting_job()` turns any of them into `PostingJob`, so nothing else looks inside `content`: an application's title and
@@ -35,6 +36,9 @@ class PostingJob:
     posted_at: str | None = None
     employment_type: str | None = None
     source: str = ""
+    # The pay a moved job listed (`legacy`); no other source sends one yet.
+    salary_min: int | None = None
+    salary_max: int | None = None
 
 
 EMPTY = PostingJob()
@@ -84,10 +88,16 @@ def read_content(source: str, content) -> PostingJob:
                               employment_type=fields.employment_type, source=source)
     found = content if isinstance(content, dict) else {}
     description = plain_text(found.get("description")) if source == "extension" else _text(found.get("description"))
+    salary = {key: _amount(found.get(key)) for key in ("salary_min", "salary_max")} if source == LEGACY else {}
     return PostingJob(title=_text(found.get("title")), company=_text(found.get("company")), description=description,
                       url=safe_url(found.get("url")), location=_text(found.get("location")) or None,
                       posted_at=_text(found.get("posted_at")) or None,
-                      employment_type=_text(found.get("employment_type")) or None, source=source)
+                      employment_type=_text(found.get("employment_type")) or None, source=source, **salary)
+
+
+def _amount(value) -> int | None:
+    """A salary bound as stored: a whole, non-negative number, else none."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
 
 
 def posting_job(posting) -> PostingJob:

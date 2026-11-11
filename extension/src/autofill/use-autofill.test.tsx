@@ -286,6 +286,28 @@ describe("scanning", () => {
   });
 });
 
+describe("a résumé's answers that come back late", () => {
+  /** A résumé's first school, and its schools in order: what "Add another" blocks fill from (#132). */
+  const schooling = (first: string, second: string) => [
+    { question: "What school did you attend?", key: "education-school", answer: first, kind: "FIXED" },
+    { question: "Education", key: "education-history", answer: [{ school: first }, { school: second }], kind: "FIXED" },
+  ];
+
+  it("never pair the picked résumé's answers with another résumé's schools", async () => {
+    let answerFirst: (entries: unknown[]) => void = () => undefined;
+    vi.mocked(getResumeAnswers).mockImplementation((_firm, _candidate, resumeId) => resumeId === "res-1"
+      ? new Promise((resolve) => { answerFirst = resolve; })
+      : Promise.resolve(schooling("Beta University", "Beta College")));
+    vi.mocked(scanTab).mockResolvedValue(page([field("s1", "School"), field("s2", "School")]));
+    await mount();
+    await pickResume("res-2");
+    expect(hook.rows!.map((row) => row.proposed ?? null)).toEqual(["Beta University", "Beta College"]);
+    await act(async () => { answerFirst(schooling("Alpha University", "Alpha College")); });
+    await run(() => hook.rescan(undefined, true));
+    expect(hook.rows!.map((row) => row.proposed ?? null)).toEqual(["Beta University", "Beta College"]);
+  });
+});
+
 describe("the job check", () => {
   it("pauses Autofill on a page for another job", async () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")], elsewhere));
