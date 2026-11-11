@@ -155,4 +155,6 @@ reviewer if you want an approval before each upload.
 
 The first approved version goes live to people who have the unlisted link; later versions update their browsers by
 themselves. If an upload is refused for a version number, note that the workflow already stamps
-`major.minor.<run number>.<attempt>`, so a re-run gets its own version; raise `major.minor` in `extension/manifest.base.json` for a bigger release.
+`major.minor.<run number>.<attempt>`, so a re-run gets its own version, **but only if you choose "Re-run all jobs"**: the
+stamp is made in the build job, and "Re-run failed jobs" repeats only the publish job with the same zip and so the same
+version; raise `major.minor` in `extension/manifest.base.json` for a bigger release.

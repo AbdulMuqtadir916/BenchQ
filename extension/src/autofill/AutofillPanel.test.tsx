@@ -50,6 +50,7 @@ type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
   answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
   step?: string | null; error?: string;
+  needsAccess?: { origins: string[]; host: string } | null; isAccessDenied?: boolean;
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
 };
 
@@ -473,6 +474,18 @@ describe("the buttons at the bottom", () => {
     const hint = host.querySelector("[data-slot='mark-applied-hint']")!;
     expect(hint.textContent).toBe("Submitted the form? Mark the job applied in BenchQ.");
     expect(atBottom()[0]!.getAttribute("aria-describedby")).toBe(hint.id);
+  });
+
+  it("keep Mark applied available on a site BenchQ may not read, so a refused site can still be marked applied", () => {
+    show({ rows: null, reviewedFor: { applicationId: "another-app", candidateId: "cand-1", resumeId: null }, fillCount: 0, needsAccess: { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" }, isAccessDenied: true }, { onApply: vi.fn() });
+    expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
+    const mark = host.querySelector<HTMLButtonElement>("[data-slot='mark-applied']")!;
+    expect(mark.disabled).toBe(false);
+  });
+
+  it("keep Mark applied waiting for the review when there is no access question", () => {
+    show({ rows: null, reviewedFor: { applicationId: "another-app", candidateId: "cand-1", resumeId: null }, fillCount: 0 }, { onApply: vi.fn() });
+    expect(host.querySelector<HTMLButtonElement>("[data-slot='mark-applied']")!.disabled).toBe(true);
   });
 
   it("lead with Mark applied once nothing is left to fill", () => {
