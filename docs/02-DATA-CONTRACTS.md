@@ -105,8 +105,7 @@ export const OutreachChannel = z.enum([
 
 export const OutreachResult = z.enum(['SENT', 'OPENED', 'REPLIED', 'BOUNCED', 'NO_RESPONSE']);
 
-export const FollowUpKind = z.enum(['DAY_3_LINKEDIN', 'DAY_7_EMAIL', 'CUSTOM']);
-export const FollowUpState = z.enum(['PENDING', 'DONE', 'SNOOZED', 'CANCELLED']);
+// FollowUpKind and FollowUpState: removed, 07 Q61 (2026-11-10), with FollowUpTask.
 
 /** JobNavigator-aligned: two scoring depths for cost control. */
 export const ScoringDepth = z.enum(['LIGHT', 'FULL']);
@@ -480,7 +479,7 @@ Approval permissions are `notification.approve` (OWNER/MANAGER; request recipien
 | Record | Change | Note |
 |---|---|---|
 | Candidate, User | none | already have `firmId` |
-| Job, Application, Resume, Record (candidate record), Document, Inbox (`CandidateInbox`, `InboxMessage`, `MailboxConnection`), Followup (`FollowUpTask`) | add `firmId: z.string()` | required; every fixture gets one in Phase T (T3) |
+| Job, Application, Resume, Record (candidate record), Document, Inbox (`CandidateInbox`, `InboxMessage`, `MailboxConnection`) | add `firmId: z.string()` | required; every fixture gets one in Phase T (T3) |
 | **Agent and tailoring runs** | add `firmId: z.string()` | **required** (A17): `/admin/system` needs AI spend by firm, and deriving it through joins is fragile |
 | LedgerEntry | add `firmId: z.string().nullable()` | rule below |
 | Company (and `CompanyVerification`) | none | global reference data (07 Q13) |
@@ -730,25 +729,17 @@ shiftWindow: z.object({
   end: ClockTime,                         // default "00:30"; end earlier than start = crosses midnight
 }),                                       // read in the firm's primaryTimezone (no timezone of its own)
 
-followUpCadence: z.array(z.object({
-  dayOffset: z.number().int().min(1).max(30),   // days after the application is submitted
-  channel: OutreachChannel,                      // §2 enum
-})).min(1).max(5),                               // ascending dayOffset, no duplicates
-// default: [{ dayOffset: 3, channel: 'LINKEDIN_MESSAGE' }, { dayOffset: 7, channel: 'EMAIL' }]
+// followUpCadence: dropped with follow-ups (removed, 07 Q61).
 ```
 
 | Value | Default | Rules |
 |---|---|---|
 | `shiftWindow` | 18:30 – 00:30 in `primaryTimezone` | Times only; the window may cross midnight; start ≠ end. Shown with the timezone's abbreviation (IST for the beachhead) |
-| `followUpCadence` | day 3 LinkedIn message, day 7 email | 1–5 steps, ascending, offsets 1–30 days; one channel per step |
 
 **Questions with this draft** (proposed answers in brackets):
 
-1. **Existing follow-ups when the cadence changes.** *(Proposed: only follow-ups created after the change
-   use the new cadence; existing ones keep their dates.)*
-2. **`FollowUpKind` (`DAY_3_LINKEDIN`, `DAY_7_EMAIL`, `CUSTOM`).** *(Proposed: keep the enum; a step that
-   matches a default kind uses it, any other step creates `CUSTOM`. No enum change.)*
-3. **What the shift window drives.** *(Proposed: display only for now — the focus-mode timer and the
+1. ~~Follow-up cadence questions~~: dropped with follow-ups (removed, 07 Q61).
+2. **What the shift window drives.** *(Proposed: display only for now — the focus-mode timer and the
    "shift" range on dashboards read it; nothing is blocked outside the window.)*
 4. **Ledger.** *(Proposed: editing either logs `UPDATE` with `entityType: "firm"`, as other firm edits do.)*
 
@@ -1550,7 +1541,7 @@ résumé upload (07 Q50–Q52); a file for every version (rendered by the backen
 
 ---
 
-## 9. Application, outreach, follow-up
+## 9. Application, outreach
 
 ### Applications backend foundation — PR 1 (2026-11-01)
 
@@ -1674,22 +1665,7 @@ export const OutreachTouchSchema = z.object({
   repliedAt: z.string().datetime().nullable(),
 });
 
-export const FollowUpTaskSchema = z.object({
-  id: z.string(),
-  applicationId: z.string(),
-  assignedToUserId: z.string(),
-  kind: FollowUpKind,
-  dueAt: z.string().datetime(),
-  state: FollowUpState,
-  completedAt: z.string().datetime().nullable(),
-  snoozedUntil: z.string().datetime().nullable(),
-  note: z.string().nullable(),
-
-  // denormalised for the queue view
-  candidateName: z.string(),
-  companyName: z.string(),
-  jobTitle: z.string(),
-});
+// FollowUpTaskSchema: removed, 07 Q61 (2026-11-10). Follow-ups are gone.
 ```
 
 ---
@@ -1793,8 +1769,6 @@ export const FirmDashboardSchema = z.object({
 
 export const BdeDashboardSchema = z.object({
   queueCount: z.number().int(),
-  followUpsDueToday: z.number().int(),
-  followUpsOverdue: z.number().int(),
   applicationsThisWeek: z.number().int(),
   responsesThisWeek: z.number().int(),
   interviewsScheduled: z.number().int(),
@@ -1826,7 +1800,7 @@ export const LedgerEntrySchema = z.object({
 /** Merged activity stream for a candidate. */
 export const TimelineEventSchema = z.object({
   id: z.string(),
-  kind: z.enum(['STATUS', 'APPLICATION', 'RESUME', 'OUTREACH', 'FOLLOWUP', 'NOTE', 'RECORD']),
+  kind: z.enum(['STATUS', 'APPLICATION', 'RESUME', 'OUTREACH', 'NOTE', 'RECORD']),
   occurredAt: z.string().datetime(),
   actorName: z.string().nullable(),
   title: z.string(),
@@ -1847,7 +1821,7 @@ export const TimelineEventSchema = z.object({
    have schemas so they can be typed — but they're produced by pure functions in
    `src/lib/derive/`, which are unit-tested against fixtures.
 4. **Denormalised fields are deliberate.** `Match.job`, `Application.companyNameAtApply`,
-   `FollowUpTask.candidateName` — these exist so list views render without N+1 lookups, and so
+   (`FollowUpTask.candidateName` was one, until follow-ups were removed) — these exist so list views render without N+1 lookups, and so
    history survives upstream edits.
 5. **No claim states (2026-11-05).** Nothing on a candidate, a résumé or an answer is Verified, Unverified or Contradicted.
 

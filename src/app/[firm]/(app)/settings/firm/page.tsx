@@ -22,7 +22,6 @@ export default function FirmSettingsPage() {
         <SettingRow label="Primary timezone" value={firm.primaryTimezone} />
         <SettingRow label="Client timezone" value={firm.clientTimezone} />
         <SettingRow label="Shift window" value="18:30 – 00:30 IST" />
-        <SettingRow label="Default follow-up cadence" value="Day-3 LinkedIn · Day-7 email" />
         {canEdit ? null : <SettingRow label="BDE capacity" value={`${firm.bdeCapacity} candidates per BDE`} />}
       </dl>
       {canEdit ? <BdeCapacityForm current={firm.bdeCapacity} /> : null}
