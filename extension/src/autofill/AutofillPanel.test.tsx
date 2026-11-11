@@ -1,0 +1,689 @@
+// @vitest-environment jsdom
+import { act, cloneElement, type ReactElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Application } from "../api";
+import { installDialog } from "../test/dialog";
+import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
+import AutofillPanel from "./AutofillPanel";
+import type { AppliedForm, Connection, ReviewRow, TabField } from "./types";
+import { useAutofill } from "./use-autofill";
+import { useResumes, type ApplicationContextStatus, type Resumes } from "./use-resumes";
+
+vi.mock("./use-autofill", () => ({ useAutofill: vi.fn() }));
+vi.mock("./use-resumes", () => ({ useResumes: vi.fn() }));
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+installDialog();
+
+const connection = {
+  tabId: 7, applicationId: "app-1", candidateId: "cand-1", userId: "user-1", confirmedHosts: [],
+  job: { title: "Java Developer", company: "Acme", url: "https://jobs.acme.test/1" },
+} as Connection;
+
+const form: AppliedForm = { fields: [{ label: "City", value: "Dallas", required: false, source: "bde" }] };
+
+const finalForm = vi.fn(async () => form);
+const autofill = vi.fn();
+
+const reviewed = {
+  rows: [], scanning: false, error: "", filling: false, outcome: null, undoable: 0, fillCount: 0, needsConfirmation: false, unreadableFrames: 0,
+  check: { conflict: false, detected: "" }, finalForm, autofill,
+};
+
+const row = (label: string, required: boolean, current = ""): ReviewRow => ({
+  key: label, status: "manual", field: { label, required, current } as TabField,
+});
+
+const base = { id: "res-2", label: "Base 1 · Java Developer · v2", meta: "Base 1 · v2", isTailored: false, isActive: true, title: "Java Developer" };
+const tailored = { id: "res-9", label: "Tailored for this job · from Base 1 · v1", meta: "Tailored for this job · from Base 1 · v1", isTailored: true, isActive: false, title: "Java Developer" };
+const pick = vi.fn();
+const retry = vi.fn();
+const oneResume: Resumes = { status: "ready", choices: [base], picked: base };
+
+let root: Root | null = null;
+let host: HTMLElement;
+let fake: FakeChrome;
+let element: ReactElement<{ connection: Connection }>;
+
+type State = {
+  fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
+  answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
+  step?: string | null; error?: string;
+  needsAccess?: { origins: string[]; host: string } | null; isAccessDenied?: boolean;
+  reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
+};
+
+function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus } = {}, resumes: Resumes = oneResume) {
+  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
+  const applicationStatus = panel.applicationStatus ?? "ready";
+  vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (applicationStatus === "ready" && resumes.status === "ready" ? { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
+  fake = fakeChrome();
+  vi.stubGlobal("chrome", fake);
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  element = <AutofillPanel connection={connection} firmId="firm-1" firmSlug="acme-staffing" candidateName="Priya" applying={false} isApplied={false} applicationStatus="ready" onDisconnect={vi.fn()} onSessionExpired={vi.fn()} onAccessLost={vi.fn()} {...panel} />;
+  act(() => { root!.render(element); });
+}
+
+/** The panel again with what the hooks now say, as after the BDE's pick. */
+function update(state: State, resumes: Resumes) {
+  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
+  const appConnection = element.props.connection;
+  vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (resumes.status === "ready" ? { applicationId: appConnection.applicationId, candidateId: appConnection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
+  // A copy, so React renders the panel again instead of keeping the one it has.
+  element = cloneElement(element);
+  act(() => { root!.render(element); });
+}
+
+const inBody = () => [...host.querySelectorAll<HTMLButtonElement>("[data-slot='autofill-body'] > button")];
+const atBottom = () => [...host.querySelectorAll<HTMLButtonElement>("[data-slot='autofill-actions'] button")];
+const named = (name: string) => [...host.querySelectorAll<HTMLButtonElement>("button")].find(({ textContent }) => textContent === name)!;
+const click = (name: string) => act(async () => { named(name).click(); });
+
+afterEach(() => {
+  act(() => { root?.unmount(); });
+  root = null;
+  host.remove();
+  vi.clearAllMocks();
+});
+
+describe("Autofill", () => {
+  it("sits at the top of the form, above the list, and gives no count", () => {
+    show({ fillCount: 3, rows: [row("Email", true)] });
+    expect(inBody().map(({ textContent }) => textContent)).toEqual(["Autofill"]);
+    expect(inBody()[0]!.className).toContain("bq-primary");
+    const button = inBody()[0]!;
+    const list = host.querySelector("[data-slot='review']")!;
+    expect(button.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("runs when clicked", () => {
+    show({ fillCount: 1 });
+    act(() => { inBody()[0]!.click(); });
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it("says it's filling during a run", () => {
+    show({ fillCount: 3, filling: true });
+    expect(inBody().map(({ textContent }) => textContent)).toEqual(["Filling…"]);
+    expect(inBody()[0]!.disabled).toBe(true);
+  });
+
+  it("makes way for Autofill complete once a run leaves nothing to fill", () => {
+    show({ fillCount: 0, outcome: { filled: 3, handedBack: 0, stopped: false } });
+    expect(inBody()).toEqual([]);
+    expect(host.querySelector("[data-slot='autofill-done']")?.textContent).toBe("Autofill complete");
+    expect(host.querySelector("[data-slot='autofill-done']")?.className).toContain("text-caption");
+  });
+
+  it("isn't complete while there's more to fill", () => {
+    show({ fillCount: 2, outcome: { filled: 3, handedBack: 0, stopped: true } });
+    expect(inBody().map(({ textContent }) => textContent)).toEqual(["Autofill"]);
+    expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
+  });
+
+  it("isn't complete when nothing was filled", () => {
+    show({ fillCount: 0, rows: [row("Phone", true), row("City", true)], outcome: { filled: 0, handedBack: 2, stopped: false } });
+    expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
+    expect(host.querySelector("[data-slot='autofill-result-title']")?.textContent).toBe("Nothing was filled");
+    expect(host.querySelector("[data-slot='autofill-result-detail']")?.textContent)
+      .toBe("Still empty: 2 required. Autofill didn't recognize these or couldn't fill them. Fill in the required ones below, then submit the form.");
+  });
+
+  it("leaves no way to rescan by hand: the panel does that itself", () => {
+    show({ fillCount: 1, undoable: 1 });
+    expect(host.textContent).not.toContain("Rescan");
+  });
+});
+
+describe("the résumé the answers come from", () => {
+  const picker = () => host.querySelector("[data-slot='resume-picker']")!;
+  const twoResumes: Resumes = { status: "ready", choices: [tailored, base], picked: base };
+
+  const select = () => picker().querySelector<HTMLButtonElement>("[data-slot='resume-select']")!;
+  const open = () => act(async () => { select().click(); });
+  const options = () => [...picker().querySelectorAll<HTMLButtonElement>("[data-slot='resume-option']")];
+  /** Picks the résumé on row `index` of the open list. */
+  const choose = (index: number) => act(async () => { options()[index]!.click(); });
+  const press = (target: Element, key: string) => act(() => { target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })); });
+
+  it("waits for the linked application before enabling fill or Mark applied", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn(), applicationStatus: "loading" }, { status: "loading" });
+    expect(host.querySelector("[data-slot='autofill-run']")).toBeNull();
+    expect(named("Mark applied")).toBeUndefined();
+    expect(vi.mocked(useAutofill).mock.lastCall?.[0].resumeId).toBeUndefined();
+  });
+
+  it("asks to restore a missing named resume instead of using a fallback", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() }, { status: "missing" });
+    expect(host.textContent).toContain("The resume saved with this application is no longer available");
+    expect(host.querySelector("[data-slot='autofill-run']")).toBeNull();
+    expect(named("Mark applied")).toBeUndefined();
+  });
+
+  it("refills after a connected application changes and holds Mark applied until the new résumé is in sync", async () => {
+    let finish!: () => void;
+    autofill.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
+    const rows = [row("Email", true)];
+    show({ fillCount: 1, rows, reviewedFor: { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id } }, { onApply: vi.fn() });
+    expect(autofill).not.toHaveBeenCalled();
+
+    vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows, fillCount: 1, reviewedFor: { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id } } as unknown as ReturnType<typeof useAutofill>);
+    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [base], picked: base }, pick, retry });
+    element = cloneElement(element, { connection: { ...connection, applicationId: "app-2" } });
+    await act(async () => { root!.render(element); });
+
+    expect(autofill).not.toHaveBeenCalled();
+    expect(named("Mark applied")).toBeUndefined();
+    vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows, fillCount: 1, reviewedFor: { applicationId: "app-2", candidateId: "cand-1", resumeId: base.id } } as unknown as ReturnType<typeof useAutofill>);
+    element = cloneElement(element);
+    await act(async () => { root!.render(element); });
+    expect(autofill).toHaveBeenCalledTimes(1);
+    expect(named("Mark applied")).toBeUndefined();
+    await act(async () => { finish(); await Promise.resolve(); });
+    expect(named("Mark applied")).toBeDefined();
+  });
+
+  it("keeps Mark applied available when a résumé was picked and the site then needed access: the queued fill waits, tracking doesn't", async () => {
+    const access = { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" };
+    const reviewedForBase = { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id };
+    show({ fillCount: 1, rows: [row("Email", true)], reviewedFor: reviewedForBase }, { onApply: vi.fn() }, twoResumes);
+    await open();
+    await choose(0);
+    expect(pick).toHaveBeenCalledWith(tailored.id);
+    // The new résumé's review can't happen on a site BenchQ may not read: access is asked for, nothing is scanned.
+    vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows: null, needsAccess: access, isAccessDenied: true, reviewedFor: null } as unknown as ReturnType<typeof useAutofill>);
+    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [tailored, base], picked: tailored }, pick, retry });
+    element = cloneElement(element);
+    await act(async () => { root!.render(element); });
+    expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
+    expect(named("Mark applied")).toBeDefined();
+    expect(named("Mark applied").disabled).toBe(false);
+    expect(autofill).not.toHaveBeenCalled();
+    // Allowed later: the page is reviewed for the picked résumé, and the fill that was queued runs once.
+    vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows: [row("Email", true)], fillCount: 1, reviewedFor: { ...reviewedForBase, resumeId: tailored.id } } as unknown as ReturnType<typeof useAutofill>);
+    element = cloneElement(element);
+    await act(async () => { root!.render(element); });
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the one résumé as a plain row, with a way to view it in BenchQ (07 Q55)", () => {
+    show({ fillCount: 1 });
+    expect(picker().querySelector("[data-slot='resume-picked']")!.textContent).toBe("Java Developer");
+    expect(picker().textContent).toContain("Base 1 · v2");
+    expect(picker().querySelector("a")!.getAttribute("href")).toContain("/acme-staffing/resumes/res-2");
+    expect(picker().querySelectorAll("button")).toHaveLength(0);
+  });
+
+  it("starts closed on the résumé in use; its ▾ opens one row per résumé, the one in use ticked, and Esc closes them", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    expect(select().getAttribute("aria-expanded")).toBe("false");
+    expect(select().textContent).toContain("Java Developer");
+    expect(picker().querySelectorAll("[data-slot='resume-choice']")).toHaveLength(0);
+    await open();
+    expect(select().getAttribute("aria-expanded")).toBe("true");
+    expect(options().map((option) => option.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
+    expect(options()[0]!.textContent).toContain("Tailored for this job · from Base 1 · v1");
+    expect(picker().querySelector("button")).toBe(select());
+    const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
+    expect(choices[0]!.querySelector("a")!.getAttribute("aria-label")).toBe(`View ${tailored.label} in BenchQ`);
+    expect(choices[0]!.querySelector("a")!.getAttribute("href")).toContain("/resumes/res-9");
+    await press(options()[1]!, "Escape");
+    expect(select().getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(select());
+  });
+
+  it("opens on the résumé in use and moves through the list with the arrow keys", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    await press(select(), "ArrowDown");
+    expect(document.activeElement).toBe(options()[1]);
+    await press(options()[1]!, "ArrowUp");
+    expect(document.activeElement).toBe(options()[0]);
+  });
+
+  it("only closes the list when the résumé in use is chosen again", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    await open();
+    await choose(1);
+    expect(pick).not.toHaveBeenCalled();
+    expect(picker().querySelectorAll("[data-slot='resume-choice']")).toHaveLength(0);
+  });
+
+  it("tags the base in use Active, as the website does, closed and in the list", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    const tag = select().querySelector("[data-slot='resume-active']")!;
+    expect(tag.textContent).toBe("Active");
+    // On the second line, after the base and version, so the role keeps the whole row.
+    expect(tag.parentElement!.textContent).toBe("Base 1 · v2Active");
+    expect(select().querySelector("[data-slot='resume-picked']")!.textContent).toBe("Java Developer");
+    await open();
+    const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
+    expect(choices.map((choice) => choice.querySelector("[data-slot='resume-active']")?.textContent ?? null)).toEqual([null, "Active"]);
+    expect(choices[1]!.querySelector("[data-slot='resume-picked']")!.textContent).toBe("Java Developer");
+  });
+
+  it("closes once a résumé is picked", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    await open();
+    await choose(0);
+    expect(pick).toHaveBeenCalledWith("res-9");
+    expect(picker().querySelectorAll("[data-slot='resume-choice']")).toHaveLength(0);
+  });
+
+  it("fills the form as soon as the picked résumé's answers are in", async () => {
+    const rows = [row("Email", true)];
+    show({ fillCount: 1, rows, answeredFrom: "res-2" }, {}, twoResumes);
+    await open();
+    await choose(0);
+    expect(pick).toHaveBeenCalledWith("res-9");
+    expect(autofill).not.toHaveBeenCalled();
+    update({ fillCount: 1, rows, answeredFrom: "res-9" }, { ...twoResumes, picked: tailored });
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it("only picks when the form isn't on the page yet", async () => {
+    show({ fillCount: 0, rows: [], answeredFrom: "res-2" }, {}, twoResumes);
+    await open();
+    await choose(0);
+    update({ fillCount: 0, rows: [], answeredFrom: "res-9" }, { ...twoResumes, picked: tailored });
+    expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("only picks when the page may be a different job", async () => {
+    const rows = [row("Email", true)];
+    show({ fillCount: 1, rows, answeredFrom: "res-2" }, {}, twoResumes);
+    await open();
+    await choose(0);
+    update({ fillCount: 1, rows, answeredFrom: "res-9", needsConfirmation: true }, { ...twoResumes, picked: tailored });
+    expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("lets the BDE pick again when the picked résumé's answers can't load, and Try again still fills", async () => {
+    const rows = [row("Email", true)];
+    show({ fillCount: 1, rows, answeredFrom: "res-2" }, { onApply: vi.fn() }, twoResumes);
+    await open();
+    await choose(0);
+    // While the pick waits for its answers, the list and Mark applied wait with it.
+    expect(select().disabled).toBe(true);
+    expect(named("Mark applied")).toBeUndefined();
+    // They never came: the review in hand is still the old résumé's.
+    const failed = "Could not load this resume's answers. Try again.";
+    update({ fillCount: 1, rows, answeredFrom: "res-2", error: failed, reviewedFor: { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: "res-2" } }, { ...twoResumes, picked: tailored });
+    expect(select().disabled).toBe(false);
+    expect(named("Mark applied")).toBeDefined();
+    expect(autofill).not.toHaveBeenCalled();
+    update({ fillCount: 1, rows, answeredFrom: "res-9" }, { ...twoResumes, picked: tailored });
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it("says when the candidate has no résumé yet", () => {
+    show({ fillCount: 0, rows: [] }, {}, { status: "ready", choices: [], picked: null });
+    expect(picker().textContent).toContain("Priya has no resume in BenchQ yet");
+  });
+
+  it("says when the résumés couldn't be loaded, with a way to try again", async () => {
+    show({ fillCount: 0, rows: [] }, {}, { status: "error" });
+    expect(picker().querySelector("[role='alert']")!.textContent).toContain("Could not load Priya's resumes");
+    await click("Try again");
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("says it's loading them", () => {
+    show({ fillCount: 0, rows: null }, {}, { status: "loading" });
+    expect(picker().querySelector("[role='status']")!.textContent).toContain("Loading Priya's resumes");
+  });
+
+  it("names it as the one to attach by hand when BenchQ has no file for it", () => {
+    const upload = { key: "cv", status: "manual", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } } as unknown as ReviewRow;
+    show({ fillCount: 0, rows: [upload] });
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe(`Attach by hand: ${base.label}`);
+  });
+
+  it("shows the file Autofill attached when the site swapped its upload for a chip (07 Q53)", () => {
+    show({ fillCount: 0, rows: [row("Email", true)], attachedFile: "Priya - Java Developer.pdf" });
+    const resume = host.querySelector("[data-document='resume']")!;
+    expect(resume.querySelector("[data-slot='document-status']")!.textContent).toBe("Attached");
+    expect(resume.querySelector("[data-slot='document-attached'] [data-slot='document-value']")!.textContent).toBe("Priya - Java Developer.pdf");
+    expect(resume.querySelector("[data-slot='document-attached']")!.textContent).toContain("Attached");
+  });
+
+  it("shows an upload's file in one line, then Attached and Go to field, with nothing else to say (07 Q56)", () => {
+    const upload = { key: "cv", status: "same", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "cv.pdf" } } as unknown as ReviewRow;
+    show({ fillCount: 0, rows: [upload] });
+    const resume = host.querySelector("[data-document='resume']")!;
+    const file = resume.querySelector("[data-slot='document-attached']")!;
+    expect([file.querySelector("[data-slot='document-value']")!.getAttribute("title"), file.textContent]).toEqual(["cv.pdf", "cv.pdfAttachedGo to field"]);
+    expect(resume.querySelector("[data-slot='document-held']")).toBeNull();
+    expect(resume.querySelector("a")).toBeNull();
+  });
+
+  it("offers Change resume on an attached résumé when there's another to pick, opening the picker's list", async () => {
+    const upload = { key: "cv", status: "same", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "cv.pdf" } } as unknown as ReviewRow;
+    show({ fillCount: 0, rows: [upload] }, {}, twoResumes);
+    const change = host.querySelector<HTMLButtonElement>("[data-document='resume'] [data-slot='document-change']")!;
+    expect(change.textContent).toBe("Change resume");
+    await act(async () => { change.click(); });
+    expect(select().getAttribute("aria-expanded")).toBe("true");
+    expect(options()).toHaveLength(2);
+  });
+
+  it("says Autofill attaches its file when BenchQ has one (07 Q49)", () => {
+    const upload = { key: "cv", status: "ready", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } } as unknown as ReviewRow;
+    show({ fillCount: 1, rows: [upload], attachment: "Priya - Java Developer.pdf", answeredFrom: base.id });
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe("Autofill attaches: Priya - Java Developer.pdf");
+    expect(host.querySelector("[data-slot='autofill-ready']")!.textContent).toBe("Ready to fill 1 field, the resume file first.");
+  });
+});
+
+describe("the keyboard shortcuts", () => {
+  const press = (command: string, tabId = 7, sender: object = { id: "extension-id" }) =>
+    act(async () => { fake.runtime.onMessage.fire({ type: "shortcut", command, tabId }, sender, () => undefined); });
+
+  it("run Autofill on its key, for this tab's job", async () => {
+    show({ fillCount: 1, rows: [row("Email", true)] });
+    await press("run-autofill");
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it("do nothing when Autofill couldn't be clicked", async () => {
+    show({ fillCount: 0, rows: [row("Email", true)], scanning: true });
+    await press("run-autofill");
+    expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("leave another tab's key alone, and a message that isn't the worker's", async () => {
+    show({ fillCount: 1, rows: [row("Email", true)] });
+    await press("run-autofill", 8);
+    await press("run-autofill", 7, { id: "extension-id", tab: { id: 7, windowId: 1 } });
+    await press("run-autofill", 7, { id: "another-extension" });
+    expect(autofill).not.toHaveBeenCalled();
+  });
+
+  it("open Mark applied on its key, with Yes ready for Enter", async () => {
+    const onApply = vi.fn();
+    show({ fillCount: 0 }, { onApply });
+    await press("mark-applied");
+    expect(host.querySelector("dialog[data-slot='autofill-confirm']")!.hasAttribute("open")).toBe(true);
+    expect(document.activeElement).toBe(host.querySelector("[data-slot='mark-applied-confirm']"));
+    expect(onApply).not.toHaveBeenCalled();
+  });
+});
+
+describe("the job card", () => {
+  it("keeps the job to a few short lines: where on a row of its own, pay and when it was found side by side", () => {
+    const details = { location: "Atlanta, GA - Hybrid; Denver, CO", salary_min: null, salary_max: null, discovered_at: new Date(Date.now() - 86_400_000).toISOString() } as unknown as Application;
+    show({}, { details });
+    const facts = [...host.querySelectorAll("[data-slot='job-facts'] li")];
+    expect(facts.map(({ textContent }) => textContent)).toEqual(["Location: Atlanta, GA - Hybrid; Denver, CO", "Pay not listed", "Found yesterday"]);
+    expect(facts.map(({ className }) => className.includes("col-span-2"))).toEqual([true, false, false]);
+    expect(host.querySelector("[data-slot='job-card']")?.textContent).not.toContain("Linked job");
+  });
+});
+
+describe("the note a run leaves", () => {
+  const note = () => host.querySelector("[data-slot='autofill-result']");
+  const closeButton = () => note()!.querySelector("button")!;
+  const wait = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
+
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const title = () => host.querySelector("[data-slot='autofill-result-title']")?.textContent;
+  const detail = () => host.querySelector("[data-slot='autofill-result-detail']")?.textContent;
+
+  it("sums the run up in two short lines: what it filled, what's left, and that the form is the BDE's to submit", () => {
+    show({ fillCount: 0, rows: [row("Phone", true)], outcome: { filled: 15, handedBack: 1, stopped: false } });
+    expect([title(), detail()]).toEqual([
+      "Filled 15 fields",
+      "Still empty: 1 required. Autofill didn't recognize it or couldn't fill it. Fill in the required one below, then submit the form.",
+    ]);
+  });
+
+  it("tells how many required and optional fields are still empty, and why, in amber", () => {
+    const rows = [row("Email", true, "a@example.test"), row("Phone", true), row("Website", false), row("Twitter", false)];
+    show({ fillCount: 0, rows, outcome: { filled: 15, handedBack: 1, stopped: false } });
+    expect([title(), detail()]).toEqual([
+      "Filled 15 fields",
+      "Still empty: 1 required, 2 optional. Autofill didn't recognize these or couldn't fill them. Fill in the required one below, then submit the form.",
+    ]);
+    expect(note()?.className).toContain("--color-warning-bg");
+  });
+
+  it("stays green when only optional fields are left, and says so", () => {
+    const rows = [row("Email", true, "a@example.test"), row("Website", false), row("Twitter", false)];
+    show({ fillCount: 0, rows, outcome: { filled: 15, handedBack: 0, stopped: false } });
+    expect(detail()).toBe("Still empty: 2 optional. Autofill didn't recognize these or couldn't fill them. Fill in any you need below, then submit the form.");
+    expect(note()?.className).toContain("--color-success-bg");
+  });
+
+  it("goes after a few seconds, but not while the BDE is reading it", () => {
+    show({ fillCount: 0, outcome: { filled: 3, handedBack: 0, stopped: false } });
+    expect([title(), detail()]).toEqual(["Filled 3 fields", "Check the form, then submit it."]);
+    act(() => { closeButton().focus(); });
+    wait(20_000);
+    expect(note()).not.toBeNull();
+    act(() => { closeButton().blur(); });
+    wait(6_000);
+    wait(1_000);
+    expect(note()).toBeNull();
+  });
+
+  it("stays when the run stopped, until the BDE closes it", () => {
+    show({ fillCount: 2, outcome: { filled: 1, handedBack: 0, stopped: true } });
+    wait(60_000);
+    expect([title(), detail()]).toEqual(["BenchQ stopped: the form changed", "Check the form before going on."]);
+    act(() => { closeButton().click(); });
+    expect(note()).toBeNull();
+  });
+});
+
+describe("a run's first steps", () => {
+  it("say what's happening beside a spinner, and hold Autofill and the picker until it's done", () => {
+    show({ fillCount: 2, step: "Taking the old resume's file off…" });
+    const step = host.querySelector("[data-slot='autofill-step']")!;
+    expect([step.getAttribute("role"), step.textContent]).toEqual(["status", "Taking the old resume's file off…"]);
+    expect(host.querySelector<HTMLButtonElement>("[data-slot='autofill-run']")!).toMatchObject({ disabled: true, textContent: "Filling…" });
+  });
+});
+
+describe("the buttons at the bottom", () => {
+  it("make Mark applied plain to see while there are fields to fill: a done look of its own, and what it's for", () => {
+    show({ fillCount: 3 }, { onApply: vi.fn() });
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
+    expect(atBottom()[0]!.className).toContain("color-success-bg");
+    expect(atBottom()[0]!.className).not.toContain("bq-primary");
+    const hint = host.querySelector("[data-slot='mark-applied-hint']")!;
+    expect(hint.textContent).toBe("Submitted the form? Mark the job applied in BenchQ.");
+    expect(atBottom()[0]!.getAttribute("aria-describedby")).toBe(hint.id);
+  });
+
+  it("keep Mark applied available on a site BenchQ may not read, so a refused site can still be marked applied", () => {
+    show({ rows: null, reviewedFor: { applicationId: "another-app", candidateId: "cand-1", resumeId: null }, fillCount: 0, needsAccess: { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" }, isAccessDenied: true }, { onApply: vi.fn() });
+    expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
+    const mark = host.querySelector<HTMLButtonElement>("[data-slot='mark-applied']")!;
+    expect(mark.disabled).toBe(false);
+  });
+
+  it("keep Mark applied waiting for the review when there is no access question", () => {
+    show({ rows: null, reviewedFor: { applicationId: "another-app", candidateId: "cand-1", resumeId: null }, fillCount: 0 }, { onApply: vi.fn() });
+    expect(host.querySelector<HTMLButtonElement>("[data-slot='mark-applied']")!.disabled).toBe(true);
+  });
+
+  it("lead with Mark applied once nothing is left to fill", () => {
+    show({ fillCount: 0 }, { onApply: vi.fn() });
+    expect(atBottom()[0]!.className).toContain("bq-primary");
+  });
+
+  it("leave Mark applied out while a run fills the form, and keep Undo waiting", () => {
+    show({ fillCount: 3, filling: true, undoable: 2 }, { onApply: vi.fn() });
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Undo"]);
+    expect(atBottom().map(({ disabled }) => disabled)).toEqual([true]);
+  });
+
+  it("keep Undo beside it", () => {
+    show({ fillCount: 0, undoable: 2 }, { onApply: vi.fn() });
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied", "Undo"]);
+  });
+
+  it("say Applied once it's done", () => {
+    show({ fillCount: 0 }, { isApplied: true });
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Applied"]);
+    expect(atBottom()[0]!.disabled).toBe(true);
+  });
+
+  it("say so while saving", () => {
+    show({ fillCount: 0 }, { onApply: vi.fn(), applying: true });
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Saving…"]);
+    expect(atBottom()[0]!.disabled).toBe(true);
+  });
+
+  it("leave nothing behind when there's nothing to offer", () => {
+    show({ fillCount: 0 });
+    expect(host.querySelector("[data-slot='autofill-actions']")?.childElementCount).toBe(0);
+  });
+});
+
+describe("confirming Mark applied", () => {
+  const onApply = vi.fn();
+  const dialog = () => host.querySelector<HTMLDialogElement>("dialog[data-slot='autofill-confirm']")!;
+  const confirmText = () => dialog().textContent;
+  const inDialog = () => [...dialog().querySelectorAll<HTMLButtonElement>("button")];
+  // The dialog's own Mark applied, beside the one that opened it.
+  const confirmButton = () => host.querySelector<HTMLButtonElement>("[data-slot='mark-applied-confirm']")!;
+  const confirm = () => act(async () => { confirmButton().click(); });
+  const note = () => host.querySelector("[data-slot='autofill-confirm-note']");
+
+  it("asks first, in a modal dialog that names the job, and marks nothing yet", async () => {
+    show({ fillCount: 0 }, { onApply });
+    expect(dialog().hasAttribute("open")).toBe(false);
+    await click("Mark applied");
+    expect(dialog().hasAttribute("open")).toBe(true);
+    expect(dialog().getAttribute("aria-labelledby")).toBe("autofill-confirm-title");
+    expect(host.querySelector("#autofill-confirm-title")?.textContent).toBe("Mark this job as applied?");
+    expect(host.querySelector("#autofill-confirm-job")?.textContent).toBe("Java Developer at Acme · for Priya");
+    expect(inDialog().map(({ textContent }) => textContent)).toEqual(["Mark applied", "Cancel"]);
+    expect(inDialog()[0]!.className).toContain("bq-primary");
+    expect(document.activeElement).toBe(confirmButton());
+    expect(onApply).not.toHaveBeenCalled();
+    expect(finalForm).not.toHaveBeenCalled();
+  });
+
+  it("sends the form as it stands on Yes", async () => {
+    show({ fillCount: 0 }, { onApply });
+    await click("Mark applied");
+    await confirm();
+    expect(finalForm).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith(form, "res-2");
+  });
+
+  it("shows it's saving while it reads the form", async () => {
+    let finish: (found: AppliedForm) => void = () => undefined;
+    finalForm.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    show({ fillCount: 0 }, { onApply });
+    await click("Mark applied");
+    await confirm();
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Saving…"]);
+    expect(onApply).not.toHaveBeenCalled();
+    await act(async () => { finish(form); });
+    expect(onApply).toHaveBeenCalledWith(form, "res-2");
+  });
+
+  it("goes back on Cancel, to the button it came from", async () => {
+    show({ fillCount: 0 }, { onApply });
+    await click("Mark applied");
+    await click("Cancel");
+    expect(onApply).not.toHaveBeenCalled();
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
+    expect(document.activeElement).toBe(named("Mark applied"));
+  });
+
+  it("goes back on Esc, to the button it came from", async () => {
+    show({ fillCount: 0 }, { onApply });
+    await click("Mark applied");
+    await act(async () => { confirmButton().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(dialog().hasAttribute("open")).toBe(false);
+    expect(confirmText()).toBe("");
+    expect(document.activeElement).toBe(named("Mark applied"));
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it("warns about required fields still empty, each a way back to it, and still lets the BDE confirm", async () => {
+    show({ fillCount: 0, rows: [row("Email", true), row("Phone", true), row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
+    await click("Mark applied");
+    expect(note()?.querySelector("p")?.textContent).toBe("2 required fields are still empty:");
+    expect([...note()!.querySelectorAll("li button")].map(({ textContent }) => textContent)).toEqual(["Email", "Phone"]);
+    await confirm();
+    expect(onApply).toHaveBeenCalledWith(form, "res-2");
+  });
+
+  it("lists the first three empty fields, one line each, and all of them on request", async () => {
+    const empty = ["Email", "Phone", "Zip code", "Which of the following metropolitan areas do you reside in?", "Veteran status"];
+    show({ fillCount: 0, rows: empty.map((label) => row(label, true)) }, { onApply });
+    await click("Mark applied");
+    const fields = () => [...note()!.querySelectorAll<HTMLButtonElement>("li button")];
+    expect(fields().map(({ textContent }) => textContent)).toEqual(["Email", "Phone", "Zip code"]);
+    expect(fields()[0]!.className).toContain("truncate");
+    expect(fields()[0]!.getAttribute("title")).toBe("Email");
+    const more = note()!.querySelector<HTMLButtonElement>("[data-slot='autofill-confirm-more']")!;
+    expect(more.textContent).toBe("Show all 5");
+    await act(async () => { more.click(); });
+    expect(fields()).toHaveLength(5);
+    expect(more.textContent).toBe("Show fewer");
+  });
+
+  it("says it right for one", async () => {
+    show({ fillCount: 0, rows: [row("Email", true)] }, { onApply });
+    await click("Mark applied");
+    expect(note()?.querySelector("p")?.textContent).toBe("1 required field is still empty:");
+  });
+
+  it("has nothing to warn about when the required fields are filled, or no form could be read", async () => {
+    show({ fillCount: 0, rows: [row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
+    await click("Mark applied");
+    expect(confirmText()).toBe("Mark this job as applied?Java Developer at Acme · for PriyaMark appliedCancel");
+    act(() => { root?.unmount(); });
+    host.remove();
+    show({ fillCount: 0, rows: null }, { onApply });
+    await click("Mark applied");
+    expect(note()).toBeNull();
+  });
+
+  describe("around a run", () => {
+    const rerender = (state: State) => act(() => {
+      vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id } } as unknown as ReturnType<typeof useAutofill>);
+      root!.render(<AutofillPanel connection={connection} candidateName="Priya" applying={false} isApplied={false} onApply={onApply} onDisconnect={vi.fn()} onSessionExpired={vi.fn()} onAccessLost={vi.fn()} />);
+    });
+    const scrolled = vi.fn();
+
+    // jsdom has no scrolling into view.
+    beforeEach(() => { Element.prototype.scrollIntoView = scrolled; });
+    afterEach(() => { delete (Element.prototype as Partial<Element>).scrollIntoView; });
+
+    it("scrolls smoothly to Autofill complete once a run ends, with Mark applied back", () => {
+      const rows = [row("Email", true, "a@example.test"), row("Phone", true)];
+      show({ fillCount: 1, rows }, { onApply });
+      expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
+      rerender({ fillCount: 1, filling: true, rows });
+      expect(atBottom()).toEqual([]);
+      expect(scrolled).not.toHaveBeenCalled();
+      rerender({ fillCount: 0, rows, outcome: { filled: 1, handedBack: 0, stopped: false } });
+      expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
+      const done = host.querySelector("[data-slot='autofill-done']");
+      expect(scrolled).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+      expect(scrolled.mock.contexts[0]).toBe(done);
+      // Its scroll margin stops it under the sticky top bar, clear of the Mark applied bar at the bottom.
+      expect(done?.className).toContain("scroll-mt-[calc(var(--topbar-height)");
+    });
+
+    it("scrolls to the run's note when fields are left to fill, and Autofill complete isn't on show", () => {
+      const rows = [row("Phone", true)];
+      show({ fillCount: 1, rows }, { onApply });
+      rerender({ fillCount: 1, filling: true, rows });
+      rerender({ fillCount: 1, rows, outcome: { filled: 1, handedBack: 1, stopped: false } });
+      expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
+      expect(scrolled.mock.contexts[0]).toBe(host.querySelector("[data-slot='autofill-result']"));
+    });
+  });
+});

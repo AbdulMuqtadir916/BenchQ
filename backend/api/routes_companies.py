@@ -13,6 +13,7 @@ from backend.models.db import get_db, Company, Job, Application, Setting, Scrape
 from backend.api.routes_auth import current_principal
 from backend.auth.scoping import firm_job_ids, scoped_jobs, viewed_firm_id
 from backend.auth.sessions import Principal
+from backend.job_search.retired import retired
 
 logger = logging.getLogger("jobnavigator.companies")
 
@@ -401,6 +402,7 @@ async def backfill_h1b_jobs(db: Session = Depends(get_db)):
 @router.post("/{company_id}/test-scrape")
 async def test_scrape_company(company_id: str, db: Session = Depends(get_db)):
     """Run Playwright scrape for a company and return results WITHOUT saving to DB."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")

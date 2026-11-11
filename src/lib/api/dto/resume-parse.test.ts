@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import parses from "@/mocks/data/resume-parses.json";
+import parses from "@/test/fixtures/resume-parses.json";
 import { matchWorkAuth, splitSkills, toLinkedinUrl, toResumeDraft, yearsFromWork } from "./resume-parse";
 
 /** docs/candidate-onboarding/04-wizard-steps.md §5, docs/02 §8.1: the base-résumé parser's format → the new-candidate
@@ -117,6 +117,13 @@ describe("the mapping rules", () => {
     expect(yearsFromWork([job("2019", "2020")], NOW)).toBe(1);
     expect(yearsFromWork([job("", "2020-05"), job("2023-01", "2022-01")], NOW)).toBeNull();
     expect(yearsFromWork([], NOW)).toBeNull();
+  });
+
+  it("counts only real months: 00 and 13 aren't one, so that job is skipped", () => {
+    const job = (start: string, end: string) => ({ job_title: "", company: "", location: "", dates: "", start, end, current: false, bullets: [] });
+    expect(yearsFromWork([job("2020-00", "2021-12")], NOW)).toBeNull();
+    expect(yearsFromWork([job("2020-01", "2021-13")], NOW)).toBeNull();
+    expect(yearsFromWork([job("2020-01", "2021-13"), job("2020-01", "2021-12")], NOW)).toBe(2);
   });
 
   it("splits skills: trimmed, no empties, no case-insensitive duplicates", () => {

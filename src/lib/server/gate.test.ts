@@ -15,7 +15,7 @@ import { firmGate, platformGate } from "./gate";
 const ONE = firms.find((firm) => firm.status === "ACTIVE")!;
 const OTHER = firms.find((firm) => firm.status === "ACTIVE" && firm.id !== ONE.id)!;
 const dashboard = (slug: string) => hrefFor("dashboard", { firm: slug });
-const analytics = (slug: string) => hrefFor("analytics", { firm: slug });
+const managers = (slug: string) => hrefFor("managers", { firm: slug });
 
 async function lookup(slug: string): Promise<FirmLookup> {
   try {
@@ -66,7 +66,7 @@ describe("firmGate", () => {
   it("a registered firm path is judged by its route, query string and all", async () => {
     const owner = await sessionFor("user_imran");
     const lookedUp = await lookup(ONE.slug);
-    expect(firmGate(owner, lookedUp, `${analytics(ONE.slug)}?range=7d`)).toEqual({ kind: "ok" });
+    expect(firmGate(owner, lookedUp, `${managers(ONE.slug)}?view=cards`)).toEqual({ kind: "ok" });
   });
 
   it("a path the registry doesn't know is not-found", async () => {

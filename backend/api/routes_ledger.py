@@ -15,6 +15,7 @@ never repeats or skips one.
 from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import DateTime, String, and_, cast, func, literal, or_
@@ -81,7 +82,7 @@ def _start_of(day: date, zone: str):
 
 
 def _limit_to_reader(entries, db: DbSession, principal: Principal, firm_id: uuid.UUID, *, picked: bool):
-    """What the role may read (07 Q52, Q56). `picked`: a candidate is chosen, so the rows on it from while it was
+    """What the role may read (07 Q52, Q59). `picked`: a candidate is chosen, so the rows on it from while it was
     theirs count too."""
     bde, manager = own_scope(principal), team_scope(principal)
     if bde is not None:
@@ -123,15 +124,23 @@ def _after_cursor(entries, cursor: str):
 @router.get("/ledger", summary="The firm's activity log, newest first, limited by role")
 def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
                 cursor: str | None = Query(None, max_length=128), filters: Filters = Depends(),
+                cursor_at: datetime | None = None, cursor_id: uuid.UUID | None = None,
                 principal: Principal = Depends(current_principal), my_firm: uuid.UUID = Depends(reader_firm_id),
                 db: DbSession = Depends(get_db)):
     if firm_id != my_firm:
         raise HTTPException(status_code=404, detail="Not found.")
+    if (cursor_at is None) != (cursor_id is None) or (cursor_at is not None and cursor_at.utcoffset() is None):
+        raise HTTPException(status_code=422, detail="Supply both cursor fields, with a timezone.")
     support.settle_expired(db)      # a support view that ran out shows its end here, dated at its expiry
     db.commit()
     entries = _visible(db, principal, my_firm, filters)
     if cursor is not None:
         entries = _after_cursor(entries, cursor)
+    if cursor_at is not None:
+        # The same marker as two fields (the whole-ledger paging on main, BUG-022): the rows after that one, in
+        # this order. Both or neither, with a timezone (checked above).
+        entries = entries.filter(or_(ActivityEntry.created_at < cursor_at,
+                                     and_(ActivityEntry.created_at == cursor_at, ActivityEntry.id < cursor_id)))
     entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id.desc()).offset(offset).limit(limit)
     return [ledger_entry_json(e, hide_email=principal.support_view_id is not None) for e in entries]
 

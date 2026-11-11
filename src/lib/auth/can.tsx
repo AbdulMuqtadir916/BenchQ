@@ -7,7 +7,7 @@ import { can, type Action } from "./policy";
 
 /**
  * Render `children` only if the signed-in principal may take the action (or open the route):
- * `<Can action="firm.suspend">…</Can>`, `<Can route={routeById("analytics")}>…</Can>`. A control the
+ * `<Can action="firm.suspend">…</Can>`, `<Can route={routeById("managers")}>…</Can>`. A control the
  * principal can't use is not rendered at all (docs/04 §0), so `fallback` is for the two §0 exceptions and
  * for read-only alternatives, never for a disabled copy of the control.
  */

@@ -80,12 +80,15 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates": F,                    # in the principal's scope (07 Q47)
     "POST /api/firms/{firm_id}/candidates": F,                   # OWNER, MANAGER: candidate.create + can_assign_to
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": F,
-    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": F,   # candidate.edit, in scope
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": F,   # candidate.editProfile (07 Q56), in scope
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": F,   # candidate.assign + can_assign_to (Q43)
     # A candidate's résumé versions and bases (résumé versioning PR 5): reads in the candidate's scope; writes by
     # can_change_resume / can_manage_resume (07 Q55)
+    "GET /api/firms/{firm_id}/resumes": F,
+    "GET /api/firms/{firm_id}/resumes/{resume_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload": F,
@@ -94,6 +97,15 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/removal": F,
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/show": F,
+    # Job search (job search PR 1): a search, the candidate's BDE (job.search + can_search_jobs); reads, in scope.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": F,   # a capture (job search PR 2), the BDE's
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": F,
+    # The job screens' firm-level reads (job search PR 3): only the candidates the principal sees.
+    "GET /api/firms/{firm_id}/job-postings": F,
+    "GET /api/firms/{firm_id}/job-postings/{posting_id}": F,
     "GET /api/firms/{firm_id}/ledger": F,          # limited by role in routes_ledger
     "GET /api/firms/{firm_id}/ledger/people": F,
     "GET /api/firms/{firm_id}/ledger/candidates": F,
@@ -173,6 +185,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/admin/invites/{invite_id}/resend": A,
     "POST /api/admin/invites/{invite_id}/revoke": A,
     "GET /api/admin/users": A,
+    "GET /api/admin/candidate-usage": A,                 # counts only (job search PR 3)
     "GET /api/admin/team": A,
     "GET /api/admin/audit": A,
     "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)

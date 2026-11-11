@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allCandidates } from "@/mocks/candidates";
+import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import { allUsers, firms } from "@/mocks/team";
 import { FIXTURE_NOW, invitesAt } from "@/mocks/tenancy";
 import type { LedgerEntry } from "@/lib/schemas/analytics";

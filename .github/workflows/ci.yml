@@ -32,6 +32,23 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  # The Chrome extension has its own package and tests (vitest, jsdom); its build runs tsc -b first.
+  extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci --prefix extension
+      - run: npm --prefix extension run test
+      - run: npm --prefix extension run build
+      # The store's own build: https only, no local address, no all-sites access. Fails here instead of in review.
+      - run: npm --prefix extension run build:store
+
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 30

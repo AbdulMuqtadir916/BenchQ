@@ -14,7 +14,6 @@ function firmKeys(firmId: string): readonly (readonly unknown[])[] {
     k.candidates.all(firmId), k.candidates.list(firmId), k.candidates.detail(firmId, "x"),
     k.jobs.all(firmId), k.jobs.list(firmId, { limit: 50 }), k.jobs.detail(firmId, "x"),
     k.applications.all(firmId), k.applications.list(firmId, { candidateId: "c" }), k.applications.detail(firmId, "x"),
-    k.followups.list(firmId, { userId: "u" }),
     k.resumes.list(firmId), k.resumes.detail(firmId, "x"), k.resumes.byCandidate(firmId, "c"),
     k.records.byCandidate(firmId, "c"), k.documents.byCandidate(firmId, "c"), k.inbox.byCandidate(firmId, "c"),
     k.ledger.list(firmId, { limit: 100 }), k.team.list(firmId), k.notifications.mine(firmId),

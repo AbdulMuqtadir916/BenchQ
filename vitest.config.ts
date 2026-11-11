@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     environment: "node",
     // Claude Code worktrees (`.claude/worktrees/*`) hold whole copies of the repo: their tests are not this checkout's.
-    exclude: [...configDefaults.exclude, ".claude/**"],
+    // The extension runs its own tests with its own tools: `pnpm ext:test`.
+    exclude: [...configDefaults.exclude, ".claude/**", "extension/**"],
   },
 });

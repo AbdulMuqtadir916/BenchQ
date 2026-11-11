@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ResumeClaimSchema } from "./resume";
+import { ResumeLineSchema } from "./resume";
 
 export const TailorResumeInputSchema = z.object({
   resumeVersionId: z.string().min(1),
@@ -14,7 +14,7 @@ export const AgentDraftSchema = z.object({
   resumeVersionId: z.string(),
   jobId: z.string(),
   stages: z.array(z.string()),
-  claims: z.array(ResumeClaimSchema),
+  lines: z.array(ResumeLineSchema),
   generatedAt: z.string().datetime(),
 });
 export type AgentDraft = z.infer<typeof AgentDraftSchema>;

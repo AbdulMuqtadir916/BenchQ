@@ -24,6 +24,7 @@ from sqlalchemy.orm import load_only
 from backend.auth import ledger
 from backend.auth.policy import is_lead_role
 from backend.auth.scoping import scoped
+from backend.candidates import autofill, profile
 from backend.candidates.first_base import first_base
 from backend.models.candidates import BaseResume, ResumeParse
 from backend.models.db import Application, Resume, utcnow
@@ -147,52 +148,91 @@ def _group(db, row: Resume):
 
 
 def version_json(row: Resume, *, with_content: bool = False) -> dict:
-    out = {"id": str(row.id), "base_resume_id": str(row.base_resume_id), "category": row.category,
+    out = {"id": str(row.id), "candidate_id": str(row.candidate_id), "base_resume_id": str(row.base_resume_id),
+           "category": row.category,
            "job_id": str(row.job_id) if row.job_id else None, "version": row.version, "name": row.name,
+           # The headline, so a list can name a base by its role (`<Candidate> · <Role> · Base 2`, docs/04 §4.3).
+           "title": row.title,
            "template": row.template, "page_format": row.page_format,
            "created_by_user_id": str(row.created_by_user_id) if row.created_by_user_id else None,
            "created_at": row.created_at.isoformat() if row.created_at else None}
     return {**out, **content_of(row)} if with_content else out
 
 
+def opened_json(row: Resume, candidate, *, with_autofill: bool = False) -> dict:
+    """One version as it is opened: its content and, with `with_autofill` (`?autofill=true`), its autofill, built
+    for this read (`autofill.merged`: nothing is written). Only these answers carry it, never the list or a save."""
+    out = version_json(row, with_content=True)
+    return {**out, "autofill": autofill.merged(candidate, row)} if with_autofill else out
+
+
 def base_json(base: BaseResume, number: int) -> dict:
-    return {"id": str(base.id), "number": number, "source": base.source, "is_active": base.is_active,
+    return {"id": str(base.id), "candidate_id": str(base.candidate_id), "number": number, "source": base.source,
+            "is_active": base.is_active,
             "resume_parse_id": str(base.resume_parse_id) if base.resume_parse_id else None,
             "promoted_from_resume_id": str(base.promoted_from_resume_id) if base.promoted_from_resume_id else None,
             "archived_at": base.archived_at.isoformat() if base.archived_at else None,
             "created_by_user_id": str(base.created_by_user_id), "created_at": base.created_at.isoformat()}
 
 
+_LISTED = (Resume.id, Resume.candidate_id, Resume.base_resume_id, Resume.category, Resume.job_id, Resume.version,
+           Resume.name, Resume.title, Resume.template, Resume.page_format, Resume.created_by_user_id, Resume.created_at)
+
+
 def listing(db, candidate) -> dict:
     """Every base with its versions, and the tailored résumés, for the base dropdown and the history. A version some
     base was promoted from carries that base's id (`promoted_to_base_id`): the dropdown leaves it out (§3.2), and so
     does it leave out a hidden base (`archived_at`); the history shows both."""
-    numbers = base_numbers(db, candidate)
-    bases = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.candidate_id == candidate.id,
-                                                             BaseResume.deleted_at.is_(None)).all()
-    promoted_to = {b.promoted_from_resume_id: b.id for b in bases if b.promoted_from_resume_id}
+    return listing_many(db, candidate.firm_id, [candidate.id])[candidate.id]
+
+
+def listing_many(db, firm_id, candidate_ids) -> dict:
+    """`listing()` for many candidates of one firm in two queries: {candidate_id: {"bases", "tailored"}}. Each base
+    and tailored résumé names its candidate. `candidate_ids` may be a list or a subquery of ids."""
+    bases = scoped(db, BaseResume, firm_id).filter(BaseResume.candidate_id.in_(candidate_ids),
+                                                    BaseResume.deleted_at.is_(None)) \
+        .order_by(BaseResume.created_at, BaseResume.id).all()
     # The list shows each version's details, never its content: only those columns are read.
-    rows = scoped(db, Resume, candidate.firm_id).filter(Resume.candidate_id == candidate.id,
-                                                        Resume.base_resume_id.isnot(None), Resume.deleted_at.is_(None)) \
-        .options(load_only(Resume.id, Resume.base_resume_id, Resume.category, Resume.job_id, Resume.version,
-                           Resume.name, Resume.template, Resume.page_format, Resume.created_by_user_id,
-                           Resume.created_at)) \
-        .order_by(Resume.version).all()
+    rows = scoped(db, Resume, firm_id).filter(Resume.candidate_id.in_(candidate_ids), Resume.base_resume_id.isnot(None),
+                                              Resume.deleted_at.is_(None)) \
+        .options(load_only(*_LISTED)).order_by(Resume.version).all()
+    promoted_to = {b.promoted_from_resume_id: b.id for b in bases if b.promoted_from_resume_id}
+    numbers, counted = {}, {}
+    for base in bases:  # "Base 1, 2…" in the order they were made, per candidate (as base_numbers)
+        counted[base.candidate_id] = counted.get(base.candidate_id, 0) + 1
+        numbers[base.id] = counted[base.candidate_id]
+
+    # Who made what: the BDE can't delete what an owner or manager made (version_removal, base_removal), so the list
+    # says so and the tree offers no delete there.
+    makers = {b.created_by_user_id for b in bases} | {r.created_by_user_id for r in rows}
+    leads = {uid for uid, role in db.query(User.id, User.role).filter(User.id.in_([m for m in makers if m])).all()
+             if is_lead_role(role)}
 
     def entry(row: Resume) -> dict:
         target = promoted_to.get(row.id)
-        return {**version_json(row), "promoted_to_base_id": str(target) if target else None}
+        return {**version_json(row), "promoted_to_base_id": str(target) if target else None,
+                "made_by_lead": row.created_by_user_id in leads}
 
-    out_bases = []
-    for base in sorted(bases, key=lambda b: numbers[b.id]):
-        versions = [entry(r) for r in rows if r.base_resume_id == base.id and r.category == "BASE"]
-        out_bases.append({**base_json(base, numbers[base.id]), "versions": versions})
+    out = {cid: {"bases": [], "tailored": []} for cid in ({b.candidate_id for b in bases} | {r.candidate_id for r in rows})}
+    if isinstance(candidate_ids, (list, tuple, set)):
+        for cid in candidate_ids:
+            out.setdefault(cid, {"bases": [], "tailored": []})
+    by_base: dict = {}
     tailored: dict[tuple, list] = {}
     for row in rows:
-        if row.category == "TAILORED":
-            tailored.setdefault((row.base_resume_id, row.job_id), []).append(entry(row))
-    return {"bases": out_bases,
-            "tailored": [{"base_resume_id": str(b), "job_id": str(j), "versions": v} for (b, j), v in tailored.items()]}
+        if row.category == "BASE":
+            by_base.setdefault(row.base_resume_id, []).append(entry(row))
+        else:
+            tailored.setdefault((row.candidate_id, row.base_resume_id, row.job_id), []).append(entry(row))
+    for base in bases:
+        versions = by_base.get(base.id, [])
+        out[base.candidate_id]["bases"].append({**base_json(base, numbers[base.id]),
+                                                "made_by_lead": base.created_by_user_id in leads
+                                                or any(v["made_by_lead"] for v in versions),
+                                                "versions": versions})
+    for (cid, b, j), v in tailored.items():
+        out[cid]["tailored"].append({"candidate_id": str(cid), "base_resume_id": str(b), "job_id": str(j), "versions": v})
+    return out
 
 
 # ── Writing ──────────────────────────────────────────────────────────────────
@@ -214,6 +254,10 @@ def _activate(db, candidate, base: BaseResume) -> None:
         .update({BaseResume.is_active: False}, synchronize_session="fetch")
     db.flush()
     base.is_active = True
+    db.flush()
+    # The candidate's name and contact are the active base's (07 Q57): forget the ones read from the old base, so the
+    # ledger entry written next and the response carry the new ones (Abdul's PR 7 review, #3).
+    profile.refresh(candidate)
 
 
 @dataclass
@@ -229,11 +273,15 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
     if content == before:
         raise _bad("No changes to save.")
     latest = _group(db, source).with_entities(func.max(Resume.version)).scalar() or source.version
+    # The autofill entries the user typed go to the next version with the résumé (the built answers aren't stored). An
+    # edit applies there only while its built answer is the one it replaced, so the new text still shows.
     row = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=source.base_resume_id,
                  category=source.category, job_id=source.job_id, version=latest + 1, name=source.name,
-                 template=source.template, page_format=source.page_format, created_by_user_id=actor.id, **content)
+                 template=source.template, page_format=source.page_format, created_by_user_id=actor.id,
+                 autofill=copy.deepcopy(autofill.entries_of(source)), **content)
     db.add(row)
     db.flush()
+    profile.refresh(candidate)              # a new newest version may change the name (07 Q57; review #3)
     number = base_numbers(db, candidate)[source.base_resume_id]
     kind = "" if source.category == "BASE" else " (tailored)"
     _record(db, actor, candidate, "UPDATE", row.id, _label(candidate, number, row),
@@ -252,7 +300,9 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     else:                                                       # (deleted ones included: they come back, see below)
         target = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.promoted_from_resume_id == row.id).first()
     if target is not None and target.deleted_at is not None:
-        return restore_base(db, actor, candidate, target)       # promoted before, deleted since: it comes back
+        # Promoted before, deleted since: it comes back, named by the version it was made from.
+        how = f"by using Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version} again"
+        return restore_base(db, actor, candidate, target, how=how)
     if target is not None:
         if target.archived_at is not None:
             raise HTTPException(status_code=409, detail=f"Base {numbers[target.id]} is hidden. Show it again first.")
@@ -267,9 +317,10 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     db.add(base)
     db.flush()
     _activate(db, candidate, base)
-    db.add(Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
-                  job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                  created_by_user_id=actor.id, **content_of(row)))
+    copied = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
+                    job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
+                    created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)), **content_of(row))
+    db.add(copied)
     db.flush()
     number = len(numbers) + 1
     source = f"Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version}"
@@ -284,15 +335,29 @@ def kept_file(db, candidate, sha256: str) -> ResumeParse | None:
                                                              ResumeParse.content_sha256 == sha256).first()
 
 
+def uploaded_file(db, candidate, row: Resume) -> ResumeParse | None:
+    """The kept upload `row` is: an uploaded base's version 1 is its file as read (§4.6), so the file can stand for it
+    on a form. A later version, a tailored one or a promoted base's has no file of its own (07 Q49)."""
+    if row.category != "BASE" or row.version != 1 or row.job_id is not None:
+        return None
+    base = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.id == row.base_resume_id,
+                                                            BaseResume.deleted_at.is_(None)).first()
+    if base is None or base.source != "UPLOAD" or base.resume_parse_id is None:
+        return None
+    return scoped(db, ResumeParse, candidate.firm_id).filter(ResumeParse.id == base.resume_parse_id,
+                                                             ResumeParse.candidate_id == candidate.id).first()
+
+
 def deleted_base_for(db, candidate, parse_row: ResumeParse) -> BaseResume | None:
     """The deleted base this kept upload made, if any: uploading the same file again brings it back (§4.7)."""
     return scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.resume_parse_id == parse_row.id,
                                                             BaseResume.deleted_at.isnot(None)).first()
 
 
-def restore_base(db, actor: User, candidate, base: BaseResume) -> BaseResume:
+def restore_base(db, actor: User, candidate, base: BaseResume, how: str = "from the same file") -> BaseResume:
     """A deleted base back, from what was stored: no new read of the file, no AI. Only its v1 (the file's own content)
-    comes back; later edits stay deleted. It becomes the base the workflow uses, as any upload does (§4.7)."""
+    comes back; later edits stay deleted. It becomes the base the workflow uses, as any upload does (§4.7). `how` says
+    what brought it back for the ledger: the same file uploaded again, or the version it was promoted from used again."""
     base.deleted_at = None
     base.archived_at = None
     db.flush()
@@ -303,7 +368,7 @@ def restore_base(db, actor: User, candidate, base: BaseResume) -> BaseResume:
     db.flush()
     number = base_numbers(db, candidate)[base.id]
     _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number),
-            f"Restored Base {number} (its v1) from the same file; the workflow uses it")
+            f"Restored Base {number} (its v1) {how}; the workflow uses it")
     return base
 
 

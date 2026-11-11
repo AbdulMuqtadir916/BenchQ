@@ -101,69 +101,29 @@ defaults as fallback. Collapses to two panes under 1280px.
 
 ---
 
-## 3. The claim-state family
+## 3. Résumé tree
 
-This is the product's core concept. These five components carry it and they must be exactly right.
-
-### `ClaimChip`
+### `ResumeTree`
 ```ts
 {
-  state: ClaimState;              // VERIFIED | UNVERIFIED | CONTRADICTED
-  label?: string;
-  size?: 'sm' | 'md';
-  showIcon?: boolean;             // default true
-  onClick?: () => void;
+  tree: TreeCandidate[];          // buildResumeTree(shelf) in src/lib/derive/resume-tree.ts
+  labels: { jobLabel(jobId): string; userName(userId): string | null };   // useTreeLabels()
+  candidateHeading?: (candidateId) => { name; role } | null;              // Resume Builder only
+  showTailored?: boolean;         // default true
+  canSeeHidden?: (candidateId) => boolean;   // canManageResume: the assigned BDE
+  openActive?: boolean;           // a candidate's tab opens the active base
+  actions?: TreeActions;          // useResumeActions(): pick, use as base, delete, show again, each by who may (Q55)
 }
 ```
-Renders **label + icon + colour**. Never colour alone — colour-blind users and greyscale printing
-both break a colour-only signal.
+A collapsible tree used by Resume Builder and the candidate's Résumés tab (`src/components/app/resumes/`). A base
+(`BaseFolder`) is a folder: its versions (newest first) and the tailored copies made from it, one per job. Each version
+opens that exact version in the studio (Builder; *View* for Viewer). `J` / `K` move between rows. The active base starts open. A deleted item is never
+listed; a hidden base shows in a "Hidden" row for the assigned BDE only. There are no claim states (dropped
+2026-11-05), so no chips, counters or export gate.
 
-| State | Colour token | Icon | Treatment |
-|---|---|---|---|
-| `VERIFIED` | `--color-signal` | `CheckCircle2` | Solid |
-| `UNVERIFIED` | `--color-unverified` | `CircleHelp` | Dashed border |
-| `CONTRADICTED` | `--color-contradicted` | `Ban` | Line-through |
-
-### `ClaimText`
-```ts
-{
-  claim: Claim;
-  editable?: boolean;
-  onEdit?: (text: string) => void;
-  onStateChange?: (state: ClaimState) => void;
-}
-```
-Inline claim text with its state treatment. Click opens the evidence popover. Editable mode is a
-contenteditable-free controlled input — do not use `contentEditable`.
-
-### `EvidencePanel`
-```ts
-{
-  evidence: RecordEvidence | null;
-  onAttach?: () => void;
-  onDetach?: () => void;
-}
-```
-Source document, page, line, with a highlighted preview. Null renders the "no evidence attached"
-state with the attach action — which is also the state that keeps a claim from being verified.
-
-### `UnverifiedCounter`
-```ts
-{ count: number; onJumpToFirst?: () => void; variant?: 'inline' | 'banner' }
-```
-Zero renders nothing. Non-zero renders "N claims need review" with the jump action.
-
-### `ExportGate`
-```ts
-{
-  unverifiedCount: number;
-  contradictedCount: number;
-  onExport: () => void;
-  onJumpToFirst: () => void;
-}
-```
-Wraps the export button. Zero unverified claims → enabled. Otherwise disabled with the reason and the
-jump link. The **only** sanctioned disabled control in the product.
+### `UploadResume`
+`{ candidateId }` — the assigned BDE's later résumé (resume-versioning §4.6): a new base, the one in use; a same-file
+409 names the base, offers a hidden one back; a deleted one comes back (`restored`).
 
 ---
 
@@ -269,11 +229,6 @@ Never render a bare UTC string anywhere in this product.
 ```
 US Eastern and IST side by side, remaining shift time, amber inside the last 45 minutes.
 
-### `FollowUpRow`
-```ts
-{ followUp: FollowUp; onComplete: () => void; onSnooze: (d: SnoozeDuration) => void; onCancel: () => void }
-```
-
 ### `OutreachComposer`
 ```ts
 {
@@ -282,8 +237,7 @@ US Eastern and IST side by side, remaining shift time, amber inside the last 45 
   onSend: (draft: OutreachDraft) => void;
 }
 ```
-Template select, merge-field preview, and the unverified-claim check that blocks send when the body
-pulls an unreviewed claim from the record.
+Template select and merge-field preview.
 
 ### `QaBankPanel`
 ```ts
@@ -303,7 +257,7 @@ Drag-only reordering is an accessibility failure.
 ```ts
 { resume: ResumeVersion; template: TemplateId; page?: number; scale?: number }
 ```
-Paginated. Excludes `CONTRADICTED` claims entirely. Must not block the editor's main thread.
+Paginated. Must not block the editor's main thread.
 
 ---
 
@@ -385,13 +339,15 @@ themes.
 { stage: string; progress: number; onCancel?: () => void; elapsedMs: number }
 ```
 Staged progress for simulated AI work. Shows the cancel action after 8 seconds. Per
-`03-MOCK-DATA.md §5`, the output always arrives `UNVERIFIED` — the UI should set that expectation while
-it runs, not surprise the user with it at the end.
+`03-MOCK-DATA.md §5`, the output is a draft to read over — the UI should say so while it runs.
 
 ### `ConfirmDialog`
 ```ts
-{ title: string; description: string; confirmLabel: string; destructive?: boolean; onConfirm: () => void }
+{ open: boolean; title: string; children?: ReactNode; confirmLabel: string; cancelLabel?: string;
+  tone?: 'danger' | 'primary'; isBusy?: boolean; onConfirm: () => void; onCancel: () => void }
 ```
+`src/components/app/confirm-dialog.tsx` (built in résumé versioning PR 7): a native modal `<dialog>`; focus starts on
+the safe choice, Esc cancels. Used by the studio (discard, "Use this as the base?") and the résumé tree's deletes.
 
 ### `Toast`
 Success, error, info, and an undo variant with a 5s window for reversible actions (status change,

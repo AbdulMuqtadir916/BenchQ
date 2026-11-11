@@ -30,7 +30,7 @@ export function StepWorkRate({ wizard, errors }: { wizard: Wizard; errors: Error
 
   return (
     <div className="space-y-8">
-      <ReviewStrip count={workAuthDrafted ? 1 : 0} onReviewed={() => wizard.markReviewed(["workAuth"])} />
+      <ReviewStrip count={workAuthDrafted ? 1 : 0} />
 
       <fieldset className="space-y-3" aria-describedby={errors.workAuth ? "cw-workauth-error" : values.workAuthText ? "cw-workauth-printed" : undefined}>
         <legend className="flex w-full flex-wrap items-center justify-between gap-2">

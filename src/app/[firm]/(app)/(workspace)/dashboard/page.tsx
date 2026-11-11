@@ -7,8 +7,9 @@ import { ManagerDashboard } from "@/features/dashboard/manager-dashboard";
 import { OwnerDashboard } from "@/features/dashboard/owner-dashboard";
 
 /**
- * /dashboard — one route, four compositions by role (docs/04 §3). VIEWER sees the manager floor with
- * every action stripped from the DOM; a support view sees the owner's whole-firm view, read-only (07 §4).
+ * /dashboard — one route, four compositions by role (docs/04 §3). OWNER, MANAGER and VIEWER each get two tabs: their
+ * overview and Activity (a manager's Activity is their team; a viewer's is the firm, read-only). VIEWER sees the floor
+ * with every action stripped from the DOM; a support view sees the owner's whole-firm view, read-only (07 §4).
  */
 export default function DashboardPage() {
   const composition = dashboardFor(useSignedInPrincipal());

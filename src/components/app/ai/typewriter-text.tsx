@@ -75,7 +75,7 @@ function AnimatedTypewriter({
       {visibleCount < text.length ? (
         <span
           aria-hidden="true"
-          className="ml-0.5 inline-block h-[1em] w-0.5 animate-pulse bg-[var(--color-unverified-fg)] align-text-bottom"
+          className="ml-0.5 inline-block h-[1em] w-0.5 animate-pulse bg-[var(--color-neutral-fg)] align-text-bottom"
         />
       ) : null}
     </span>

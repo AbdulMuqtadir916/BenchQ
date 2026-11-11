@@ -8,7 +8,7 @@ import "./globals.css";
 // No `title` here: <RouteTitle> sets it per route from the registry.
 export const metadata: Metadata = {
   description:
-    "AI placement platform for US-focused IT staffing firms. Every claim traceable to verified evidence.",
+    "AI placement platform for US-focused IT staffing firms.",
 };
 
 export default function RootLayout({

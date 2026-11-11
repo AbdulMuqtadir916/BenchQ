@@ -16,7 +16,7 @@ def firm_json(firm: Firm) -> dict:
     return {
         "id": str(firm.id), "name": firm.name, "slug": firm.slug, "logo_url": firm.logo_url,
         "primary_timezone": firm.primary_timezone, "client_timezone": firm.client_timezone,
-        "truth_guard_mode": firm.truth_guard_mode, "application_expiry_days": firm.application_expiry_days,
+        "application_expiry_days": firm.application_expiry_days,
         "status": firm.status, "plan_id": str(firm.plan_id), "seat_limit": firm.seat_limit,
         "candidate_limit": firm.candidate_limit, "contact_phone": firm.contact_phone,
         "bde_capacity": firm.bde_capacity, "created_at": _iso(firm.created_at),
@@ -54,17 +54,35 @@ def _cursor(entry: ActivityEntry) -> str:
     return f"{(entry.created_at - EPOCH) // timedelta(microseconds=1)}_{entry.id}"
 
 
+# What a platform admin reading the ledger (the audit, or a support view) sees instead of a firm's own content:
+# entity_type → (label, or None to keep it; summary). The entry still says what happened, to whom, by whom and when.
+# A job search's role and country, and a job's title and company, are the firm's business (job search PR 1,
+# Abdul's review, P2).
+_RESTRICTED = {
+    "email": (None, "Candidate inbox activity (content restricted)."),
+    "job_search": ("Job search", "Searched jobs (content restricted)."),
+    "job_posting": ("Captured job", "Captured a job (content restricted)."),        # job search PR 2
+}
+
+
 def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False) -> dict:
-    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case, with what the log adds to it."""
-    hidden = hide_email and entry.entity_type == "email"
+    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case, with what the log adds to it.
+    `hide_email`: the reader is a platform admin, so a restricted entry's content is replaced (`_RESTRICTED`) and its
+    before/after values are left out."""
+    restricted = _RESTRICTED.get(entry.entity_type) if hide_email else None
+    hidden = restricted is not None
+    # A hand-off's note is what the firm wrote about its candidate: not for a platform admin (CodeAnt on #135, done at
+    # Abdul's request). The entry itself (who was moved where) stays.
+    note = None if restricted or (hide_email and entry.action == "ASSIGN") else entry.note
     return {
         "id": str(entry.id), "firm_id": str(entry.firm_id) if entry.firm_id else None,
         "candidate_id": str(entry.candidate_id) if entry.candidate_id else None,
         "actor_user_id": str(entry.actor_user_id) if entry.actor_user_id else None, "actor_type": entry.actor_type,
         "actor_name": entry.actor_name, "entity_type": entry.entity_type, "entity_id": entry.entity_id,
-        "entity_label": entry.entity_label, "action": entry.action,
-        "summary": "Candidate inbox activity (content restricted)." if hide_email and entry.entity_type == "email" else entry.summary,
-        "note": None if hide_email and entry.entity_type == "email" else entry.note,
+        "entity_label": (restricted[0] or entry.entity_label) if restricted else entry.entity_label,
+        "action": entry.action,
+        "summary": restricted[1] if restricted else entry.summary,
+        "note": note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
         "created_at": _iso(entry.created_at), "cursor": _cursor(entry),
         "actor_role": entry.actor_role,

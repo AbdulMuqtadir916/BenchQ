@@ -8,11 +8,16 @@ id (§3.4) that later versions keep, so a claim follows its item from version to
 A BDE's later upload (§4.6, PR 5) builds its base the same way, without a form: then everything comes from the parse.
 
 """
+import logging
 import uuid
 
 from backend.candidates.base_resume import split_skills
+from backend.candidates.profile_links import normalize_profile_link
+from backend.candidates.values import dicts as _dicts, text as _text
 from backend.models.candidates import BaseResume
 from backend.models.db import Resume
+
+logger = logging.getLogger(__name__)
 
 BASE_NAME = "Base"
 # The app's own labels for the form's codes (src/components/app/work-auth-chip.tsx WORK_AUTH_LABEL).
@@ -24,16 +29,8 @@ def _id() -> str:
     return str(uuid.uuid4())
 
 
-def _text(value) -> str:
-    return str(value or "").strip()
-
-
 def _list(value) -> list:
     return value if isinstance(value, list) else []
-
-
-def _dicts(value) -> list[dict]:
-    return [item for item in _list(value) if isinstance(item, dict)]
 
 
 def _bullets(value) -> list[dict]:
@@ -54,11 +51,19 @@ def _form_header(candidate, body, header) -> dict:
     """The form, as the person corrected it, for what it holds."""
     return dict(
         full_name=candidate.full_name, title=candidate.primary_role, email=candidate.email, phone=candidate.phone,
-        linkedin=candidate.linkedin_url, city=candidate.city, state=candidate.state,
+        linkedin=candidate.linkedin_url, city=candidate.city, state=candidate.state, country=candidate.country,
         work_authorization=WORK_AUTH_LABEL.get(body.work_auth) or _text(header.get("work_authorization")) or None,
         summary=(body.summary or "").strip() or None,
         skills=[{"id": _id(), "category": _text(s.family), "name": s.name.strip()} for s in body.skills if s.name.strip()],
     )
+
+
+def _parsed_link(header: dict, field: str) -> str | None:
+    try:
+        return normalize_profile_link(_text(header.get(field)))
+    except ValueError:
+        logger.warning("Ignoring an invalid résumé parser %s link", field)
+        return None
 
 
 def _parse_header(candidate, parse, header) -> dict:
@@ -66,8 +71,8 @@ def _parse_header(candidate, parse, header) -> dict:
     return dict(
         full_name=_text(header.get("name")) or candidate.full_name, title=_text(header.get("title")) or None,
         email=_text(header.get("email")) or None, phone=_text(header.get("phone")) or None,
-        linkedin=_text(header.get("linkedin")) or None, city=_text(header.get("city")) or None,
-        state=_text(header.get("state")) or None,
+        linkedin=_parsed_link(header, "linkedin"), city=_text(header.get("city")) or None,
+        state=_text(header.get("state")) or None, country=_text(header.get("country")) or None,
         work_authorization=_text(header.get("work_authorization")) or None,
         summary=_text(parse.get("professional_summary")) or None,
         skills=[{"id": _id(), "category": _text(group.get("category")), "name": name}
@@ -78,21 +83,19 @@ def _parse_header(candidate, parse, header) -> dict:
 def first_base(parse_row, candidate, body, created_by_user_id) -> tuple[BaseResume, Resume]:
     """The base and its version 1 for `candidate` from `parse_row` (a kept `resume_parses` row), active. Filled from
     the create form (`body`, as corrected) and the parse; with `body` None (a later upload, §4.6) from the parse
-    alone. With `parse_row` None (a candidate created without a résumé file, migration 0015) the base is `MANUAL` and
-    its version 1 holds only what the form holds; the lists start empty. Not added to the session: the caller does, in
-    its transaction, after switching the previous base off."""
-    parse = parse_row.parse if parse_row is not None and isinstance(parse_row.parse, dict) else {}
+    alone. Every base starts from a file: a candidate is onboarded only with their résumé (07 Q58). Not added to the
+    session: the caller does, in its transaction, after switching the previous base off."""
+    parse = parse_row.parse if isinstance(parse_row.parse, dict) else {}
     header = parse.get("header") if isinstance(parse.get("header"), dict) else {}
-    base = BaseResume(id=uuid.uuid4(), firm_id=candidate.firm_id, candidate_id=candidate.id,
-                      source="UPLOAD" if parse_row is not None else "MANUAL",
-                      resume_parse_id=parse_row.id if parse_row is not None else None, is_active=True,
+    base = BaseResume(id=uuid.uuid4(), firm_id=candidate.firm_id, candidate_id=candidate.id, source="UPLOAD",
+                      resume_parse_id=parse_row.id, is_active=True,
                       created_by_user_id=created_by_user_id)
     version = Resume(
         firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, name=BASE_NAME,
         category="BASE", version=1, created_by_user_id=created_by_user_id,
         **(_form_header(candidate, body, header) if body is not None else _parse_header(candidate, parse, header)),
         # The parse, for what the form doesn't hold.
-        country=_text(header.get("country")) or None, github=_text(header.get("github")) or None,
+        github=_parsed_link(header, "github"),
         experiences=[{"id": _id(), **{k: _text(r.get(k)) for k in ("job_title", "company", "location", "dates", "start",
                                                                     "end")},
                       "current": bool(r.get("current")), "bullets": _bullets(r.get("bullets"))}
