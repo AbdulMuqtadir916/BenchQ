@@ -1,8 +1,7 @@
 import { JobMarkKind, JobMarkSchema, type JobMark } from "@/lib/schemas/job";
-import { findInFirm, mockResult, newId } from "./_shared";
+import { mockResult, newId } from "./_shared";
 import { currentPrincipal, currentUser } from "./auth";
 import { changed, table } from "./db";
-import { allJobs } from "./jobs";
 import { firmScoped } from "./membership";
 
 /** Every person's saved / hidden jobs (docs/02 §6.x), persisted in the browser's demo data. */
@@ -17,9 +16,8 @@ export const jobMarksMock = firmScoped("jobMarks", {
     return mockResult(principal.kind === "firm" ? mine(firmId, principal.userId) : []);
   },
 
-  /** Save or hide a job of this firm for yourself. Marking it again changes nothing. */
+  /** Save or hide a job for yourself (the job is the backend's: not checked here, docs/02 §6.z). Marking it again changes nothing. */
   mark: (firmId: string, jobId: string, kind: JobMarkKind): Promise<JobMark> => {
-    findInFirm(allJobs(), firmId, jobId, "Job");
     const user = currentUser();
     const existing = mine(firmId, user.id).find((mark) => mark.jobId === jobId && mark.kind === JobMarkKind.parse(kind));
     if (existing) return mockResult(existing);

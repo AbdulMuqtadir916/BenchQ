@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ChevronRight, CircleHelp, type LucideIcon } from "lucide-react";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ResumeSectionKey } from "@/lib/schemas/resume-document";
 import { cn } from "@/lib/cn";
@@ -13,12 +13,11 @@ interface BuilderSectionProps {
   title: string;
   icon: LucideIcon;
   count?: number;
-  unverified?: number;
   children: ReactNode;
 }
 
-/** One collapsible section card in Builder mode. Open state lives in the store so "jump to claim" can open it. */
-export function BuilderSection({ id, title, icon: Icon, count, unverified = 0, children }: BuilderSectionProps) {
+/** One collapsible section card in Builder mode. Open state lives in the store. */
+export function BuilderSection({ id, title, icon: Icon, count, children }: BuilderSectionProps) {
   const isOpen = useStudio((s) => !!s.openSections[id]);
   const toggle = useStudio((s) => s.toggleSection);
   const reduce = useReducedMotion() ?? false;
@@ -43,12 +42,6 @@ export function BuilderSection({ id, title, icon: Icon, count, unverified = 0, c
           <Icon size={15} aria-hidden className="shrink-0 text-[var(--color-text-3)]" />
           <span className="text-h3 text-[var(--color-text)]">{title}</span>
           {count !== undefined ? <span className="tabular text-sm text-[var(--color-text-3)]">({count})</span> : null}
-          {unverified > 0 ? (
-            <span className="bq-tag ml-auto" data-tone="neutral" title={`${unverified} unverified — needs evidence before export`}>
-              <CircleHelp size={11} aria-hidden />
-              {unverified} to verify
-            </span>
-          ) : null}
         </button>
       </h3>
       <AnimatePresence initial={false}>

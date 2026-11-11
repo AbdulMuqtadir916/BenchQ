@@ -1,6 +1,7 @@
 /**
  * Which API modules are served by the real backend. Everything else is served by src/mocks. Set
- * NEXT_PUBLIC_LIVE_MODULES=companies,jobs in .env.local.
+ * NEXT_PUBLIC_LIVE_MODULES=inbox in .env.local. Candidates, résumés and jobs have no switch: they are always the
+ * backend's, with no mock (decided 2026-11-11).
  * Temporary: once every module is live and src/mocks is gone, delete this file.
  *
  * The session, the team, the invites, the /admin firms, plans, users, invites and audit, and the ledger are
@@ -8,13 +9,9 @@
  * signed-in principal (src/lib/api/live-session.ts) until their track lands.
  */
 export type ApiModule =
-  | "candidates"
   | "companies"
-  | "jobs"
   | "records"
-  | "resumes"
   | "applications"
-  | "followups"
   | "documents"
   | "inbox"
   | "agents";

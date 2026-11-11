@@ -44,8 +44,6 @@ NOT_REACHED: dict[str, str] = {
         "400: This link has expired. Contact your manager or firm owner for a new one",
     "GET /api/admin/activity/{entry_id}/ip": "404: Not found",
     "POST /api/auth/sign-in": "401: Email or password is incorrect",
-    "POST /api/companies/{company_id}/test-scrape": "400: No scrape URLs configured",
-    "POST /api/cover-letters": "400: name is required",
     "GET /api/cover-letters/{cl_id}/pdf": "422: Unknown template: <planted>",
     "POST /api/firms/{firm_id}/candidates": "404: That résumé read has expired. Upload it again",
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": "400: Invalid email cursor",
@@ -54,6 +52,10 @@ NOT_REACHED: dict[str, str] = {
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}":
         "409: Mailbox confirmation expired. Connect again",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": "400: Invalid local return path",
+    # Only the candidate's BDE searches (decided 2026-11-10) and the sweep signs in as the OWNER. The search's own
+    # logging (ids, codes, counts; never the query) is checked in test_job_search_api.py.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": "403: Only this candidate's BDE searches jobs for them",
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": "403: Only this candidate's BDE adds jobs for them",
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}":
         "409: Base 1 holds what an owner or manager added, so it can't be deleted",
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}":
@@ -65,21 +67,26 @@ NOT_REACHED: dict[str, str] = {
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": "403: Only BenchQ can resend or revoke the owner's invite",
     "PATCH /api/firms/{firm_id}/members/{user_id}/manager": "404: Not found",
     "POST /api/invites/{token}/accept": "410: This invite link isn't valid",
-    "POST /api/jobs/bulk-update": "422: updates must be an object",
-    "POST /api/jobs/manual": "400: title, company, and url are required",
-    "POST /api/jobs/save-from-extension": "400: title, company, and url are required",
-    "PATCH /api/jobs/{job_id}": "400: saved must be true or false",
     "GET /api/jobs/{job_id}/live-page": "502: Posting is rendered client-side — needs the extension",
     "POST /api/notifications/{notification_id}/password-reset-decision": "404: Notification not found",
     "POST /api/notifications/{notification_id}/password-reset-link": "404: Notification not found",
     "GET /api/oauth/google/callback": "404: Not found",
     "POST /api/persona/qa-bank": "400: question and answer are required",
     "GET /api/searches/test-result/{run_id}": "404: Test run not found",
-    "POST /api/searches/{search_id}/test":
-        "400: Test only supports keyword, levels_fyi, linkedin_personal, jobright, and freehire searches",
     "POST /api/telegram/webhook": "503: Telegram webhook secret not configured",
     "GET /cv/{token}": "404: Link not found",
 }
+
+# The old job pool's write routes answer 410 (job search PR 2, backend/job_search/retired.py) until the clean-up PR
+# deletes them.
+NOT_REACHED.update({route: "410: the old job pool is retired" for route in (
+    "POST /api/jobs/linkedin-import", "POST /api/jobs/save-from-extension", "POST /api/jobs/manual",
+    "PATCH /api/jobs/{job_id}", "POST /api/scrape/run-all", "POST /api/analyze/{job_id}",
+    "POST /api/jobs/backfill-descriptions", "POST /api/scrape/company/{company_id}", "POST /api/searches/{search_id}/run",
+    "POST /api/searches/{search_id}/test", "POST /api/companies/{company_id}/test-scrape", "POST /api/cover-letters",
+    "POST /api/cover-letters/generate", "POST /api/jobs/bulk-update")})
+# A letter's job is a job posting since 0023; the sweep's `job_id` names the old pool's seeded job, so this is 404.
+NOT_REACHED["PATCH /api/cover-letters/{cl_id}"] = "404: Job not found"
 
 # "METHOD path" -> the state a seeded row needs for the route to do its work, set just before its request.
 ROUTE_STATE = {

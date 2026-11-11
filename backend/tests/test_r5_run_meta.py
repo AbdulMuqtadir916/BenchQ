@@ -121,58 +121,6 @@ def _gated_score(gate):
     return _slow
 
 
-def test_analyze_endpoint_meta_names_the_base_resumes(client, test_db):
-    """POST /api/analyze/{id} tags the run with the names it will score under."""
-    make_resume(test_db, name="PM")
-    make_resume(test_db, name="Platform")
-    job = make_job(test_db, description="Looking for a PM")
-    gate = asyncio.Event()
-    try:
-        with patch("backend.analyzer.cv_scorer.score_single_job", _gated_score(gate)):
-            assert client.post(f"/api/analyze/{job.id}?depth=light").status_code == 202
-            data = client.get(f"/api/monitor/in-flight?detail=1&job_ids={job.id}").json()
-            entry = data[str(job.id)][0]
-            assert entry["job_type"] == "analyze_job"
-            assert entry["meta"]["depth"] == "light"
-            assert set(entry["meta"]["resume_names"]) == {"PM", "Platform"}
-    finally:
-        gate.set()
-
-
-def test_analyze_endpoint_meta_uses_explicit_cv_ids(client, test_db):
-    """With cv_ids the meta names only those résumés."""
-    picked = make_resume(test_db, name="PM")
-    make_resume(test_db, name="Platform")
-    job = make_job(test_db, description="Looking for a PM")
-    gate = asyncio.Event()
-    try:
-        with patch("backend.analyzer.cv_scorer.score_single_job", _gated_score(gate)):
-            resp = client.post(f"/api/analyze/{job.id}?depth=full",
-                               json={"cv_ids": [str(picked.id)]})
-            assert resp.status_code == 202
-            data = client.get(f"/api/monitor/in-flight?detail=1&job_ids={job.id}").json()
-            meta = data[str(job.id)][0]["meta"]
-            assert meta == {"resume_names": ["PM"], "depth": "full"}
-    finally:
-        gate.set()
-
-
-def test_on_save_auto_score_meta(client, test_db):
-    """PATCH /api/jobs/{id} {saved:true} with on_save_action set tags the run too."""
-    set_setting(test_db, "on_save_action", "light")
-    make_resume(test_db, name="PM")
-    job = make_job(test_db, description="JD text")
-    gate = asyncio.Event()
-    try:
-        with patch("backend.analyzer.cv_scorer.score_single_job", _gated_score(gate)):
-            assert client.patch(f"/api/jobs/{job.id}",
-                                json={"saved": True}).status_code == 200
-            data = client.get(f"/api/monitor/in-flight?detail=1&job_ids={job.id}").json()
-            meta = data[str(job.id)][0]["meta"]
-            assert meta == {"resume_names": ["PM"], "depth": "light"}
-    finally:
-        gate.set()
-
 
 # The tailor and score-check runs went with the old /api/resumes router (résumé versioning PR 6).
 

@@ -1,17 +1,15 @@
 import { arrayOf } from "@/lib/api/client";
-import { ApplicationSchema, FollowUpTaskSchema, type Application, type FollowUpTask } from "@/lib/schemas/application";
+import { ApplicationSchema, type Application } from "@/lib/schemas/application";
 import { UpdateApplicationStatusSchema, type UpdateApplicationStatus } from "@/lib/schemas/inbox";
 import applicationsSeed from "./data/applications.json";
-import followupsSeed from "./data/followups.json";
 import { scopeApplications } from "@/lib/auth/policy";
 import { currentPrincipal, currentUser } from "./auth";
-import { allCandidates } from "./candidates";
+import { candidatesApi } from "@/lib/api/candidates";
 import { findInFirm, inFirm, mockResult, notFound } from "./_shared";
 import { firmScoped } from "./membership";
 import { changed, table } from "./db";
 
 export const allApplications: Application[] = table("applications", ApplicationSchema, () => arrayOf(ApplicationSchema).parse(applicationsSeed));
-export const allFollowups: FollowUpTask[] = arrayOf(FollowUpTaskSchema).parse(followupsSeed);
 
 const CLOSED_STATUSES = ["PLACED", "REJECTED", "WITHDRAWN", "EXPIRED"];
 
@@ -24,13 +22,14 @@ export const applicationsMock = firmScoped("applications", {
   byId: (firmId: string, id: string): Promise<Application> => mockResult(findInFirm(allApplications, firmId, id, "Application")),
 
   // Stand-in for the backend's status-transition rules; delete with this module.
-  updateStatus: (firmId: string, id: string, body: UpdateApplicationStatus): Promise<Application> => {
+  updateStatus: async (firmId: string, id: string, body: UpdateApplicationStatus): Promise<Application> => {
     const application = findInFirm(allApplications, firmId, id, "Application");
     // Who may move it is the policy (docs/07 Phase C): `application.move` is checked by firmScoped (a
     // VIEWER or a support view → 403); the record must be in the principal's scope (a BDE, someone
     // else's; a MANAGER, another team's → 404, exactly like a missing one, so the call never confirms it
     // exists, principle 4).
-    if (scopeApplications(currentPrincipal(), [application], inFirm(allCandidates, firmId)).length === 0) notFound("Application", id);
+    // The candidates the principal sees come from the backend (no candidates mock, decided 2026-11-11).
+    if (scopeApplications(currentPrincipal(), [application], await candidatesApi.list(firmId)).length === 0) notFound("Application", id);
     const update = UpdateApplicationStatusSchema.parse(body);
     const now = new Date().toISOString();
 
@@ -53,10 +52,3 @@ export const applicationsMock = firmScoped("applications", {
     return mockResult(ApplicationSchema.parse(application));
   },
 }, { updateStatus: "application.move" });
-
-export const followupsMock = firmScoped("followups", {
-  list: (firmId: string, params?: { userId?: string }): Promise<FollowUpTask[]> => {
-    const followups = inFirm(allFollowups, firmId);
-    return mockResult(params?.userId ? followups.filter((followup) => followup.assignedToUserId === params.userId) : followups);
-  },
-});

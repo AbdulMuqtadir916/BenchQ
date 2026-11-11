@@ -1,5 +1,5 @@
 /**
- * Inline rich text for resume claims. The editor is a contentEditable, so
+ * Inline rich text for resume lines. The editor is a contentEditable, so
  * anything the browser inserts (spans, styles, pasted markup) is reduced to
  * bold / italic / underline / line breaks before it reaches the document.
  */

@@ -5,6 +5,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 // renderToString reads a zustand store through its server snapshot, the store's *initial* state
 // (signed out: in the app the gates wait for the client). The BDE dashboard needs the signed-in principal,
 // so in this server render it reads the live store instead. Everything else is real.
+// The owner's dashboard keeps its tab and level in the URL; a server render has no app router, so it gets a still one.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/hyderabad-tech-staffing/dashboard",
+}));
 vi.mock("@/lib/stores/session-store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/stores/session-store")>();
   return { ...actual, useSignedInUser: () => actual.useSession.getState().user!, useSignedInPrincipal: () => actual.useSession.getState().principal! };
@@ -12,7 +19,8 @@ vi.mock("@/lib/stores/session-store", async (importOriginal) => {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firms } from "@/mocks/team";
-import { stubBackendReads } from "@/mocks/fixture-backend";
+import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
+import { setStubJobs, stubBackendReads, stubJob } from "@/mocks/fixture-backend";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "@/lib/stores/session-store";
 import { OwnerDashboard } from "./owner-dashboard";
@@ -25,28 +33,29 @@ import { BdeDashboard } from "./bde-dashboard";
  * the real hooks and the mock backend; failures come from the dev fault switch.
  */
 
-type Resource = "candidates" | "applications" | "followups" | "team" | "memberInvites" | "jobs";
+type Resource = "candidates" | "applications" | "team" | "memberInvites" | "jobs";
 /** `as`: the seeded account the dashboard is rendered for (the OWNER one reads invites, which needs `team.view`). */
-type Dashboard = { name: string; as: string; component: ComponentType; queries: Resource[]; groups: Record<string, { reads: Resource[]; labels: string[] }> };
+type Dashboard = { name: string; as: string; component: ComponentType; queries: Resource[]; groups: Record<string, { reads: Resource[]; labels: string[] }>; seed?: () => Promise<unknown> };
 
 const floorGroups = {
   throughput: { reads: ["candidates", "applications", "team"] as Resource[], labels: ["Applied today", "Active BDEs", "Candidates on bench"] },
-  performance: { reads: ["team", "candidates", "applications", "followups"] as Resource[], labels: ["Interviews"] },
+  performance: { reads: ["team", "candidates", "applications"] as Resource[], labels: ["Interviews"] },
   pipeline: { reads: ["applications"] as Resource[], labels: [] },
   risk: { reads: ["candidates", "applications"] as Resource[], labels: [] },
   needsBde: { reads: ["candidates", "team"] as Resource[], labels: [] }, // the "Needs a BDE" card (onboarding 05 §5)
 };
 
 const DASHBOARDS: Dashboard[] = [
-  { name: "OWNER", as: "user_imran", component: OwnerDashboard, queries: ["candidates", "applications", "followups", "team", "memberInvites"], groups: { rollups: { reads: ["applications", "candidates", "team", "memberInvites"], labels: ["Time to place", "BDE seats used", "Assigned candidates"] }, ...floorGroups } },
-  { name: "MANAGER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "MANAGER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
-  { name: "VIEWER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "followups", "team"], groups: floorGroups },
-  { name: "BDE", as: "user_adnan", component: BdeDashboard, queries: ["candidates", "applications", "followups", "jobs"], groups: {
-    numbers: { reads: ["candidates", "applications", "followups"], labels: ["Unverified claims", "Responses"] },
+  { name: "OWNER", as: "user_imran", component: OwnerDashboard, queries: ["candidates", "applications", "team", "memberInvites"], groups: { rollups: { reads: ["applications", "candidates", "team", "memberInvites"], labels: ["Time to place", "BDE seats used", "Assigned candidates"] }, ...floorGroups } },
+  { name: "VIEWER", as: "user_adnan", component: () => createElement(ManagerDashboard, { role: "VIEWER" }), queries: ["candidates", "applications", "team"], groups: floorGroups },
+  { name: "BDE", as: "user_adnan", component: BdeDashboard, queries: ["candidates", "applications", "jobs"], groups: {
+    numbers: { reads: ["candidates", "applications"], labels: ["Candidates", "Responses"] },
     mine: { reads: ["candidates", "applications"], labels: ["apps</span>"] }, // per-candidate app counts in the list body
     queue: { reads: ["candidates", "applications", "jobs"], labels: ["Tailor resume"] }, // the queue rows' action
     newAssignments: { reads: ["candidates"], labels: ["No new candidates this week."] }, // its empty state: no ASSIGN entries on mocks (05 §7)
-  } },
+  },
+  // A job is a candidate's (docs/02 §6.z), and jobs are only the backend's: each of the BDE's candidates has one.
+  seed: async () => setStubJobs(allCandidates.filter((c) => c.firmId === "firm_hts" && c.bdeId === "user_adnan").map((c, n) => stubJob("firm_hts", c.id, n, c.primaryRole ?? "Developer"))) },
 ];
 
 const ERROR = "Something didn’t load";
@@ -69,12 +78,13 @@ afterEach(() => {
   fault.__BENCHQ_MOCK_FAIL__ = [];
 });
 
-describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 }, ({ as, component, queries, groups }) => {
+describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 }, ({ as, component, queries, groups, seed }) => {
   // Signed in as a member of firm A, in the mock backend (it checks membership, T8) and in the client
   // store (the BDE dashboard reads the signed-in user), as the app is after /sign-in.
   beforeAll(async () => {
     stubBackendReads();
     useSession.getState().setSession(await signInAs(as));
+    await seed?.();
   });
   afterAll(() => {
     vi.restoreAllMocks();

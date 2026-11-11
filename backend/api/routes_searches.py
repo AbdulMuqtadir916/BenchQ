@@ -12,6 +12,7 @@ from backend.countries import (DEFAULT_COUNTRY, compose_location, normalize_coun
                                split_country_suffix, supported_countries)
 from backend.models.db import get_db, Search, Setting, ScrapeLog, Job, is_acknowledged
 from backend.models.tenancy import DEFAULT_FIRM_ID
+from backend.job_search.retired import retired
 
 logger = logging.getLogger("jobnavigator.routes_searches")
 
@@ -209,6 +210,7 @@ def delete_search(search_id: str, db: Session = Depends(get_db)):
 @router.post("/{search_id}/run", status_code=202)
 async def trigger_search(search_id: str, auto_score: bool = None, db: Session = Depends(get_db)):
     """Trigger a single search in the background; returns immediately with a run_id pollable via /api/monitor/active (scope_key = search id); auto_score overrides the search's auto_scoring_depth when set."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     search = db.query(Search).filter(Search.id == search_id).first()
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
@@ -245,6 +247,7 @@ async def trigger_search(search_id: str, auto_score: bool = None, db: Session = 
 @router.post("/{search_id}/test")
 async def test_search(search_id: str, db: Session = Depends(get_db)):
     """Run a search test: keyword mode runs synchronously and returns results directly, while slow modes (levels_fyi, linkedin_personal, jobright, freehire) launch in the background and return a run_id to poll."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     search = db.query(Search).filter(Search.id == search_id).first()
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")

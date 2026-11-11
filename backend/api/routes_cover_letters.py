@@ -21,6 +21,7 @@ from backend.models.tenancy import DEFAULT_FIRM_ID, User
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 from backend.api.render_shared import _get_browser, _rewrite_urls_with_tracers, _resolve_tailoring_jd
 from backend.candidates.resume_text import resume_text as version_text
+from backend.job_search.retired import retired
 
 logger = logging.getLogger("jobnavigator.cover_letters")
 
@@ -140,14 +141,20 @@ def _to_dict(cl: CoverLetter, include_json_data: bool = False, ctx: dict | None 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
 def _build_ctx(rows: list[CoverLetter], db: Session, firm_id) -> dict:
-    """Batch-load the job, its application stage and the source resume name for a set of letters — three queries total rather than three per row."""
-    from backend.models.db import Application, Job, Resume
+    """Batch-load the job, its application stage and the source resume name for a set of letters — three queries total
+    rather than three per row. A letter's job is one of the firm's job postings (migration 0023), read through its
+    provider like every job read (bot review on #135: it still read the old pool, so a linked letter lost its job)."""
+    from backend.job_search import providers
+    from backend.models.db import Application, Resume
+    from backend.models.job_search import JobPosting
     job_ids = {cl.job_id for cl in rows if cl.job_id}
     res_ids = {cl.resume_id for cl in rows if cl.resume_id}
     jobs, stages, names = {}, {}, {}
     if job_ids:
-        for j in scoped_jobs(db, firm_id).filter(Job.id.in_(job_ids)).all():
-            jobs[j.id] = j
+        for posting in scoped(db, JobPosting, firm_id).filter(JobPosting.id.in_(job_ids)).all():
+            reader = providers.reader_for(posting.source)
+            jobs[posting.id] = reader.read(posting.content or {}) if reader else None
+        # An application names a posting once Arbaz's repoint lands (docs/team/arbaz.md); until then none match.
         for a in (scoped(db, Application, firm_id)
                     .filter(Application.job_id.in_(job_ids))
                     .order_by(Application.updated_at.desc()).all()):
@@ -157,12 +164,12 @@ def _build_ctx(rows: list[CoverLetter], db: Session, firm_id) -> dict:
             names[r.id] = r.name
     out = {}
     for cl in rows:
-        j = jobs.get(cl.job_id)
+        job = jobs.get(cl.job_id)
         out[cl.id] = {
-            "company": j.company if j else None,
-            "title": j.title if j else None,
-            "job_url": j.url if j else None,
-            "job_status": j.status if j else None,
+            "company": (job.company or None) if job else None,
+            "title": (job.title or None) if job else None,
+            "job_url": job.apply_url if job else None,
+            "job_status": None,                        # a posting has no status (docs/02 §6.y)
             "stage": stages.get(cl.job_id),
             "source_name": names.get(cl.resume_id) or ("Persona" if cl.from_persona else None),
         }
@@ -210,6 +217,7 @@ def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_d
 def create_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id),
                         principal: Principal = Depends(current_principal)):
     # See R4-T1-20: a non-string name used to raise AttributeError -> 500.
+    retired()  # job search PR 2: the old pool's write routes answer 410
     name = str_field(body, "name", required=True)
     if "template" in body:
         _validate_template(body["template"])
@@ -250,7 +258,9 @@ def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db), f
         _validate_template(body["template"])
     # A linked job or résumé must be the firm's own (07 F7); checked before anything is set.
     if "job_id" in body:
-        body["job_id"] = firm_ref(db, firm_id, Job, body["job_id"], "Job")
+        # A letter's job is one of the firm's job postings (migration 0023), not the old pool's.
+        from backend.models.job_search import JobPosting
+        body["job_id"] = firm_ref(db, firm_id, JobPosting, body["job_id"], "Job")
     if "resume_id" in body:
         body["resume_id"] = firm_ref(db, firm_id, Resume, body["resume_id"], "Resume")
     before, text_before = _letter_state(cl), cl.json_data
@@ -372,6 +382,7 @@ async def export_pdf(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(
 async def generate_cover_letter(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id),
                                 principal: Principal = Depends(current_principal)):
     """Generate a cover letter for a (resume, job) pair in the background; returns 202 + run_id, and with cover_letter_id rewrites that existing letter in place instead of creating a new one."""
+    retired()  # job search PR 2: the old pool's write routes answer 410
     resume_id = body.get("resume_id")
     job_id = body.get("job_id")
     if not resume_id or not job_id:

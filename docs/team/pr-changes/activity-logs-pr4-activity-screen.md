@@ -60,3 +60,16 @@ Two choices of mine:
 
 Until PR 5 the log holds only what is written today, so there are no AI agent rows yet. The name in the Candidate
 column is the candidate's current name. `when` shows IST for exact times, as `DualTimestamp` does everywhere.
+
+## Brought up to date with main (2026-11-12)
+
+While this PR waited, main reworked the old Ledger page (Samad's BUG-002, BUG-003 and BUG-022 fixes). This PR replaces
+that page with the Activity screen, which pages, sorts and searches on the server, so:
+
+- **Kept from main:** the table's one-column URL sort, page keys (J, K, x and / from anywhere) and its page-reset rule.
+  The table gains server paging (`page.count`, which also leaves sorting to the server) and `countLabel` for this screen.
+  The backend still accepts main's two-field paging (`cursor_at` + `cursor_id`) beside the Activity screen's `cursor`.
+- **Removed, because only the old page used them:** the whole-ledger loader (`ledgerApi.listAll`, `useLedgerAll`, its
+  query key and `LEDGER_MAX_ENTRIES`), the cap notice (`ledger-cap-notice`), the actor filter helpers (`ledger-actors`)
+  and the old page's URL schema (`ledger-list-query`), with their tests. The general `loadAllPages` helper stays.
+- **Candidate names** in the log come from the résumé (`profile.prime`, 07 Q57), since main moved them off `candidates`.

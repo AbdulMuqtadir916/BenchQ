@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allCandidates } from "@/mocks/candidates";
+import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { deriveNewAssignments, isWaitingForBde, latestHandoff, queueByManager } from "./assignment";

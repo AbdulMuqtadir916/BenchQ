@@ -123,8 +123,8 @@ resume_parses ──(resume_parse_id)──▶ base_resumes ◀──(base_resum
 | `id` | uuid | PK, `gen_random_uuid()` | The base's id ("base 1, 2…") |
 | `firm_id` | uuid | FK → firms, NOT NULL | The firm that owns it |
 | `candidate_id` | uuid | FK → candidates, NOT NULL | The candidate it belongs to |
-| `source` | varchar | NOT NULL, `UPLOAD` / `PROMOTED` / `MANUAL` | Made from an upload, promoted by a person from a `resumes` version, or (`MANUAL`, **0015**) made from the new-candidate form alone when no file was given |
-| `resume_parse_id` | uuid | FK → resume_parses, nullable | The upload it came from; required for `UPLOAD`, empty for `PROMOTED` and `MANUAL` |
+| `source` | varchar | NOT NULL, `UPLOAD` / `PROMOTED` | Made from an upload, or promoted by a person from a `resumes` version. (`MANUAL`, a base from the form alone, existed from 0015 to **0018**: 07 Q58, no candidate without a résumé) |
+| `resume_parse_id` | uuid | FK → resume_parses, nullable | The upload it came from; required for `UPLOAD`, empty for `PROMOTED` |
 | `is_active` | boolean | NOT NULL, default false | The base the workflow uses (tailoring, job search) |
 | `created_by_user_id` | uuid | FK → users, NOT NULL | Who made it |
 | `created_at` | timestamptz | NOT NULL, `now()` | When it was made |
@@ -142,8 +142,8 @@ CREATE TABLE base_resumes (
   is_active          boolean NOT NULL DEFAULT false,
   created_by_user_id uuid NOT NULL REFERENCES users(id)         ON DELETE RESTRICT,
   created_at         timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT ck_base_resumes_source_values CHECK (source IN ('UPLOAD', 'PROMOTED', 'MANUAL')),
-  CONSTRAINT ck_base_resumes_source CHECK (source IN ('PROMOTED', 'MANUAL') OR resume_parse_id IS NOT NULL),
+  CONSTRAINT ck_base_resumes_source_values CHECK (source IN ('UPLOAD', 'PROMOTED')),
+  CONSTRAINT ck_base_resumes_source CHECK (source = 'PROMOTED' OR resume_parse_id IS NOT NULL),
   CONSTRAINT uq_base_resumes_id_candidate UNIQUE (id, candidate_id)
 );
 CREATE UNIQUE INDEX uq_base_resumes_one_active ON base_resumes (candidate_id) WHERE is_active;
@@ -202,6 +202,7 @@ All reads, edits, tailoring, previews and downloads go through this table.
 | `certifications` | jsonb | | `[{id, name, issuer, date, detail}]` | **new** |
 | `awards` | jsonb | | `[{id, name, issuer, date, detail}]` | **new** |
 | `languages` | jsonb | | `[{id, name}]` | **new** |
+| `autofill` | jsonb | `'{}'` | The autofill entries the user typed for this version, `{"edited": {key: {"answer", "over"}}, "custom": {question: answer}}`: an edit to a built answer, by its key, with `over`, a copy of the built answer it replaced (for the work history, the whole list; the edit applies while that's still the built answer), or a question they added ([docs/02](../02-DATA-CONTRACTS.md) §8.1). The built answers aren't otherwise stored: `backend/candidates/autofill.py` builds them from the version and the profile each time one version is read with `?autofill=true`. A save, a promote and tailoring copy the entries to the new version. Not content: a save never compares it | **new in 0019** |
 | `created_by_user_id` | uuid | FK → users | Who saved this version | **new** |
 | `created_at` | timestamptz | `now()` | When this version was saved | exists |
 
@@ -307,7 +308,7 @@ the parse for the rest. `resume_parses.parse` keeps the AI's original untouched.
 
 | From the form (corrected) | From the parse |
 |---|---|
-| name, title, email, phone, LinkedIn, city, state, work authorization, summary, skills | country, GitHub, work experience, projects, education, certifications, awards, languages |
+| name, title, email, phone, LinkedIn, city, state, country, work authorization, summary, skills | GitHub, work experience, projects, education, certifications, awards, languages |
 
 No résumé uploaded (`resume_parse_id` null) → no base is created; one can be added later.
 
@@ -338,7 +339,8 @@ Built in PR 4 (`backend/candidates/first_base.py`):
 - **The base dropdown lists only bases** and their versions (it reads `base_resumes` and the `BASE` rows of
   `resumes`). Tailored résumés are not listed. Hidden bases and versions already promoted to a base are left out;
   history shows both. Bases are numbered in the order they were made ("Base 1, 2…"); deleting one renumbers the
-  later ones, and a hidden one keeps its place.
+  later ones, and a hidden one keeps its place. The screens name a base `<Candidate> · <Role> · Base 2` from its
+  headline (`title`, which the listing carries for that reason; docs/04 §4.3).
 - **Saving** (decided 2026-11-02):
   - The save names the version it was edited from. The new row is that résumé's next version, whatever was saved
     in between: two people saving from v2 at once get **v3 and v4**, both kept (Abdul). The second one is told:
@@ -346,6 +348,10 @@ Built in PR 4 (`backend/candidates/first_base.py`):
   - A save that changes nothing is refused: *"No changes to save."*
   - Ids follow §3.4: an item, bullet or summary kept as it was keeps its id; a changed or new one gets a new id.
     An id that isn't in the version edited is refused, so a save can't take over another item's id.
+- **Saving from the studio (PR 7, Zuhair 2026-11-05):** Save reads the version again just before saving, lays the
+  studio's edits over it and sends that: what the studio doesn't edit (languages; work authorization, shown read-only)
+  is carried over untouched, so no save drops it. The studio shows every field of the parser's strict format but
+  languages. The design (template) and the résumé's name aren't part of a save (the save copies them from the version).
 - **A tailored résumé becomes a base only through "Use this as the base?"**: its copy is `category = 'BASE'`,
   `job_id` NULL; the original stays `TAILORED`.
 - **Editing the active base does not change the workflow**: it stays on v1 until the person says Yes.
@@ -369,7 +375,6 @@ BenchQ has no Verified, Unverified or Contradicted states, no `claims` and `evid
 drops the tables; the frontend removes the rest in PR 7). Any résumé that is not soft deleted can be exported. What stays:
 - the truth rules in the parser's prompts and its strict response format (§2): the parser must not invent content;
 - ids on every item (§3.4), which tell a save what changed;
-- a `MANUAL` base has no upload, so "upload the same file again" (§4.7) cannot bring it back if it is soft deleted; it can never be the only base (the active base can't be deleted).
 
 ### 4.6 A later résumé (decided 2026-11-02, Abdul and Zuhair)
 
@@ -473,7 +478,7 @@ from the columns. Job scoring and interview prep use it; nothing converts the co
 The DTO mapper (`src/lib/api/dto/`) groups rows into `Resume` objects. No backend shape leaves `src/lib/api/dto/`.
 
 **The docs/02 addition (approved; written in `docs/02-DATA-CONTRACTS.md` §8.1):**
-- **`BaseResume`**: `id`, `candidateId`, `firmId`, `source` (`UPLOAD` / `PROMOTED` / `MANUAL`), `isActive`, `createdAt`,
+- **`BaseResume`**: `id`, `candidateId`, `firmId`, `source` (`UPLOAD` / `PROMOTED`), `isActive`, `createdAt`,
   `createdByUserId` — for the base dropdown and showing which base is active.
 - **`baseResumeId`** on `Resume`.
 - **The new parser fields** in `ResumeDraftSchema` (`country`; city and state read directly, no `splitLocation`)
@@ -482,7 +487,14 @@ The DTO mapper (`src/lib/api/dto/`) groups rows into `Resume` objects. No backen
   (nullable), for leaving promoted versions and hidden bases out of the dropdown (§3.2). The studio's content gains
   `summaryId` (nullable), the summary's id (§3.4).
 
-Change `src/lib/schemas/` only after the docs/02 text is merged (PR 1); PR 7 does it.
+Change `src/lib/schemas/` only after the docs/02 text is merged (PR 1); PR 7 does it (`BaseResume`, `baseResumeId`, and the
+shelf and opened-version shapes are built; the studio content's `awards`, `languages` and `summaryId` come with saving).
+
+**PR 7's read routes** (`backend/api/routes_firm_resumes.py`): `GET /api/firms/{firm}/resumes` lists every base and
+résumé of the candidates in the principal's scope (07 Q47) in two queries, with no content; `GET
+/api/firms/{firm}/resumes/{id}` opens one version by its id alone (a link from an application or the studio's URL). A
+version outside the scope, of another firm, or deleted is the same 404 as a missing one. Every base and version in a
+listing names its `candidate_id`.
 
 ---
 
@@ -533,7 +545,7 @@ and contracts.
 | 4 | `feat/base-resume-from-parse` (**built**) | Candidate create (`routes_candidates.py` `create_candidate`) writes the base and `resumes` v1 in its transaction (§4.2), item ids (§3.4); tests incl. rollback on failure and isolation. | — |
 | 5 | `feat/resume-versions` (**built**) | Routes under `/api/firms/{firm}/candidates/{candidate}/resumes`: list bases + versions, open a version, save the next version (§4.3), "use as base" and pick a base (v1 flips, v2+ promotes or reuses), the BDE's upload (§4.6), delete / hide / show again with the usage reads for the warning (§4.7). `can_change_resume` / `can_manage_resume` in both policies (§6), `access.py`, `isolation_cases.py`; races tested. Migration 0011: `promoted_from_resume_id`, `archived_at`, `content_sha256` and their unique rules (§3.1, §3.2), `summary_id` (§3.4). Saving gives changed text new ids instead of resetting claims (§4.5). Docs: 07 Q55, docs/02 §8.1. **Tailoring is not here**: the tailoring module creates tailored résumés; their edits use PR 5's save. | **0011** |
 | 6 | `feat/drop-legacy-resume-columns` (**built**) | **The approved drops** (§3.1, §3.3) and the old JobNavigator résumé code (decided 2026-11-02). Migration 0013: deletes JobNavigator's old résumé rows (§3.3), drops the approved columns and index, makes `base_resume_id` and `candidate_id` required. Removes the old `/api/resumes` router (its shared rendering helpers move to `backend/api/render_shared.py` for cover letters), the 8 backend templates, the old parser (`parse_resume_pdf`), `POST /api/persona/import` and the "Sample PM" seed. The other readers read the columns (§4.8): job scoring, interview prep, the jobs checks, cover letters. | **0013** |
-| 7 | `integrate/resumes` | Frontend live: the résumé adapter's live path, the DTO mapper (§5), the `BaseResume` schema, the base dropdown, the "Use this as the base?" prompt, version history. Both themes, keyboard, skeleton/empty/error states. | — |
+| 7 | `integrate/resumes` | **No claim states on the frontend** (chips, export gate, "Mark as reviewed", the claim types; `firms.truth_guard_mode` dropped, migration 0016). **Reading live:** two read-only routes (`GET /firms/{firm}/resumes`, the firm's list in the principal's scope; `GET /firms/{firm}/resumes/{id}`, a version by its id alone, `backend/api/routes_firm_resumes.py`); the résumé adapter's live path and DTO mapper (§5); `BaseResume`, `baseResumeId`; the studio opens the exact version from its own text; one résumé tree (base → versions, tailored by job) in the Resume Builder library and the candidate's Résumés tab. **Writing:** explicit Save with the notice, use as base and pick, upload, delete / hide / show again. Both themes, keyboard, skeleton/empty/error states. | **0016** |
 
 If someone else's 0008 merges first, renumber and fix `down_revision` before merging.
 

@@ -4,12 +4,12 @@ import type { ReactNode } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-/** "Drafted from résumé" (07 Q49): icon and words, never colour alone. Goes when the field is edited or reviewed. */
+/** "Filled from résumé" (07 Q49): icon and words, never colour alone. Goes when the field is edited. */
 export function DraftedMarker({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1 text-caption text-[var(--color-violet-fg)]", className)}>
       <Sparkles size={12} aria-hidden />
-      Drafted from résumé
+      Filled from résumé
     </span>
   );
 }

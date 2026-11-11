@@ -11,6 +11,10 @@ vi.mock("@/lib/stores/session-store", async (importOriginal) => {
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/navigation")>()),
   useParams: () => ({ firmId: "firm_hts" }),
+  // The owner's dashboard keeps its tab in the URL; a server render has no app router, so it gets a still one.
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/hyderabad-tech-staffing/dashboard",
 }));
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";

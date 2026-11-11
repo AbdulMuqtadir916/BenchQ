@@ -10,7 +10,6 @@ export const FirmSchema = z.object({
   logoUrl: z.string().url().nullable(),
   primaryTimezone: z.string().default("Asia/Kolkata"),
   clientTimezone: z.string().default("America/New_York"),
-  truthGuardMode: z.enum(["STRICT", "BALANCED", "LENIENT"]).default("BALANCED"),
   applicationExpiryDays: z.number().int().default(30),
   status: FirmStatus,
   /** Required in every status, ONBOARDING included (A16). */

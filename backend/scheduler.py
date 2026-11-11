@@ -73,14 +73,12 @@ def configure_scheduler():
 
     scheduler.remove_all_jobs()
 
-    # Interval-based jobs (0 = disabled)
+    # Interval-based jobs (0 = disabled). The old pool's scheduled scrape (`run_all_scrapes`) is no longer scheduled
+    # (job search PR 2, decided 2026-11-10): jobs come from a candidate's search (`job_postings`), and its scoring
+    # would name old jobs in logs that now point at `job_postings`. `scrape_interval_minutes` is ignored until the
+    # clean-up PR removes the old pool.
     if scrape_interval > 0:
-        scheduler.add_job(
-            run_all_scrapes,
-            IntervalTrigger(minutes=scrape_interval),
-            id="scrape_all",
-            replace_existing=True,
-        )
+        logger.info("scrape_interval_minutes is set but the old pool's scheduled scrape is retired; not scheduled")
 
     if email_interval > 0:
         scheduler.add_job(

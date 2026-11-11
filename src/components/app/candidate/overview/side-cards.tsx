@@ -10,46 +10,33 @@ import { PortalLogo } from "@/components/app/jobs/portal-logo";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import { useHref } from "@/lib/routes/use-href";
 
-/**
- * How ready the master resume is to send. It's the verified source every
- * tailored copy reuses, so verifying a claim here clears it everywhere.
- */
-export function ResumeReadiness({ master, reviewHref }: { master: CandidateWorkspace["master"]; reviewHref: string | null }) {
+/** The base résumé the workflow uses: its name, newest version and how many tailored copies hang off it. */
+export function BaseResumeCard({ base, onOpenResumes }: { base: CandidateWorkspace["base"]; onOpenResumes: () => void }) {
   const toHref = useHref();
-  if (!master) {
+  if (!base) {
     return (
       <Card>
-        <h2 className="mb-1 text-h3 text-[var(--color-text)]">Resume readiness</h2>
-        <p className="text-sm text-[var(--color-text-2)]">No master resume yet. Build one — tailored copies reuse its verified claims.</p>
-        <Button asChild size="sm" className="mt-3"><Link href={toHref("resumes.studio", { id: "new" })}>Build master resume</Link></Button>
+        <h2 className="mb-1 text-h3 text-[var(--color-text)]">Base résumé</h2>
+        <p className="text-sm text-[var(--color-text-2)]">No base résumé yet. The candidate&apos;s BDE uploads one on the Résumés tab.</p>
+        <Button size="sm" variant="secondary" className="mt-3" onClick={onOpenResumes}>Open Résumés</Button>
       </Card>
     );
   }
-  const percent = master.total ? Math.round((master.verified / master.total) * 100) : 100;
-  const blocked = master.gate.unverifiedCount;
   return (
     <Card>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-h3 text-[var(--color-text)]"><FileUser size={15} aria-hidden className="text-[var(--color-text-3)]" />Resume readiness</h2>
-        <span className="tabular text-body-strong text-[var(--color-text)]">{percent}%</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-[var(--radius-full)] bg-[var(--color-surface-3)]" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label="Master resume claims verified">
-        <div className={`h-full rounded-[var(--radius-full)] transition-[width] duration-[var(--duration-slow)] ${blocked ? "bg-[var(--color-warning-fg)]" : "bg-[var(--color-success-fg)]"}`} style={{ width: `${percent}%` }} />
-      </div>
-      <p className="mt-2.5 text-sm text-[var(--color-text-2)]">
-        <span className="tabular">{master.verified} of {master.total}</span> claims in the master resume verified.{" "}
-        {blocked ? `${blocked} still ${blocked === 1 ? "needs" : "need"} evidence before any copy can be exported.` : "Every copy can be exported."}
+      <h2 className="mb-2 flex items-center gap-2 text-h3 text-[var(--color-text)]"><FileUser size={15} aria-hidden className="text-[var(--color-text-3)]" />Base résumé</h2>
+      <p className="truncate text-body-strong text-[var(--color-text)]">{base.resume.name}</p>
+      <p className="mt-0.5 text-sm text-[var(--color-text-2)]">
+        <span className="tabular">v{base.version.versionNumber}</span> · {base.tailoredCount} tailored {base.tailoredCount === 1 ? "copy" : "copies"}
       </p>
-      {reviewHref && blocked ? (
-        <Link href={reviewHref} className="mt-2 inline-flex items-center gap-1 text-sm text-[var(--color-primary-subtle-fg)] hover:underline">
-          Review unverified claims <ArrowRight size={13} aria-hidden />
-        </Link>
-      ) : null}
+      <Link href={toHref("resumes.studio", { id: base.version.id })} className="mt-2 inline-flex items-center gap-1 text-sm text-[var(--color-primary-subtle-fg)] hover:underline">
+        Open <ArrowRight size={13} aria-hidden />
+      </Link>
     </Card>
   );
 }
 
-export function TopMatches({ matches, onFindJobs }: { matches: Array<{ job: Job; score: number }>; onFindJobs: () => void }) {
+export function TopMatches({ matches, onFindJobs, failed = false, onRetry }: { matches: Array<{ job: Job; score: number }>; onFindJobs?: () => void; /** The jobs didn't load: said, with Retry, not "no matches". */ failed?: boolean; onRetry?: () => void }) {
   const toHref = useHref();
   return (
     <Card className="p-0">
@@ -67,11 +54,13 @@ export function TopMatches({ matches, onFindJobs }: { matches: Array<{ job: Job;
             <MatchScore score={score} />
           </li>
         ))}
-        {matches.length === 0 ? <li className="px-4 py-4 text-sm text-[var(--color-text-3)]">No unapplied matches right now.</li> : null}
+        {failed ? (
+          <li role="alert" className="flex items-center justify-between gap-3 px-4 py-4 text-sm text-[var(--color-text-2)]">The jobs didn&apos;t load.<button type="button" onClick={onRetry} className="text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:underline">Retry</button></li>
+        ) : matches.length === 0 ? <li className="px-4 py-4 text-sm text-[var(--color-text-3)]">No unapplied matches right now.</li> : null}
       </ul>
-      <button type="button" onClick={onFindJobs} className="flex w-full items-center justify-center gap-1.5 border-t border-[var(--color-border)] py-2.5 text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:bg-[var(--color-primary-subtle)]">
+      {onFindJobs ? <button type="button" onClick={onFindJobs} className="flex w-full items-center justify-center gap-1.5 border-t border-[var(--color-border)] py-2.5 text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:bg-[var(--color-primary-subtle)]">
         <Sparkles size={14} aria-hidden /> Find more jobs
-      </button>
+      </button> : null}
     </Card>
   );
 }

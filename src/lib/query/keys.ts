@@ -24,9 +24,14 @@ const resource = <R extends string>(name: R) => ({
 
 export const queryKeys = {
   candidates: resource("candidates"),
-  jobs: resource("jobs"),
+  jobs: {
+    ...resource("jobs"),
+    /** A candidate's searches and today's usage ("Find jobs", docs/02 §6.z): under `jobs`, so a capture refreshes it. */
+    searches: (firmId: string, candidateId: string) => [firmId, "jobs", "searches", candidateId] as const,
+    /** The search this tab started for the candidate, until its outcome is read (never fetched: set on the start). */
+    startedSearch: (firmId: string, candidateId: string) => [firmId, "jobs", "started", candidateId] as const,
+  },
   applications: resource("applications"),
-  followups: resource("followups"),
   resumes: {
     ...resource("resumes"),
     byCandidate: (firmId: string, candidateId: string) => [firmId, "resumes", "byCandidate", candidateId] as const,
@@ -64,7 +69,6 @@ export const queryKeys = {
   /** /invite/[token]: public, before anyone signs in. */
   invite: (token: string) => ["invite", token] as const,
   /** The mock parser's sample résumé names (not firm data: the same fixtures for every firm). */
-  resumeSamples: () => ["resume-samples"] as const,
   companies: {
     all: () => ["companies"] as const,
     detail: (id: string) => ["companies", "detail", id] as const,

@@ -29,7 +29,6 @@ export const FirmDto = z.object({
   logo_url: z.string().nullable(),
   primary_timezone: z.string(),
   client_timezone: z.string(),
-  truth_guard_mode: z.string(),
   application_expiry_days: z.number(),
   status: z.string(),
   plan_id: id,
@@ -154,7 +153,6 @@ export function toFirm(dto: z.infer<typeof FirmDto>): Firm {
     logoUrl: dto.logo_url,
     primaryTimezone: dto.primary_timezone,
     clientTimezone: dto.client_timezone,
-    truthGuardMode: dto.truth_guard_mode,
     applicationExpiryDays: dto.application_expiry_days,
     status: dto.status,
     planId: mapId(dto.plan_id),
@@ -273,3 +271,7 @@ export function toLedgerEntry(dto: z.infer<typeof LedgerEntryDto>): LedgerEntry 
     createdAt: toIso(dto.created_at),
   });
 }
+
+/** `GET /api/admin/candidate-usage` (backend/api/routes_admin.py): each candidate's firm, status and BDE, counts only. */
+export const CandidateUsageDto = z.object({ firm_id: z.string(), status: z.string(), bde_id: z.string().nullable() });
+
