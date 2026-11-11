@@ -96,3 +96,87 @@ def test_a_job_outside_the_principals_candidates_is_not_found(anonymous_client, 
 
 def test_a_firm_with_no_jobs_lists_none(anonymous_client, world, adnans):
     assert _seen(_list(anonymous_client, world, "owner")) == []
+
+
+# ── A searched job's whole posting, on its first open (decided 2026-11-11) ──
+
+class _FullPostings:
+    """freehire.me's single-job read, made up: counts the calls; `fail` makes the next ones fail."""
+    name = "freehire"
+
+    def __init__(self):
+        self.calls, self.fail = 0, False
+
+    async def full_description(self, content):
+        from backend.job_search.providers.base import ProviderError
+        self.calls += 1
+        if self.fail:
+            raise ProviderError("timeout")
+        return content["description"] + "<p>The rest of the posting.</p>"
+
+
+@pytest.fixture
+def full_postings(monkeypatch):
+    from backend.job_search import providers
+    fake = _FullPostings()
+    monkeypatch.setitem(providers.REGISTRY, "freehire", fake)
+    return fake
+
+
+def _searched(test_db, world, candidate, n=1):
+    """A job a freehire.me search saved: its description cut like the search's."""
+    import hashlib
+    import uuid as uuid_
+    from backend.models.db import utcnow
+    from backend.models.job_search import JobPosting, ScrapeJob
+    candidate_id = uuid_.UUID(candidate["id"])
+    batch = ScrapeJob(firm_id=world["firm"].id, candidate_id=candidate_id, user_id=world["people"]["adnan"].id,
+                      batch_id=uuid_.uuid4(), kind="search", state="success", finished_at=utcnow(), meta={})
+    test_db.add(batch)
+    test_db.flush()
+    posting = JobPosting(firm_id=world["firm"].id, candidate_id=candidate_id, batch_id=batch.batch_id, source="freehire",
+                         first_source="freehire", job_id=hashlib.sha256(f"searched-{n}-{uuid_.uuid4()}".encode()).hexdigest(),
+                         content={"title": f"Searched Developer {n}", "company": "Example Corp", "public_slug": f"searched-{n}",
+                                  "description": "<p>The start of the posting.</p>", "url": "https://jobs.example.test/s"})
+    test_db.add(posting)
+    test_db.commit()
+    return str(posting.id)
+
+
+def test_the_first_open_brings_the_whole_posting_and_keeps_it(anonymous_client, world, adnans, full_postings, test_db):
+    posting_id = _searched(test_db, world, adnans)
+    first = _one(anonymous_client, world, "adnan", posting_id).json()
+    assert first["description"] == "The start of the posting.\nThe rest of the posting."
+    again = _one(anonymous_client, world, "owner", posting_id).json()
+    assert again["description"] == first["description"] and full_postings.calls == 1      # asked once, then kept
+
+
+def test_a_failed_read_shows_the_search_text_and_is_tried_again(anonymous_client, world, adnans, full_postings, test_db):
+    posting_id = _searched(test_db, world, adnans)
+    full_postings.fail = True
+    assert _one(anonymous_client, world, "adnan", posting_id).json()["description"] == "The start of the posting."
+    full_postings.fail = False
+    assert _one(anonymous_client, world, "adnan", posting_id).json()["description"].endswith("The rest of the posting.")
+    assert full_postings.calls == 2
+
+
+def test_a_captured_job_is_never_asked_for(anonymous_client, world, adnans, jobs, full_postings):
+    assert _one(anonymous_client, world, "adnan", jobs["own"]["id"]).status_code == 200
+    assert full_postings.calls == 0
+
+
+def test_a_support_view_sees_the_whole_posting_but_never_writes_it(world, adnans, full_postings, test_db):
+    """No platform-admin write into a firm: the support view's read fills the answer, not the row."""
+    import types
+    import uuid as uuid_
+    from backend.api.routes_job_search import FULL_POSTING_KEY, _fill_full_posting
+    from backend.models.job_search import JobPosting
+    posting_id = _searched(test_db, world, adnans)
+    row = test_db.get(JobPosting, uuid_.UUID(posting_id))
+    _fill_full_posting(test_db, row, types.SimpleNamespace(kind="platform"))
+    assert row.content["description"].endswith("<p>The rest of the posting.</p>")
+    test_db.rollback()
+    test_db.expire_all()
+    stored = test_db.get(JobPosting, uuid_.UUID(posting_id)).content
+    assert FULL_POSTING_KEY not in stored and stored["description"] == "<p>The start of the posting.</p>"
+

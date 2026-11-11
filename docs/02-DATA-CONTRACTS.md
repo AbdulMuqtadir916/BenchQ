@@ -1325,6 +1325,12 @@ and a viewer: the whole firm; a manager: their BDEs' candidates; a BDE: their ow
 the firm's owner). The list has **one item per job** (`job_postings.job_id`, the content hash), newest first, with
 `candidate_ids`: the visible candidates it was found or captured for. Its fields are the newest of those rows. One
 job's read is the same plus `description`; a posting outside the person's scope is 404.
+A searched job's description is the start of the posting only (freehire.me's search cuts it at about 1,000
+characters): its first open asks the provider's single-job read (`GET /api/v1/jobs/{public_slug}`, 5 s, one attempt)
+for the whole posting and keeps it in `content` (`_full_posting: true`), so it is asked once; a failed call leaves the
+search's text and is tried on the next open; a support view's read shows it but never writes it (decided 2026-11-11).
+The list never carries descriptions: the preview reads the selected job. Both lay the text out from the structure it
+has (`src/lib/format/job-description.ts`): facts, headings, bullets, paragraphs.
 
 **`Job` from a posting (the mapper; nothing invented):**
 

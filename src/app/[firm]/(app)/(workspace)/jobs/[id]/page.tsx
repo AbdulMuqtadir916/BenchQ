@@ -14,6 +14,7 @@ import type { Candidate } from "@/lib/schemas/candidate";
 import { PageHeader } from "@/components/app/page-header";
 import { VerificationBadge } from "@/components/app/verification-badge";
 import { SourceChip } from "@/components/app/source-chip";
+import { JobDescription } from "@/components/app/jobs/job-description";
 import { MatchScore } from "@/components/app/match-score";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
@@ -106,7 +107,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card>
           <CardHeader><CardTitle>Description</CardTitle></CardHeader>
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text-2)]">{job.description}</div>
+          {job.description ? <JobDescription text={job.description} /> : <p className="text-sm text-[var(--color-text-3)]">This job has no description.</p>}
           {job.requirements.length > 0 ? (
             <div className="mt-5">
               <h3 className="text-label mb-2 text-[var(--color-text-3)]">Requirements</h3>

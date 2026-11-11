@@ -175,3 +175,36 @@ def test_the_job_id_ignores_case_and_spacing_but_not_content():
     b = job_id(JobFields(title="java developer ", company="EXAMPLE CORP", description="Build services."))
     c = job_id(JobFields(title="Java Developer", company="Example Corp", description="Build other services."))
     assert a == b != c and len(a) == 64
+
+
+# ── freehire.me's single-job read: the whole posting (job search PR 3, decided 2026-11-11) ──
+
+def _full(content):
+    return asyncio.run(Freehire().full_description(content))
+
+
+def test_the_whole_posting_comes_from_the_job_by_its_slug_once_with_a_short_limit(monkeypatch):
+    whole = "<p>Build services in Java.</p>" + "<p>More of the posting.</p>" * 60
+    calls = _serve(monkeypatch, lambda request, n: httpx.Response(200, json={"data": {"description": whole}}))
+    content = {**MADE_UP_JOB, "public_slug": "java-developer-example-corp-ab12cd"}
+    assert _full(content) == whole
+    assert [str(c.url) for c in calls] == ["https://freehire.me/api/v1/jobs/java-developer-example-corp-ab12cd"]
+
+
+@pytest.mark.parametrize("slug", [None, "", "../admin", "Java Developer", "a" * 201, 7])
+def test_no_call_without_a_plain_slug(monkeypatch, slug):
+    calls = _serve(monkeypatch, lambda request, n: httpx.Response(200, json={"data": {"description": "x" * 5000}}))
+    assert _full({**MADE_UP_JOB, "public_slug": slug}) is None
+    assert calls == []
+
+
+def test_nothing_longer_than_the_search_gave_is_none(monkeypatch):
+    _serve(monkeypatch, lambda request, n: httpx.Response(200, json={"data": {"description": "<p>short</p>"}}))
+    assert _full({**MADE_UP_JOB, "public_slug": "java-developer-1"}) is None
+
+
+def test_a_failed_single_job_read_is_not_retried(monkeypatch, no_wait):
+    calls = _serve(monkeypatch, lambda request, n: httpx.Response(502))
+    with pytest.raises(ProviderError):
+        _full({**MADE_UP_JOB, "public_slug": "java-developer-1"})
+    assert len(calls) == 1

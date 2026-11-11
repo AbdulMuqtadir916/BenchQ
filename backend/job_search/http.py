@@ -26,8 +26,8 @@ class _Retry(Exception):
         self.code = code
 
 
-async def _once(url: str, params: dict, headers: dict) -> dict:
-    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=False, transport=transport) as client:
+async def _once(url: str, params: dict, headers: dict, timeout: float) -> dict:
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, transport=transport) as client:
         async with client.stream("GET", url, params=params, headers=headers) as resp:
             status = resp.status_code
             if status == 429 or status >= 500:
@@ -51,29 +51,32 @@ async def _once(url: str, params: dict, headers: dict) -> dict:
     return payload
 
 
-async def _attempt(url: str, params: dict, headers: dict) -> dict:
+async def _attempt(url: str, params: dict, headers: dict, timeout: float) -> dict:
     try:
-        return await asyncio.wait_for(_once(url, params, headers), timeout=TIMEOUT_SECONDS)
+        return await asyncio.wait_for(_once(url, params, headers, timeout), timeout=timeout)
     except (asyncio.TimeoutError, httpx.TimeoutException):
         raise _Retry("timeout") from None
     except httpx.TransportError:
         raise _Retry("provider_unavailable") from None
 
 
-async def get_json(url: str, params: dict, *, headers: dict | None = None, source: str = "") -> dict:
-    """The source's JSON object, or `ProviderError`. Logs the outcome by code and timing only."""
+async def get_json(url: str, params: dict, *, headers: dict | None = None, source: str = "",
+                   timeout: float | None = None, attempts: int = 2) -> dict:
+    """The source's JSON object, or `ProviderError`. Logs the outcome by code and timing only. A page waiting on the
+    call (a job's full posting, job search PR 3) passes a shorter `timeout` and one attempt."""
     started = time.monotonic()
     headers = headers or {}
-    for attempt in (1, 2):
+    timeout = TIMEOUT_SECONDS if timeout is None else timeout       # read now: tests and settings may change it
+    for attempt in range(1, attempts + 1):
         try:
-            payload = await _attempt(url, params, headers)
+            payload = await _attempt(url, params, headers, timeout)
             logger.info("job search source=%s attempt=%d ok ms=%d", source, attempt,
                         (time.monotonic() - started) * 1000)
             return payload
         except _Retry as retry:
             logger.warning("job search source=%s attempt=%d code=%s ms=%d", source, attempt, retry.code,
                            (time.monotonic() - started) * 1000)
-            if attempt == 2:
+            if attempt == attempts:
                 raise ProviderError(retry.code) from None
             await asyncio.sleep(RETRY_DELAY_SECONDS)
         except ProviderError as error:

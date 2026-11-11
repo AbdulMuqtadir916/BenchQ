@@ -16,6 +16,7 @@ Who (decided 2026-11-10): a search, only the candidate's assigned BDE (`job.sear
 anyone who can see the candidate. A support view reads only (backend/auth/access.py). The country is the candidate's
 résumé country (`Candidate.country`), never a request field.
 """
+import asyncio
 import uuid
 from typing import Annotated, Literal
 
@@ -33,6 +34,7 @@ from backend.auth.sessions import Principal
 from backend.job_monitor import JobAlreadyRunningError, launch_background
 from backend.job_search import limits, pipeline, providers
 from backend.job_search.country import search_country
+from backend.job_search.providers.base import ProviderError
 from backend.job_search.text import safe_url, typed_text
 from backend.models.candidates import Candidate
 from backend.models.db import get_db, utcnow
@@ -262,6 +264,28 @@ def _id_or_404(value: str) -> uuid.UUID:
         raise HTTPException(status_code=404, detail="Not found.") from None
 
 
+# Set in a posting's `content` once its provider's single-job read has replaced the search's cut description.
+FULL_POSTING_KEY = "_full_posting"
+
+
+def _fill_full_posting(db: DbSession, row: JobPosting, principal: Principal) -> None:
+    """A searched job's description is the search's first ~1,000 characters (freehire.me cuts it). Its first open asks
+    the provider for the whole posting (decided 2026-11-11) and keeps it in `content`, so it is asked once. A support
+    view shows it but never writes it (no platform-admin write into a firm). A failed call leaves the search's text
+    and is tried again on the next open."""
+    content = row.content or {}
+    fetch = getattr(providers.REGISTRY.get(row.source), "full_description", None)
+    if fetch is None or content.get(FULL_POSTING_KEY):
+        return
+    try:
+        full = asyncio.run(fetch(content))           # this sync route runs in a worker thread, outside the event loop
+    except ProviderError:
+        return
+    row.content = {**content, **({"description": full} if full else {}), FULL_POSTING_KEY: True}
+    if principal.kind == "firm":
+        db.commit()
+
+
 def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
     """One job, from the visible postings that share its content hash: the newest seen row's fields, and the
     candidates it was found or captured for. A posting's own candidate and batch aren't the job's, so they're left
@@ -309,6 +333,7 @@ def get_firm_job(firm_id: uuid.UUID, posting_id: str, principal: Principal = Dep
         raise HTTPException(status_code=404, detail="Not found.")
     rows = scoped(db, JobPosting, firm_id).filter(JobPosting.job_id == row.job_id,
                                                   JobPosting.candidate_id.in_(visible)).all()
+    _fill_full_posting(db, row, principal)
     out = _job_json(rows, with_description=True)
     # The page is this posting's: its own fields, even when another candidate's copy was seen more recently.
     out.update({k: v for k, v in _posting_json(row, with_description=True).items() if k not in ("candidate_id", "batch_id")})

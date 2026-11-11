@@ -4,14 +4,21 @@
 One call: `GET /api/v1/jobs/search?q=<query>&countries=<us|ca|in>&limit=100&offset=<n>`. The cursor is the offset:
 the next search of the same role asks for the next 100 (job search PR 2). `countries` filters by country (a plain
 `country=` is ignored by the API). The reply is `{"data": [job, …], "meta": {"limit", "offset", "total"}}`; each job
-carries the employer's apply link, an HTML description, location, countries, skills and an `enrichment` object, so no
-second call per job is needed. A job with `closed_at` set is closed.
+carries the employer's apply link, an HTML description, location, countries, skills and an `enrichment` object. The
+search cuts each description at about 1,000 characters; `GET /api/v1/jobs/{public_slug}` has the whole posting, asked
+for once, when someone first opens the job (job search PR 3, decided 2026-11-11). A job with `closed_at` set is closed.
 """
+import re
+
 from backend.job_search import http
 from backend.job_search.providers.base import JobFields, ProviderError, SearchResult
 from backend.job_search.text import clean_str, html_to_text, safe_url
 
 API_URL = "https://freehire.me/api/v1/jobs/search"
+JOB_URL = "https://freehire.me/api/v1/jobs/{slug}"
+# A page waits on the single-job read: short, one attempt; on failure the search's text stays.
+FULL_POSTING_TIMEOUT_SECONDS = 5.0
+_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,199}$")
 
 
 def _strings(value) -> tuple[str, ...]:
@@ -40,6 +47,20 @@ class Freehire:
         more = bool(jobs) and (total is None or reached < total)
         return SearchResult(jobs=[j for j in jobs[:limit] if isinstance(j, dict)],
                             metadata={**rest, "total": total}, next_cursor=str(reached) if more else None)
+
+    async def full_description(self, content: dict) -> str | None:
+        """The whole posting's HTML description, from the single-job read; None when the job has no usable slug or the
+        source has nothing longer. `ProviderError` when the call fails."""
+        slug = content.get("public_slug")
+        if not isinstance(slug, str) or not _SLUG.match(slug):
+            return None
+        payload = await http.get_json(JOB_URL.format(slug=slug), {}, source=f"{self.name}-job",
+                                      timeout=FULL_POSTING_TIMEOUT_SECONDS, attempts=1)
+        job = payload.get("data")
+        full = job.get("description") if isinstance(job, dict) else None
+        if not isinstance(full, str) or len(full) <= len(content.get("description") or ""):
+            return None
+        return full
 
     def read(self, content: dict) -> JobFields:
         enrichment = content.get("enrichment") if isinstance(content.get("enrichment"), dict) else {}

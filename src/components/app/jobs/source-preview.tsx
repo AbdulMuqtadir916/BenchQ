@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tag } from "@/components/ui/tag";
 import { PORTALS, PortalLogo, type PortalKey } from "@/components/app/jobs/portal-logo";
+import { JobDescription } from "@/components/app/jobs/job-description";
 
 /**
  * The selected job as its source shows it. The list leaves descriptions out (a list of up to 400 jobs stays small,
@@ -65,15 +66,5 @@ function Description({ job }: { job: Job }) {
     );
   }
   if (!description) return <p className="text-sm text-[var(--color-text-3)]">This job has no description.</p>;
-  const lines = description.split("\n").map((line) => line.trim()).filter(Boolean);
-  return (
-    <div className="space-y-3 text-sm leading-6 text-[var(--color-text-2)]">
-      {lines.map((line, index) => {
-        const isHeading = /^(Responsibilities|Requirements|Nice to have|Qualifications|About (the|this) (role|job)):?$/i.test(line);
-        if (isHeading) return <h4 key={`${index}-${line}`} className="pt-2 text-body-strong text-[var(--color-text)]">{line.replace(/:$/, "")}</h4>;
-        if (/^[-•*]\s/.test(line)) return <p key={`${index}-${line}`} className="flex gap-2"><span className="mt-[9px] h-1 w-1 shrink-0 rounded-[var(--radius-full)] bg-[var(--color-primary)]" /><span>{line.replace(/^[-•*]\s/, "")}</span></p>;
-        return <p key={`${index}-${line}`}>{line}</p>;
-      })}
-    </div>
-  );
+  return <JobDescription text={description} />;
 }
