@@ -180,3 +180,26 @@ def test_a_support_view_sees_the_whole_posting_but_never_writes_it(world, adnans
     stored = test_db.get(JobPosting, uuid_.UUID(posting_id)).content
     assert FULL_POSTING_KEY not in stored and stored["description"] == "<p>The start of the posting.</p>"
 
+
+def test_the_whole_posting_does_not_overwrite_a_refresh_made_while_it_was_fetched(anonymous_client, world, adnans,
+                                                                                  full_postings, test_db, monkeypatch):
+    """A search refreshing the job while the single-job read waits keeps its fields (CodeRabbit on #135)."""
+    import uuid as uuid_
+    from backend.models.db import SessionLocal
+    from backend.models.job_search import JobPosting
+    posting_id = _searched(test_db, world, adnans)
+    real = full_postings.full_description
+
+    async def refreshed_meanwhile(content):
+        with SessionLocal() as other:                    # the search, in its own session
+            row = other.get(JobPosting, uuid_.UUID(posting_id))
+            row.content = {**row.content, "location": "Refreshed City"}
+            other.commit()
+        return await real(content)
+    monkeypatch.setattr(full_postings, "full_description", refreshed_meanwhile)
+    assert _one(anonymous_client, world, "adnan", posting_id).status_code == 200
+    test_db.expire_all()
+    content = test_db.get(JobPosting, uuid_.UUID(posting_id)).content
+    assert content["location"] == "Refreshed City" and content["_full_posting"] is True
+    assert content["description"].endswith("<p>The rest of the posting.</p>")
+

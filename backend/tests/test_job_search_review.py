@@ -299,3 +299,33 @@ def test_a_failed_start_check_ends_the_search_as_an_error_not_running(world, adn
     batch = test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == batch_id).one()
     assert result == "failed: internal" and fake.calls == []
     assert batch.state == "error" and batch.meta["error_code"] == "internal"
+
+
+# ── The bot reviews on #135, PR 3's backend part ──
+
+def test_a_search_refreshing_a_job_keeps_its_whole_posting(world, adnans, fake, test_db):
+    """The whole posting fetched on a job's first open stays when a later search of the same source refreshes it."""
+    from backend.models.job_search import JobPosting
+    fake.jobs = [_job(1)]
+    _run(world, adnans)
+    posting = test_db.query(JobPosting).filter(JobPosting.candidate_id == uuid.UUID(adnans["id"])).one()
+    posting.content = {**posting.content, "d": "the whole posting", "description": "the whole posting", "_full_posting": True}
+    test_db.commit()
+    _run(world, adnans)                                  # the same job again: a refresh
+    test_db.expire_all()
+    content = test_db.get(JobPosting, posting.id).content
+    assert content["_full_posting"] is True and content["description"] == "the whole posting"
+
+
+def test_a_hand_off_note_is_not_shown_to_a_platform_admin():
+    """CodeAnt on #135 (Abdul's file, at his request): the firm's note on an ASSIGN entry stays in the firm."""
+    import types
+    from backend.auth.serialize import ledger_entry_json
+    entry = types.SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), candidate_id=uuid.uuid4(), actor_user_id=None,
+                                  actor_type="USER", actor_name="Manager", entity_type="candidate", entity_id="c1",
+                                  entity_label="A candidate", action="ASSIGN", summary="Assigned to a BDE.",
+                                  note="Over to you: they prefer remote roles.", model_id=None, prompt_version=None,
+                                  created_at=None)
+    assert ledger_entry_json(entry, hide_email=True)["note"] is None
+    assert ledger_entry_json(entry, hide_email=True)["summary"] == "Assigned to a BDE."
+    assert ledger_entry_json(entry)["note"] == "Over to you: they prefer remote roles."

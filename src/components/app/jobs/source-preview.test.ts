@@ -27,6 +27,12 @@ describe("the source preview (docs/02 §6.z): the description comes from the one
     expect(html).toContain("AWS");
   });
 
+  it("never calls an undated posting recent", () => {
+    const html = render(new QueryClient());
+    expect(html).toContain("Posting date not given");
+    expect(html).not.toContain("recently");
+  });
+
   it("says it is loading until the read answers", () => {
     const html = render(new QueryClient());
     expect(html).toContain("Loading the job description");

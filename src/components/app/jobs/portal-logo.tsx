@@ -18,7 +18,7 @@ export const PORTALS: Record<PortalKey, { label: string; logo?: string; color: s
 };
 
 /** The sources a job list can be filtered by. */
-export const SOURCE_KEYS = ["FREEHIRE", "MANUAL", "EXTENSION"] as const satisfies readonly PortalKey[];
+export const SOURCE_KEYS = ["FREEHIRE", "OTHER_SOURCE", "MANUAL", "EXTENSION"] as const satisfies readonly PortalKey[];
 
 export function portalForJob(job: Job): PortalKey {
   if (job.provenance.sourceType === "MANUAL") return "MANUAL";

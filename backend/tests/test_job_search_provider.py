@@ -223,3 +223,13 @@ def test_a_failed_single_job_read_is_not_retried(monkeypatch, no_wait):
     with pytest.raises(ProviderError):
         _full({**MADE_UP_JOB, "public_slug": "java-developer-1"})
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("reply", [{}, {"data": None}, {"data": {"title": "x"}}, {"data": {"description": 7}}])
+def test_a_single_job_reply_without_the_job_is_a_failure(monkeypatch, reply):
+    """A malformed reply is tried again on the next open, not marked done (CodeRabbit on #135)."""
+    _serve(monkeypatch, lambda request, n: httpx.Response(200, json=reply))
+    with pytest.raises(ProviderError) as e:
+        _full({**MADE_UP_JOB, "public_slug": "java-developer-1"})
+    assert e.value.code == "bad_response"
+

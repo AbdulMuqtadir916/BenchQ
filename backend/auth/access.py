@@ -183,6 +183,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/admin/invites/{invite_id}/resend": A,
     "POST /api/admin/invites/{invite_id}/revoke": A,
     "GET /api/admin/users": A,
+    "GET /api/admin/candidate-usage": A,                 # counts only (job search PR 3)
     "GET /api/admin/team": A,
     "GET /api/admin/audit": A,
     "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)

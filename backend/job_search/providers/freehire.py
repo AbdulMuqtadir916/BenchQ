@@ -58,9 +58,9 @@ class Freehire:
                                       timeout=FULL_POSTING_TIMEOUT_SECONDS, attempts=1)
         job = payload.get("data")
         full = job.get("description") if isinstance(job, dict) else None
-        if not isinstance(full, str) or len(full) <= len(content.get("description") or ""):
-            return None
-        return full
+        if not isinstance(full, str):     # a reply without the job: a failure, tried again (CodeRabbit on #135)
+            raise ProviderError("bad_response")
+        return full if len(full) > len(content.get("description") or "") else None
 
     def read(self, content: dict) -> JobFields:
         enrichment = content.get("enrichment") if isinstance(content.get("enrichment"), dict) else {}

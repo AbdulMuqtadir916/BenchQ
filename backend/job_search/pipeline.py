@@ -203,6 +203,9 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
         for key, content in picked:
             row = existing.get(key)
             if row is not None:
+                if (row.content or {}).get("_full_posting") and row.source == provider.name:
+                    # The whole posting fetched on its first open stays (CodeRabbit on #135): the search's is cut.
+                    content = {**content, "description": row.content.get("description"), "_full_posting": True}
                 row.batch_id, row.last_seen_at, row.content, row.source = batch_id, now, content, provider.name
                 counts["refreshed"] += 1
             elif counts["saved"] < room:

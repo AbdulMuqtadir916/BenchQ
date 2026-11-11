@@ -23,7 +23,10 @@ function JobsContent() {
   const principal = useSignedInPrincipal();
   const focusId = useSearchParams().get("candidate");
   const reduce = useReducedMotion() ?? false;
-  const jobsQuery = useJobs({ limit: 400 });
+  // The candidate picked in the explorer: their own jobs are read (the firm's newest 400 can leave theirs out, bot
+  // review on #135); none picked, the firm's.
+  const [pickedId, setPickedId] = useState<string | null>(focusId);
+  const jobsQuery = useJobs({ limit: 400, candidateId: pickedId || undefined });
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
   const [introDoneFor, setIntroDoneFor] = useState<string | null>(null);
@@ -85,6 +88,7 @@ function JobsContent() {
                 applications={applicationsQuery.data ?? []}
                 loading={isLoading}
                 initialCandidateId={focus?.id}
+                onCandidateChange={(id) => setPickedId(id || null)}
                 animateRows={!!focus}
                 toolbarBordered={false}
               />

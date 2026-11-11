@@ -16,6 +16,7 @@ ROUTE_FILES = sorted((BACKEND / "api").glob("routes_*.py")) + [BACKEND / "api" /
 
 # (file, function) -> why it may query a firm-owned model without `scoped()`.
 ALLOWED = {
+    ("routes_admin.py", "candidate_usage"): "platform admins only (A); counts every firm's candidates by firm, status and BDE, no candidate detail",
     ("routes_inbox.py", "_disconnect_locked"): "internal same-Gmail pending grant invalidation under project revoke barrier; no cross-firm data returned",
     ("routes_inbox.py", "_retire_attempt"): "internal global grant-safety probe only; never returns another tenant identity; Google revoke is project-wide",
     ("routes_inbox.py", "cleanup_expired_grants"): "scheduled cross-firm encrypted-grant cleanup, not a user-readable query",

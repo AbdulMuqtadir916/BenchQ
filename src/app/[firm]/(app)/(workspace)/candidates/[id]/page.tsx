@@ -94,8 +94,13 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   // can't start (no role, no country, today's limit, one running), the tab opens and the header says why.
   const { mutate: startMutate, isPending: isStartPending } = startSearch;
   const findJobs = useCallback(() => {
-    if (role && !searchBlocked && !isSearching && !isStartPending) startMutate(role);
-    setMatchRun((n) => n + 1);
+    // The matching sequence plays only for a search that starts, and stops if the backend refuses it; otherwise the
+    // Jobs tab just opens and the header says why (CodeRabbit on #135).
+    if (role && !searchBlocked && !isSearching && !isStartPending) {
+      let run = 0;
+      setMatchRun((n) => (run = n + 1));
+      startMutate(role, { onError: () => setMatchDone((done) => Math.max(done, run)) });
+    }
     setTab("jobs");
     requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
   }, [role, searchBlocked, isSearching, isStartPending, startMutate, setTab, reduce]);
@@ -174,6 +179,8 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
               jobs={ws.jobsQuery.data ?? []}
               applications={ws.applications}
               isLoading={ws.jobsQuery.isLoading || ws.applicationsQuery.isLoading}
+              error={ws.jobsQuery.error}
+              onRetry={() => void ws.jobsQuery.refetch()}
               isMatching={matchRun > matchDone}
               isSearching={isSearching}
               hasMatched={matchRun > 0}

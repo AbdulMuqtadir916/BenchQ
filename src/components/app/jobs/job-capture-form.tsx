@@ -81,11 +81,16 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
           <h2 id="capture-for-heading" className="text-body-strong text-[var(--color-text)]">For</h2>
           {candidatesQuery.isLoading ? (
             <p className="text-caption text-[var(--color-text-3)]">Loading your candidates…</p>
+          ) : candidatesQuery.error ? (
+            <div role="alert" className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-2)]">
+              <span>Your candidates didn&apos;t load.</span>
+              <Button type="button" variant="secondary" size="sm" onClick={() => void candidatesQuery.refetch()}>Retry</Button>
+            </div>
           ) : options.length === 0 ? (
             <p className="text-sm text-[var(--color-text-2)]">You have no candidates to capture a job for. A job is captured for a candidate you are the BDE of.</p>
           ) : (
             <FieldLabel label="Candidate">
-              <Select value={chosen} options={choices} onValueChange={setCandidateId} aria-label="Candidate" />
+              <Select value={chosen} options={choices} onValueChange={(value) => { setCandidateId(value); setProblem(null); }} aria-label="Candidate" />
             </FieldLabel>
           )}
         </section>

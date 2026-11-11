@@ -81,6 +81,11 @@ export function stubBackendReads(): void {
     return mockResult(firm);
   });
   vi.spyOn(platformApi.firms, "list").mockImplementation(() => mockResult(firms));
+  // Candidate usage is the backend's counts (GET /api/admin/candidate-usage): the test candidates' firm, status and BDE.
+  vi.spyOn(platformApi.candidates, "usage").mockImplementation(() => {
+    injectedFailure("platform.candidates.usage");
+    return mockResult(fixtureCandidates.map((candidate) => ({ firmId: candidate.firmId, status: candidate.status, bdeId: candidate.bdeId })));
+  });
   vi.spyOn(platformApi.users, "list").mockImplementation((firmId) => mockResult(firmId ? inFirm(allUsers, firmId) : allUsers));
   vi.spyOn(platformApi.invites, "list").mockImplementation((firmId) => mockResult(firmId === undefined ? invites : invites.filter((invite) => invite.firmId === firmId)));
   vi.spyOn(platformApi.plans, "list").mockImplementation(() => mockResult(plans));

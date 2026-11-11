@@ -29,6 +29,7 @@ describe("a job from the backend (docs/02 §6.z): what a posting knows, nothing 
       apply_url: "javascript:alert(1)", is_closed: true, candidate_ids: [] }), "firm_hts");
     expect(job).toMatchObject({ remoteMode: "REMOTE", employmentType: null, postedAt: null, applyUrl: null, isActive: false });
     expect(toFirmJob(FirmJobDto.parse({ ...posting, location: null, candidate_ids: [] }), "f").city).toBeNull();
+    expect(toFirmJob(FirmJobDto.parse({ ...posting, location: "Austin, TX (Hybrid)", candidate_ids: [] }), "f").remoteMode).toBe("HYBRID");
   });
 
   it("a captured job is its candidate's, and says how it was added", () => {

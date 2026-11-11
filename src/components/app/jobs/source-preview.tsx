@@ -30,7 +30,7 @@ export function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) 
         <div className="p-5">
           <div className="mb-5 flex items-start gap-3">
             <PortalLogo portal="COMPANY" domain={job.company.domain} size={40} />
-            <div><h3 className="text-h2 text-[var(--color-text)]">{job.title}</h3><p className="mt-0.5 text-sm text-[var(--color-text-2)]">{job.company.name} · {jobLocation(job)}</p><p className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><Clock3 size={12} />Posted {job.postedAt ? formatRelative(job.postedAt) : "recently"}{job.applicantCount ? ` · ${job.applicantCount} applicants` : ""}</p></div>
+            <div><h3 className="text-h2 text-[var(--color-text)]">{job.title}</h3><p className="mt-0.5 text-sm text-[var(--color-text-2)]">{job.company.name} · {jobLocation(job)}</p><p className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><Clock3 size={12} />{job.postedAt ? `Posted ${formatRelative(job.postedAt)}` : "Posting date not given"}{job.applicantCount ? ` · ${job.applicantCount} applicants` : ""}</p></div>
           </div>
           <Description job={job} />
           {job.requirements.length > 0 ? (

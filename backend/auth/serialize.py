@@ -61,6 +61,9 @@ def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
     """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case. `hide_email`: the reader is a platform
     admin, so a restricted entry's content is replaced (`_RESTRICTED`)."""
     restricted = _RESTRICTED.get(entry.entity_type) if hide_email else None
+    # A hand-off's note is what the firm wrote about its candidate: not for a platform admin (CodeAnt on #135, done at
+    # Abdul's request). The entry itself (who was moved where) stays.
+    note = None if restricted or (hide_email and entry.action == "ASSIGN") else entry.note
     return {
         "id": str(entry.id), "firm_id": str(entry.firm_id) if entry.firm_id else None,
         "candidate_id": str(entry.candidate_id) if entry.candidate_id else None,
@@ -69,7 +72,7 @@ def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
         "entity_label": (restricted[0] or entry.entity_label) if restricted else entry.entity_label,
         "action": entry.action,
         "summary": restricted[1] if restricted else entry.summary,
-        "note": None if restricted else entry.note,
+        "note": note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
         "created_at": _iso(entry.created_at),
     }

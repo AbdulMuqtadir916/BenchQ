@@ -86,20 +86,24 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   const blocked = blockedReason(candidate, searches);
   const last = searches?.searches.find((search) => search.kind === "SEARCH") ?? null;
   const refusal = search.refusal;
+  // Today's searches didn't load: whether one runs, and the day's usage, are unknown, so no start (CodeRabbit on #135).
+  const isUnknown = !searches && Boolean(searchesQuery.error);
 
   function run() {
-    if (!role || blocked || isSearching) return;
+    if (!role || blocked || isSearching || isUnknown) return;
     search.run();
   }
 
   return (
     <div className="flex flex-col items-start gap-1 sm:items-end">
-      <Button variant="secondary" onClick={run} disabled={Boolean(blocked) || isSearching} aria-describedby={`find-jobs-${candidate.id}`}>
+      <Button variant="secondary" onClick={run} disabled={Boolean(blocked) || isSearching || isUnknown} aria-describedby={`find-jobs-${candidate.id}`}>
         {isSearching ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
         {isSearching ? "Searching…" : "Find jobs"}
       </Button>
       <p id={`find-jobs-${candidate.id}`} className="max-w-xs text-caption text-[var(--color-text-3)] sm:max-w-none sm:text-right" aria-live="polite">
-        {blocked ? (
+        {isUnknown ? (
+          <span className="inline-flex items-center gap-2">Today&apos;s searches didn&apos;t load.<button type="button" onClick={() => void searchesQuery.refetch()} className="underline">Retry</button></span>
+        ) : blocked ? (
           !candidate.country?.trim() && resumeHref && searchRole(candidate) ? <Link href={resumeHref} className="underline">{blocked}</Link> : blocked
         ) : refusal ? (
           <span className="text-[var(--color-danger-fg)]">{refusal}</span>

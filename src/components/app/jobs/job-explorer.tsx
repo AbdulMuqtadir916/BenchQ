@@ -76,6 +76,7 @@ export function JobExplorer({
   loading = false,
   lockedCandidate,
   initialCandidateId,
+  onCandidateChange,
   animateRows = false,
   showToolbar = true,
   toolbarBordered = true,
@@ -88,6 +89,8 @@ export function JobExplorer({
   lockedCandidate?: Candidate;
   /** Preselect a candidate context (e.g. arriving from "Find jobs" on a profile). */
   initialCandidateId?: string;
+  /** Called when the candidate picked changes, so the page can read that candidate's own jobs (docs/02 §6.z). */
+  onCandidateChange?: (candidateId: string) => void;
   /** Stagger the first rows in — used right after the matching intro. */
   animateRows?: boolean;
   showToolbar?: boolean;
@@ -202,7 +205,7 @@ export function JobExplorer({
               <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-[var(--color-text-3)]" />
               <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, company, location…" className="pl-8" />
             </label>
-            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); setSelectedId(""); setScoreFloor(value ? "70" : "0"); setSort(value ? "MATCH" : "NEWEST"); }} aria-label="Candidate context" /> : <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" />}
+            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor(value ? "70" : "0"); setSort(value ? "MATCH" : "NEWEST"); }} aria-label="Candidate context" /> : <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" />}
             {!lockedCandidate ? <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" /> : null}
             <Select value={remote} options={REMOTE_OPTIONS} onValueChange={setRemote} aria-label="Work mode" />
             <Select value={scoreFloor} options={SCORE_OPTIONS} onValueChange={setScoreFloor} aria-label="Minimum match score" disabled={!context} />

@@ -1217,13 +1217,12 @@ export const JobMarkSchema = z.object({
   the content hash.** `applications.job_id` moves in Arbaz's own PR (docs/team/arbaz.md, "Repoint `applications.job_id`"); until then an
   application's job and its tailored résumé's job are in different tables, so the prep page and the tracker can't
   pair them (nothing creates a tailored résumé today; those tests are strict xfails).
-- **Not yet built:** repointing
-  `applications.job_id` / `job_runs.target_job_id` off the old `jobs` table onto this one. The old `jobs` table and
-  everything still pointing at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`, `job_runs`) is
-  unchanged for now; retiring it and reclaiming the `jobs` name is a later migration once those are repointed.
-- **Frontend contract:** none yet — the routes exist (below), but there is no adapter, DTO mapper, or screen (PR 2). `JobSchema`/`CompanySchema`
-  above describe the existing mock-backed job explorer, not this table; reconciling (or replacing) that contract
-  is separate, later work once this module starts serving real screens.
+- **Not yet built:** repointing `applications.job_id` off the old `jobs` table onto this one (Arbaz's PR,
+  docs/team/arbaz.md); `job_runs.target_job_id` already points here (0023). The old `jobs` table and what still points
+  at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`) stay until the clean-up PR retires it and
+  reclaims the `jobs` name.
+- **Frontend contract:** §6.z (job search PR 3): the job screens read `job_postings` through `src/lib/api/jobs.ts` and
+  the mapper `src/lib/api/dto/jobs.ts`, which turns a posting into the existing `JobSchema`; there is no jobs mock.
 - **Second source, freehire.me (decided 2026-11-09, still applies under the `content` design):** target markets
   are US, Canada and India, so a posting can legitimately list more than one country/city (e.g. a remote NA role
   open to `["us", "ca"]`). Rather than a multi-location child table (the old `job_locations` pattern, dropped),
@@ -1339,7 +1338,7 @@ has (`src/lib/format/job-description.ts`): facts, headings, bullets, paragraphs.
 | `id`, `title`, `description`, `applyUrl`, `postedAt` | as sent (`postedAt` only when it is a date-time) |
 | `company` | built from the name alone: everything else unknown (`null`), `clientType: 'UNKNOWN'` |
 | `city` / `state` | the location text / `null` (the screens print the text alone) |
-| `remoteMode` | `REMOTE` when the location says remote, else `ONSITE` |
+| `remoteMode` | `REMOTE` when the location says remote, `HYBRID` when it says hybrid, else `ONSITE` |
 | `employmentType` | a known value, else `null` |
 | `allowedWorkAuth` | `[]`: **unknown**, and the screens show a job with unknown work authorization |
 | pay, `applicantCount`, `excludesC2C` | `null` / `null` / `false` |

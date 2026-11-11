@@ -281,9 +281,14 @@ def _fill_full_posting(db: DbSession, row: JobPosting, principal: Principal) -> 
         full = asyncio.run(fetch(content))           # this sync route runs in a worker thread, outside the event loop
     except ProviderError:
         return
-    row.content = {**content, **({"description": full} if full else {}), FULL_POSTING_KEY: True}
-    if principal.kind == "firm":
-        db.commit()
+    if principal.kind != "firm":
+        row.content = {**content, **({"description": full} if full else {}), FULL_POSTING_KEY: True}
+        return                                      # shown, never written (a support view)
+    # Re-read the row under a lock: a search may have refreshed it while the call waited (CodeRabbit on #135), so only
+    # the description and the marker are laid over its latest content.
+    db.refresh(row, with_for_update=True)
+    row.content = {**(row.content or {}), **({"description": full} if full else {}), FULL_POSTING_KEY: True}
+    db.commit()
 
 
 def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
