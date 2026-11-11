@@ -175,3 +175,18 @@ def test_the_job_id_ignores_case_and_spacing_but_not_content():
     b = job_id(JobFields(title="java developer ", company="EXAMPLE CORP", description="Build services."))
     c = job_id(JobFields(title="Java Developer", company="Example Corp", description="Build other services."))
     assert a == b != c and len(a) == 64
+
+
+def test_the_time_limit_covers_the_retry_too(monkeypatch):
+    """Two stalled attempts can't take 20 s each: the retry gets what is left of the whole call's limit."""
+    import time
+    monkeypatch.setattr(http, "TIMEOUT_SECONDS", 0.4)
+    monkeypatch.setattr(http, "RETRY_DELAY_SECONDS", 0.05)
+
+    async def hang(*args, **kwargs):
+        await asyncio.sleep(5)
+    monkeypatch.setattr(http, "_once", hang)
+    started = time.monotonic()
+    with pytest.raises(ProviderError) as e:
+        _search()
+    assert e.value.code == "timeout" and time.monotonic() - started < 0.7

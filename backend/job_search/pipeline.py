@@ -198,12 +198,24 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
     marks its `job_runs` row failed."""
     provider = REGISTRY[provider_name]
     started = time.monotonic()
-    if not await asyncio.to_thread(_still_running, firm_id, candidate_id, batch_id):
+    ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
+               country=country)
+    try:
+        still_running = await asyncio.to_thread(_still_running, firm_id, candidate_id, batch_id)
+    except Exception as error:          # a database blip: the batch ends as an error now, not `running` for 15 minutes
+        logger.error("job search batch=%s candidate=%s start check failed %s", batch_id, candidate_id,
+                     type(error).__name__)
+        try:
+            await asyncio.to_thread(_save_error, provider=provider.name, code="internal", **ids)
+        except Exception as save_error:
+            logger.error("job search batch=%s candidate=%s error not saved %s", batch_id, candidate_id,
+                         type(save_error).__name__)
+        mark_run_failed("internal")
+        return "failed: internal"
+    if not still_running:
         logger.warning("job search batch=%s candidate=%s not running at start; source not asked", batch_id,
                        candidate_id)
         return "dropped: the search was no longer running"
-    ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
-               country=country)
     try:
         result = await provider.search(query, country, limits.JOBS_PER_SEARCH)
     except ProviderError as error:
