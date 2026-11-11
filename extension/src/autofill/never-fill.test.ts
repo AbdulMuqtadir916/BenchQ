@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { neverFillReason } from "./never-fill";
+import { holdsSensitiveNumber, neverFillReason } from "./never-fill";
 import type { ScannedField } from "./types";
 
 const field = (label: string, overrides: Partial<ScannedField> = {}): ScannedField => ({
@@ -48,5 +48,21 @@ describe("neverFillReason", () => {
   it("reads the field's name and id too", () => {
     expect(reason("Please complete", { hints: "ssn_field" })).toContain("Government");
     expect(reason("Please complete", { hints: "dateOfBirth" })).toContain("Date of birth");
+  });
+});
+
+describe("a sensitive number in any field, kept out of the saved form", () => {
+  it("finds a Social Security number or a payment card's number, however it's written", () => {
+    for (const value of ["123-45-6789", "123 45 6789", "123456789", "My SSN is 123-45-6789", "4111 1111 1111 1111",
+      "4111-1111-1111-1111", "5555555555554444", "378282246310005"]) {
+      expect(holdsSensitiveNumber(value), value).toBe(true);
+    }
+  });
+
+  it("leaves phone numbers, ZIP codes, dates, rates and links alone", () => {
+    for (const value of ["+1 555 010 0100", "(555) 010-0100", "75001-1234", "12/01/2026", "$85/hr", "000-12-3456",
+      "4111 1111 1111 1112", "https://linkedin.com/in/ravi-123456789"]) {
+      expect(holdsSensitiveNumber(value), value).toBe(false);
+    }
   });
 });

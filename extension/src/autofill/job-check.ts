@@ -35,6 +35,23 @@ function titleOverlap(title: string | null, text: string): number {
 
 const TITLE_SEEN = 0.6;
 
+/** Two names of one company, give or take a suffix ("Acme Bank Inc") or a longer form ("Robinhood Markets"). */
+export function sameCompany(left: string | null, right: string | null): boolean {
+  const [ours, theirs] = [companyWords(left), companyWords(right)];
+  return ours.length > 0 && theirs.length > 0 && (companySeen(ours, theirs.join(" "), "") || companySeen(theirs, ours.join(" "), ""));
+}
+
+/** Whether a page's job is this saved job, at whatever link: the same company and the same role, word for word give or
+ * take order and filler. Two places that share no word are two jobs. */
+export function sameListing(found: { title: string; company: string; location?: string | null },
+  job: { title: string | null; company: string | null; location?: string | null }): boolean {
+  if (!sameCompany(found.company, job.company)) return false;
+  const [saved, seen] = [tokens(job.title ?? ""), tokens(found.title)];
+  if (saved.size === 0 || saved.size !== seen.size || ![...saved].every((word) => seen.has(word))) return false;
+  const [here, there] = [tokens(found.location ?? ""), tokens(job.location ?? "")];
+  return here.size === 0 || there.size === 0 || [...here].some((word) => there.has(word));
+}
+
 /** Whether the page looks like a different job or company from the saved one. A posting's structured data says so
  * outright; otherwise the page has to show neither the company nor the role. A page with nothing to go on is no
  * conflict: the BDE still reviews every value. */

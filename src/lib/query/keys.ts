@@ -30,6 +30,9 @@ export const queryKeys = {
   resumes: {
     ...resource("resumes"),
     byCandidate: (firmId: string, candidateId: string) => [firmId, "resumes", "byCandidate", candidateId] as const,
+    /** One version's autofill, as the Autofill screen reads it; `autofillAll` is every version's. */
+    autofill: (firmId: string, versionId: string) => [firmId, "resumes", "autofill", versionId] as const,
+    autofillAll: (firmId: string) => [firmId, "resumes", "autofill"] as const,
   },
   records: { byCandidate: (firmId: string, candidateId: string) => [firmId, "records", "byCandidate", candidateId] as const },
   documents: { byCandidate: (firmId: string, candidateId: string) => [firmId, "documents", "byCandidate", candidateId] as const },

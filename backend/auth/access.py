@@ -89,6 +89,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file": F,
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/autofill": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload": F,

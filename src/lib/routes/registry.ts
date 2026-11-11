@@ -94,6 +94,8 @@ const ROUTE_DEFS = [
   { id: "applications.detail", path: "/[firm]/applications/[id]", title: "Application", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")) },
   { id: "resumes", path: "/[firm]/resumes", title: "Resume Builder", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")), nav: { section: "workspace", order: 5, icon: FileText }, palette: true },
   { id: "resumes.studio", path: "/[firm]/resumes/[id]", title: "Resume", area: "firm", shell: "studio", access: firm(roles("full", "team", "assigned", "read")) },
+  // One version's Autofill screen (07 Q6, Q13): the studio's access; editing follows canChangeResume, as saving does.
+  { id: "resumes.autofill", path: "/[firm]/resumes/[id]/autofill", title: "Autofill answers", area: "firm", shell: "studio", access: firm(roles("full", "team", "assigned", "read")) },
   { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 6, icon: Mail }, palette: true },
   { id: "followups", path: "/[firm]/followups", title: "Follow-ups", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "none")), nav: { section: "workspace", order: 7, icon: Bell }, shortcut: "f", palette: true },
   { id: "analytics", path: "/[firm]/analytics", title: "Analytics", area: "firm", shell: "app", access: firm(roles("full", "team", "none", "read")), nav: { section: "workspace", order: 8, icon: BarChart3 }, palette: true },

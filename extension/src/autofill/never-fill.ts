@@ -29,6 +29,32 @@ const KEPT_REASONS = new Set(["File upload", "Consent or legal statement"]);
 
 export const staysOutOfSavedForm = (reason: string) => !KEPT_REASONS.has(reason);
 
+/** A US Social Security number written in groups (123-45-6789, 123 45 6789), or alone as nine digits, never one the
+ * SSA doesn't issue (000, 666 or 9xx first; 00 or 0000 after). */
+const SSN_WRITTEN = /\b(?!000|666|9\d\d)\d{3}([- ])(?!00)\d{2}\1(?!0000)\d{4}\b/;
+const SSN_ALONE = /^(?!000|666|9\d\d)\d{3}(?!00)\d{2}(?!0000)\d{4}$/;
+/** A run of 13 to 19 digits, spaced or dashed as a card number is written. */
+const CARD_DIGITS = /\b(?:\d[ -]?){12,18}\d\b/g;
+
+/** The check every payment card number passes (Luhn). */
+function passesCardCheck(digits: string): boolean {
+  let sum = 0;
+  for (let index = 0; index < digits.length; index += 1) {
+    const digit = Number(digits[digits.length - 1 - index]);
+    sum += index % 2 === 1 ? (digit * 2 > 9 ? digit * 2 - 9 : digit * 2) : digit;
+  }
+  return sum % 10 === 0;
+}
+
+/** Whether a value holds a US Social Security number or a payment card's number, whatever its field is called. The
+ * rules above go by the label, so this keeps one typed into a field they don't name ("ID number", "Notes") out of the
+ * form saved with an application too. A long number that happens to pass the card check stays out with them. */
+export function holdsSensitiveNumber(value: string): boolean {
+  const text = value.trim();
+  if (SSN_WRITTEN.test(text) || SSN_ALONE.test(text)) return true;
+  return (text.match(CARD_DIGITS) ?? []).some((run) => passesCardCheck(run.replace(/\D/g, "")));
+}
+
 export function neverFillReason(field: ScannedField): string | null {
   if (field.kind === "password") return "Password";
   if (field.kind === "file") return "File upload";

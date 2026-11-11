@@ -43,7 +43,7 @@ type AutofillPanelProps = {
 const STEP = "flex items-center gap-1.5 text-sm text-[var(--color-text-2)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:animate-spin [&_svg]:text-[var(--color-primary)] motion-reduce:[&_svg]:animate-none";
 const SKELETON = "grid gap-1.5 *:h-[var(--skeleton-row)] *:animate-pulse *:rounded-[var(--radius-md)] *:bg-[var(--color-surface-3)]";
 
-/** To "Autofill complete" once a run ends, or to the run's note when fields are left, so the BDE sees how it went: just
+/** To "Autofill complete" once a run ends, or to the note of a run that stopped, so the BDE sees how it went: just
  * under the sticky top bar (their scroll margin), with the résumé and the fields below. Smoothly, unless the BDE's
  * system asks for less motion. With neither on show, back to the top of whatever scrolls the panel. */
 function scrollToResult(card: HTMLElement | null) {
@@ -127,7 +127,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   const [isCollecting, setIsCollecting] = useState(false);
   const card = useRef<HTMLElement>(null);
   const wasFilling = useRef(filling);
-  // The run's note, once it has gone or the BDE closed it. A new run brings a new one.
+  // The note of a run that stopped, once the BDE closed it. A new run brings a new one.
   const [dismissed, setDismissed] = useState<Outcome | null>(null);
   const dismiss = useCallback(() => setDismissed(outcome), [outcome]);
   // A run follows its newest field down the panel, so once it ends the panel goes back up to how it went.
@@ -140,8 +140,6 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   const isComplete = reviewMatches && !hasFillsLeft && Boolean(outcome?.filled);
   const hasForm = currentRows !== null && currentRows.length > 0;
   const emptyRequired = (currentRows ?? []).filter((row) => row.field.required && !filledValue(row));
-  // What the run's note says is still empty, required and optional.
-  const left = { required: emptyRequired.length, optional: (currentRows ?? []).filter((row) => !row.field.required && !filledValue(row)).length };
   // The résumé and the cover letter have sections of their own, so the list leaves them out.
   const rest = (currentRows ?? []).filter(({ field }) => !documentOf(field));
   const jobLine = `${job.title || "Untitled role"}${job.company ? ` at ${job.company}` : ""} · for ${candidateName}`;
@@ -184,7 +182,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
       <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl}
         isBusy={isWorking || applicationStatus !== "ready"} onPick={pickResume} onRetry={retry} onRetryContext={onRetryContext} />
 
-      {hasForm && <FormProgress rows={currentRows} />}
+      {hasForm && <FormProgress rows={currentRows} isRestarting={pendingFill !== null} />}
 
       {hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={isWorking || !reviewMatches || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
         {isWorking ? "Filling…" : <>{SPARKLES_ICON}Autofill</>}
@@ -193,6 +191,8 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
         Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id ? ", the resume file first" : ""}.
       </p>}
       {isComplete && <p data-slot="autofill-done" className={`flex items-center gap-1 ${BELOW_TOP_BAR} text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`} role="status">{CHECK}Autofill complete</p>}
+      {/* Once the BDE has run Autofill on this application, its form's next pages fill as they open (07 Q4). */}
+      {state.isFollowingSteps && hasForm && !isWorking && <p data-slot="autofill-follows" className={`-mt-1.5 ${MUTED_TEXT}`}>Next pages of this form fill on their own as they open.</p>}
 
       {error && <div role="alert">
         <p data-slot="error" className={ALERT}>{error}</p>
@@ -208,7 +208,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
 
       {step && <p data-slot="autofill-step" role="status" className={STEP}>{SPINNER_ICON}{step}</p>}
       {filling && run && <RunList run={run} />}
-      {reviewMatches && outcome && outcome !== dismissed && <OutcomeNote outcome={outcome} left={left} onDismiss={dismiss} />}
+      {reviewMatches && outcome?.stopped && outcome !== dismissed && <OutcomeNote onDismiss={dismiss} />}
       {state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
 
       {hasForm && <DocumentSections rows={currentRows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
@@ -216,7 +216,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
         onChangeResume={hasOtherResumes ? changeResume : undefined} />}
       {!filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
-        onSuggest={(row, entry) => void state.fillWith(row, entry)} />}
+        onSuggest={(row, entry) => void state.fillWith(row, entry)} onSave={state.saveAnswer} />}
     </div>
 
     <div data-slot="autofill-actions" className="sticky bottom-0 z-1 grid gap-1.5 rounded-b-[var(--radius-lg)] border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pt-2 pb-3 empty:hidden">

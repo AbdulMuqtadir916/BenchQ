@@ -2,6 +2,7 @@
 
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { EASE_OUT } from "@/lib/motion";
 import { BuilderPanel } from "./builder/builder-panel";
@@ -13,8 +14,10 @@ import { SelectionToolbar } from "./selection-toolbar";
 import { useTailorRun } from "./tailor-run";
 import { usePrintExport } from "./print-export";
 import { stepTemplate } from "./templates";
-import { useStudio } from "./studio-store";
+import { useStudio, type StudioTab } from "./studio-store";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { AutofillTab } from "@/components/app/resume-autofill/autofill-tab";
+import type { ResumeSectionKey } from "@/lib/schemas/resume-document";
 import { resumeFileName } from "@/lib/derive/resume-name";
 
 /** True when a key press belongs to a text field rather than to the studio. */
@@ -23,21 +26,59 @@ function isTyping(target: EventTarget | null): boolean {
   return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 }
 
+/** A saved version's three tabs, as URLs (07 Q13). */
+export type StudioHrefs = { build: string; view: string; autofill: string };
+
+/** The studio's tabs are two pages, so a switch remounts the studio: it shouldn't play its opening again. */
+let lastShown: { id: string; at: number } | null = null;
+const SWITCH_MS = 1500;
+
 /**
  * The full-screen resume workspace — no app sidebar or top nav, so the page
  * gets all the room. Builder mode: section forms left, live page right.
- * Viewer mode: the page itself, editable in place.
+ * Viewer mode: the page itself, editable in place. Autofill answers (its own route, `isAutofill`): what the extension
+ * fills from this version. A switch to or from it replaces the URL, so closing goes back to where the studio was opened.
  */
-export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false }: { name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
+export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false, isAutofill = false, hrefs }: {
+  name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean;
+  isAutofill?: boolean;
+  /** Absent for an unsaved draft, which has no Autofill tab. */
+  hrefs?: StudioHrefs;
+}) {
   const doc = useStudio((s) => s.doc);
   const mode = useStudio((s) => s.mode);
+  const setMode = useStudio((s) => s.setMode);
+  const router = useRouter();
+  const tab: StudioTab = isAutofill ? "autofill" : mode;
   const rootRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion() ?? false;
+  const [isOpening] = useState(() => {
+    const id = useStudio.getState().doc?.resumeId;
+    return !(lastShown && id && lastShown.id === id && Date.now() - lastShown.at < SWITCH_MS);
+  });
+  useEffect(() => () => {
+    const id = useStudio.getState().doc?.resumeId;
+    if (id) lastShown = { id, at: Date.now() };
+  }, []);
   const tailor = useTailorRun();
   const exporter = usePrintExport(doc, resumeFileName(name));
   const [isConfirmingClose, setConfirmingClose] = useState(false);
   // Closing with unsaved edits asks first: a save is explicit (no autosave), so closing would lose them.
   const close = useCallback(() => (useStudio.getState().isDirty && onSave ? setConfirmingClose(true) : onClose()), [onClose, onSave]);
+  const selectTab = useCallback((next: StudioTab) => {
+    if (next === tab) return;
+    if (next === "autofill") {
+      if (hrefs) router.replace(hrefs.autofill, { scroll: false });
+      return;
+    }
+    setMode(next);
+    if (isAutofill && hrefs) router.replace(next === "view" ? hrefs.view : hrefs.build, { scroll: false });
+  }, [tab, hrefs, isAutofill, router, setMode]);
+  // A list of records on the Autofill tab (the work history…) is changed in the Builder: its section opens there.
+  const editInBuilder = useCallback((section: ResumeSectionKey) => {
+    useStudio.getState().toggleSection(section, true);
+    selectTab("build");
+  }, [selectTab]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -53,14 +94,14 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
         e.preventDefault();
         close();
       }
-      if (e.key === "[" || e.key === "]") {
+      if ((e.key === "[" || e.key === "]") && !isAutofill) {
         const { doc: current, setTemplate } = useStudio.getState();
         if (current) setTemplate(stepTemplate(current.templateId, e.key === "]" ? 1 : -1).id);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, canEdit, onSave]);
+  }, [close, canEdit, onSave, isAutofill]);
 
   if (!doc) return null;
   const isEditable = canEdit && mode === "view";
@@ -71,7 +112,7 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
       role="dialog"
       aria-modal="true"
       aria-label={name}
-      initial={reduce ? false : { opacity: 0, scale: 0.985, y: 8 }}
+      initial={reduce || !isOpening ? false : { opacity: 0, scale: 0.985, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.26, ease: EASE_OUT }}
       className="fixed inset-0 z-50 flex flex-col bg-[var(--color-bg)]"
@@ -87,10 +128,15 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
         onClose={close}
         onTailor={tailor.start}
         onExport={exporter.print}
+        tab={tab}
+        onTab={selectTab}
+        hasAutofill={Boolean(hrefs)}
       />
 
       <div className="flex min-h-0 flex-1">
-        {mode === "build" ? (
+        {isAutofill ? (
+          <AutofillTab versionId={doc.resumeId} canEdit={canEdit} onEditInBuilder={editInBuilder} />
+        ) : mode === "build" ? (
           <>
             <div className="w-full shrink-0 overflow-y-auto bg-[var(--color-bg-subtle)] p-3 sm:p-4 lg:w-[44%] lg:max-w-2xl lg:border-r lg:border-[var(--color-border)]">
               {canEdit ? <BuilderPanel doc={doc} /> : <p className="p-4 text-body text-[var(--color-text-3)]">You have view-only access to this resume.</p>}
@@ -107,8 +153,8 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
         )}
       </div>
 
-      <StatusBar doc={doc} />
-      {isEditable || (canEdit && mode === "build") ? <SelectionToolbar scopeRef={rootRef} /> : null}
+      <StatusBar doc={doc} showWords={!isAutofill} />
+      {!isAutofill && (isEditable || (canEdit && mode === "build")) ? <SelectionToolbar scopeRef={rootRef} /> : null}
       {tailor.panel}
       {exporter.portal}
       <ConfirmDialog open={isConfirmingClose} title="Discard unsaved changes?" confirmLabel="Discard" tone="danger" cancelLabel="Keep editing"

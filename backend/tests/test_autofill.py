@@ -97,7 +97,8 @@ def test_every_non_id_fact_as_a_typed_answer_and_nothing_of_the_firms_own():
         "Which languages do you speak?": ["English"],
         "Will you now or in the future require visa sponsorship?": True,
         "Do you need a visa transfer?": False,
-        YEARS: 8,                                                        # from the jobs: 2018-01 to 2026-10
+        "Are you a US citizen?": False,                                  # the profile's H1B
+        YEARS: 8,                                                       # from the jobs: 2018-01 to 2026-10
         "What is your primary role?": "Java Developer",
         "What roles are you looking for?": ["Java Developer", "Backend Engineer"],
         "What is your expected rate?": 85,
@@ -114,16 +115,21 @@ def test_every_non_id_fact_as_a_typed_answer_and_nothing_of_the_firms_own():
 
 def test_every_question_has_its_own_key():
     assert len(set(QUESTIONS.values())) == len(QUESTIONS)
-    assert all(re.fullmatch(r"[a-z]+(-[a-z]+)*", key) for key in QUESTIONS)
+    # Lower-case words joined by hyphens; a digit may name a part ("address-line1", "over-18", as the extension names them).
+    assert all(re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", key) for key in QUESTIONS)
 
 
 def _edit(answer, over):
     return {"answer": answer, "over": over}
 
 
+def _custom(question, answer, also=()):
+    return {"question": question, "also": list(also), "answer": answer}
+
+
 def test_the_users_entry_wins_and_every_answer_says_what_it_is():
     typed = {"edited": {"pay-rate": _edit(95, 85), "github-url": _edit("github.com/ravi", None)},
-             "custom": {"Why do you want to work here?": "Payments."}}
+             "custom": [_custom("Why do you want to work here?", "Payments.")]}
     entries = merged(CANDIDATE, {**VERSION, "autofill": typed}, TODAY)
     by_question = {entry["question"]: entry for entry in entries}
     assert entries[0] == {"question": "What is your full name?", "answer": "Ravi Teja", "kind": "FIXED",
@@ -171,6 +177,8 @@ def test_an_edit_is_kept_by_its_key_whatever_the_wording(monkeypatch):
     "Texas", ["a", "b"], [], None, {"edited": "Texas"}, {"edited": {"address-region": "Texas"}},
     # What the first 0019 wrote: every built answer by its question, never typed by anyone.
     {"What is your full name?": "Old Name", "Which state do you live in?": "CA"},
+    # `custom` as a map, as before 07 Q40 made it a list: nothing ever wrote one.
+    {"custom": {"Why us?": "Payments."}},
 ])
 def test_anything_else_stored_reads_as_no_entries(stored):
     entries = merged(CANDIDATE, {**VERSION, "autofill": stored}, TODAY)
@@ -182,7 +190,8 @@ def test_a_custom_question_in_a_fixed_questions_words_is_kept_and_shows_while_th
     """A question added or reworded here can take the words of one the user typed before (Abdul's third review): the
     entry stays, so a save copies it on, and the read shows the fixed question while it has an answer."""
     notice = "What is your notice period in days?"
-    typed = {"custom": {notice: "30, negotiable", "What is your full name?": "Someone Else", "Why us?": "Payments."}}
+    typed = {"custom": [_custom(notice, "30, negotiable"), _custom("What is your full name?", "Someone Else"),
+                        _custom("Why us?", "Payments.")]}
     assert entries_of({"autofill": typed}) == {"edited": {}, "custom": typed["custom"]}
 
     def asked(candidate, question):
@@ -335,6 +344,83 @@ def test_each_education_line_ranks_by_the_written_rules(line, level):
         assert not autofill._is_certificate(line) and autofill._level(line) == level
 
 
+FIELD_LINES = [
+    ("B.Tech in Computer Science and Engineering", "Computer Science and Engineering"),
+    ("Master of Science in Information Systems", "Information Systems"),
+    ("Master's in Computer Science", "Computer Science"),
+    ("B.S., Information Systems", "Information Systems"),
+    ("Bachelor's degree, Computer Science", "Computer Science"),
+    ("B.E. - Mechanical Engineering", "Mechanical Engineering"),
+    ("M.S. Computer Science", "Computer Science"),
+    ("MS Data Science", "Data Science"),
+    ("BS Computer Science", "Computer Science"),
+    ("MBA Finance", "Finance"),
+    ("Diploma in Electronics", "Electronics"),
+    ("Ph.D. in Computer Science (2019)", "Computer Science"),
+    ("Bachelor of Engineering in Civil (Honours)", "Civil"),
+    ("M.S in CS, GPA 3.8", "CS"),
+    ("MBA", None),
+    ("B.Tech", None),
+    ("Master of Computer Applications", None),
+    ("B.Tech (CSE)", None),
+    ("High School Diploma", None),
+    ("MS Certified: Azure Data Engineer Associate", None),
+    ("", None),
+]
+
+
+@pytest.mark.parametrize("line, field", FIELD_LINES)
+def test_the_field_of_study_is_what_the_degree_line_names_after_the_degree(line, field):
+    assert autofill._field_of_study(line) == field
+
+
+def test_the_highest_degree_comes_with_its_field_and_gpa_and_each_school_with_its_field():
+    built = build(CANDIDATE, {**VERSION, "educations": [
+        {"degree": "B.Tech in ECE", "institution": "JNTU", "graduation_date": "2017", "grade": "8.1/10"},
+        {"degree": "M.S. Computer Science", "institution": "UT Dallas", "graduation_date": "Dec 2019", "grade": "3.8"}]}, TODAY)
+    assert (built["What did you study?"], built["What was your GPA?"]) == ("Computer Science", "3.8")
+    assert built["List your education."] == [
+        {"degree": "B.Tech in ECE", "field": "ECE", "school": "JNTU", "graduation_date": "2017", "grade": "8.1/10"},
+        {"degree": "M.S. Computer Science", "field": "Computer Science", "school": "UT Dallas",
+         "graduation_date": "Dec 2019", "grade": "3.8"}]
+    # A line that names only the degree, and no grade, leave both questions out.
+    assert "What did you study?" not in build(CANDIDATE, VERSION, TODAY)
+    assert "What was your GPA?" not in build(CANDIDATE, VERSION, TODAY)
+
+
+SELF_ID = ("gender", "pronouns", "race", "hispanic-latino", "veteran-status", "disability-status", "sexual-orientation",
+           "transgender")
+
+
+PERSONAL = ("preferred-name", "middle-name", "address-line1", "address-line2", "address-postal", "portfolio-url",
+            "nationality", "current-pay", "salary-expectation", "onsite-work", "willing-to-travel", "commute", "over-18",
+            "criminal-history", "background-check", "drug-test", "security-clearance", "non-compete", "government-work",
+            "relative-at-company", "former-employee", "accommodations", "essential-functions")
+
+
+def test_personal_questions_wait_for_the_bdes_answer_and_citizenship_is_the_profiles_status():
+    built = build(CANDIDATE, VERSION, TODAY)
+    assert not {QUESTIONS[key] for key in PERSONAL} & set(built)
+    listed = {entry["key"] for entry in merged(CANDIDATE, VERSION, TODAY, editor=True) if entry["answer"] is None}
+    assert set(PERSONAL) <= listed
+    assert built["Are you a US citizen?"] is False                                  # H1B
+    assert build({**CANDIDATE, "work_auth": "USC"}, VERSION, TODAY)["Are you a US citizen?"] is True
+    assert "Are you a US citizen?" not in build({**CANDIDATE, "work_auth": None}, VERSION, TODAY)
+
+
+def test_self_identification_is_never_built_and_the_screen_lists_it_to_answer():
+    assert all(autofill.ANSWER_TYPES[key] == "text" for key in SELF_ID)
+    assert not {QUESTIONS[key] for key in SELF_ID} & set(build(CANDIDATE, VERSION, TODAY))
+    listed = {entry["key"]: entry for entry in merged(CANDIDATE, VERSION, TODAY, editor=True) if entry.get("key") in SELF_ID}
+    assert set(listed) == set(SELF_ID)
+    assert all(entry["answer"] is None and entry["kind"] == "FIXED" and entry["type"] == "text" for entry in listed.values())
+    # The BDE's answer is an edit over no built answer: it applies, and the extension's read carries it.
+    version = {**VERSION, "autofill": {"edited": {"gender": {"answer": "Female", "over": None}}}}
+    read = {entry["key"]: entry for entry in merged(CANDIDATE, version, TODAY) if entry.get("key")}
+    assert (read["gender"]["answer"], read["gender"]["kind"]) == ("Female", "EDITED")
+    assert "race" not in read
+
+
 def test_the_current_job_is_the_one_marked_current_else_the_one_that_ended_last():
     older_first = [_job("2015-01", "2017-12", company="Old Co", job_title="Developer"),
                    _job("2018-01", "2023-06", company="Recent Co", job_title="Senior Developer")]
@@ -449,8 +535,8 @@ def test_the_users_entries_go_with_a_save_and_a_promote_and_an_upload_starts_wit
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     v1 = _v(anonymous_client, world, c, who="adnan")
     typed = {"edited": {"pay-rate": _edit(120, None), "professional-title": _edit("Lead Java Developer", "Java Developer")},
-             "custom": {"Why do you want to work here?": "Payments.",
-                        "What is your notice period in days?": "30, negotiable"}}     # in a fixed question's words
+             "custom": [_custom("Why do you want to work here?", "Payments."),
+                        _custom("What is your notice period in days?", "30, negotiable")]}  # in a fixed question's words
     _stored(test_db, v1["id"]).autofill = typed
     test_db.commit()
     on_v1 = {e["question"]: e for e in _open(anonymous_client, world, c, v1["id"], "adnan", autofill="true")["autofill"]}
@@ -465,7 +551,8 @@ def test_the_users_entries_go_with_a_save_and_a_promote_and_an_upload_starts_wit
     # v2's own title shows: the edit replaced v1's title, which v2 doesn't have.
     assert entries["What is your professional title?"] == {"question": "What is your professional title?",
                                                            "answer": "Staff Engineer", "kind": "FIXED",
-                                                           "key": "professional-title"}
+                                                           "key": "professional-title",
+                                                           "replaced": "Lead Java Developer"}      # 07 Q15
 
     r = anonymous_client.post(_url(world, c, f"/{v2['id']}/use-as-base"), headers=world["as"]["adnan"])
     assert r.status_code in (200, 201), r.text
@@ -484,7 +571,7 @@ def test_a_save_leaves_behind_what_isnt_an_entry(anonymous_client, test_db, worl
     _stored(test_db, v1["id"]).autofill = {"What is your full name?": "Old Name", "edited": {"pay-rate": _edit(120, None)}}
     test_db.commit()
     v2 = _save(anonymous_client, world, c, v1, title="Staff Engineer").json()
-    assert _stored(test_db, v2["id"]).autofill == {"edited": {"pay-rate": _edit(120, None)}, "custom": {}}
+    assert _stored(test_db, v2["id"]).autofill == {"edited": {"pay-rate": _edit(120, None)}, "custom": []}
     answers = {e["question"]: e["answer"] for e in _open(anonymous_client, world, c, v1["id"], autofill="true")["autofill"]}
     assert answers["What is your full name?"] == "Ravi Teja"
 

@@ -1,3 +1,5 @@
+import type { SaveOffer } from "./save-answer";
+
 /** What the side panel, the background worker and the page script say to each other. Types only: the page script
  * must stay free of shared runtime code (vite.config.ts checks it). */
 
@@ -81,8 +83,19 @@ export type ChoiceList = { status: "open"; options: FieldOption[]; multiple?: bo
 export type FieldTarget = { scanId: number; fieldId: string };
 
 /** What the page script exposes in its isolated world. */
+/** A job as its page shows it, for adding it to a candidate's jobs (the add-job plan, 2026-11-11): `description` as the
+ * page wrote it (HTML from its JobPosting data, else its main text). */
+/** `isJobPage`: the page is a job's page (`page/job.ts`); on any other page the rest is empty. */
+export type PageJob = {
+  title: string; company: string; description: string; location: string | null; url: string; isJobPage: boolean;
+  /** The codes the page gives its job (its JobPosting identifier, a "Job ID:" line), lowercase, and the other links it
+   * gives itself (canonical, og:url), for knowing a job the candidate already has. */
+  ids?: string[]; links?: string[];
+};
+
 export type PageApi = {
   version: string;
+  readJob(): PageJob;
   scan(): Promise<FrameScan>;
   read(): FrameRead | null;
   fill(request: FillRequest): Promise<FillResult>;
@@ -147,6 +160,12 @@ export type ReviewRow = {
   /** BenchQ filled it from another résumé, it's unchanged since, and the picked résumé doesn't answer it: Autofill takes
    * it back, so the old résumé's value doesn't stay on the form. */
   isStale?: boolean;
+  /** BenchQ filled it from another résumé than the picked one, and it's unchanged since: Autofill replaces it or takes it
+   * back. While a switch of résumé refills the form, the progress doesn't count it, so the count starts afresh. */
+  isOldFill?: boolean;
+  /** An answer the BDE typed while BenchQ watched, which they can keep for next time (07 Q58): what saving it would do,
+   * or "saved" once it's kept. */
+  saveOffer?: SaveOffer | "saved";
   /** For a question no saved answer clearly matches: the closest of the candidate's own screening answers, which the
    * BDE can use with a click. Never filled on their own. */
   suggestions?: BankEntry[];

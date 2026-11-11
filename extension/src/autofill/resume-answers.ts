@@ -12,7 +12,9 @@ import type { BankEntry } from "./types";
  * - a list of words is one line, and a list of places parts them with semicolons ("Dallas, TX; Austin, TX");
  * - a list of jobs, schools, projects or awards answers no one field, so it's left out, as is an empty answer.
  *
- * A question the BDE saved with other wordings (`also`, docs/02 §8.1) answers each of them with the same answer.
+ * A question the BDE saved with other wordings (`also`, docs/02 §8.1) answers each of them with the same answer. A fixed
+ * question's other wordings keep its key, so they're read as it is: "Major" for "What did you study?" is matched by its
+ * words, never read as the degree question.
  *
  * Two answers are worked out from the others: whether the candidate may work in the US, from their status (all eight
  * statuses BenchQ records may; a status typed in reads as it says), and where they live, from the city and state. */
@@ -46,8 +48,8 @@ function textOf(key: string | null, answer: unknown): string | null {
   return items.join(key !== null && PLACE_LISTS.has(key) ? "; " : ", ");
 }
 
-const entryOf = (question: string, answer: string, key: string | null): BankEntry => ({
-  id: key ? `key:${key}` : `custom:${question}`, question, answer, category: (key && CATEGORIES[key]) || "OTHER",
+const entryOf = (question: string, answer: string, key: string | null, id = key ? `key:${key}` : `custom:${question}`): BankEntry => ({
+  id, question, answer, category: (key && CATEGORIES[key]) || "OTHER",
   ...(key ? { key } : {}),
 });
 
@@ -83,7 +85,7 @@ export function answersFromResume(entries: unknown): BankEntry[] {
     for (const wording of Array.isArray(also) ? also : []) {
       if (typeof wording !== "string" || !wording.trim() || asked.has(wording.trim())) continue;
       asked.add(wording.trim());
-      bank.push(entryOf(wording.trim(), text, null));
+      bank.push(entryOf(wording.trim(), text, named, `custom:${wording.trim()}`));
     }
   }
   return [...bank, ...workedOut(bank)];

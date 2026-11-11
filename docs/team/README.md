@@ -114,4 +114,7 @@ it. Everyone else reads it.
 | 0019 | Zuhair | Résumé autofill: `resumes.autofill`, the entries the user typed (`{}` on every version; the built answers aren't stored), `candidates.qa_bank` dropped | `feat/resume-autofill` |
 | 0020 | Zuhair | Job-search tables: `job_postings` and `scrape_jobs` | PR #122 |
 | 0021 | Arbaz | `applications.form_data`: the form the extension saw when a job was marked applied. Follows 0020 (Zuhair's) | `feat/apply-extension-autofill` |
-| 0022+ | — | Claim the next number here in your PR | — |
+| 0022–0023 | Zuhair, Uzair | In open PRs: 0022 in #123/#124 (`scrape_jobs.user`) and #127 (email outcome), 0023 in #124 (job postings repoint) | Open PRs |
+| 0024 | Arbaz | Applications let go of the old `jobs` pool: `applications_job_id_fkey` dropped, `job_postings (firm_id, candidate_id, id)` made unique. Schema only; a local database moves its rows with `python -m backend.scripts.move_local_jobs_to_postings` at 0024. Follows 0021 | `feat/autofill-screen` |
+| 0025 | Arbaz | Applications on `job_postings`: `candidate_id` NOT NULL, `(firm_id, candidate_id, job_id)` → `job_postings` ON DELETE RESTRICT; refuses while an application names an old job. Follows 0024 | `feat/autofill-screen` |
+| 0026+ | — | Claim the next number here in your PR | — |

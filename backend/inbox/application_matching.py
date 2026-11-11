@@ -14,7 +14,9 @@ from sqlalchemy import and_, or_
 from backend.auth.scoping import scoped
 from backend.models.candidates import InboxMessage
 from backend.inbox.google_oauth import decrypt_content
-from backend.models.db import Application, Company, Job
+from backend.applications.postings import posting_job
+from backend.models.db import Application, Company
+from backend.models.job_search import JobPosting
 
 _TOKEN = re.compile(r"\w+(?:\+\+|#)?", re.UNICODE)
 _BOUNDARY = re.compile(r"[\n\r:;|()\[\]!?.,\u2013\u2014]|\s-\s")
@@ -109,8 +111,11 @@ def matching_application_id(db, mailbox, message, *, allow_thread=False):
     # Subject/body are separate evidence segments; never form a name across their boundary.
     subject, body = classification_text(message)
     segments = [_segment(subject), _segment(body)]
-    applications = submitted_applications(db, mailbox.firm_id, mailbox.candidate_id).join(
-        Job, Application.job_id == Job.id).with_entities(Application.id, Job.company, Job.title).all()
+    # The job is the application's posting (2026-11-11), read the one way: its company and title.
+    applications = [(app_id, job.company, job.title) for app_id, job in (
+        (app_id, posting_job(posting)) for app_id, posting in submitted_applications(
+            db, mailbox.firm_id, mailbox.candidate_id).join(JobPosting, Application.job_id == JobPosting.id)
+        .with_entities(Application.id, JobPosting).all())]
     companies = db.query(Company.name, Company.aliases).all()  # Global reference data.
     aliases = {}
     for company, names in companies:

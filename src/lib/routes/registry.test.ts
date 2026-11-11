@@ -95,6 +95,7 @@ describe("route registry", () => {
     expect(matchRoute(f("/candidates/cand_01"))?.id).toBe("candidates.detail");
     expect(matchRoute(f("/jobs/capture"))?.id).toBe("jobs.capture");
     expect(matchRoute(f("/resumes/new"))?.id).toBe("resumes.studio");
+    expect(matchRoute(f("/resumes/res_01/autofill"))?.id).toBe("resumes.autofill");
     expect(matchRoute(f("/settings/team?x=1"))?.id).toBe("settings.team");
     expect(matchRoute("/sign-in")?.id).toBe("sign-in");
     expect(matchRoute("/dev/design-system")?.id).toBe("design-system");
@@ -141,6 +142,7 @@ describe("hrefFor", () => {
     expect(hrefFor("settings.preferences", { firm: S })).toBe("/acme/settings/preferences");
     expect(hrefFor("candidates.detail", { firm: S, id: "cand_01" })).toBe("/acme/candidates/cand_01");
     expect(hrefFor("resumes.studio", { firm: S, id: "new" })).toBe("/acme/resumes/new");
+    expect(hrefFor("resumes.autofill", { firm: S, id: "res_01" })).toBe("/acme/resumes/res_01/autofill");
     expect(hrefFor("jobs.detail", { firm: S, id: "a/b" })).toBe("/acme/jobs/a%2Fb");
   });
 
@@ -185,6 +187,7 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["applications.detail", "full", "team", "own", "read"],
   ["resumes", "full", "team", "assigned", "read"],
   ["resumes.studio", "full", "team", "assigned", "read"],
+  ["resumes.autofill", "full", "team", "assigned", "read"],
   ["outreach", "full", "team", "own", "read"],
   ["followups", "full", "team", "own", "none"],
   ["focus", "full", "full", "full", "none"],
@@ -361,7 +364,7 @@ describe("isRouteActive (matches on route ids, not paths)", () => {
 const SUPPORT_TABLE: ReadonlyArray<readonly [RouteId, Access]> = [
   ["welcome", "none"], ["dashboard", "read"], ["candidates", "read"], ["candidates.new", "none"], ["candidates.detail", "read"],
   ["jobs", "read"], ["jobs.detail", "read"], ["jobs.capture", "none"], ["applications", "read"], ["applications.detail", "read"],
-  ["resumes", "read"], ["resumes.studio", "read"], ["outreach", "read"], ["followups", "read"], ["focus", "none"],
+  ["resumes", "read"], ["resumes.studio", "read"], ["resumes.autofill", "read"], ["outreach", "read"], ["followups", "read"], ["focus", "none"],
   ["analytics", "read"], ["ledger", "read"], ["settings", "read"], ["settings.firm", "read"], ["settings.team", "read"],
   ["settings.templates", "read"], ["settings.preferences", "none"], ["notifications", "none"], ["notifications.requests", "none"],
 ];

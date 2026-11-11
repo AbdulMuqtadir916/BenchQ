@@ -1,6 +1,8 @@
 import { ApiError } from "@/lib/api/client";
 import type { Resume, ResumeRemoval, ResumeShelf } from "@/lib/schemas/resume";
 import type { OpenedResume, ResumeDocument, ResumeSaveResult } from "@/lib/schemas/resume-document";
+import type { AutofillChange, AutofillSaveResult, ResumeAutofill } from "@/lib/schemas/resume-autofill";
+import { applyMockChange, mockAutofill } from "./resume-autofill";
 import { buildResumeDocument } from "@/lib/resume-doc/build";
 import { canChangeResume, canManageResume } from "@/lib/auth/policy";
 import { inFirm, mockResult, notFound } from "./_shared";
@@ -148,4 +150,20 @@ export const resumesMock = firmScoped("resumes", {
     showBaseRow(baseId);
     return mockResult({ number: baseNumber(baseId) });
   },
-}, { save: "resume.edit", useAsBase: "resume.edit", upload: "resume.edit", deleteBase: "resume.edit", deleteVersion: "resume.edit", showBase: "resume.edit" });
+
+  autofill: (firmId: string, versionId: string): Promise<ResumeAutofill> => {
+    const resume = groupOf(firmId, versionId);
+    const candidate = inFirm(allCandidates, firmId).find((c) => c.id === resume.candidateId);
+    const entries = mockAutofill(versionId, opened(firmId, resume, versionId).document, candidate);
+    return mockResult({ versionId, candidateId: resume.candidateId, entries });
+  },
+
+  saveAutofill: (firmId: string, versionId: string, change: AutofillChange): Promise<AutofillSaveResult> => {
+    const resume = groupOf(firmId, versionId);
+    mayChange(firmId, resume.candidateId);
+    const candidate = inFirm(allCandidates, firmId).find((c) => c.id === resume.candidateId);
+    const { document } = opened(firmId, resume, versionId);
+    applyMockChange(versionId, document, candidate, change);
+    return mockResult({ autofill: { versionId, candidateId: resume.candidateId, entries: mockAutofill(versionId, document, candidate) }, changed: 1 });
+  },
+}, { save: "resume.edit", useAsBase: "resume.edit", upload: "resume.edit", deleteBase: "resume.edit", deleteVersion: "resume.edit", showBase: "resume.edit", saveAutofill: "resume.edit" });

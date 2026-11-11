@@ -223,7 +223,8 @@ function reviewField(scanned: Base, repeated: boolean, review: Review): ReviewRo
   return row.status === "blocked" ? row : withStatus(row, typeOf(scanned.field), workStatus(saved));
 }
 
-const typeOf = (field: TabField) => {
+/** What a field asks, as the engine names it: the type its answer is matched by. */
+export const typeOf = (field: TabField) => {
   const asked = { ...field, label: questionOf(field.label) };
   return fieldTypeFor(asked) ?? classifyField(asked);
 };

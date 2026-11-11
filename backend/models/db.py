@@ -228,7 +228,6 @@ class Job(Base):
     has_cached_page = column_property(cached_page_html.columns[0].isnot(None))
 
     search = relationship("Search", backref="jobs")
-    applications = relationship("Application", back_populates="job")
 
     @staticmethod
     def clean_url(url):
@@ -324,10 +323,13 @@ class Application(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = firm_id_column()
-    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=False)
-    # The candidate core (07 Q53d, migration 0007): whose application, the tailored résumé sent, who sent it. Null
-    # only on rows from before 0007; the routes require the candidate. One per candidate per job. Owner: Samad.
-    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=True,
+    # The job (migration 0025, decided 2026-11-11): one of its candidate's `job_postings`, by the posting's row id
+    # (`job_postings.id`, not its content hash `job_postings.job_id`). Read what it is through
+    # `backend.applications.postings.posting_job(app.posting)`, never `content` directly.
+    job_id = Column(UUID(as_uuid=True), nullable=False)
+    # The candidate core (07 Q53d, migration 0007): whose application, the tailored résumé sent, who sent it. Every
+    # application has one since 0025. One per candidate per job. Owner: Samad (the repoint: Arbaz, 2026-11-11).
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=False,
                           index=True)
     resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
     submitted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
@@ -354,11 +356,15 @@ class Application(Base):
     __table_args__ = (
         Index("uq_applications_candidate_job", "candidate_id", "job_id", unique=True,
               postgresql_where=text("candidate_id IS NOT NULL")),
+        # The job is the application's own candidate's, in its own firm: never another candidate's posting.
+        ForeignKeyConstraint(["firm_id", "candidate_id", "job_id"],
+                             ["job_postings.firm_id", "job_postings.candidate_id", "job_postings.id"],
+                             name="fk_applications_job_posting", ondelete="RESTRICT"),
     )
 
     reviews = relationship("ApplicationReview", order_by="ApplicationReview.created_at")
     status_events = relationship("ApplicationStatusEvent", order_by="ApplicationStatusEvent.occurred_at")
-    job = relationship("Job", back_populates="applications")
+    posting = relationship("JobPosting", primaryjoin="foreign(Application.job_id) == JobPosting.id", viewonly=True)
     interviews = relationship("Interview", back_populates="application",
                               cascade="all, delete-orphan", order_by="Interview.created_at")
 

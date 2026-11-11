@@ -1,4 +1,4 @@
-import type { AppliedForm } from "./autofill/types";
+import type { AppliedForm, PageJob } from "./autofill/types";
 
 export const BENCHQ_URL = __BENCHQ_URL__.replace(/\/$/, "");
 
@@ -115,6 +115,10 @@ export async function getResumeFile(firmId: string, candidateId: string, resumeI
   }
 }
 
+/** Keeps answers the BDE typed on a résumé version's autofill, for next time: phase 3's save route (docs/02 §8.3). */
+export const saveResumeAnswers = (firmId: string, candidateId: string, resumeId: string, change: object) =>
+  request<unknown>(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}/autofill`, { method: "PATCH", body: JSON.stringify(change) });
+
 export const getSavedApplications = async (candidateId: string) => {
   const candidate = `&candidate_id=${encodeURIComponent(candidateId)}`;
   const [saved, applied] = await Promise.all([
@@ -131,6 +135,17 @@ export const getSavedApplications = async (candidateId: string) => {
 };
 /** Marks the job applied with the form as it stood and, when known, the résumé version its answers came from: the one
  * sent (docs/02 §9). */
+/** A job added for a candidate from the page it's on (the add-job plan, 2026-11-11): it becomes one of their jobs and a
+ * Saved application at once, or the application they already have for it. */
+export const addJob = (candidateId: string, job: PageJob) => request<Application & { job_created: boolean; application_created: boolean }>(
+  "/api/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      candidate_id: candidateId,
+      job: { source: "extension", title: job.title, company: job.company, description: job.description, url: job.url, location: job.location },
+    }),
+  });
+
 export const markApplied = (application: Application, form: AppliedForm, resumeId: string | null = null) => request<Application>(`/api/applications/${encodeURIComponent(application.id)}/candidate-status`, {
   method: "PATCH",
   body: JSON.stringify({

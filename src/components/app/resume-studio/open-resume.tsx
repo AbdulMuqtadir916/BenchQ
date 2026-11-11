@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useOpenedResume, useResumeShelf } from "@/lib/hooks/use-resumes";
+import { matchRoute } from "@/lib/routes/registry";
+import { cameFromInsideApp } from "@/lib/routes/navigation-trail";
 import { baseNumber } from "@/lib/derive/resume-tree";
 import { baseName, roleOf, tailoredName, versionName } from "@/lib/derive/resume-name";
 import { useTreeLabels } from "@/components/app/resumes/use-tree-labels";
@@ -21,17 +23,26 @@ import { useStudio, type StudioMode } from "./studio-store";
 import { useStudioSave } from "./use-studio-save";
 import { UseAsBaseDialog } from "./use-as-base-dialog";
 
-/** Close = go back to wherever the user opened the resume from, or the library on a direct visit. */
+/** The studio's pages: its tabs and its versions replace each other in the history, so they count as one. */
+const isStudioPath = (pathname: string) => {
+  const route = matchRoute(pathname)?.id;
+  return route === "resumes.studio" || route === "resumes.autofill";
+};
+
+/** Close = go back to wherever the user opened the resume from, or the library on a direct visit (a new tab, a link
+ * from the extension), where Back would leave BenchQ. */
 export function useCloseStudio() {
   const router = useRouter();
   const toHref = useHref();
   return useCallback(() => {
-    if (window.history.length > 1) router.back();
+    if (cameFromInsideApp(isStudioPath)) router.back();
     else router.push(toHref("resumes"));
   }, [router, toHref]);
 }
 
-export function OpenResume({ id, initialMode }: { id: string; initialMode: StudioMode }) {
+/** `initialMode`: how the page was opened (`?mode=view`); null on the Autofill tab, which keeps the mode the studio had,
+ * so going back to the document returns to the same way of editing it. */
+export function OpenResume({ id, initialMode, isAutofill = false }: { id: string; initialMode: StudioMode | null; isAutofill?: boolean }) {
   const toHref = useHref();
   const principal = useSignedInPrincipal();
   const close = useCloseStudio();
@@ -46,14 +57,14 @@ export function OpenResume({ id, initialMode }: { id: string; initialMode: Studi
   const load = useStudio((s) => s.load);
   const setMode = useStudio((s) => s.setMode);
   const { access } = useRouteAccess();
-  const { onSave, isSaving } = useStudioSave(id, initialMode);
+  const { onSave, isSaving } = useStudioSave(id, isAutofill ? "autofill" : initialMode ?? "build");
   const inScope = !candidateQuery.data || isInScope(access, principal.userId, { bdeId: candidateQuery.data.bdeId, managerId: candidateQuery.data.managerId });
 
   useEffect(() => {
     // The store, not this render's `loadedId`: an effect that runs twice (React's dev mode) must load once.
     if (!inScope || !openedQuery.data || !candidateQuery.data || useStudio.getState().doc?.resumeId === id) return;
     const { pendingNotice, notify, setPendingNotice } = useStudio.getState();
-    load(openedQuery.data.document, initialMode, !!pendingNotice); // after a save: same layout, the next version
+    load(openedQuery.data.document, initialMode ?? "build", !!pendingNotice); // after a save: same layout, the next version
     if (pendingNotice) {
       notify(pendingNotice.text, pendingNotice.tone);
       setPendingNotice(null);
@@ -61,7 +72,9 @@ export function OpenResume({ id, initialMode }: { id: string; initialMode: Studi
   }, [inScope, openedQuery.data, candidateQuery.data, loadedId, id, initialMode, load]);
 
   // Reopening the same resume keeps this session's edits but honours how it was opened (View vs card).
-  useEffect(() => setMode(initialMode), [id, initialMode, setMode]);
+  useEffect(() => {
+    if (initialMode) setMode(initialMode);
+  }, [id, initialMode, setMode]);
 
   const error = openedQuery.error ?? candidateQuery.error;
   // A missing or deleted version (or its candidate) and one outside the user's scope look the same: not-found (07 Q6).
@@ -113,6 +126,8 @@ export function OpenResume({ id, initialMode }: { id: string; initialMode: Studi
         onClose={close}
         onSave={onSave}
         isSaving={isSaving}
+        isAutofill={isAutofill}
+        hrefs={{ build: toHref("resumes.studio", { id }), view: toHref("resumes.studio", { id }, { mode: "view" }), autofill: toHref("resumes.autofill", { id }) }}
       />
       <UseAsBaseDialog />
     </>

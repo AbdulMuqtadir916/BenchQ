@@ -1042,15 +1042,8 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
             from backend.api.routes_applications import _cache_job_page
             background_tasks.add_task(_cache_job_page, str(job.id), job.url)
 
-        from backend.models.db import Application
-        from datetime import datetime, timezone
-        existing_app = scoped(db, Application, firm_id).filter(Application.job_id == job.id).first()
-        if not existing_app:
-            app = Application(firm_id=firm_id, job_id=job.id, status="applied",
-                              status_transitions=[{"from": None, "to": "applied", "at": datetime.now(timezone.utc).isoformat(), "source": "ui"}])
-            db.add(app)
-            db.commit()
-            created_application_id = str(app.id)
+        # An application names one of a candidate's job postings since 2026-11-11, never an old pool job: marking an
+        # old job applied keeps its flag and records no application (add the job for its candidate instead).
 
         if job.company and job.company.strip():
             from backend.models.db import Company, Setting

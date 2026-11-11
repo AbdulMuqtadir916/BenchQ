@@ -10,6 +10,7 @@ import httpx
 
 from backend.config import GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN
 from backend.models.db import SessionLocal, Setting, Application
+from backend.applications.postings import posting_job
 from backend.email_monitor.response_parser import classify_email
 
 logger = logging.getLogger("jobnavigator.gmail")
@@ -135,8 +136,8 @@ def _get_active_apps_for_llm(db) -> list:
     apps = db.query(Application).filter(Application.candidate_id.is_(None), Application.status.in_(active_statuses)).all()
     result = []
     for i, app in enumerate(apps, 1):
-        job = app.job
-        if not job:
+        job = posting_job(app.posting)
+        if not (job.company or job.title):
             continue
         applied_at = app.applied_at.strftime("%Y-%m-%d") if app.applied_at else "unknown"
         result.append({
@@ -429,10 +430,7 @@ def _match_email_to_application(db, from_header: str, subject: str, body: str, s
     body_lower = (body or "").lower()
     body_fallback = None
     for app in apps:
-        job = app.job
-        if not job:
-            continue
-        company = job.company or ""
+        company = posting_job(app.posting).company
         # Strong: the company is named in the sender / subject.
         if _email_matches_company(company, from_header, subject, "", sender_domain):
             return app

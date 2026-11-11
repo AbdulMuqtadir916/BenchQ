@@ -16,6 +16,7 @@ permission checked under the lock can't change before the commit. Nothing here c
 import copy
 import uuid
 from dataclasses import dataclass, field
+from datetime import date
 
 from fastapi import HTTPException
 from sqlalchemy import func, or_
@@ -159,11 +160,12 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
     return {**out, **content_of(row)} if with_content else out
 
 
-def opened_json(row: Resume, candidate, *, with_autofill: bool = False) -> dict:
+def opened_json(row: Resume, candidate, *, with_autofill: bool = False, editor: bool = False) -> dict:
     """One version as it is opened: its content and, with `with_autofill` (`?autofill=true`), its autofill, built
-    for this read (`autofill.merged`: nothing is written). Only these answers carry it, never the list or a save."""
+    for this read (`autofill.merged`: nothing is written), as the Autofill screen reads it with `editor`. Only these
+    answers carry it, never the list or a save."""
     out = version_json(row, with_content=True)
-    return {**out, "autofill": autofill.merged(candidate, row)} if with_autofill else out
+    return {**out, "autofill": autofill.merged(candidate, row, editor=editor)} if with_autofill else out
 
 
 def base_json(base: BaseResume, number: int) -> dict:
@@ -264,6 +266,45 @@ def _activate(db, candidate, base: BaseResume) -> None:
 class Saved:
     row: Resume
     notice: str | None = None
+
+
+def _family(db, candidate, row: Resume) -> list[Resume]:
+    """The newest version of `row`'s base and of each live tailored résumé made from it, `row` left out: where a saved
+    answer goes for all of the candidate's jobs (07 Q30, Q44)."""
+    rows = scoped(db, Resume, candidate.firm_id).filter(Resume.candidate_id == candidate.id,
+                                                        Resume.base_resume_id == row.base_resume_id,
+                                                        Resume.deleted_at.is_(None)).all()
+    newest: dict = {}
+    for item in rows:
+        group = (item.category, item.job_id)
+        if group not in newest or item.version > newest[group].version:
+            newest[group] = item
+    return [item for item in newest.values() if item.id != row.id]
+
+
+def save_autofill(db, actor: User, candidate, row: Resume, change: dict, *, only_this: bool, today: date) -> int:
+    """`change` (from `autofill.checked_change`) made to `row`'s autofill in place, with no new version (07 Q7), and,
+    unless `only_this`, to the rest of its résumé that still answers as `row` did (`autofill.change`). One activity
+    entry names the questions, never the answers. How many versions changed."""
+    before = autofill.shown(candidate, row, today)
+    changed = 0
+    for target in [row, *([] if only_this else _family(db, candidate, row))]:
+        entries = autofill.change(candidate, target, change, before, today, is_opened=target is row)
+        if entries is not None:
+            target.autofill = entries
+            changed += 1
+    if changed:
+        number = base_numbers(db, candidate)[row.base_resume_id]
+        kind = "" if row.category == "BASE" else " (tailored)"
+        named = [autofill.QUESTIONS[key] for key in (*change["edit"], *change["reset"])] + [*change["add"],
+                                                                                          *change["remove"]]
+        listed = ", ".join(f'"{question}"' for question in named[:5]) + (f" and {len(named) - 5} more"
+                                                                         if len(named) > 5 else "")
+        others = f"; {changed - 1} other version{'s' if changed > 2 else ''} too" if changed > 1 else ""
+        _record(db, actor, candidate, "UPDATE", row.id, _label(candidate, number, row),
+                f"Changed the autofill answers of Base {number}{kind} v{row.version}: {listed}{others}")
+    db.flush()
+    return changed
 
 
 def save_version(db, actor: User, candidate, source: Resume, submitted: dict) -> Saved:

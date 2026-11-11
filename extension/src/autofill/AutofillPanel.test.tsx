@@ -53,7 +53,7 @@ type State = {
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
 };
 
-function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus } = {}, resumes: Resumes = oneResume) {
+function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null } = {}, resumes: Resumes = oneResume) {
   vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
   const applicationStatus = panel.applicationStatus ?? "ready";
   vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (applicationStatus === "ready" && resumes.status === "ready" ? { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
@@ -123,12 +123,10 @@ describe("Autofill", () => {
     expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
   });
 
-  it("isn't complete when nothing was filled", () => {
+  it("isn't complete when nothing was filled, and leaves no note: the list shows what's left", () => {
     show({ fillCount: 0, rows: [row("Phone", true), row("City", true)], outcome: { filled: 0, handedBack: 2, stopped: false } });
     expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
-    expect(host.querySelector("[data-slot='autofill-result-title']")?.textContent).toBe("Nothing was filled");
-    expect(host.querySelector("[data-slot='autofill-result-detail']")?.textContent)
-      .toBe("Still empty: 2 required. Autofill didn't recognize these or couldn't fill them. Fill in the required ones below, then submit the form.");
+    expect(host.querySelector("[data-slot='autofill-result']")).toBeNull();
   });
 
   it("leaves no way to rescan by hand: the panel does that itself", () => {
@@ -191,6 +189,27 @@ describe("the résumé the answers come from", () => {
     expect(picker().textContent).toContain("Base 1 · v2");
     expect(picker().querySelector("a")!.getAttribute("href")).toContain("/acme-staffing/resumes/res-2");
     expect(picker().querySelectorAll("button")).toHaveLength(0);
+  });
+
+  it("says the one résumé is the only one, with a way to add another in BenchQ", () => {
+    show({ fillCount: 1 }, { resumesUrl: "https://app.test/acme-staffing/candidates/cand-1?tab=resumes" });
+    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("· 1 resume");
+    const only = picker().querySelector("[data-slot='resume-only']")!;
+    expect(only.textContent).toBe("Only resume·Add another in BenchQ");
+    expect(only.querySelector("a")!.getAttribute("href")).toBe("https://app.test/acme-staffing/candidates/cand-1?tab=resumes");
+    expect(picker().querySelector("[data-slot='resume-select']")).toBeNull();
+  });
+
+  it("says how many résumés there are to choose from, closed and open", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("· 2 resumes");
+    expect(select().querySelector("[data-slot='resume-change']")!.textContent).toBe("Change");
+    expect(select().getAttribute("aria-label")).toBe(`Change the resume, 2 resumes to choose from. In use: ${base.label}`);
+    expect(picker().querySelector("[data-slot='resume-only']")).toBeNull();
+    await open();
+    const title = picker().querySelector("[data-slot='resume-list-title']")!;
+    expect(title.textContent).toBe("2 resumes for Priya");
+    expect(picker().querySelector("ul")!.getAttribute("aria-labelledby")).toBe(title.id);
   });
 
   it("starts closed on the résumé in use; its ▾ opens one row per résumé, the one in use ticked, and Esc closes them", async () => {
@@ -400,58 +419,30 @@ describe("the job card", () => {
 
 describe("the note a run leaves", () => {
   const note = () => host.querySelector("[data-slot='autofill-result']");
-  const closeButton = () => note()!.querySelector("button")!;
-  const wait = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
-
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
-
   const title = () => host.querySelector("[data-slot='autofill-result-title']")?.textContent;
   const detail = () => host.querySelector("[data-slot='autofill-result-detail']")?.textContent;
 
-  it("sums the run up in two short lines: what it filled, what's left, and that the form is the BDE's to submit", () => {
-    show({ fillCount: 0, rows: [row("Phone", true)], outcome: { filled: 15, handedBack: 1, stopped: false } });
-    expect([title(), detail()]).toEqual([
-      "Filled 15 fields",
-      "Still empty: 1 required. Autofill didn't recognize it or couldn't fill it. Fill in the required one below, then submit the form.",
-    ]);
-  });
-
-  it("tells how many required and optional fields are still empty, and why, in amber", () => {
-    const rows = [row("Email", true, "a@example.test"), row("Phone", true), row("Website", false), row("Twitter", false)];
+  it("is gone from a run that ended as it should: only Autofill complete shows, in green", () => {
+    const rows = [row("Email", true, "a@example.test"), row("Phone", true), row("Website", false)];
     show({ fillCount: 0, rows, outcome: { filled: 15, handedBack: 1, stopped: false } });
-    expect([title(), detail()]).toEqual([
-      "Filled 15 fields",
-      "Still empty: 1 required, 2 optional. Autofill didn't recognize these or couldn't fill them. Fill in the required one below, then submit the form.",
-    ]);
-    expect(note()?.className).toContain("--color-warning-bg");
-  });
-
-  it("stays green when only optional fields are left, and says so", () => {
-    const rows = [row("Email", true, "a@example.test"), row("Website", false), row("Twitter", false)];
-    show({ fillCount: 0, rows, outcome: { filled: 15, handedBack: 0, stopped: false } });
-    expect(detail()).toBe("Still empty: 2 optional. Autofill didn't recognize these or couldn't fill them. Fill in any you need below, then submit the form.");
-    expect(note()?.className).toContain("--color-success-bg");
-  });
-
-  it("goes after a few seconds, but not while the BDE is reading it", () => {
-    show({ fillCount: 0, outcome: { filled: 3, handedBack: 0, stopped: false } });
-    expect([title(), detail()]).toEqual(["Filled 3 fields", "Check the form, then submit it."]);
-    act(() => { closeButton().focus(); });
-    wait(20_000);
-    expect(note()).not.toBeNull();
-    act(() => { closeButton().blur(); });
-    wait(6_000);
-    wait(1_000);
     expect(note()).toBeNull();
+    expect(host.textContent).not.toContain("Still empty");
+    expect(host.querySelector("[data-slot='autofill-done']")?.textContent).toBe("Autofill complete");
+    expect(host.querySelector("[data-slot='autofill-done']")?.className).toContain("--color-success-fg");
   });
 
-  it("stays when the run stopped, until the BDE closes it", () => {
-    show({ fillCount: 2, outcome: { filled: 1, handedBack: 0, stopped: true } });
-    wait(60_000);
-    expect([title(), detail()]).toEqual(["BenchQ stopped: the form changed", "Check the form before going on."]);
-    act(() => { closeButton().click(); });
-    expect(note()).toBeNull();
+  it("stays when the run stopped, in amber, until the BDE closes it", () => {
+    vi.useFakeTimers();
+    try {
+      show({ fillCount: 2, outcome: { filled: 1, handedBack: 0, stopped: true } });
+      act(() => { vi.advanceTimersByTime(60_000); });
+      expect([title(), detail()]).toEqual(["BenchQ stopped: the form changed", "Check the form before going on."]);
+      expect(note()?.className).toContain("--color-warning-bg");
+      act(() => { note()!.querySelector("button")!.click(); });
+      expect(note()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -641,11 +632,11 @@ describe("confirming Mark applied", () => {
       expect(done?.className).toContain("scroll-mt-[calc(var(--topbar-height)");
     });
 
-    it("scrolls to the run's note when fields are left to fill, and Autofill complete isn't on show", () => {
+    it("scrolls to the note of a run that stopped, when Autofill complete isn't on show", () => {
       const rows = [row("Phone", true)];
       show({ fillCount: 1, rows }, { onApply });
       rerender({ fillCount: 1, filling: true, rows });
-      rerender({ fillCount: 1, rows, outcome: { filled: 1, handedBack: 1, stopped: false } });
+      rerender({ fillCount: 1, rows, outcome: { filled: 1, handedBack: 1, stopped: true } });
       expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
       expect(scrolled.mock.contexts[0]).toBe(host.querySelector("[data-slot='autofill-result']"));
     });

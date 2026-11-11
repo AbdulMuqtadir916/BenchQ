@@ -3,6 +3,7 @@ import {
   ariaChecked, ariaLabelOf, cleanLabel, collapse, fieldClues, groupLabel, hasOptionalMark, hasRequiredMark, isAriaChoice, isChoiceVisible, isFileInput,
   isOn, isUploadShown, isVisible, optionLabel, PLACEHOLDER_OPTION, rawLabel, shownFileName, shownValue, textOf,
 } from "./labels";
+import { queryDeep } from "./shadow";
 
 /** One field of a scan: what the panel sees, and the elements a later fill writes to. */
 export type Entry = {
@@ -226,7 +227,15 @@ function collectSlots(doc: Document): Slot[] {
   const groups = new Map<string, HTMLInputElement[]>();
   const ariaGroups = new Map<Element, AriaGroup>();
   const forms = Array.from(doc.forms);
-  for (const element of Array.from(doc.querySelectorAll<HTMLElement>(`input, textarea, select, ${ARIA_CHOICES}`))) {
+  // Radios of one name in two components are two groups: a component's names are its own.
+  const trees = new Map<Node, number>();
+  const treeOf = (element: Element) => {
+    const tree = element.getRootNode();
+    if (tree === doc) return "";
+    if (!trees.has(tree)) trees.set(tree, trees.size);
+    return `${trees.get(tree)}/`;
+  };
+  for (const element of queryDeep<HTMLElement>(doc, `input, textarea, select, ${ARIA_CHOICES}`)) {
     if (isAriaChoice(element)) {
       if (!isAriaQuestion(element)) continue;
       const grouping = ariaGroupOf(element);
@@ -250,7 +259,7 @@ function collectSlots(doc: Document): Slot[] {
         if (!value || value === "on") slots.push(element);
         continue;
       }
-      const key = `${element.form ? forms.indexOf(element.form) : -1}:${element.type}:${element.name}`;
+      const key = `${treeOf(element)}${element.form ? forms.indexOf(element.form) : -1}:${element.type}:${element.name}`;
       const group = groups.get(key);
       if (group) group.push(element);
       else {
@@ -265,7 +274,7 @@ function collectSlots(doc: Document): Slot[] {
 
 /** Dropdowns built from <div>s or buttons, which `input, textarea, select` can't find. */
 function customControls(doc: Document): HTMLElement[] {
-  return Array.from(doc.querySelectorAll<HTMLElement>("[role='combobox'], [aria-haspopup='listbox']")).filter((element) =>
+  return queryDeep<HTMLElement>(doc, "[role='combobox'], [aria-haspopup='listbox']").filter((element) =>
     !element.matches("input, select, textarea") && !element.querySelector("input, select, textarea") && isVisible(element));
 }
 

@@ -1,7 +1,7 @@
 import { optionFor, pickOneReason } from "./options";
 import { racePartsFor } from "./race";
 import type {
-  ChoiceList, ChoiceRequest, FieldOption, FieldTarget, FillRequest, FillResult, FrameRead, FrameScan, PageApi, PageSignals, TabField,
+  ChoiceList, ChoiceRequest, FieldOption, FieldTarget, FillRequest, FillResult, FrameRead, FrameScan, PageApi, PageJob, PageSignals, TabField,
   UndoResult,
 } from "./types";
 
@@ -63,6 +63,13 @@ export async function scanTab(tabId: number): Promise<TabScan> {
     signals: scans.find(({ result }) => result.signals)?.result.signals ?? null,
     unreadableFrames: await countUnreadable(tabId, scans),
   };
+}
+
+/** The job the tab's page shows (its top frame), for adding it to a candidate's jobs. */
+export async function readJobPage(tabId: number): Promise<PageJob | null> {
+  await chrome.scripting.executeScript({ target: { tabId, frameIds: [MAIN_FRAME] }, files: [PAGE_SCRIPT] });
+  const [found] = await inFrames<PageJob>({ tabId, frameIds: [MAIN_FRAME] }, "readJob", []);
+  return found?.result ?? null;
 }
 
 /** A light look at a scanned tab, between scans. A frame that came, went or scanned again means the form has moved on. */

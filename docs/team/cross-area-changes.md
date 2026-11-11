@@ -15,6 +15,14 @@ of the AI answer routes and their `access.py` rows are undone (2026-11-09): the 
 | Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
 | Candidates / résumés (Zuhair) | `backend/api/routes_candidate_resumes.py`, `backend/candidates/versions.py` (`uploaded_file`), `backend/auth/access.py` (one `F` row, approved by Arbaz), `isolation_cases.py`, `test_resume_file.py`, `docs/02-DATA-CONTRACTS.md` §8.2 | `GET …/resumes/{rid}/file`: an uploaded base's version 1 as its file, as uploaded; 404 for any other version. | The extension attaches the picked résumé to the form's résumé upload (07 Q49–Q52). A file for every version is asked of Zuhair (Q25). |
 
+## The Autofill screen — phase 3 of résumé autofill (Arbaz; contract for Abdul's sign-off)
+
+Not agreed yet: docs/02 §8.3 is proposed for Abdul's sign-off; the `access.py` row was approved by Arbaz (2026-11-09).
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Candidates / résumés (Zuhair, Abdul) | `backend/candidates/autofill.py`, `backend/candidates/versions.py` (`save_autofill`, `_family`), `backend/api/routes_candidate_resumes.py`, `backend/api/routes_firm_resumes.py`, `backend/auth/access.py` (one `F` row), `isolation_cases.py`, `test_autofill.py`, `test_autofill_screen.py`, `docs/02-DATA-CONTRACTS.md` §8.1, §8.3 | `resumes.autofill.custom` is a list of `{question, also, answer}` (07 Q40–Q41; nothing wrote the map); the read marks an edit that stopped applying (`replaced`, Q15) and, with `&editor=true`, lists unanswered questions with each answer's `type` (Q34); `PATCH …/resumes/{rid}/autofill` saves edits, resets, added and removed questions in place, for the rest of the résumé unless `only_this` (Q7, Q14, Q30, Q44). | The Autofill screen (`/[firm]/resumes/[id]/autofill`), where a BDE sees and changes what the extension fills. |
+
 ## Job search tables (`feat/jobs-table`, Zuhair)
 
 `job_postings` and `scrape_jobs`, migration 0020 ([docs/02](../02-DATA-CONTRACTS.md) §6.y).

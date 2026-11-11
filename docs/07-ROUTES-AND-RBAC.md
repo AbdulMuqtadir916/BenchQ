@@ -130,6 +130,7 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | `/[firm]/applications`, `/[firm]/applications/[id]` | app         | full                                                  | team                | own             | read             | read                     |
 | `/[firm]/resumes`                                   | app         | full                                                  | team                | assigned        | read             | read                     |
 | `/[firm]/resumes/[id]`                              | studio      | full                                                  | team                | assigned        | read (view mode) | read (view mode)         |
+| `/[firm]/resumes/[id]/autofill`                     | studio      | full                                                  | team                | assigned        | read             | read                     |
 | `/[firm]/outreach`                                  | app         | full                                                  | team                | own             | read             | read                     |
 | `/[firm]/followups`                                 | app         | full                                                  | team                | own             | —                | read                     |
 | `/[firm]/focus`                                     | focus       | full                                                  | full                | full            | —                | —                        |
@@ -317,7 +318,7 @@ src/app/
       settings/                    → sections gated per §2.2
         firm (OWNER) · team (OWNER manages, MANAGER read + assign) · templates · preferences
       @modal/                      → intercepts for candidates/new, jobs/capture
-    (studio)/resumes/[id]
+    (studio)/resumes/[id]          → the studio; autofill/ is the version's Autofill screen (Q13)
     focus/
   dev/design-system/
   not-found.tsx · global-error.tsx
