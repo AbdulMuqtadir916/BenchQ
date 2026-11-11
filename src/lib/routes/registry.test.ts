@@ -464,6 +464,13 @@ describe("⌘K navigation by area (P5, docs/04 §14.1)", () => {
     for (const id of pages) expect(accessFor(routeById(id), inSupport), id).toBe("read");
   });
 
+  it("offers Focus mode only to firm users who can open it", () => {
+    for (const role of ROLES) {
+      expect(ids(asRole(role), "firm").includes("focus"), role).toBe(role !== "VIEWER");
+    }
+    expect(ids(inSupport, "firm")).not.toContain("focus");
+  });
+
   it("a firm user never gets admin pages", () => {
     for (const role of ROLES) expect(ids(asRole(role), "platform"), role).toEqual([]);
   });

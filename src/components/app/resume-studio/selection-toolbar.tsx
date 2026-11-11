@@ -17,6 +17,7 @@ const AI_ACTIONS: Array<{ action: RewriteAction; label: string; hint: string }> 
   { action: "grammar", label: "Fix grammar", hint: "Spelling, casing, punctuation" },
 ];
 const HIGHLIGHT = "bq-ai-pending";
+const HIGHLIGHT_STYLESHEET = "/resume-highlight.css";
 type Anchor = { top: number; left: number };
 
 /** Above the selection, or below it when there's no room at the top; kept inside the viewport. */
@@ -138,6 +139,7 @@ export function SelectionToolbar({ scopeRef }: { scopeRef: RefObject<HTMLElement
 
   return createPortal(
     <AnimatePresence>
+      <link rel="stylesheet" href={HIGHLIGHT_STYLESHEET} precedence="default" />
       {anchor ? (
         <motion.div
           key="selection-toolbar"

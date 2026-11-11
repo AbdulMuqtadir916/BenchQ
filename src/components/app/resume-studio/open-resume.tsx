@@ -10,7 +10,7 @@ import { baseName, roleOf, tailoredName, versionName } from "@/lib/derive/resume
 import { useTreeLabels } from "@/components/app/resumes/use-tree-labels";
 import { useCandidate } from "@/lib/hooks/use-candidates";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { canChangeResume } from "@/lib/auth/permissions";
+import { canChangeResume, canManageResume } from "@/lib/auth/permissions";
 import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { isNotFoundError } from "@/lib/api/client";
@@ -123,6 +123,7 @@ export function OpenResume({ id, initialMode, isAutofill = false }: { id: string
         name={name}
         subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")}
         canEdit={!!candidate && canChangeResume(principal, candidate)}
+        canTailor={!!candidate && canManageResume(principal, candidate)}
         onClose={close}
         onSave={onSave}
         isSaving={isSaving}

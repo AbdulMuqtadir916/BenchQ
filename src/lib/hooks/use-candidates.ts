@@ -33,6 +33,7 @@ export function useUpdateCandidate(id: string) {
     onSuccess: (candidate) => {
       queryClient.setQueryData(queryKeys.candidates.detail(firmId, id), candidate);
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidates.list(firmId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
     },
   });
 }

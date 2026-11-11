@@ -18,6 +18,7 @@ import { useStudio, type StudioTab } from "./studio-store";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { AutofillTab } from "@/components/app/resume-autofill/autofill-tab";
 import type { ResumeSectionKey } from "@/lib/schemas/resume-document";
+import { normalizeProfileLink } from "@/lib/resume-doc/profile-link";
 import { resumeFileName } from "@/lib/derive/resume-name";
 
 /** True when a key press belongs to a text field rather than to the studio. */
@@ -39,9 +40,9 @@ const SWITCH_MS = 1500;
  * Viewer mode: the page itself, editable in place. Autofill answers (its own route, `isAutofill`): what the extension
  * fills from this version. A switch to or from it replaces the URL, so closing goes back to where the studio was opened.
  */
-export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false, isAutofill = false, hrefs }: {
-  name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean;
-  isAutofill?: boolean;
+export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSave, isSaving = false, isAutofill = false, hrefs }: {
+  name: string; subtitle: string; canEdit: boolean; canTailor: boolean; onClose: () => void; onSave?: () => void;
+  isSaving?: boolean; isAutofill?: boolean;
   /** Absent for an unsaved draft, which has no Autofill tab. */
   hrefs?: StudioHrefs;
 }) {
@@ -80,11 +81,13 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
     selectTab("build");
   }, [selectTab]);
 
+  const hasInvalidLinks = !!doc && [doc.header.linkedin, doc.header.github].some((value) => normalizeProfileLink(value) === null);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (canEdit && onSave && useStudio.getState().isDirty) onSave();
+        if (canEdit && onSave && !hasInvalidLinks && !isSaving && useStudio.getState().isDirty) onSave();
         return;
       }
       // A dialog on top (discard, "Use this as the base?") answers its own Esc; the studio stays open.
@@ -101,7 +104,7 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, canEdit, onSave, isAutofill]);
+  }, [close, canEdit, onSave, hasInvalidLinks, isSaving, isAutofill]);
 
   if (!doc) return null;
   const isEditable = canEdit && mode === "view";
@@ -122,9 +125,11 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
         name={name}
         subtitle={subtitle}
         canEdit={canEdit}
+        canTailor={canTailor}
         isTailoring={tailor.isRunning}
         onSave={onSave}
         isSaving={isSaving}
+        isSaveBlocked={hasInvalidLinks}
         onClose={close}
         onTailor={tailor.start}
         onExport={exporter.print}
