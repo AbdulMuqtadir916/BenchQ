@@ -6,7 +6,7 @@ import { Check, LoaderCircle, SkipForward } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
-import { deriveMatchScore } from "@/lib/derive";
+import { deriveMatchScore, isJobForCandidate } from "@/lib/derive";
 import { cn } from "@/lib/cn";
 import { EASE_OUT } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ interface JobMatchIntroProps {
   applications: Application[];
   /** Data has loaded — the sequence only starts once there is something real to count. */
   isReady: boolean;
+  /** A real search is running (docs/02 §6.z): the last step holds, "Searching…", until it ends. */
+  isSearching?: boolean;
   onDone: () => void;
 }
 
@@ -29,7 +31,7 @@ function useMatchStats(candidate: Candidate | null, jobs: Job[], applications: A
     const active = jobs.filter((j) => j.isActive && j.dedupe.duplicateOfJobId === null);
     if (!candidate) return { active: active.length, eligible: 0, strong: 0, best: null as null | { score: number; job: Job } };
     const applied = new Set(applications.filter((a) => a.candidateId === candidate.id).map((a) => a.jobId));
-    const eligible = active.filter((j) => j.allowedWorkAuth.includes(candidate.workAuth) && !applied.has(j.id));
+    const eligible = active.filter((j) => isJobForCandidate(j, candidate) && !applied.has(j.id));
     const scored = eligible.map((job) => ({ job, score: deriveMatchScore(candidate, job) }));
     const best = scored.reduce<null | { score: number; job: Job }>((top, s) => (!top || s.score > top.score ? s : top), null);
     return { active: active.length, eligible: eligible.length, strong: scored.filter((s) => s.score >= 70).length, best };
@@ -49,7 +51,7 @@ function CountUp({ to, duration }: { to: number; duration: number }) {
  * "Find jobs" from a candidate: a short, skippable matching sequence before the
  * ranked list — read the profile, filter by work authorization, score, rank.
  */
-export function JobMatchIntro({ candidate, jobs, applications, isReady, onDone }: JobMatchIntroProps) {
+export function JobMatchIntro({ candidate, jobs, applications, isReady, isSearching = false, onDone }: JobMatchIntroProps) {
   const reduce = useReducedMotion() ?? false;
   const stats = useMatchStats(candidate, jobs, applications);
   const [stage, setStage] = useState(0);
@@ -58,10 +60,16 @@ export function JobMatchIntro({ candidate, jobs, applications, isReady, onDone }
 
   useEffect(() => {
     if (!isRunning) return;
-    const timers = [1, 2, 3, 4].map((n) => setTimeout(() => setStage(n), step * 1000 * n));
-    timers.push(setTimeout(onDone, step * 1000 * 4 + (reduce ? 100 : 650)));
+    const timers = [1, 2, 3].map((n) => setTimeout(() => setStage(n), step * 1000 * n));
     return () => timers.forEach(clearTimeout);
-  }, [isRunning, step, reduce, onDone]);
+  }, [isRunning, step]);
+
+  // The last step finishes once no search is running: at once without one, when it ends with one.
+  useEffect(() => {
+    if (!isRunning || stage < 3 || isSearching) return;
+    const timers = [setTimeout(() => setStage(4), step * 1000), setTimeout(onDone, step * 1000 + (reduce ? 100 : 650))];
+    return () => timers.forEach(clearTimeout);
+  }, [isRunning, stage, isSearching, step, reduce, onDone]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onDone();
@@ -74,7 +82,7 @@ export function JobMatchIntro({ candidate, jobs, applications, isReady, onDone }
     { label: `Reading ${first}'s profile`, done: `Read ${first}'s profile`, detail: candidate ? [candidate.primaryRole, ...candidate.targetRoles].filter(Boolean).slice(0, 4).join(" · ") : "" },
     { label: "Checking work authorization", done: "Filtered by work authorization", detail: <><CountUp to={stats.eligible} duration={step} /> of {stats.active} open roles accept this visa</> },
     { label: `Scoring ${stats.eligible} roles against the profile`, done: `Scored ${stats.eligible} roles`, detail: <><CountUp to={stats.strong} duration={step} /> strong matches (70+)</> },
-    { label: "Ranking the best matches", done: "Ranked the best matches", detail: stats.best ? `Top match ${stats.best.score} — ${stats.best.job.title} at ${stats.best.job.company.name}` : "No eligible roles right now" },
+    { label: isSearching ? "Searching for new jobs…" : "Ranking the best matches", done: "Ranked the best matches", detail: stats.best ? `Top match ${stats.best.score} — ${stats.best.job.title} at ${stats.best.job.company.name}` : "No eligible roles right now" },
   ];
 
   return (

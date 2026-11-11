@@ -52,7 +52,8 @@ function JobsContent() {
         title="Jobs"
         subtitle={focus ? `Open roles ranked for ${focus.fullName} — best match first.` : "Search, score, and inspect every role without leaving the queue."}
         actions={
-          can(principal, "job.capture") ? (
+          // Capturing is the BDE's, for their own candidate (docs/02 §6.z): `job.search` is the BDE-only action.
+          can(principal, "job.search") ? (
             <JobCaptureDialogTrigger />
           ) : undefined
         }

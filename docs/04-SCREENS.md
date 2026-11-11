@@ -284,7 +284,11 @@ every submission stand*, *what did recruiters say*, *where do I submit next*.
 **Header.** Initials avatar, name, work-auth chip, candidate status, role · location · years ·
 target rate, availability and relocation. The owning BDE shows to managers and owners only — a BDE
 looking at their own candidate doesn't need it. Actions: `Find jobs` (runs the matching
-sequence inside the Jobs tab — never navigates away) and `Build resume`. Below it, the derived
+sequence inside the Jobs tab — never navigates away) and `Build resume`. Since job search PR 3 (docs/02 §6.z) `Find
+jobs` is the candidate's BDE's only and really searches, for the candidate's main role (else the first target role):
+under it, the last search's outcome ("12 new · 3 seen again") and today's usage ("47/100 jobs · 3/20 searches ·
+2/20 captures · resets 6:30 PM IST"); disabled with the reason when there is no role, no résumé country, or the
+day's searches are used. Below it, the derived
 stat strip (applications, active, interviews, offers, response rate, days on bench); **every stat
 is a button** that opens the tab behind it.
 
@@ -340,8 +344,10 @@ Signals detected per email: `SHORTLISTED`, `CALL_REQUEST`, `INTERVIEW_SCHEDULED`
 application's stage is behind the stage the email implies.
 
 #### Jobs
-The profile-locked job explorer. `Find jobs` plays the matching sequence (read profile → filter by
-work authorization → score → rank) with real counts, then the ranked list staggers in.
+The profile-locked job explorer: the candidate's own jobs (job search PR 3). `Find jobs` plays the matching sequence (read profile → filter by
+work authorization → score → rank) with real counts, then the ranked list staggers in. While the candidate's search
+runs, the last step holds on "Searching for new jobs…" until it ends; Skip opens the list and the search goes on.
+A job whose work authorization is unknown (a searched job's) is shown, never filtered out.
 
 #### Resumes
 This candidate's résumés as a collapsible tree (the same component as the Resume Builder library): each **base**
@@ -395,6 +401,10 @@ Virtualise past 100 rows. 500 rows must scroll at 60fps.
 Filtered to nothing → clear-filters state.
 
 ### 5.2 `/jobs/capture`
+
+> **Since job search PR 3 (docs/02 §6.z):** one form, the candidate's BDE's only: the candidate (one of theirs), the
+> job URL, title, company, location (optional) and description, the fields the backend keeps. The same job again for
+> that candidate links to the one they have. The tabs below were the earlier design.
 
 Three tabs.
 

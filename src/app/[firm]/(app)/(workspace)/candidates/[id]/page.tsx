@@ -4,7 +4,8 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { can, canManageResume } from "@/lib/auth/permissions";
+import { can, canManageResume, canSearchJobs } from "@/lib/auth/permissions";
+import { useJobSearches } from "@/lib/hooks/use-jobs";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { EASE_OUT } from "@/lib/motion";
@@ -45,6 +46,10 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const updateStatus = useUpdateApplicationStatus();
   const canAct = can(principal, "candidate.edit");
   const canEditProfile = can(principal, "candidate.editProfile");
+  // "Find jobs" is the candidate's BDE's (docs/02 §6.z); while their search runs, the matching sequence waits for it.
+  const canSearch = ws.candidate ? canSearchJobs(principal, ws.candidate) : false;
+  const searchesQuery = useJobSearches(id, canSearch);
+  const isSearching = Boolean(searchesQuery.data?.running);
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
@@ -122,6 +127,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         canAct={canAct}
         resumeHref={ws.base ? toHref("resumes.studio", { id: ws.base.version.id }) : null}
         onFindJobs={actions.findJobs}
+        canSearchJobs={canSearch}
         onOpenTab={setTab}
       />
 
@@ -157,6 +163,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
               applications={ws.applications}
               isLoading={ws.jobsQuery.isLoading || ws.applicationsQuery.isLoading}
               isMatching={matchRun > matchDone}
+              isSearching={isSearching}
               hasMatched={matchRun > 0}
               onMatchDone={finishMatch}
             />

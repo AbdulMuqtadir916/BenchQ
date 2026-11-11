@@ -25,6 +25,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { isNotFoundError } from "@/lib/api/client";
 import { useHref } from "@/lib/routes/use-href";
+import { jobLocation } from "@/lib/format/job";
 
 const ANALYSIS_STAGES = [
   "Reading the job description",
@@ -70,6 +71,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   if (jobQuery.error || !jobQuery.data) return <div className="bq-page"><ErrorState error={jobQuery.error as Error} onRetry={() => void jobQuery.refetch()} /></div>;
 
   const job: Job = jobQuery.data;
+  // The candidates this job was found or captured for, among the ones this person sees (docs/02 §6.z).
+  const foundFor = myCandidates.filter((candidate) => job.candidateIds.includes(candidate.id));
   const score = context ? deriveMatchScore(context, job) : null;
   const analysisReady = run.status === "complete";
 
@@ -81,7 +84,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
       <PageHeader
         title={job.title}
-        subtitle={`${job.company.name} · ${job.remoteMode === "REMOTE" ? "Remote" : `${job.city}, ${job.state}`}${job.rateMax ? ` · $${job.rateMin}–${job.rateMax}/hr` : ""}`}
+        subtitle={`${job.company.name} · ${jobLocation(job)}${job.rateMax ? ` · $${job.rateMin}–${job.rateMax}/hr` : ""}`}
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -90,6 +93,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {job.postedAt ? <span className="text-caption text-[var(--color-text-3)]">Posted <DualTimestamp iso={job.postedAt} format="relative" /></span> : null}
         <span className="text-caption text-[var(--color-text-3)]">· Captured <DualTimestamp iso={job.provenance.ingestedAt} format="relative" /></span>
       </div>
+
+      {foundFor.length > 0 ? (
+        <p className="-mt-2 mb-5 text-sm text-[var(--color-text-2)]">
+          <span className="text-[var(--color-text-3)]">Found for </span>
+          {foundFor.map((candidate, index) => (
+            <span key={candidate.id}>{index > 0 ? ", " : null}<Link href={toHref("candidates.detail", { id: candidate.id })} className="font-[550] text-[var(--color-text)] hover:underline">{candidate.fullName}</Link></span>
+          ))}
+        </p>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card>

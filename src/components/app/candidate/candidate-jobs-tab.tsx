@@ -15,13 +15,15 @@ interface CandidateJobsTabProps {
   isLoading: boolean;
   /** "Find jobs" was pressed and the matching sequence hasn't finished yet. */
   isMatching: boolean;
+  /** The candidate's search is running: the matching sequence holds on its last step until it ends. */
+  isSearching: boolean;
   /** Stagger the list in — true once a matching run has played. */
   hasMatched: boolean;
   onMatchDone: () => void;
 }
 
 /** The candidate's Jobs tab: optional matching sequence, then roles ranked for this profile. */
-export function CandidateJobsTab({ candidate, jobs, applications, isLoading, isMatching, hasMatched, onMatchDone }: CandidateJobsTabProps) {
+export function CandidateJobsTab({ candidate, jobs, applications, isLoading, isMatching, isSearching, hasMatched, onMatchDone }: CandidateJobsTabProps) {
   const reduce = useReducedMotion() ?? false;
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -33,7 +35,7 @@ export function CandidateJobsTab({ candidate, jobs, applications, isLoading, isM
           exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, filter: "blur(6px)" }}
           transition={{ duration: 0.28, ease: EASE_OUT }}
         >
-          <JobMatchIntro candidate={candidate} jobs={jobs} applications={applications} isReady={!isLoading} onDone={onMatchDone} />
+          <JobMatchIntro candidate={candidate} jobs={jobs} applications={applications} isReady={!isLoading} isSearching={isSearching} onDone={onMatchDone} />
         </motion.div>
       ) : (
         <motion.div

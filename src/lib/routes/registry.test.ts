@@ -180,7 +180,7 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["candidates.detail", "full", "team", "assigned", "read"],
   ["jobs", "full", "full", "full", "read"],
   ["jobs.detail", "full", "full", "full", "read"],
-  ["jobs.capture", "full", "full", "full", "none"],
+  ["jobs.capture", "none", "none", "full", "none"], // a BDE captures for their own candidate (job search PR 3)
   ["applications", "full", "team", "own", "read"],
   ["applications.detail", "full", "team", "own", "read"],
   ["resumes", "full", "team", "assigned", "read"],

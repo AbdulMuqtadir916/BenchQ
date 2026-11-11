@@ -11,8 +11,11 @@
 > `POST …/job-postings` (a capture, job search PR 2: `{source: manual | extension, title, company, description,
 > url, location?}`, 201, or 200 with the job the candidate already has), `POST …/job-searches` `{query}` (202
 > `{batch_id, run_id}`; the batch is `running` until it finishes; a repeat of the same role continues from the last; the candidate's BDE only; 403 / 404 / 409 / 422 / 429). docs/02
-> §6.y has the rules. Showing them in the screens, with Apply and Tailor off for them until PR 3 repoints
-> `applications`, is PR 2. The rest of this page still describes the old pool.
+> §6.y has the rules. **On the screens (job search PR 3, `integrate/jobs`, docs/02 §6.z):** with
+> `NEXT_PUBLIC_LIVE_MODULES=jobs` every job screen reads `GET /api/firms/{firm}/job-postings` (one item per job, the
+> visible `candidate_ids`) and `…/job-postings/{id}` through `src/lib/api/dto/jobs.ts`; only real jobs show, never the
+> mock's (decided 2026-11-11: put `jobs` in that line of `.env.local`). Applications still name the old pool until
+> Arbaz's repoint (docs/team/arbaz.md). The rest of this page still describes the old pool.
 
 ## Why companies are folded in
 

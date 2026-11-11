@@ -40,8 +40,8 @@ const ARGS: Record<string, unknown[]> = {
   "candidates.followBde": ["user_adnan", "user_fatima"],
   "candidates.reassign": ["cand_01", { managerId: "user_priya", bdeId: "user_vikram", note: null }],
   "candidates.parseResume": [{ fileName: "Ravi_Teja_Java_FullStack.pdf", sizeBytes: 1000, mimeType: "application/pdf" }],
-  "jobs.capture": [{ candidateId: "cand_01", sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", description: "Policy check" }],
-  "jobs.startSearch": ["cand_01", "QA"],
+  "jobs.capture": [{ candidateId: "cand_03", sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", description: "Policy check" }],
+  "jobs.startSearch": ["cand_03", "QA"],
   "documents.upload": ["cand_01", { kind: "OTHER", title: "Note", fileName: "note.pdf", sizeBytes: 1000, expiresAt: null }],
   "documents.remove": ["doc_none"],
   "inbox.connect": ["cand_01"],
@@ -59,7 +59,8 @@ const ARGS: Record<string, unknown[]> = {
   "resumes.showBase": ["cand_03", "base_none"],
 };
 /** Only the candidate's BDE does these (07 Q55): the OWNER's control is refused them by that rule, not the policy. */
-const BDE_ONLY = new Set(["resumes.upload", "resumes.deleteBase", "resumes.deleteVersion", "resumes.showBase"]);
+// Capturing and searching jobs are the candidate's BDE's too (docs/02 §6.z).
+const BDE_ONLY = new Set(["resumes.upload", "resumes.deleteBase", "resumes.deleteVersion", "resumes.showBase", "jobs.capture", "jobs.startSearch"]);
 
 const writes = Object.entries(WRITE_ACTIONS).flatMap(([resource, methods]) => Object.entries(methods).map(([name, action]) => ({ resource, name, action })));
 const call = (resource: string, name: string) => MOCKS[resource]![name]!(FIRM, ...(ARGS[`${resource}.${name}`] ?? []));

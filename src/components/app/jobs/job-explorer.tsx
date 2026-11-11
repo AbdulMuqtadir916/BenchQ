@@ -22,7 +22,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
-import { deriveMatchScore, newestDate } from "@/lib/derive";
+import { deriveMatchScore, isJobForCandidate, newestDate } from "@/lib/derive";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { EASE_OUT, POPOVER_TRANSITION } from "@/lib/motion";
@@ -38,6 +38,7 @@ import { PORTALS, PortalLogo, portalForJob, type PortalKey } from "@/components/
 import { useCan } from "@/lib/auth/permissions";
 import { useHref } from "@/lib/routes/use-href";
 import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
+import { jobLocation } from "@/lib/format/job";
 
 const REMOTE_OPTIONS: SelectOption[] = [
   { value: "ALL", label: "Any work mode" },
@@ -123,7 +124,7 @@ export function JobExplorer({
     const minimum = Number(scoreFloor);
     const list = jobs
       .filter((job) => job.isActive && job.dedupe.duplicateOfJobId === null && (showHidden || !hiddenIds.has(job.id)))
-      .filter((job) => !context || (job.allowedWorkAuth.includes(context.workAuth) && !appliedIds.has(job.id)))
+      .filter((job) => !context || (isJobForCandidate(job, context) && !appliedIds.has(job.id)))
       .map((job) => ({ job, score: context ? deriveMatchScore(context, job) : null, portal: portalForJob(job) }))
       .filter(({ job, score, portal: rowPortal }) => {
         if (normalizedQuery && !`${job.title} ${job.company.name} ${job.city ?? ""} ${job.state ?? ""}`.toLowerCase().includes(normalizedQuery)) return false;
@@ -255,7 +256,7 @@ export function JobExplorer({
                               {score !== null ? <MatchScore score={score} variant="ring" /> : null}
                             </div>
                             <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-[var(--color-text-2)]">
-                              <span className="truncate">{job.company.name}</span><span className="text-[var(--color-border-strong)]">·</span><span className="truncate">{job.remoteMode === "REMOTE" ? "Remote" : `${job.city}, ${job.state}`}</span>
+                              <span className="truncate">{job.company.name}</span><span className="text-[var(--color-border-strong)]">·</span><span className="truncate">{jobLocation(job)}</span>
                             </div>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-caption text-[var(--color-text-3)]">
                               <span className="inline-flex items-center gap-1"><PortalLogo portal={rowPortal} domain={job.company.domain} size={16} />{PORTALS[rowPortal].label}</span>
@@ -353,7 +354,7 @@ function JobDetailHeader({
           </div>
           <h2 className="max-w-3xl text-h1 text-[var(--color-text)]">{job.title}</h2>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--color-text-2)]">
-            <span className="inline-flex items-center gap-1"><MapPin size={13} />{job.remoteMode === "REMOTE" ? "Remote" : `${job.city}, ${job.state}`}</span>
+            <span className="inline-flex items-center gap-1"><MapPin size={13} />{jobLocation(job)}</span>
             <span>·</span><span>{job.employmentType ?? "Contract"}</span>
             {job.rateMax ? <><span>·</span><span className="font-mono">${job.rateMin}–{job.rateMax}/hr</span></> : null}
           </div>
@@ -403,7 +404,7 @@ function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) {
         <div className="p-5">
           <div className="mb-5 flex items-start gap-3">
             <PortalLogo portal="COMPANY" domain={job.company.domain} size={40} />
-            <div><h3 className="text-h2 text-[var(--color-text)]">{job.title}</h3><p className="mt-0.5 text-sm text-[var(--color-text-2)]">{job.company.name} · {job.remoteMode === "REMOTE" ? "Remote" : `${job.city}, ${job.state}`}</p><p className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><Clock3 size={12} />Posted {job.postedAt ? formatRelative(job.postedAt) : "recently"}{job.applicantCount ? ` · ${job.applicantCount} applicants` : ""}</p></div>
+            <div><h3 className="text-h2 text-[var(--color-text)]">{job.title}</h3><p className="mt-0.5 text-sm text-[var(--color-text-2)]">{job.company.name} · {jobLocation(job)}</p><p className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><Clock3 size={12} />Posted {job.postedAt ? formatRelative(job.postedAt) : "recently"}{job.applicantCount ? ` · ${job.applicantCount} applicants` : ""}</p></div>
           </div>
           <div className="space-y-3 text-sm leading-6 text-[var(--color-text-2)]">
             {lines.map((line, index) => {

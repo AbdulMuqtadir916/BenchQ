@@ -12,6 +12,9 @@ PR 1 and PR 2 merge.
 |---|---|---|---|---|
 | Access (Abdul) | `backend/auth/access.py` | Two rows: `GET /api/firms/{firm_id}/job-postings` and `…/job-postings/{posting_id}`, both `FIRM`. | The job screens' firm-level reads; `test_access.py` refuses an unclassified route. Scoping inside is the routes' (`_visible`). | **Pending: Abdul** |
 | Support view tests (Abdul) | `backend/tests/test_support_views.py` | `/api/firms/{acme}/job-postings` added to the reads a support view answers. | A support view reads the job screens like the firm's owner. | **Pending: Abdul** |
+| Applications screen (Samad) | `src/app/[firm]/(app)/(workspace)/applications/[id]/page.tsx` | The application's job title is a link only when its job is found; otherwise plain text. | Until Arbaz's repoint, an application names an old pool job, which the job screens (on `job_postings`) can't open (decided 2026-11-11, R3-Q3). | **Pending: Samad** |
+| Routes and access (Abdul) | `src/lib/routes/registry.ts`, `registry.test.ts`, `docs/07-ROUTES-AND-RBAC.md` §2 | `/[firm]/jobs/capture`: BDE only (was OWNER, MANAGER and BDE). | A captured job is a candidate's, and only the candidate's BDE adds one (the backend's rule, 2026-11-10; decided for the screens 2026-11-11, R1-Q5). | **Pending: Abdul** |
+| Dashboard and mock tests (shared) | `src/features/dashboard/dashboard-errors.test.ts`, `src/mocks/write-authorization.test.ts` | The BDE dashboard test gives each of the BDE's candidates a captured job first; capture and search are on the BDE-only list. | The mock's fixture jobs belong to no candidate (decided 2026-11-11), so the BDE's queue was empty. | Informational |
 
 ## Job postings repoint (`feat/job-postings-repoint`, Zuhair; job search PR 2)
 

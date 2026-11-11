@@ -88,7 +88,7 @@ const ROUTE_DEFS = [
   { id: "candidates.new", path: "/[firm]/candidates/new", title: "New candidate", area: "firm", shell: "studio", access: firm(roles("full", "full", "none", "none"), "none") },
   { id: "candidates.detail", path: "/[firm]/candidates/[id]", title: "Candidate", area: "firm", shell: "app", access: firm(roles("full", "team", "assigned", "read")) },
   { id: "jobs", path: "/[firm]/jobs", title: "Jobs", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")), nav: { section: "workspace", order: 3, icon: Briefcase }, shortcut: "j", palette: true },
-  { id: "jobs.capture", path: "/[firm]/jobs/capture", title: "Capture job", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "none"), "none") },
+  { id: "jobs.capture", path: "/[firm]/jobs/capture", title: "Capture job", area: "firm", shell: "app", access: firm(roles("none", "none", "full", "none"), "none") },
   { id: "jobs.detail", path: "/[firm]/jobs/[id]", title: "Job", area: "firm", shell: "app", access: firm(roles("full", "full", "full", "read")) },
   { id: "applications", path: "/[firm]/applications", title: "Applications", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 4, icon: Send }, shortcut: "a", palette: true },
   { id: "applications.detail", path: "/[firm]/applications/[id]", title: "Application", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")) },
