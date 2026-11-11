@@ -6,7 +6,6 @@ import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDndContext, 
 import { Archive, Inbox } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus, StoredApplicationStatus } from "@/lib/schemas/enums";
-import { useFollowups } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
 import { cn } from "@/lib/cn";
 import { ApplicationCardFace } from "./application-card";
@@ -38,7 +37,6 @@ const noSubscription = () => () => {};
 
 export function ApplicationBoard({ apps, onMove, canAct, candidateName, onOpen, showClosed = false, saving, reviewColumn, reviewCount, showReviewColumn = true }: ApplicationBoardProps) {
   const teamQuery = useTeam();
-  const followupsQuery = useFollowups();
   const [activeId, setActiveId] = useState<string | null>(null);
   // True only in the browser (false while server-rendering and hydrating), so the portal never mismatches.
   const isClient = useSyncExternalStore(noSubscription, () => true, () => false);
@@ -51,18 +49,7 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, onOpen, 
     return (id: string) => map.get(id) ?? "Unassigned";
   }, [teamQuery.data]);
 
-  const nextFollowup = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const task of followupsQuery.data ?? []) {
-      if (task.state !== "PENDING" && task.state !== "SNOOZED") continue;
-      const due = task.snoozedUntil ?? task.dueAt;
-      const current = map.get(task.applicationId);
-      if (!current || due < current) map.set(task.applicationId, due);
-    }
-    return map;
-  }, [followupsQuery.data]);
-
-  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), followUpDue: nextFollowup.get(app.id), isSaving: saving?.has(app.id) });
+  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), isSaving: saving?.has(app.id) });
   const active = apps.find((a) => a.id === activeId) ?? null;
   const hasLegacy = apps.some((a) => isLegacy(a.status));
   const columns: Array<{ id: string; statuses: StoredApplicationStatus[] }> = [

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ApiError } from "./client";
-import type { Application, FollowUpTask } from "@/lib/schemas/application";
+import type { Application } from "@/lib/schemas/application";
 import type { StoredApplicationStatus } from "@/lib/schemas/enums";
 import type { UpdateApplicationStatus } from "@/lib/schemas/inbox";
 import { newCommandId } from "@/lib/utils";
@@ -123,8 +123,4 @@ export const applicationsApi = {
     if (!isLive("applications")) throw new ApiError("Undo needs the live applications module.", "UNSUPPORTED", 400);
     return live.undoAutomatic(firmId, id, eventId, expectedRevision, commandId);
   },
-};
-
-export const followupsApi = {
-  list: async (firmId: string, params?: { userId?: string }): Promise<FollowUpTask[]> => (await mock()).followupsMock.list(firmId, params),
 };

@@ -128,12 +128,6 @@ export const OutreachResult = z.enum([
 ]);
 export type OutreachResult = z.infer<typeof OutreachResult>;
 
-export const FollowUpKind = z.enum(["DAY_3_LINKEDIN", "DAY_7_EMAIL", "CUSTOM"]);
-export type FollowUpKind = z.infer<typeof FollowUpKind>;
-
-export const FollowUpState = z.enum(["PENDING", "DONE", "SNOOZED", "CANCELLED"]);
-export type FollowUpState = z.infer<typeof FollowUpState>;
-
 /** JobNavigator-aligned: two scoring depths for cost control. */
 export const ScoringDepth = z.enum(["LIGHT", "FULL"]);
 export type ScoringDepth = z.infer<typeof ScoringDepth>;

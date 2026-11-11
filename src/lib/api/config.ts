@@ -14,7 +14,6 @@ export type ApiModule =
   | "records"
   | "resumes"
   | "applications"
-  | "followups"
   | "documents"
   | "inbox"
   | "agents";

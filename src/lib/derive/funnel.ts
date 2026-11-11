@@ -22,6 +22,15 @@ function furthestRank(app: Application): number {
   return furthest;
 }
 
+/**
+ * Every pipeline stage this application has reached, by the same rule as the funnel: a skipped stage counts (D1), and
+ * a legacy placement counts as reaching Offer (D6). Saved drafts reach nothing.
+ */
+export function reachedStatuses(app: Application): Set<ApplicationStatus> {
+  const furthest = furthestRank(app);
+  return new Set(STAGES.filter((status) => stageRank(status) <= furthest));
+}
+
 export function deriveFunnel(applications: Application[]): FunnelStage[] {
   const reached = applications.map(furthestRank);
   let previousCount: number | null = null;

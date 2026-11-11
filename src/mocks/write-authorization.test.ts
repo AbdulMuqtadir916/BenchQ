@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { can } from "@/lib/auth/policy";
 import { agentsMock } from "./agents";
-import { applicationsMock, followupsMock } from "./applications";
+import { applicationsMock } from "./applications";
 import { candidatesMock } from "./candidates";
 import { createCandidateBody } from "./create-candidate-body";
 import { documentsMock } from "./documents";
@@ -22,7 +22,7 @@ import { signInAs, signInAsSupportView, signOutForTest } from "./sign-in-as";
 
 type AnyMethod = (firmId: string, ...args: unknown[]) => Promise<unknown>;
 const MOCKS: Record<string, Record<string, AnyMethod>> = {
-  candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock, records: recordsMock,
+  candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, resumes: resumesMock, records: recordsMock,
   documents: documentsMock, inbox: inboxMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
 } as unknown as Record<string, Record<string, AnyMethod>>;
 

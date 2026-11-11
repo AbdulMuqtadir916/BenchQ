@@ -34,7 +34,6 @@ export const queryKeys = {
     /** Mutation key of status moves (the pending-move overlay reads it). */
     moves: (firmId: string) => [firmId, "applications", "move"] as const,
   },
-  followups: resource("followups"),
   resumes: {
     ...resource("resumes"),
     byCandidate: (firmId: string, candidateId: string) => [firmId, "resumes", "byCandidate", candidateId] as const,

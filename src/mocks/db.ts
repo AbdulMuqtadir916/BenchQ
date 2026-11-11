@@ -23,7 +23,7 @@ import { arrayOf } from "@/lib/api/client";
  */
 
 /** sha256 of src/mocks/data/*.json (first 16 hex). db.test.ts recomputes it: update it with the fixtures. */
-export const FIXTURE_VERSION = "16a8dcda2b343dd2";
+export const FIXTURE_VERSION = "ba2349ea697b1bea";
 
 const STORAGE_KEY = "benchq.demo-data";
 

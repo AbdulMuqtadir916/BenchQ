@@ -59,6 +59,15 @@ dispatched call — main's Q33 rule — written inside our result transaction, u
 branch before the merge has `alembic_version = 0015` meaning *our* old revision: set it to `0014` and restart the backend
 so main's 0015 and our 0016 both run (only the outcome CHECK differs between our old 0015 and 0016).
 
+## Merge with main: PR 8 (#125), 2026-11-11
+
+Conflicts resolved: Follow-ups is gone (main removed it, 07 Q61), so this branch's `useFollowups`, `followupsApi`,
+`followupsMock`, `FollowUpTask`, the `followups` key and the board's follow-up date go with it; the live applications
+adapter, counts, save/unsave, Undo, pending moves, the review column and Move On are kept; the Applications page has
+main's URL filters and chips with this branch's "Saving…" state. `FIXTURE_VERSION` recomputed. PR 8's Activity dashboard
+moved to the new stage list, placements became offers (Offer is the last stage): see
+[pr8-owner-dashboard.md](./pr8-owner-dashboard.md) and [cross-area-changes.md](../cross-area-changes.md).
+
 ## Phase 9 — classification speed, auto-refresh and review UI (2026-11-07)
 
 Added: `backend/tests/test_pr4_concurrency.py`, `src/lib/hooks/inbox-refetch.test.ts`.

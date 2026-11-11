@@ -3,6 +3,18 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Main merged into PR 4 — the Activity dashboard on the new stage list (`feat/inbox-masking-and-review`)
+
+Not agreed yet: Umamah reviews. Main brought PR 8 (#125), built on the old stages; this branch replaced them (docs/02
+§2.1). Without a change the dashboard would count every new application as never shortlisted, interviewed or placed.
+Details: [pr8-owner-dashboard.md](./pr-changes/pr8-owner-dashboard.md), "Merged with PR 4's stage list".
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Activity dashboard (Umamah) | `src/lib/derive/funnel.ts` (`reachedStatuses`), `src/lib/schemas/list-search.ts` (`REACHED_STAGES`, `APPLICATION_DATES`), `src/lib/derive/list-filters.ts` (`applicationDate`) | Reached = every pipeline stage up to the furthest (D1, D6); the seven new stages; no `placed` date; interview and offer dated from the history when the record has no date. | New applications never hold the old names, and the live backend sends no stage dates. |
+| Activity dashboard (Umamah) | `src/features/dashboard/activity/{activity-numbers,activity-insights,activity-firm-cards,activity-tables,activity-team-cards}.ts(x)`, `owner-activity-views.tsx`, `src/features/managers/managers-list.tsx`, and their tests | Placements → Offers everywhere; "Offer → placed" removed; days to an offer; applications per offer; the per-BDE chart is Shortlisted / Interview scheduled / Offer. | Offer is the last stage on the new list; Placed is legacy. |
+| Dashboards (Umamah) | `src/features/dashboard/owner-dashboard.tsx`, `manager-dashboard.tsx`, `dashboard-errors.test.ts` | Finance tab: Offers this quarter and Time to offer, dated by reaching Offer; the per-BDE table's column says Offers (it already counted offers, D6). | As above. |
+
 ## Extension autofill — the form behind an application, and the extension's own tests (`feat/apply-extension-autofill`)
 
 Not agreed yet: Samad reviews the applications change before merge. The branch's earlier `/config` change, its removal

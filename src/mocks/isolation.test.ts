@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { candidatesApi } from "@/lib/api/candidates";
 import { jobsApi } from "@/lib/api/jobs";
-import { applicationsApi, followupsApi } from "@/lib/api/applications";
+import { applicationsApi } from "@/lib/api/applications";
 import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
@@ -31,12 +31,11 @@ const is404 = async (promise: Promise<unknown>) => {
 };
 
 describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
-  it("lists: candidates, jobs, applications, follow-ups, resumes", async () => {
+  it("lists: candidates, jobs, applications, resumes", async () => {
     await as(mine);
     expect(onlyFirm(await candidatesApi.list(mine), mine)).toBe(true);
     expect(onlyFirm(await jobsApi.list(mine, { limit: 1000 }), mine)).toBe(true);
     expect(onlyFirm(await applicationsApi.list(mine), mine)).toBe(true);
-    expect(onlyFirm(await followupsApi.list(mine), mine)).toBe(true);
     const shelf = await resumesApi.shelf(mine);
     expect(onlyFirm(shelf.resumes, mine) && onlyFirm(shelf.bases, mine)).toBe(true);
   });

@@ -33,10 +33,12 @@ interface GridProps {
   showBde: boolean;
   status: { tone: (c: Candidate) => TagTone; label: (c: Candidate) => string };
   toolbar: React.ReactNode;
+  /** Shown instead of "No candidates yet" when the list is empty (for example because filters left none). */
+  emptyState?: React.ReactNode;
 }
 
 /** Card view of the bench — one card per candidate, whole card opens the profile. */
-export function CandidateCardGrid({ rows, isLoading, error, onRetry, showBde, status, toolbar }: GridProps) {
+export function CandidateCardGrid({ rows, isLoading, error, onRetry, showBde, status, toolbar, emptyState }: GridProps) {
   const toHref = useHref();
   const reduce = useReducedMotion() ?? false;
   const [query, setQuery] = useState("");
@@ -64,7 +66,7 @@ export function CandidateCardGrid({ rows, isLoading, error, onRetry, showBde, st
         rows.length ? (
           <EmptyState variant="filtered" icon={Search} title="No candidates match" description="Try a different name, role or city." />
         ) : (
-          <EmptyState icon={Users} title="No candidates yet" description="Add a candidate to start building their bench profile." />
+          emptyState ?? <EmptyState icon={Users} title="No candidates yet" description="Add a candidate to start building their bench profile." />
         )
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -229,11 +229,6 @@ Never render a bare UTC string anywhere in this product.
 ```
 US Eastern and IST side by side, remaining shift time, amber inside the last 45 minutes.
 
-### `FollowUpRow`
-```ts
-{ followUp: FollowUp; onComplete: () => void; onSnooze: (d: SnoozeDuration) => void; onCancel: () => void }
-```
-
 ### `OutreachComposer`
 ```ts
 {

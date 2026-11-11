@@ -1,7 +1,6 @@
 import { Clock3 } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
 import { daysBetween } from "@/lib/derive/dates";
-import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { AvatarStack } from "@/components/app/avatar-stack";
 import { NeedsReviewBadge } from "@/components/app/inbox/needs-review-badge";
@@ -12,7 +11,6 @@ export interface CardFaceProps {
   /** Candidate name — shown on the firm-wide board, omitted on a candidate's own page. */
   candidateName?: string;
   owner: string;
-  followUpDue?: string;
   /** A move for this card is in flight: shown as "Saving…" until the server confirms it. */
   isSaving?: boolean;
   /** Off inside the BDE review column, where every card is waiting for review anyway. */
@@ -20,7 +18,7 @@ export interface CardFaceProps {
 }
 
 /** The content of one application card. Shared by the draggable card and its drag overlay. */
-export function ApplicationCardFace({ app, candidateName, owner, followUpDue, isSaving = false, showReviewBadge = true }: CardFaceProps) {
+export function ApplicationCardFace({ app, candidateName, owner, isSaving = false, showReviewBadge = true }: CardFaceProps) {
   const days = daysBetween(stageEnteredAt(app), new Date());
   const Icon = STATUS_ICON[app.status];
   const ageTone = days >= 7 ? "text-[var(--color-danger-fg)]" : days >= 3 ? "text-[var(--color-warning-fg)]" : "text-[var(--color-text-3)]";
@@ -45,11 +43,7 @@ export function ApplicationCardFace({ app, candidateName, owner, followUpDue, is
           <Clock3 size={12} aria-hidden />
           {days === 0 ? "Today" : `${days}d in stage`}
         </span>
-        {followUpDue ? (
-          <span className="truncate text-caption text-[var(--color-text-3)]">Follow-up {formatRelative(followUpDue)}</span>
-        ) : (
-          <AvatarStack people={[{ name: owner }]} />
-        )}
+        <AvatarStack people={[{ name: owner }]} />
       </div>
     </>
   );

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
-import { applicationsApi, followupsApi, type SaveJob } from "@/lib/api/applications";
+import { applicationsApi, type SaveJob } from "@/lib/api/applications";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { queryKeys } from "@/lib/query/keys";
@@ -22,14 +22,6 @@ export function useApplication(id: string) {
     queryKey: queryKeys.applications.detail(firmId, id),
     queryFn: () => applicationsApi.byId(firmId, id),
     enabled: !!id,
-  });
-}
-
-export function useFollowups(userId?: string) {
-  const firmId = useFirmId();
-  return useQuery({
-    queryKey: queryKeys.followups.list(firmId, { userId }),
-    queryFn: () => followupsApi.list(firmId, userId ? { userId } : undefined),
   });
 }
 

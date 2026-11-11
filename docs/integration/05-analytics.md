@@ -4,7 +4,7 @@
 
 ## Why it's mostly free
 
-`src/app/(app)/analytics/page.tsx` and the dashboards don't fetch statistics. They derive them
+The dashboards (the Analytics page was removed by 07 Q60; its numbers are on the Activity tab) don't fetch statistics. They derive them
 from raw lists (`useApplications`, `useCandidates`, `useJobs`, `useTeam`) through
 `src/lib/derive/` (`deriveFunnel`, `deriveBdePerformance`, …). That's a deliberate product rule:
 every number is derived, never stored. Once Modules 02 and 03 are live, these screens show backend
@@ -14,7 +14,7 @@ This module is a **verification pass** plus small fixes.
 
 ## Tasks
 
-- [ ] With `jobs,companies,applications` live, open `/analytics` and every dashboard role
+- [ ] With `jobs,companies,applications` live, open every dashboard role, both tabs,
       (BDE / MANAGER / OWNER: sign in as each seeded account, docs/03 §3.2). Every number must match a manual count from
       `GET /api/applications` and `GET /api/stats`
 - [ ] Funnel with four backend statuses: confirm `deriveFunnel` copes with empty `RESPONSE` /
