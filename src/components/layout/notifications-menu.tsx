@@ -39,7 +39,6 @@ const NOTIFICATIONS: Notification[] = [
     detail: "Senior Java Developer at Brillio LLC.",
     time: "12m",
     route: "jobs",
-    query: { candidate: "cand_01" },
     icon: BriefcaseBusiness,
     tone: "green",
   },
