@@ -3,6 +3,7 @@ import { arrayOf } from "./client";
 import { toBackendId } from "./dto/demo-ids";
 import { LedgerEntryDto, toLedgerEntry } from "./dto/session";
 import { http } from "./http";
+import { loadAllPages, type LoadedPages } from "./paging";
 
 /**
  * Which entries to read (backend/api/routes_ledger.py): a page, and optionally one record's history
@@ -33,7 +34,17 @@ const live = {
     })).map(toLedgerEntry),
 };
 
+/** The backend serves 500 at most per request; a screen that shows the whole ledger stops at this many entries (and says so). */
+const LEDGER_PAGE_SIZE = 500;
+export const LEDGER_MAX_ENTRIES = 2000;
+
 /** Firm-scoped (docs/07 T5): every call names the firm, and the backend serves only that firm's rows. */
 export const ledgerApi = {
   list: async (firmId: string, params?: LedgerQuery): Promise<LedgerEntry[]> => live.list(firmId, params),
+  /**
+   * The whole ledger for a screen that shows all of it (BUG-022), newest first: page after page until it runs out, up to
+   * `LEDGER_MAX_ENTRIES`, with `hasMore` true when entries remain beyond that. `limit` and `offset` in `params` are ignored.
+   */
+  listAll: async (firmId: string, params?: Omit<LedgerQuery, "limit" | "offset">): Promise<LoadedPages<LedgerEntry>> =>
+    loadAllPages((offset, limit) => live.list(firmId, { ...params, limit, offset }), { pageSize: LEDGER_PAGE_SIZE, maxItems: LEDGER_MAX_ENTRIES }),
 };

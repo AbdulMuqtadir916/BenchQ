@@ -29,6 +29,7 @@ from backend.auth.policy import can_assign_to, require
 from backend.auth.scoping import own_scope, scoped, team_scope
 from backend.auth.sessions import Principal
 from backend.candidates.first_base import first_base
+from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.candidates import profile
 from backend.candidates.serialize import candidate_json
@@ -63,7 +64,7 @@ class CreateCandidateBody(BaseModel):
     primary_role: Required200
     email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]
     phone: Required200
-    linkedin_url: str | None = Field(default=None, max_length=500)
+    linkedin_url: ProfileLink = None
     city: str | None = Text200
     state: str | None = Text200
     country: Required200

@@ -64,9 +64,8 @@ def test_the_owner_sees_the_firms_entries_newest_first(api_client, accounts, led
     assert _summaries(api_client.get(_url(accounts.firm_id))) == ["Ben edit", "Bea edit", "Owner edit"]
 
 
-@pytest.mark.parametrize("role", ["manager", "viewer"])
-def test_a_manager_and_a_viewer_see_the_whole_firm(anonymous_client, accounts, ledger, role):
-    resp = anonymous_client.get(_url(accounts.firm_id), headers=ledger[role])
+def test_a_viewer_sees_the_whole_firm(anonymous_client, accounts, ledger):
+    resp = anonymous_client.get(_url(accounts.firm_id), headers=ledger["viewer"])
     assert _summaries(resp) == ["Ben edit", "Bea edit", "Owner edit"]
 
 
@@ -139,6 +138,33 @@ def _assign(firm_id, actor, candidate, summary, minutes_ago, note=None):
     entry.entity_id, entry.entity_label, entry.note = str(candidate.id), candidate.full_name, note
     entry.candidate_id = candidate.id          # as ledger.record sets it for an entry about a candidate (Q53h)
     return entry
+
+
+def test_manager_scope_is_applied_before_paging(anonymous_client, accounts, ledger, test_db):
+    from backend.models.tenancy import User
+    firm = test_db.get(Firm, accounts.firm_id)
+    owner = test_db.get(User, accounts.user_id)
+    first = make_user(test_db, firm, email="first@acme.test", role="MANAGER")
+    second = make_user(test_db, firm, email="second@acme.test", role="MANAGER")
+    bea = ledger["bde_user"]
+    bea.manager_id = first.id
+    ben = test_db.query(User).filter(User.email == "bde2@acme.test").one()
+    candidate = _candidate(test_db, firm, second, ben, "Ravi")
+    assignment = _assign(firm.id, owner, candidate, "Assigned Ravi", 4)
+    test_db.add(assignment)
+    test_db.commit()
+
+    def entries(manager, query=""):
+        response = anonymous_client.get(_url(firm.id, query), headers=_session_for(test_db, manager))
+        assert response.status_code == 200
+        return response.json()
+
+    first_entries = entries(first, "?limit=1")
+    second_entries = entries(second)
+    assert [row["summary"] for row in first_entries] == ["Bea edit"]
+    assert [row["summary"] for row in second_entries] == ["Ben edit", "Assigned Ravi"]
+    assert {row["id"] for row in first_entries}.isdisjoint(row["id"] for row in second_entries)
+    assert str(assignment.id) == second_entries[1]["id"]
 
 
 @pytest.fixture

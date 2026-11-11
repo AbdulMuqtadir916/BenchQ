@@ -2,7 +2,8 @@
 
 The worked example of a firm-scoped read: the path names the firm, `reader_firm_id` says which firm the caller
 may read, `scoped()` adds the filter, and a BDE sees the entries they made (`own_scope`, 07 §2.2) plus the assignment
-entries about the candidates they work now (07 Q52: "New assignments" and the handoff note). Another firm's ledger
+entries about the candidates they work now (07 Q52: "New assignments" and the handoff note). A Manager sees their team
+and managed candidates (07 Q47). Another firm's ledger
 is 404, the same as a missing firm (principle 4). Platform-only events (`firm_id` null) are the Super Admin's, in
 `/api/admin/audit`.
 
@@ -17,17 +18,17 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
 from backend.auth import support
-from backend.auth.scoping import own_scope, reader_firm_id, scoped
+from backend.auth.scoping import own_scope, reader_firm_id, scoped, team_scope
 from backend.auth.serialize import ledger_entry_json
 from backend.auth.sessions import Principal
 from backend.models.candidates import Candidate
 from backend.models.db import get_db
-from backend.models.tenancy import LedgerEntry
+from backend.models.tenancy import LedgerEntry, User
 
 router = APIRouter(prefix="/firms/{firm_id}", tags=["ledger"])
 
 
-@router.get("/ledger", summary="The firm's ledger, newest first; a BDE's own entries and their candidates' assignments")
+@router.get("/ledger", summary="The firm's ledger, newest first and scoped to the reader")
 def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
                 entity_type: str | None = Query(None, max_length=64), entity_id: str | None = Query(None, max_length=128),
                 action: str | None = Query(None, max_length=32), candidate_id: uuid.UUID | None = None,
@@ -44,6 +45,19 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
         entries = entries.filter(or_(
             LedgerEntry.actor_user_id == actor,
             and_(LedgerEntry.action == "ASSIGN", LedgerEntry.entity_type == "candidate", LedgerEntry.entity_id.in_(theirs)),
+        ))
+    if (manager := team_scope(principal)) is not None:
+        managed = scoped(db, Candidate, my_firm).filter(Candidate.manager_id == manager)
+        reports = scoped(db, User, my_firm, User.id).filter(User.manager_id == manager).scalar_subquery()
+        entries = entries.filter(or_(
+            LedgerEntry.actor_user_id == manager,
+            LedgerEntry.actor_user_id.in_(reports),
+            LedgerEntry.actor_user_id.in_(managed.with_entities(Candidate.bde_id).scalar_subquery()),
+            LedgerEntry.candidate_id.in_(managed.with_entities(Candidate.id).scalar_subquery()),
+            and_(
+                LedgerEntry.entity_type == "candidate",
+                LedgerEntry.entity_id.in_(managed.with_entities(cast(Candidate.id, String)).scalar_subquery()),
+            ),
         ))
     if entity_type is not None:
         entries = entries.filter(LedgerEntry.entity_type == entity_type)

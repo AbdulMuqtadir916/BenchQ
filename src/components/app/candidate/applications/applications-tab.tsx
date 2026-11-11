@@ -9,6 +9,7 @@ import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
 import { STATUS_LABEL, isClosed } from "@/components/app/applications/status-meta";
+import { countApplications, describeApplicationCounts } from "@/lib/derive/application-counts";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { ApplicationList } from "./application-list";
@@ -22,7 +23,9 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
   const [scope, setScope] = useState<Scope>("active");
   const all = ws.applications;
   const visible = scope === "active" ? all.filter((a) => !isClosed(a.status)) : all;
-  const closedCount = all.filter((a) => isClosed(a.status)).length;
+  // One definition of the counts for the whole candidate screen (BUG-005): saved jobs are not applications, so they are
+  // counted on their own and never as active. "10 active · 2 closed · 3 saved", with the active part in bold.
+  const [activePart = "", ...otherParts] = describeApplicationCounts(countApplications(all)).split(" · ");
 
   if (ws.applicationsQuery.error) return <ErrorState error={ws.applicationsQuery.error} onRetry={() => void ws.applicationsQuery.refetch()} />;
   if (ws.applicationsQuery.isLoading) return <SkeletonList rows={6} />;
@@ -35,7 +38,7 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--color-text-3)]">
-          <span className="text-body-strong text-[var(--color-text)]">{all.length - closedCount} active</span> · {closedCount} closed · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
+          <span className="text-body-strong text-[var(--color-text)]">{activePart}</span> · {otherParts.join(" · ")} · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
         </p>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">

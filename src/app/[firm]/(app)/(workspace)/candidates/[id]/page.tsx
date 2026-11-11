@@ -30,6 +30,9 @@ import { UploadResume } from "@/components/app/resumes/upload-resume";
 import { ActivityTab } from "@/components/app/candidate/activity-tab";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
 import { useHref } from "@/lib/routes/use-href";
+import { BACK_SHORTCUT } from "@/lib/list-shortcuts";
+import { usePageShortcuts } from "@/lib/hooks/use-page-shortcuts";
+import { useEscapeBack } from "@/lib/hooks/use-escape-back";
 
 export default function CandidateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const toHref = useHref();
@@ -45,6 +48,15 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const updateStatus = useUpdateApplicationStatus();
   const canAct = can(principal, "candidate.edit");
   const canEditProfile = can(principal, "candidate.editProfile");
+
+  // Esc goes back (docs/04 §1.3, BUG-004): to where the person came from, which keeps the list's page, search and sort in its
+  // URL, or to the candidates list when this page was opened directly. A drawer, dialog or field keeps its own Esc.
+  const leave = useCallback(() => {
+    if (window.history.length > 1) router.back();
+    else router.push(toHref("candidates"));
+  }, [router, toHref]);
+  useEscapeBack(leave);
+  usePageShortcuts(BACK_SHORTCUT);
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);

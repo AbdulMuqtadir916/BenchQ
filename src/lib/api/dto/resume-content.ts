@@ -1,3 +1,4 @@
+import { normalizeProfileLink } from "@/lib/resume-doc/profile-link";
 import type { ResumeDocument, RichText } from "@/lib/schemas/resume-document";
 import { stripTags } from "@/lib/resume-doc/rich-text";
 import type { ResumeVersionDto } from "./resumes";
@@ -58,7 +59,7 @@ export function toBackendContent(doc: ResumeDocument, source: ResumeVersionDto):
   return {
     full_name: doc.fullName.trim(), title: doc.title.trim(),
     city: doc.header.city.trim(), state: doc.header.state.trim(), country: doc.header.country.trim(),
-    email: doc.header.email.trim(), phone: doc.header.phone.trim(), github: doc.header.github.trim(), linkedin: doc.header.linkedin.trim(),
+    email: doc.header.email.trim(), phone: doc.header.phone.trim(), github: normalizeProfileLink(doc.header.github) ?? doc.header.github.trim(), linkedin: normalizeProfileLink(doc.header.linkedin) ?? doc.header.linkedin.trim(),
     work_authorization: source.work_authorization,
     summary: plain(doc.summary),
     skills,
