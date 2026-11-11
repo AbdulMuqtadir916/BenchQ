@@ -49,7 +49,7 @@ describe("sign-in target: returnTo only if the new account can open it", () => {
     const kiran = await signInAs("user_kiran"); // STL BDE, after a firm A user signed out on this screen
     expect(signInTarget(kiran, "/hyderabad-tech-staffing/dashboard")).toBe("/secunderabad-talent/dashboard");
     const bde = await signInAs("user_adnan");
-    expect(signInTarget(bde, "/hyderabad-tech-staffing/analytics")).toBe("/hyderabad-tech-staffing/dashboard"); // BDE: none
+    expect(signInTarget(bde, "/hyderabad-tech-staffing/managers")).toBe("/hyderabad-tech-staffing/dashboard"); // BDE: none
     const sana = await signInAs("padm_sana");
     expect(signInTarget(sana, "/hyderabad-tech-staffing/dashboard")).toBe("/admin");
     expect(signInTarget(sana, "/admin")).toBe("/admin");

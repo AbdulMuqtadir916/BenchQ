@@ -22,11 +22,11 @@ bookkeeping inside application commands is covered here without changing the Job
 
 | Kind | Path |
 |---|---|
-| Screens | `src/app/(app)/applications/page.tsx` (kanban / table / calendar), `applications/[id]/page.tsx`, plus application data in the dashboards, `candidates`, `candidates/[id]`, `jobs`, `analytics`, `outreach`, `followups`, `focus`, `components/app/applications/application-board.tsx` |
+| Screens | `src/app/(app)/applications/page.tsx` (kanban / table / calendar), `applications/[id]/page.tsx`, plus application data in the dashboards, `candidates`, `candidates/[id]`, `jobs`, `outreach`, `focus`, the dashboards' Activity view (its funnel and per-BDE numbers; Analytics and Follow-ups were removed, 07 Q60 and Q61), `components/app/applications/application-board.tsx` |
 | Hooks | `src/lib/hooks/use-applications.ts` — `useApplications(candidateId?)`, `useApplication(id)`, `useUpdateApplicationStatus()` (optimistic update with rollback on error) |
-| Adapter | `src/lib/api/applications.ts` → `applicationsApi` (`followupsApi` in the same file is **not** part of this module) |
+| Adapter | `src/lib/api/applications.ts` → `applicationsApi` |
 | Frontend type | `ApplicationSchema`, `ApplicationEventSchema` in `src/lib/schemas/application.ts`; `ApplicationStatus` in `enums.ts`; `UpdateApplicationStatus` in `inbox.ts` |
-| Mock to delete | the `applicationsMock` half of `src/mocks/applications.ts`, `src/mocks/data/applications.json` (keep `followupsMock` and `followups.json`) |
+| Mock to delete | the `applicationsMock` half of `src/mocks/applications.ts`, `src/mocks/data/applications.json` |
 
 ## Backend endpoints
 
@@ -108,7 +108,7 @@ error. Never silently map `SCREENING` → `interview` or `PLACED` → `offer`.
   `EXPIRED` don't exist in the backend. `SAVED` is a *job* status there (`job.status = "saved"`).
 - **Interviews are richer in the backend** (what / where / prep) than the frontend's single
   `interviewAt`. Surfacing them is new UI, so it's out of scope here.
-- **Follow-ups** could come from `next_action` / `next_action_date`. That's decision D5, not this
+- **Follow-ups** were removed (07 Q61), so `next_action` / `next_action_date` feed nothing here. Formerly D5, not this
   module.
 
 ## Acceptance criteria
