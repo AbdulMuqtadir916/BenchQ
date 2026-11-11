@@ -64,29 +64,24 @@ export const JobSchema = z.object({
   provenance: JobProvenanceSchema,
 
   isActive: z.boolean(),
+  /** The candidates this job was found or captured for, only those the viewer may see (docs/02 §6.z). The mock's
+   * fixture jobs belong to no candidate (decided 2026-11-11). */
+  candidateIds: z.array(z.string()).default([]),
 });
 export type Job = z.infer<typeof JobSchema>;
 
 /**
- * Capture a job by hand (docs/04 §5.2, `POST /api/jobs`): what the capture form sends. The mock (the
- * backend in Phase D) builds the `Job` from it — provenance `USER_SUBMITTED` / `USER_SESSION`, the
- * company matched by name or added, dedup on the canonical URL.
+ * Capture a job by hand for one candidate (docs/02 §6.z): what the capture form sends to
+ * `POST …/candidates/{candidateId}/job-postings`. The backend keeps only these; the same job again for the
+ * candidate is the one they already have (`DUPLICATE_JOB`).
  */
 export const CaptureJobSchema = z.object({
+  candidateId: z.string().min(1, "Choose the candidate."),
   sourceUrl: z.string().trim().url("Enter the job's URL."),
-  title: z.string().trim().min(1, "Enter the job title."),
-  companyName: z.string().trim().min(1, "Enter the company."),
-  location: z.string().trim(),
-  remoteMode: RemoteMode,
-  employmentType: EmploymentType.nullable(),
-  payPeriod: z.enum(["HOUR", "YEAR"]),
-  payMin: z.number().nonnegative().nullable(),
-  payMax: z.number().nonnegative().nullable(),
-  sponsorsVisa: z.boolean(),
-  excludesC2C: z.boolean(),
-  experience: z.string().trim(),
-  skills: z.array(z.string().trim().min(1)),
-  description: z.string().trim().min(1, "Paste the job description."),
+  title: z.string().trim().min(1, "Enter the job title.").max(300),
+  companyName: z.string().trim().min(1, "Enter the company.").max(300),
+  location: z.string().trim().max(300),
+  description: z.string().trim().min(1, "Paste the job description.").max(100_000),
 });
 export type CaptureJob = z.infer<typeof CaptureJobSchema>;
 

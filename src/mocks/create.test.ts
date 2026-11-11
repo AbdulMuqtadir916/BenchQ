@@ -35,9 +35,8 @@ async function uploadedCandidate(m: Awaited<ReturnType<typeof load>>, overrides:
 }
 
 const job = (overrides: Partial<CaptureJob> = {}): CaptureJob => ({
-  sourceUrl: "https://careers.example.com/jobs/4021?utm_source=linkedin", title: "Senior Data Engineer", companyName: "JPMorgan Chase", location: "Dallas, TX",
-  remoteMode: "HYBRID", employmentType: "C2C", payPeriod: "HOUR", payMin: 80, payMax: 95, sponsorsVisa: true, excludesC2C: false,
-  experience: "5+ years", skills: ["Spark", "AWS"], description: "Build data pipelines.", ...overrides,
+  candidateId: "cand_03", sourceUrl: "https://careers.example.com/jobs/4021?utm_source=linkedin", title: "Senior Data Engineer",
+  companyName: "JPMorgan Chase", location: "Dallas, TX", description: "Build data pipelines.", ...overrides,
 });
 
 beforeAll(() => {
@@ -194,41 +193,72 @@ describe("Reassign (07 Q43, 05 §6)", () => {
   });
 });
 
-describe("Capture job", () => {
-  it("captures one: first in the list, by id, provenance USER_SUBMITTED by the user, the known company reused, kept after a reload", async () => {
+describe("Capture job (for one candidate, docs/02 §6.z)", () => {
+  it("captures one for the BDE's candidate: in that candidate's jobs, by id, only what the form gave, kept after a reload", async () => {
     const m = await load(EMAIL.adnan);
     const captured = await m.jobs.capture(FIRM, job());
     expect(captured).toMatchObject({
-      firmId: FIRM, title: "Senior Data Engineer", city: "Dallas", state: "TX", remoteMode: "HYBRID", employmentType: "C2C", rateMin: 80, rateMax: 95, salaryMin: null,
+      firmId: FIRM, title: "Senior Data Engineer", city: "Dallas, TX", state: null, remoteMode: "ONSITE", employmentType: null,
+      rateMin: null, salaryMin: null, allowedWorkAuth: [], candidateIds: ["cand_03"],
       company: { id: "comp_01", name: "JPMorgan Chase" },
       dedupe: { canonicalUrl: "https://careers.example.com/jobs/4021" },
-      provenance: { sourceType: "USER_SUBMITTED", legalBasis: "USER_SESSION", capturedByUserId: "user_adnan" },
+      provenance: { sourceType: "MANUAL", legalBasis: "USER_SESSION", capturedByUserId: "user_adnan" },
     });
-    expect(captured.requirements.map((requirement) => [requirement.category, requirement.value])).toEqual([["SKILL", "Spark"], ["SKILL", "AWS"], ["EXPERIENCE_YEARS", "5+ years"]]);
-    expect((await m.jobs.list(FIRM))[0]?.id).toBe(captured.id);
+    expect((await m.jobs.list(FIRM, { candidateId: "cand_03" })).map((row) => row.id)).toEqual([captured.id]);
     m.db.flush();
 
     const later = await load(EMAIL.adnan);
     expect(await later.jobs.byId(FIRM, captured.id)).toMatchObject({ title: "Senior Data Engineer" });
   });
 
-  it("a company it doesn't know is added with nothing known yet; a yearly range is a salary", async () => {
-    const m = await load(EMAIL.imran);
-    const captured = await m.jobs.capture(FIRM, job({ companyName: "Brand New Labs", payPeriod: "YEAR", payMin: 120000, payMax: 150000, sponsorsVisa: false }));
+  it("a company it doesn't know is added with nothing known; a remote location is remote", async () => {
+    const m = await load(EMAIL.adnan);
+    const captured = await m.jobs.capture(FIRM, job({ companyName: "Brand New Labs", location: "Remote, US" }));
     expect(captured.company).toMatchObject({ name: "Brand New Labs", normalisedName: "brand-new-labs", clientType: "UNKNOWN", h1b: null, verification: null });
-    expect(captured).toMatchObject({ rateMin: null, salaryMin: 120000, salaryMax: 150000, allowedWorkAuth: ["USC", "GC"] });
+    expect(captured.remoteMode).toBe("REMOTE");
   });
 
-  it("the same listing twice in a firm is refused with the existing job (tracking and trailing slash ignored); another firm may capture it", async () => {
-    const m = await load(EMAIL.imran);
+  it("the same listing again for the candidate is the one they have; another of their candidates may have it too", async () => {
+    const m = await load(EMAIL.adnan);
     const first = await m.jobs.capture(FIRM, job());
     const again = m.jobs.capture(FIRM, job({ sourceUrl: "https://CAREERS.example.com/jobs/4021/?gclid=x#apply", title: "Other title" }));
     await expect(again).rejects.toBeInstanceOf(m.DuplicateJobError);
     await expect(again).rejects.toMatchObject({ status: 409, jobId: first.id });
-    const fixture = (await m.jobs.list(FIRM))[1]!;
-    await expect(m.jobs.capture(FIRM, job({ sourceUrl: `${fixture.dedupe.canonicalUrl}?ref=x` }))).rejects.toMatchObject({ jobId: fixture.id });
+    await expect(m.jobs.capture(FIRM, job({ candidateId: "cand_04" }))).resolves.toMatchObject({ candidateIds: ["cand_04"] });
+  });
 
-    await m.signInAs(EMAIL.lakshmi);
-    await expect(m.jobs.capture("firm_stl", job())).resolves.toMatchObject({ firmId: "firm_stl" });
+  it("only the candidate's BDE captures for them", async () => {
+    const m = await load(EMAIL.imran);
+    await expect(m.jobs.capture(FIRM, job())).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("Find jobs (the mock's search, docs/02 §6.z)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("runs one search at a time, then saves a few jobs for the candidate, and counts the day's usage", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-11T15:00:00Z"));
+    const m = await load(EMAIL.adnan);
+    expect((await m.jobs.list(FIRM, { candidateId: "cand_03" }))).toEqual([]);
+
+    await m.jobs.startSearch(FIRM, "cand_03", "Data Engineer");
+    const running = await m.jobs.searches(FIRM, "cand_03");
+    expect(running.running).toMatchObject({ kind: "SEARCH", state: "RUNNING", query: "Data Engineer" });
+    await expect(m.jobs.startSearch(FIRM, "cand_03", "Data Engineer")).rejects.toMatchObject({ status: 409 });
+
+    vi.setSystemTime(new Date("2026-11-11T15:00:05Z"));
+    const done = await m.jobs.searches(FIRM, "cand_03");
+    expect(done.running).toBeNull();
+    expect(done.searches[0]).toMatchObject({ state: "SUCCESS", newCount: 5 });
+    expect(done.usage).toMatchObject({ jobsToday: 5, jobsCap: 100, searchesToday: 1, searchesCap: 20, capturesToday: 0, resetsAt: "2026-11-12T13:00:00.000Z" });
+    expect(await m.jobs.list(FIRM, { candidateId: "cand_03" })).toHaveLength(5);
+  });
+
+  it("only the candidate's BDE searches", async () => {
+    const m = await load(EMAIL.imran);
+    await expect(m.jobs.startSearch(FIRM, "cand_03", "Data Engineer")).rejects.toMatchObject({ status: 403 });
   });
 });

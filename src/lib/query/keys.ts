@@ -24,7 +24,11 @@ const resource = <R extends string>(name: R) => ({
 
 export const queryKeys = {
   candidates: resource("candidates"),
-  jobs: resource("jobs"),
+  jobs: {
+    ...resource("jobs"),
+    /** A candidate's searches and today's usage ("Find jobs", docs/02 §6.z): under `jobs`, so a capture refreshes it. */
+    searches: (firmId: string, candidateId: string) => [firmId, "jobs", "searches", candidateId] as const,
+  },
   applications: resource("applications"),
   followups: resource("followups"),
   resumes: {

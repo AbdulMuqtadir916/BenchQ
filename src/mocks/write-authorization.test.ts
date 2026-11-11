@@ -40,7 +40,8 @@ const ARGS: Record<string, unknown[]> = {
   "candidates.followBde": ["user_adnan", "user_fatima"],
   "candidates.reassign": ["cand_01", { managerId: "user_priya", bdeId: "user_vikram", note: null }],
   "candidates.parseResume": [{ fileName: "Ravi_Teja_Java_FullStack.pdf", sizeBytes: 1000, mimeType: "application/pdf" }],
-  "jobs.capture": [{ sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", remoteMode: "REMOTE", employmentType: null, payPeriod: "HOUR", payMin: null, payMax: null, sponsorsVisa: false, excludesC2C: false, experience: "", skills: [], description: "Policy check" }],
+  "jobs.capture": [{ candidateId: "cand_01", sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", description: "Policy check" }],
+  "jobs.startSearch": ["cand_01", "QA"],
   "documents.upload": ["cand_01", { kind: "OTHER", title: "Note", fileName: "note.pdf", sizeBytes: 1000, expiresAt: null }],
   "documents.remove": ["doc_none"],
   "inbox.connect": ["cand_01"],
@@ -79,7 +80,7 @@ describe("the write inventory", () => {
       }
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
-      "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture",
+      "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture", "jobs.startSearch",
       "resumes.deleteBase", "resumes.deleteVersion", "resumes.save", "resumes.showBase", "resumes.upload", "resumes.useAsBase",
     ]);
   });
@@ -88,6 +89,7 @@ describe("the write inventory", () => {
     expect(WRITE_ACTIONS.candidates?.create).toBe("candidate.create");
     expect(WRITE_ACTIONS.candidates?.parseResume).toBe("candidate.create"); // reading a résumé is part of adding one
     expect(WRITE_ACTIONS.jobs?.capture).toBe("job.capture");
+    expect(WRITE_ACTIONS.jobs?.startSearch).toBe("job.search");
     expect(WRITE_ACTIONS.jobMarks).toEqual({ mark: "job.apply", unmark: "job.apply" });
   });
 });

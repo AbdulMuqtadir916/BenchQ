@@ -1138,7 +1138,8 @@ export const JobSchema = z.object({
 
   isActive: z.boolean(),
   // The candidates this job was found or captured for, only the ones the viewer may see (job search PR 3, §6.z).
-  candidateIds: z.array(z.string()),
+  // The mock's fixture jobs belong to no candidate (decided 2026-11-11).
+  candidateIds: z.array(z.string()).default([]),
 });
 ```
 
@@ -1306,7 +1307,7 @@ export const JobMarkSchema = z.object({
     control characters, the description keeping its tabs and line breaks): the candidate's BDE only, 20 per BDE per
     day. A capture is its own batch (`scrape_jobs.kind = 'capture'`, finished at once) with one posting and a ledger
     entry (entity `job_posting`, restricted for a platform admin like a search's); the same job again (same hash) returns the posting the candidate has
-    (200), even at the cap: only a capture that would create a posting counts against the 20 (Abdul's comment on PR
+    (200; the body's `created` is false, true on a 201, PR 3), even at the cap: only a capture that would create a posting counts against the 20 (Abdul's comment on PR
     2). An `extension` description is read as HTML. Captures aren't search attempts and don't use the 100-new cap.
     A search that finds a captured job merges into that row (`source` and `content` become the provider's), and it
     still stays out of the 100: the cap counts `first_source`, which never changes (Abdul's comment on PR 2).
@@ -1881,8 +1882,11 @@ MANAGER) may name one; a BDE's new candidate is assigned to themself. The candid
 the firm's candidate limit the call is refused (A4). An input shape over existing `Candidate` fields: no new
 field. Logged as `CREATE` on `candidate`.
 
-`CaptureJob` (`src/lib/schemas/job.ts`, Phase B fix PR 1) — the Capture job form (docs/04 §5.2), sent to
-`POST /api/jobs`. The server builds the `Job`: provenance `USER_SUBMITTED` / `USER_SESSION` with the user as
+`CaptureJob` (`src/lib/schemas/job.ts`): **since job search PR 3 (§6.z)** `{candidateId, sourceUrl, title,
+companyName, location, description}`, sent to `POST /api/firms/{firm}/candidates/{candidateId}/job-postings`
+(`source: manual`): a captured job is the candidate's, and the backend keeps only these. The same job again for the
+candidate is the one they have (`DUPLICATE_JOB` with its id). The rest of this paragraph is the Phase B fix PR 1
+shape it replaces: sent to `POST /api/jobs`. The server builds the `Job`: provenance `USER_SUBMITTED` / `USER_SESSION` with the user as
 `capturedByUserId`; the company reused by normalised name, else added with nothing known (`clientType`
 `UNKNOWN`, no H-1B data, no verification); an hourly range fills `rateMin/Max`, a yearly one
 `salaryMin/Max`; "visa sponsorship available" allows every work authorization, otherwise

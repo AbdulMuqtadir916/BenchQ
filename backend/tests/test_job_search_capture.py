@@ -38,6 +38,7 @@ def test_the_same_job_captured_again_is_the_one_the_candidate_has(anonymous_clie
     first = _capture(anonymous_client, world, adnans).json()
     again = _capture(anonymous_client, world, adnans, title="  java developer ", url="https://jobs.example.test/x")
     assert again.status_code == 200 and again.json()["id"] == first["id"]
+    assert first["created"] is True and again.json()["created"] is False
     batches, postings = _rows(test_db, adnans)
     assert len(batches) == 1 and len(postings) == 1
 

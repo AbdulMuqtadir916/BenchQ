@@ -22,7 +22,7 @@ export function requireMember(firmId: string, access: "read" | "write" = "read")
 }
 
 /** The firm-scoped methods that only read; every other method of a firm-scoped mock writes. */
-const READ_METHODS = new Set(["list", "byId", "byCandidate", "shelf", "shelfByCandidate", "open", "baseRemoval", "versionRemoval"]);
+const READ_METHODS = new Set(["list", "byId", "byCandidate", "searches", "shelf", "shelfByCandidate", "open", "baseRemoval", "versionRemoval"]);
 export const isReadMethod = (name: string): boolean => READ_METHODS.has(name);
 
 /**

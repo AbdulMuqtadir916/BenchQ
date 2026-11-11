@@ -28,7 +28,7 @@ export const FIXTURE_VERSION = "14ac27f9dd44d1b9";
 const STORAGE_KEY = "benchq.demo-data";
 
 /** Tables that can change. A new writable table registers here and calls `changed()` after writing. */
-export type TableName = "firms" | "users" | "invites" | "plans" | "platformUsers" | "candidates" | "records" | "applications" | "documents" | "inboxMessages" | "inboxConnections" | "capturedJobs" | "jobMarks";
+export type TableName = "firms" | "users" | "invites" | "plans" | "platformUsers" | "candidates" | "records" | "applications" | "documents" | "inboxMessages" | "inboxConnections" | "capturedJobs" | "jobMarks" | "jobSearches";
 
 interface Snapshot {
   version: string;

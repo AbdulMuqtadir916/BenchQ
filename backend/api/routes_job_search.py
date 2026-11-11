@@ -207,7 +207,8 @@ def capture_job(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: CaptureBody, 
     db.commit()
     if not created:
         response.status_code = 200
-    return _posting_json(posting, with_description=True)
+    # `created` says the same as the status, for a client that only reads the body (the job screens, PR 3).
+    return {**_posting_json(posting, with_description=True), "created": created}
 
 
 def _posting_json(row: JobPosting, with_description: bool) -> dict:
