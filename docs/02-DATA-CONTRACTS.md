@@ -1243,7 +1243,8 @@ export const JobMarkSchema = z.object({
   when the BDE starts it** and finished in place (`success` / `empty` / `error`); `finished_at` is set exactly when
   it isn't running (`ck_scrape_jobs_finished_iff_done`). "Is a search running", the attempt count and the history
   read this table, not `job_runs`. A row still `running` after 15 minutes was lost (a restart): the BDE's next search
-  marks it `error` (`internal`), and reads show it as that error without writing. The batch carries its `run_id`;
+  marks it `error` (`internal`), and reads show it as that error without writing. The batch carries its `run_id`
+  (written after the launch with the row locked, so a search saving at that moment keeps its cursor and counts);
   the search's `job_runs` row (the background launcher's own record) names nothing of the firm's, no `meta` and the
   opaque `batch_id` as its scope, because Super Admin's monitor lists runs across firms without a support view
   (Abdul's review, P1). `metadata` also carries
