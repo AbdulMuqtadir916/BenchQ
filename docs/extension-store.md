@@ -85,8 +85,10 @@ Draft answers, to be confirmed by the owner:
 > form goes back to your BenchQ account, both over HTTPS to www.benchq.io. Your sign-in is the BenchQ session cookie, which
 > the browser keeps and the extension never reads. Nothing is sent to anyone else, sold, or used for advertising.
 >
-> *What it keeps.* Only which tab is connected to which job, for the current browser session. It is erased when the
-> browser closes.
+> *What it keeps.* For the current browser session: which tab is connected to which job, erased when the browser
+> closes. In the extension's own storage on this device, until you uninstall it: your light or dark theme, the last
+> candidate you picked (an ID, not their details), and when it last reloaded itself after an update. Nothing else is
+> stored, and none of it leaves the device.
 >
 > *Your control.* You press Autofill and you submit every form yourself. You can remove BenchQ's access to any site in
 > chrome://extensions, and uninstall at any time. For BenchQ account data, contact **[support email]**.
