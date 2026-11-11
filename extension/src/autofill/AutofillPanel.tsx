@@ -14,6 +14,7 @@ import ResumePicker from "./ResumePicker";
 import ReviewList from "./ReviewList";
 import RunList from "./RunList";
 import type { AppliedForm, Connection, ReviewRow, ShortcutMessage } from "./types";
+import { SiteAccessNotice } from "./SiteAccessNotice";
 import { useAutofill, type Outcome } from "./use-autofill";
 import { useResumes, type ApplicationContextStatus } from "./use-resumes";
 
@@ -88,7 +89,9 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     setReadyContext(context);
     if (readyContext !== null) setPendingFill({ context, resumeId: picked?.id ?? null });
   }
-  const isSelectionSyncing = pendingFill !== null && !(error && !scanning);
+  // A queued fill (a résumé pick, another application) waits for its review. On a site BenchQ may not read there is no review
+  // to wait for until access is given, so the wait stays queued but no longer holds the panel, or Mark applied, busy.
+  const isSelectionSyncing = pendingFill !== null && !(error && !scanning) && !state.needsAccess;
   // A run is busy from its first step (taking the old file off) to its last fill.
   const isWorking = filling || Boolean(step) || isSelectionSyncing;
   const reviewMatches = canReview && reviewedFor?.applicationId === connection.applicationId
@@ -194,11 +197,12 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
       </p>}
       {isComplete && <p data-slot="autofill-done" className={`flex items-center gap-1 ${BELOW_TOP_BAR} text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`} role="status">{CHECK}Autofill complete</p>}
 
+      {state.needsAccess && <SiteAccessNotice access={state.needsAccess} isDenied={state.isAccessDenied} isAsking={state.isAsking} onAllow={() => void state.allowAccess()} />}
       {error && <div role="alert">
         <p data-slot="error" className={ALERT}>{error}</p>
         <button type="button" className={TEXT_BUTTON} disabled={scanning} onClick={() => void state.rescan()}>Try again</button>
       </div>}
-      {canReview && currentRows === null && !error && <div className={SKELETON} role="status" aria-label="Scanning this page"><span /><span /><span /></div>}
+      {canReview && currentRows === null && !error && !state.needsAccess && <div className={SKELETON} role="status" aria-label="Scanning this page"><span /><span /><span /></div>}
       {currentRows?.length === 0 && !scanning && !error && <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] p-2.5">
         <h3 className="text-sm font-[550]">No form on this page yet</h3>
         <p className={`mt-0.5 ${SOFT_TEXT}`}>Click Apply on the employer&apos;s page. BenchQ scans the form when it opens, in this tab or a new one.</p>
@@ -221,7 +225,8 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
 
     <div data-slot="autofill-actions" className="sticky bottom-0 z-1 grid gap-1.5 rounded-b-[var(--radius-lg)] border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pt-2 pb-3 empty:hidden">
       {/* Mark applied steps aside while a run fills the form, and is back once it ends. */}
-      {onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || !reviewMatches} jobLine={jobLine} emptyRequired={emptyRequired} onConfirm={() => void apply()} onGoTo={goTo} />}
+      {/* On a site BenchQ may not read yet there is no review to wait for: the BDE who declines fills the form by hand, and may still mark it applied. */}
+      {onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || (!reviewMatches && !state.needsAccess)} jobLine={jobLine} emptyRequired={emptyRequired} onConfirm={() => void apply()} onGoTo={goTo} />}
       {isApplied && applicationStatus === "ready" && <button type="button" className={button("secondary", "large")} disabled>{CHECK}Applied</button>}
       {undoable > 0 && <button type="button" className={button("secondary", "compact")} disabled={filling} onClick={() => void state.undo()}>Undo</button>}
     </div>

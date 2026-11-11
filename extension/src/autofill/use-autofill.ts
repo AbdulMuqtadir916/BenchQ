@@ -6,6 +6,7 @@ import { checkJob, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
 import { answersFromResume } from "./resume-answers";
 import { buildReview, suggestedRow } from "./review";
+import { missingAccess, requestAccess, type SiteAccess } from "./site-access";
 import {
   chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills,
   type TabScan,
@@ -178,6 +179,13 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [scanning, setScanning] = useState(true);
   const [error, setError] = useState("");
+  // The site this tab is on, while Chrome hasn't been told BenchQ may read it (a site outside the built-in list).
+  const [access, setAccess] = useState<SiteAccess | null>(null);
+  const [isAccessDenied, setIsAccessDenied] = useState(false);
+  const [isAsking, setIsAsking] = useState(false);
+  // The site asked about last, and whether Chrome's prompt is open: a second click while it is waits for the first.
+  const accessKey = useRef("");
+  const asking = useRef(false);
   const [bankEmpty, setBankEmpty] = useState(false);
   const [unreadableFrames, setUnreadableFrames] = useState(0);
   const [signals, setSignals] = useState<PageSignals | null>(null);
@@ -238,6 +246,23 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
 
   const readPage = useCallback(async (isCurrent: () => boolean) => {
     try {
+      const missing = await missingAccess(tabId);
+      if (isCurrent()) {
+        const key = missing?.origins.join() ?? "";
+        // Another site, or none: a "no" given on the last one says nothing about this one.
+        if (key !== accessKey.current) {
+          accessKey.current = key;
+          setAccess(missing);
+          setIsAccessDenied(false);
+        }
+        // The last page's review isn't this page's: clear it, so Autofill and Mark applied can't act on it here.
+        if (missing) {
+          shownRows.current = null;
+          setRows(null);
+          setReviewedFor(null);
+        }
+      }
+      if (missing) return null;
       return { ...await scanTab(tabId), pending: await undoCount(tabId) };
     } catch (e) {
       if (isCurrent()) setError(explain(PAGE_UNREADABLE, e));
@@ -302,6 +327,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       setScanning(false);
     }
   }, [applicationId, candidateId, resumeId, loadAnswers, loadFile, readPage, review]);
+  // The scan for the current résumé, for a click that started before the résumé changed (Allow, while Chrome asks).
+  const currentScan = useRef(scan);
+  useEffect(() => { currentScan.current = scan; }, [scan]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void scan(), 0);
@@ -324,6 +352,33 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       chrome.webNavigation.onHistoryStateUpdated.removeListener(onNavigated);
     };
   }, [scan, tabId]);
+
+  /** The BDE's click on Allow: Chrome's own prompt, which needs this click, so the request comes before anything is awaited.
+   * Once allowed, the page is scanned as if it had been on the list all along. */
+  const allowAccess = useCallback(async () => {
+    if (!access || asking.current) return;
+    const requested = access.origins.join();
+    asking.current = true;
+    setIsAsking(true);
+    try {
+      const granted = await requestAccess(access).catch(() => false);
+      // A "no" belongs to the site asked about: if the tab has moved to another one, that one was never asked.
+      if (accessKey.current === requested) setIsAccessDenied(!granted);
+      if (granted) {
+        // Allowed now: this site's notice goes at once, whatever the scan finds, but not the notice of another site the
+        // tab moved to while Chrome's prompt was open. The scan is the latest one, not the one this click began with:
+        // the résumé may have changed meanwhile.
+        if (accessKey.current === requested) {
+          accessKey.current = "";
+          setAccess(null);
+        }
+        await currentScan.current();
+      }
+    } finally {
+      asking.current = false;
+      setIsAsking(false);
+    }
+  }, [access]);
 
   /** A look at the form between scans: what the BDE has filled since, and whether fields came or went. The page has no
    * way to message the extension, so the panel asks. */
@@ -663,7 +718,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, [applicationId, watchForm]);
 
   return {
-    rows, scanning, error, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, reviewedFor, attachment, attachedFile, step,
+    rows, scanning, error, needsAccess: access, isAccessDenied, isAsking, allowAccess, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, reviewedFor, attachment, attachedFile, step,
     needsConfirmation, fillCount: targets.length, staleCount: (rows ?? []).filter((row) => row.isStale).length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
   };
 }
