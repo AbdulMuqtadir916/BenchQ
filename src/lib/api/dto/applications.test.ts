@@ -18,8 +18,11 @@ const row = (over: Partial<BackendApplication> = {}): BackendApplication => ({
   company: "Acme",
   company_canonical: "Acme Inc",
   title: "Java Developer",
+  interviews: [],
   ...over,
 });
+
+const move = (from: string | null, to: string, at: string) => ({ from, to, at: `2026-11-${at}:00+00:00`, source: "ui", actor_user_id: null, note: null });
 
 describe("applications DTO mapper", () => {
   it("maps a saved row to a valid Application carrying its server revision", () => {
@@ -41,6 +44,46 @@ describe("applications DTO mapper", () => {
     expect(ApplicationSchema.safeParse(application).success).toBe(true);
     expect(application).toMatchObject({ status: "APPLIED", statusRevision: 4, appliedAt: "2026-11-05T11:00:00.000Z" });
     expect(application?.events[0]).toMatchObject({ fromStatus: "SAVED", toStatus: "APPLIED", isAutomated: false });
+  });
+
+  it("reads the stage dates the backend doesn't store off the history, oldest move first", () => {
+    const application = toApplication(row({
+      status: "offer",
+      applied_at: "2026-11-01T09:00:00+00:00",
+      // Sent out of order on purpose: the oldest move decides.
+      status_transitions: [move("interview_scheduled", "offer", "06T10:00"), move("saved", "applied", "01T09:00"),
+        move("applied", "screening_call", "02T10:00"), move("shortlisted", "interview_scheduled", "04T10:00")],
+    }), "firm_1");
+    expect(ApplicationSchema.safeParse(application).success).toBe(true);
+    expect(application).toMatchObject({
+      firstResponseAt: "2026-11-02T10:00:00.000Z", interviewAt: "2026-11-04T10:00:00.000Z", offerAt: "2026-11-06T10:00:00.000Z",
+    });
+  });
+
+  it("counts Move On as hearing back, but not a correction back to Saved", () => {
+    const corrected = toApplication(row({ status: "saved", status_transitions: [move("saved", "applied", "01T09:00"), move("applied", "saved", "01T09:05")] }), "firm_1");
+    expect(corrected?.firstResponseAt).toBeNull();
+    const rejected = toApplication(row({ status: "move_on", status_transitions: [move("saved", "applied", "01T09:00"), move("applied", "move_on", "03T12:00")] }), "firm_1");
+    expect(rejected?.firstResponseAt).toBe("2026-11-03T12:00:00.000Z");
+  });
+
+  it("dates the interview by the earliest booking that wasn't cancelled, before the history", () => {
+    const application = toApplication(row({
+      status: "interview_scheduled",
+      status_transitions: [move("applied", "interview_scheduled", "04T10:00")],
+      interviews: [
+        { when_at: "2026-11-05T15:00:00+00:00", status: "cancelled" },
+        { when_at: "2026-11-09T15:00:00+00:00", status: "scheduled" },
+        { when_at: null, status: "scheduled" },
+      ],
+    }), "firm_1");
+    expect(application?.interviewAt).toBe("2026-11-09T15:00:00.000Z");
+  });
+
+  it("counts a legacy placement as the offer date (D6), and leaves every date empty with no history", () => {
+    expect(toApplication(row({ status: "placed", status_transitions: [move("interview", "placed", "07T10:00")] }), "firm_1")?.offerAt)
+      .toBe("2026-11-07T10:00:00.000Z");
+    expect(toApplication(row({ status: "offer" }), "firm_1")).toMatchObject({ firstResponseAt: null, interviewAt: null, offerAt: null });
   });
 
   it("marks only email_classifier changes as automatic and keeps their email and revision", () => {

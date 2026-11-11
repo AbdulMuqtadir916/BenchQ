@@ -39,6 +39,8 @@ export const BackendApplicationSchema = z.object({
   company: z.string().nullable(),
   company_canonical: z.string().nullable().optional(),
   title: z.string().nullable(),
+  /** Booked interviews (the calendar picker). Only the date and state are read. */
+  interviews: z.array(z.object({ when_at: z.string().nullable().optional(), status: z.string().nullable().optional() })).default([]),
 });
 export type BackendApplication = z.infer<typeof BackendApplicationSchema>;
 
@@ -88,6 +90,31 @@ function toEvents(dto: BackendApplication): ApplicationEvent[] {
   return events;
 }
 
+/**
+ * The stage dates the backend doesn't store, read off its history (docs/integration/03-applications.md, the field
+ * table), oldest move first:
+ * - heard back: the first move out of Applied, except back to Saved (a correction, not a reply). Move On counts.
+ * - interview: the earliest booked interview that wasn't cancelled, else the first move to Interview scheduled.
+ * - offer: the first move to Offer, or to a legacy Placed (D6: a placement reached Offer).
+ */
+function stageDates(dto: BackendApplication): Pick<Application, "firstResponseAt" | "interviewAt" | "offerAt"> {
+  const moves = dto.status_transitions
+    .map((move) => ({ from: move.from ? toFrontendStatus(move.from) : null, to: toFrontendStatus(move.to), at: toIsoOrNull(move.at) }))
+    .filter((move): move is typeof move & { at: string } => move.at !== null)
+    .sort((a, b) => a.at.localeCompare(b.at));
+  const firstMove = (test: (move: (typeof moves)[number]) => boolean) => moves.find(test)?.at ?? null;
+  const booked = dto.interviews
+    .filter((interview) => interview.status?.toLowerCase() !== "cancelled")
+    .map((interview) => toIsoOrNull(interview.when_at ?? null))
+    .filter((when): when is string => when !== null)
+    .sort()[0];
+  return {
+    firstResponseAt: firstMove((move) => move.from === "APPLIED" && move.to !== "APPLIED" && move.to !== "SAVED"),
+    interviewAt: booked ?? firstMove((move) => move.to === "INTERVIEW_SCHEDULED"),
+    offerAt: firstMove((move) => move.to === "OFFER" || move.to === "PLACED"),
+  };
+}
+
 /** One application, or null for a row without a candidate (the legacy non-candidate tracker). */
 export function toApplication(dto: BackendApplication, firmId: string): Application | null {
   if (!dto.candidate_id) return null;
@@ -106,9 +133,7 @@ export function toApplication(dto: BackendApplication, firmId: string): Applicat
     companyNameAtApply: dto.company_canonical ?? dto.company ?? "",
     jobTitleAtApply: dto.title ?? "",
     appliedAt,
-    firstResponseAt: null,
-    interviewAt: null,
-    offerAt: null,
+    ...stageDates(dto),
     closedAt: null,
     expiresAt: null,
     coverLetterText: null,

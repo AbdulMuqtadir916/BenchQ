@@ -5,6 +5,7 @@ import type { Application } from "@/lib/schemas/application";
 import type { User } from "@/lib/schemas/session";
 import type { BdePerformance } from "@/lib/schemas/analytics";
 import { round1 } from "./dates";
+import { applicationDate } from "./list-filters";
 
 /**
  * Per-BDE performance for the owner/manager transparency view.
@@ -32,7 +33,8 @@ export function deriveBdePerformance(
         applicationsSubmitted: apps.length,
         responses,
         responseRatePct: apps.length ? round1((100 * responses) / apps.length) : 0,
-        interviews: apps.filter((a) => a.interviewAt).length,
+        // Same rule as the Activity dashboard: a skipped stage counts as reached (D1).
+        interviews: apps.filter((a) => applicationDate(a, "interview")).length,
         placements: apps.filter(reachedOffer).length, // D6
       };
     });

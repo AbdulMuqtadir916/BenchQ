@@ -162,9 +162,10 @@ dashboard moved to the new stages, so it doesn't count new work as zero:
   placement" is "Applications per offer"; the Applications `by` filter has no `placed`. The Finance tab's Placements and
   Time to place are Offers and Time to offer.
 - **Per-BDE chart:** applied / Shortlisted / Interview scheduled / Offer.
-- **Dates:** the live backend sends no interview or offer dates, so both come from the history (when the application
-  first got there) when the record has none (`applicationDate` in `list-filters.ts`). Responses still use
-  `firstResponseAt`, which the live backend doesn't fill: Responses show 0 on live data.
+- **Dates:** the live backend stores no interview or offer dates, so both come from the history (when the application
+  first got there) when the record has none (`applicationDate` in `list-filters.ts`). On live data the
+  applications mapper now fills all three dates from the history too (`firstResponseAt` = the first move out of
+  Applied), so Responses and % heard back count as well.
 - **Kept:** "Placed" as a candidate status, and Bench placed (bench utilization) with it.
 
 Logged in [cross-area-changes.md](../cross-area-changes.md); for Umamah to review.

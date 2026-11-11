@@ -68,6 +68,13 @@ main's URL filters and chips with this branch's "Saving…" state. `FIXTURE_VERS
 moved to the new stage list, placements became offers (Offer is the last stage): see
 [pr8-owner-dashboard.md](./pr8-owner-dashboard.md) and [cross-area-changes.md](../cross-area-changes.md).
 
+**Stage dates on live data** (`src/lib/api/dto/applications.ts`): the backend stores no response, interview or offer
+date, and the mapper set all three to `null`, so Responses, % heard back and the Finance tab's Interviews showed 0.
+They are now read off the history and the booked interviews, as docs/integration/03 planned: heard back = the first
+move out of Applied (a correction back to Saved doesn't count; Move On does), interview = the earliest booking not
+cancelled, else the first move to Interview scheduled, offer = the first move to Offer or a legacy Placed. Not counted
+yet: a reply still waiting in BDE review (the new inbox doesn't fill `last_email_received`).
+
 ## Phase 9 — classification speed, auto-refresh and review UI (2026-11-07)
 
 Added: `backend/tests/test_pr4_concurrency.py`, `src/lib/hooks/inbox-refetch.test.ts`.
