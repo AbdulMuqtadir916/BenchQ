@@ -56,6 +56,7 @@ const ARGS: Record<string, unknown[]> = {
   "resumes.deleteBase": ["cand_03", "base_none", false],
   "resumes.deleteVersion": ["cand_03", "rv_none"],
   "resumes.showBase": ["cand_03", "base_none"],
+  "resumes.saveAutofill": ["rv_cand_02_3", { edit: {}, built: {}, reset: [], add: {}, remove: [] }],
 };
 /** Only the candidate's BDE does these (07 Q55): the OWNER's control is refused them by that rule, not the policy. */
 const BDE_ONLY = new Set(["resumes.upload", "resumes.deleteBase", "resumes.deleteVersion", "resumes.showBase"]);
@@ -80,7 +81,7 @@ describe("the write inventory", () => {
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
       "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture",
-      "resumes.deleteBase", "resumes.deleteVersion", "resumes.save", "resumes.showBase", "resumes.upload", "resumes.useAsBase",
+      "resumes.deleteBase", "resumes.deleteVersion", "resumes.save", "resumes.saveAutofill", "resumes.showBase", "resumes.upload", "resumes.useAsBase",
     ]);
   });
 
