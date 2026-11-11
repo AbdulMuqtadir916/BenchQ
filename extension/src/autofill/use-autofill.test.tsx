@@ -1122,6 +1122,20 @@ describe("a site BenchQ may not read yet", () => {
     expect(hook.isAsking).toBe(false);
   });
 
+  it("still records the last captured form when the tab ends on a site it may not read", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname"), field("a", "Email")]));
+    await mount();
+    typed(["0:n", "Pri"], ["0:a", ""]);
+    await finalForm();
+    // The application redirects to an unlisted confirmation site: the review is cleared, the form BenchQ saw is not.
+    onFrames();
+    await run(() => hook.rescan());
+    expect(hook.needsAccess).not.toBeNull();
+    expect(hook.rows).toBeNull();
+    const form = await finalForm();
+    expect(form.fields.map(({ label, value }) => [label, value])).toEqual([["Nickname", "Pri"]]);
+  });
+
   it("doesn't mark a newer site denied when an older site's prompt is declined", async () => {
     onFrames();
     let answer: (granted: boolean) => void = () => undefined;

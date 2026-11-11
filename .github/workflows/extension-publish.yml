@@ -71,7 +71,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Create an environment named chrome-web-store in the repository settings to require an approval before each upload.
+    # The environment holds the five secrets, is limited to main, and can require an approval before each upload.
     environment: chrome-web-store
     steps:
       - uses: actions/download-artifact@v4
@@ -80,7 +80,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # All five are needed. Repository secrets (Settings, Secrets and variables, Actions); see docs/extension-store.md.
+      # All five are needed. They are secrets of the chrome-web-store ENVIRONMENT, not repository secrets, and that
+      # environment is limited to the main branch (Settings, Environments), so a workflow run on another branch can't
+      # read them. See docs/extension-store.md.
       - name: Check the store credentials
         id: store
         env:
@@ -95,9 +97,9 @@ jobs:
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
-      # Chrome Web Store API V2 (V1 was supported until 2026-10-15): CLI 4.x, which needs the publisher ID. With no
-      # command it uploads, then submits the upload for review and publishing.
-      - name: Upload to the Chrome Web Store and submit for review
+      # Chrome Web Store API V2 (V1 was supported until 2026-10-15): CLI 4.x, which needs the publisher ID. Upload and
+      # submit are two steps, so a run shows which one failed (see docs/extension-store.md, "If an upload goes wrong").
+      - name: Upload to the Chrome Web Store
         if: steps.store.outputs.ready == 'true'
         env:
           EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
@@ -105,7 +107,16 @@ jobs:
           CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
-        run: npx --yes chrome-webstore-upload-cli@4.0.2 --source benchq-extension.zip
+        run: npx --yes chrome-webstore-upload-cli@4.0.2 upload --source benchq-extension.zip
+      - name: Submit the upload for review
+        if: steps.store.outputs.ready == 'true'
+        env:
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: npx --yes chrome-webstore-upload-cli@4.0.2 publish
       - name: No store credentials
         if: steps.store.outputs.ready != 'true'
         run: echo "Not every Chrome Web Store secret is set, so nothing was uploaded. The built zip is attached to this run."

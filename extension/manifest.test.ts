@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import hosts from "./hosts.json" with { type: "json" };
 import { buildManifest, KNOWN_SITES, storeProblem } from "./manifest";
 
-const STORE = { benchqUrl: "https://app.benchq.test", isStore: true };
+const STORE = { benchqUrl: hosts.storeOrigin, isStore: true };
 
 describe("the extension's manifest", () => {
   it("asks for BenchQ and the known job sites, and no more, outright", () => {
     const { host_permissions } = buildManifest(STORE);
-    expect(host_permissions[0]).toBe("https://app.benchq.test/*");
+    expect(host_permissions[0]).toBe(`${hosts.storeOrigin}/*`);
     expect(host_permissions.slice(1)).toEqual(KNOWN_SITES);
     expect(host_permissions).toHaveLength(1 + hosts.boards.length + hosts.applicationSystems.length);
     expect(host_permissions.some((host) => host.includes("localhost") || host === "https://*/*")).toBe(false);
@@ -40,10 +40,18 @@ describe("the extension's manifest", () => {
   });
 
   it("refuses any address on this machine, however it is written", () => {
-    for (const host of ["https://127.0.0.2/*", "https://localhost:8443/*", "https://app.localhost/*", "https://0.0.0.0/*", "https://[::1]/*", "https://[::1]:3000/*"]) {
+    for (const host of ["https://127.0.0.2/*", "https://localhost:8443/*", "https://localhost./*", "https://LOCALHOST./*", "https://app.localhost/*",
+      "https://0.0.0.0/*", "https://10.0.0.5/*", "https://[::1]/*", "https://[::1]:3000/*", "https://[::ffff:127.0.0.1]/*", "https://[::ffff:7f00:1]/*"]) {
       expect(storeProblem({ host_permissions: [host] }), host).toMatch(/not local/);
     }
-    expect(() => buildManifest({ benchqUrl: "https://127.0.0.2", isStore: true })).toThrow(/Not a store manifest/);
+  });
+
+  it("builds a store manifest only for the production origin, so no other address or spelling gets through", () => {
+    for (const url of ["https://127.0.0.2", "https://localhost.", "https://[::ffff:127.0.0.1]", "https://[::ffff:7f00:1]", "https://10.0.0.5",
+      "https://staging.benchq.io", "https://www.benchq.io.evil.test", "https://app.benchq.test", "http://www.benchq.io"]) {
+      expect(() => buildManifest({ benchqUrl: url, isStore: true }), url).toThrow(/Not a store manifest/);
+    }
+    expect(() => buildManifest(STORE)).not.toThrow();
   });
 
   it("checks the optional sites too: all of https is allowed there, a local or plain http one is not", () => {

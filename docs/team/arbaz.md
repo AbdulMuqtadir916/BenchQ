@@ -83,8 +83,8 @@ Uses React, TypeScript, Vite, Tailwind v4 (through PostCSS, as the website does)
   change) publishes by itself. It tests, runs `build:store`, stamps the version as
   `major.minor.<run number>.<attempt>` (the store refuses a version it already has, and a re-run gets its own), zips, and
   uploads and submits through the Chrome Web Store API V2 when all five secrets `CHROME_EXTENSION_ID`,
-  `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and `CHROME_REFRESH_TOKEN` exist; only the upload
-  step sees them. Without them it only keeps the zip. The first upload and the listing are done by hand in the store dashboard. The listing text, permission justifications, privacy draft, reviewer instructions and secret setup are in
+  `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and `CHROME_REFRESH_TOKEN` exist as secrets of the
+  `chrome-web-store` environment (limited to `main`; not repository secrets); only the upload steps see them. Without them it only keeps the zip. The first upload and the listing are done by hand in the store dashboard. The listing text, permission justifications, privacy draft, reviewer instructions and secret setup are in
   [../extension-store.md](../extension-store.md).
 - Load unpacked in Chrome: run the build, open `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose `extension/dist/`.
 

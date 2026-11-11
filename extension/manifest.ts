@@ -13,24 +13,26 @@ const BROAD = new Set(["<all_urls>", "*://*/*", "http://*/*", "https://*/*"]);
 /** The host of a match pattern such as `https://example.com/*`, or null when it has none to read. */
 function hostOf(pattern: string): string | null {
   const match = /^[a-z*]+:\/\/([^/]+)\//.exec(pattern);
-  return match ? match[1].replace(/:\d+$/, "").toLowerCase() : null;
+  // No port, no trailing dot ("localhost." is localhost), lower case.
+  return match ? match[1].replace(/:\d+$/, "").replace(/\.$/, "").toLowerCase() : null;
 }
 
-/** A host on this machine: localhost and *.localhost, any 127.x address, 0.0.0.0, and IPv6 loopback. */
-function isLocalHost(host: string): boolean {
-  return host === "localhost" || host.endsWith(".localhost") || /^127(\.\d{1,3}){3}$/.test(host) || host === "0.0.0.0"
-    || host === "[::1]" || host === "[::]";
-}
+/** An address, not a name: any IPv4 literal, or an IPv6 literal in brackets (which covers every way of writing a loopback
+ * or mapped address, such as `[::ffff:127.0.0.1]`). A store build points at a domain name, never at one of these. */
+const isIpLiteral = (host: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith("[");
+
+/** A host on this machine by name. (Addresses are refused by `isIpLiteral`.) */
+const isLocalHost = (host: string) => host === "localhost" || host.endsWith(".localhost");
 
 const isLocalOrInsecure = (pattern: string) => {
   const host = hostOf(pattern);
-  return !pattern.startsWith("https://") || host === null || isLocalHost(host);
+  return !pattern.startsWith("https://") || host === null || isIpLiteral(host) || isLocalHost(host);
 };
 
 export interface ManifestOptions {
   /** The BenchQ website's address: what the extension signs in on and calls `/api/*` on. */
   benchqUrl: string;
-  /** A build for the Chrome Web Store: BenchQ's own https address only, nothing local. */
+  /** A build for the Chrome Web Store: exactly the production origin in hosts.json, nothing else. */
   isStore: boolean;
 }
 
@@ -51,6 +53,11 @@ export function storeProblem(manifest: { host_permissions?: string[]; optional_h
  * the known boards and application systems; every other https site is optional, for the panel to ask about. */
 export function buildManifest({ benchqUrl, isStore }: ManifestOptions) {
   const origin = new URL(benchqUrl).origin;
+  // The store build is checked against the one origin it is meant for, not against a list of bad ones: any other
+  // spelling of a local address, or a staging site, fails here.
+  if (isStore && origin !== hosts.storeOrigin) {
+    throw new Error(`Not a store manifest: BENCHQ_URL is ${origin}, but a store build must use ${hosts.storeOrigin} (storeOrigin in hosts.json).`);
+  }
   const manifest = {
     ...base,
     host_permissions: [`${origin}/*`, ...KNOWN_SITES],

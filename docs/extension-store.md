@@ -80,7 +80,8 @@ Draft answers, to be confirmed by the owner:
   activity such as keystrokes or clicks, or personal communications.
 - **Certify:** data is not sold; not used for anything unrelated to the single purpose; not used for creditworthiness or
   lending.
-- **Where it goes:** to the user's own BenchQ account (www.benchq.io), and, when the user presses Autofill, into the
+- **Where it goes:** to the user's own BenchQ account (www.benchq.io), and, when the user presses Autofill or picks a
+  different résumé for the job (which fills the form again from that résumé, and attaches its file), into the
   employer's application page in the connected tab. That page can read the filled answers and any attached résumé file,
   and may save or upload them before the user submits. Nothing is sent anywhere else.
 - **Privacy policy URL:** required. It must be a public page. Draft in section 4.
@@ -95,8 +96,8 @@ Draft answers, to be confirmed by the owner:
 >
 > *What it sends, and where.* The résumé answers it uses to fill a form come from your BenchQ account, and the recorded
 > form goes back to your BenchQ account, both over HTTPS to www.benchq.io. Your sign-in is the BenchQ session cookie, which
-> the browser keeps and the extension never reads. When you press Autofill, the candidate's answers (and the résumé file,
-> if attached) are written into the employer's application page in that tab: the page can read them and may save or
+> the browser keeps and the extension never reads. When you press Autofill, or pick a different résumé for the job (which
+> fills the form again from that résumé), the candidate's answers (and the résumé file, if attached) are written into the employer's application page in that tab: the page can read them and may save or
 > upload them before you submit, as with anything typed into a form. That can include answers a candidate has saved to
 > self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay questions. When you
 > mark the application applied, BenchQ records the form as filled. Answers to questions BenchQ recognises as
@@ -109,7 +110,7 @@ Draft answers, to be confirmed by the owner:
 > candidate you picked (an ID, not their details), and when it last reloaded itself after an update. Nothing else is
 > stored, and none of it leaves the device.
 >
-> *Your control.* You press Autofill and you submit every form yourself. You can remove BenchQ's access to any site in
+> *Your control.* Filling starts only when you press Autofill or pick a résumé for the job, and you submit every form yourself. You can remove BenchQ's access to any site in
 > chrome://extensions, and uninstall at any time. For BenchQ account data, contact **[support email]**.
 
 Fill in the support email, and publish it at a stable public address, for example `https://www.benchq.io/privacy`. (A page
@@ -130,11 +131,20 @@ Use a demo account that holds only made-up candidates.
 ## 6. The five GitHub secrets (one-time)
 
 The workflow reads `CHROME_EXTENSION_ID`, `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and
-`CHROME_REFRESH_TOKEN` (GitHub, Settings, Secrets and variables, Actions), and uploads only when all five are set. The
-build runs in one job with no secrets and hands over only the zip; the upload runs in a second job, on a fresh runner that
-never installed the project's code, and only it sees the secrets. It uses the Chrome Web Store API V2
-(`chrome-webstore-upload-cli` 4.x): Google supported V1 only until 2026-10-15. A manual run publishes from `main` only. Create the environment `chrome-web-store` too, with a required
-reviewer if you want an approval before each upload.
+`CHROME_REFRESH_TOKEN`, and uploads only when all five are set. The build runs in one job with no secrets and hands over
+only the zip; the upload runs in a second job, on a fresh runner that never installed the project's code, and only it sees
+the secrets. It uses the Chrome Web Store API V2 (`chrome-webstore-upload-cli` 4.x): Google supported V1 only until
+2026-10-15. A manual run publishes from `main` only.
+
+**Store the five as secrets of the `chrome-web-store` environment, not as repository secrets.** A repository secret can be
+read by any workflow someone with write access runs on their own branch, which would bypass the `main` check and the
+reviewer gate. In GitHub, Settings, **Environments**, create `chrome-web-store`, then:
+- **Deployment branches and tags:** Selected branches and tags, add `main` only. A run from any other branch can then
+  neither start the job nor read the secrets.
+- **Required reviewers:** add the people who approve each upload (turn off "Allow administrators to bypass" if you
+  want no exceptions).
+- **Environment secrets:** add the five values here (Add environment secret). Do not add them under Settings, Secrets and
+  variables, Actions, Repository secrets; if they exist there, delete them.
 
 1. **Extension ID:** the 32-letter ID on the item in the dashboard (after the first upload).
    **Publisher ID:** your developer account's ID (not the extension's), in the dashboard's address when signed in. V2
@@ -152,6 +162,13 @@ reviewer if you want an approval before each upload.
 5. Treat all five as secrets. Never put them in `extension/.env.store` or any committed file.
 
 ## 7. After approval
+
+**If an upload goes wrong part way.** The workflow uploads the zip and then submits it for review as two steps, so the
+run says which one failed.
+- *Upload failed:* run the workflow again ("Re-run all jobs", or a new Run workflow from `main`); nothing reached the store.
+- *Upload succeeded but Submit failed:* the store already holds the new version as a draft. Press Submit for review on it in
+  the Developer Dashboard. Do not use "Re-run failed jobs": it uploads the same version again and is refused before it
+  reaches the submit step. A new Run workflow from `main` also works, but it uploads a higher version and replaces the draft.
 
 The first approved version goes live to people who have the unlisted link; later versions update their browsers by
 themselves. If an upload is refused for a version number, note that the workflow already stamps
