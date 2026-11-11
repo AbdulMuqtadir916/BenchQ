@@ -52,17 +52,26 @@ export const CandidateDto = z.object({
 });
 export type CandidateDto = z.infer<typeof CandidateDto>;
 
+// A malformed LinkedIn value on the active résumé should not make the candidate unreadable (07 Q57, BUG-014).
+const linkRule = CandidateSchema.shape.linkedinUrl;
+function readableLink(candidateId: string, link: string | null): string | null {
+  if (link === null || linkRule.safeParse(link).success) return link;
+  console.warn(`[api] candidate ${candidateId}: ignoring a malformed linkedin_url`);
+  return null;
+}
+
 /** Backend candidate → `Candidate`. */
 export function toCandidate(dto: CandidateDto): Candidate {
+  const id = fromBackendId(dto.id);
   return CandidateSchema.parse({
-    id: fromBackendId(dto.id),
+    id,
     firmId: fromBackendId(dto.firm_id),
     managerId: fromBackendId(dto.manager_id),
     bdeId: dto.bde_id === null ? null : fromBackendId(dto.bde_id),
     fullName: dto.full_name,
     email: dto.email,
     phone: dto.phone,
-    linkedinUrl: dto.linkedin_url,
+    linkedinUrl: readableLink(id, dto.linkedin_url),
     city: dto.city,
     state: dto.state,
     country: dto.country,

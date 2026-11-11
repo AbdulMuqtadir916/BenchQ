@@ -73,7 +73,9 @@ describe("validateStep", () => {
     expect(validateStep("basic", { ...valid, email: "ravi[at]example.com" }).email).toMatch(/valid email/);
     expect(validateStep("basic", { ...valid, yearsExperience: "212" }).yearsExperience).toMatch(/0 to 60/);
     expect(validateStep("basic", { ...valid, yearsExperience: "2.5" }).yearsExperience).toBeDefined();
-    expect(validateStep("basic", { ...valid, linkedinUrl: "linkedin.com/in/x" }).linkedinUrl).toBeDefined();
+    expect(validateStep("basic", { ...valid, linkedinUrl: "linkedin.com/in/x" }).linkedinUrl).toBeUndefined();
+    expect(validateStep("basic", { ...valid, linkedinUrl: "ftp://linkedin.com/in/x" }).linkedinUrl).toBe("Enter an HTTP or HTTPS link.");
+    expect(toCreateCandidate({ ...valid, managerId: "m", linkedinUrl: "linkedin.com/in/x" }).linkedinUrl).toBe("https://linkedin.com/in/x");
     expect(validateStep("basic", valid)).toEqual({});
   });
 

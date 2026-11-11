@@ -27,13 +27,17 @@ services:
   db-test:
     image: postgres:16-alpine
     profiles: ["test"]
-    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
+    # A full run (~4,000 tests) truncates every table before each test, and Postgres leaves each emptied file
+    # until the next checkpoint. The in-memory disk's default of ~500,000 files (inodes) ran out late in the run
+    # ("could not create file ... No space left on device", `DiskFull`) while its bytes were still 80% free. So:
+    # more inodes, a bounded size (a full run peaks near 400 MB), and a checkpoint every 30 s to clear the files.
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off", "-c", "checkpoint_timeout=30s"]
     environment:
       POSTGRES_USER: jobnavigator
       POSTGRES_PASSWORD: password
       POSTGRES_DB: jobnavigator_test
     tmpfs:
-      - /var/lib/postgresql/data
+      - /var/lib/postgresql/data:rw,size=1g,nr_inodes=2m
     ports:
       - "127.0.0.1:5433:5432"
     healthcheck:
