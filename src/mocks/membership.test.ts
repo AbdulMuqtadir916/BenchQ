@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { candidatesApi } from "@/lib/api/candidates";
 import { jobsApi } from "@/lib/api/jobs";
-import { applicationsApi, followupsApi } from "@/lib/api/applications";
+import { applicationsApi } from "@/lib/api/applications";
 import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
@@ -13,7 +13,7 @@ import { createCandidateBody } from "./create-candidate-body";
 import { allJobs, jobsMock } from "./jobs";
 import { allJobMarks, jobMarksMock } from "./job-marks";
 import { jobMarksApi } from "@/lib/api/job-marks";
-import { allApplications, applicationsMock, followupsMock } from "./applications";
+import { allApplications, applicationsMock } from "./applications";
 import { allResumes, resumesMock } from "./resumes";
 import { recordsMock } from "./records";
 import { allDocuments, documentsMock } from "./documents";
@@ -66,7 +66,6 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["applications", "list", (f) => applicationsApi.list(f), false],
   ["applications", "byId", (f, i) => applicationsApi.byId(f, i.application), false],
   ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "WITHDRAWN", note: null }), true],
-  ["followups", "list", (f) => followupsApi.list(f), false],
   ["resumes", "shelf", (f) => resumesApi.shelf(f), false],
   ["resumes", "shelfByCandidate", (f, i) => resumesApi.shelfByCandidate(f, i.candidate), false],
   ["resumes", "open", (f, i) => resumesApi.open(f, i.resumeVersion), false],
@@ -93,7 +92,7 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
 ];
 
 const MOCKS: Record<(typeof FIRM_SCOPED_RESOURCES)[number], object> = {
-  candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock,
+  candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, resumes: resumesMock,
   records: recordsMock, documents: documentsMock, inbox: inboxMock, agents: agentsMock, jobMarks: jobMarksMock,
 };
 /** Mock methods that take no firm (they work on text alone). */

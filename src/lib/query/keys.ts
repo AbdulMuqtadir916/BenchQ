@@ -26,7 +26,6 @@ export const queryKeys = {
   candidates: resource("candidates"),
   jobs: resource("jobs"),
   applications: resource("applications"),
-  followups: resource("followups"),
   resumes: {
     ...resource("resumes"),
     byCandidate: (firmId: string, candidateId: string) => [firmId, "resumes", "byCandidate", candidateId] as const,

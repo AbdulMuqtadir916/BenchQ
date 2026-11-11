@@ -75,6 +75,9 @@ All decisions live here. Change a decision here first, then the sections below.
 | Q56 | Who edits a candidate's profile | Decided 2026-11-03 by Zuhair, built 2026-11-06 (résumé versioning PR 7): what the parser's strict format holds lives in `resumes`, and its editors are Q55's (the candidate's BDE once assigned). **The profile** (the `candidates` fields outside that format: work authorization and its expiry, sponsorship and transfer, rates, employment types, availability, notice, relocation; the rest of the onboarding answers are set at creation) is edited only by the **OWNER** (every candidate) and the candidate's **MANAGER**, never by a BDE or a VIEWER. A new action, `candidate.editProfile` (OWNER, MANAGER), guards `PATCH …/candidates/{id}` and the Submission facts Edit; `candidate.edit` keeps the BDE's work on the candidate (inbox, documents). A changed work authorization carries its sponsorship and transfer (the new-candidate flow's rule) | 2026-11-06 |
 | Q57 | Where the résumé's fields live | Decided by Zuhair 2026-11-03, built 2026-11-06 (migration 0017): what the parser's strict format holds is stored only in `resumes`. `candidates` loses `full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`; the profile reads them from the active base's newest version (`backend/candidates/profile.py`; the API keeps the same keys). They change when the BDE saves a version (Q55). The owner's and manager's decisions stay on `candidates` (`primary_role`, `years_experience`, `work_auth`, rates, availability, preferences) | 2026-11-06 |
 | Q58 | A candidate is onboarded only with their résumé | Decided by Abdul 2026-11-06, built the same day (résumé versioning PR 7, migration 0018): step 1 can't be passed without a résumé, and the backend refuses a create without one (400). The "Skip, enter manually" button was a stub from onboarding module 04 so step 1 wasn't a dead end before the parser existed, never a decision; the `MANUAL` base built on it (2026-11-04) is gone. 0018 turns each MANUAL base into an UPLOAD base with a résumé file generated from its details (`backend/candidates/generated_resume.py`, no AI; the demo seed does the same) and removes a former placeholder next to a real upload | 2026-11-06 |
+| Q60 | Managers page, Analytics, and who has the Activity tab | Decided 2026-11-10 by Umamah (PR 8): **`/[firm]/managers` is OWNER only** (sidebar between Dashboard and Candidates, `g m`): every manager with their team size, queue and last 30 days, as a table or cards; a manager opens at their level of the dashboard's Activity tab. **Analytics is removed**: its funnel, per-BDE numbers and job sources are on the Activity tab. **The VIEWER's dashboard gets the Activity tab** next to its floor, and sees the whole firm, read-only; a MANAGER's dashboard is the Activity dashboard only (Q62) and sees their own team only (no way up to the firm, Q47). Every count on the tab opens the Applications or Candidates list filtered to the records it counted (job sources and time between stages are not links) | 2026-11-10 |
+| Q61 | Follow-ups removed | Decided 2026-11-10 by Umamah with Abdul (PR 8; closes `docs/integration/06-open-decisions.md` D5): **Follow-ups is removed.** It ran only on demo data (the backend never had follow-ups), its Done, Snooze and Cancel saved nothing, and nobody was building it (Samad's plan only named it). Gone: the `/[firm]/followups` page, its sidebar item and `g f`, the BDE dashboard's Follow-ups tile, the floor's overdue column, the board card's "Follow-up in" line, the profile's follow-up items, the demo notification, the Settings cadence row, and the data, types and `followup.act` permission behind them (frontend and backend). The outreach "Follow-up" message templates stay: they are email templates | 2026-11-10 |
+| Q62 | A manager's dashboard and BDEs page | Decided 2026-11-10 by Umamah (PR 8): **a MANAGER's dashboard is the Activity dashboard only** (no floor, no tabs; a VIEWER and the OWNER keep their tabs). Under the BDE cards sits a chart of how far each BDE's applications got (applied, shortlisted, interview, placed, counted like the pipeline), each BDE opening their dashboard. **`/[firm]/bdes` is MANAGER only** (sidebar between Dashboard and Candidates, `g b`): the manager's own BDEs as a table with search and a period; a row opens that BDE on the dashboard | 2026-11-10 |
 
 ---
 
@@ -91,7 +94,7 @@ All decisions live here. Change a decision here first, then the sections below.
 4. **Never confirm existence.** Unknown firm, a firm you're not a member of, a record outside your
    scope, and `/admin` for a non-admin all render **not-found**.
 5. **Forbidden is for known-but-not-allowed routes inside your own area** (e.g. a BDE opening
-   `/acme/analytics`). It renders in place (Q2).
+   `/acme/managers`). It renders in place (Q2).
 6. **Client guards are UX.** Real enforcement is Phase D (server session + backend). Until then
    every guard comment says so.
 7. **Cache is firm-scoped.** Every firm-data query key starts with the firm id.
@@ -122,6 +125,8 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | --------------------------------------------------- | ----------- | ----------------------------------------------------- | ------------------- | --------------- | ---------------- | ------------------------ |
 | `/[firm]/welcome`                                   | auth        | full (first run)                                      | → landing           | → landing       | → landing        | → landing                |
 | `/[firm]/dashboard`                                 | app         | full                                                  | full                | full            | read             | read (OWNER composition) |
+| `/[firm]/managers`                                  | app         | full (Q60)                                            | —                   | —               | —                | read                     |
+| `/[firm]/bdes`                                      | app         | —                                                     | team (Q62)          | —               | —                | —                        |
 | `/[firm]/candidates`                                | app         | full                                                  | team                | assigned        | read             | read                     |
 | `/[firm]/candidates/new`                            | app / modal | full                                                  | full                | —              | —                | —                        |
 | `/[firm]/candidates/[id]`                           | app         | full                                                  | team                | assigned        | read             | read                     |
@@ -132,9 +137,7 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | `/[firm]/resumes/[id]`                              | studio      | full                                                  | team                | assigned        | read (view mode) | read (view mode)         |
 | `/[firm]/resumes/[id]/autofill`                     | studio      | full                                                  | team                | assigned        | read             | read                     |
 | `/[firm]/outreach`                                  | app         | full                                                  | team                | own             | read             | read                     |
-| `/[firm]/followups`                                 | app         | full                                                  | team                | own             | —                | read                     |
 | `/[firm]/focus`                                     | focus       | full                                                  | full                | full            | —                | —                        |
-| `/[firm]/analytics`                                 | app         | full                                                  | team                | —               | read             | read                     |
 | `/[firm]/ledger`                                    | app         | full                                                  | team                | own             | read             | read                     |
 | `/[firm]/notifications`                             | app         | full; approve own firm's requests                     | full; approve only assigned BDE requests | full; view own notifications | full; view own notifications | —; main sidebar → Preferences; its own sidebar of inboxes |
 | `/[firm]/notifications/requests`                    | app         | full; approve own firm's requests                     | full; approve only assigned BDE requests | full; view own notifications | full; view own notifications | —; in the Notifications sidebar |
@@ -312,9 +315,9 @@ src/app/
     welcome/                       → OWNER first run
     (app)/                         → app shell (sidebar + topbar); groups below don't change URLs
       (workspace)/                 → daily work, every role
-        dashboard · candidates · jobs · applications · resumes · outreach · followups
-      (manage)/                    → oversight, OWNER + MANAGER (+ VIEWER read)
-        analytics · ledger
+        dashboard · candidates · jobs · applications · resumes · outreach
+      (manage)/                    → oversight: managers (OWNER, Q60) · ledger (OWNER + MANAGER, VIEWER read)
+        managers · ledger
       settings/                    → sections gated per §2.2
         firm (OWNER) · team (OWNER manages, MANAGER read + assign) · templates · preferences
       @modal/                      → intercepts for candidates/new, jobs/capture
@@ -510,7 +513,7 @@ their invite on `/invite/[token]` and lands on `/welcome`.
 | The pure policy: `can(principal, action)` over one table for every action — firm work (`candidate.create`, `candidate.edit`, `job.capture`, `job.apply`, `application.move`, `resume.edit`, `outreach.act`, `followup.act`), team (Q15: `member.invite`, `member.remove`, `member.changeRole`, `member.deactivate` OWNER only; `candidate.assign`, `team.view` OWNER and MANAGER) and platform (`firm.create`, `firm.edit`, `firm.suspend`, `firm.viewWorkspace`, `plan.edit`, `invite.resend`, `invite.revoke`, `platformTeam.manage`: PLATFORM_ADMIN, in or out of a support view). A support view: no firm or team action, `team.view` only | `src/lib/auth/policy.ts` |
 | Route access: `can(principal, "route.view", route)` — the registry's access table; used by the route guard, ⌘K actions and the sign-in target | `policy.ts`, `route-guard.tsx`, `command-palette.tsx`, `landing.ts` |
 | `useCan`, `useCanView`, `<Can action>` / `<Can route>` | `src/lib/auth/permissions.ts`, `can.tsx` |
-| Scope helpers `scopeCandidates`, `scopeApplications`, `scopeFollowupsUserId`, `scopeLedger`, `hasOwnScope`, `dashboardFor` | `policy.ts` |
+| Scope helpers `scopeCandidates`, `scopeApplications`, `scopeLedger` (`scopeFollowupsUserId` removed with follow-ups, Q61), `hasOwnScope`, `dashboardFor` | `policy.ts` |
 | Per-candidate résumé actions (Q55, résumé versioning PR 5): `canChangeResume` (edit, save, choose the base: the candidate's BDE, or OWNER and MANAGER while no BDE is assigned) and `canManageResume` (upload, delete, show again, tailor: the candidate's BDE), on top of `resume.edit`; Python mirrors `can_change_resume` / `can_manage_resume` | `policy.ts`, `backend/auth/policy.py` |
 | Firm pages read the principal and ask `can()` (no `role !== "VIEWER"` checks, no BDE filters); controls that ignored `canAct` gated | firm pages (P4) |
 | Admin screens ask `can()` for every platform action: New firm and `n` (`firm.create`); Edit, Change slug, Change plan, Adjust limits, user (de)activation (`firm.edit`); Suspend / Reactivate (`firm.suspend`); View workspace, ⌘K "View workspace of" (`firm.viewWorkspace`); plan New / Edit / Hide (`plan.edit`); Resend, Copy link (`invite.resend`); Revoke (`invite.revoke`); staff invite / deactivate (`platformTeam.manage`) | `src/features/admin/**` |
@@ -521,7 +524,7 @@ their invite on `/invite/[token]` and lands on `/welcome`.
 | Exit grep: `grep -rE "role (===|!==)" src` finds nothing outside `src/lib/auth/` and the registry | — |
 
 **Left for later phases:** the member controls on `/settings/team` and candidate assignment UI (Phase M);
-outreach and follow-up write endpoints, which will declare `outreach.act` / `followup.act` and be covered
+outreach write endpoints, which will declare `outreach.act` (`followup.act` was removed with follow-ups, Q61) and be covered
 by the write-authorization test automatically.
 
 As v1 Phase C, typed on `Principal`:
