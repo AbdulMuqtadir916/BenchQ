@@ -13,32 +13,39 @@ export type DescriptionBlock =
 
 /** A heading: a short line that ends in ":" ("Job Description:", "Required Skills:"). */
 const HEADING = /^[^:]{2,60}:$/;
+/** A heading without its colon: two to five Title Case words and no closing punctuation ("Key Responsibilities"). */
+const TITLE_HEADING = /^(?:[A-Z][\w'&/()-]*|&|and|of|to|for|the|a|an|in|on|with|or)(?: (?:[A-Z][\w'&/()-]*|&|and|of|to|for|the|a|an|in|on|with|or)){1,4}$/;
+/** One-word headings postings use ("Responsibilities", "Qualifications"). */
+const WORD_HEADING = /^(?:Responsibilities|Requirements|Qualifications|Skills|Benefits|Overview|Summary|Description|Duties|Education|Experience|Compensation|Perks|About)$/;
 /** A fact: "Location: Lansing, MI (Hybrid)": a label of up to four words, then a short value. */
 const FACT = /^([A-Za-z][A-Za-z/&()'-]*(?: [A-Za-z/&()'-]+){0,3}):\s+(.{1,120})$/;
 /** A line that is already a list item: "- x", "• x", "* x", "1. x", "2) x". */
 const MARKED = /^(?:[-•*·▪●]|\d{1,2}[.)])\s+(.+)$/;
 /** Under a heading, a line this short is one item of its list; a longer one is a paragraph of its own. */
-const ITEM_MAX = 220;
+const ITEM_MAX = 300;
 
 export function describeJob(text: string): DescriptionBlock[] {
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
   const blocks: DescriptionBlock[] = [];
   let underHeading = false;
+  /** Lists whose items were marked in the text ("- x"): kept as lists even with one item. */
+  const marked = new Set<DescriptionBlock>();
   const last = () => blocks[blocks.length - 1];
-  const addBullet = (item: string) => {
+  const addBullet = (item: string, isMarked = false) => {
     const block = last();
     if (block?.kind === "bullets") block.items.push(item);
     else blocks.push({ kind: "bullets", items: [item] });
+    if (isMarked) marked.add(last()!);
   };
 
   for (const line of lines) {
-    const marked = MARKED.exec(line);
-    if (marked) {
-      addBullet(marked[1]!);
+    const item = MARKED.exec(line);
+    if (item) {
+      addBullet(item[1]!, true);
       continue;
     }
-    if (HEADING.test(line)) {
-      blocks.push({ kind: "heading", text: line.slice(0, -1).trim() });
+    if (HEADING.test(line) || isPlainHeading(line)) {
+      blocks.push({ kind: "heading", text: line.replace(/:$/, "").trim() });
       underHeading = true;
       continue;
     }
@@ -56,5 +63,13 @@ export function describeJob(text: string): DescriptionBlock[] {
     }
     blocks.push({ kind: "paragraph", text: line });
   }
-  return blocks;
+  // A heading followed by a single unmarked line ("Role Overview", then its paragraph) is a paragraph, not a list.
+  return blocks.map((block) => (block.kind === "bullets" && block.items.length === 1 && !marked.has(block) ? { kind: "paragraph", text: block.items[0]! } : block));
 }
+
+/** A heading written without its colon: Title Case, short, not a sentence, and not one of the job's facts. */
+function isPlainHeading(line: string): boolean {
+  if (line.length > 40 || /[.,;!?:]$/.test(line) || /\d/.test(line)) return false;
+  return WORD_HEADING.test(line) || TITLE_HEADING.test(line);
+}
+

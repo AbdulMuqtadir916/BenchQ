@@ -39,9 +39,9 @@ describe("describeJob: the structure a plain-paragraph posting already has", () 
   });
 
   it("reads a 'Label: value' line under a heading as an item, not a fact", () => {
-    expect(describeJob("Benefits:\nHealth: medical and dental")).toEqual([
+    expect(describeJob("Benefits:\nHealth: medical and dental\nLeave: 20 days a year")).toEqual([
       { kind: "heading", text: "Benefits" },
-      { kind: "bullets", items: ["Health: medical and dental"] },
+      { kind: "bullets", items: ["Health: medical and dental", "Leave: 20 days a year"] },
     ]);
   });
 
@@ -51,5 +51,24 @@ describe("describeJob: the structure a plain-paragraph posting already has", () 
       { kind: "paragraph", text: "Another one." },
     ]);
     expect(describeJob("")).toEqual([]);
+  });
+
+  it("reads headings written without a colon, and the longer items under them, as a list", () => {
+    const text = [
+      "Job Title: Java Developer",
+      "Role Overview",
+      "We are looking for a developer to design, build and run the services our finance teams rely on, working with product, operations and data teams every day to deliver new features, improve reliability and keep the platform secure, observable and fast for every user, with a strong focus on quality.",
+      "Key Responsibilities",
+      "Design, develop, and deploy scalable Java backend services using Spring Boot to support financial operations, including transaction processing, reporting engines, and secure APIs for internal and external integrations.",
+      "Lead code reviews.",
+      "Desired Skills",
+      "Experience in financial services",
+      "Remote",
+      "Contract",
+    ].join("\n");
+    expect(describeJob(text).map((block) => [block.kind, block.kind === "heading" ? block.text : block.kind === "bullets" ? block.items.length : ""])).toEqual([
+      ["facts", ""], ["heading", "Role Overview"], ["paragraph", ""], ["heading", "Key Responsibilities"], ["bullets", 2],
+      ["heading", "Desired Skills"], ["bullets", 3],
+    ]);
   });
 });

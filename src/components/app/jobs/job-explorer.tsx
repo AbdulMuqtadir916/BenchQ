@@ -284,9 +284,11 @@ export function JobExplorer({
           </div>
         </div>
 
-        <div className="min-w-0 bg-[var(--color-surface)]">
+        {/* The pane keeps the panel's height and scrolls as one (the job's header, then its whole posting), so a short
+            window shows the description by scrolling, never cut off. */}
+        <div className="min-w-0 bg-[var(--color-surface)] lg:min-h-0 lg:overflow-y-auto">
           {selected ? (
-            <motion.div key={selected.job.id} initial={{ opacity: 0, x: reduceMotion ? 0 : 5 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: reduceMotion ? 0.1 : 0.2 }} className="flex h-full min-h-[580px] flex-col lg:min-h-0">
+            <motion.div key={selected.job.id} initial={{ opacity: 0, x: reduceMotion ? 0 : 5 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: reduceMotion ? 0.1 : 0.2 }} className="flex min-h-[580px] flex-col lg:min-h-full">
               <JobDetailHeader
                 job={selected.job}
                 score={selected.score}

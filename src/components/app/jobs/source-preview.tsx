@@ -18,7 +18,7 @@ import { JobDescription } from "@/components/app/jobs/job-description";
 export function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) {
   const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl;
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface-2)] p-4">
+    <div className="flex-1 bg-[var(--color-surface-2)] p-4">
       <article className="mx-auto max-w-3xl overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]">
         <header className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
