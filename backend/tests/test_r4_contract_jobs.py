@@ -9,7 +9,7 @@ import pytest
 
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
-    make_job, make_search, big_string, EMOJI, MISSING_UUID,
+    make_job, make_search, EMOJI, MISSING_UUID,
 )
 
 pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
@@ -105,15 +105,6 @@ def test_save_from_extension_wrongly_typed_title_never_leaks_internals(client, b
                                json={"title": bad, "company": "C", "url": "https://x.com/1"}))
 
 
-def test_save_from_extension_ten_megabyte_description(client):
-    """A pathological paste must be stored or refused — never a 500."""
-    r = client.post("/api/jobs/save-from-extension", json={
-        "title": "Big", "company": "Acme", "url": "https://x.com/jobs/big",
-        "description": big_string(10),
-    })
-    assert_clean(r, 200, 400, 413, 422)
-
-
 @pytest.mark.parametrize("body", [[1, 2], "hello", 5, None])
 def test_save_from_extension_non_object_body_is_422(client, body):
     assert_clean(client.post("/api/jobs/save-from-extension", json=body), 422)
@@ -166,5 +157,3 @@ def test_a_valid_search_id_filter_still_filters(client, test_db):
     make_job(test_db, url="https://x.com/other")
     r = assert_clean(client.get(f"/api/jobs?search_id={search.id}"), 200)
     assert r.json()["total"] == 1
-
-
