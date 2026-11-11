@@ -3,6 +3,7 @@ import { addJob, BENCHQ_URL, type Application } from "../api";
 import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CHECK, SPINNER_ICON } from "./icons";
 import { sameCompany, sameListing } from "./job-check";
+import { missingAccess, requestAccess, type SiteAccess } from "./site-access";
 import { readJobPage } from "./tab-bridge";
 import type { PageJob } from "./types";
 
@@ -88,16 +89,33 @@ function sharesJobId(found: PageJob, known: KnownJob): boolean {
 export const offersPage = (url: string | undefined, knownUrls: readonly string[]) =>
   Boolean(url && /^https?:\/\//i.test(url) && !url.startsWith(BENCHQ_URL) && !knownUrls.some((known) => isSameJob(url, known)));
 
+/** Words a job page's link has in its host or path: careers.acme.com, /jobs/123, /positions/…, /apply. */
+const JOB_WORDS = /(?:^|[^a-z])(?:jobs?|careers?|positions?|openings?|vacanc(?:y|ies)|requisitions?|apply|hiring|recruit(?:ing|ment)?|opportunit(?:y|ies))(?:[^a-z]|$)/i;
+
+/** Whether a link looks like a job's page: a job word in its host or path, or a query key that names a job. On a site
+ * BenchQ can't read yet it can't tell from the page, so it asks for the site only on such a link, not on every site. */
+export function looksLikeJobPage(url: string): boolean {
+  const key = jobKeyOf(url);
+  if (!key) return false;
+  return key.ids.size > 0 || JOB_WORDS.test(new URL(url).hostname) || JOB_WORDS.test(key.path);
+}
+
 /**
  * Add the job on this page to the candidate's jobs (the add-job plan, decided 2026-11-11). Shown only on a job's page
  * (`readJob`: JobPosting data, or a job link with an Apply button), and the BDE confirms first. BenchQ saves it as one of
  * the candidate's jobs and a Saved application at once; the same job again is the one they have. Then the tab connects
- * to it, ready for Autofill.
+ * to it, ready for Autofill. On a site BenchQ may not read yet (#126) it first asks, on a link that looks like a job's
+ * page, and reads the page once the BDE allows it.
  */
 export default function AddJobCard({ tab, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab }: AddJobCardProps) {
   const tabId = tab && offersPage(tab.url, knownUrls) ? tab.id : null;
   const [job, setJob] = useState<PageJob | null>(null);
   const [state, setState] = useState<{ status: "idle" | "confirming" | "adding" | "added" | "error"; text?: string }>({ status: "idle" });
+  // The site, while BenchQ may not read it: the page is read once the BDE allows it (`allowed` counts the grants).
+  const [access, setAccess] = useState<SiteAccess | null>(null);
+  const [isDenied, setIsDenied] = useState(false);
+  const [isAsking, setIsAsking] = useState(false);
+  const [allowed, setAllowed] = useState(0);
 
   useEffect(() => {
     if (tabId === null) return;
@@ -108,13 +126,34 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
       timers.forEach(clearTimeout);
       setJob(found);
     }, () => undefined);
-    look();
-    timers = LOOK_AGAIN_MS.map((wait) => setTimeout(look, wait));
+    const read = () => {
+      look();
+      timers = LOOK_AGAIN_MS.map((wait) => setTimeout(look, wait));
+    };
+    // A site BenchQ may not read can't be looked at yet: the card asks for it instead.
+    void missingAccess(tabId).then((missing) => {
+      if (!isLive) return;
+      setAccess(missing);
+      if (!missing) read();
+    }, () => { if (isLive) read(); });
     return () => {
       isLive = false;
       timers.forEach(clearTimeout);
     };
-  }, [tabId]);
+  }, [tabId, allowed]);
+
+  /** Chrome's own prompt, which it shows only from a click: asked before anything is awaited. */
+  const allow = async () => {
+    if (!access) return;
+    setIsAsking(true);
+    try {
+      const granted = await requestAccess(access).catch(() => false);
+      setIsDenied(!granted);
+      if (granted) setAllowed((count) => count + 1);
+    } finally {
+      setIsAsking(false);
+    }
+  };
 
   const isWebPage = Boolean(tab && /^https?:\/\//i.test(tab.url) && !tab.url.startsWith(BENCHQ_URL));
   const saved = (isWebPage && knownJobs.find((known) => known.url && isSameJob(tab!.url, known.url)))
@@ -124,6 +163,19 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
       <h2 id="use-tab-title" className="text-sm font-[550]">{candidateName}&apos;s job is on this page</h2>
       <p className={SOFT_TEXT}>{[saved.title, saved.company].filter(Boolean).join(" · ")}</p>
       <button type="button" data-slot="use-tab-run" className={button("primary")} onClick={() => onUseTab(saved)}>Use this tab for Autofill</button>
+    </section> : null;
+  }
+  if (tabId !== null && access) {
+    return looksLikeJobPage(tab!.url) ? <section data-slot="add-job-access" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-access-title">
+      <h2 id="add-job-access-title" className="text-sm font-[550]">A job on this page?</h2>
+      <p className={SOFT_TEXT}>
+        To add it to {candidateName}&apos;s Saved jobs, BenchQ needs to read <strong className="font-[550]">{access.host}</strong>.
+        Chrome asks once for this site, and you can take it back any time in chrome://extensions.
+      </p>
+      {isDenied && <p role="alert" className={ALERT}>Not allowed. BenchQ can&apos;t read {access.host}, so it can&apos;t add this job from here.</p>}
+      <button type="button" data-slot="add-job-allow" className={button("primary")} disabled={isAsking} onClick={() => void allow()}>
+        {isDenied ? "Ask again" : `Allow on ${access.host}`}
+      </button>
     </section> : null;
   }
   if (tabId === null || !job) return null;

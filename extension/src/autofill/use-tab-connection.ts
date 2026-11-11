@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { connectionKey } from "./connection-store";
 import { hasAutofillPermissions } from "./manifest-check";
+import { pageUrlOf } from "./site-access";
 import type { Connection } from "./types";
 
 type ActiveTab = { id: number; url: string };
@@ -15,9 +16,13 @@ export function useTabConnection(userId: string | null) {
   useEffect(() => {
     let mounted = true;
     let windowId: number | undefined;
+    let shownTab: number | undefined;
     const refresh = async () => {
       const [current] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (mounted) setTab(current?.id === undefined ? null : { id: current.id, url: current.url ?? "" });
+      // Chrome hides the address of a page on a site BenchQ can't read yet (#126): its navigation still says it.
+      const url = current?.id === undefined ? "" : current.url ?? await pageUrlOf(current.id).catch(() => "");
+      shownTab = current?.id;
+      if (mounted) setTab(current?.id === undefined ? null : { id: current.id, url });
     };
     const onActivated = (info: { windowId: number }) => {
       if (info.windowId === windowId) void refresh();
@@ -25,14 +30,20 @@ export function useTabConnection(userId: string | null) {
     const onUpdated = (_tabId: number, change: { url?: string }) => {
       if (change.url) void refresh();
     };
+    // A page on such a site moves on without a `url` in onUpdated: its own navigation tells.
+    const onCommitted = (details: { tabId: number; frameId: number }) => {
+      if (details.frameId === 0 && details.tabId === shownTab) void refresh();
+    };
     void chrome.windows.getCurrent().then((current) => { windowId = current.id; });
     void refresh();
     chrome.tabs.onActivated.addListener(onActivated);
     chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.webNavigation.onCommitted.addListener(onCommitted);
     return () => {
       mounted = false;
       chrome.tabs.onActivated.removeListener(onActivated);
       chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.webNavigation.onCommitted.removeListener(onCommitted);
     };
   }, []);
 

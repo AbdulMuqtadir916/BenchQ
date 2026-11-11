@@ -3,10 +3,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { addJob, BENCHQ_URL } from "../api";
-import AddJobCard, { jobIdsOf, offersPage } from "./AddJobCard";
+import AddJobCard, { jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
+import { missingAccess, requestAccess } from "./site-access";
 import { readJobPage } from "./tab-bridge";
 
 vi.mock("./tab-bridge", () => ({ readJobPage: vi.fn() }));
+// A site BenchQ may read, unless a test says otherwise (#126).
+vi.mock("./site-access", () => ({ missingAccess: vi.fn(async () => null), requestAccess: vi.fn() }));
 vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), addJob: vi.fn() }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -17,11 +20,11 @@ let host: HTMLElement;
 
 type Known = { title: string | null; company: string | null; location: string | null; url?: string | null };
 
-async function show(onAdded = vi.fn(), knownUrls: string[] = [], knownJobs: Known[] = []) {
+async function show(onAdded = vi.fn(), knownUrls: string[] = [], knownJobs: Known[] = [], url = page.url) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => { root!.render(<AddJobCard tab={{ id: 7, url: page.url }} candidateId="cand-1" candidateName="Priya" knownUrls={knownUrls} knownJobs={knownJobs} onAdded={onAdded} />); });
+  await act(async () => { root!.render(<AddJobCard tab={{ id: 7, url }} candidateId="cand-1" candidateName="Priya" knownUrls={knownUrls} knownJobs={knownJobs} onAdded={onAdded} />); });
   return onAdded;
 }
 
@@ -143,5 +146,49 @@ describe("adding the job on this page", () => {
     await show(vi.fn(), [page.url]);
     expect(readJobPage).not.toHaveBeenCalled();
     expect(host.querySelector("[data-slot='add-job']")).toBeNull();
+  });
+});
+
+describe("a site BenchQ may not read yet (#126)", () => {
+  const careers = "https://careers.acme.test/jobs/123";
+  const site = { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" };
+
+  it("asks for it on a job's page, then reads the page once the BDE allows it", async () => {
+    vi.mocked(missingAccess).mockResolvedValueOnce(site).mockResolvedValue(null);
+    vi.mocked(requestAccess).mockResolvedValue(true);
+    vi.mocked(readJobPage).mockResolvedValue({ ...page, url: careers });
+    await show(vi.fn(), [], [], careers);
+    expect(host.querySelector("[data-slot='add-job-access']")?.textContent).toContain("BenchQ needs to read careers.acme.test");
+    expect(readJobPage).not.toHaveBeenCalled();
+    await click("add-job-allow");
+    expect(requestAccess).toHaveBeenCalledWith(site);
+    expect(readJobPage).toHaveBeenCalledWith(7);
+    expect(host.querySelector("[data-slot='add-job-access']")).toBeNull();
+    expect(host.querySelector("[data-slot='add-job']")?.textContent).toContain("Senior QA Engineer · Acme Bank");
+  });
+
+  it("says so when the BDE doesn't allow it, and asks again on the next click", async () => {
+    vi.mocked(missingAccess).mockResolvedValue(site);
+    vi.mocked(requestAccess).mockResolvedValue(false);
+    await show(vi.fn(), [], [], careers);
+    await click("add-job-allow");
+    expect(host.querySelector("[role='alert']")?.textContent).toContain("Not allowed");
+    expect(host.querySelector("[data-slot='add-job-allow']")?.textContent).toBe("Ask again");
+    expect(readJobPage).not.toHaveBeenCalled();
+  });
+
+  it("doesn't ask on a page whose link isn't a job's", async () => {
+    vi.mocked(missingAccess).mockResolvedValue({ origins: ["https://mail.example.test/*"], host: "mail.example.test" });
+    await show(vi.fn(), [], [], "https://mail.example.test/inbox/42");
+    expect(host.querySelector("[data-slot='add-job-access']")).toBeNull();
+    expect(readJobPage).not.toHaveBeenCalled();
+  });
+
+  it("knows a job's page by its link", () => {
+    expect(looksLikeJobPage("https://careers.acme.test/en/position/42")).toBe(true);
+    expect(looksLikeJobPage("https://acme.test/jobs/view/42")).toBe(true);
+    expect(looksLikeJobPage("https://acme.test/opportunities?gh_jid=8329677")).toBe(true);
+    expect(looksLikeJobPage("https://mail.example.test/inbox/42")).toBe(false);
+    expect(looksLikeJobPage("https://news.example.test/jobsearch-tips")).toBe(false);
   });
 });
