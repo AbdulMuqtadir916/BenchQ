@@ -7,7 +7,6 @@ import {
   BriefcaseBusiness,
   Check,
   CircleHelp,
-  Clock3,
   Copy,
   ExternalLink,
   Eye,
@@ -22,7 +21,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
-import { deriveMatchScore, newestDate } from "@/lib/derive";
+import { deriveMatchScore, isJobForCandidate, newestDate } from "@/lib/derive";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { EASE_OUT, POPOVER_TRANSITION } from "@/lib/motion";
@@ -34,12 +33,14 @@ import { MatchScore } from "@/components/app/match-score";
 import { VerificationBadge } from "@/components/app/verification-badge";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { EmptyState } from "@/components/app/empty-state";
-import { PORTALS, PortalLogo, portalForJob, type PortalKey } from "@/components/app/jobs/portal-logo";
+import { PORTALS, PortalLogo, SOURCE_KEYS, portalForJob, type PortalKey } from "@/components/app/jobs/portal-logo";
 import { useCan } from "@/lib/auth/permissions";
 import { useHref } from "@/lib/routes/use-href";
 import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
 import { savedJobKey, usePendingSavedJobs, useToggleSavedJob } from "@/lib/hooks/use-applications";
 import { ApiError } from "@/lib/api/client";
+import { jobLocation } from "@/lib/format/job";
+import { SourcePreview } from "@/components/app/jobs/source-preview";
 
 const REMOTE_OPTIONS: SelectOption[] = [
   { value: "ALL", label: "Any work mode" },
@@ -50,7 +51,7 @@ const REMOTE_OPTIONS: SelectOption[] = [
 
 const SOURCE_OPTIONS: SelectOption[] = [
   { value: "ALL", label: "All sources" },
-  ...(["LINKEDIN", "INDEED", "DICE", "GLASSDOOR", "COMPANY"] as const).map((portal) => ({
+  ...SOURCE_KEYS.map((portal) => ({
     value: portal,
     label: PORTALS[portal].label,
     icon: <PortalLogo portal={portal} size={18} />,
@@ -77,6 +78,7 @@ export function JobExplorer({
   loading = false,
   lockedCandidate,
   initialCandidateId,
+  onCandidateChange,
   animateRows = false,
   showToolbar = true,
   toolbarBordered = true,
@@ -89,6 +91,8 @@ export function JobExplorer({
   lockedCandidate?: Candidate;
   /** Preselect a candidate context (e.g. arriving from "Find jobs" on a profile). */
   initialCandidateId?: string;
+  /** Called when the candidate picked changes, so the page can read that candidate's own jobs (docs/02 §6.z). */
+  onCandidateChange?: (candidateId: string) => void;
   /** Stagger the first rows in — used right after the matching intro. */
   animateRows?: boolean;
   showToolbar?: boolean;
@@ -141,7 +145,7 @@ export function JobExplorer({
     const minimum = Number(scoreFloor);
     const list = jobs
       .filter((job) => job.isActive && job.dedupe.duplicateOfJobId === null && (showHidden || !hiddenIds.has(job.id)))
-      .filter((job) => !context || (job.allowedWorkAuth.includes(context.workAuth) && !appliedIds.has(job.id)))
+      .filter((job) => !context || (isJobForCandidate(job, context) && !appliedIds.has(job.id)))
       .map((job) => ({ job, score: context ? deriveMatchScore(context, job) : null, portal: portalForJob(job) }))
       .filter(({ job, score, portal: rowPortal }) => {
         if (normalizedQuery && !`${job.title} ${job.company.name} ${job.city ?? ""} ${job.state ?? ""}`.toLowerCase().includes(normalizedQuery)) return false;
@@ -238,7 +242,7 @@ export function JobExplorer({
               <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-[var(--color-text-3)]" />
               <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, company, location…" className="pl-8" />
             </label>
-            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); setSelectedId(""); setScoreFloor(value ? "70" : "0"); setSort(value ? "MATCH" : "NEWEST"); }} aria-label="Candidate context" /> : <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" />}
+            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor(value ? "70" : "0"); setSort(value ? "MATCH" : "NEWEST"); }} aria-label="Candidate context" /> : <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" />}
             {!lockedCandidate ? <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" /> : null}
             <Select value={remote} options={REMOTE_OPTIONS} onValueChange={setRemote} aria-label="Work mode" />
             <Select value={scoreFloor} options={SCORE_OPTIONS} onValueChange={setScoreFloor} aria-label="Minimum match score" disabled={!context} />
@@ -294,7 +298,7 @@ export function JobExplorer({
                               {score !== null ? <MatchScore score={score} variant="ring" /> : null}
                             </div>
                             <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-[var(--color-text-2)]">
-                              <span className="truncate">{job.company.name}</span><span className="text-[var(--color-border-strong)]">·</span><span className="truncate">{job.remoteMode === "REMOTE" ? "Remote" : `${job.city}, ${job.state}`}</span>
+                              <span className="truncate">{job.company.name}</span><span className="text-[var(--color-border-strong)]">·</span><span className="truncate">{jobLocation(job)}</span>
                             </div>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-caption text-[var(--color-text-3)]">
                               <span className="inline-flex items-center gap-1"><PortalLogo portal={rowPortal} domain={job.company.domain} size={16} />{PORTALS[rowPortal].label}</span>
@@ -330,9 +334,11 @@ export function JobExplorer({
           </div>
         </div>
 
-        <div className="min-w-0 bg-[var(--color-surface)]">
+        {/* The pane keeps the panel's height and scrolls as one (the job's header, then its whole posting), so a short
+            window shows the description by scrolling, never cut off. */}
+        <div className="min-w-0 bg-[var(--color-surface)] lg:min-h-0 lg:overflow-y-auto">
           {selected ? (
-            <motion.div key={selected.job.id} initial={{ opacity: 0, x: reduceMotion ? 0 : 5 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: reduceMotion ? 0.1 : 0.2 }} className="flex h-full min-h-[580px] flex-col lg:min-h-0">
+            <motion.div key={selected.job.id} initial={{ opacity: 0, x: reduceMotion ? 0 : 5 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: reduceMotion ? 0.1 : 0.2 }} className="flex min-h-[580px] flex-col lg:min-h-full">
               <JobDetailHeader
                 job={selected.job}
                 score={selected.score}
@@ -404,7 +410,7 @@ function JobDetailHeader({
           </div>
           <h2 className="max-w-3xl text-h1 text-[var(--color-text)]">{job.title}</h2>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--color-text-2)]">
-            <span className="inline-flex items-center gap-1"><MapPin size={13} />{job.remoteMode === "REMOTE" ? "Remote" : `${job.city}, ${job.state}`}</span>
+            <span className="inline-flex items-center gap-1"><MapPin size={13} />{jobLocation(job)}</span>
             <span>·</span><span>{job.employmentType ?? "Contract"}</span>
             {job.rateMax ? <><span>·</span><span className="font-mono">${job.rateMin}–{job.rateMax}/hr</span></> : null}
           </div>
@@ -434,41 +440,6 @@ function JobDetailHeader({
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function SourcePreview({ job, portal, onOpenSource }: { job: Job; portal: PortalKey; onOpenSource: ((job: Job) => void) | null }) {
-  const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl;
-  const lines = job.description.split("\n").filter(Boolean);
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface-2)] p-4">
-      <article className="mx-auto max-w-3xl overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]">
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <PortalLogo portal={portal} domain={job.company.domain} size={32} />
-            <div className="min-w-0"><div className="text-body-strong text-[var(--color-text)]">{PORTALS[portal].label} source preview</div><div className="truncate text-caption text-[var(--color-text-3)]">{sourceUrl ?? job.company.websiteUrl ?? "Source URL unavailable"}</div></div>
-          </div>
-          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)} className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">Open original<ArrowUpRight size={13} /></a> : null}
-        </header>
-        <div className="p-5">
-          <div className="mb-5 flex items-start gap-3">
-            <PortalLogo portal="COMPANY" domain={job.company.domain} size={40} />
-            <div><h3 className="text-h2 text-[var(--color-text)]">{job.title}</h3><p className="mt-0.5 text-sm text-[var(--color-text-2)]">{job.company.name} · {job.remoteMode === "REMOTE" ? "Remote" : `${job.city}, ${job.state}`}</p><p className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><Clock3 size={12} />Posted {job.postedAt ? formatRelative(job.postedAt) : "recently"}{job.applicantCount ? ` · ${job.applicantCount} applicants` : ""}</p></div>
-          </div>
-          <div className="space-y-3 text-sm leading-6 text-[var(--color-text-2)]">
-            {lines.map((line, index) => {
-              const isHeading = /^(Responsibilities|Requirements|Nice to have):?$/.test(line);
-              if (isHeading) return <h4 key={`${line}-${index}`} className="pt-2 text-body-strong text-[var(--color-text)]">{line.replace(/:$/, "")}</h4>;
-              if (line.startsWith("- ")) return <p key={`${line}-${index}`} className="flex gap-2"><span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[var(--color-primary)]" /><span>{line.slice(2)}</span></p>;
-              return <p key={`${line}-${index}`}>{line}</p>;
-            })}
-          </div>
-          <div className="mt-6 flex flex-wrap gap-1.5 border-t border-[var(--color-border)] pt-4">
-            {job.requirements.slice(0, 8).map((requirement) => <Tag key={requirement.id} tone={requirement.kind === "MANDATORY" ? "blue" : "neutral"}>{requirement.value}</Tag>)}
-          </div>
-        </div>
-      </article>
     </div>
   );
 }

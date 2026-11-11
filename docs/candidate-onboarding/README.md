@@ -65,7 +65,7 @@ filled in; its "Owner" row becomes **"Assigned BDE"** (Q48).
 | 3 | [Work and rate](./screens/3-work-and-rate.webp) | Work authorization (one of nine), valid until, engagement types (C2C / W2 / 1099 / Full-time), target rate, walk-away floor, available from, notice period. | 04 |
 | 4 | [Preferences](./screens/4-preferences.webp) | Target roles, work setting, preferred locations, willing to relocate, industries, deal breakers, notes for the BDE. "Skip for now" allowed. | 04 |
 | 5 | [Assign](./screens/5-assign.webp) | MANAGER: pick one of their BDEs. OWNER: pick a manager, then optionally a BDE. Load per BDE, capacity warning, handoff note. **Create candidate.** The "Notify the BDE" toggle is removed (Q50). | 05 |
-| 6 | [Done](./screens/6-done.webp) | "{name} is on the bench." Open profile · Find jobs · Add another. Copy in module 05. | 05 |
+| 6 | [Done](./screens/6-done.webp) | "{name} is on the bench." Open profile · Add another (Find jobs removed 2026-11-11: only the candidate's BDE searches). Copy in module 05. | 05 |
 
 ## 5. Modules
 
@@ -117,12 +117,12 @@ tailored claim can point back to the original résumé text as evidence.
 
 | # | Assumption |
 |---|---|
-| A1 | The "Try a sample" résumés on step 1 appear only when the module runs on mocks (demo). |
+| A1 | ~~The "Try a sample" résumés on step 1 appear only when the module runs on mocks (demo).~~ Removed 2026-11-11 with the candidates mock: a candidate is only made from a real résumé. |
 | A2 | A new candidate starts `ON_BENCH`, `benchStartDate` = creation time. |
 | A3 | `needsSponsorship` and `needsTransfer` are derived from the work authorization card (H-1B → transfer; H-1B, H4 EAD, OPT, CPT, TN → sponsorship). The screen has no separate checkboxes. The flow works them out and sends them; the backend only checks they were sent (decided 2026-11-05). |
 | A4 | "Works N similar profiles" on step 5 = the BDE's candidates in a working status whose "Marketed as" matches, ignoring case. |
 | A5 | "New assignments" on the BDE dashboard = candidates whose latest `ASSIGN` entry names this BDE and is under 7 days old. |
-| A6 | The done screen's "Find jobs" opens `/[firm]/jobs` filtered to the new candidate (an existing URL filter). |
+| A6 | ~~The done screen's "Find jobs" opens `/[firm]/jobs` filtered to the new candidate.~~ Removed 2026-11-11 (job search PR 3): only owners and managers add a candidate, and only the candidate's BDE searches jobs. |
 
 ## 8. Later, not in this plan
 

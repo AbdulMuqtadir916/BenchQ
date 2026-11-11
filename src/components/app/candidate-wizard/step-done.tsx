@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Plus, Search } from "lucide-react";
+import { ArrowRight, Check, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHref } from "@/lib/routes/use-href";
 
@@ -16,7 +16,8 @@ export interface Created {
 
 /**
  * The done screen (docs/candidate-onboarding/05-assign.md §3). No promise of notifications or tonight's matching
- * (Q50): the backend makes neither. Open profile is focused; Find jobs opens the jobs page on this candidate (A6).
+ * (Q50): the backend makes neither. Open profile is focused. No "Find jobs": only owners and managers add a candidate,
+ * and only the candidate's BDE searches jobs (decided 2026-11-11, job search PR 3).
  */
 export function StepDone({ created, onAddAnother }: { created: Created; onAddAnother: () => void }) {
   const toHref = useHref();
@@ -43,9 +44,6 @@ export function StepDone({ created, onAddAnother }: { created: Created; onAddAno
       <div className="mt-8 flex flex-wrap justify-center gap-2">
         <Button asChild>
           <Link ref={openRef} href={toHref("candidates.detail", { id: created.id })}>Open profile<ArrowRight size={14} aria-hidden /></Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href={toHref("jobs", {}, { candidate: created.id })}><Search size={14} aria-hidden />Find jobs</Link>
         </Button>
         <Button variant="ghost" onClick={onAddAnother}><Plus size={14} aria-hidden />Add another</Button>
       </div>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CLOSED, isActive, isClosed } from "@/components/app/applications/status-meta";
 import { ApplicationStatus, LegacyApplicationStatus, type StoredApplicationStatus } from "@/lib/schemas/enums";
 import { allApplications } from "@/mocks/applications";
-import { allCandidates } from "@/mocks/candidates";
+import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import { CLOSED_STATUSES, applicationsInScope, applicationsSubmittedWithin, countApplications, describeApplicationCounts, isSubmitted } from "./application-counts";
 import { deriveCandidateStats } from "./candidate-stats";
 import { deriveFunnel } from "./funnel";

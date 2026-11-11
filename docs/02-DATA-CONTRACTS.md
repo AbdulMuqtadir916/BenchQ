@@ -1157,6 +1157,8 @@ export const JobSchema = z.object({
   provenance: JobProvenanceSchema,
 
   isActive: z.boolean(),
+  // The candidates this job was found or captured for, only the ones the viewer may see (job search PR 3, §6.z).
+  candidateIds: z.array(z.string()),
 });
 ```
 
@@ -1191,7 +1193,7 @@ export const JobMarkSchema = z.object({
 - Endpoints: `GET /api/job-marks` (the signed-in user's), `PUT /api/job-marks/:jobId/:kind`,
   `DELETE /api/job-marks/:jobId/:kind`.
 
-### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migration 0020; backend only, no frontend schema/screen yet)
+### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migrations 0020, 0022, 0023; on the screens: §6.z)
 
 > Zuhair's track. Deliberately **not** `jobs`: this is a separate, candidate+batch-scoped table
 > (`backend/models/job_search.py`), not the existing shared-pool `jobs` table above (`backend/models/db.py`) or its
@@ -1202,7 +1204,8 @@ export const JobMarkSchema = z.object({
 > membership table is the answer if a screen ever needs that history.
 
 - **Columns (revised 2026-11-10, from Abdul's review):** `id`, `firm_id`, `candidate_id`, `batch_id`, `source`,
-  `job_id`, `content`, `discovered_at`, `last_seen_at`, `created_at`, `updated_at`.
+  `first_source` (0023: how the job was first saved, never changed), `job_id`, `content`, `discovered_at`,
+  `last_seen_at`, `created_at`, `updated_at`.
   - **No `status` column.** Whether a job was saved or applied to lives in `applications` (its `saved` status, and
     an application row), so a copy here can't drift from it. Hiding a job (dismissed) isn't built.
   - **Tenancy:** `(firm_id, candidate_id)` references `candidates (firm_id, id)` (on `scrape_jobs` too), so a row
@@ -1228,38 +1231,187 @@ export const JobMarkSchema = z.object({
   fallback, modeled on JSearch's `job-details` response; that's been replaced before anything shipped, because the
   set of sources isn't fixed to JSearch/freehire.me, and typed columns built around one source's fields would need
   a migration every time another aggregator is added or a source changes its response shape. `content`'s internal
-  shape is the ingestion/adapter code's decision (not yet written), not this table's — so filtering/ranking on its
-  fields (location, salary, seniority, skills) is a JSON-path query, not a plain `WHERE` on a column, and no CHECK
-  constraint can cover anything inside it.
-- **Not yet built:** the ingestion/adapter code itself, and repointing
-  `applications.job_id` / `job_runs.target_job_id` off the old `jobs` table onto this one. The old `jobs` table and
-  everything still pointing at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`, `job_runs`) is
-  unchanged for now; retiring it and reclaiming the `jobs` name is a later migration once those are repointed.
-- **Frontend contract:** none yet — this table has no adapter, DTO mapper, or screen. `JobSchema`/`CompanySchema`
-  above describe the existing mock-backed job explorer, not this table; reconciling (or replacing) that contract
-  is separate, later work once this module starts serving real screens.
+  shape is the provider's, not this table's — so filtering/ranking on its fields (location, salary, seniority,
+  skills) is a JSON-path query, not a plain `WHERE` on a column, and no CHECK constraint can cover anything inside it.
+  **Revised 2026-11-10 (job search PR 1): `content` is the provider's own job object, as it arrived** (control
+  characters stripped). Each provider's `read(content)` (`backend/job_search/providers/`) gives the common fields
+  (title, company, plain-text description, http(s) apply link, location, countries, posted date, employment type,
+  skills, closed), picked by `source`; nothing else looks inside `content`, and the API never returns it.
+- **Repointed (migration 0023, job search PR 2, decided 2026-11-10):** `resumes (firm_id, candidate_id, job_id)` →
+  `job_postings (firm_id, candidate_id, id)` ON DELETE CASCADE (a tailored résumé names its own candidate's job, and
+  goes with it); `cover_letters.job_id`, `job_runs.target_job_id`, `llm_call_log.job_id` → `job_postings.id` ON
+  DELETE SET NULL. `job_postings` has `UNIQUE (firm_id, candidate_id, id)` as the target. Nothing was copied (no real
+  firm yet): the upgrade stops while a tailored résumé or a cover letter names an old job; the two logs are only
+  unlinked. **The column names are kept, so `resumes.job_id` is a posting's `id`, while `job_postings.job_id` is
+  the content hash.** `applications.job_id` moves in Arbaz's own PR (docs/team/arbaz.md, "Repoint `applications.job_id`"); until then an
+  application's job and its tailored résumé's job are in different tables, so the prep page and the tracker can't
+  pair them (nothing creates a tailored résumé today; those tests are strict xfails).
+- **Not yet built:** repointing `applications.job_id` off the old `jobs` table onto this one (Arbaz's PR,
+  docs/team/arbaz.md); `job_runs.target_job_id` already points here (0023). The old `jobs` table and what still points
+  at it (`candidate_jobs`, `favorite_jobs`, `firm_jobs`, `applications`) stay until the clean-up PR retires it and
+  reclaims the `jobs` name.
+- **Frontend contract:** §6.z (job search PR 3): the job screens read `job_postings` through `src/lib/api/jobs.ts` and
+  the mapper `src/lib/api/dto/jobs.ts`, which turns a posting into the existing `JobSchema`; there is no jobs mock.
 - **Second source, freehire.me (decided 2026-11-09, still applies under the `content` design):** target markets
   are US, Canada and India, so a posting can legitimately list more than one country/city (e.g. a remote NA role
-  open to `["us", "ca"]`). Rather than a multi-location child table (the old `job_locations` pattern, dropped), the
-  ingestion/adapter code (not yet written) should set `content`'s location fields to whichever country the search
-  itself targeted — not the first entry in the provider's array — while keeping the full array somewhere in
-  `content` too. Cross-market queries ("all jobs open to India OR Canada at once") are out of scope; a candidate's
+  open to `["us", "ca"]`). Rather than a multi-location child table (the old `job_locations` pattern, dropped),
+  `content` keeps the provider's full array and the country the search targeted is the batch's
+  (`scrape_jobs.metadata.request.country`; revised 2026-11-10, since `content` is now the provider's object as sent). Cross-market queries ("all jobs open to India OR Canada at once") are out of scope; a candidate's
   search is always scoped to one target market. freehire.me's own `source` response field names the underlying ATS
   (e.g. `"successfactors"`) and maps to a publisher field inside `content`, the same role JSearch's `job_publisher`
   plays — not to this table's own `source` column, which holds the literal provider name (`"freehire"`). A closed
   posting is filtered out before it reaches this table; a posting that closes *after* being stored has no
   automatic signal and stays visible until something else catches it — accepted for now, revisit with a staleness
   rule if it becomes a real problem.
-- **`scrape_jobs` (migration 0020, with `job_postings`):** one row per finished batch — `firm_id`, `candidate_id`, `batch_id` (unique),
+- **`scrape_jobs` (migration 0020, with `job_postings`):** one row per batch — `firm_id`, `candidate_id`,
+  `user_id` (migration 0022: who ran it, the candidate's BDE; FK `users.id`, NOT NULL), `kind` (migration 0023:
+  `search` | `capture`), `batch_id` (unique),
   `state` (revised 2026-11-10: `success`, the source answered with at least one job | `empty`, it answered with
   none | `error`, it failed), `error` (text, the failure detail, set exactly when `state = 'error'`: a real failure
   and an empty result never look the same), `metadata` (JSONB, `{}` by
   default: everything in the source's response except the jobs themselves, such as request id, parameters and
-  totals, stored once per batch rather than on every job row), `created_at`. Written once the
-  batch completes; there is no `request`/`pending` row, so this is a log, not a queue — any "search in progress"
-  UI state is the frontend's own, not backed by a row here. One row per batch, not per source: freehire.me is the
+  totals, stored once per batch rather than on every job row), `created_at` (when it started), `finished_at`
+  (migration 0022). **Revised 2026-11-10 (Q18): the search runs in the background, so its row is written `running`
+  when the BDE starts it** and finished in place (`success` / `empty` / `error`); `finished_at` is set exactly when
+  it isn't running (`ck_scrape_jobs_finished_iff_done`). "Is a search running", the attempt count and the history
+  read this table, not `job_runs`. A row still `running` after 15 minutes was lost (a restart): the BDE's next search
+  marks it `error` (`internal`), and reads show it as that error without writing. The batch carries its `run_id`
+  (written after the launch with the row locked, so a search saving at that moment keeps its cursor and counts);
+  the search's `job_runs` row (the background launcher's own record) names nothing of the firm's, no `meta` and the
+  opaque `batch_id` as its scope, because Super Admin's monitor lists runs across firms without a support view
+  (Abdul's review, P1). `metadata` also carries
+  `request` (`query`, `country`, `provider`, `limit`), `counts` (`found`, `saved`, `refreshed`, `skipped_closed`,
+  `skipped_unreadable`, `skipped_duplicate`, `skipped_over_cap`) and, on an error, `error_code`; `error` is
+  `"<code>: <safe message>"`, never the source's body or URL. One row per batch, not per source: freehire.me is the
   only live source, so there's nothing to break down yet; a per-source breakdown becomes a real question again
   once a second source goes live alongside it.
+
+- **The search pipeline (job search PR 1, decided 2026-11-10):**
+  - **Who:** only the candidate's assigned BDE (`job.search`, BDE role, plus `bde_id` = the user: `can_search_jobs`);
+    nobody while the candidate has no BDE. Reads: anyone who can see the candidate.
+  - **Input:** `query` (1–100 characters, one role per search, no control characters: NUL, tab or a line break
+    inside it is 422 with nothing written; Abdul's second review, P2). The country is the candidate's résumé country
+    (`Candidate.country`: the active base, newest version) mapped to `us` / `ca` / `in`; empty or anything else is
+    422, never a default.
+  - **Provider:** a registry by name; the active one is the global setting `job_search_provider` (default
+    `freehire`), a PLATFORM setting (`settings_scope.py`) that `PATCH /api/settings` takes only as a registered
+    provider. Every search asks for 100 jobs. One call: 20 s limit, one retry after 2 s on a timeout, a dropped
+    connection, 5xx or 429; 5 MB cap; no redirects. Error codes: `timeout`, `provider_unavailable`,
+    `provider_rejected`, `bad_response`, `too_large`, `internal`.
+  - **Background:** `POST` commits the batch `running`, then launches the search through
+    `job_monitor.launch_background` (four at once per worker) and returns 202 `{batch_id, run_id}`; a launch that
+    fails deletes the batch (503, not an attempt). The task asks the source only while its batch exists and is
+    `running` (Abdul's second review, P2), and finishes it. The admission (its locks and checks) runs in a worker thread,
+    never on the event loop, so waiting for a lock can't stall other requests (Abdul's comment on PR 2). One search per candidate at a
+    time (409), checked from the `running` row with the candidate row locked, so it holds across workers. The BDE
+    is locked too (a Postgres advisory lock on their id, after the candidate), so two of their searches for
+    different candidates count the 20 attempts in turn (Abdul's review, P2).
+  - **Caps (per day from 6:30 PM IST):** 100 **new** jobs per candidate (a job seen again only refreshes its row);
+    20 attempts per BDE, any outcome. Over either is 429 up front, nothing written. A search that reaches the
+    candidate's 100 keeps the provider's order and drops the rest (`skipped_over_cap`).
+  - **Saving:** closed and unreadable jobs (no title, company or description) and repeats within the reply are
+    dropped. One transaction with the candidate row locked: the `scrape_jobs` row, then each job — one the candidate
+    has gets `batch_id`, `last_seen_at`, `content` and `source` replaced (`discovered_at` kept); a new one is inserted
+    while there is room — then one ledger entry (`CREATE`, entity `job_search`, every outcome: success, empty,
+    error, and a lost search when it is written as `internal`, with its `error_code`, credited to the BDE who started
+    it). The firm's ledger shows the role and country; a platform admin's (the audit, a support view) shows
+    "Searched jobs (content restricted)." (`ledger_entry_json`, Abdul's second review, P2).
+  - **Routes** (`backend/api/routes_job_search.py`, under `/api/firms/{firm_id}/candidates/{candidate_id}`):
+    `POST /job-searches`, `GET /job-searches` (`running`, `searches` newest first, `usage`: `jobs_saved_today`,
+    `jobs_cap`, `attempts_today`, `attempts_cap`, `resets_at`), `GET /job-postings?page=&size=` (newest first,
+    common fields, no description), `GET /job-postings/{posting_id}` (with the description).
+  - **Captures (job search PR 2):** `POST /job-postings` `{source: manual | extension, title, company,
+    description, url, location?}` (title and company 1–300 characters, description 1–100,000, an http(s) link; no
+    control characters, the description keeping its tabs and line breaks): the candidate's BDE only, 20 per BDE per
+    day. A capture is its own batch (`scrape_jobs.kind = 'capture'`, finished at once) with one posting and a ledger
+    entry (entity `job_posting`, restricted for a platform admin like a search's); the same job again (same hash) returns the posting the candidate has
+    (200; the body's `created` is false, true on a 201, PR 3), even at the cap: only a capture that would create a posting counts against the 20 (Abdul's comment on PR
+    2). An `extension` description is read as HTML. Captures aren't search attempts and don't use the 100-new cap.
+    A search that finds a captured job merges into that row (`source` and `content` become the provider's), and it
+    still stays out of the 100: the cap counts `first_source`, which never changes (Abdul's comment on PR 2).
+  - **A repeated search continues (job search PR 2):** a provider returns `next_cursor`; the same role (case and
+    spacing ignored), country and provider searched again since 6:30 PM IST asks from there (freehire.me: `offset`).
+    A failed search doesn't move it. When the source has no more, the next search of that role ends `empty` without
+    asking (`metadata.request.exhausted`). The next day starts from the top.
+  - **The old pool (job search PR 2):** its scheduled scrape is no longer scheduled, and its write routes answer 410
+    (`backend/job_search/retired.py`): manual / extension / LinkedIn job saves, PATCH a job, analyze, the scrape and
+    backfill triggers, a search's run and test, a company's test scrape, cover letter create and generate. Its read
+    routes still answer. The clean-up PR deletes it.
+  - **Known limit:** the search runs in the API process. A restart loses a search in flight (its batch shows as an
+    `internal` error after 15 minutes and the BDE searches again); a real job queue is the deployment work's.
+
+### 6.z Job search on the screens (job search PR 3; approved by Zuhair as product 2026-11-11)
+
+> The existing job screens read `job_postings` through `src/lib/api/jobs.ts` and a DTO mapper
+> (`src/lib/api/dto/jobs.ts`); no screen is redesigned. Jobs come only from the backend: the jobs mock and its
+> `jobs` switch are gone (decided 2026-11-11). A job's source shows as the backend says it (freehire.me, added by
+> hand, from the extension), never a guessed job board.
+
+**Reads (firm level, PR 3):** `GET /api/firms/{firm}/job-postings?candidate_id=&limit=` (limit 1–400, default 400)
+and `GET /api/firms/{firm}/job-postings/{id}`. Both read only the candidates the signed-in person may see (the owner
+and a viewer: the whole firm; a manager: their BDEs' candidates; a BDE: their own; a support view: read-only, like
+the firm's owner). The list has **one item per job** (`job_postings.job_id`, the content hash), newest first, with
+`candidate_ids`: the visible candidates it was found or captured for. Its fields are the newest of those rows. One
+job's read is the same plus `description`; a posting outside the person's scope is 404.
+A searched job's description is the start of the posting only (freehire.me's search cuts it at about 1,000
+characters): its first open asks the provider's single-job read (`GET /api/v1/jobs/{public_slug}`, 5 s, one attempt)
+for the whole posting and keeps it in `content` (`_full_posting: true`), so it is asked once; a failed call leaves the
+search's text and is tried on the next open; a support view's read shows it but never writes it (decided 2026-11-11).
+The list never carries descriptions: the preview reads the selected job. Both lay the text out from the structure it
+has (`src/lib/format/job-description.ts`): facts, headings, bullets, paragraphs.
+
+**`Job` from a posting (the mapper; nothing invented):**
+
+| `Job` | From the posting |
+|---|---|
+| `id`, `title`, `description`, `applyUrl`, `postedAt` | as sent (`postedAt` only when it is a date-time) |
+| `company` | built from the name alone: everything else unknown (`null`), `clientType: 'UNKNOWN'`; `h1b` is `{sponsorsH1b: true, dataSource: 'freehire.me'}` only when the posting's `h1b_sponsor` is true (freehire.me's `us-h1b-sponsor`), else `null` (not known, never "doesn't sponsor"); no `verification`, so no badge shows |
+| `city` / `state` | the location text / `null` (the screens print the text alone) |
+| `remoteMode` | `REMOTE` when the location says remote, `HYBRID` when it says hybrid, else `ONSITE` |
+| `employmentType` | a known value, else `null` |
+| `allowedWorkAuth` | `[]`: **unknown**, and the screens show a job with unknown work authorization |
+| pay, `applicantCount`, `excludesC2C` | `null` / `null` / `false` |
+| `requirements` | the skills, as `PREFERRED` `SKILL`s, none a blocker |
+| `provenance.sourceType` | a provider: `AGGREGATOR`; `manual`: `MANUAL`; `extension`: `USER_SUBMITTED` |
+| `isActive` | not `is_closed` |
+| `candidateIds` | `candidate_ids` |
+
+**"Find jobs" (a candidate's search, from `GET` / `POST …/candidates/{id}/job-searches`, §6.y):**
+
+```ts
+// src/lib/schemas/job-search.ts
+export const JobSearchSchema = z.object({
+  id: z.string(),                                   // the batch
+  kind: z.enum(['SEARCH', 'CAPTURE']),
+  state: z.enum(['RUNNING', 'SUCCESS', 'EMPTY', 'ERROR']),
+  query: z.string().nullable(),                     // the role searched; null for a capture
+  newCount: z.number().int(),                       // jobs saved
+  seenAgainCount: z.number().int(),                 // jobs the candidate already had, refreshed
+  overLimitCount: z.number().int(),                 // jobs left out by today's 100
+  errorCode: z.enum(['timeout', 'provider_unavailable', 'provider_rejected', 'bad_response', 'too_large',
+                     'internal']).nullable(),       // set when state is ERROR; the screen words it
+  startedAt: z.string().datetime(),
+  finishedAt: z.string().datetime().nullable(),
+});
+
+export const JobSearchUsageSchema = z.object({     // today, since 6:30 PM IST; every number counted by the backend
+  jobsToday: z.number().int(), jobsCap: z.number().int(),                  // new jobs for this candidate / 100
+  searchesToday: z.number().int().nullable(), searchesCap: z.number().int(), // the candidate's BDE's / 20 (null: no BDE)
+  capturesToday: z.number().int().nullable(), capturesCap: z.number().int(), // the candidate's BDE's / 20
+  resetsAt: z.string().datetime(),
+});
+
+export const JobSearchesSchema = z.object({
+  running: JobSearchSchema.nullable(),
+  searches: z.array(JobSearchSchema),               // newest first, searches and captures
+  usage: JobSearchUsageSchema,
+});
+```
+
+Only the candidate's BDE starts one (`canSearchJobs`), for the candidate's main role, else the first target role.
+The screen polls the searches every 3 s while one runs. A capture names its candidate (`CaptureJob.candidateId`) and
+sends only the link, title, company, location and description; the same job again is the job the candidate already
+has.
 
 ## 7. Matching & scoring
 
@@ -1746,8 +1898,11 @@ MANAGER) may name one; a BDE's new candidate is assigned to themself. The candid
 the firm's candidate limit the call is refused (A4). An input shape over existing `Candidate` fields: no new
 field. Logged as `CREATE` on `candidate`.
 
-`CaptureJob` (`src/lib/schemas/job.ts`, Phase B fix PR 1) — the Capture job form (docs/04 §5.2), sent to
-`POST /api/jobs`. The server builds the `Job`: provenance `USER_SUBMITTED` / `USER_SESSION` with the user as
+`CaptureJob` (`src/lib/schemas/job.ts`): **since job search PR 3 (§6.z)** `{candidateId, sourceUrl, title,
+companyName, location, description}`, sent to `POST /api/firms/{firm}/candidates/{candidateId}/job-postings`
+(`source: manual`): a captured job is the candidate's, and the backend keeps only these. The same job again for the
+candidate is the one they have (`DUPLICATE_JOB` with its id). The rest of this paragraph is the Phase B fix PR 1
+shape it replaces: sent to `POST /api/jobs`. The server builds the `Job`: provenance `USER_SUBMITTED` / `USER_SESSION` with the user as
 `capturedByUserId`; the company reused by normalised name, else added with nothing known (`clientType`
 `UNKNOWN`, no H-1B data, no verification); an hourly range fills `rateMin/Max`, a yearly one
 `salaryMin/Max`; "visa sponsorship available" allows every work authorization, otherwise

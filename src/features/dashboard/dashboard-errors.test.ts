@@ -19,7 +19,8 @@ vi.mock("@/lib/stores/session-store", async (importOriginal) => {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firms } from "@/mocks/team";
-import { stubBackendReads } from "@/mocks/fixture-backend";
+import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
+import { setStubJobs, stubBackendReads, stubJob } from "@/mocks/fixture-backend";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "@/lib/stores/session-store";
 import { OwnerDashboard } from "./owner-dashboard";
@@ -34,7 +35,7 @@ import { BdeDashboard } from "./bde-dashboard";
 
 type Resource = "candidates" | "applications" | "team" | "memberInvites" | "jobs";
 /** `as`: the seeded account the dashboard is rendered for (the OWNER one reads invites, which needs `team.view`). */
-type Dashboard = { name: string; as: string; component: ComponentType; queries: Resource[]; groups: Record<string, { reads: Resource[]; labels: string[] }> };
+type Dashboard = { name: string; as: string; component: ComponentType; queries: Resource[]; groups: Record<string, { reads: Resource[]; labels: string[] }>; seed?: () => Promise<unknown> };
 
 const floorGroups = {
   throughput: { reads: ["candidates", "applications", "team"] as Resource[], labels: ["Applied today", "Active BDEs", "Candidates on bench"] },
@@ -52,7 +53,9 @@ const DASHBOARDS: Dashboard[] = [
     mine: { reads: ["candidates", "applications"], labels: ["apps</span>"] }, // per-candidate app counts in the list body
     queue: { reads: ["candidates", "applications", "jobs"], labels: ["Tailor resume"] }, // the queue rows' action
     newAssignments: { reads: ["candidates"], labels: ["No new candidates this week."] }, // its empty state: no ASSIGN entries on mocks (05 §7)
-  } },
+  },
+  // A job is a candidate's (docs/02 §6.z), and jobs are only the backend's: each of the BDE's candidates has one.
+  seed: async () => setStubJobs(allCandidates.filter((c) => c.firmId === "firm_hts" && c.bdeId === "user_adnan").map((c, n) => stubJob("firm_hts", c.id, n, c.primaryRole ?? "Developer"))) },
 ];
 
 const ERROR = "Something didn’t load";
@@ -75,12 +78,13 @@ afterEach(() => {
   fault.__BENCHQ_MOCK_FAIL__ = [];
 });
 
-describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 }, ({ as, component, queries, groups }) => {
+describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 }, ({ as, component, queries, groups, seed }) => {
   // Signed in as a member of firm A, in the mock backend (it checks membership, T8) and in the client
   // store (the BDE dashboard reads the signed-in user), as the app is after /sign-in.
   beforeAll(async () => {
     stubBackendReads();
     useSession.getState().setSession(await signInAs(as));
+    await seed?.();
   });
   afterAll(() => {
     vi.restoreAllMocks();

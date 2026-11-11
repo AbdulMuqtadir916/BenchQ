@@ -230,6 +230,7 @@ def test_the_view_lasts_across_requests(anonymous_client, world):
     "/api/firms/{acme}/ledger", "/api/firms/{acme}/members", "/api/firms/{acme}/invites", "/api/applications",
     "/api/firms/{acme}/candidates/{candidate}/resumes", "/api/firms/{acme}/candidates/{candidate}/resumes/{resume}",
     "/api/jobs", "/api/cover-letters", "/api/stats", "/api/companies",
+    "/api/firms/{acme}/job-postings",                       # the job screens' list (job search PR 3)
 ])
 def test_the_viewed_firms_reads_answer(anonymous_client, world, path):
     _start(anonymous_client, world)

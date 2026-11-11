@@ -39,27 +39,12 @@ def test_the_feed_and_its_menus_show_only_the_firms_jobs(api_client, jobs):
 
 @pytest.mark.parametrize("method, path", [
     ("GET", "/api/jobs/{job}"),
-    ("PATCH", "/api/jobs/{job}"),
     ("GET", "/api/jobs/{job}/cached-page"),
     ("GET", "/api/jobs/{job}/frame-check"),
-    ("POST", "/api/analyze/{job}"),
 ])
 def test_another_firms_job_is_not_found(api_client, jobs, method, path):
     resp = api_client.request(method, path.format(job=jobs["theirs"].id), json={} if method != "GET" else None)
     assert resp.status_code == 404, resp.text
 
 
-def test_bulk_update_reports_another_firms_job_as_not_found(api_client, jobs, test_db):
-    theirs = str(jobs["theirs"].id)
-    out = api_client.post("/api/jobs/bulk-update", json={"job_ids": [theirs], "status": "saved"}).json()
-    assert out["not_found"] == [theirs]
-    test_db.expire_all()
-    assert test_db.get(Job, jobs["theirs"].id).status == "new"
-
-
-def test_documents_cannot_be_made_for_another_firms_job(api_client, jobs, test_db, accounts):
-    base = old_resume(test_db, accounts.firm_id, "Base", {"header": {"name": "A"}})
-    test_db.commit()
-    theirs = str(jobs["theirs"].id)
-    assert api_client.post("/api/cover-letters/generate", json={"resume_id": str(base.id),
-                                                                "job_id": theirs}).status_code == 404
+# POST /api/jobs/bulk-update is retired (job search PR 2): its 410 is tested in test_job_search_capture.py.

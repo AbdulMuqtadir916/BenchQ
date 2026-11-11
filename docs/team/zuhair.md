@@ -38,11 +38,20 @@ by content hash, with everything about the job itself (title, description, locat
 `scrape_jobs` (same migration), a log of finished batches (`success`/`empty`/`error`, the error detail only on
 `error`), not a queue. A successful batch's row and its postings are written in one transaction, batch row first
 (`job_postings.batch_id` references it). `job_postings` has no status: saved/applied live in `applications`.
-Live source right now: freehire.me. **Built so far:** both tables. **Not yet built:** the ingestion/adapter code
-(field mapping into `content`, the `job_id` (content hash) dedup rule, the country-by-search-target rule for multi-country
-postings), and repointing `applications.job_id` and `job_runs.target_job_id` off the old `jobs` table, retiring
-`jobs`/`job_locations`/`firm_jobs` once nothing points at them. Until that repoint lands, the flow described below
-(steps 1–5) is still what's actually running; treat it as the current production path, not the forward plan.
+Live source right now: freehire.me. **Built so far:** both tables (0020), and the search pipeline
+(`feat/job-search-pipeline`, migration 0022, docs/02 §6.y "The search pipeline"): `backend/job_search/` (providers
+behind one contract, freehire.me first; `content` is the provider's job as sent, read through its `read()`), the
+background search (`POST …/candidates/{id}/job-searches`, the candidate's BDE only; its `scrape_jobs` row is
+`running` until it finishes), the caps (100 new jobs per
+candidate, 20 attempts per BDE, per 6:30 PM IST day) and the reads (`GET …/job-searches`, `…/job-postings`). **PR 2**
+(`feat/job-postings-repoint`, migration 0023): tailored résumés, cover letters and the two logs point at
+`job_postings`; captures (`POST …/job-postings`, manual and extension); a repeated search continues; the old pool's
+scheduled scrape and write routes retired (410). **PR 3** (`integrate/jobs`, docs/02 §6.z; opened after PR 1 and 2
+merge): the existing job screens on the backend through a mapper, two firm-level reads, "Find jobs" really searching
+(the BDE's), the capture form per candidate. **Not yet built:** Arbaz's `applications` repoint and the clean-up PR: delete the old pool (`jobs`,
+`job_locations`, `firm_jobs`, `candidate_jobs`, `companies` (no companies module, decided 2026-11-11), their routes and scrapers) once `applications` no longer points at it.
+The flow described below (steps 1–5) is the old pool's: its scheduled scrape and write routes are retired (PR 2), its
+reads still answer until the clean-up.
 
 The scraper runs firm searches into the shared pool (`jobs`, `firm_jobs`, 07 Q37). From 0007 a search belongs to a
 candidate (`searches.candidate_id`) and what it finds is recorded per candidate (`candidate_jobs`).

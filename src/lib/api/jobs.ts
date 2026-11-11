@@ -1,49 +1,67 @@
+import { z } from "zod";
 import { ApiError } from "@/lib/api/client";
 import type { CaptureJob, Job } from "@/lib/schemas/job";
-import { isLive } from "./config";
-import { http } from "./http";
+import type { JobSearches } from "@/lib/schemas/job-search";
 import { toBackendId } from "./dto/demo-ids";
-import { BackendJobListSchema, BackendJobSchema, toJob } from "./dto/jobs";
+import { CapturedPostingDto, FirmJobDto, FirmJobListDto, JobSearchesDto, toBackendCapture, toCapturedJob, toFirmJob, toJobSearches } from "./dto/jobs";
+import { http } from "./http";
 
-const mock = () => import("@/mocks/jobs").then((m) => m.jobsMock);
+/** The most jobs one list read returns (the backend's FIRM_LIST_MAX). */
+export const JOBS_LIST_MAX = 400;
 
-/** The backend serves at most 200 jobs per request (`GET /api/jobs`, `limit ≤ 200`). */
-const PAGE = 200;
+export interface JobListParams {
+  limit?: number;
+  /** One candidate's jobs only (docs/02 §6.z). */
+  candidateId?: string;
+}
 
-/** The backend takes the firm from the session. An empty feed is an empty list, never an error. */
+/** The capture found the job the candidate already has; `jobId` is that job, for "View job". */
+export function duplicateJobError(jobId: string): ApiError & { jobId: string } {
+  return Object.assign(new ApiError("This job is already in this candidate's jobs.", "DUPLICATE_JOB", 409), { jobId });
+}
+
+/** backend/api/routes_job_search.py (docs/02 §6.y–§6.z): the firm's jobs and a candidate's searches. */
+const firmPath = (firmId: string) => `/api/firms/${toBackendId(firmId)}`;
+const candidatePath = (firmId: string, candidateId: string) => `${firmPath(firmId)}/candidates/${toBackendId(candidateId)}`;
 const live = {
-  list: async (firmId: string, params?: { limit?: number; offset?: number }): Promise<Job[]> => {
-    const wanted = params?.limit ?? PAGE;
-    const start = params?.offset ?? 0;
-    const rows = [];
-    for (let offset = start; rows.length < wanted; offset += PAGE) {
-      const limit = Math.min(PAGE, wanted - rows.length);
-      const page = await http.get("/api/jobs", BackendJobListSchema, { query: { limit, offset } });
-      rows.push(...page.jobs);
-      if (page.jobs.length < limit || offset + page.jobs.length >= page.total) break;
-    }
-    return [...new Map(rows.map((row) => [row.id, row])).values()].map((row) => toJob(row, firmId));
+  list: async (firmId: string, params?: JobListParams): Promise<Job[]> => {
+    // The backend answers at most 400 (routes_job_search.py FIRM_LIST_MAX): a larger ask is a 422, so it is capped here.
+    const query = { limit: Math.min(params?.limit ?? JOBS_LIST_MAX, JOBS_LIST_MAX), candidate_id: params?.candidateId ? toBackendId(params.candidateId) : undefined };
+    const { items } = await http.get(`${firmPath(firmId)}/job-postings`, FirmJobListDto, { query });
+    return items.map((item) => toFirmJob(item, firmId));
   },
-
-  byId: async (firmId: string, id: string): Promise<Job> => toJob(await http.get(`/api/jobs/${encodeURIComponent(toBackendId(id))}`, BackendJobSchema), firmId),
-
-  /** Hand capture has no backend endpoint yet (Jobs track 02); refused rather than written to the mock. */
-  capture: async (): Promise<Job> => {
-    throw new ApiError("Adding a job by hand is not connected to the backend yet.", "NOT_AVAILABLE", 501);
+  byId: async (firmId: string, id: string): Promise<Job> => toFirmJob(await http.get(`${firmPath(firmId)}/job-postings/${id}`, FirmJobDto), firmId),
+  capture: async (firmId: string, body: CaptureJob): Promise<Job> => {
+    const dto = await http.post(`${candidatePath(firmId, body.candidateId)}/job-postings`, CapturedPostingDto, { body: toBackendCapture(body) });
+    if (!dto.created) throw duplicateJobError(dto.id);
+    return toCapturedJob(dto, firmId);
   },
+  searches: async (firmId: string, candidateId: string): Promise<JobSearches> =>
+    toJobSearches(await http.get(`${candidatePath(firmId, candidateId)}/job-searches`, JobSearchesDto)),
+  startSearch: async (firmId: string, candidateId: string, query: string): Promise<string> =>
+    (await http.post(`${candidatePath(firmId, candidateId)}/job-searches`, z.object({ batch_id: z.string() }), { body: { query } })).batch_id,
 };
 
-/** Firm-scoped (docs/07 T5): every call names the firm, and the backend/mock serves only that firm's rows. */
+/**
+ * Firm-scoped (docs/07 T5): every call names the firm, and the backend serves only the jobs of the candidates the
+ * signed-in person sees. Jobs come only from the backend: there is no mock (decided 2026-11-11).
+ */
 export const jobsApi = {
-  list: async (firmId: string, params?: { limit?: number; offset?: number }): Promise<Job[]> =>
-    isLive("jobs") ? live.list(firmId, params) : (await mock()).list(firmId, params),
+  list: (firmId: string, params?: JobListParams): Promise<Job[]> => live.list(firmId, params),
 
-  byId: async (firmId: string, id: string): Promise<Job> => (isLive("jobs") ? live.byId(firmId, id) : (await mock()).byId(firmId, id)),
+  byId: (firmId: string, id: string): Promise<Job> => live.byId(firmId, id),
 
-  capture: async (firmId: string, body: CaptureJob): Promise<Job> => (isLive("jobs") ? live.capture() : (await mock()).capture(firmId, body)),
+  /** For one candidate (their BDE only); the same job again throws `DUPLICATE_JOB` naming the one they have. */
+  capture: (firmId: string, body: CaptureJob): Promise<Job> => live.capture(firmId, body),
+
+  /** The candidate's running search, past searches and captures, and today's usage. */
+  searches: (firmId: string, candidateId: string): Promise<JobSearches> => live.searches(firmId, candidateId),
+
+  /** "Find jobs": start a search for a role (the candidate's BDE only); it runs in the background. Its batch id. */
+  startSearch: (firmId: string, candidateId: string, query: string): Promise<string> => live.startSearch(firmId, candidateId, query),
 };
 
-/** The capture was refused because the firm already has this listing; `jobId` is the existing job. */
+/** The capture was refused because the candidate already has this job; `jobId` is the existing job. */
 export function isDuplicateJob(error: unknown): error is ApiError & { jobId: string } {
   return error instanceof ApiError && error.code === "DUPLICATE_JOB" && typeof (error as { jobId?: unknown }).jobId === "string";
 }

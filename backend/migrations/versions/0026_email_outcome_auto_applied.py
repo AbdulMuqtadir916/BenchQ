@@ -1,13 +1,14 @@
-"""Allow the AUTO_APPLIED classification outcome (PR 4 automatic status updates); no data change.
+"""Allow the AUTO_APPLIED classification outcome (PR 4 automatic status updates); no data change. Renumbered from 0022 (0024-0025 are
+Arbaz's #129).
 
-Revision ID: 0022
-Revises: 0021
+Revision ID: 0026
+Revises: 0023
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0022'
-down_revision = '0021'
+revision = '0026'
+down_revision = '0023'
 branch_labels = None
 depends_on = None
 

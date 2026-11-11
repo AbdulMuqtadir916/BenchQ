@@ -69,27 +69,6 @@ async def test_scoring_a_job_never_sends_another_firms_resume(test_db, two_firms
     assert summary == "No resumes to score against" and len(sent) == 1
 
 
-def test_analyze_names_only_the_firms_resumes(api_client, test_db, two_firms, monkeypatch):
-    """POST /api/analyze with another firm's résumé id: the run is named for none of it."""
-    job = Job(company="Initech", title="PM", url="https://initech.test/2", external_id="e-initech-2", status="new")
-    test_db.add(job)
-    test_db.flush()
-    test_db.add(FirmJob(firm_id=two_firms["acme"], job_id=job.id, origin="CAPTURED"))
-    test_db.commit()
-    calls = []
-
-    async def fake_score_single_job(job_id, cv_ids=None, depth="full", *, firm_id):
-        calls.append(firm_id)
-        return "ok"
-
-    monkeypatch.setattr(scorer, "score_single_job", fake_score_single_job)
-    resp = api_client.post(f"/api/analyze/{job.id}", json={"cv_ids": [str(two_firms["theirs"].id)]})
-    assert resp.status_code == 202, resp.text
-    from backend.models.db import JobRun
-    test_db.expire_all()
-    run = test_db.query(JobRun).filter(JobRun.target_job_id == job.id).one()
-    assert (run.meta or {}).get("resume_names") == []
-
 
 @pytest.mark.asyncio
 async def test_the_pipeline_scores_only_the_default_firms_jobs(test_db, two_firms, monkeypatch):

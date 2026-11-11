@@ -5,8 +5,9 @@
     docker compose exec backend python -m backend.scripts.seed_demo
 
 It reads the same JSON the mocks use (src/mocks/data/*.json; docker-compose mounts it read-only), never a
-copy, so the two can't drift. Today: the plans, the four firms, their users, the Super Admin, the invites and the
-candidates (onboarding 06 PR 5).
+copy, so the two can't drift. Today: the plans, the four firms, their users, the Super Admin and the invites. No
+candidates (decided 2026-11-11, job search PR 3): a candidate is only ever made from a real résumé, by onboarding.
+`--reset` still deletes every candidate in the demo firms, real ones included, because it deletes those firms.
 Each module's data joins as its track lands. Every seeded account signs in with the one demo password
 (docs/03 §3.2).
 
@@ -29,6 +30,7 @@ from backend.auth.tokens import hash_token, new_token
 from backend.config import IS_PRODUCTION
 from backend.models.db import SessionLocal, utcnow, Resume
 from backend.models.candidates import BaseResume, Candidate, ResumeParse
+from backend.models.job_search import JobPosting, ScrapeJob
 from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, Session, User
 
 DEMO_PASSWORD = "benchq-demo-2026"                                     # docs/03 §3.2
@@ -82,6 +84,9 @@ def reset(db) -> None:
     db.query(Resume).filter(Resume.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(BaseResume).filter(BaseResume.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(ResumeParse).filter(ResumeParse.firm_id.in_(firm_ids)).delete(synchronize_session=False)
+    # Their job searches: the postings, then the batches they name (both RESTRICT on the candidate).
+    db.query(JobPosting).filter(JobPosting.firm_id.in_(firm_ids)).delete(synchronize_session=False)
+    db.query(ScrapeJob).filter(ScrapeJob.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Candidate).filter(Candidate.firm_id.in_(firm_ids)).delete(synchronize_session=False)
     db.query(Invite).filter(or_(Invite.id.in_(fixture_ids["invites"]), Invite.firm_id.in_(firm_ids))) \
         .delete(synchronize_session=False)
@@ -120,7 +125,6 @@ def _fixture_ids() -> dict[str, list[uuid.UUID]]:
         "users": [demo_id(u["id"]) for u in firm["users"]],
         "platform_users": [demo_id(p["id"]) for p in _load("platform-users.json")],
         "invites": [demo_id(i["id"]) for i in _load("invites.json")],
-        "candidates": [demo_id(c["id"]) for c in _load("candidates.json")],
     }
 
 
@@ -129,7 +133,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
     now = now or utcnow()
     password_hash = hash_password(DEMO_PASSWORD)
     firm_data = _load("firm.json")
-    added = {"plans": 0, "firms": 0, "users": 0, "platform_users": 0, "invites": 0, "candidates": 0}
+    added = {"plans": 0, "firms": 0, "users": 0, "platform_users": 0, "invites": 0}
 
     for p in _load("plans.json"):
         added["plans"] += _add_missing(db, Plan, demo_id(p["id"]), name=p["name"], seat_limit=p["seatLimit"],
@@ -169,60 +173,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             token_hash=hash_token(new_token()), expires_at=_shift(i["expiresAt"], now), created_at=created,
             accepted_at=created + timedelta(hours=1) if i["status"] == "ACCEPTED" else None,
             revoked_at=created + timedelta(hours=1) if i["status"] == "REVOKED" else None)
-    for c in _load("candidates.json"):
-        row_id = demo_id(c["id"])
-        if db.get(Candidate, row_id) is not None:
-            continue
-        # Keep this object until its first version is written. A candidate's name, email, phone and location are not
-        # `candidates` columns (07 Q57): the model holds them on the object, and the session references a flushed object
-        # only weakly, so letting it go and re-reading the row (what `_add_missing` + `db.get` did) lost them and wrote
-        # every version 1 blank (BUG-011).
-        candidate = Candidate(id=row_id, **_candidate_fields(c))
-        db.add(candidate)
-        db.flush()
-        added["candidates"] += 1
-        _form_base(db, candidate, c)
     return added
-
-
-def _form_base(db, candidate, c: dict) -> None:
-    """The demo candidate's résumé (07 Q58: no candidate without one): a file generated from their details, kept like
-    an upload, and its UPLOAD base, whose v1 holds the name, contact details and location (07 Q57)."""
-    from types import SimpleNamespace
-    from backend.candidates import generated_resume
-    from backend.candidates.first_base import WORK_AUTH_LABEL, first_base
-    content, parse = generated_resume.from_details(
-        name=c["fullName"], title=c["primaryRole"], email=c["email"], phone=c["phone"], linkedin=c["linkedinUrl"],
-        city=c["city"], state=c["state"], country=c["country"], work_authorization=WORK_AUTH_LABEL.get(c["workAuth"]))
-    upload = ResumeParse(firm_id=candidate.firm_id, uploaded_by_user_id=demo_id(c["managerId"]), candidate_id=candidate.id,
-                         file_name=f"{c['fullName']} - résumé.pdf", mime_type=generated_resume.PDF_MIME,
-                         size_bytes=len(content), content=content, content_sha256=generated_resume.sha256(content),
-                         parse=parse, expires_at=None)
-    db.add(upload)
-    db.flush()
-    base, version = first_base(upload, candidate, SimpleNamespace(work_auth=c["workAuth"], summary="", skills=[]),
-                               demo_id(c["managerId"]))
-    db.add(base)
-    db.flush()
-    db.add(version)
-    db.flush()
-
-
-def _candidate_fields(c: dict) -> dict:
-    """A mock candidate (src/mocks/data/candidates.json) as a `candidates` row. Its manager added it."""
-    return dict(
-        firm_id=demo_id(c["firmId"]), manager_id=demo_id(c["managerId"]),
-        bde_id=demo_id(c["bdeId"]) if c["bdeId"] else None, created_by_user_id=demo_id(c["managerId"]),
-        full_name=c["fullName"], email=c["email"], phone=c["phone"], linkedin_url=c["linkedinUrl"], city=c["city"],
-        state=c["state"], country=c["country"], willing_to_relocate=c["willingToRelocate"], work_auth=c["workAuth"],
-        work_auth_expiry=_when(c["workAuthExpiry"]), needs_sponsorship=c["needsSponsorship"],
-        needs_transfer=c["needsTransfer"], employment_types=c["employmentTypes"], rate_min=c["rateMin"],
-        rate_target=c["rateTarget"], status=c["status"], bench_start_date=_when(c["benchStartDate"]),
-        available_from=_when(c["availableFrom"]), notice_period_days=c["noticePeriodDays"],
-        years_experience=c["yearsExperience"], primary_role=c["primaryRole"], target_roles=c["targetRoles"],
-        work_settings=c["workSettings"], preferred_locations=c["preferredLocations"], contact_notes=c["contactNotes"],
-        preferred_industries=c["preferredIndustries"], deal_breakers=c["dealBreakers"],
-        created_at=_when(c["createdAt"]), updated_at=_when(c["updatedAt"]))
 
 
 def main(argv: list[str] | None = None) -> int:

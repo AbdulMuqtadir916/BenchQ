@@ -27,7 +27,7 @@ Each decision: what the frontend needs → what the backend has → options → 
   3. Interim: every live application/resume belongs to one configured mock candidate
      (`NEXT_PUBLIC_DEFAULT_CANDIDATE_ID`). That's what Modules 03/04 do today.
 - **Recommendation:** 3 now, plan 1. Candidates screens stay mocked.
-- **Mock stays:** `src/mocks/candidates.ts`, `candidates.json`.
+- **Mock stays:** ~~`src/mocks/candidates.ts`, `candidates.json`~~ Superseded 2026-11-11 (job search PR 3): the candidates mock is deleted; its fixture is test-only (`src/test/fixtures/`).
 
 ## D2 — Users, roles and firms (auth)
 
