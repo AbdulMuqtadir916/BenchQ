@@ -78,7 +78,7 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["resumes", "deleteVersion", (f, i) => resumesApi.deleteVersion(f, i.resumeCandidate, "rv_none"), true],
   ["resumes", "showBase", (f, i) => resumesApi.showBase(f, i.resumeCandidate, "base_none"), true],
   ["resumes", "autofill", (f, i) => resumesApi.autofill(f, i.resumeVersion), false],
-  ["resumes", "saveAutofill", (f, i) => resumesApi.saveAutofill(f, i.resumeCandidate, i.resumeVersion, { edit: {}, built: {}, reset: [], add: {}, remove: [] }), true],
+  ["resumes", "saveAutofill", (f, i) => resumesApi.saveAutofill(f, i.resumeCandidate, i.resumeVersion, {} as never), true],
   ["records", "byCandidate", (f, i) => recordsApi.byCandidate(f, i.candidate), false],
   ["documents", "byCandidate", (f, i) => documentsApi.byCandidate(f, i.candidate), false],
   ["documents", "upload", (f, i) => documentsApi.upload(f, i.candidate, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null } as never), true],

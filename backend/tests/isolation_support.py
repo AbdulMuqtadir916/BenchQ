@@ -93,12 +93,6 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     db.add(job)
     db.flush()
     link_job_to_firm(db, firm.id, job.id, "CAPTURED", captured_by_user_id=owner.id)
-    app = Application(firm_id=firm.id, job_id=job.id, status="applied", notes=f"{tag} application notes")
-    legacy_app = Application(firm_id=firm.id, job_id=job.id, status="applied", notes=f"{tag} legacy application")
-    db.add_all([app, legacy_app])
-    db.flush()
-    interview = Interview(firm_id=firm.id, application_id=app.id, what=f"{tag} phone screen")
-    db.add(interview)
     # The hierarchy (07 Q40): a MANAGER and a BDE who reports to them.
     from backend.models.tenancy import User
     from backend.tests.auth_support import password_hash
@@ -115,6 +109,17 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                           full_name=f"{tag} candidate", primary_role=f"{tag} Java Developer", work_auth="H1B")
     db.add(candidate)
     db.flush()
+    # Applications name one of their candidate's postings (migration 0025): the job, as the candidate's.
+    from backend.tests.posting_support import posting_for
+    posted = dict(title=job.title, company=job.company, url=job.url, description=JOB_TEXT)
+    app = Application(firm_id=firm.id, candidate_id=candidate.id, status="applied", notes=f"{tag} application notes",
+                      job_id=posting_for(db, firm.id, candidate.id, **posted).id)
+    legacy_app = Application(firm_id=firm.id, candidate_id=candidate.id, status="applied",
+                             notes=f"{tag} legacy application", job_id=posting_for(db, firm.id, candidate.id, **posted).id)
+    db.add_all([app, legacy_app])
+    db.flush()
+    interview = Interview(firm_id=firm.id, application_id=app.id, what=f"{tag} phone screen")
+    db.add(interview)
     # Résumé versioning (PRs 5, 6): the candidate's upload, its active base (the owner's, at onboarding: v1 is
     # "resume") with a BDE's v2 and a tailored résumé for the job ("tailored"); and a second base the BDE made from
     # v2, unused, so a delete of it or of v2 goes through.
@@ -166,7 +171,6 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                              from_email=f"recruiter@{tag.lower()}.test", subject=f"{tag} interview",
                              snippet=f"{tag} snippet", received_at=utcnow())
     db.add(candidate_message)
-    app.candidate_id = candidate.id
     db.flush()
     invite, _ = send_invite(db, inviter=owner, firm=firm, email=f"bde@{tag.lower()}.test", role="BDE",
                             invitee_name=f"{tag} invitee", summary=f"Invited a BDE to {tag}", now=utcnow(),
@@ -178,7 +182,8 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     review_job = Job(external_id=f"{tag}-review", title=f"{tag} review role", company=f"{tag} Corp", source="manual")
     db.add(review_job)
     db.flush()
-    review_app = Application(firm_id=firm.id, candidate_id=candidate.id, job_id=review_job.id, status="applied")
+    review_app = Application(firm_id=firm.id, candidate_id=candidate.id, status="applied",
+                             job_id=posting_for(db, firm.id, candidate.id, title=review_job.title, company=review_job.company).id)
     db.add(review_app)
     db.flush()
     review_message = InboxMessage(firm_id=firm.id, candidate_id=candidate.id, mailbox_id=mailbox.id,
