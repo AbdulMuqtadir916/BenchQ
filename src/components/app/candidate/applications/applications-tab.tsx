@@ -9,7 +9,8 @@ import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { ReviewQueue } from "./review-queue";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
-import { STATUS_LABEL, isClosed } from "@/components/app/applications/status-meta";
+import { STATUS_LABEL } from "@/components/app/applications/status-meta";
+import { applicationsInScope, countApplications, describeApplicationCounts } from "@/lib/derive/application-counts";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { ApplicationList } from "./application-list";
@@ -49,11 +50,10 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
     }
   }, [scope]);
   const all = ws.applications;
-  // Move On is a current stage with its own board column, so a confirmed Move On card is always shown;
-  // the board hides only the older closed values (Placed, Rejected, Withdrawn, Expired).
-  const visible = all.filter((a) => a.status === "MOVE_ON" || !isClosed(a.status));
-  const moveOnCount = all.filter((a) => a.status === "MOVE_ON").length;
-  const closedCount = all.filter((a) => isClosed(a.status) && a.status !== "MOVE_ON").length;
+  // One rule for the count line, the board and the list (BUG-005, PR #128): a saved job is never active; every row shown is
+  // named in the line. Move On has its own column and counts as closed; the legacy closed values are left out.
+  const visible = applicationsInScope(all, "active");
+  const [activePart = "", ...otherParts] = describeApplicationCounts(countApplications(all)).split(" · ");
   const irrelevantCount = irrelevantEmails(ws.messages).length;
 
   if (ws.applicationsQuery.error) return <ErrorState error={ws.applicationsQuery.error} onRetry={() => void ws.applicationsQuery.refetch()} />;
@@ -67,7 +67,7 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--color-text-3)]">
-          <span className="text-body-strong text-[var(--color-text)]">{all.length - closedCount - moveOnCount} active</span> · {moveOnCount} Move On · {closedCount} older closed · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
+          <span className="text-body-strong text-[var(--color-text)]">{activePart}</span> · {otherParts.join(" · ")} · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
         </p>
         <div className="flex items-center gap-2">
           <div ref={switchRef} className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">

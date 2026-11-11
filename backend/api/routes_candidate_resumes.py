@@ -33,6 +33,7 @@ from backend.api.routes_candidates import _candidate, _member_of
 from backend.auth.policy import can_change_resume, can_manage_resume, require
 from backend.auth.sessions import Principal
 from backend.candidates import versions
+from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.models.candidates import ResumeParse, file_sha256
 from backend.models.db import get_db
@@ -107,8 +108,8 @@ class ContentIn(BaseModel):
     email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]         # mandatory
     phone: str | None = Field(default=None, max_length=300)
     work_authorization: str | None = Field(default=None, max_length=300)
-    github: str | None = Field(default=None, max_length=500)
-    linkedin: str | None = Field(default=None, max_length=500)
+    github: ProfileLink = None
+    linkedin: ProfileLink = None
     summary: str | None = Field(default=None, max_length=10000)
     skills: list[SkillIn] = Field(default_factory=list, max_length=500)
     experiences: list[ExperienceIn] = Field(default_factory=list, max_length=100)

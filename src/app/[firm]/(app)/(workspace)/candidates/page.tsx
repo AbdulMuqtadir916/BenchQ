@@ -1,24 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useMemo, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutGrid, Plus, SearchX, Table2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CandidateCardGrid } from "@/components/app/candidate/candidate-card-grid";
 import { AssignmentToggle, NeedsBdeTag } from "@/components/app/candidate/assignment-filter";
 import { FilterChips, type FilterChip } from "@/components/app/filter-chips";
 import { filterCandidates } from "@/lib/derive/list-filters";
+import { useSearchText } from "@/lib/hooks/use-search-text";
 import { useNow } from "@/lib/hooks/use-now";
 import { CandidatesSearch, type BenchBand } from "@/lib/schemas/list-search";
 import { isWaitingForBde } from "@/lib/derive/assignment";
+import { candidateListShortcuts } from "@/lib/list-shortcuts";
+import { usePageShortcuts } from "@/lib/hooks/use-page-shortcuts";
 import { useUrlState } from "@/lib/routes/use-url-state";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { CandidateStatus } from "@/lib/schemas/enums";
 import { useCandidates } from "@/lib/hooks/use-candidates";
-import { NO_MANAGER_REASON } from "@/lib/derive/platform";
-import { isManager } from "@/lib/auth/roles";
+import { newCandidateBlockReason } from "@/lib/derive/platform";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
 import { can, hasOwnScope, hasTeamScope, scopeCandidates, scopeTeam } from "@/lib/auth/permissions";
@@ -33,6 +35,13 @@ import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/format/timezone";
 import { CandidateStatusSelect } from "@/components/app/candidate-status-select";
 import { useHref } from "@/lib/routes/use-href";
+import { pageIndexFor } from "@/lib/routes/page-index";
+import { formatSort, parseSort } from "@/lib/routes/sort-param";
+import { matchesSearch } from "@/lib/search";
+import { isNewItemKey } from "@/lib/list-keys";
+import { readKeyInput } from "@/lib/list-keys-dom";
+
+const PAGE_SIZE = 15;
 
 const STATUS_TONE: Record<CandidateStatus, TagTone> = {
   ON_BENCH: "blue",
@@ -108,7 +117,16 @@ function CandidatesList() {
   const teamQuery = useTeam();
   const now = useNow();
   const [search, setQuery] = useUrlState(CandidatesSearch);
-  const { assignment, status: statusFilter } = search;
+  const { assignment, status: statusFilter, q, sort, page } = search;
+  const searchParams = useSearchParams();
+  const [searchText, setSearchText] = useSearchText(q, (value) => setQuery({ q: value, page: 1 }));
+  const listParams = new URLSearchParams(searchParams);
+  if (searchText !== q) {
+    if (searchText) listParams.set("q", searchText);
+    else listParams.delete("q");
+    listParams.delete("page");
+  }
+  const listHref = toHref("candidates") + (listParams.size ? `?${listParams}` : "");
   const view = useSyncExternalStore(subscribeView, readView, () => "table" as View);
 
 
@@ -133,6 +151,10 @@ function CandidatesList() {
       });
   }, [candidatesQuery.data, applicationsQuery.data, teamQuery.data, principal, search, assignment, now]);
   const waiting = useMemo(() => scopeCandidates(principal, candidatesQuery.data ?? []).filter(isWaitingForBde).length, [principal, candidatesQuery.data]);
+  const tableRows = useMemo(
+    () => rows.filter((r) => matchesSearch([r.candidate.fullName, r.candidate.primaryRole, r.candidate.city, r.candidate.workAuth, STATUS_LABEL[r.candidate.status], r.bde], searchText)),
+    [rows, searchText],
+  );
 
   const columns = useMemo<ColumnDef<Row, unknown>[]>(() => {
     const cols: ColumnDef<Row, unknown>[] = [
@@ -180,21 +202,42 @@ function CandidatesList() {
     }
     return cols;
   }, [isOwnScope]);
+  // `?sort=` is a column id, `-` first for descending; an id this role's table does not have (the BDE column is hidden from a BDE) is no sort.
+  const sortValue = useMemo(() => parseSort(sort, columns.map((c) => c.id ?? "")), [sort, columns]);
 
   const canCreate = can(principal, "candidate.create");
+  // `n` opens New candidate (docs/04 §1.3, BUG-017) under exactly the button's rules: the permission, and a firm that has an
+  // active manager (07 Q40). The plan's candidate limit never blocks it (Q45).
+  const canOpenNew = canCreate && !teamQuery.isError && !!teamQuery.data && newCandidateBlockReason(teamQuery.data) === null;
+  usePageShortcuts(candidateListShortcuts(canOpenNew));
+  const newCandidateHref = toHref("candidates.new");
+  useEffect(() => {
+    if (!canOpenNew) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (!isNewItemKey(readKeyInput(event))) return;
+      event.preventDefault();
+      router.push(newCandidateHref);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [canOpenNew, newCandidateHref, router]);
+
   const scopedTeam = teamQuery.data && scopeTeam(principal, teamQuery.data, candidatesQuery.data ?? []);
   const personName = (id: string) => scopedTeam?.find((user) => user.id === id)?.name
     ?? (teamQuery.isLoading || candidatesQuery.isLoading ? "…" : "Unknown team member");
   const chips: FilterChip[] = [
-    search.bench ? { key: "bench", label: BENCH_LABEL[search.bench], onRemove: () => setQuery({ bench: "" }) } : null,
-    search.manager ? { key: "manager", label: `Team: ${personName(search.manager)}`, onRemove: () => setQuery({ manager: "" }) } : null,
-    search.bde ? { key: "bde", label: `BDE: ${personName(search.bde)}`, onRemove: () => setQuery({ bde: "" }) } : null,
-    search.role ? { key: "role", label: `Role: ${search.role.replaceAll("-", " ")}`, onRemove: () => setQuery({ role: "" }) } : null,
+    search.bench ? { key: "bench", label: BENCH_LABEL[search.bench], onRemove: () => setQuery({ bench: "", page: 1 }) } : null,
+    search.manager ? { key: "manager", label: `Team: ${personName(search.manager)}`, onRemove: () => setQuery({ manager: "", page: 1 }) } : null,
+    search.bde ? { key: "bde", label: `BDE: ${personName(search.bde)}`, onRemove: () => setQuery({ bde: "", page: 1 }) } : null,
+    search.role ? { key: "role", label: `Role: ${search.role.replaceAll("-", " ")}`, onRemove: () => setQuery({ role: "", page: 1 }) } : null,
   ].filter((chip): chip is FilterChip => chip !== null);
-  const clearFilters = () => setQuery({ assignment: "all", status: "ALL", bench: "", manager: "", bde: "", role: "" });
+  const clearFilters = () => {
+    setSearchText("");
+    setQuery({ assignment: "all", status: "ALL", bench: "", manager: "", bde: "", role: "", q: "", page: 1 });
+  };
   // A link from the dashboard can leave nothing: that is "no match", not a firm with no candidates.
   // The assignment toggle and the status select filter too, though they are not chips.
-  const hasFilters = chips.length > 0 || assignment !== "all" || statusFilter !== "ALL";
+  const hasFilters = chips.length > 0 || assignment !== "all" || statusFilter !== "ALL" || searchText.trim() !== "";
   const emptyFiltered = hasFilters ? (
     <EmptyState variant="filtered" icon={SearchX} title="No candidates match these filters" description="Remove a filter above, or clear them all to see every candidate."
       action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>} />
@@ -202,8 +245,8 @@ function CandidatesList() {
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
-      {isOwnScope ? null : <AssignmentToggle value={assignment} waiting={waiting} onChange={(next) => setQuery({ assignment: next })} />}
-      <CandidateStatusSelect className="w-40" value={statusFilter} onValueChange={(status) => setQuery({ status })} />
+      {isOwnScope ? null : <AssignmentToggle value={assignment} waiting={waiting} onChange={(next) => setQuery({ assignment: next, page: 1 })} />}
+      <CandidateStatusSelect className="w-40" value={statusFilter} onValueChange={(status) => setQuery({ status, page: 1 })} />
       <div role="group" aria-label="View" className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5">
         {([["table", "Table", Table2], ["cards", "Cards", LayoutGrid]] as const).map(([id, label, Icon]) => (
           <button key={id} type="button" aria-pressed={view === id} onClick={() => chooseView(id)} className={cn("inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 text-sm", view === id ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
@@ -220,7 +263,7 @@ function CandidatesList() {
         title="Candidates"
         subtitle={isOwnScope ? "Your assigned bench." : hasTeamScope(principal) ? "Your team's bench: your BDEs' candidates and the ones waiting for a BDE." : "Every candidate on the firm's bench."}
         actions={
-          canCreate ? <NewCandidateAction href={toHref("candidates.new")} /> : undefined
+          canCreate ? <NewCandidateAction href={newCandidateHref} /> : undefined
         }
       />
 
@@ -228,7 +271,9 @@ function CandidatesList() {
         <FilterChips chips={chips} onClear={clearFilters} />
         {view === "cards" ? (
           <CandidateCardGrid
-            rows={rows}
+            rows={tableRows}
+            search={{ value: searchText, onChange: setSearchText }}
+            returnTo={listHref}
             isLoading={candidatesQuery.isLoading || applicationsQuery.isLoading}
             error={candidatesQuery.error}
             onRetry={() => void candidatesQuery.refetch()}
@@ -240,19 +285,23 @@ function CandidatesList() {
         ) : (
         <DataTable
           columns={columns}
-          data={rows}
+          data={tableRows}
           getRowId={(r) => r.candidate.id}
           isLoading={candidatesQuery.isLoading}
           error={candidatesQuery.error as Error | null}
           onRetry={() => void candidatesQuery.refetch()}
-          onRowClick={(r) => router.push(toHref("candidates.detail", { id: r.candidate.id }))}
+          onRowClick={(r) => router.push(toHref("candidates.detail", { id: r.candidate.id }, { returnTo: listHref }))}
           searchPlaceholder="Search candidates…"
           storageKey="candidates-list"
           pagination
-          pageSize={15}
+          pageSize={PAGE_SIZE}
+          search={{ value: searchText, onChange: setSearchText }}
+          sort={{ value: sortValue, onChange: (next) => setQuery({ sort: formatSort(next), page: 1 }) }}
+          page={{ index: pageIndexFor(searchText === q ? page : 1, tableRows.length, PAGE_SIZE), onChange: (index) => setQuery({ page: index + 1 }) }}
           toolbarActions={toolbar}
           toolbarPlacement="outside"
           emptyState={emptyFiltered}
+          pageKeys
         />
         )}
       </div>
@@ -266,7 +315,11 @@ function CandidatesList() {
  */
 function NewCandidateAction({ href }: { href: string }) {
   const teamQuery = useTeam();
-  const reason = teamQuery.data && !teamQuery.data.some((user) => user.isActive && isManager(user)) ? NO_MANAGER_REASON : null;
+  const reason = teamQuery.isError
+    ? "Could not load the team."
+    : !teamQuery.data
+      ? "Loading the team…"
+      : newCandidateBlockReason(teamQuery.data);
   if (reason === null) {
     return (
       <Button asChild>
@@ -277,6 +330,7 @@ function NewCandidateAction({ href }: { href: string }) {
   return (
     <>
       <span id="new-candidate-blocked" className="text-sm text-[var(--color-text-2)]">{reason}</span>
+      {teamQuery.isError ? <Button variant="secondary" onClick={() => void teamQuery.refetch()}>Retry</Button> : null}
       <Button disabled aria-describedby="new-candidate-blocked"><Plus size={14} aria-hidden />New candidate</Button>
     </>
   );

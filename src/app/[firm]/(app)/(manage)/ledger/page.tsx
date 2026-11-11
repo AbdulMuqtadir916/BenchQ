@@ -1,35 +1,44 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
-import { useLedger } from "@/lib/hooks/use-ledger";
-import { useCandidates } from "@/lib/hooks/use-candidates";
-import { useTeam } from "@/lib/hooks/use-team";
-import { hasOwnScope, hasTeamScope, scopeLedger } from "@/lib/auth/permissions";
+import { useLedgerAll } from "@/lib/hooks/use-ledger";
+import { LEDGER_MAX_ENTRIES } from "@/lib/api/analytics";
+import { LedgerCapNotice } from "@/components/app/ledger-cap-notice";
+import { hasOwnScope, hasTeamScope } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { PageHeader } from "@/components/app/page-header";
 import { DataTable } from "@/components/app/data-table";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { ActionTag, ActorTag } from "@/components/app/ledger-tags";
+import { ACTOR_FILTERS, actorFilterLabel, countByActor, filterByActor, type ActorFilter } from "@/lib/derive/ledger-actors";
+
+import { LedgerListQuery, LEDGER_SORT_COLUMNS } from "@/lib/routes/ledger-list-query";
+import { useUrlState } from "@/lib/routes/use-url-state";
+import { pageIndexFor } from "@/lib/routes/page-index";
+import { formatSort, parseSort } from "@/lib/routes/sort-param";
+import { useSearchText } from "@/lib/hooks/use-search-text";
+import { matchesSearch } from "@/lib/search";
+
+const PAGE_SIZE = 15;
+const EMPTY_LEDGER: LedgerEntry[] = [];
 
 export default function LedgerPage() {
   const principal = useSignedInPrincipal();
-  const ledgerQuery = useLedger({ limit: 100 });
-  // A MANAGER's ledger is their team's (07 Q47): who is on it comes from the team and the candidates they manage.
+  // The whole ledger, not the first page (BUG-022: 100 of 119 entries were shown, the older ones unreachable).
+  const ledgerQuery = useLedgerAll();
   const isTeamScope = hasTeamScope(principal);
-  const teamQuery = useTeam();
-  const candidatesQuery = useCandidates();
-  const [actorFilter, setActorFilter] = useState<"ALL" | LedgerEntry["actorType"]>("ALL");
+  const [{ actor, q, sort, page }, setQuery] = useUrlState(LedgerListQuery);
+  const [searchText, setSearchText] = useSearchText(q, (value) => setQuery({ q: value, page: 1 }));
 
-  const rows = useMemo(() => {
-    // The backend already scopes a BDE's ledger to their own entries (07 §2.2); the page applies the same rule.
-    const entries = scopeLedger(principal, ledgerQuery.data ?? [], { users: teamQuery.data ?? [], candidates: candidatesQuery.data ?? [] });
-    return entries.filter((e) => actorFilter === "ALL" || e.actorType === actorFilter);
-  }, [ledgerQuery.data, teamQuery.data, candidatesQuery.data, actorFilter, principal]);
-  const contextQueries = isTeamScope ? [teamQuery, candidatesQuery] : [];
-  const isLoading = ledgerQuery.isLoading || contextQueries.some((query) => query.isLoading);
-  const loadError = (ledgerQuery.error ?? contextQueries.find((query) => query.error)?.error ?? null) as Error | null;
+  const scoped = ledgerQuery.data?.items ?? EMPTY_LEDGER;
+  const rows = useMemo(
+    () => filterByActor(scoped, actor).filter((entry) => matchesSearch([entry.createdAt, entry.actorName, entry.action, entry.summary], searchText)),
+    [scoped, actor, searchText],
+  );
+  // Each option says how many rows it would show, so one that is empty (no AI agent has written an entry yet) reads as empty.
+  const actorCounts = useMemo(() => countByActor(scoped), [scoped]);
 
   const columns = useMemo<ColumnDef<LedgerEntry, unknown>[]>(
     () => [
@@ -77,27 +86,30 @@ export default function LedgerPage() {
       <PageHeader title="Ledger" subtitle={hasOwnScope(principal) ? "Your actions in the audit trail. Append-only, immutable." : isTeamScope ? "Your team's actions and candidates in the audit trail. Append-only, immutable." : "Append-only audit trail. Every AI action, every state change, immutable."} />
 
       <div className="mt-4">
+        <LedgerCapNotice hasMore={ledgerQuery.data?.hasMore ?? false} shown={LEDGER_MAX_ENTRIES} />
         <DataTable
           columns={columns}
           data={rows}
           getRowId={(e) => e.id}
-          isLoading={isLoading}
-          error={loadError}
-          onRetry={() => { void ledgerQuery.refetch(); for (const query of contextQueries) void query.refetch(); }}
+          isLoading={ledgerQuery.isLoading}
+          error={ledgerQuery.error}
+          onRetry={() => void ledgerQuery.refetch()}
           isRowSelectable={false}
           searchPlaceholder="Search the ledger…"
           storageKey="ledger-list"
           pagination
-          pageSize={15}
+          pageSize={PAGE_SIZE}
+          search={{ value: searchText, onChange: setSearchText }}
+          sort={{ value: parseSort(sort, LEDGER_SORT_COLUMNS), onChange: (value) => setQuery({ sort: formatSort(value), page: 1 }) }}
+          page={{ index: pageIndexFor(searchText === q ? page : 1, rows.length, PAGE_SIZE), onChange: (index) => setQuery({ page: index + 1 }) }}
           toolbarActions={
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-2 text-sm text-[var(--color-text-2)]">
                 <span className="sr-only">Filter by actor</span>
-                <select value={actorFilter} onChange={(e) => setActorFilter(e.target.value as typeof actorFilter)} className="bq-input h-8 w-auto">
-                  <option value="ALL">All actors</option>
-                  <option value="USER">Users</option>
-                  <option value="AGENT">AI agents</option>
-                  <option value="SYSTEM">System</option>
+                <select value={actor} onChange={(e) => setQuery({ actor: e.target.value as ActorFilter, page: 1 })} className="bq-input h-8 w-auto">
+                  {ACTOR_FILTERS.map((filter) => (
+                    <option key={filter} value={filter}>{actorFilterLabel(filter, actorCounts)}</option>
+                  ))}
                 </select>
               </label>
             </div>

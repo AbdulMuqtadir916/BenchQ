@@ -44,6 +44,9 @@ export const CandidatesSearch = z.object({
   bench: z.union([z.enum(BENCH_BANDS), z.literal("")]).catch(""),
   manager: z.string().catch(""),
   bde: z.string().catch(""),
+  q: z.string().catch(""),
+  sort: z.string().regex(/^-?[A-Za-z]+$/).catch(""),
+  page: z.coerce.number().int().min(1).catch(1),
   /** A role slug, as "Roles in demand" groups them. */
   role: z.string().catch(""),
 });

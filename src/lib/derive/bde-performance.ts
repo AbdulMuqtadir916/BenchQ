@@ -4,6 +4,7 @@ import { isBde } from "@/lib/auth/roles";
 import type { Application } from "@/lib/schemas/application";
 import type { User } from "@/lib/schemas/session";
 import type { BdePerformance } from "@/lib/schemas/analytics";
+import { isSubmitted } from "./application-counts";
 import { round1 } from "./dates";
 import { applicationDate } from "./list-filters";
 
@@ -22,7 +23,7 @@ export function deriveBdePerformance(
       const assigned = candidates.filter((c) => c.bdeId === user.id);
       const assignedIds = new Set(assigned.map((c) => c.id));
       const apps = applications.filter(
-        (a) => assignedIds.has(a.candidateId) && a.status !== "SAVED",
+        (a) => assignedIds.has(a.candidateId) && isSubmitted(a.status),
       );
       const responses = apps.filter((a) => a.firstResponseAt).length;
 

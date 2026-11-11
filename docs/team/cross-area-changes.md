@@ -3,6 +3,16 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Main merged into PR 4 again — #128's application counts on the new stage list (`feat/inbox-masking-and-review`)
+
+Not agreed yet: Samad reviews. #128 (BUG-005) gave every screen one count of applications, written on the old stages, so on this
+branch Shortlisted or Interview scheduled wouldn't have counted as active and Move On not as closed.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `src/lib/derive/application-counts.ts` (+ test) | Active = submitted and not closed (`isActive` in status-meta, every stage Applied to Offer); closed = Move On and the legacy closed values; a legacy Placed on its own; `OPEN_STATUSES` is gone. The candidate's Active rows keep Saved and Move On (the PR 4 board has a column for each), and the line above the board names every row shown ("N active · M closed · S saved"). Saved is still never counted as active. | The stage list in docs/02 §2.1; the PR 4 tab has no "All" view, so hiding Saved would have left saved jobs nowhere on the candidate page. |
+| Applications (Samad) | `src/components/app/candidate/applications/applications-tab.tsx` | The BDE review and Irrelevant tabs and the scroll fix kept; the rows and the count line use the shared rule above. | As above. |
+
 ## Main merged into PR 4 — the Activity dashboard on the new stage list (`feat/inbox-masking-and-review`)
 
 Not agreed yet: Umamah reviews. Main brought PR 8 (#125), built on the old stages; this branch replaced them (docs/02
