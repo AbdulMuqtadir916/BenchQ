@@ -111,9 +111,10 @@ Use a demo account that holds only made-up candidates.
 ## 6. The five GitHub secrets (one-time)
 
 The workflow reads `CHROME_EXTENSION_ID`, `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and
-`CHROME_REFRESH_TOKEN` (GitHub, Settings, Secrets and variables, Actions), and uploads only when all five are set. They
-reach the upload step only, never install, tests or build. It uses the Chrome Web Store API V2 (`chrome-webstore-upload-cli`
-4.x): Google supported V1 only until 2026-10-15. A manual run publishes from `main` only. Create the environment `chrome-web-store` too, with a required
+`CHROME_REFRESH_TOKEN` (GitHub, Settings, Secrets and variables, Actions), and uploads only when all five are set. The
+build runs in one job with no secrets and hands over only the zip; the upload runs in a second job, on a fresh runner that
+never installed the project's code, and only it sees the secrets. It uses the Chrome Web Store API V2
+(`chrome-webstore-upload-cli` 4.x): Google supported V1 only until 2026-10-15. A manual run publishes from `main` only. Create the environment `chrome-web-store` too, with a required
 reviewer if you want an approval before each upload.
 
 1. **Extension ID:** the 32-letter ID on the item in the dashboard (after the first upload).
