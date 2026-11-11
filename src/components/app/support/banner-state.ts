@@ -1,5 +1,4 @@
-/** The structure the decision needs of the signed-in principal (`Principal` in the session store). */
-type LivePrincipal = { kind: "platform"; support?: { id: string } | null } | { kind: "firm" } | null;
+import type { Principal } from "@/lib/schemas/tenancy";
 
 export type ForbiddenBannerState =
   /** The session is still being read: mount nothing, so an ended view cannot trigger its expiry redirect. */
@@ -13,7 +12,7 @@ export type ForbiddenBannerState =
  * Whether the 403 screen shows the server's support banner (PR #128 review). A session that could not be read (`null` once
  * bootstrapping ends) is unknown, not a different view, so the server's banner stays and its Exit stays reachable.
  */
-export function forbiddenBannerState({ bootstrapping, principal, serverViewId }: { bootstrapping: boolean; principal: LivePrincipal; serverViewId: string | undefined }): ForbiddenBannerState {
+export function forbiddenBannerState({ bootstrapping, principal, serverViewId }: { bootstrapping: boolean; principal: Principal | null; serverViewId: string | undefined }): ForbiddenBannerState {
   if (bootstrapping) return "wait";
   if (principal === null) return serverViewId ? "show" : "none";
   const liveViewId = principal.kind === "platform" ? principal.support?.id : undefined;
