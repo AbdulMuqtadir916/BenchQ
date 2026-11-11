@@ -29,7 +29,6 @@ export type FirmAction =
   | "application.move"
   | "resume.edit"
   | "outreach.act"
-  | "followup.act"
   | "email.retry"
   | "email.reclassify";
 
@@ -65,7 +64,7 @@ export type PlatformAction =
 
 export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
 
-export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search", "application.move", "resume.edit", "outreach.act", "followup.act", "email.retry", "email.reclassify"];
+export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search", "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify"];
 export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "firmSettings.edit", "notification.approve"];
 export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
 export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
@@ -90,7 +89,6 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   "application.move": ALL_ACTING,
   "resume.edit": ALL_ACTING,
   "outreach.act": ALL_ACTING,
-  "followup.act": ALL_ACTING,
   "member.invite": OWNER_ONLY,
   "member.remove": OWNER_ONLY,
   "member.changeRole": OWNER_ONLY,
@@ -267,23 +265,6 @@ export function scopeLedger<T extends { actorUserId: string | null; entityType: 
     return entries.filter((entry) => (entry.actorUserId !== null && team.has(entry.actorUserId)) || (entry.entityType === "candidate" && managed.has(entry.entityId)));
   }
   return [...entries];
-}
-
-/** The follow-ups to load: one person's for a BDE, the whole firm's (undefined) otherwise (a MANAGER's are then narrowed by `scopeFollowups`). */
-export function scopeFollowupsUserId(principal: Principal): string | undefined {
-  const scope = scopeOf(principal);
-  return scope.kind === "own" ? scope.userId : undefined;
-}
-
-/** Follow-ups in scope: a MANAGER's team's, a BDE's own, the firm's for everyone else. */
-export function scopeFollowups<T extends { assignedToUserId: string }>(principal: Principal, followups: readonly T[], context: TeamContext): T[] {
-  const scope = scopeOf(principal);
-  if (scope.kind === "own") return followups.filter((followup) => followup.assignedToUserId === scope.userId);
-  if (scope.kind === "team") {
-    const team = teamMemberIds(scope.managerId, context.users, context.candidates);
-    return followups.filter((followup) => team.has(followup.assignedToUserId));
-  }
-  return [...followups];
 }
 
 /** The firm's people a page shows: a MANAGER sees themself and their team (Q47); everyone else the whole firm. */
