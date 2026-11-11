@@ -24,7 +24,7 @@ const serverHttp = async () => {
 };
 
 /** Who is signed in, or null when there is no session or the backend no longer knows it. */
-const readSession = cache(async (): Promise<Session | null> => {
+export const readSession = cache(async (): Promise<Session | null> => {
   if (!(await cookies()).has(SESSION_COOKIE)) return null;
   try {
     return toSession(await (await serverHttp()).get("/api/auth/me", SessionDto));

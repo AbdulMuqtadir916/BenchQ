@@ -51,6 +51,7 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "tailoring_max_concurrent": (P, ""),
     "tracer_links_base_url": (P, ""),
     "tracer_links_url_style": (P, ""),
+    "job_search_provider": (P, ""),        # the job source every firm's search uses (job search PR 1)
 
     # ── AI presets: models, keys, prompts (one active preset per module, Super Admin) ──
     "llm_provider": (AI, "AI presets"),

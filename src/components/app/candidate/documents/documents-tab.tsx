@@ -17,11 +17,6 @@ export function DocumentsTab({ ws, canAct, onNotify }: { ws: CandidateWorkspace;
   const candidate = ws.candidate!;
   const remove = useRemoveDocument(candidate.id);
   const documents = useMemo(() => ws.documentsQuery.data ?? [], [ws.documentsQuery.data]);
-  const evidenceCount = useMemo(() => {
-    const evidence = ws.recordQuery.data?.evidence ?? [];
-    return (documentId: string) => evidence.filter((e) => e.documentId === documentId).length;
-  }, [ws.recordQuery.data]);
-
   const expiring = ws.expiringDocuments;
 
   return (
@@ -44,7 +39,6 @@ export function DocumentsTab({ ws, canAct, onNotify }: { ws: CandidateWorkspace;
           <DocumentList
             documents={documents}
             now={ws.now}
-            evidenceCount={evidenceCount}
             canAct={canAct}
             onRemove={(id) => {
               const doc = documents.find((d) => d.id === id);

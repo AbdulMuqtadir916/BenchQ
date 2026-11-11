@@ -51,14 +51,14 @@ export function ResumeSent({ application, resumes, isLoading = false, className 
         <div className="min-w-0 flex-1">
           <p className="truncate text-body-strong text-[var(--color-text)]">{sent.resume.name}</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
-            <Tag tone={sent.resume.isMaster ? "blue" : "teal"}>{sent.resume.isMaster ? "Master" : "Tailored"}</Tag>
+            <Tag tone={sent.resume.isMaster ? "blue" : "teal"}>{sent.resume.isMaster ? "Base" : "Tailored"}</Tag>
             <Tag>v{sent.version.versionNumber}</Tag>
             <Tag>{template}</Tag>
             {sent.version.atsScore !== null ? <Tag tone={sent.version.atsScore >= 75 ? "green" : "amber"}>ATS {sent.version.atsScore}</Tag> : null}
           </div>
           {application.appliedAt ? <p className="mt-1.5 text-caption text-[var(--color-text-3)]">Sent {formatIst(application.appliedAt, "MMM d, yyyy")}</p> : null}
         </div>
-        <Link href={toHref("resumes.studio", { id: sent.resume.id }, { mode: "view" })} className="bq-secondary inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 text-sm" aria-label={`View ${sent.resume.name}`}>
+        <Link href={toHref("resumes.studio", { id: sent.version.id }, { mode: "view" })} className="bq-secondary inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 text-sm" aria-label={`View ${sent.resume.name}`}>
           <Eye size={13} aria-hidden />View
         </Link>
       </div>

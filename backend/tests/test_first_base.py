@@ -62,17 +62,18 @@ def test_a_create_from_an_upload_writes_its_active_base_and_version_1(anonymous_
 def test_version_1_takes_the_corrected_form_and_the_parse_for_the_rest(anonymous_client, test_db, world):
     upload = _upload(test_db, world)
     r = _create(anonymous_client, world, resume_parse_id=str(upload.id), primary_role="Senior Java Developer",
-                city="Dallas", summary="Corrected summary.", phone="+1 214 555 0100",
+                city="Dallas", country="Canada", summary="Corrected summary.", phone="+1 214 555 0100",
                 skills=[{"name": "Java", "family": "Languages", "source": "RESUME_UPLOAD"},
                         {"name": "AWS (ECS, Lambda)", "family": "Cloud", "source": "MANUAL"}])
     (_,), (v1,) = _rows(test_db, r.json()["id"])
     # The form, as corrected.
-    assert (v1.full_name, v1.title, v1.email, v1.phone, v1.city, v1.summary) == (
-        "Ravi Teja", "Senior Java Developer", "ravi@example.com", "+1 214 555 0100", "Dallas", "Corrected summary.")
+    assert (v1.full_name, v1.title, v1.email, v1.phone, v1.city, v1.country, v1.summary) == (
+        "Ravi Teja", "Senior Java Developer", "ravi@example.com", "+1 214 555 0100", "Dallas", "Canada",
+        "Corrected summary.")                                   # the form's country, not the file's "USA"
     assert v1.work_authorization == "H-1B"                      # the form's code, in the app's own label
     assert [(s["category"], s["name"]) for s in v1.skills] == [("Languages", "Java"), ("Cloud", "AWS (ECS, Lambda)")]
     # The parse, for what the form doesn't hold.
-    assert (v1.country, v1.github) == ("USA", "https://github.com/ravi")
+    assert v1.github == "https://github.com/ravi"
     assert [(e["job_title"], e["company"], e["current"], [b["text"] for b in e["bullets"]]) for e in v1.experiences] == [
         ("Senior Java Developer", "Capital Payments", True, ["Built the payments API.", "Cut latency 40%."]),
         ("Java Developer", "Acme", False, ["Wrote the batch jobs."])]
@@ -94,13 +95,14 @@ def test_every_item_has_its_own_id(anonymous_client, test_db, world):
                                                                # 2 languages, 4 bullets
 
 
-def test_no_upload_gets_a_manual_base_from_the_form(anonymous_client, test_db, world):
-    """Since 0015 every candidate has a base: with no file it is `MANUAL`, with a v1 from the form alone."""
-    r = _create(anonymous_client, world)
+def test_the_form_country_wins_over_the_files(anonymous_client, test_db, world):
+    """07 Q57: v1 takes the profile's country even when the file has none."""
+    upload = _upload(test_db, world, parse={**PARSE, "header": {**PARSE["header"], "country": ""}})
+    r = _create(anonymous_client, world, resume_parse_id=str(upload.id))
     assert r.status_code == 201
     (base,), (v1,) = _rows(test_db, r.json()["id"])
-    assert (base.source, base.resume_parse_id, base.is_active) == ("MANUAL", None, True)
-    assert (v1.category, v1.version, v1.experiences, v1.educations) == ("BASE", 1, [], [])
+    assert (base.source, base.is_active) == ("UPLOAD", True)
+    assert v1.country == "US"
 
 
 def test_other_is_not_a_work_authorization(anonymous_client, test_db, world):
@@ -139,3 +141,21 @@ def test_a_failure_saves_nothing(anonymous_client, test_db, world, monkeypatch):
     assert test_db.query(BaseResume).count() == 0
     kept = test_db.get(ResumeParse, upload.id)
     assert kept.candidate_id is None and kept.expires_at is not None          # still waiting for a create
+
+
+def test_create_rejects_an_invalid_profile_link(anonymous_client, world):
+    response = _create(anonymous_client, world, linkedin_url="aghajrgng;knga")
+    assert response.status_code == 422
+    assert any(error["loc"][-1] == "linkedin_url" for error in response.json()["detail"])
+
+
+@pytest.mark.parametrize("link", ["LinkedIn", "bare-handle", "ftp://linkedin.com/in/qa"])
+def test_first_base_drops_invalid_parser_links(link):
+    import uuid
+    from types import SimpleNamespace
+    from backend.candidates.first_base import first_base
+
+    upload = SimpleNamespace(id=uuid.uuid4(), parse={"header": {"linkedin": link, "github": link}})
+    candidate = SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), full_name="Candidate")
+    _, version = first_base(upload, candidate, None, uuid.uuid4())
+    assert version.linkedin is None and version.github is None

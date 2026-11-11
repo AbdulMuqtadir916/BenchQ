@@ -49,7 +49,7 @@ def test_the_session_matches_the_frontend_contract(anonymous_client, accounts):
     assert set(map(_camel, firm["user"])) == {"id", "firmId", "name", "email", "role", "managerId", "avatarUrl",
                                               "isActive", "lastActiveAt"}
     assert set(map(_camel, firm["firm"])) == {
-        "id", "name", "slug", "logoUrl", "primaryTimezone", "clientTimezone", "truthGuardMode",
+        "id", "name", "slug", "logoUrl", "primaryTimezone", "clientTimezone",
         "applicationExpiryDays", "status", "planId", "seatLimit", "candidateLimit", "contactPhone", "bdeCapacity",
         "createdAt"}
     platform = _sign_in(anonymous_client, "admin@benchq.test").json()

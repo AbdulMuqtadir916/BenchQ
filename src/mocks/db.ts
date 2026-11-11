@@ -23,12 +23,12 @@ import { arrayOf } from "@/lib/api/client";
  */
 
 /** sha256 of src/mocks/data/*.json (first 16 hex). db.test.ts recomputes it: update it with the fixtures. */
-export const FIXTURE_VERSION = "19761d87fcff330c";
+export const FIXTURE_VERSION = "c1cbe26139d6951b";
 
 const STORAGE_KEY = "benchq.demo-data";
 
 /** Tables that can change. A new writable table registers here and calls `changed()` after writing. */
-export type TableName = "firms" | "users" | "invites" | "plans" | "platformUsers" | "candidates" | "records" | "applications" | "documents" | "inboxMessages" | "inboxConnections" | "capturedJobs" | "jobMarks";
+export type TableName = "firms" | "users" | "invites" | "plans" | "platformUsers" | "records" | "applications" | "documents" | "inboxMessages" | "inboxConnections" | "jobMarks";
 
 interface Snapshot {
   version: string;

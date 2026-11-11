@@ -103,37 +103,6 @@ def test_split_country_suffix(location, expected):
 
 # ── both call sites compose the same string ──────────────────────────────────
 
-@pytest.mark.parametrize("location,country", [
-    ("Austin", "usa"),
-    ("Toronto", "canada"),
-    ("Toronto, Canada", "usa"),
-    ("Toronto, ON", "canada"),
-    ("", "canada"),
-    ("Remote", "uk"),
-])
-def test_the_scraper_and_the_test_preview_send_the_same_location(
-    api_client, test_db, monkeypatch, location, country
-):
-    """One composition, two callers. This test fails if either side drifts."""
-    from backend.scraper.sources.jobspy import _run_sync
-
-    search = _search(test_db, location=location, country=country)
-
-    calls = []
-    _record_kwargs(monkeypatch, calls)
-
-    _run_sync(search)
-    resp = api_client.post(f"/api/searches/{search.id}/test")
-    assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
-
-    assert len(calls) == 2, f"expected one call per site, got {len(calls)}"
-    scraper_loc, preview_loc = calls[0]["location"], calls[1]["location"]
-    assert scraper_loc == preview_loc, \
-        f"the two call sites drifted: {scraper_loc!r} vs {preview_loc!r}"
-
-    from backend.countries import compose_location
-    assert scraper_loc == compose_location(location, country)
-
 
 def test_the_scraper_sends_the_country_to_indeed_and_to_the_location(test_db, monkeypatch):
     """`country_indeed` still reaches Indeed, and the composed string reaches the rest."""

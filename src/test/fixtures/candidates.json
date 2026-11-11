@@ -1,0 +1,1903 @@
+[
+  {
+    "id": "cand_01",
+    "firmId": "firm_hts",
+    "fullName": "Rajesh Venkataraman",
+    "email": "rajesh.v@example.com",
+    "phone": "+1-469-555-0142",
+    "linkedinUrl": "https://linkedin.com/in/rajesh-v",
+    "city": "Dallas",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2028-03-24T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2"
+    ],
+    "rateMin": 70,
+    "rateTarget": 85,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-07T06:17:52.966Z",
+    "availableFrom": "2026-09-29T06:17:52.966Z",
+    "noticePeriodDays": 14,
+    "yearsExperience": 8,
+    "primaryRole": "Senior Java Developer",
+    "targetRoles": [
+      "Java Backend",
+      "Full Stack"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": null,
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
+    ],
+    "preferredLocations": [
+      "Dallas, TX",
+      "Austin, TX"
+    ],
+    "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
+    "preferredIndustries": [
+      "fintech",
+      "healthcare"
+    ],
+    "dealBreakers": [
+      "no travel over 25%"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_01_0",
+        "question": "Are you open to C2C?",
+        "answer": "Yes, C2C through my employer or W2",
+        "category": "COMPENSATION",
+        "useCount": 7,
+        "lastUsedAt": "2026-09-30T15:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_01_1",
+        "question": "Current visa status?",
+        "answer": "H1B valid until 2028, no transfer needed",
+        "category": "WORK_AUTH",
+        "useCount": 5,
+        "lastUsedAt": "2026-09-29T10:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_01_2",
+        "question": "Notice period?",
+        "answer": "2 weeks from offer acceptance",
+        "category": "AVAILABILITY",
+        "useCount": 0,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_01_3",
+        "question": "Willing to relocate?",
+        "answer": "Yes, within Texas or remote",
+        "category": "RELOCATION",
+        "useCount": 0,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_01_4",
+        "question": "Microservices experience?",
+        "answer": "5 years building Spring Boot services at scale",
+        "category": "EXPERIENCE",
+        "useCount": 9,
+        "lastUsedAt": "2026-09-29T23:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-09-01T06:17:52.966Z",
+    "updatedAt": "2026-10-01T02:17:52.966Z"
+  },
+  {
+    "id": "cand_02",
+    "firmId": "firm_hts",
+    "fullName": "Priya Raman",
+    "email": "priya.r@example.com",
+    "phone": null,
+    "linkedinUrl": "https://linkedin.com/in/priya-raman",
+    "city": "Jersey City",
+    "state": "NJ",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "GC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C"
+    ],
+    "rateMin": 80,
+    "rateTarget": 95,
+    "status": "INTERVIEWING",
+    "benchStartDate": "2026-08-21T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 11,
+    "primaryRole": "Data Engineer",
+    "targetRoles": [
+      "Data Engineer",
+      "Analytics Engineer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": null,
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "fintech",
+      "ecommerce"
+    ],
+    "dealBreakers": [
+      "no onsite-only roles"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_02_0",
+        "question": "Preferred tech stack?",
+        "answer": "Snowflake, dbt, Airflow, Python",
+        "category": "EXPERIENCE",
+        "useCount": 1,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_02_1",
+        "question": "Rate expectations?",
+        "answer": "$80-95/hr C2C, negotiable for long-term",
+        "category": "COMPENSATION",
+        "useCount": 8,
+        "lastUsedAt": "2026-09-29T19:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_02_2",
+        "question": "Can you start immediately?",
+        "answer": "Currently interviewing, 1 week notice",
+        "category": "AVAILABILITY",
+        "useCount": 7,
+        "lastUsedAt": "2026-09-30T18:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_02_3",
+        "question": "Work authorization?",
+        "answer": "Green Card holder, no sponsorship needed",
+        "category": "WORK_AUTH",
+        "useCount": 2,
+        "lastUsedAt": null
+      }
+    ],
+    "createdAt": "2026-08-12T06:17:52.966Z",
+    "updatedAt": "2026-09-30T22:17:52.966Z"
+  },
+  {
+    "id": "cand_03",
+    "firmId": "firm_hts",
+    "fullName": "Amit Patel",
+    "email": "amit.p@example.com",
+    "phone": "+1-972-555-0198",
+    "linkedinUrl": null,
+    "city": "Plano",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2026-12-15T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": true,
+    "employmentTypes": [
+      "W2"
+    ],
+    "rateMin": 65,
+    "rateTarget": 78,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-08-02T06:17:52.966Z",
+    "availableFrom": "2026-09-26T06:17:52.966Z",
+    "noticePeriodDays": 14,
+    "yearsExperience": 6,
+    "primaryRole": ".NET Developer",
+    "targetRoles": [
+      ".NET Backend",
+      "C# Developer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
+    ],
+    "preferredLocations": [
+      "New Jersey",
+      "New York, NY"
+    ],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "insurance",
+      "healthcare"
+    ],
+    "dealBreakers": [
+      "no startups under 50 employees"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_03_0",
+        "question": "Transfer timeline?",
+        "answer": "Need 3-4 weeks for H1B transfer",
+        "category": "WORK_AUTH",
+        "useCount": 5,
+        "lastUsedAt": "2026-09-28T13:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_03_1",
+        "question": ".NET version experience?",
+        "answer": ".NET 6/7/8, Blazor, Entity Framework Core",
+        "category": "EXPERIENCE",
+        "useCount": 9,
+        "lastUsedAt": "2026-10-01T06:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_03_2",
+        "question": "Azure certifications?",
+        "answer": "AZ-204, planning AZ-400",
+        "category": "EXPERIENCE",
+        "useCount": 5,
+        "lastUsedAt": "2026-09-28T23:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-07-28T06:17:52.966Z",
+    "updatedAt": "2026-09-23T06:17:52.966Z"
+  },
+  {
+    "id": "cand_04",
+    "firmId": "firm_hts",
+    "fullName": "Lakshmi Narayanan",
+    "email": "lakshmi.n@example.com",
+    "phone": "+1-404-555-0134",
+    "linkedinUrl": "https://linkedin.com/in/lakshmi-n",
+    "city": "Atlanta",
+    "state": "GA",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "OPT",
+    "workAuthExpiry": "2027-05-29T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2",
+      "C2C"
+    ],
+    "rateMin": 55,
+    "rateTarget": 65,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-16T06:17:52.966Z",
+    "availableFrom": "2026-09-30T06:17:52.966Z",
+    "noticePeriodDays": 7,
+    "yearsExperience": 3,
+    "primaryRole": "QA Automation Engineer",
+    "targetRoles": [
+      "QA Automation",
+      "SDET"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "tech",
+      "fintech"
+    ],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_04_0",
+        "question": "Testing frameworks?",
+        "answer": "Selenium, Cypress, Jest, TestNG",
+        "category": "EXPERIENCE",
+        "useCount": 7,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_04_1",
+        "question": "OPT timeline?",
+        "answer": "STEM OPT, 18 months remaining",
+        "category": "WORK_AUTH",
+        "useCount": 9,
+        "lastUsedAt": "2026-09-29T07:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-09-11T06:17:52.966Z",
+    "updatedAt": "2026-09-30T18:17:52.966Z"
+  },
+  {
+    "id": "cand_05",
+    "firmId": "firm_hts",
+    "fullName": "Deepak Sharma",
+    "email": "deepak.s@example.com",
+    "phone": null,
+    "linkedinUrl": "https://linkedin.com/in/deepak-sharma-dev",
+    "city": "Columbus",
+    "state": "OH",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2027-11-05T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2"
+    ],
+    "rateMin": 75,
+    "rateTarget": 90,
+    "status": "OFFER",
+    "benchStartDate": "2026-07-03T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 10,
+    "primaryRole": "Cloud Architect",
+    "targetRoles": [
+      "Cloud Architect",
+      "DevOps Lead",
+      "SRE"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
+    ],
+    "preferredLocations": [
+      "Bay Area, CA"
+    ],
+    "contactNotes": "Best reached by email after 7 PM IST.",
+    "preferredIndustries": [
+      "enterprise",
+      "SaaS"
+    ],
+    "dealBreakers": [
+      "no roles under $80/hr"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_05_0",
+        "question": "Cloud certifications?",
+        "answer": "AWS SA Pro, AWS DevOps Pro, CKA",
+        "category": "EXPERIENCE",
+        "useCount": 0,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_05_1",
+        "question": "Team size led?",
+        "answer": "Led infrastructure team of 8 at TCS",
+        "category": "EXPERIENCE",
+        "useCount": 4,
+        "lastUsedAt": "2026-09-30T08:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_05_2",
+        "question": "Current offer details?",
+        "answer": "Verbal offer from Deloitte, $88/hr C2C",
+        "category": "COMPENSATION",
+        "useCount": 9,
+        "lastUsedAt": "2026-09-28T13:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-06-28T06:17:52.966Z",
+    "updatedAt": "2026-10-01T04:17:52.966Z"
+  },
+  {
+    "id": "cand_06",
+    "firmId": "firm_hts",
+    "fullName": "Meera Krishnan",
+    "email": "meera.k@example.com",
+    "phone": "+1-214-555-0167",
+    "linkedinUrl": null,
+    "city": "Dallas",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "USC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2",
+      "FTE"
+    ],
+    "rateMin": 60,
+    "rateTarget": 72,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-28T06:17:52.966Z",
+    "availableFrom": "2026-09-28T06:17:52.966Z",
+    "noticePeriodDays": 0,
+    "yearsExperience": 5,
+    "primaryRole": "Salesforce Developer",
+    "targetRoles": [
+      "Salesforce Developer",
+      "Salesforce Admin"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "any"
+    ],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_06_0",
+        "question": "Salesforce certifications?",
+        "answer": "Platform Developer I, Admin",
+        "category": "EXPERIENCE",
+        "useCount": 3,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_06_1",
+        "question": "CPQ experience?",
+        "answer": "2 years implementing CPQ at Verizon",
+        "category": "EXPERIENCE",
+        "useCount": 6,
+        "lastUsedAt": "2026-09-28T19:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-09-26T06:17:52.966Z",
+    "updatedAt": "2026-10-01T00:17:52.966Z"
+  },
+  {
+    "id": "cand_07",
+    "firmId": "firm_hts",
+    "fullName": "Kavitha Subramanian",
+    "email": "kavitha.s@example.com",
+    "phone": null,
+    "linkedinUrl": "https://linkedin.com/in/kavitha-s",
+    "city": "Charlotte",
+    "state": "NC",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2026-11-30T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": true,
+    "employmentTypes": [
+      "C2C"
+    ],
+    "rateMin": 72,
+    "rateTarget": 85,
+    "status": "INTERVIEWING",
+    "benchStartDate": "2026-08-12T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": 21,
+    "yearsExperience": 9,
+    "primaryRole": "SAP ABAP Developer",
+    "targetRoles": [
+      "SAP ABAP",
+      "SAP S/4HANA"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
+    ],
+    "preferredLocations": [
+      "Charlotte, NC"
+    ],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [
+      "must sponsor H1B extension"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_07_0",
+        "question": "SAP modules?",
+        "answer": "ABAP, S/4HANA, FI/CO integration",
+        "category": "EXPERIENCE",
+        "useCount": 5,
+        "lastUsedAt": "2026-09-30T04:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_07_1",
+        "question": "Visa urgency?",
+        "answer": "H1B expiring in ~60 days, needs transfer + extension",
+        "category": "WORK_AUTH",
+        "useCount": 2,
+        "lastUsedAt": null
+      }
+    ],
+    "createdAt": "2026-08-07T06:17:52.966Z",
+    "updatedAt": "2026-09-30T12:17:52.966Z"
+  },
+  {
+    "id": "cand_08",
+    "firmId": "firm_hts",
+    "fullName": "Ravi Menon",
+    "email": "ravi.m@example.com",
+    "phone": "+1-602-555-0189",
+    "linkedinUrl": null,
+    "city": "Phoenix",
+    "state": "AZ",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "OPT",
+    "workAuthExpiry": "2027-07-08T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2"
+    ],
+    "rateMin": 55,
+    "rateTarget": 65,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-22T06:17:52.966Z",
+    "availableFrom": "2026-09-30T06:17:52.966Z",
+    "noticePeriodDays": 7,
+    "yearsExperience": 3,
+    "primaryRole": "React Frontend Developer",
+    "targetRoles": [
+      "Frontend",
+      "UI Engineer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_adnan",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "tech",
+      "ecommerce"
+    ],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_08_0",
+        "question": "Frontend frameworks?",
+        "answer": "React 18+, Next.js, Vue 3",
+        "category": "EXPERIENCE",
+        "useCount": 7,
+        "lastUsedAt": "2026-09-29T16:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_08_1",
+        "question": "TypeScript proficiency?",
+        "answer": "2 years, comfortable with generics and type inference",
+        "category": "EXPERIENCE",
+        "useCount": 0,
+        "lastUsedAt": "2026-09-29T15:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-09-19T06:17:52.966Z",
+    "updatedAt": "2026-09-30T10:17:52.966Z"
+  },
+  {
+    "id": "cand_09",
+    "firmId": "firm_hts",
+    "fullName": "Suresh Gupta",
+    "email": "suresh.g@example.com",
+    "phone": "+1-704-555-0211",
+    "linkedinUrl": "https://linkedin.com/in/suresh-gupta",
+    "city": "Charlotte",
+    "state": "NC",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "GC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2"
+    ],
+    "rateMin": 82,
+    "rateTarget": 98,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-13T06:17:52.966Z",
+    "availableFrom": "2026-09-28T06:17:52.966Z",
+    "noticePeriodDays": 14,
+    "yearsExperience": 12,
+    "primaryRole": "Java Full Stack Developer",
+    "targetRoles": [
+      "Java Full Stack",
+      "Spring Boot Developer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
+    ],
+    "preferredLocations": [
+      "Chicago, IL"
+    ],
+    "contactNotes": "Can interview any weekday; two weeks' notice to current vendor.",
+    "preferredIndustries": [
+      "banking",
+      "fintech"
+    ],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_09_0",
+        "question": "Full stack experience?",
+        "answer": "Angular 14+, Spring Boot, PostgreSQL",
+        "category": "EXPERIENCE",
+        "useCount": 1,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_09_1",
+        "question": "Leadership?",
+        "answer": "Tech lead for 3 years, managed 6 developers",
+        "category": "EXPERIENCE",
+        "useCount": 6,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_09_2",
+        "question": "Rate flexibility?",
+        "answer": "Firm on $82 minimum, prefer $95+",
+        "category": "COMPENSATION",
+        "useCount": 3,
+        "lastUsedAt": "2026-09-30T19:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-09-09T06:17:52.966Z",
+    "updatedAt": "2026-10-01T01:17:52.966Z"
+  },
+  {
+    "id": "cand_10",
+    "firmId": "firm_hts",
+    "fullName": "Ananya Reddy",
+    "email": "ananya.r@example.com",
+    "phone": null,
+    "linkedinUrl": "https://linkedin.com/in/ananya-reddy",
+    "city": "Columbus",
+    "state": "OH",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "CPT",
+    "workAuthExpiry": "2027-01-29T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2"
+    ],
+    "rateMin": 45,
+    "rateTarget": 55,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-24T06:17:52.966Z",
+    "availableFrom": "2026-09-24T06:17:52.966Z",
+    "noticePeriodDays": 0,
+    "yearsExperience": 1,
+    "primaryRole": "Business Analyst",
+    "targetRoles": [
+      "Business Analyst",
+      "Product Analyst"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [],
+    "createdAt": "2026-09-21T06:17:52.966Z",
+    "updatedAt": "2026-09-24T06:17:52.966Z"
+  },
+  {
+    "id": "cand_11",
+    "firmId": "firm_hts",
+    "fullName": "Vinod Kumar",
+    "email": "vinod.k@example.com",
+    "phone": "+1-614-555-0145",
+    "linkedinUrl": null,
+    "city": "Columbus",
+    "state": "OH",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2028-05-23T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2"
+    ],
+    "rateMin": 68,
+    "rateTarget": 80,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-08-27T06:17:52.966Z",
+    "availableFrom": "2026-09-21T06:17:52.966Z",
+    "noticePeriodDays": 14,
+    "yearsExperience": 7,
+    "primaryRole": "Senior DevOps Engineer",
+    "targetRoles": [
+      "DevOps",
+      "SRE",
+      "Platform Engineer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
+    ],
+    "preferredLocations": [
+      "Dallas, TX",
+      "Austin, TX"
+    ],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "cloud",
+      "SaaS"
+    ],
+    "dealBreakers": [
+      "no Windows-only environments"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_11_0",
+        "question": "IaC tools?",
+        "answer": "Terraform, Pulumi, CloudFormation",
+        "category": "EXPERIENCE",
+        "useCount": 1,
+        "lastUsedAt": "2026-09-29T08:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_11_1",
+        "question": "Container orchestration?",
+        "answer": "Kubernetes (EKS, AKS), Docker, Helm",
+        "category": "EXPERIENCE",
+        "useCount": 2,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_11_2",
+        "question": "CI/CD?",
+        "answer": "Jenkins, GitHub Actions, ArgoCD",
+        "category": "EXPERIENCE",
+        "useCount": 9,
+        "lastUsedAt": "2026-10-01T03:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_11_3",
+        "question": "On-call experience?",
+        "answer": "Yes, PagerDuty, 24/7 rotation for 2 years",
+        "category": "EXPERIENCE",
+        "useCount": 2,
+        "lastUsedAt": "2026-10-01T02:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-08-22T06:17:52.966Z",
+    "updatedAt": "2026-09-30T14:17:52.966Z"
+  },
+  {
+    "id": "cand_12",
+    "firmId": "firm_hts",
+    "fullName": "Shalini Nair",
+    "email": "shalini.n@example.com",
+    "phone": "+1-469-555-0223",
+    "linkedinUrl": "https://linkedin.com/in/shalini-nair",
+    "city": "Dallas",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "H4_EAD",
+    "workAuthExpiry": "2027-07-28T06:17:52.966Z",
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2",
+      "C2C"
+    ],
+    "rateMin": 60,
+    "rateTarget": 72,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-19T06:17:52.966Z",
+    "availableFrom": "2026-09-26T06:17:52.966Z",
+    "noticePeriodDays": 7,
+    "yearsExperience": 6,
+    "primaryRole": "Python/Django Developer",
+    "targetRoles": [
+      "Python Backend",
+      "Django Developer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_12_0",
+        "question": "Python frameworks?",
+        "answer": "Django 4, Flask, FastAPI, Celery",
+        "category": "EXPERIENCE",
+        "useCount": 7,
+        "lastUsedAt": "2026-09-28T14:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_12_1",
+        "question": "Gap year explanation?",
+        "answer": "Personal reasons, stayed current with side projects",
+        "category": "BEHAVIOURAL",
+        "useCount": 4,
+        "lastUsedAt": null
+      }
+    ],
+    "createdAt": "2026-09-16T06:17:52.966Z",
+    "updatedAt": "2026-09-30T20:17:52.966Z"
+  },
+  {
+    "id": "cand_13",
+    "firmId": "firm_hts",
+    "fullName": "Karthik Iyer",
+    "email": "karthik.i@example.com",
+    "phone": null,
+    "linkedinUrl": null,
+    "city": "Atlanta",
+    "state": "GA",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "OPT",
+    "workAuthExpiry": "2027-03-10T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2"
+    ],
+    "rateMin": 50,
+    "rateTarget": 60,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-03T06:17:52.966Z",
+    "availableFrom": "2026-09-17T06:17:52.966Z",
+    "noticePeriodDays": 0,
+    "yearsExperience": 2,
+    "primaryRole": "React Frontend Developer",
+    "targetRoles": [
+      "Frontend Developer",
+      "UI Developer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
+    ],
+    "preferredLocations": [
+      "New Jersey",
+      "New York, NY"
+    ],
+    "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [],
+    "createdAt": "2026-09-01T06:17:52.966Z",
+    "updatedAt": "2026-09-17T06:17:52.966Z"
+  },
+  {
+    "id": "cand_14",
+    "firmId": "firm_hts",
+    "fullName": "Pooja Deshmukh",
+    "email": "pooja.d@example.com",
+    "phone": "+1-704-555-0188",
+    "linkedinUrl": "https://linkedin.com/in/pooja-deshmukh",
+    "city": "Charlotte",
+    "state": "NC",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "GC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2",
+      "FTE"
+    ],
+    "rateMin": 75,
+    "rateTarget": 88,
+    "status": "INTERVIEWING",
+    "benchStartDate": "2026-08-17T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": 14,
+    "yearsExperience": 9,
+    "primaryRole": "ServiceNow Developer",
+    "targetRoles": [
+      "ServiceNow Developer",
+      "ITSM Consultant"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "enterprise IT",
+      "consulting"
+    ],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_14_0",
+        "question": "ServiceNow modules?",
+        "answer": "ITSM, ITOM, HRSD, custom app dev",
+        "category": "EXPERIENCE",
+        "useCount": 6,
+        "lastUsedAt": "2026-10-01T00:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_14_1",
+        "question": "Scripting?",
+        "answer": "GlideScript, Business Rules, Client Scripts, REST APIs",
+        "category": "EXPERIENCE",
+        "useCount": 5,
+        "lastUsedAt": "2026-10-01T00:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_14_2",
+        "question": "Certifications?",
+        "answer": "CSA, CAD, working on CIS-ITSM",
+        "category": "EXPERIENCE",
+        "useCount": 8,
+        "lastUsedAt": null
+      }
+    ],
+    "createdAt": "2026-08-14T06:17:52.966Z",
+    "updatedAt": "2026-09-30T06:17:52.966Z"
+  },
+  {
+    "id": "cand_15",
+    "firmId": "firm_hts",
+    "fullName": "Rahul Joshi",
+    "email": "rahul.j@example.com",
+    "phone": null,
+    "linkedinUrl": "https://linkedin.com/in/rahul-joshi-dev",
+    "city": "Jersey City",
+    "state": "NJ",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2028-01-24T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C"
+    ],
+    "rateMin": 78,
+    "rateTarget": 92,
+    "status": "PLACED",
+    "benchStartDate": "2026-06-03T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 10,
+    "primaryRole": "Java Full Stack Developer",
+    "targetRoles": [
+      "Java Full Stack"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
+    ],
+    "preferredLocations": [
+      "Bay Area, CA"
+    ],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_15_0",
+        "question": "Current engagement?",
+        "answer": "JPMorgan, Spring Boot microservices, 6-month contract",
+        "category": "AVAILABILITY",
+        "useCount": 2,
+        "lastUsedAt": "2026-10-01T01:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-05-24T06:17:52.966Z",
+    "updatedAt": "2026-08-17T06:17:52.966Z"
+  },
+  {
+    "id": "cand_16",
+    "firmId": "firm_hts",
+    "fullName": "Nisha Agarwal",
+    "email": "nisha.a@example.com",
+    "phone": "+1-480-555-0199",
+    "linkedinUrl": null,
+    "city": "Phoenix",
+    "state": "AZ",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "CPT",
+    "workAuthExpiry": "2027-04-19T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2"
+    ],
+    "rateMin": 42,
+    "rateTarget": 52,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-26T06:17:52.966Z",
+    "availableFrom": "2026-09-26T06:17:52.966Z",
+    "noticePeriodDays": 0,
+    "yearsExperience": 1,
+    "primaryRole": "QA Automation Engineer",
+    "targetRoles": [
+      "QA Automation",
+      "Test Engineer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [],
+    "createdAt": "2026-09-23T06:17:52.966Z",
+    "updatedAt": "2026-09-26T06:17:52.966Z"
+  },
+  {
+    "id": "cand_17",
+    "firmId": "firm_hts",
+    "fullName": "Arjun Mehta",
+    "email": "arjun.m@example.com",
+    "phone": "+1-614-555-0177",
+    "linkedinUrl": "https://linkedin.com/in/arjun-mehta",
+    "city": "Columbus",
+    "state": "OH",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "USC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2",
+      "FTE",
+      "C2C"
+    ],
+    "rateMin": 70,
+    "rateTarget": 85,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-21T06:17:52.966Z",
+    "availableFrom": "2026-09-28T06:17:52.966Z",
+    "noticePeriodDays": 14,
+    "yearsExperience": 7,
+    "primaryRole": "Data Engineer",
+    "targetRoles": [
+      "Data Engineer",
+      "ETL Developer"
+    ],
+    "managerId": "user_fatima",
+    "bdeId": "user_sneha",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
+    ],
+    "preferredLocations": [
+      "Charlotte, NC"
+    ],
+    "contactNotes": "Best reached by email after 7 PM IST.",
+    "preferredIndustries": [
+      "healthcare",
+      "insurance"
+    ],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_17_0",
+        "question": "Big data stack?",
+        "answer": "Spark, Databricks, Kafka, Airflow, Snowflake",
+        "category": "EXPERIENCE",
+        "useCount": 5,
+        "lastUsedAt": "2026-09-30T12:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_17_1",
+        "question": "Cloud preference?",
+        "answer": "AWS preferred, comfortable with Azure",
+        "category": "EXPERIENCE",
+        "useCount": 2,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_17_2",
+        "question": "Why bench sales vs. direct?",
+        "answer": "Flexibility, variety of projects",
+        "category": "BEHAVIOURAL",
+        "useCount": 0,
+        "lastUsedAt": "2026-09-28T15:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-09-17T06:17:52.966Z",
+    "updatedAt": "2026-10-01T03:17:52.966Z"
+  },
+  {
+    "id": "cand_18",
+    "firmId": "firm_hts",
+    "fullName": "Divya Venkatesh",
+    "email": "divya.v@example.com",
+    "phone": "+1-469-555-0256",
+    "linkedinUrl": "https://linkedin.com/in/divya-v",
+    "city": "Dallas",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2027-09-16T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2"
+    ],
+    "rateMin": 65,
+    "rateTarget": 78,
+    "status": "INTERVIEWING",
+    "benchStartDate": "2026-09-09T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": 14,
+    "yearsExperience": 5,
+    "primaryRole": ".NET Developer",
+    "targetRoles": [
+      ".NET Developer",
+      "Azure Developer"
+    ],
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [],
+    "createdAt": "2026-09-06T06:17:52.966Z",
+    "updatedAt": "2026-09-30T16:17:52.966Z"
+  },
+  {
+    "id": "cand_19",
+    "firmId": "firm_hts",
+    "fullName": "Sanjay Pillai",
+    "email": "sanjay.p@example.com",
+    "phone": null,
+    "linkedinUrl": "https://linkedin.com/in/sanjay-pillai",
+    "city": "Plano",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "GC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C"
+    ],
+    "rateMin": 85,
+    "rateTarget": 100,
+    "status": "INTERVIEWING",
+    "benchStartDate": "2026-08-07T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": 14,
+    "yearsExperience": 14,
+    "primaryRole": "Cloud Architect",
+    "targetRoles": [
+      "Solutions Architect",
+      "Cloud Architect"
+    ],
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
+    ],
+    "preferredLocations": [
+      "Chicago, IL"
+    ],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [
+      "no roles under $85/hr",
+      "no pure hands-on IC"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_19_0",
+        "question": "Architecture scale?",
+        "answer": "Designed systems serving 50M+ users at Oracle",
+        "category": "EXPERIENCE",
+        "useCount": 4,
+        "lastUsedAt": "2026-09-30T20:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_19_1",
+        "question": "Certifications?",
+        "answer": "AWS SA Pro, Azure Solutions Architect Expert, GCP PCA",
+        "category": "EXPERIENCE",
+        "useCount": 0,
+        "lastUsedAt": "2026-09-30T06:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-08-02T06:17:52.966Z",
+    "updatedAt": "2026-09-30T00:17:52.966Z"
+  },
+  {
+    "id": "cand_20",
+    "firmId": "firm_hts",
+    "fullName": "Neha Bhatt",
+    "email": "neha.b@example.com",
+    "phone": "+1-404-555-0234",
+    "linkedinUrl": null,
+    "city": "Atlanta",
+    "state": "GA",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "OPT",
+    "workAuthExpiry": "2027-04-19T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2"
+    ],
+    "rateMin": 48,
+    "rateTarget": 58,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-17T06:17:52.966Z",
+    "availableFrom": "2026-09-24T06:17:52.966Z",
+    "noticePeriodDays": 0,
+    "yearsExperience": 2,
+    "primaryRole": "Business Analyst",
+    "targetRoles": [
+      "Business Analyst",
+      "Data Analyst"
+    ],
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [],
+    "createdAt": "2026-09-13T06:17:52.966Z",
+    "updatedAt": "2026-09-24T06:17:52.966Z"
+  },
+  {
+    "id": "cand_21",
+    "firmId": "firm_hts",
+    "fullName": "Harish Rao",
+    "email": "harish.r@example.com",
+    "phone": "+1-972-555-0278",
+    "linkedinUrl": "https://linkedin.com/in/harish-rao",
+    "city": "Plano",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "OPT",
+    "workAuthExpiry": "2028-02-13T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2"
+    ],
+    "rateMin": 70,
+    "rateTarget": 82,
+    "status": "OFFER",
+    "benchStartDate": "2026-08-24T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": 14,
+    "yearsExperience": 8,
+    "primaryRole": "Senior DevOps Engineer",
+    "targetRoles": [
+      "DevOps",
+      "Platform Engineer"
+    ],
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
+    ],
+    "preferredLocations": [
+      "Dallas, TX",
+      "Austin, TX"
+    ],
+    "contactNotes": "Can interview any weekday; two weeks' notice to current vendor.",
+    "preferredIndustries": [
+      "fintech",
+      "SaaS"
+    ],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_21_0",
+        "question": "AWS services?",
+        "answer": "ECS, EKS, Lambda, Step Functions, CDK",
+        "category": "EXPERIENCE",
+        "useCount": 5,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_21_1",
+        "question": "Monitoring?",
+        "answer": "Datadog, Prometheus, Grafana, CloudWatch",
+        "category": "EXPERIENCE",
+        "useCount": 5,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_21_2",
+        "question": "Interview status?",
+        "answer": "Final round with Capital One",
+        "category": "AVAILABILITY",
+        "useCount": 5,
+        "lastUsedAt": null
+      }
+    ],
+    "createdAt": "2026-08-20T06:17:52.966Z",
+    "updatedAt": "2026-09-30T08:17:52.966Z"
+  },
+  {
+    "id": "cand_22",
+    "firmId": "firm_hts",
+    "fullName": "Swathi Mohan",
+    "email": "swathi.m@example.com",
+    "phone": null,
+    "linkedinUrl": null,
+    "city": "Dallas",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "USC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2",
+      "FTE"
+    ],
+    "rateMin": 55,
+    "rateTarget": 68,
+    "status": "PAUSED",
+    "benchStartDate": "2026-04-04T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 4,
+    "primaryRole": "Python/Django Developer",
+    "targetRoles": [
+      "Python Developer",
+      "Backend Developer"
+    ],
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_22_0",
+        "question": "When resuming search?",
+        "answer": "Approximately 30 days from now",
+        "category": "AVAILABILITY",
+        "useCount": 5,
+        "lastUsedAt": null
+      }
+    ],
+    "createdAt": "2026-03-30T06:17:52.966Z",
+    "updatedAt": "2026-09-01T06:17:52.966Z"
+  },
+  {
+    "id": "cand_23",
+    "firmId": "firm_hts",
+    "fullName": "Manoj Srinivasan",
+    "email": "manoj.s@example.com",
+    "phone": "+1-704-555-0299",
+    "linkedinUrl": "https://linkedin.com/in/manoj-s",
+    "city": "Charlotte",
+    "state": "NC",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "CPT",
+    "workAuthExpiry": "2027-02-28T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2"
+    ],
+    "rateMin": 40,
+    "rateTarget": 50,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-25T06:17:52.966Z",
+    "availableFrom": "2026-09-25T06:17:52.966Z",
+    "noticePeriodDays": 0,
+    "yearsExperience": 1,
+    "primaryRole": "Java Developer",
+    "targetRoles": [
+      "Java Developer",
+      "Backend Developer"
+    ],
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
+    ],
+    "preferredLocations": [
+      "New Jersey",
+      "New York, NY"
+    ],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [],
+    "createdAt": "2026-09-23T06:17:52.966Z",
+    "updatedAt": "2026-09-25T06:17:52.966Z"
+  },
+  {
+    "id": "cand_24",
+    "firmId": "firm_hts",
+    "fullName": "Vikram Reddy",
+    "email": "vikram.r@example.com",
+    "phone": "+1-469-555-0312",
+    "linkedinUrl": "https://linkedin.com/in/vikram-reddy",
+    "city": "Dallas",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2028-08-31T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2"
+    ],
+    "rateMin": 72,
+    "rateTarget": 85,
+    "status": "INACTIVE",
+    "benchStartDate": "2026-05-04T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 9,
+    "primaryRole": "Salesforce Developer",
+    "targetRoles": [
+      "Salesforce Developer",
+      "Salesforce Architect"
+    ],
+    "managerId": "user_priya",
+    "bdeId": "user_vikram",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_24_0",
+        "question": "Current status?",
+        "answer": "Found FTE independently, inactive on bench",
+        "category": "AVAILABILITY",
+        "useCount": 9,
+        "lastUsedAt": "2026-09-28T15:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-04-24T06:17:52.966Z",
+    "updatedAt": "2026-08-02T06:17:52.966Z"
+  },
+  {
+    "id": "cand_stl02",
+    "firmId": "firm_stl",
+    "fullName": "Farhan Siddiqui",
+    "email": "farhan.siddiqui@gmail.com",
+    "phone": null,
+    "linkedinUrl": "https://www.linkedin.com/in/farhan-siddiqui",
+    "city": "Jersey City",
+    "state": "NJ",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "GC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C"
+    ],
+    "rateMin": 80,
+    "rateTarget": 95,
+    "status": "INTERVIEWING",
+    "benchStartDate": "2026-08-21T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 11,
+    "primaryRole": "Data Engineer",
+    "targetRoles": [
+      "Data Engineer",
+      "Analytics Engineer"
+    ],
+    "managerId": "user_arjun",
+    "bdeId": null,
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
+    ],
+    "preferredLocations": [
+      "Bay Area, CA"
+    ],
+    "contactNotes": "Prefers WhatsApp. Not available for interviews before 9 AM CT.",
+    "preferredIndustries": [
+      "fintech",
+      "ecommerce"
+    ],
+    "dealBreakers": [
+      "no onsite-only roles"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_stl02_0",
+        "question": "Preferred tech stack?",
+        "answer": "Snowflake, dbt, Airflow, Python",
+        "category": "EXPERIENCE",
+        "useCount": 1,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_stl02_1",
+        "question": "Rate expectations?",
+        "answer": "$80-95/hr C2C, negotiable for long-term",
+        "category": "COMPENSATION",
+        "useCount": 8,
+        "lastUsedAt": "2026-09-29T19:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_stl02_2",
+        "question": "Can you start immediately?",
+        "answer": "Currently interviewing, 1 week notice",
+        "category": "AVAILABILITY",
+        "useCount": 7,
+        "lastUsedAt": "2026-09-30T18:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_stl02_3",
+        "question": "Work authorization?",
+        "answer": "Green Card holder, no sponsorship needed",
+        "category": "WORK_AUTH",
+        "useCount": 2,
+        "lastUsedAt": null
+      }
+    ],
+    "createdAt": "2026-08-12T06:17:52.966Z",
+    "updatedAt": "2026-09-30T22:17:52.966Z"
+  },
+  {
+    "id": "cand_stl03",
+    "firmId": "firm_stl",
+    "fullName": "Bhavana Kulkarni",
+    "email": "bhavana.kulkarni@gmail.com",
+    "phone": "+1-972-555-0198",
+    "linkedinUrl": null,
+    "city": "Plano",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2026-12-15T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": true,
+    "employmentTypes": [
+      "W2"
+    ],
+    "rateMin": 65,
+    "rateTarget": 78,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-08-02T06:17:52.966Z",
+    "availableFrom": "2026-09-26T06:17:52.966Z",
+    "noticePeriodDays": 14,
+    "yearsExperience": 6,
+    "primaryRole": ".NET Developer",
+    "targetRoles": [
+      ".NET Backend",
+      "C# Developer"
+    ],
+    "managerId": "user_arjun",
+    "bdeId": "user_kiran",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "insurance",
+      "healthcare"
+    ],
+    "dealBreakers": [
+      "no startups under 50 employees"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_stl03_0",
+        "question": "Transfer timeline?",
+        "answer": "Need 3-4 weeks for H1B transfer",
+        "category": "WORK_AUTH",
+        "useCount": 5,
+        "lastUsedAt": "2026-09-28T13:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_stl03_1",
+        "question": ".NET version experience?",
+        "answer": ".NET 6/7/8, Blazor, Entity Framework Core",
+        "category": "EXPERIENCE",
+        "useCount": 9,
+        "lastUsedAt": "2026-10-01T06:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_stl03_2",
+        "question": "Azure certifications?",
+        "answer": "AZ-204, planning AZ-400",
+        "category": "EXPERIENCE",
+        "useCount": 5,
+        "lastUsedAt": "2026-09-28T23:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-07-28T06:17:52.966Z",
+    "updatedAt": "2026-09-23T06:17:52.966Z"
+  },
+  {
+    "id": "cand_stl05",
+    "firmId": "firm_stl",
+    "fullName": "Tarun Bose",
+    "email": "tarun.bose@gmail.com",
+    "phone": null,
+    "linkedinUrl": "https://www.linkedin.com/in/tarun-bose",
+    "city": "Columbus",
+    "state": "OH",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2027-11-05T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C",
+      "W2"
+    ],
+    "rateMin": 75,
+    "rateTarget": 90,
+    "status": "OFFER",
+    "benchStartDate": "2026-07-03T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 10,
+    "primaryRole": "Cloud Architect",
+    "targetRoles": [
+      "Cloud Architect",
+      "DevOps Lead",
+      "SRE"
+    ],
+    "managerId": "user_arjun",
+    "bdeId": "user_kiran",
+    "workSettings": [
+      "HYBRID",
+      "ONSITE"
+    ],
+    "preferredLocations": [
+      "Charlotte, NC"
+    ],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "enterprise",
+      "SaaS"
+    ],
+    "dealBreakers": [
+      "no roles under $80/hr"
+    ],
+    "qaBank": [
+      {
+        "id": "qa_cand_stl05_0",
+        "question": "Cloud certifications?",
+        "answer": "AWS SA Pro, AWS DevOps Pro, CKA",
+        "category": "EXPERIENCE",
+        "useCount": 0,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_stl05_1",
+        "question": "Team size led?",
+        "answer": "Led infrastructure team of 8 at TCS",
+        "category": "EXPERIENCE",
+        "useCount": 4,
+        "lastUsedAt": "2026-09-30T08:17:52.966Z"
+      },
+      {
+        "id": "qa_cand_stl05_2",
+        "question": "Current offer details?",
+        "answer": "Verbal offer from Deloitte, $88/hr C2C",
+        "category": "COMPENSATION",
+        "useCount": 9,
+        "lastUsedAt": "2026-09-28T13:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-06-28T06:17:52.966Z",
+    "updatedAt": "2026-10-01T04:17:52.966Z"
+  },
+  {
+    "id": "cand_stl15",
+    "firmId": "firm_stl",
+    "fullName": "Asha Pinto",
+    "email": "asha.pinto@gmail.com",
+    "phone": null,
+    "linkedinUrl": "https://www.linkedin.com/in/asha-pinto",
+    "city": "Jersey City",
+    "state": "NJ",
+    "country": "US",
+    "willingToRelocate": true,
+    "workAuth": "H1B",
+    "workAuthExpiry": "2028-01-24T06:17:52.966Z",
+    "needsSponsorship": true,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "C2C"
+    ],
+    "rateMin": 78,
+    "rateTarget": 92,
+    "status": "PLACED",
+    "benchStartDate": "2026-06-03T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 10,
+    "primaryRole": "Java Full Stack Developer",
+    "targetRoles": [
+      "Java Full Stack"
+    ],
+    "managerId": "user_arjun",
+    "bdeId": "user_kiran",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_stl15_0",
+        "question": "Current engagement?",
+        "answer": "JPMorgan, Spring Boot microservices, 6-month contract",
+        "category": "AVAILABILITY",
+        "useCount": 2,
+        "lastUsedAt": "2026-10-01T01:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-05-24T06:17:52.966Z",
+    "updatedAt": "2026-08-17T06:17:52.966Z"
+  },
+  {
+    "id": "cand_stl22",
+    "firmId": "firm_stl",
+    "fullName": "Wasim Qureshi",
+    "email": "wasim.qureshi@gmail.com",
+    "phone": null,
+    "linkedinUrl": null,
+    "city": "Dallas",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "USC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2",
+      "FTE"
+    ],
+    "rateMin": 55,
+    "rateTarget": 68,
+    "status": "PAUSED",
+    "benchStartDate": "2026-04-04T06:17:52.966Z",
+    "availableFrom": null,
+    "noticePeriodDays": null,
+    "yearsExperience": 4,
+    "primaryRole": "Python/Django Developer",
+    "targetRoles": [
+      "Python Developer",
+      "Backend Developer"
+    ],
+    "managerId": "user_arjun",
+    "bdeId": "user_kiran",
+    "workSettings": [
+      "REMOTE",
+      "HYBRID"
+    ],
+    "preferredLocations": [
+      "Chicago, IL"
+    ],
+    "contactNotes": "Best reached by email after 7 PM IST.",
+    "preferredIndustries": [],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_stl22_0",
+        "question": "When resuming search?",
+        "answer": "Approximately 30 days from now",
+        "category": "AVAILABILITY",
+        "useCount": 5,
+        "lastUsedAt": null
+      }
+    ],
+    "createdAt": "2026-03-30T06:17:52.966Z",
+    "updatedAt": "2026-09-01T06:17:52.966Z"
+  },
+  {
+    "id": "cand_cbw06",
+    "firmId": "firm_cbw",
+    "fullName": "Zoya Fernandes",
+    "email": "zoya.fernandes@gmail.com",
+    "phone": "+1-214-555-0167",
+    "linkedinUrl": null,
+    "city": "Dallas",
+    "state": "TX",
+    "country": "US",
+    "willingToRelocate": false,
+    "workAuth": "USC",
+    "workAuthExpiry": null,
+    "needsSponsorship": false,
+    "needsTransfer": false,
+    "employmentTypes": [
+      "W2",
+      "FTE"
+    ],
+    "rateMin": 60,
+    "rateTarget": 72,
+    "status": "ON_BENCH",
+    "benchStartDate": "2026-09-28T06:17:52.966Z",
+    "availableFrom": "2026-09-28T06:17:52.966Z",
+    "noticePeriodDays": 0,
+    "yearsExperience": 5,
+    "primaryRole": "Salesforce Developer",
+    "targetRoles": [
+      "Salesforce Developer",
+      "Salesforce Admin"
+    ],
+    "managerId": "user_salma",
+    "bdeId": "user_rehana",
+    "workSettings": [],
+    "preferredLocations": [],
+    "contactNotes": null,
+    "preferredIndustries": [
+      "any"
+    ],
+    "dealBreakers": [],
+    "qaBank": [
+      {
+        "id": "qa_cand_cbw06_0",
+        "question": "Salesforce certifications?",
+        "answer": "Platform Developer I, Admin",
+        "category": "EXPERIENCE",
+        "useCount": 3,
+        "lastUsedAt": null
+      },
+      {
+        "id": "qa_cand_cbw06_1",
+        "question": "CPQ experience?",
+        "answer": "2 years implementing CPQ at Verizon",
+        "category": "EXPERIENCE",
+        "useCount": 6,
+        "lastUsedAt": "2026-09-28T19:17:52.966Z"
+      }
+    ],
+    "createdAt": "2026-09-26T06:17:52.966Z",
+    "updatedAt": "2026-10-01T00:17:52.966Z"
+  }
+]

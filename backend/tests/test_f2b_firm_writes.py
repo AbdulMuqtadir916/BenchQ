@@ -33,27 +33,6 @@ def test_a_logged_application_belongs_to_the_users_firm(api_client, accounts, te
     assert (link.firm_id, link.origin, link.captured_by_user_id) == (accounts.firm_id, "CAPTURED", accounts.user_id)
 
 
-def test_a_hand_added_job_is_captured_by_the_user(api_client, accounts, test_db):
-    resp = api_client.post("/api/jobs/manual", json={"title": "Analyst", "company": "Globex",
-                                                     "url": "https://globex.test/jobs/2"})
-    assert resp.status_code == 200, resp.text
-    [link] = _links(test_db, uuid.UUID(resp.json()["id"]))
-    assert (link.firm_id, link.origin, link.captured_by_user_id) == (accounts.firm_id, "CAPTURED", accounts.user_id)
-
-    # The same posting again changes nothing and adds no second link.
-    again = api_client.post("/api/jobs/manual", json={"title": "Analyst", "company": "Globex",
-                                                      "url": "https://globex.test/jobs/2"})
-    assert again.json()["created"] is False
-    assert len(_links(test_db, link.job_id)) == 1
-
-
-def test_documents_belong_to_the_users_firm(api_client, accounts, test_db):
-    """(Résumés are made under the candidate's URL since résumé versioning PR 5; test_resume_versions.py.)"""
-    letter = api_client.post("/api/cover-letters", json={"name": "Letter"})
-    assert letter.status_code == 201, letter.text
-    test_db.expire_all()
-    assert test_db.get(CoverLetter, uuid.UUID(letter.json()["id"])).firm_id == accounts.firm_id
-
 
 def test_a_scraped_job_goes_to_its_searchs_firm(test_db, default_firm):
     search = Search(firm_id=DEFAULT_FIRM_ID, name="Keywords", search_mode="keyword")

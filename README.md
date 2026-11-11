@@ -2,8 +2,9 @@
 
 A multi-tenant B2B SaaS for US-focused IT staffing firms: bench-sales recruiters (BDEs) submit applications for
 their candidates, and owners and managers see all of it as it happens. The frontend is Next.js; the backend is
-JobNavigator (FastAPI + PostgreSQL) in `backend/`. The session, the team, invites, `/admin` and the ledger run
-on the backend; every other module runs on mock data until its track connects it.
+JobNavigator (FastAPI + PostgreSQL) in `backend/`. The session, the team, invites, `/admin`, the ledger, candidates,
+résumés and jobs run on the backend (candidates, résumés and jobs have no mock data at all since 2026-11-11: add a
+candidate by onboarding one with a real résumé); every other module runs on mock data until its track connects it.
 
 ## Quick start
 

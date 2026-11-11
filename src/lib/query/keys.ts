@@ -24,9 +24,14 @@ const resource = <R extends string>(name: R) => ({
 
 export const queryKeys = {
   candidates: resource("candidates"),
-  jobs: resource("jobs"),
+  jobs: {
+    ...resource("jobs"),
+    /** A candidate's searches and today's usage ("Find jobs", docs/02 §6.z): under `jobs`, so a capture refreshes it. */
+    searches: (firmId: string, candidateId: string) => [firmId, "jobs", "searches", candidateId] as const,
+    /** The search this tab started for the candidate, until its outcome is read (never fetched: set on the start). */
+    startedSearch: (firmId: string, candidateId: string) => [firmId, "jobs", "started", candidateId] as const,
+  },
   applications: resource("applications"),
-  followups: resource("followups"),
   resumes: {
     ...resource("resumes"),
     byCandidate: (firmId: string, candidateId: string) => [firmId, "resumes", "byCandidate", candidateId] as const,
@@ -34,7 +39,7 @@ export const queryKeys = {
   records: { byCandidate: (firmId: string, candidateId: string) => [firmId, "records", "byCandidate", candidateId] as const },
   documents: { byCandidate: (firmId: string, candidateId: string) => [firmId, "documents", "byCandidate", candidateId] as const },
   inbox: { confirmation: (firm: string, candidate: string, attempt: string | null) => [firm, "mailbox-confirmation", candidate, attempt] as const, body: (firm: string, candidate: string, message?: string | null) => message === undefined ? [firm, "inbox-body", candidate] as const : [firm, "inbox-body", candidate, message] as const, byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const },
-  ledger: { all: (firmId: string) => [firmId, "ledger"] as const, list: (firmId: string, params?: Params) => [firmId, "ledger", "list", params ?? {}] as const, people: (firmId: string, params?: Params) => [firmId, "ledger", "people", params ?? {}] as const, candidates: (firmId: string, params?: Params) => [firmId, "ledger", "candidates", params ?? {}] as const, days: (firmId: string, params?: Params) => [firmId, "ledger", "days", params ?? {}] as const },
+  ledger: { all: (firmId: string) => [firmId, "ledger"] as const, list: (firmId: string, params?: Params) => [firmId, "ledger", "list", params ?? {}] as const, people: (firmId: string, params?: Params) => [firmId, "ledger", "people", params ?? {}] as const, candidates: (firmId: string, params?: Params) => [firmId, "ledger", "candidates", params ?? {}] as const, days: (firmId: string, params?: Params) => [firmId, "ledger", "days", params ?? {}] as const, whole: (firmId: string, params?: Params) => [firmId, "ledger", "whole", params ?? {}] as const },
   team: {
     all: (firmId: string) => [firmId, "team"] as const,
     list: (firmId: string) => [firmId, "team", "list"] as const,
@@ -63,7 +68,6 @@ export const queryKeys = {
   /** /invite/[token]: public, before anyone signs in. */
   invite: (token: string) => ["invite", token] as const,
   /** The mock parser's sample résumé names (not firm data: the same fixtures for every firm). */
-  resumeSamples: () => ["resume-samples"] as const,
   companies: {
     all: () => ["companies"] as const,
     detail: (id: string) => ["companies", "detail", id] as const,

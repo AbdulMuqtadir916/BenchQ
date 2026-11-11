@@ -2,8 +2,7 @@ import { z } from "zod";
 
 /**
  * Files a BDE keeps per candidate and sends to vendors on request — visa
- * papers, ID, certifications, original resumes. The same files are the
- * evidence behind verified claims (RecordEvidence.documentId points here).
+ * papers, ID, certifications, original resumes.
  */
 export const DocumentKind = z.enum(["WORK_AUTH", "IDENTITY", "RESUME", "CERTIFICATION", "EDUCATION", "EMPLOYMENT", "OTHER"]);
 export type DocumentKind = z.infer<typeof DocumentKind>;

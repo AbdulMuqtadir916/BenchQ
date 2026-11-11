@@ -42,7 +42,7 @@ export function ModeSwitch() {
             tabIndex={isActive ? 0 : -1}
             title={hint}
             onClick={() => setMode(id)}
-            className={cn("relative inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-3 text-sm", isActive ? "font-[550] text-[var(--color-text)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}
+            className={cn("relative inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-3 text-sm", isActive ? "font-[550] text-[var(--color-text)]" : "text-[var(--color-text-2)] hover:text-[var(--color-text)]")}
           >
             {isActive ? (
               <motion.span
