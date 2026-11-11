@@ -15,7 +15,7 @@ pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _make_app(test_db, title="Bulk Role", status="applied", company="Bulk Co"):
-    """One candidate's application on a posting of theirs (every application is one since migration 0025),
+    """One candidate's application on a posting of theirs (every application is one since migration 0027),
     committed; returns the Application."""
     from backend.tests.posting_support import posting_for
     from backend.tests.resume_support import make_version

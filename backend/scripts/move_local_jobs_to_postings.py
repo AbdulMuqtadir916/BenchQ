@@ -1,10 +1,10 @@
 """Move a local database's applications from the old `jobs` pool onto `job_postings` (the add-job plan, 2026-11-11).
 
-For a developer's own database, between migrations 0024 and 0025 (0025 refuses until this is done):
+For a developer's own database, between migrations 0026 and 0027 (0027 refuses until this is done):
 
     python -m backend.scripts.move_local_jobs_to_postings            # copy and point, in one transaction
     python -m backend.scripts.move_local_jobs_to_postings --dry-run  # say what it would do; write nothing
-    python -m backend.scripts.move_local_jobs_to_postings --undo     # point back and drop the copies (before 0024's downgrade)
+    python -m backend.scripts.move_local_jobs_to_postings --undo     # point back and drop the copies (before 0026's downgrade)
 
 - Every old job a candidate has (an application, or a search result in `candidate_jobs`) becomes one of that
   candidate's `job_postings`, source `legacy`, in one batch per candidate (a finished capture, `kind = 'capture'`, run
@@ -14,7 +14,7 @@ For a developer's own database, between migrations 0024 and 0025 (0025 refuses u
   jobs never fold into one posting. A copy already made is reused, so a second run changes nothing.
 - Each application then names its candidate's copy.
 
-Refuses: a database not at 0024, one not on this machine (`db`, `localhost`), and an application with no candidate.
+Refuses: a database not at 0026, one not on this machine (`db`, `localhost`), and an application with no candidate.
 Prints counts only, never a job's or a candidate's details.
 """
 import argparse
@@ -113,9 +113,9 @@ def main(argv=None) -> None:
     with engine.connect() as conn:
         transaction = conn.begin()
         version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        if version != "0024":
+        if version != "0026":
             transaction.rollback()
-            _refuse(f"the database is at {version}; this runs at 0024 (upgrade or downgrade to it first).")
+            _refuse(f"the database is at {version}; this runs at 0026 (upgrade or downgrade to it first).")
         counts = undo(conn) if args.undo else move(conn)
         if args.dry_run:
             transaction.rollback()

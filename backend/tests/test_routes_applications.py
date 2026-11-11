@@ -41,7 +41,7 @@ def _stub_background_tasks(monkeypatch):
 
 
 def _application(test_db, title):
-    """A candidate's Applied application on a posting of theirs (every application is one since migration 0025)."""
+    """A candidate's Applied application on a posting of theirs (every application is one since migration 0027)."""
     from backend.models.db import Application
     from backend.models.tenancy import DEFAULT_FIRM_ID
     from backend.tests.posting_support import posting_for

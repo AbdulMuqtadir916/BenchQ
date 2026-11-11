@@ -1,7 +1,7 @@
 """Applications on `job_postings` (docs/02 §6.y; the add-job plan, decided 2026-11-11). Schema only.
 
-Revision ID: 0025
-Revises: 0024
+Revision ID: 0027
+Revises: 0026
 Create Date: 2026-11-11 12:05:00.000000
 
 - `applications (firm_id, candidate_id, job_id)` → `job_postings (firm_id, candidate_id, id)` ON DELETE RESTRICT: an
@@ -10,14 +10,14 @@ Create Date: 2026-11-11 12:05:00.000000
 
 Refuses, changing nothing, while an application has no candidate or names anything but one of its candidate's
 postings (an old pool job): move them first. Locally, `python -m backend.scripts.move_local_jobs_to_postings`, run at
-0024, does that; a database with no such rows needs nothing. Follows 0024.
+0026, does that; a database with no such rows needs nothing. Follows 0026.
 """
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = '0025'
-down_revision = '0024'
+revision = '0027'
+down_revision = '0026'
 branch_labels = None
 depends_on = None
 
@@ -29,7 +29,7 @@ def upgrade():
         "AND p.firm_id = a.firm_id)")).scalar()
     if unmoved:
         raise RuntimeError(f"{unmoved} application(s) still name an old pool job (or no candidate). Move them first: "
-                           "at 0024, run `python -m backend.scripts.move_local_jobs_to_postings`, then upgrade again.")
+                           "at 0026, run `python -m backend.scripts.move_local_jobs_to_postings`, then upgrade again.")
     op.alter_column('applications', 'candidate_id', nullable=False)
     op.create_foreign_key('fk_applications_job_posting', 'applications', 'job_postings',
                           ['firm_id', 'candidate_id', 'job_id'], ['firm_id', 'candidate_id', 'id'], ondelete='RESTRICT')

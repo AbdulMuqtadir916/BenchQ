@@ -15,8 +15,8 @@ describe("can() (07 Phase C slice, Q32)", () => {
     for (const action of ACTIONS) expect(can(firmUser("VIEWER"), action), action).toBe(false);
   });
 
-  it("only the OWNER changes a BDE's manager or the firm's settings (07 Q40, Q46)", () => {
-    for (const action of ["member.changeManager", "firmSettings.edit"] as const) {
+  it("only the OWNER changes a BDE's manager (07 Q40)", () => {
+    for (const action of ["member.changeManager"] as const) {
       expect(["OWNER", "MANAGER", "BDE", "VIEWER"].map((role) => can(firmUser(role as "OWNER"), action)), action).toEqual([true, false, false, false]);
       expect(can(support, action), action).toBe(false);
     }

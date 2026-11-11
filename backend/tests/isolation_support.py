@@ -124,7 +124,7 @@ def build_firm(db, firm, owner, tag: str) -> dict:
                                   "description": f"{tag} job description", "url": "https://jobs.example.test/search"})
     db.add(posting)
     db.flush()
-    # Applications name one of their candidate's postings (migration 0025): the job, as the candidate's.
+    # Applications name one of their candidate's postings (migration 0027): the job, as the candidate's.
     from backend.tests.posting_support import posting_for
     posted = dict(title=job.title, company=job.company, url=job.url, description=JOB_TEXT,
                   source="legacy", old_job_id=job.id)

@@ -1123,7 +1123,7 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
 
 def _application_responses(db, firm_id, apps):
     """Enrich every response consistently, batching candidate/job-scoped documents. An application's documents
-    (tailored résumés, cover letters) name the same job posting it does (migrations 0023, 0025)."""
+    (tailored résumés, cover letters) name the same job posting it does (migrations 0023, 0027)."""
     from backend.models.db import build_company_lookup, Resume, CoverLetter
     if not apps:
         return []

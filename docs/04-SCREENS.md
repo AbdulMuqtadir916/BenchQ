@@ -662,7 +662,7 @@ the knowledge that it exists.
 | Route | Role | Content |
 |---|---|---|
 | `/settings` | all | No content: redirects to the first section the role may open (docs/07 Q1) |
-| `/settings/firm` | OWNER | Firm name, logo, timezone, shift window |
+| `/settings/firm` | OWNER | Read-only: the firm's name and timezones (a Super Admin changes them), and a Plan and usage card: BDE seats and candidates against the plan's limits (07 Q59, Q63). There is no BDE capacity |
 | `/settings/team` | OWNER, MANAGER | Member table and candidate assignment matrix. **OWNER** invites, removes and deactivates members and changes roles; **MANAGER** sees the team read-only and assigns candidates to BDEs (docs/07 Q15). BDE and VIEWER don't see it |
 | `/settings/templates` | OWNER, MANAGER | Resume templates and outreach templates, with preview and merge-field reference |
 | `/settings/preferences` | all | Theme, density, keyboard shortcut sheet, notification preferences, timezone display |

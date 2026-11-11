@@ -89,7 +89,7 @@ def test_candidate_responses_share_scoped_resume_and_letter_metadata(api_client,
                       created_by_user_id=accounts.user_id, full_name='Other candidate', work_auth='H1B')
     test_db.add(other)
     test_db.flush()
-    # Documents name the application's job posting (0023, 0025); the other candidate's résumé is for their own copy of
+    # Documents name the application's job posting (0023, 0027); the other candidate's résumé is for their own copy of
     # the job, and only a letter from this candidate's résumé counts, whatever posting the others name.
     from backend.tests.posting_support import posting_for
     theirs = posting_for(test_db, app.firm_id, other.id, title=job.title, company=job.company, url=job.url)

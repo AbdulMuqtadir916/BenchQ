@@ -116,6 +116,7 @@ it. Everyone else reads it.
 | 0021 | Arbaz | `applications.form_data`: the form the extension saw when a job was marked applied. Follows 0020 (Zuhair's) | `feat/apply-extension-autofill` |
 | 0022 | Zuhair | Job search: `scrape_jobs.user_id` (who ran the search, for the BDE's daily attempts; filled in for rows a downgrade kept), `running` + `finished_at`, and the indexes for the caps and the history. Follows 0021 (Arbaz's) | `feat/job-search-pipeline` |
 | 0023 | Zuhair | Job search PR 2: `resumes` / `cover_letters` / `job_runs` / `llm_call_log` point at `job_postings`; `scrape_jobs.kind`; `job_postings.first_source`; `UNIQUE (firm_id, candidate_id, id)` on `job_postings`. Follows 0022 | `feat/job-postings-repoint` |
-| 0024 | Arbaz | Applications let go of the old `jobs` pool: `applications_job_id_fkey` dropped. Schema only; a local database moves its rows with `python -m backend.scripts.move_local_jobs_to_postings` at 0024. Follows 0023 | `feat/autofill-screen` |
-| 0025 | Arbaz | Applications on `job_postings`: `candidate_id` NOT NULL, `(firm_id, candidate_id, job_id)` → `job_postings` ON DELETE RESTRICT; refuses while an application names an old job. Follows 0024 | `feat/autofill-screen` |
-| 0026+ | — | Claim the next number here in your PR | — |
+| 0024 | Abdul | Drop `firms.bde_capacity` (07 Q63, reverses Q46) | `feat/firm-settings-cleanup` |
+| 0026 | Arbaz | Applications let go of the old `jobs` pool: `applications_job_id_fkey` dropped. Schema only; a local database moves its rows with `python -m backend.scripts.move_local_jobs_to_postings` at 0026. Follows 0025 (another PR's, merging first; 0024 until it's on main) | `feat/autofill-screen` |
+| 0027 | Arbaz | Applications on `job_postings`: `candidate_id` NOT NULL, `(firm_id, candidate_id, job_id)` → `job_postings` ON DELETE RESTRICT; refuses while an application names an old job. Follows 0026 | `feat/autofill-screen` |
+| 0028+ | — | Claim the next number here in your PR | — |

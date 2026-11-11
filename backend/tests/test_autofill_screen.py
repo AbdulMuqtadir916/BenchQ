@@ -7,8 +7,7 @@ import uuid
 import pytest
 
 from backend.candidates import autofill
-from backend.tests.r4_support import make_job
-from backend.tests.resume_support import make_version
+from backend.tests.resume_support import make_posting, make_version
 from backend.tests.test_autofill import CANDIDATE, TODAY, VERSION, _custom, _edit, _open, _stored
 from backend.tests.test_candidates_api import world  # noqa: F401  (the fixture)
 from backend.tests.test_resume_versions import _candidate, _listing, _save, _url, _v  # noqa: F401
@@ -144,8 +143,10 @@ def test_a_save_reaches_the_rest_of_the_resume_that_answers_the_same_unless_only
     v1 = _v(anonymous_client, world, c, who="adnan")
     v2 = _save(anonymous_client, world, c, v1, "adnan", summary="An edited summary.").json()       # the newest
     candidate = test_db.get(Candidate, uuid.UUID(c["id"]))
-    a, b = (make_version(test_db, world["firm"].id, candidate=candidate, category="TAILORED", job_id=make_job(test_db).id,
-                         full_name="Ravi Teja") for _ in range(2))
+    # A tailored résumé names one of its candidate's job postings (migration 0023).
+    a, b = (make_version(test_db, world["firm"].id, candidate=candidate, category="TAILORED",
+                         job_id=make_posting(test_db, world["firm"].id, candidate.id, candidate.created_by_user_id, n).id,
+                         full_name="Ravi Teja") for n in range(2))
     test_db.commit()
     a_id, b_id = str(a.id), str(b.id)
 

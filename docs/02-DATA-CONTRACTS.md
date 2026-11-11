@@ -712,10 +712,10 @@ export const AiUsageSchema = z.object({
 | S11 | Time zone for period boundaries | **Answered (07 Q34):** IST, like the rest of the admin area |
 | S12 | Do failed AI calls count in spend? | **Answered (07 Q34):** yes, when the provider billed them |
 
-### 3.3 Firm working rhythm — DRAFT, awaiting sign-off (2026-10-19)
+### 3.3 Firm working rhythm — WITHDRAWN 2026-11-08 (07 Q59)
 
-> **Status: draft for the product owner's sign-off.** Nothing is built from it. Until it is approved,
-> `settings/firm` shows **"Not set"** for both values, never an invented one (Phase B audit W7).
+> **Withdrawn, never built.** The product owner dropped the shift window and the follow-up cadence on 2026-11-08: no
+> columns, no endpoint, and `settings/firm` shows neither. Kept below only as a record of what was proposed.
 
 Two additions to `FirmSchema` (§3.1). Both are set when a firm is created (to the defaults below) and
 edited by the OWNER on `settings/firm`; a support view reads them.
@@ -759,9 +759,6 @@ managerId: z.string().nullable(),      // the MANAGER this BDE reports to. null 
 // src/lib/schemas/tenancy.ts — InviteBaseSchema gains:
 managerId: z.string().nullable(),      // the BDE's manager-to-be (Q40). null for non-BDE invites. A new BDE invite
                                        // always names one (checked when sent); an older one may be null (Q51)
-
-// src/lib/schemas/session.ts — FirmSchema gains:
-bdeCapacity: z.number().int().positive().default(10),   // comfortable load per BDE: a warning, never a block (Q46)
 ```
 
 `UserSchema` and `InviteSchema` are refined like `InviteSchema` already is (a base object plus `superRefine`):
@@ -775,7 +772,6 @@ MANAGER of the same firm, is a store/backend check: users and invites from befor
 | `seatsUsed` | active users **with role BDE** + pending, unexpired invites **with role BDE** (Q44). OWNER, MANAGER and VIEWER are free and unlimited; `seatLimit` means BDE seats |
 | working statuses | `ON_BENCH`, `INTERVIEWING`, `OFFER` (Q45). One list in `src/lib/derive/tenancy.ts` |
 | assigned candidates | candidates with a BDE (`bdeId` not null) **and** a working status. What `candidateLimit` counts (Q45). Creating a candidate is never blocked; assigning a BDE is, at the limit |
-| BDE load | a BDE's candidates in a working status, against `Firm.bdeCapacity` (Q46) |
 
 Ledger: `ASSIGN` (`entityType: "candidate"`) whenever a candidate's manager or BDE is set or changed, summary
 "Assigned to {BDE} ({manager})" or "Handed to {manager}", with "(from {previous})" on a move; its `note` is the

@@ -462,7 +462,7 @@ async def test_cache_job_page_rolls_back_when_recording_an_unexpected_failure_fa
 # ── GET "" — the tailored-résumé join ────────────────────────────────────────
 
 def test_list_applications_reports_the_latest_tailored_resume(client, test_db):
-    """Tailored résumés name a job posting (0023), the application's own (0025): the newest one is reported."""
+    """Tailored résumés name a job posting (0023), the application's own (0027): the newest one is reported."""
     from backend.models.candidates import Candidate
     app, _ = _make_app(test_db)
     candidate = test_db.get(Candidate, app.candidate_id)

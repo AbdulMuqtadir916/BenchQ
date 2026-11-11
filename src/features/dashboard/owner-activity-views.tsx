@@ -75,8 +75,8 @@ function PersonHeader({ user, detail }: { user: User; detail: string }) {
 const busiestFirst = <T extends { name: string; counts: { applications: number } }>(rows: T[]) =>
   [...rows].sort((a, b) => b.counts.applications - a.counts.applications || a.name.localeCompare(b.name));
 
-export function FirmView({ managers, users, candidates, applications, period, window, now, jobs, capacity, onSelectManager, onSelectBde }: ViewProps & {
-  managers: User[]; users: User[]; jobs: JobsData; capacity: number; onSelectManager: (managerId: string) => void; onSelectBde: (bdeId: string) => void;
+export function FirmView({ managers, users, candidates, applications, period, window, now, jobs, onSelectManager, onSelectBde }: ViewProps & {
+  managers: User[]; users: User[]; jobs: JobsData; onSelectManager: (managerId: string) => void; onSelectBde: (bdeId: string) => void;
 }) {
   const links = useListLinks({});
   const health = benchHealth(candidates, applications, now);
@@ -96,8 +96,8 @@ export function FirmView({ managers, users, candidates, applications, period, wi
     </div>
     <SpeedStrip speeds={stageSpeeds(applications, window)} daysToPlace={averageDaysToPlace(applications, window)} />
     <SourceCard rows={sourceEffectiveness(applications, jobs.jobs, window)} jobs={jobs} />
-    <TableCard title="Every BDE" hint={`Busiest first, across the firm. Workload is candidates being worked, against a capacity of ${capacity}. Open a BDE to see their candidates.`}>
-      <BdeTable rows={bdes} capacity={capacity} onOpen={(row) => onSelectBde(row.id)} />
+    <TableCard title="Every BDE" hint={`Busiest first, across the firm. Workload is candidates being worked. Open a BDE to see their candidates.`}>
+      <BdeTable rows={bdes} onOpen={(row) => onSelectBde(row.id)} />
     </TableCard>
   </>;
 }
@@ -111,8 +111,8 @@ function TableCard({ title, hint, children }: { title: string; hint: string; chi
   );
 }
 
-export function ManagerView({ user, bdes, candidates, applications, period, window, now, capacity, jobs, canAssign, onSelectBde }: ViewProps & {
-  user: User; bdes: User[]; capacity: number; jobs: JobsData; canAssign: boolean; onSelectBde: (bdeId: string) => void;
+export function ManagerView({ user, bdes, candidates, applications, period, window, now, jobs, canAssign, onSelectBde }: ViewProps & {
+  user: User; bdes: User[]; jobs: JobsData; canAssign: boolean; onSelectBde: (bdeId: string) => void;
 }) {
   const links = useListLinks({ manager: user.id });
   const health = benchHealth(candidates, applications, now);
@@ -127,9 +127,9 @@ export function ManagerView({ user, bdes, candidates, applications, period, wind
       <QueueCard waiting={candidates.filter(isWaitingForBde)} now={now} links={links} canAssign={canAssign} />
     </div>
     <section aria-label="BDEs" className="space-y-3">
-      <h2 className="text-h3 text-[var(--color-text)]">BDEs <span className="text-caption text-[var(--color-text-3)]">busiest first · workload against a capacity of {capacity}</span></h2>
+      <h2 className="text-h3 text-[var(--color-text)]">BDEs <span className="text-caption text-[var(--color-text-3)]">busiest first · workload is candidates being worked</span></h2>
       <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
-        <BdeCards rows={rows} capacity={capacity} onSelectBde={onSelectBde} columns="sm:grid-cols-2" />
+        <BdeCards rows={rows} onSelectBde={onSelectBde} columns="sm:grid-cols-2" />
         <BdeStageBars rows={bdeStageRows(bdes, candidates, applications, window).sort((a, b) => b.applied - a.applied || a.name.localeCompare(b.name))} onSelectBde={onSelectBde} />
       </div>
     </section>

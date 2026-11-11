@@ -34,8 +34,7 @@ export type FirmAction =
 
 /**
  * Managing the firm and its team (07 Q15). `candidate.assign` also covers reassigning (07 Q43); who may be given which
- * candidate is `canAssignTo` below. `member.changeManager` moves a BDE to another manager (Q40); `firmSettings.edit`
- * is the OWNER's firm settings, such as the BDE capacity (Q46).
+ * candidate is `canAssignTo` below. `member.changeManager` moves a BDE to another manager (Q40). The OWNER edits no firm settings (Q59, Q63).
  */
 export type TeamAction =
   | "member.invite"
@@ -44,7 +43,6 @@ export type TeamAction =
   | "member.deactivate"
   | "member.changeManager"
   | "candidate.assign"
-  | "firmSettings.edit"
   | "notification.approve";
 
 /** Not an action: whether the person sees the team (members, owner, assignments) on firm pages (Q15). */
@@ -65,7 +63,7 @@ export type PlatformAction =
 export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
 
 export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search", "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify"];
-export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "firmSettings.edit", "notification.approve"];
+export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "notification.approve"];
 export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
 export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
 
@@ -95,7 +93,6 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   "member.deactivate": OWNER_ONLY,
   "member.changeManager": OWNER_ONLY,
   "candidate.assign": OWNER_AND_MANAGER,
-  "firmSettings.edit": OWNER_ONLY,
   "notification.approve": OWNER_AND_MANAGER,
   "team.view": OWNER_AND_MANAGER,
 };

@@ -25,7 +25,7 @@ def _world(db):
                        created_by_user_id=bde.id)
     db.add(base2)
     db.flush()
-    # A tailored résumé names one of the candidate's job postings (0023), and so does an application (0025).
+    # A tailored résumé names one of the candidate's job postings (0023), and so does an application (0027).
     postings = [make_posting(db, DEFAULT_FIRM_ID, candidate.id, bde.id, n) for n in range(2)]
 
     def version(number, category="BASE", job=None):

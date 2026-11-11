@@ -5,7 +5,7 @@ import uuid
 
 from sqlalchemy import inspect, text
 
-from backend.tests.migration_support import down_to_0024, upgrade_head
+from backend.tests.migration_support import down_to_0026, upgrade_head
 from backend.tests.test_migration_0002 import _alembic, scratch_db  # noqa: F401
 from backend.tests.test_migration_0020 import _firm_and_candidate, _rejected
 from backend.tests.test_migration_0022 import _owner_id
@@ -113,7 +113,7 @@ def test_downgrade_unlinks_what_names_a_posting_and_upgrades_again(scratch_db):
     before = counts()
     assert before["SELECT count(*) FROM resumes WHERE job_id IS NOT NULL"] > 0
     assert before["SELECT count(*) FROM cover_letters WHERE job_id IS NOT NULL"] > 0
-    down_to_0024(name, engine)          # past 0024 the applications name their old jobs again (the move's undo)
+    down_to_0026(name, engine)          # past 0026 the applications name their old jobs again (the move's undo)
     _ok(_alembic(name, "downgrade", "0022"))
     after = counts()
     assert after["SELECT count(*) FROM resumes WHERE job_id IS NOT NULL"] == 0

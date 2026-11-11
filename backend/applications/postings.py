@@ -3,7 +3,7 @@
 `content` is whatever wrote the posting sent, by `source`:
 - `manual` / `extension`: a job the BDE added for the candidate, by hand or from the extension
   (`{title, company, description, url, location}`; the extension's description may be the employer's HTML);
-- `legacy`: a job copied from the old `jobs` pool when applications moved onto `job_postings` (migration 0024): the
+- `legacy`: a job copied from the old `jobs` pool when applications moved onto `job_postings` (migration 0026): the
   same keys plus `salary_min`, `salary_max` (whole dollars, when the old job had them), `posted_at`, `old_job_id` and
   `old_source`;
 - a job search provider's own object (job search, Zuhair's #123), read by that provider's reader once it's here.

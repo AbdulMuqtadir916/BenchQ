@@ -323,12 +323,12 @@ class Application(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = firm_id_column()
-    # The job (migration 0025, decided 2026-11-11): one of its candidate's `job_postings`, by the posting's row id
+    # The job (migration 0027, decided 2026-11-11): one of its candidate's `job_postings`, by the posting's row id
     # (`job_postings.id`, not its content hash `job_postings.job_id`). Read what it is through
     # `backend.applications.postings.posting_job(app.posting)`, never `content` directly.
     job_id = Column(UUID(as_uuid=True), nullable=False)
     # The candidate core (07 Q53d, migration 0007): whose application, the tailored résumé sent, who sent it. Every
-    # application has one since 0025. One per candidate per job. Owner: Samad (the repoint: Arbaz, 2026-11-11).
+    # application has one since 0027. One per candidate per job. Owner: Samad (the repoint: Arbaz, 2026-11-11).
     candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=False,
                           index=True)
     resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)

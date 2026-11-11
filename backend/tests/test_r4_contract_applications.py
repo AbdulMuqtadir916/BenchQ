@@ -1,6 +1,6 @@
 """R4-T1 · /api/applications contract: bad input, the retired hand log, status order.
 
-The status machine is the interesting part: every application is a candidate's since migration 0025, so a move is the
+The status machine is the interesting part: every application is a candidate's since migration 0027, so a move is the
 candidate status command (`backend/applications/tracking.py`), whose transitions drive the Stats funnel + Sankey: an
 out-of-order or backwards move writes a real edge into the chart.
 """
@@ -57,7 +57,7 @@ def test_create_application_non_object_body_is_422(client, body):
 # ── PATCH /api/applications/{id} ─────────────────────────────────────────────
 
 def _app_id(client):
-    """A candidate's Applied application on a posting of theirs (what an application is since migration 0025), with
+    """A candidate's Applied application on a posting of theirs (what an application is since migration 0027), with
     its first funnel edge."""
     from backend.models.db import Application, SessionLocal, utcnow
     from backend.tests.posting_support import posting_for

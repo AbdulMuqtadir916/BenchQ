@@ -1,22 +1,23 @@
 """Applications let go of the old `jobs` pool (docs/02 §6.y; the add-job plan, decided 2026-11-11). Schema only.
 
-Revision ID: 0024
-Revises: 0023
+Revision ID: 0026
+Revises: 0024
 Create Date: 2026-11-11 12:00:00.000000
 
 - `applications.job_id` stops referencing `jobs.id` (`applications_job_id_fkey` goes): it is about to name one of the
-  candidate's `job_postings` instead (0025), through `uq_job_postings_firm_candidate_id`, which job search PR 2 (0023)
+  candidate's `job_postings` instead (0027), through `uq_job_postings_firm_candidate_id`, which job search PR 2 (0023)
   made for it.
 
-Nothing is copied or changed in a row. A database with applications on old jobs moves them before 0025, which refuses
+Nothing is copied or changed in a row. A database with applications on old jobs moves them before 0027, which refuses
 until it's done: locally, `python -m backend.scripts.move_local_jobs_to_postings` (it copies each candidate's old
-jobs into `job_postings` and points the applications at them). Follows 0023.
+jobs into `job_postings` and points the applications at them). Follows 0024 (firm capacity's) for
+now: 0025 is another PR's, merging first, and once it's on main this revises 0025.
 """
 from alembic import op
 
 
-revision = '0024'
-down_revision = '0023'
+revision = '0026'
+down_revision = '0024'
 branch_labels = None
 depends_on = None
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.tests.auth_support import seed_accounts
 from backend.tests.isolation_support import make_world
-from backend.tests.migration_support import down_to_0024, downgrade_to, upgrade_head
+from backend.tests.migration_support import down_to_0026, downgrade_to, upgrade_head
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401
 
 
@@ -55,12 +55,12 @@ def test_downgrade_refuses_to_discard_credentials_or_account_provenance(scratch_
             conn.execute(text('UPDATE candidate_mailboxes SET refresh_token_ciphertext=:value'), {'value': b'synthetic-ciphertext'})
         elif protected == 'retained-account':
             conn.execute(text("UPDATE inbox_messages SET source_address='older-account@example.test'"))
-    down_to_0024(name, engine)      # past 0024 the applications name their old jobs again
+    down_to_0026(name, engine)      # past 0026 the applications name their old jobs again
     result = _alembic(name, 'downgrade', '0011')
     assert result.returncode != 0
     expected = {'credential':'Disconnect candidate mailboxes', 'retained-account':'preserve retained mailbox account provenance', 'active-oauth':'active OAuth attempts'}
     assert expected[protected] in result.stderr
     with engine.connect() as conn:
         # Nothing moved: still where the refused downgrade started.
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0024'
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0026'
         assert conn.execute(text('SELECT count(*) FROM inbox_messages')).scalar_one() > 0

@@ -1,4 +1,4 @@
-"""A job as an application names it since migration 0025: one of its candidate's `job_postings`, in its own batch."""
+"""A job as an application names it since migration 0027: one of its candidate's `job_postings`, in its own batch."""
 import hashlib
 import uuid
 
