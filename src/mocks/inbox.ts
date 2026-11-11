@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ApiError, arrayOf } from "@/lib/api/client";
 import { CandidateInboxSchema, InboxMessageSchema, type CandidateInbox, type InboxMessage } from "@/lib/schemas/inbox";
 import inboxSeed from "./data/inbox.json";
-import { allCandidates } from "./candidates";
+import { candidatesApi } from "@/lib/api/candidates";
 import { findInFirm, inFirm, mockResult, wait } from "./_shared";
 import { firmScoped } from "./membership";
 import { changed, seededAt, table } from "./db";
@@ -19,8 +19,9 @@ const connections = table("inboxConnections", ConnectionSchema, () =>
 );
 const connectedSince = (candidateId: string) => connections.find((connection) => connection.candidateId === candidateId)?.connectedAt;
 
-function inboxFor(firmId: string, candidateId: string): CandidateInbox {
-  const candidate = findInFirm(allCandidates, firmId, candidateId, "Candidate");
+/** The candidate is the backend's (no candidates mock, decided 2026-11-11): one the principal doesn't see is a 404. */
+async function inboxFor(firmId: string, candidateId: string): Promise<CandidateInbox> {
+  const candidate = await candidatesApi.byId(firmId, candidateId);
   const since = connectedSince(candidateId);
   if (!since) return { firmId: candidate.firmId, connection: null, messages: [], nextCursor: null };
 
@@ -40,25 +41,25 @@ function inboxFor(firmId: string, candidateId: string): CandidateInbox {
 }
 
 export const inboxMock = firmScoped("inbox", {
-  byCandidate: (firmId: string, candidateId: string): Promise<CandidateInbox> => mockResult(inboxFor(firmId, candidateId)),
+  byCandidate: async (firmId: string, candidateId: string): Promise<CandidateInbox> => mockResult(await inboxFor(firmId, candidateId)),
 
   connect: async (firmId: string, candidateId: string): Promise<CandidateInbox> => {
-    findInFirm(allCandidates, firmId, candidateId, "Candidate");
+    await candidatesApi.byId(firmId, candidateId);
     await wait(500);
     const at = new Date().toISOString();
     const existing = connections.find((connection) => connection.candidateId === candidateId);
     if (existing) { existing.connectedAt = at; existing.status = "CONNECTED"; }
     else connections.push({ candidateId, connectedAt: at, status: "CONNECTED" });
     changed("inboxConnections");
-    return mockResult(inboxFor(firmId, candidateId));
+    return mockResult(await inboxFor(firmId, candidateId));
   },
 
-  disconnect: (firmId: string, candidateId: string): Promise<CandidateInbox> => {
-    findInFirm(allCandidates, firmId, candidateId, "Candidate");
+  disconnect: async (firmId: string, candidateId: string): Promise<CandidateInbox> => {
+    await candidatesApi.byId(firmId, candidateId);
     const index = connections.findIndex((connection) => connection.candidateId === candidateId);
     if (index >= 0) connections[index]!.status = "DISCONNECTED";
     changed("inboxConnections");
-    return mockResult(inboxFor(firmId, candidateId));
+    return mockResult(await inboxFor(firmId, candidateId));
   },
 
   markRead: (firmId: string, messageId: string, candidateId?: string): Promise<InboxMessage> => {

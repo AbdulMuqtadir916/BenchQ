@@ -23,13 +23,14 @@ def test_latest_tailored_resume_stays_with_its_candidate_or_legacy_application(
     test_db.add(other)
     test_db.flush()
     now = utcnow()
-    tailored = dict(category="TAILORED", job_id=job.id)
+    # A tailored résumé names its candidate's job posting (0023): the application's, and the other candidate's copy.
+    theirs = posting_for(test_db, candidate.firm_id, other.id, title=job.title, company=job.company, url=job.url)
     make_version(test_db, candidate.firm_id, candidate=candidate, name="Own older tailored", version=1,
-                 created_at=now - timedelta(hours=3), **tailored)
+                 created_at=now - timedelta(hours=3), category="TAILORED", job_id=app.job_id)
     own_newer = make_version(test_db, candidate.firm_id, candidate=candidate, name="Own latest tailored", version=2,
-                             created_at=now - timedelta(hours=2), **tailored)
+                             created_at=now - timedelta(hours=2), category="TAILORED", job_id=app.job_id)
     make_version(test_db, candidate.firm_id, candidate=other, name="Other candidate newer tailored",
-                 created_at=now, **tailored)
+                 created_at=now, category="TAILORED", job_id=theirs.id)
     other_app = None
     if with_legacy:
         other_posting = posting_for(test_db, candidate.firm_id, other.id, title="Unmatched role",

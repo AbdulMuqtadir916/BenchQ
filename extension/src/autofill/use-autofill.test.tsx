@@ -1156,3 +1156,154 @@ describe("picking another résumé (07 Q24)", () => {
     expect(onPage.b).toBe("Tempe");
   });
 });
+
+describe("a site BenchQ may not read yet", () => {
+  const employer = "https://careers.employer.test/job/1";
+  const onFrames = () => fake.webNavigation.getAllFrames.mockResolvedValue([
+    { frameId: 0, url: employer }, { frameId: 5, url: "https://ads.tracker.test/frame" },
+  ]);
+  const allowed = new Set<string>();
+  beforeEach(() => {
+    allowed.clear();
+    fake.permissions.contains.mockImplementation(async ({ origins }) => origins.every((origin) => allowed.has(origin)));
+    fake.permissions.request.mockImplementation(async ({ origins }) => { origins.forEach((origin) => allowed.add(origin)); return true; });
+  });
+
+  it("asks about the page's own site only, and doesn't scan until it's allowed", async () => {
+    onFrames();
+    await mount();
+    expect(hook.needsAccess).toEqual({ origins: ["https://careers.employer.test/*"], host: "careers.employer.test" });
+    expect(scanTab).not.toHaveBeenCalled();
+    expect(hook.error).toBe("");
+    expect(fake.permissions.request).not.toHaveBeenCalled();
+  });
+
+  it("scans the page once the BDE allows it", async () => {
+    onFrames();
+    await mount();
+    await run(() => hook.allowAccess());
+    expect(fake.permissions.request).toHaveBeenCalledWith({ origins: ["https://careers.employer.test/*"] });
+    expect(hook.needsAccess).toBeNull();
+    expect(scanTab).toHaveBeenCalledTimes(1);
+    expect(hook.rows).not.toBeNull();
+  });
+
+  it("says so, and scans nothing, when the BDE says no", async () => {
+    onFrames();
+    fake.permissions.request.mockResolvedValue(false);
+    await mount();
+    await run(() => hook.allowAccess());
+    expect(hook.isAccessDenied).toBe(true);
+    expect(hook.needsAccess).not.toBeNull();
+    expect(scanTab).not.toHaveBeenCalled();
+  });
+
+  it("never asks about a site it is already allowed on, as for every site before", async () => {
+    onFrames();
+    allowed.add("https://careers.employer.test/*");
+    await mount();
+    expect(hook.needsAccess).toBeNull();
+    expect(scanTab).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the last page's review when the tab moves to a site it may not read", async () => {
+    await mount();
+    expect(hook.rows).not.toBeNull();
+    onFrames();
+    await run(() => hook.rescan());
+    expect(hook.needsAccess).not.toBeNull();
+    expect(hook.rows).toBeNull();
+    expect(hook.reviewedFor).toBeNull();
+  });
+
+  it("forgets a no when the tab moves to another site", async () => {
+    onFrames();
+    fake.permissions.request.mockResolvedValue(false);
+    await mount();
+    await run(() => hook.allowAccess());
+    expect(hook.isAccessDenied).toBe(true);
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "https://jobs.other.test/2" }]);
+    await run(() => hook.rescan());
+    expect(hook.needsAccess?.host).toBe("jobs.other.test");
+    expect(hook.isAccessDenied).toBe(false);
+  });
+
+  it("asks Chrome once when Allow is clicked twice", async () => {
+    onFrames();
+    let answer: (granted: boolean) => void = () => undefined;
+    fake.permissions.request.mockImplementation(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+    await mount();
+    await act(async () => { void hook.allowAccess(); void hook.allowAccess(); });
+    expect(fake.permissions.request).toHaveBeenCalledTimes(1);
+    expect(hook.isAsking).toBe(true);
+    await act(async () => { answer(true); });
+    await wait(5);
+    expect(hook.isAsking).toBe(false);
+  });
+
+  it("clears the notice once allowed, even while the résumé was reloading, and scans when it arrives", async () => {
+    onFrames();
+    await mount();
+    expect(hook.needsAccess).not.toBeNull();
+    await pickResume(LOADING);
+    await run(() => hook.allowAccess());
+    expect(hook.needsAccess).toBeNull();
+    vi.mocked(scanTab).mockClear();
+    await pickResume("res-1");
+    expect(scanTab).toHaveBeenCalled();
+    expect(hook.rows).not.toBeNull();
+  });
+
+  it("keeps the notice of a newer site when an older site's prompt is answered", async () => {
+    onFrames();
+    let answer: (granted: boolean) => void = () => undefined;
+    fake.permissions.request.mockImplementation(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+    await mount();
+    await act(async () => { void hook.allowAccess(); });
+    expect(hook.isAsking).toBe(true);
+    // While Chrome asks about the first site, the tab moves to another one.
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "https://jobs.other.test/2" }]);
+    await run(() => hook.rescan());
+    expect(hook.needsAccess?.host).toBe("jobs.other.test");
+    allowed.add("https://careers.employer.test/*");
+    await act(async () => { answer(true); });
+    await wait(5);
+    expect(hook.needsAccess?.host).toBe("jobs.other.test");
+    expect(hook.isAsking).toBe(false);
+  });
+
+  it("still records the last captured form when the tab ends on a site it may not read", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname"), field("a", "Email")]));
+    await mount();
+    typed(["0:n", "Pri"], ["0:a", ""]);
+    await finalForm();
+    // The application redirects to an unlisted confirmation site: the review is cleared, the form BenchQ saw is not.
+    onFrames();
+    await run(() => hook.rescan());
+    expect(hook.needsAccess).not.toBeNull();
+    expect(hook.rows).toBeNull();
+    const form = await finalForm();
+    expect(form.fields.map(({ label, value }) => [label, value])).toEqual([["Nickname", "Pri"]]);
+  });
+
+  it("doesn't mark a newer site denied when an older site's prompt is declined", async () => {
+    onFrames();
+    let answer: (granted: boolean) => void = () => undefined;
+    fake.permissions.request.mockImplementation(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+    await mount();
+    await act(async () => { void hook.allowAccess(); });
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "https://jobs.other.test/2" }]);
+    await run(() => hook.rescan());
+    await act(async () => { answer(false); });
+    await wait(5);
+    expect(hook.needsAccess?.host).toBe("jobs.other.test");
+    expect(hook.isAccessDenied).toBe(false);
+  });
+
+  it("leaves a page that isn't https alone", async () => {
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "http://careers.employer.test/job" }]);
+    await mount();
+    expect(hook.needsAccess).toBeNull();
+    expect(fake.permissions.contains).not.toHaveBeenCalled();
+  });
+});

@@ -50,6 +50,7 @@ type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
   answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
   step?: string | null; error?: string;
+  needsAccess?: { origins: string[]; host: string } | null; isAccessDenied?: boolean;
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
 };
 
@@ -181,6 +182,29 @@ describe("the résumé the answers come from", () => {
     expect(named("Mark applied")).toBeUndefined();
     await act(async () => { finish(); await Promise.resolve(); });
     expect(named("Mark applied")).toBeDefined();
+  });
+
+  it("keeps Mark applied available when a résumé was picked and the site then needed access: the queued fill waits, tracking doesn't", async () => {
+    const access = { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" };
+    const reviewedForBase = { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id };
+    show({ fillCount: 1, rows: [row("Email", true)], reviewedFor: reviewedForBase }, { onApply: vi.fn() }, twoResumes);
+    await open();
+    await choose(0);
+    expect(pick).toHaveBeenCalledWith(tailored.id);
+    // The new résumé's review can't happen on a site BenchQ may not read: access is asked for, nothing is scanned.
+    vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows: null, needsAccess: access, isAccessDenied: true, reviewedFor: null } as unknown as ReturnType<typeof useAutofill>);
+    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [tailored, base], picked: tailored }, pick, retry });
+    element = cloneElement(element);
+    await act(async () => { root!.render(element); });
+    expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
+    expect(named("Mark applied")).toBeDefined();
+    expect(named("Mark applied").disabled).toBe(false);
+    expect(autofill).not.toHaveBeenCalled();
+    // Allowed later: the page is reviewed for the picked résumé, and the fill that was queued runs once.
+    vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows: [row("Email", true)], fillCount: 1, reviewedFor: { ...reviewedForBase, resumeId: tailored.id } } as unknown as ReturnType<typeof useAutofill>);
+    element = cloneElement(element);
+    await act(async () => { root!.render(element); });
+    expect(autofill).toHaveBeenCalledTimes(1);
   });
 
   it("shows the one résumé as a plain row, with a way to view it in BenchQ (07 Q55)", () => {
@@ -464,6 +488,18 @@ describe("the buttons at the bottom", () => {
     const hint = host.querySelector("[data-slot='mark-applied-hint']")!;
     expect(hint.textContent).toBe("Submitted the form? Mark the job applied in BenchQ.");
     expect(atBottom()[0]!.getAttribute("aria-describedby")).toBe(hint.id);
+  });
+
+  it("keep Mark applied available on a site BenchQ may not read, so a refused site can still be marked applied", () => {
+    show({ rows: null, reviewedFor: { applicationId: "another-app", candidateId: "cand-1", resumeId: null }, fillCount: 0, needsAccess: { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" }, isAccessDenied: true }, { onApply: vi.fn() });
+    expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
+    const mark = host.querySelector<HTMLButtonElement>("[data-slot='mark-applied']")!;
+    expect(mark.disabled).toBe(false);
+  });
+
+  it("keep Mark applied waiting for the review when there is no access question", () => {
+    show({ rows: null, reviewedFor: { applicationId: "another-app", candidateId: "cand-1", resumeId: null }, fillCount: 0 }, { onApply: vi.fn() });
+    expect(host.querySelector<HTMLButtonElement>("[data-slot='mark-applied']")!.disabled).toBe(true);
   });
 
   it("lead with Mark applied once nothing is left to fill", () => {

@@ -1,8 +1,8 @@
 """Adding a job for a candidate, and saving it (decided 2026-11-11, the add-job plan).
 
 - `add_job()`: a job the BDE adds, by hand or from the extension, becomes one of the candidate's `job_postings`, in a
-  batch of its own (a finished capture, as job search PR 2, #124, writes one: `metadata.kind = 'capture'`). The same
-  job again (the same identity, `job_hash`) is the posting the candidate already has: nothing is written.
+  batch of its own (a finished capture, `kind = 'capture'`, as `backend.job_search.pipeline.capture` writes one). The
+  same job again (the same identity, `job_hash`) is the posting the candidate already has: nothing is written.
 - `ensure_saved()`: the candidate's application for a posting: the one they have, at any status, or a new Saved one.
   Adding a job always ends with one, so an added job is ready to apply to.
 
@@ -104,12 +104,12 @@ def add_job(db, *, firm_id, actor, candidate, source: str, job: dict) -> tuple[J
     if existing is not None:
         return existing, False
     now = utcnow()
-    batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate.id, batch_id=uuid.uuid4(), state="success",
-                      meta={"kind": "capture", "request": {"source": source}})
+    batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate.id, user_id=actor.id, batch_id=uuid.uuid4(),
+                      kind="capture", state="success", finished_at=now, meta={"request": {"source": source}})
     db.add(batch)
     db.flush()
     posting = JobPosting(firm_id=firm_id, candidate_id=candidate.id, batch_id=batch.batch_id, source=source,
-                         job_id=digest, content=content, discovered_at=now, last_seen_at=now)
+                         first_source=source, job_id=digest, content=content, discovered_at=now, last_seen_at=now)
     db.add(posting)
     db.flush()
     record(db, actor=actor, action="CREATE", entity_type="job_posting", entity_id=posting.id,

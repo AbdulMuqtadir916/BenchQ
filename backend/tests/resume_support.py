@@ -130,3 +130,42 @@ def old_resume(db, firm_id, name, json_data=None, *, is_base=True, job_id=None, 
     résumé for `job_id`, of a new candidate called `name` (scoring labels a base with its candidate's name)."""
     return make_version(db, firm_id, name=name, candidate_name=name, category="BASE" if is_base else "TAILORED",
                         job_id=job_id, **columns_from_json(json_data or {}), **kw)
+
+
+def make_posting(db, firm_id, candidate_id, user_id, n=0, title="Dev"):
+    """A job posting of the candidate's (job search, migration 0023): what a tailored résumé or a cover letter names.
+    Its own finished capture batch, made-up content. Flushed, not committed."""
+    import hashlib
+    from backend.models.db import utcnow
+    from backend.models.job_search import JobPosting, ScrapeJob
+    batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=uuid.uuid4(),
+                      kind="capture", state="success", finished_at=utcnow(), meta={"request": {"source": "manual"}})
+    db.add(batch)
+    db.flush()
+    posting = JobPosting(firm_id=firm_id, candidate_id=candidate_id, batch_id=batch.batch_id, source="manual",
+                         job_id=hashlib.sha256(f"{candidate_id}-{n}-{uuid.uuid4()}".encode()).hexdigest(),
+                         content={"title": f"{title} {n}", "company": "Acme", "description": f"Made-up job {n}.",
+                                  "url": f"https://jobs.example.test/{n}"})
+    db.add(posting)
+    db.flush()
+    return posting
+
+
+def make_target_posting(db, id=None):
+    """A job posting with that id, of a new candidate in the Default firm: what `job_runs.target_job_id` and
+    `llm_call_log.job_id` name since migration 0023. Committed."""
+    from backend.models.candidates import Candidate
+    from backend.tests.firm_support import default_firm_id
+    firm_id = default_firm_id(db)
+    manager = User(firm_id=firm_id, role="MANAGER", name="Test manager",
+                   email=f"manager-{uuid.uuid4().hex[:8]}@example.test", password_hash="x")
+    db.add(manager)
+    db.flush()
+    candidate = Candidate(firm_id=firm_id, manager_id=manager.id, created_by_user_id=manager.id, work_auth="H1B")
+    db.add(candidate)
+    db.flush()
+    posting = make_posting(db, firm_id, candidate.id, manager.id)
+    if id is not None:
+        posting.id = id
+    db.commit()
+    return posting

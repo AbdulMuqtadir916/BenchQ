@@ -63,12 +63,57 @@ Uses React, TypeScript, Vite, Tailwind v4 (through PostCSS, as the website does)
 - Whether the candidate may work in the US is worked out from their status, and where they live from the city and state.
 - Nothing is stored: the answers and the file stay in the panel's memory while the tab is reviewed.
 
+## Repoint `applications.job_id` onto `job_postings` (yours; decided 2026-11-11 by Zuhair)
+
+First given to Samad (2026-11-10, job search grilling Q2, Q5–Q7, Q16), moved to you 2026-11-11. `applications` stays
+Samad's table (`docs/team/README.md` §3): confirm the change with him and log it in
+`cross-area-changes.md`. Until it lands, a job found by a candidate's search can't be Saved or applied to, and the
+extension's saved and applied lists only show old pool jobs.
+
+The old `jobs` pool is being retired: jobs now come from a candidate's search (`job_postings`, docs/02
+§6.y). Zuhair's PR 2 repoints his own tables (`resumes`, `cover_letters`, `job_runs`, `llm_call_log`) and adds
+`UNIQUE (firm_id, candidate_id, id)` on `job_postings` as your key's target. Your PR, from main **after** his PR 2
+merges:
+- **Migration** (the next free number; recheck the head): `applications (firm_id, candidate_id, job_id)` →
+  `job_postings (firm_id, candidate_id, id)` ON DELETE RESTRICT, so an application can only name its own
+  candidate's job. `applications.candidate_id` becomes NOT NULL (rows from before 0007 are gone). No data is
+  copied: no real firm uses BenchQ yet, so the migration refuses to run while any application still points at
+  `jobs` ("clear your local test applications first").
+- **The column keeps its name** `job_id`, now meaning `job_postings.id`. Careful: `job_postings.job_id` is the
+  posting's content hash, not a row id (docs/02 §6.y).
+- **Reading the job:** a posting's fields come from its provider:
+  `providers.reader_for(posting.source).read(posting.content)` (`backend/job_search/providers/`) gives `title`,
+  `company`, `description` (plain text), `apply_url`, `location`. Never read `content` directly.
+- **Keep the application JSON the same** (`title`, `company`, `url`, …) so your extension (saved and applied
+  lists, mark applied) works unchanged. Saving a job is `POST /api/applications` with `job_id` = the posting's
+  `id`.
+- **Also yours:** the ledger labels, the prep page and `inbox/application_matching.py`, which read `app.job`, so the
+  link keeps working there. `favorite_jobs` (also on `jobs`) is not part of this: it stays Samad's.
+- Log what you change outside your area in `cross-area-changes.md`.
+
 ## Build and setup
 
 - `npm run ext:build` — builds the standalone extension.
 - `npm run ext:watch` — rebuilds on source changes.
 - `pnpm ext:test` — runs the extension's tests, or in `extension/`: `npm test`, and `npm run test:watch` while working.
 - Vite loads `BENCHQ_URL` from `extension/.env`; copy `extension/.env.example` as a starting point. It is the BenchQ web-app origin used for the sign-in tab and all `/api/*` requests. In local development it is `http://localhost:3000`; Next.js rewrites those API paths to the backend at `BACKEND_URL`. For another environment, set it to that BenchQ web-app origin, rebuild, and ensure the backend `ALLOWED_ORIGINS` includes the extension's exact `chrome-extension://` origin.
+- **Site access (the manifest is built, not hand-written):** `extension/manifest.base.json` holds the fixed parts and
+  `extension/hosts.json` the job boards and application systems BenchQ may read without asking. `npm run build` writes
+  `dist/manifest.json` from them plus `BENCHQ_URL`: `host_permissions` is BenchQ's address and those sites only, and every
+  other https site is `optional_host_permissions`. For an employer's own careers page the panel says why it needs access
+  (`SiteAccessNotice`), then Chrome asks once, from the BDE's click on Allow. Only the tab's own site is asked about, so
+  a form framed from an unlisted domain is "unreadable" like any frame BenchQ can't reach. A store build is
+  `npm run build:store` (`ext:build:store` from the root is not added): it reads `extension/.env.store`, which holds the live
+  address `https://www.benchq.io`, and fails on a local address or all-sites access.
+- **Publishing:** `.github/workflows/extension-publish.yml` is **manual-only for now** (Actions, Publish extension, Run
+  workflow, from `main`): the first version is uploaded and approved by hand first. When that is done, add the `push`
+  trigger shown in the comment at its top, so a change under `extension/**` on `main` (never a backend or frontend
+  change) publishes by itself. It tests, runs `build:store`, stamps the version as
+  `major.minor.<run number>.<attempt>` (the store refuses a version it already has, and a re-run gets its own), zips, and
+  uploads and submits through the Chrome Web Store API V2 when all five secrets `CHROME_EXTENSION_ID`,
+  `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and `CHROME_REFRESH_TOKEN` exist as secrets of the
+  `chrome-web-store` environment (limited to `main`; not repository secrets); only the upload steps see them. Without them it only keeps the zip. The first upload and the listing are done by hand in the store dashboard. The listing text, permission justifications, privacy draft, reviewer instructions and secret setup are in
+  [../extension-store.md](../extension-store.md).
 - Load unpacked in Chrome: run the build, open `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose `extension/dist/`.
 
 The extension calls the BenchQ origin directly with browser-managed cookies. Backend CORS and unsafe-request origin checks use `ALLOWED_ORIGINS`; the deployment must include the installed extension's `chrome-extension://<extension-id>` origin. This is an environment setup dependency, not changed by this implementation. The manifest's HTTPS host access is also what lets the page script run on employer sites, in connected tabs only; API calls stay limited to the configured `BENCHQ_URL`.

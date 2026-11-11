@@ -462,10 +462,12 @@ async def test_cache_job_page_rolls_back_when_recording_an_unexpected_failure_fa
 # ── GET "" — the tailored-résumé join ────────────────────────────────────────
 
 def test_list_applications_reports_the_latest_tailored_resume(client, test_db):
-    app, job = _make_app(test_db)
-    older = make_resume(test_db, name="T1", is_base=False, job_id=job.id)
-    candidate = _own(test_db, app, older)
-    newer = make_resume(test_db, name="T2", is_base=False, job_id=job.id, version=2, candidate=candidate)
+    """Tailored résumés name a job posting (0023), the application's own (0025): the newest one is reported."""
+    from backend.models.candidates import Candidate
+    app, _ = _make_app(test_db)
+    candidate = test_db.get(Candidate, app.candidate_id)
+    older = make_resume(test_db, name="T1", is_base=False, job_id=app.job_id, candidate=candidate)
+    newer = make_resume(test_db, name="T2", is_base=False, job_id=app.job_id, version=2, candidate=candidate)
     now = datetime.now(timezone.utc)
     older.created_at = now - timedelta(hours=1)
     newer.created_at = now
@@ -489,9 +491,9 @@ def test_list_applications_shows_a_moved_jobs_pay(client, test_db):
 def test_list_applications_flags_a_cover_letter(client, test_db):
     """A letter from one of the candidate's résumés, for the job: an application is always a candidate's."""
     from backend.models.db import CoverLetter, Resume
-    app, job = _make_app(test_db)
+    app, _ = _make_app(test_db)
     own = test_db.query(Resume).filter(Resume.candidate_id == app.candidate_id).first()
-    test_db.add(CoverLetter(firm_id=DEFAULT_FIRM_ID, name="CL", job_id=job.id, resume_id=own.id, json_data={}))
+    test_db.add(CoverLetter(firm_id=DEFAULT_FIRM_ID, name="CL", job_id=app.job_id, resume_id=own.id, json_data={}))
     test_db.commit()
     row = assert_clean(client.get("/api/applications"), 200).json()["applications"][0]
     assert row["has_cover_letter"] is True
@@ -785,11 +787,11 @@ def test_prep_bundle_lists_booked_interviews_with_their_prep_notes(client, test_
 
 
 def test_prep_bundle_prefers_the_tailored_copy_over_the_base(client, test_db):
-    app, job = _make_app(test_db)
+    app, _ = _make_app(test_db)
     app.cv_version_used = "PM"
     test_db.commit()
     candidate = _own(test_db, app, make_resume(test_db, name="PM", json_data={"summary": "the base"}))
-    make_resume(test_db, name="PM — Acme", is_base=False, job_id=job.id, candidate=candidate,
+    make_resume(test_db, name="PM — Acme", is_base=False, job_id=app.job_id, candidate=candidate,
                 json_data={"summary": "the tailored copy"})
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert "## My résumé — PM — Acme" in text

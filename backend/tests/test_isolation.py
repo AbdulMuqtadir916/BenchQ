@@ -117,6 +117,13 @@ def test_no_case_reason_or_known_gap_names_a_route_that_is_gone():
 def test_firm_data_never_crosses_firms(key, anonymous_client, world):
     case, client, method = CASES[key], anonymous_client, key.split(" ", 1)[0]
     has_ids = _has_ids(key, case)
+    if case.retired:                    # the old job pool's write routes (job search PR 2): 410 for everyone
+        b = add_firm_b(world)
+        untouched = snapshot_of(world.db, b.firm_id)
+        for ids, who in ((b.ids, world.a.cookie), (b.ids, b.cookie), (world.missing(), world.a.cookie)):
+            assert _call(client, key, case, ids, who).status_code == 410
+        assert snapshot_of(world.db, b.firm_id) == untouched
+        return
     if case.prepare:
         case.prepare(world.db, world.a.ids)
 

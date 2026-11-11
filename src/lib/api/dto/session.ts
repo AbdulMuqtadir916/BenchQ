@@ -257,3 +257,7 @@ export function toLedgerEntry(dto: z.infer<typeof LedgerEntryDto>): LedgerEntry 
     createdAt: toIso(dto.created_at),
   });
 }
+
+/** `GET /api/admin/candidate-usage` (backend/api/routes_admin.py): each candidate's firm, status and BDE, counts only. */
+export const CandidateUsageDto = z.object({ firm_id: z.string(), status: z.string(), bde_id: z.string().nullable() });
+

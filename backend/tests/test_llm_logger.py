@@ -95,9 +95,9 @@ def test_log_llm_call_with_job_id(test_db):
     from backend.analyzer.llm_logger import log_llm_call
     from backend.models.db import LlmCallLog
 
-    from backend.tests.r4_support import make_job
+    from backend.tests.resume_support import make_target_posting
     job_id = uuid.uuid4()
-    make_job(test_db, id=job_id)   # llm_call_log.job_id is a real foreign key on Postgres
+    make_target_posting(test_db, id=job_id)   # llm_call_log.job_id is a real foreign key on Postgres
     log_llm_call(
         purpose="score_full",
         provider="claude_api",

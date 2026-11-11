@@ -7,8 +7,8 @@ For a developer's own database, between migrations 0024 and 0025 (0025 refuses u
     python -m backend.scripts.move_local_jobs_to_postings --undo     # point back and drop the copies (before 0024's downgrade)
 
 - Every old job a candidate has (an application, or a search result in `candidate_jobs`) becomes one of that
-  candidate's `job_postings`, source `legacy`, in one batch per candidate (a finished capture, `metadata.kind =
-  'capture'`, `metadata.moved_locally = true`). Its `content` keeps the old job's title, company, description, link,
+  candidate's `job_postings`, source `legacy`, in one batch per candidate (a finished capture, `kind = 'capture'`, run
+  by the candidate's BDE or, before one, its creator; `metadata.moved_locally = true`). Its `content` keeps the old job's title, company, description, link,
   location and salary bounds, `posted_at` (the old `discovered_at`), `old_job_id` and `old_source`, read by
   `backend/applications/postings.py`. Its identity is the job search rule over the old job's id as well, so two old
   jobs never fold into one posting. A copy already made is reused, so a second run changes nothing.
@@ -29,7 +29,7 @@ from backend.applications.postings import LEGACY, job_hash
 from backend.config import DATABASE_URL
 
 LOCAL_HOSTS = {"db", "localhost", "127.0.0.1", "::1"}
-BATCH_META = {"kind": "capture", "request": {"source": LEGACY}, "moved_locally": True}
+BATCH_META = {"request": {"source": LEGACY}, "moved_locally": True}
 
 
 def _refuse(message: str) -> None:
@@ -58,8 +58,9 @@ def move(conn) -> dict:
         if (firm_id, candidate_id) not in batches:
             batches[(firm_id, candidate_id)] = batch_id = uuid.uuid4()
             conn.execute(text(
-                "INSERT INTO scrape_jobs (firm_id, candidate_id, batch_id, state, metadata) "
-                "VALUES (:firm_id, :candidate_id, :batch_id, 'success', CAST(:meta AS jsonb))"),
+                "INSERT INTO scrape_jobs (firm_id, candidate_id, user_id, batch_id, kind, state, finished_at, metadata) "
+                "SELECT :firm_id, :candidate_id, COALESCE(bde_id, created_by_user_id), :batch_id, 'capture', 'success', "
+                "now(), CAST(:meta AS jsonb) FROM candidates WHERE id = :candidate_id"),
                 {"firm_id": firm_id, "candidate_id": candidate_id, "batch_id": batch_id, "meta": json.dumps(BATCH_META)})
         content = {key: value for key, value in {
             "title": job.title, "company": job.company, "description": job.description, "url": job.url,
@@ -68,9 +69,9 @@ def move(conn) -> dict:
             "old_job_id": str(old_id), "old_source": job.source,
         }.items() if value not in (None, "")}
         copies[(candidate_id, str(old_id))] = conn.execute(text(
-            "INSERT INTO job_postings (firm_id, candidate_id, batch_id, source, job_id, content, discovered_at, "
-            "last_seen_at) VALUES (:firm_id, :candidate_id, :batch_id, :legacy, :digest, CAST(:content AS jsonb), "
-            "COALESCE(:seen, now()), now()) RETURNING id"),
+            "INSERT INTO job_postings (firm_id, candidate_id, batch_id, source, first_source, job_id, content, "
+            "discovered_at, last_seen_at) VALUES (:firm_id, :candidate_id, :batch_id, :legacy, :legacy, :digest, "
+            "CAST(:content AS jsonb), COALESCE(:seen, now()), now()) RETURNING id"),
             {"firm_id": firm_id, "candidate_id": candidate_id, "batch_id": batches[(firm_id, candidate_id)],
              "legacy": LEGACY, "digest": job_hash(job.company or "", job.title or "",
                                                   f"{job.description or ''}\x1f{old_id}"),

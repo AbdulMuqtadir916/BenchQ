@@ -31,7 +31,7 @@ export function useCandidateWorkspace(candidateId: string) {
   const applicationsQuery = useApplications(candidateId);
   const recordQuery = useRecord(candidateId);
   const shelfQuery = useResumeShelf(candidateId);
-  const jobsQuery = useJobs({ limit: 300 });
+  const jobsQuery = useJobs({ limit: 400, candidateId }); // the candidate's own jobs (docs/02 §6.z)
   const inboxQuery = useCandidateInbox(candidateId);
   const documentsQuery = useCandidateDocuments(candidateId);
   const teamQuery = useTeam();

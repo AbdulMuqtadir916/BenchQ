@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import parses from "@/mocks/data/resume-parses.json";
+import parses from "@/test/fixtures/resume-parses.json";
 import { matchWorkAuth, splitSkills, toLinkedinUrl, toResumeDraft, yearsFromWork } from "./resume-parse";
 
 /** docs/candidate-onboarding/04-wizard-steps.md §5, docs/02 §8.1: the base-résumé parser's format → the new-candidate

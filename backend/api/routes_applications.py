@@ -400,7 +400,7 @@ def list_applications(
     from sqlalchemy.orm import selectinload
     from backend.api.routes_candidates import _candidate
 
-    # The posting too: every row reads its job (`posting_job`) and its documents' job (`_document_job_id`).
+    # The posting too: every row reads its job from it (`posting_job`).
     q = scoped(db, Application, firm_id).options(selectinload(Application.interviews), selectinload(Application.reviews),
                                                  selectinload(Application.posting))
     from backend.api.routes_candidates import _visible
@@ -1083,7 +1083,7 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     tailored = scoped(db, Resume, firm_id).filter(Resume.id == app.resume_id).first() if app.resume_id else None
     if tailored is None and app.job_id:
         tailored = (scoped(db, Resume, firm_id)
-                    .filter(Resume.job_id == _document_job_id(app), Resume.category == "TAILORED",
+                    .filter(Resume.job_id == app.job_id, Resume.category == "TAILORED",
                             Resume.candidate_id == app.candidate_id, Resume.deleted_at.is_(None))
                     .order_by(Resume.created_at.desc(), Resume.version.desc()).first())
     cv_name = (tailored.name if tailored else None) or app.cv_version_used
@@ -1121,24 +1121,14 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     return {"text": "\n".join(L)}
 
 
-def _document_job_id(app):
-    """The job a candidate's documents (tailored résumés, cover letters) name for `app`. They still name the old `jobs`
-    row until they move onto postings (#124); a posting moved from one keeps its id as `old_job_id`."""
-    content = app.posting.content if app.posting is not None else None
-    old = content.get("old_job_id") if isinstance(content, dict) else None
-    try:
-        return uuid.UUID(str(old)) if old else app.job_id
-    except ValueError:
-        return app.job_id
-
-
 def _application_responses(db, firm_id, apps):
-    """Enrich every response consistently, batching candidate/job-scoped documents."""
+    """Enrich every response consistently, batching candidate/job-scoped documents. An application's documents
+    (tailored résumés, cover letters) name the same job posting it does (migrations 0023, 0025)."""
     from backend.models.db import build_company_lookup, Resume, CoverLetter
     if not apps:
         return []
     lookup = build_company_lookup(db)
-    document_job = {app.id: _document_job_id(app) for app in apps}
+    document_job = {app.id: app.job_id for app in apps}
     job_ids = set(document_job.values())
     candidate_scope = Resume.candidate_id.in_({app.candidate_id for app in apps if app.candidate_id})
     if any(app.candidate_id is None for app in apps):

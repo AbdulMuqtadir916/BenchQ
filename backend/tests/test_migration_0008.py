@@ -11,6 +11,7 @@ from backend.models.candidates import BaseResume, Candidate, ResumeParse
 from backend.models.db import Application, Job, Resume, utcnow
 from backend.models.tenancy import DEFAULT_FIRM_ID, Firm, User
 from backend.tests.auth_support import make_user
+from backend.tests.resume_support import make_posting
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401
 
 
@@ -33,8 +34,10 @@ def world(test_db, accounts):
                       is_active=True, created_by_user_id=owner.id)
     test_db.add(base)
     test_db.flush()
-    return {"firm": firm, "owner": owner, "asha": people[0], "ravi": people[1], "jobs": jobs, "parse": parse,
-            "base": base}
+    # What a tailored résumé names since 0023, and an application since 0025: Asha's job postings.
+    postings = [make_posting(test_db, firm.id, people[0].id, owner.id, n) for n in (7, 8)]
+    return {"firm": firm, "owner": owner, "asha": people[0], "ravi": people[1], "jobs": jobs, "postings": postings,
+            "parse": parse, "base": base}
 
 
 def _refused(test_db, row, constraint: str) -> None:
@@ -82,7 +85,7 @@ def test_a_new_version_starts_with_every_section_empty_not_null(test_db, world):
 
 
 def test_one_resume_is_one_base_category_and_job_each_edit_a_version(test_db, world):
-    job7, job8 = world["jobs"]
+    job7, job8 = world["postings"]
     test_db.add_all([_version(world), _version(world, version=2),
                      _version(world, category="TAILORED", job_id=job7.id),
                      _version(world, category="TAILORED", job_id=job7.id, version=2),
@@ -93,7 +96,7 @@ def test_one_resume_is_one_base_category_and_job_each_edit_a_version(test_db, wo
 
 
 def test_a_base_has_no_job_and_a_tailored_resume_has_one(test_db, world):
-    _refused(test_db, _version(world, job_id=world["jobs"][0].id), "ck_resumes_category_job")
+    _refused(test_db, _version(world, job_id=world["postings"][0].id), "ck_resumes_category_job")
     _refused(test_db, _version(world, category="TAILORED"), "ck_resumes_category_job")
     _refused(test_db, _version(world, category="DRAFT"), "ck_resumes_category_(values|job)")   # breaks both
 
@@ -120,7 +123,7 @@ def test_a_versioned_candidate_has_many_base_versions_and_bases(test_db, world):
 # ── Deleting a job (Abdul, 2026-11-01) ──────────────────────────────────────
 
 def test_deleting_a_job_deletes_the_resumes_tailored_for_it(test_db, world):
-    job7, job8 = world["jobs"]
+    job7, job8 = world["postings"]
     base = _version(world)
     test_db.add_all([base, _version(world, category="TAILORED", job_id=job7.id),
                      _version(world, category="TAILORED", job_id=job7.id, version=2),
@@ -133,19 +136,15 @@ def test_deleting_a_job_deletes_the_resumes_tailored_for_it(test_db, world):
 
 
 def test_a_posting_an_application_names_cannot_be_deleted(test_db, world):
-    from backend.models.job_search import JobPosting
-    from backend.tests.posting_support import posting_for
-    job7 = world["jobs"][0]
-    tailored = _version(world, category="TAILORED", job_id=job7.id)
+    posting = world["postings"][0]          # the application's job, and its tailored résumé's (0023, 0025)
+    tailored = _version(world, category="TAILORED", job_id=posting.id)
     test_db.add(tailored)
     test_db.flush()
-    posting = posting_for(test_db, world["firm"].id, world["asha"].id, title=job7.title,
-                          company=job7.company, url=job7.url, old_job_id=job7.id)
     test_db.add(Application(firm_id=world["firm"].id, candidate_id=world["asha"].id, job_id=posting.id,
                             resume_id=tailored.id, submitted_by_user_id=world["owner"].id))
     test_db.commit()
     with pytest.raises(IntegrityError):
-        test_db.delete(test_db.get(JobPosting, posting.id))
+        test_db.delete(posting)
         test_db.commit()
     test_db.rollback()
     assert test_db.get(Resume, tailored.id) is not None                # the résumé that was sent stays

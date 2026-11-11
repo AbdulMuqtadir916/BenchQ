@@ -53,7 +53,10 @@ def test_prep_never_uses_another_candidates_resume(api_client, test_db, accounts
         created_by_user_id=accounts.user_id, full_name='Other synthetic', work_auth='H1B')
     test_db.add(other)
     test_db.flush()
-    make_version(test_db, candidate.firm_id, candidate=other, category='TAILORED', job_id=job.id,
+    # The same job is the other candidate's own posting: a tailored résumé names its candidate's job (0023).
+    from backend.tests.posting_support import posting_for
+    theirs = posting_for(test_db, candidate.firm_id, other.id, title=job.title, company=job.company, url=job.url)
+    make_version(test_db, candidate.firm_id, candidate=other, category='TAILORED', job_id=theirs.id,
                  name='Other private resume', summary='PRIVATE OTHER CANDIDATE')
     test_db.commit()
     response = api_client.get(f'/api/applications/{app.id}/prep')

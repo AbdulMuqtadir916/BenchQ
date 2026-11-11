@@ -57,7 +57,10 @@ def test_an_added_job_is_a_posting_in_its_own_batch_and_a_saved_application(anon
     assert str(posting.id) == body["job_id"] and posting.source == "extension"
     assert posting.content["description"].startswith("<h2>")                  # kept as sent; read as plain text
     batch = test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == posting.batch_id).one()
-    assert (batch.state, batch.meta) == ("success", {"kind": "capture", "request": {"source": "extension"}})
+    assert (batch.kind, batch.state, batch.meta) == ("capture", "success", {"request": {"source": "extension"}})
+    # Run by the BDE who added it, finished at once, as job search's own capture writes one.
+    assert (batch.user_id, batch.finished_at is not None) == (world["people"]["adnan"].id, True)
+    assert posting.first_source == "extension"
 
 
 def test_the_same_job_again_is_the_one_the_candidate_has(anonymous_client, test_db, world):

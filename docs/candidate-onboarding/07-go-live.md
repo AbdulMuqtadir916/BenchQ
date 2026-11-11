@@ -36,7 +36,7 @@ Read first: `docs/integration/README.md`, `src/lib/api/http.ts`, `src/lib/api/dt
 - Live flag: add `candidates` to `NEXT_PUBLIC_LIVE_MODULES` handling (the same reader as `session`, `ledger`). Without
   it, everything stays on mocks.
 - Multipart: `http.ts` is the only `fetch`; add a `postForm` there if it has none, not a second `fetch`.
-- The parse adapter in live mode: hide "Try a sample" (README A1).
+- The parse adapter in live mode: hide "Try a sample" (README A1). Done 2026-11-11: the samples and the mock are gone.
 - Query keys stay firm-first (`[firmId, "candidates", …]`).
 - **Ledger, two backend gaps found in 05b. Done in 07a (Q52):** both below are built (`routes_ledger.py`,
   `ledgerApi`'s `LedgerQuery`), and the handoff note and "New assignments" use the filters.

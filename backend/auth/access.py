@@ -98,6 +98,15 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/removal": F,
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/show": F,
+    # Job search (job search PR 1): a search, the candidate's BDE (job.search + can_search_jobs); reads, in scope.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": F,   # a capture (job search PR 2), the BDE's
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": F,
+    # The job screens' firm-level reads (job search PR 3): only the candidates the principal sees.
+    "GET /api/firms/{firm_id}/job-postings": F,
+    "GET /api/firms/{firm_id}/job-postings/{posting_id}": F,
     "GET /api/firms/{firm_id}/ledger": F,          # a BDE gets their own entries only (routes_ledger)
     "POST /api/analyze/{job_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,
@@ -175,6 +184,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/admin/invites/{invite_id}/resend": A,
     "POST /api/admin/invites/{invite_id}/revoke": A,
     "GET /api/admin/users": A,
+    "GET /api/admin/candidate-usage": A,                 # counts only (job search PR 3)
     "GET /api/admin/team": A,
     "GET /api/admin/audit": A,
     "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)
