@@ -237,9 +237,13 @@ New/changed fields and endpoints:
 | `GET …/candidates/{id}/email-reviews` | `{reviews[], next_cursor, total_count}`; review adds `subject`, `from_name`, `received_at`, `created_at` | newest first; cursor `"<created_at>|<id>"`; support view: count only |
 | `PATCH …/inbox-messages/{id}/review` | unchanged body | Dismiss never links or checks an application; `SET_STATUS` accepts every stage except `saved` |
 | Inbox message JSON | adds `content_revision`, `classification_version` | echoed by review/retry commands |
-| `email_classifications.outcome` | adds `AUTO_APPLIED` | migration 0016; guarded downgrade |
+| `email_classifications.outcome` | adds `AUTO_APPLIED` | migration **0026** (renumbered 0016 → 0022 → 0026 as main took those numbers); guarded downgrade |
 | Review reasons | adds `FORWARDED_EMAIL`, `INSUFFICIENT_CONTENT`, `CONFIDENCE_DISAGREEMENT`, `EMAIL_ALREADY_APPLIED`, `AUTOMATIC_CHANGE_UNDONE` | frontend labels in `review-reason.ts` |
 | `GET /api/stats/llm-costs` | adds `candidate_email_classification.{unpriced_calls, unconfirmed_calls}` | unknown cost is never summed as 0 |
+| `POST …/candidates/{id}/inbox-messages/{message_id}/review/open` (#127) | → `{review_id}` | `application.move`; opens a `MANUAL_REVIEW` for an email classified Other (Irrelevant), or returns the pending one; 409 when the email isn't a current Other result |
+| Other (Irrelevant) mail (#127) | shown, not hidden | decided 2026-11-07: a confident Other is listed in the Inbox as Irrelevant with subject and sender in clear (no longer encrypted); `other_purge_after` is still set to 30 days and the purge stays gated and OFF; mail linked to an application is never purged. Mail hidden before #127 stays hidden |
+| Classifier request (#127) | masked | `backend/inbox/masking.py`: before any network call the subject and body are masked in three layers (the candidate's and sender's known values; validated patterns for IN/US/GB phones, Aadhaar, bank, IFSC, UPI, PAN, addresses; Presidio 2.2.362 with `en_core_web_lg`, threshold 0.4, no network). It fails closed: if masking can't run, nothing is sent |
+| Applications: stage dates (live mapper) | `firstResponseAt`, `interviewAt`, `offerAt` | the backend stores none: read off `status_transitions` and `interviews` (first move out of Applied, not back to Saved; earliest booking not cancelled, else first move to Interview scheduled; first move to Offer or legacy Placed) |
 
 Automatic writes (switches OFF by default): the five approved targets at ≥ 0.8 (decision value = the lower of the
 provider's two numbers), Gmail-verified sender, unique match, fresh email, plus one narrow rule pending sign-off
@@ -2127,7 +2131,8 @@ or activation of external processing/purge/automation. Exact legacy/UI status ma
   content_revision, category, finite confidence/probabilities, model/provider/prompt/category identity,
   normalized sender_auth_result, receive_time_verified, reason/outcome and created_at. Unique email/result version;
   database trigger rejects updates and permits deletion only after explicit content tombstoning. No raw prompts,
-  bodies or authentication headers. Other is retained hidden/encrypted, not a new application status.
+  bodies or authentication headers. Other is retained hidden/encrypted, not a new application status. **Changed by #127
+  (2026-11-07): Other is shown as Irrelevant, not hidden or encrypted; see "PR 4 as built" in §2.1.**
 - inbox_messages: classification_state PENDING/PROCESSING/DONE/ERROR/EXCLUDED, attempts/result version,
   content_revision, lease owner/expiry, next retry and safe error; normalized sender verdict UNKNOWN/PASS/FAIL,
   receive-time provenance, hidden_at and other_purge_after. Hidden subject/sender values are encrypted too.

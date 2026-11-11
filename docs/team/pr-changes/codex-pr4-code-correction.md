@@ -1,9 +1,13 @@
-# PR 4 — automatic status updates, Undo and the review UI (`codex/pr4-code-correction`)
+# PR 4 — automatic status updates, Undo and the review UI (#127, `feat/inbox-masking-and-review`)
+
+**#127 supersedes #116.** It holds all of Samad's PR 4 work (`codex/pr4-code-correction`, sections below from "Backend"
+to "Phase 9"), plus Uzair's masking, Irrelevant and review-UI work, the date fix and three merges with main
+(sections "#127 on top of #116" onward).
 
 Authority: `docs/team/samad.md` §1.3–1.5, issue #110 (Abdul's decisions), PR #111 approval conditions. Plan, tracker and
 problem log: `docs/integration/pr4-application-workflow/` (`PR_4_IMPLEMENTATION_PLAN.md`, `PR_4_STATUS.md`, `DEBUG.md`).
 Base: main 3f8be61 (PR 3 merged), refreshed by merging main 09eb35b (#112 candidates final schema, #107 logging).
-One migration (**0016**, after main's 0015). Switches ship OFF.
+One migration, now **0026** (was 0016, then 0022, as main took those numbers). Switches ship OFF.
 
 ## Backend
 
@@ -84,7 +88,57 @@ Modified: `backend/config.py`, `backend/.env.example`, `backend/inbox/classifica
 `src/components/app/candidate/applications/applications-tab.tsx` (Move On shown; counts split).
 Migration: none. API: none. Limits: a submitted review decision was not run live in this phase.
 
+## #127 on top of #116: masking, Irrelevant, BDE review UI (Uzair, 2026-11-09)
+
+Supersedes #116 (Samad's commits kept). Decisions: Other shown as Irrelevant (2026-11-07); Presidio approved by Abdul.
+
+| File | Change |
+|---|---|
+| `backend/inbox/masking.py` (new) | `mask_for_classifier(text, known)`: layer 1 the candidate's and sender's known values; layer 2 validated patterns (IN/US/GB phones, Aadhaar, bank, IFSC, UPI, PAN, addresses); layer 3 Presidio 2.2.362 with `en_core_web_lg`, threshold 0.4, no network (its email recognizer removed). Fails closed |
+| `backend/inbox/classification_worker.py` | `_known_identity` (candidate name, email, phone, LinkedIn, mailbox, sender; never stored or logged) passed to the classifier; a confident Other is no longer hidden or encrypted, only given `other_purge_after` |
+| `backend/inbox/decider.py` | The request is built from masked text (`build_request` → `mask_for_classifier`) |
+| `backend/inbox/retention.py` | The purge selects Other by `other_purge_after` (earlier hidden mail still qualifies) and skips mail linked to an application |
+| `backend/inbox/policy.py` | "next round" / "next interview" is a repeated round only when the email's category equals the application's current stage |
+| `backend/inbox/sync_jobs.py` | Gmail `labelAdded` history events are imported: mail moved into INBOX from Spam or the archive arrives |
+| `backend/api/routes_inbox.py`, `backend/auth/access.py` | `POST …/inbox-messages/{message_id}/review/open` (FIRM; `application.move`) |
+| `backend/requirements.txt` | `presidio-analyzer==2.2.362`, `spacy==3.8.18`, `phonenumbers==9.0.42`, `en_core_web_lg` 3.8.0 pinned by URL and sha256 (**the image needs a rebuild**, about +600 MB) |
+| Backend tests | masking (5), résumé identity reaches `known`, Other shown with a purge date and linked rows kept, next-round policy (3), `review/open` (3), moved-in mail imported once; isolation case for `review/open` |
+| `applications-tab.tsx`, `irrelevant-emails.tsx` (new) | Tabs **Active · BDE review · Irrelevant** (was All · Active · Irrelevant); scroll kept on tab switch |
+| `application-board.tsx`, `application-card.tsx`, `application-list.tsx`, `needs-review-badge.tsx` (new) | Drag overlay portalled to `body` (the frame's backdrop filter offset it); "BDE review" badge replaces the email stage badge |
+| `inbox-tab.tsx`, `inbox-reader.tsx`, `inbox-connect.tsx`, `disconnect-mailbox-dialog.tsx` (new) | Filters All + every category; "Review email" on Irrelevant mail; body skeleton in place; confirm before disconnecting |
+| `email-review-panel.tsx`, `review-reason.ts`, `signal-meta.ts`, `lib/api/inbox.ts`, `use-email-reviews.ts` | "Irrelevant" in the stage list, Dismiss removed; the open-review call |
+| Frontend tests | board, card, Irrelevant list, disconnect dialog, review panel |
+
+Evidence: masking parity 735 of 738 labelled emails classified the same; no network during masking; a real request
+checked masked.
+
+## Merge with main: #128 (resilient candidate links, one application count), 2026-11-11
+
+#128 (BUG-005) gave every screen one count of applications, written on the old stages. On this branch: active =
+submitted and not closed (every stage Applied to Offer), closed = Move On and the legacy closed values, a legacy Placed on
+its own, a saved job never active (`src/lib/derive/application-counts.ts`). The candidate's Active board keeps its Saved
+and Move On columns (no "All" view here); the line above it reads "N active · M closed · S saved". Abdul's decision on
+#128 ("Active excludes Saved and Placed; All shows them") is **not** followed on the board, by Uzair's choice; logged in
+[cross-area-changes.md](../cross-area-changes.md).
+
+## Merge with main: #135 (job screens on `job_postings`), 2026-11-12
+
+The job screens read `job_postings`; the candidates, résumés and jobs mocks are gone (#135). PR 4's old-feed jobs code
+(`GET /api/jobs`, its mapper and tests) is replaced by #135's. The heart keeps PR 4's save to Applications (Abdul's
+decision 1 on #135); the preview's Open original saves too. Migration renumbered **0022 → 0026** (main took 0022–0023;
+0024–0025 are Arbaz's #129); its test is `test_migration_0026.py`. CI's backend limit raised to 60 minutes (`adec998`).
+
 ## Remaining limits
+
+- **Until Arbaz's #129 (applications on `job_postings`):** the heart answers "Job not found"; the application page's job
+  is plain text, not a link. Whichever of #127 and #129 merges second points its first migration at the other's last,
+  and **#127's two new `app.job.title` uses in `backend/applications/tracking.py` (automatic change ≈ l.258, Undo
+  ≈ l.314) become `posting_job(app.posting).title`** — git may merge them without a conflict, and the ledger write would
+  then fail.
+- Responses: a reply still waiting in BDE review doesn't count as heard back (the new inbox doesn't fill
+  `last_email_received`).
+- axe findings on the dashboards and board (colour contrast, an empty table header, board roles) predate these merges.
+
 
 Sign-offs needed at review: G2 status mapping, G3 contracts, G4 Incomplete → Applied, G6 migration, G7 logger, G8
 endpoint (all Abdul). Board column paging deferred (D-20 note). Jobs: the backend has no per-candidate job list yet (Zuhair), so saving a

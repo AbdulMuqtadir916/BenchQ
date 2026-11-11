@@ -1,17 +1,18 @@
 # PR 4 status — live tracker
 
 Plan: [PR_4_IMPLEMENTATION_PLAN.md](./PR_4_IMPLEMENTATION_PLAN.md) · Fixes: [DEBUG.md](./DEBUG.md)
-Branch `codex/pr4-code-correction` · Folder `~/Documents/cloned` · Base main 3f8be61 (PR 3 merged)
+Branch `feat/inbox-masking-and-review` (#127, supersedes #116 on `codex/pr4-code-correction`) · up to date with main (#125, #128, #135)
 
 **Rule:** tick a task only when its completion criteria in the plan are met and the evidence is written below.
 
 <!-- LIVE -->
 ## Live
 
-- **Now:** implementation and checks complete (36 of 38 tasks). Full backend 3852 passed / 0 failed; frontend 613 tests,
-  typecheck, lint, build passed; live classification, review loop, automatic move, Undo and setup recovery verified.
-- **Next:** reconcile docs (done 2026-11-06), then T5.5 PR **only on Samad's instruction**; T6.1 production activation
-  after merge.
+- **Now (2026-11-12):** #127 open and mergeable; merged with main three times (#125 PR 8, #128, #135). Last full
+  checks on `8af292c`: backend 4376 tests (4375 passed + the one isolation case fixed after the merge), frontend 772
+  tests, typecheck and lint.
+- **Next:** merge #127; then T6.1 production activation. Coordinate with Arbaz's #129 (migration order, `app.job.title`
+  in `tracking.py`; see the per-file report's "Remaining limits").
 - **Approvals still needed (not obtained by implementing):** Abdul — G2 status mapping, G3 contracts, G4 Incomplete →
   Applied, G6 migration 0016, G7 logger change, G8 endpoint decision. Samad's go-ahead to build them was given; their
   sign-off happens at PR review.
@@ -91,6 +92,18 @@ Branch `codex/pr4-code-correction` · Folder `~/Documents/cloned` · Base main 3
 - [x] T8.3 Tested live on 6 seeded jobs for Manoj (dev DB only): heart → Saved card; Open source → Saved card;
   un-heart → draft removed, job still listed.
 
+## Phase 10 — Masking, Irrelevant, review UI (Uzair, #127, 2026-11-09)
+- [x] T10.1 Mask the email before the classifier (three layers, fails closed); parity 735/738
+- [x] T10.2 Other shown as Irrelevant; purge skips linked mail; `review/open`
+- [x] T10.3 Tabs Active · BDE review · Irrelevant; review badge; drag overlay; disconnect confirm; inbox filters
+- [x] T10.4 Sync imports mail moved into INBOX; next-round policy
+
+## Phase 11 — Merges with main and the dashboards (2026-11-11 – 12)
+- [x] T11.1 #125 (PR 8): Follow-ups removed; Activity dashboard on the new stages; placements → offers
+- [x] T11.2 Stage dates on live data (heard back, interview, offer from the history)
+- [x] T11.3 #128: one application count on the new stages
+- [x] T11.4 #135: job screens on `job_postings`; heart kept; migration → 0026
+
 ## Phase 6 — Activation (after merge)
 - [ ] T6.1 Activation checklist signed off
 
@@ -99,6 +112,16 @@ Branch `codex/pr4-code-correction` · Folder `~/Documents/cloned` · Base main 3
 - Saved as a review choice? (Selected: no.)
 
 ## Evidence log
+2026-11-12, **#135 merged into #127** (`8af292c`): migration 0022 → 0026 (`down_revision 0023`); full backend run 4376
+tests, one failure caused by the merge (an isolation setup lost its `db.commit()`), fixed, isolation file 160 passed;
+frontend 772 tests, typecheck, lint. Pushed.
+
+2026-11-11, **#128 merged** (`499503b`): application counts on the new stages; frontend 830/831 (the isolation mock test's
+known timeout, passes alone). CI passed.
+
+2026-11-11, **#125 merged and stage dates** (`3aade96`, `c7f21a2`): backend 4387 passed; frontend 728; 90 browser views
+(5 accounts, both themes, 3 widths) with no errors or overflow; live data: % heard back 0% → 40%.
+
 2026-11-06, Phase 8. Frontend: typecheck, lint, 631 tests pass (new `live-jobs.test.ts`, 7). Dev DB: 6 jobs seeded
 (`external_id` `pr4-heart-seed-1..6`, linked to Manoj through `firm_jobs` and `candidate_jobs`). Live: heart on "Java
 Developer" and Open source on "Java Backend Developer" each made a `saved` application with its favourite; un-heart
