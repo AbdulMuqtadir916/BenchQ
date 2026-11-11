@@ -75,4 +75,6 @@ class Freehire:
             employment_type=clean_str(enrichment.get("employment_type")),
             skills=_strings(content.get("skills")),
             is_closed=bool(content.get("closed_at")),
+            # freehire.me tags employers it knows sponsor H-1B (`collections`; job search PR 3, decided 2026-11-11).
+            h1b_sponsor="us-h1b-sponsor" in _strings(content.get("collections")),
         )

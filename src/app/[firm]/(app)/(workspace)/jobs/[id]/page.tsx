@@ -90,6 +90,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <VerificationBadge verification={job.company.verification} />
+        {job.company.h1b?.sponsorsH1b ? <Tag tone="green">H-1B sponsor</Tag> : null}
         <SourceChip sourceType={job.provenance.sourceType} legalBasis={job.provenance.legalBasis} showBasis />
         {job.postedAt ? <span className="text-caption text-[var(--color-text-3)]">Posted <DualTimestamp iso={job.postedAt} format="relative" /></span> : null}
         <span className="text-caption text-[var(--color-text-3)]">· Captured <DualTimestamp iso={job.provenance.ingestedAt} format="relative" /></span>

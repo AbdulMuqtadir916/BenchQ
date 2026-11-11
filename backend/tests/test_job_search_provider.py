@@ -233,3 +233,10 @@ def test_a_single_job_reply_without_the_job_is_a_failure(monkeypatch, reply):
         _full({**MADE_UP_JOB, "public_slug": "java-developer-1"})
     assert e.value.code == "bad_response"
 
+
+
+def test_freehire_marks_a_known_h1b_sponsor_and_nothing_else():
+    """`us-h1b-sponsor` in freehire.me's collections: a known sponsor. Without it the source doesn't know: False."""
+    assert Freehire().read({**MADE_UP_JOB, "collections": ["us-h1b-sponsor", "fortune500"]}).h1b_sponsor is True
+    assert Freehire().read({**MADE_UP_JOB, "collections": ["uk-skilled-worker-sponsor"]}).h1b_sponsor is False
+    assert Freehire().read(MADE_UP_JOB).h1b_sponsor is False

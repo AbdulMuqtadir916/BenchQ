@@ -50,6 +50,8 @@ class JobFields:
     employment_type: str | None = None
     skills: tuple[str, ...] = ()
     is_closed: bool = False
+    # The source marks the employer a known H-1B sponsor. False means not known, never "doesn't sponsor".
+    h1b_sponsor: bool = False
 
 
 @dataclass

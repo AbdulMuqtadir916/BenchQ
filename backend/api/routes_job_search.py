@@ -223,7 +223,8 @@ def _posting_json(row: JobPosting, with_description: bool) -> dict:
            "apply_url": fields.apply_url if fields else None, "location": fields.location if fields else None,
            "countries": list(fields.countries) if fields else [], "posted_at": fields.posted_at if fields else None,
            "employment_type": fields.employment_type if fields else None,
-           "skills": list(fields.skills) if fields else [], "is_closed": fields.is_closed if fields else False}
+           "skills": list(fields.skills) if fields else [], "is_closed": fields.is_closed if fields else False,
+           "h1b_sponsor": fields.h1b_sponsor if fields else False}
     if with_description:
         out["description"] = fields.description if fields else ""
     return out

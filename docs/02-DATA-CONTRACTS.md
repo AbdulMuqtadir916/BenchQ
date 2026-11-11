@@ -1336,7 +1336,7 @@ has (`src/lib/format/job-description.ts`): facts, headings, bullets, paragraphs.
 | `Job` | From the posting |
 |---|---|
 | `id`, `title`, `description`, `applyUrl`, `postedAt` | as sent (`postedAt` only when it is a date-time) |
-| `company` | built from the name alone: everything else unknown (`null`), `clientType: 'UNKNOWN'` |
+| `company` | built from the name alone: everything else unknown (`null`), `clientType: 'UNKNOWN'`; `h1b` is `{sponsorsH1b: true, dataSource: 'freehire.me'}` only when the posting's `h1b_sponsor` is true (freehire.me's `us-h1b-sponsor`), else `null` (not known, never "doesn't sponsor"); no `verification`, so no badge shows |
 | `city` / `state` | the location text / `null` (the screens print the text alone) |
 | `remoteMode` | `REMOTE` when the location says remote, `HYBRID` when it says hybrid, else `ONSITE` |
 | `employmentType` | a known value, else `null` |

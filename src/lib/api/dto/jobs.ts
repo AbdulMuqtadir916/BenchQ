@@ -25,6 +25,8 @@ const posting = {
   employment_type: z.string().nullable(),
   skills: z.array(z.string()),
   is_closed: z.boolean(),
+  /** The source marks the employer a known H-1B sponsor (freehire.me's `us-h1b-sponsor`). False: not known. */
+  h1b_sponsor: z.boolean().optional().default(false),
   description: z.string().optional(),
 };
 
@@ -70,18 +72,21 @@ const SOURCE_TYPE: Record<string, { type: JobSourceType; basis: LegalBasis }> = 
 };
 const PROVIDER = { type: "AGGREGATOR", basis: "LICENSED_API" } as const;
 
-/** Only the name is known: the rest of the company is unknown (`null`), as the mock does for a captured job. */
-function companyFrom(name: string): Company {
+/** The source's H-1B mark (docs/02 §6.z): a known sponsor only; nothing known is `null`, never "doesn't sponsor". */
+const KNOWN_SPONSOR = { sponsorsH1b: true, lcaCount: null, lcaYear: null, medianLcaWage: null, topLcaTitles: [], dataSource: "freehire.me", lastCheckedAt: null };
+
+/** The name, and whether the source knows it sponsors H-1B: the rest of the company is unknown (`null`). */
+function companyFrom(name: string, isKnownSponsor: boolean): Company {
   return CompanySchema.parse({
     id: `company:${normalise(name)}`, name, normalisedName: normalise(name), domain: null, websiteUrl: null,
-    linkedinUrl: null, employeeBand: null, hasUsPresence: null, clientType: "UNKNOWN", atsProvider: null, h1b: null,
-    verification: null,
+    linkedinUrl: null, employeeBand: null, hasUsPresence: null, clientType: "UNKNOWN", atsProvider: null,
+    h1b: isKnownSponsor ? KNOWN_SPONSOR : null, verification: null,
   });
 }
 
 /** One posting (or one job's newest posting) as a `Job` (docs/02 §6.z). */
 export function toJob(dto: z.infer<z.ZodObject<typeof posting>>, firmId: string, candidateIds: string[]): Job {
-  const company = companyFrom(dto.company);
+  const company = companyFrom(dto.company, dto.h1b_sponsor);
   const applyUrl = urlOrNull(dto.apply_url);
   const source = SOURCE_TYPE[dto.source] ?? PROVIDER;
   const location = dto.location?.trim() || null;

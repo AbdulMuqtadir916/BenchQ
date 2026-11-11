@@ -32,6 +32,12 @@ describe("a job from the backend (docs/02 §6.z): what a posting knows, nothing 
     expect(toFirmJob(FirmJobDto.parse({ ...posting, location: "Austin, TX (Hybrid)", candidate_ids: [] }), "f").remoteMode).toBe("HYBRID");
   });
 
+  it("a known H-1B sponsor is marked from the source; no mark is unknown, never \"doesn't sponsor\"", () => {
+    expect(toFirmJob(FirmJobDto.parse({ ...posting, h1b_sponsor: true, candidate_ids: [] }), "f").company.h1b).toMatchObject({ sponsorsH1b: true, dataSource: "freehire.me" });
+    expect(toFirmJob(FirmJobDto.parse({ ...posting, h1b_sponsor: false, candidate_ids: [] }), "f").company.h1b).toBeNull();
+    expect(toFirmJob(FirmJobDto.parse({ ...posting, candidate_ids: [] }), "f").company.h1b).toBeNull();
+  });
+
   it("a captured job is its candidate's, and says how it was added", () => {
     const job = toCapturedJob(CapturedPostingDto.parse({ ...posting, source: "manual", candidate_id: "c9", created: true, description: "Line one.\nLine two." }), "firm_hts");
     expect(job).toMatchObject({ candidateIds: ["c9"], description: "Line one.\nLine two.", provenance: { sourceType: "MANUAL", legalBasis: "USER_SESSION" } });

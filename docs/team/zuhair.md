@@ -49,7 +49,7 @@ candidate, 20 attempts per BDE, per 6:30 PM IST day) and the reads (`GET …/job
 scheduled scrape and write routes retired (410). **PR 3** (`integrate/jobs`, docs/02 §6.z; opened after PR 1 and 2
 merge): the existing job screens on the backend through a mapper, two firm-level reads, "Find jobs" really searching
 (the BDE's), the capture form per candidate. **Not yet built:** Arbaz's `applications` repoint and the clean-up PR: delete the old pool (`jobs`,
-`job_locations`, `firm_jobs`, `candidate_jobs`, its routes and scrapers) once `applications` no longer points at it.
+`job_locations`, `firm_jobs`, `candidate_jobs`, `companies` (no companies module, decided 2026-11-11), their routes and scrapers) once `applications` no longer points at it.
 The flow described below (steps 1–5) is the old pool's: its scheduled scrape and write routes are retired (PR 2), its
 reads still answer until the clean-up.
 
