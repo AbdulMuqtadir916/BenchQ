@@ -2,16 +2,12 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api/client";
 import type { CaptureJob, Job } from "@/lib/schemas/job";
 import type { JobSearches } from "@/lib/schemas/job-search";
-import { isLive } from "./config";
 import { toBackendId } from "./dto/demo-ids";
 import { CapturedPostingDto, FirmJobDto, FirmJobListDto, JobSearchesDto, toBackendCapture, toCapturedJob, toFirmJob, toJobSearches } from "./dto/jobs";
 import { http } from "./http";
 
-const mock = () => import("@/mocks/jobs").then((m) => m.jobsMock);
-
 export interface JobListParams {
   limit?: number;
-  offset?: number;
   /** One candidate's jobs only (docs/02 §6.z). */
   candidateId?: string;
 }
@@ -44,22 +40,22 @@ const live = {
 };
 
 /**
- * Firm-scoped (docs/07 T5): every call names the firm, and the backend/mock serves only that firm's rows. Live with
- * `NEXT_PUBLIC_LIVE_MODULES=jobs`: then only the backend's jobs show, never the mock's (decided 2026-11-11).
+ * Firm-scoped (docs/07 T5): every call names the firm, and the backend serves only the jobs of the candidates the
+ * signed-in person sees. Jobs come only from the backend: there is no mock (decided 2026-11-11).
  */
 export const jobsApi = {
-  list: async (firmId: string, params?: JobListParams): Promise<Job[]> => (isLive("jobs") ? live.list(firmId, params) : (await mock()).list(firmId, params)),
+  list: (firmId: string, params?: JobListParams): Promise<Job[]> => live.list(firmId, params),
 
-  byId: async (firmId: string, id: string): Promise<Job> => (isLive("jobs") ? live.byId(firmId, id) : (await mock()).byId(firmId, id)),
+  byId: (firmId: string, id: string): Promise<Job> => live.byId(firmId, id),
 
   /** For one candidate (their BDE only); the same job again throws `DUPLICATE_JOB` naming the one they have. */
-  capture: async (firmId: string, body: CaptureJob): Promise<Job> => (isLive("jobs") ? live.capture(firmId, body) : (await mock()).capture(firmId, body)),
+  capture: (firmId: string, body: CaptureJob): Promise<Job> => live.capture(firmId, body),
 
   /** The candidate's running search, past searches and captures, and today's usage. */
-  searches: async (firmId: string, candidateId: string): Promise<JobSearches> => (isLive("jobs") ? live.searches(firmId, candidateId) : (await mock()).searches(firmId, candidateId)),
+  searches: (firmId: string, candidateId: string): Promise<JobSearches> => live.searches(firmId, candidateId),
 
   /** "Find jobs": start a search for a role (the candidate's BDE only); it runs in the background. */
-  startSearch: async (firmId: string, candidateId: string, query: string): Promise<void> => (isLive("jobs") ? live.startSearch(firmId, candidateId, query) : (await mock()).startSearch(firmId, candidateId, query)),
+  startSearch: (firmId: string, candidateId: string, query: string): Promise<void> => live.startSearch(firmId, candidateId, query),
 };
 
 /** The capture was refused because the candidate already has this job; `jobId` is the existing job. */

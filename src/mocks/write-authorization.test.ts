@@ -6,7 +6,6 @@ import { candidatesMock } from "./candidates";
 import { createCandidateBody } from "./create-candidate-body";
 import { documentsMock } from "./documents";
 import { inboxMock } from "./inbox";
-import { jobsMock } from "./jobs";
 import { jobMarksMock } from "./job-marks";
 import { FIRM_SCOPED_RESOURCES, WRITE_ACTIONS, isReadMethod } from "./membership";
 import { recordsMock } from "./records";
@@ -22,7 +21,7 @@ import { signInAs, signInAsSupportView, signOutForTest } from "./sign-in-as";
 
 type AnyMethod = (firmId: string, ...args: unknown[]) => Promise<unknown>;
 const MOCKS: Record<string, Record<string, AnyMethod>> = {
-  candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock, records: recordsMock,
+  candidates: candidatesMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock, records: recordsMock,
   documents: documentsMock, inbox: inboxMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
 } as unknown as Record<string, Record<string, AnyMethod>>;
 
@@ -40,8 +39,6 @@ const ARGS: Record<string, unknown[]> = {
   "candidates.followBde": ["user_adnan", "user_fatima"],
   "candidates.reassign": ["cand_01", { managerId: "user_priya", bdeId: "user_vikram", note: null }],
   "candidates.parseResume": [{ fileName: "Ravi_Teja_Java_FullStack.pdf", sizeBytes: 1000, mimeType: "application/pdf" }],
-  "jobs.capture": [{ candidateId: "cand_03", sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", description: "Policy check" }],
-  "jobs.startSearch": ["cand_03", "QA"],
   "documents.upload": ["cand_01", { kind: "OTHER", title: "Note", fileName: "note.pdf", sizeBytes: 1000, expiresAt: null }],
   "documents.remove": ["doc_none"],
   "inbox.connect": ["cand_01"],
@@ -59,8 +56,7 @@ const ARGS: Record<string, unknown[]> = {
   "resumes.showBase": ["cand_03", "base_none"],
 };
 /** Only the candidate's BDE does these (07 Q55): the OWNER's control is refused them by that rule, not the policy. */
-// Capturing and searching jobs are the candidate's BDE's too (docs/02 §6.z).
-const BDE_ONLY = new Set(["resumes.upload", "resumes.deleteBase", "resumes.deleteVersion", "resumes.showBase", "jobs.capture", "jobs.startSearch"]);
+const BDE_ONLY = new Set(["resumes.upload", "resumes.deleteBase", "resumes.deleteVersion", "resumes.showBase"]);
 
 const writes = Object.entries(WRITE_ACTIONS).flatMap(([resource, methods]) => Object.entries(methods).map(([name, action]) => ({ resource, name, action })));
 const call = (resource: string, name: string) => MOCKS[resource]![name]!(FIRM, ...(ARGS[`${resource}.${name}`] ?? []));
@@ -81,7 +77,7 @@ describe("the write inventory", () => {
       }
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
-      "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture", "jobs.startSearch",
+      "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark",
       "resumes.deleteBase", "resumes.deleteVersion", "resumes.save", "resumes.showBase", "resumes.upload", "resumes.useAsBase",
     ]);
   });
@@ -89,8 +85,6 @@ describe("the write inventory", () => {
   it("the Phase B writes name their own actions (fix PRs 1, 2)", () => {
     expect(WRITE_ACTIONS.candidates?.create).toBe("candidate.create");
     expect(WRITE_ACTIONS.candidates?.parseResume).toBe("candidate.create"); // reading a résumé is part of adding one
-    expect(WRITE_ACTIONS.jobs?.capture).toBe("job.capture");
-    expect(WRITE_ACTIONS.jobs?.startSearch).toBe("job.search");
     expect(WRITE_ACTIONS.jobMarks).toEqual({ mark: "job.apply", unmark: "job.apply" });
   });
 });

@@ -13,8 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firms } from "@/mocks/team";
 import { allCandidates } from "@/mocks/candidates";
-import { jobsMock } from "@/mocks/jobs";
-import { stubBackendReads } from "@/mocks/fixture-backend";
+import { setStubJobs, stubBackendReads, stubJob } from "@/mocks/fixture-backend";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "@/lib/stores/session-store";
 import { OwnerDashboard } from "./owner-dashboard";
@@ -49,10 +48,8 @@ const DASHBOARDS: Dashboard[] = [
     queue: { reads: ["candidates", "applications", "jobs"], labels: ["Tailor resume"] }, // the queue rows' action
     newAssignments: { reads: ["candidates"], labels: ["No new candidates this week."] }, // its empty state: no ASSIGN entries on mocks (05 §7)
   },
-  // A job is a candidate's (docs/02 §6.z): the mock's fixture jobs are nobody's, so each of the BDE's candidates gets one.
-  seed: () => Promise.all(allCandidates.filter((c) => c.firmId === "firm_hts" && c.bdeId === "user_adnan").map((c, n) => jobsMock.capture("firm_hts", {
-    candidateId: c.id, sourceUrl: `https://jobs.example.test/queue-${n}`, title: c.primaryRole ?? "Developer", companyName: "Example Corp", location: "Remote", description: "A made-up job.",
-  }))) },
+  // A job is a candidate's (docs/02 §6.z), and jobs are only the backend's: each of the BDE's candidates has one.
+  seed: async () => setStubJobs(allCandidates.filter((c) => c.firmId === "firm_hts" && c.bdeId === "user_adnan").map((c, n) => stubJob("firm_hts", c.id, n, c.primaryRole ?? "Developer"))) },
 ];
 
 const ERROR = "Something didn’t load";

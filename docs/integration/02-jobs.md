@@ -11,10 +11,9 @@
 > `POST …/job-postings` (a capture, job search PR 2: `{source: manual | extension, title, company, description,
 > url, location?}`, 201, or 200 with the job the candidate already has), `POST …/job-searches` `{query}` (202
 > `{batch_id, run_id}`; the batch is `running` until it finishes; a repeat of the same role continues from the last; the candidate's BDE only; 403 / 404 / 409 / 422 / 429). docs/02
-> §6.y has the rules. **On the screens (job search PR 3, `integrate/jobs`, docs/02 §6.z):** with
-> `NEXT_PUBLIC_LIVE_MODULES=jobs` every job screen reads `GET /api/firms/{firm}/job-postings` (one item per job, the
-> visible `candidate_ids`) and `…/job-postings/{id}` through `src/lib/api/dto/jobs.ts`; only real jobs show, never the
-> mock's (decided 2026-11-11: put `jobs` in that line of `.env.local`). Applications still name the old pool until
+> §6.y has the rules. **On the screens (job search PR 3, `integrate/jobs`, docs/02 §6.z):** every job screen reads `GET /api/firms/{firm}/job-postings` (one item per job, the
+> visible `candidate_ids`) and `…/job-postings/{id}` through `src/lib/api/dto/jobs.ts`. Jobs are only the backend's: the jobs
+> mock, its fixture and the `jobs` switch are deleted (decided 2026-11-11). Applications still name the old pool until
 > Arbaz's repoint (docs/team/arbaz.md). The rest of this page still describes the old pool.
 
 ## Why companies are folded in
@@ -31,7 +30,7 @@ jobs to `GET /api/companies` to build that object.
 | Hooks | `src/lib/hooks/use-jobs.ts`, `use-companies.ts` (unused today) |
 | Adapters | `src/lib/api/jobs.ts`, `src/lib/api/companies.ts` |
 | Frontend types | `JobSchema` in `src/lib/schemas/job.ts`, `CompanySchema` in `src/lib/schemas/company.ts`, enums in `enums.ts` |
-| Mocks to delete | `src/mocks/jobs.ts`, `src/mocks/companies.ts`, `src/mocks/data/jobs.json` (53k lines), `src/mocks/data/companies.json` |
+| Mocks to delete | ~~`src/mocks/jobs.ts`, `src/mocks/data/jobs.json`~~ (deleted, job search PR 3); `src/mocks/companies.ts`, `src/mocks/data/companies.json` |
 
 ## Backend endpoints
 

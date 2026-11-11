@@ -3,25 +3,27 @@
 import { Building2, Globe2 } from "lucide-react";
 import type { Job } from "@/lib/schemas/job";
 
-export type PortalKey = "LINKEDIN" | "INDEED" | "DICE" | "GLASSDOOR" | "COMPANY";
+/**
+ * Where a job came from, as the backend says (docs/02 §6.z): never a guessed job board. A search's jobs come through
+ * freehire.me; a capture is by hand or from the extension. "Company site" is the employer's own mark in a preview.
+ */
+export type PortalKey = "FREEHIRE" | "OTHER_SOURCE" | "MANUAL" | "EXTENSION" | "COMPANY";
 
 export const PORTALS: Record<PortalKey, { label: string; logo?: string; color: string }> = {
-  LINKEDIN: { label: "LinkedIn", logo: "https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg", color: "#0A66C2" },
-  INDEED: { label: "Indeed", logo: "https://cdn.simpleicons.org/indeed/003A9B", color: "#003A9B" },
-  DICE: { label: "Dice", logo: "https://mma.prnewswire.com/media/1099567/Dice_Logo.jpg?p=facebook", color: "#EE2747" },
-  GLASSDOOR: { label: "Glassdoor", logo: "https://cdn.simpleicons.org/glassdoor/00A264", color: "#00A264" },
+  FREEHIRE: { label: "freehire.me", color: "var(--color-primary)" },
+  OTHER_SOURCE: { label: "Job search", color: "var(--color-primary)" },
+  MANUAL: { label: "Added by hand", color: "var(--color-text-2)" },
+  EXTENSION: { label: "From the extension", color: "var(--color-text-2)" },
   COMPANY: { label: "Company site", color: "var(--color-text-2)" },
 };
 
-function jobNumber(job: Job) {
-  return Number(job.id.replace(/\D/g, "")) || 0;
-}
+/** The sources a job list can be filtered by. */
+export const SOURCE_KEYS = ["FREEHIRE", "MANUAL", "EXTENSION"] as const satisfies readonly PortalKey[];
 
 export function portalForJob(job: Job): PortalKey {
-  const index = jobNumber(job);
-  if (job.provenance.sourceType === "CONNECTOR") return index % 3 === 0 ? "DICE" : "LINKEDIN";
-  if (job.provenance.sourceType === "AGGREGATOR") return index % 2 === 0 ? "GLASSDOOR" : "INDEED";
-  return "COMPANY";
+  if (job.provenance.sourceType === "MANUAL") return "MANUAL";
+  if (job.provenance.sourceType === "USER_SUBMITTED") return "EXTENSION";
+  return job.provenance.sourceId === "freehire" ? "FREEHIRE" : "OTHER_SOURCE";
 }
 
 export function PortalLogo({ portal, domain, size = 24 }: { portal: PortalKey; domain?: string | null; size?: number }) {
@@ -34,7 +36,7 @@ export function PortalLogo({ portal, domain, size = 24 }: { portal: PortalKey; d
       style={{ width: size, height: size, color: config.color }}
       aria-hidden="true"
     >
-      {portal === "COMPANY" ? <Building2 size={Math.round(size * 0.56)} /> : <Globe2 size={Math.round(size * 0.5)} />}
+      {portal === "COMPANY" || portal === "MANUAL" || portal === "EXTENSION" ? <Building2 size={Math.round(size * 0.56)} /> : <Globe2 size={Math.round(size * 0.5)} />}
       {src ? (
         // Brand marks use canonical assets; the icon fallback remains legible offline.
         // eslint-disable-next-line @next/next/no-img-element

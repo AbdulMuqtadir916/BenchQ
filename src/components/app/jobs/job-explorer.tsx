@@ -34,7 +34,7 @@ import { MatchScore } from "@/components/app/match-score";
 import { VerificationBadge } from "@/components/app/verification-badge";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { EmptyState } from "@/components/app/empty-state";
-import { PORTALS, PortalLogo, portalForJob, type PortalKey } from "@/components/app/jobs/portal-logo";
+import { PORTALS, PortalLogo, SOURCE_KEYS, portalForJob, type PortalKey } from "@/components/app/jobs/portal-logo";
 import { useCan } from "@/lib/auth/permissions";
 import { useHref } from "@/lib/routes/use-href";
 import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
@@ -49,7 +49,7 @@ const REMOTE_OPTIONS: SelectOption[] = [
 
 const SOURCE_OPTIONS: SelectOption[] = [
   { value: "ALL", label: "All sources" },
-  ...(["LINKEDIN", "INDEED", "DICE", "GLASSDOOR", "COMPANY"] as const).map((portal) => ({
+  ...SOURCE_KEYS.map((portal) => ({
     value: portal,
     label: PORTALS[portal].label,
     icon: <PortalLogo portal={portal} size={18} />,
@@ -397,7 +397,7 @@ function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) {
         <header className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <PortalLogo portal={portal} domain={job.company.domain} size={32} />
-            <div className="min-w-0"><div className="text-body-strong text-[var(--color-text)]">{PORTALS[portal].label} source preview</div><div className="truncate text-caption text-[var(--color-text-3)]">{sourceUrl ?? job.company.websiteUrl ?? "Source URL unavailable"}</div></div>
+            <div className="min-w-0"><div className="text-body-strong text-[var(--color-text)]">Source preview · {PORTALS[portal].label}</div><div className="truncate text-caption text-[var(--color-text-3)]">{sourceUrl ?? job.company.websiteUrl ?? "Source URL unavailable"}</div></div>
           </div>
           {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">Open original<ArrowUpRight size={13} /></a> : null}
         </header>

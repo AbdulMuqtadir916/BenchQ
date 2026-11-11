@@ -10,7 +10,6 @@
 export type ApiModule =
   | "candidates"
   | "companies"
-  | "jobs"
   | "records"
   | "resumes"
   | "applications"

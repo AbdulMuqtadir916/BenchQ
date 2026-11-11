@@ -36,7 +36,7 @@ export function BaseResumeCard({ base, onOpenResumes }: { base: CandidateWorkspa
   );
 }
 
-export function TopMatches({ matches, onFindJobs }: { matches: Array<{ job: Job; score: number }>; onFindJobs: () => void }) {
+export function TopMatches({ matches, onFindJobs }: { matches: Array<{ job: Job; score: number }>; onFindJobs?: () => void }) {
   const toHref = useHref();
   return (
     <Card className="p-0">
@@ -56,9 +56,9 @@ export function TopMatches({ matches, onFindJobs }: { matches: Array<{ job: Job;
         ))}
         {matches.length === 0 ? <li className="px-4 py-4 text-sm text-[var(--color-text-3)]">No unapplied matches right now.</li> : null}
       </ul>
-      <button type="button" onClick={onFindJobs} className="flex w-full items-center justify-center gap-1.5 border-t border-[var(--color-border)] py-2.5 text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:bg-[var(--color-primary-subtle)]">
+      {onFindJobs ? <button type="button" onClick={onFindJobs} className="flex w-full items-center justify-center gap-1.5 border-t border-[var(--color-border)] py-2.5 text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:bg-[var(--color-primary-subtle)]">
         <Sparkles size={14} aria-hidden /> Find more jobs
-      </button>
+      </button> : null}
     </Card>
   );
 }

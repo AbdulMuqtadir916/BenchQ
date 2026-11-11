@@ -4,7 +4,7 @@ import Link from "next/link";
 import { LoaderCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatIst } from "@/lib/format/timezone";
-import { useJobSearches, useStartJobSearch } from "@/lib/hooks/use-jobs";
+import { useJobSearches } from "@/lib/hooks/use-jobs";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { JobSearch, JobSearchErrorCode, JobSearches } from "@/lib/schemas/job-search";
 
@@ -58,32 +58,38 @@ export function blockedReason(candidate: Pick<Candidate, "primaryRole" | "target
   return null;
 }
 
+/** The search, owned by the candidate page: every "Find jobs" there starts the same one and shares its refusal. */
+export interface FindJobsSearch {
+  /** Starts the search for the candidate's role, opens the Jobs tab and plays the matching sequence. */
+  run: () => void;
+  isStarting: boolean;
+  /** Why the backend refused the last start (409, 422, 429, 503), as it says it. */
+  refusal: string | null;
+}
+
 interface FindJobsProps {
   candidate: Candidate;
   /** The résumé to open when the country is missing (the header's "Build resume" target). */
   resumeHref: string | null;
-  /** Opens the Jobs tab and plays the matching sequence. */
-  onFindJobs: () => void;
+  search: FindJobsSearch;
 }
 
 /**
  * "Find jobs" for the candidate's BDE (docs/02 §6.z): starts a real search for the candidate's role, then shows its
  * outcome and today's usage under the button. Disabled, with the reason, when it can't start.
  */
-export function FindJobs({ candidate, resumeHref, onFindJobs }: FindJobsProps) {
+export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   const searchesQuery = useJobSearches(candidate.id);
-  const start = useStartJobSearch(candidate.id);
   const searches = searchesQuery.data;
   const role = searchRole(candidate);
-  const isSearching = Boolean(searches?.running) || start.isPending;
+  const isSearching = Boolean(searches?.running) || search.isStarting;
   const blocked = blockedReason(candidate, searches);
   const last = searches?.searches.find((search) => search.kind === "SEARCH") ?? null;
-  const refusal = start.error instanceof Error ? start.error.message : null;
+  const refusal = search.refusal;
 
   function run() {
     if (!role || blocked || isSearching) return;
-    start.mutate(role);
-    onFindJobs();
+    search.run();
   }
 
   return (

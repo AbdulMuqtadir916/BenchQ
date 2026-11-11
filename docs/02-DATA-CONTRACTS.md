@@ -1138,8 +1138,7 @@ export const JobSchema = z.object({
 
   isActive: z.boolean(),
   // The candidates this job was found or captured for, only the ones the viewer may see (job search PR 3, §6.z).
-  // The mock's fixture jobs belong to no candidate (decided 2026-11-11).
-  candidateIds: z.array(z.string()).default([]),
+  candidateIds: z.array(z.string()),
 });
 ```
 
@@ -1325,7 +1324,9 @@ export const JobMarkSchema = z.object({
 ### 6.z Job search on the screens (job search PR 3; approved by Zuhair as product 2026-11-11)
 
 > The existing job screens read `job_postings` through `src/lib/api/jobs.ts` and a DTO mapper
-> (`src/lib/api/dto/jobs.ts`); no screen is redesigned. Live with `NEXT_PUBLIC_LIVE_MODULES=jobs`.
+> (`src/lib/api/dto/jobs.ts`); no screen is redesigned. Jobs come only from the backend: the jobs mock and its
+> `jobs` switch are gone (decided 2026-11-11). A job's source shows as the backend says it (freehire.me, added by
+> hand, from the extension), never a guessed job board.
 
 **Reads (firm level, PR 3):** `GET /api/firms/{firm}/job-postings?candidate_id=&limit=` (limit 1–400, default 400)
 and `GET /api/firms/{firm}/job-postings/{id}`. Both read only the candidates the signed-in person may see (the owner

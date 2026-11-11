@@ -95,8 +95,9 @@ Hook `useCreateCandidate` invalidates the firm's candidates, records, documents 
 - Handed to a manager: **"{name} is on the bench"** / "Handed to **{manager}**, who will pick a BDE."
 - Drop the screen's "notified when their shift starts" and "Matching jobs … starts tonight" (Q50; the backend promises
   no such job).
-- Buttons: **Open profile** (primary, focused) → `candidates.detail`; **Find jobs** → `/[firm]/jobs?candidate={id}` via
-  `hrefFor` (A6); **Add another** → a fresh wizard on step 1.
+- Buttons: **Open profile** (primary, focused) → `candidates.detail`; **Add another** → a fresh wizard on step 1. (A
+  **Find jobs** button was removed 2026-11-11, job search PR 3: only owners and managers add a candidate, and only the
+  candidate's BDE searches jobs.)
 
 ## 4. Switch the route over
 

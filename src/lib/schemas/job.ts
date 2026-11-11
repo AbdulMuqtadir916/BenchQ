@@ -64,9 +64,8 @@ export const JobSchema = z.object({
   provenance: JobProvenanceSchema,
 
   isActive: z.boolean(),
-  /** The candidates this job was found or captured for, only those the viewer may see (docs/02 §6.z). The mock's
-   * fixture jobs belong to no candidate (decided 2026-11-11). */
-  candidateIds: z.array(z.string()).default([]),
+  /** The candidates this job was found or captured for, only those the viewer may see (docs/02 §6.z). */
+  candidateIds: z.array(z.string()),
 });
 export type Job = z.infer<typeof JobSchema>;
 

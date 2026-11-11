@@ -22,7 +22,7 @@ export function requireMember(firmId: string, access: "read" | "write" = "read")
 }
 
 /** The firm-scoped methods that only read; every other method of a firm-scoped mock writes. */
-const READ_METHODS = new Set(["list", "byId", "byCandidate", "searches", "shelf", "shelfByCandidate", "open", "baseRemoval", "versionRemoval"]);
+const READ_METHODS = new Set(["list", "byId", "byCandidate", "shelf", "shelfByCandidate", "open", "baseRemoval", "versionRemoval"]);
 export const isReadMethod = (name: string): boolean => READ_METHODS.has(name);
 
 /**
@@ -77,4 +77,4 @@ export function firmScoped<M extends Record<string, FirmMethod>>(resource: strin
 }
 
 /** Every firm-scoped mock's name, for the isolation test to check it covers them all. */
-export const FIRM_SCOPED_RESOURCES = ["candidates", "jobs", "applications", "followups", "resumes", "records", "documents", "inbox", "agents", "jobMarks"] as const;
+export const FIRM_SCOPED_RESOURCES = ["candidates", "applications", "followups", "resumes", "records", "documents", "inbox", "agents", "jobMarks"] as const;

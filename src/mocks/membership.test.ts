@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { candidatesApi } from "@/lib/api/candidates";
-import { jobsApi } from "@/lib/api/jobs";
 import { applicationsApi, followupsApi } from "@/lib/api/applications";
 import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
@@ -10,7 +9,6 @@ import { inboxApi } from "@/lib/api/inbox";
 import { agentsApi } from "@/lib/api/agents";
 import { allCandidates, candidatesMock } from "./candidates";
 import { createCandidateBody } from "./create-candidate-body";
-import { allJobs, jobsMock } from "./jobs";
 import { allJobMarks, jobMarksMock } from "./job-marks";
 import { jobMarksApi } from "@/lib/api/job-marks";
 import { allApplications, applicationsMock, followupsMock } from "./applications";
@@ -39,7 +37,7 @@ const idsOf = (firmId: string) => {
   const resume = of(allResumes, firmId);
   return {
     candidate: candidate.id,
-    job: of(allJobs(), firmId).id,
+    job: "job_001", // jobs are the backend's (no jobs mock): marks and tailoring take any id
     application: of(allApplications, firmId).id,
     resume: resume.id,
     resumeVersion: resume.versions[0]!.id,
@@ -60,11 +58,6 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["candidates", "reassign", (f, i) => candidatesApi.reassign(f, i.candidate, { managerId: "user_priya", bdeId: null, note: null }), true],
   ["candidates", "followBde", (f) => candidatesMock.followBde(f, "user_adnan", "user_fatima"), true],
   ["candidates", "parseResume", (f) => candidatesMock.parseResume(f, { fileName: "Ravi_Teja_Java_FullStack.pdf", sizeBytes: 1000, mimeType: "application/pdf" }), true],
-  ["jobs", "list", (f) => jobsApi.list(f), false],
-  ["jobs", "byId", (f, i) => jobsApi.byId(f, i.job), false],
-  ["jobs", "capture", (f, i) => jobsApi.capture(f, { candidateId: i.candidate, sourceUrl: "https://example.com/jobs/1", title: "X", companyName: "Y", location: "", description: "Z" }), true],
-  ["jobs", "searches", (f, i) => jobsApi.searches(f, i.candidate), false],
-  ["jobs", "startSearch", (f, i) => jobsApi.startSearch(f, i.candidate, "Java Developer"), true],
   ["applications", "list", (f) => applicationsApi.list(f), false],
   ["applications", "byId", (f, i) => applicationsApi.byId(f, i.application), false],
   ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "WITHDRAWN", note: null }), true],
@@ -95,7 +88,7 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
 ];
 
 const MOCKS: Record<(typeof FIRM_SCOPED_RESOURCES)[number], object> = {
-  candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock,
+  candidates: candidatesMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock,
   records: recordsMock, documents: documentsMock, inbox: inboxMock, agents: agentsMock, jobMarks: jobMarksMock,
 };
 /** Mock methods that take no firm (they work on text alone). */
@@ -123,10 +116,10 @@ describe("membership: a firm-A principal can't reach firm B through any adapter 
   });
 
   it("leaves firm B's records untouched after every refused write", async () => {
-    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)));
+    const before = JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)));
     await signInAs("user_imran");
     for (const [, , call, isWrite] of CALLS) if (isWrite) await status(call(B, idsOf(B)));
-    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobs(), allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
+    expect(JSON.stringify([allCandidates, allApplications, allDocuments, allMessages, allJobMarks].map((rows) => rows.filter((row) => row.firmId === B)))).toBe(before);
   });
 
   it("answers another firm exactly like a firm that doesn't exist", async () => {

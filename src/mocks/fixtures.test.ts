@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isOwner } from "@/lib/auth/roles";
 import { allCandidates } from "./candidates";
-import { allJobs } from "./jobs";
 import { allApplications, allFollowups } from "./applications";
 import { allResumes } from "./resumes";
 import { allRecords } from "./records";
@@ -19,7 +18,6 @@ const invites = invitesAt(FIXTURE_NOW);
 const firmIds = new Set(firms.map((firm) => firm.id));
 const byId = <T extends { id: string }>(rows: readonly T[]) => new Map(rows.map((row) => [row.id, row]));
 const candidateById = byId(allCandidates);
-const jobById = byId(allJobs());
 const applicationById = byId(allApplications);
 
 describe("firms, plans, users and invites", () => {
@@ -80,7 +78,6 @@ describe("firms, plans, users and invites", () => {
 describe("firmId on every firm-scoped record", () => {
   const tables = {
     candidates: allCandidates,
-    jobs: allJobs(),
     applications: allApplications,
     followups: allFollowups,
     resumes: allResumes,
@@ -98,7 +95,6 @@ describe("firmId on every firm-scoped record", () => {
     const same = (label: string, a: string | undefined, b: string | undefined) => expect(a, label).toBe(b);
     for (const a of allApplications) {
       same(`${a.id} candidate`, candidateById.get(a.candidateId)?.firmId, a.firmId);
-      same(`${a.id} job`, jobById.get(a.jobId)?.firmId, a.firmId);
     }
     for (const f of allFollowups) same(`${f.id} application`, applicationById.get(f.applicationId)?.firmId, f.firmId);
     for (const r of allResumes) {

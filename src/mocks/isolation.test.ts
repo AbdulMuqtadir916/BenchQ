@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { candidatesApi } from "@/lib/api/candidates";
-import { jobsApi } from "@/lib/api/jobs";
 import { applicationsApi, followupsApi } from "@/lib/api/applications";
 import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
@@ -31,10 +30,10 @@ const is404 = async (promise: Promise<unknown>) => {
 };
 
 describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
-  it("lists: candidates, jobs, applications, follow-ups, resumes", async () => {
+  // Jobs are the backend's only (no jobs mock): their isolation is backend/tests/test_isolation.py and test_job_search_firm_reads.py.
+  it("lists: candidates, applications, follow-ups, resumes", async () => {
     await as(mine);
     expect(onlyFirm(await candidatesApi.list(mine), mine)).toBe(true);
-    expect(onlyFirm(await jobsApi.list(mine, { limit: 1000 }), mine)).toBe(true);
     expect(onlyFirm(await applicationsApi.list(mine), mine)).toBe(true);
     expect(onlyFirm(await followupsApi.list(mine), mine)).toBe(true);
     const shelf = await resumesApi.shelf(mine);
@@ -44,12 +43,10 @@ describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
   it("reads by id or candidate: the other firm's records are 404", async () => {
     await as(other);
     const theirCandidate = (await candidatesApi.list(other))[0]!;
-    const theirJob = (await jobsApi.list(other))[0]!;
     const theirApplication = (await applicationsApi.list(other))[0]!;
     const theirResume = (await resumesApi.shelf(other)).resumes[0]!;
     await as(mine);
     expect(await is404(candidatesApi.byId(mine, theirCandidate.id))).toBe(true);
-    expect(await is404(jobsApi.byId(mine, theirJob.id))).toBe(true);
     expect(await is404(applicationsApi.byId(mine, theirApplication.id))).toBe(true);
     expect(await is404(resumesApi.open(mine, theirResume.latestVersionId))).toBe(true);
     expect(await is404(recordsApi.byCandidate(mine, theirCandidate.id))).toBe(true);
