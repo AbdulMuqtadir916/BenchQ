@@ -1,10 +1,16 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { stubCandidateReads } from "@/mocks/fixture-backend";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { candidatesApi } from "@/lib/api/candidates";
 import { useSession } from "@/lib/stores/session-store";
 import { queryKeys } from "./keys";
 import { clearCacheOnPrincipalChange } from "./principal-boundary";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
+
+// Candidates are the backend's (no candidates mock): reads are answered from the test fixture.
+beforeAll(() => {
+  stubCandidateReads();
+});
 
 const FIRM = "firm_hts";
 const key = queryKeys.candidates.list(FIRM);

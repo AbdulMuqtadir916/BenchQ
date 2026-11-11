@@ -1,18 +1,15 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { candidatesApi } from "@/lib/api/candidates";
 import { applicationsApi, followupsApi } from "@/lib/api/applications";
-import { resumesApi } from "@/lib/api/resumes";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
 import { inboxApi } from "@/lib/api/inbox";
 import { agentsApi } from "@/lib/api/agents";
-import { allCandidates, candidatesMock } from "./candidates";
-import { createCandidateBody } from "./create-candidate-body";
+import { stubCandidateReads } from "./fixture-backend";
+import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import { allJobMarks, jobMarksMock } from "./job-marks";
 import { jobMarksApi } from "@/lib/api/job-marks";
 import { allApplications, applicationsMock, followupsMock } from "./applications";
-import { allResumes, resumesMock } from "./resumes";
 import { recordsMock } from "./records";
 import { allDocuments, documentsMock } from "./documents";
 import { allMessages, inboxMock } from "./inbox";
@@ -25,7 +22,8 @@ import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
  * one of these adapter methods with the URL's firm id; here each one is called as a firm-A member
  * with firm B's id and firm B's OWN valid record ids, so the only thing that can refuse it is the
  * mock backend's membership check (not the per-firm filtering, which isolation.test.ts covers). The
- * modules that moved to the backend (team, invites, ledger) are covered by backend/tests/test_isolation.py.
+ * modules that moved to the backend (team, invites, ledger, candidates, résumés, jobs) are covered by
+ * backend/tests/test_isolation.py.
  */
 
 const A = "firm_hts";
@@ -34,15 +32,11 @@ const of = <T extends { firmId: string | null }>(rows: readonly T[], firmId: str
 /** Valid records of a firm, so a call naming that firm would succeed for its own members. */
 const idsOf = (firmId: string) => {
   const candidate = of(allCandidates, firmId);
-  const resume = of(allResumes, firmId);
   return {
     candidate: candidate.id,
     job: "job_001", // jobs are the backend's (no jobs mock): marks and tailoring take any id
     application: of(allApplications, firmId).id,
-    resume: resume.id,
-    resumeVersion: resume.versions[0]!.id,
-    base: resume.baseResumeId!,
-    resumeCandidate: resume.candidateId,
+    resumeVersion: "rv_001", // résumés are the backend's (no résumé mock): tailoring takes any id
     document: of(allDocuments, firmId).id,
     message: of(allMessages, firmId).id,
   };
@@ -51,28 +45,10 @@ type Ids = ReturnType<typeof idsOf>;
 
 /** Every firm-scoped adapter method: [resource, method, call, isWrite]. */
 const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) => Promise<unknown>, boolean]> = [
-  ["candidates", "list", (f) => candidatesApi.list(f), false],
-  ["candidates", "byId", (f, i) => candidatesApi.byId(f, i.candidate), false],
-  ["candidates", "create", (f) => candidatesApi.create(f, createCandidateBody()), true],
-  ["candidates", "update", (f, i) => candidatesApi.update(f, i.candidate, { noticePeriodDays: 99 } as never), true],
-  ["candidates", "reassign", (f, i) => candidatesApi.reassign(f, i.candidate, { managerId: "user_priya", bdeId: null, note: null }), true],
-  ["candidates", "followBde", (f) => candidatesMock.followBde(f, "user_adnan", "user_fatima"), true],
-  ["candidates", "parseResume", (f) => candidatesMock.parseResume(f, { fileName: "Ravi_Teja_Java_FullStack.pdf", sizeBytes: 1000, mimeType: "application/pdf" }), true],
   ["applications", "list", (f) => applicationsApi.list(f), false],
   ["applications", "byId", (f, i) => applicationsApi.byId(f, i.application), false],
   ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "WITHDRAWN", note: null }), true],
   ["followups", "list", (f) => followupsApi.list(f), false],
-  ["resumes", "shelf", (f) => resumesApi.shelf(f), false],
-  ["resumes", "shelfByCandidate", (f, i) => resumesApi.shelfByCandidate(f, i.candidate), false],
-  ["resumes", "open", (f, i) => resumesApi.open(f, i.resumeVersion), false],
-  ["resumes", "baseRemoval", (f, i) => resumesApi.baseRemoval(f, i.resumeCandidate, i.base), false],
-  ["resumes", "versionRemoval", (f, i) => resumesApi.versionRemoval(f, i.resumeCandidate, i.resumeVersion), false],
-  ["resumes", "save", (f, i) => resumesApi.save(f, i.resumeVersion, {} as never), true],
-  ["resumes", "useAsBase", (f, i) => resumesApi.useAsBase(f, i.resumeCandidate, i.resumeVersion), true],
-  ["resumes", "upload", (f, i) => resumesApi.upload(f, i.candidate, { name: "later.pdf" } as File), true],
-  ["resumes", "deleteBase", (f, i) => resumesApi.deleteBase(f, i.resumeCandidate, "base_none", false), true],
-  ["resumes", "deleteVersion", (f, i) => resumesApi.deleteVersion(f, i.resumeCandidate, "rv_none"), true],
-  ["resumes", "showBase", (f, i) => resumesApi.showBase(f, i.resumeCandidate, "base_none"), true],
   ["records", "byCandidate", (f, i) => recordsApi.byCandidate(f, i.candidate), false],
   ["documents", "byCandidate", (f, i) => documentsApi.byCandidate(f, i.candidate), false],
   ["documents", "upload", (f, i) => documentsApi.upload(f, i.candidate, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null } as never), true],
@@ -88,13 +64,18 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
 ];
 
 const MOCKS: Record<(typeof FIRM_SCOPED_RESOURCES)[number], object> = {
-  candidates: candidatesMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock,
+  applications: applicationsMock, followups: followupsMock,
   records: recordsMock, documents: documentsMock, inbox: inboxMock, agents: agentsMock, jobMarks: jobMarksMock,
 };
 /** Mock methods that take no firm (they work on text alone). */
 const UNSCOPED = new Set(["agents.rewrite"]);
 
 const status = (promise: Promise<unknown>) => promise.then(() => 200, (error: unknown) => (error instanceof ApiError ? error.status : -1));
+
+// Candidates are the backend's: the mocks that check one (documents, the inbox) read the test fixture.
+beforeAll(() => {
+  stubCandidateReads();
+});
 
 afterEach(() => {
   signOutForTest();
@@ -124,7 +105,7 @@ describe("membership: a firm-A principal can't reach firm B through any adapter 
 
   it("answers another firm exactly like a firm that doesn't exist", async () => {
     await signInAs("user_imran");
-    const errors = await Promise.all([B, "firm_nope"].map((firmId) => candidatesApi.list(firmId).catch((error: ApiError) => [error.status, error.code, error.message])));
+    const errors = await Promise.all([B, "firm_nope"].map((firmId) => applicationsApi.list(firmId).catch((error: ApiError) => [error.status, error.code, error.message])));
     expect(errors[0]).toEqual(errors[1]);
   });
 

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isOwner } from "@/lib/auth/roles";
-import { allCandidates } from "./candidates";
+import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import { allApplications, allFollowups } from "./applications";
-import { allResumes } from "./resumes";
 import { allRecords } from "./records";
 import { allDocuments } from "./documents";
 import { allMessages } from "./inbox";
@@ -80,7 +79,6 @@ describe("firmId on every firm-scoped record", () => {
     candidates: allCandidates,
     applications: allApplications,
     followups: allFollowups,
-    resumes: allResumes,
     records: allRecords,
     documents: allDocuments,
     inboxMessages: allMessages,
@@ -97,10 +95,6 @@ describe("firmId on every firm-scoped record", () => {
       same(`${a.id} candidate`, candidateById.get(a.candidateId)?.firmId, a.firmId);
     }
     for (const f of allFollowups) same(`${f.id} application`, applicationById.get(f.applicationId)?.firmId, f.firmId);
-    for (const r of allResumes) {
-      same(`${r.id} candidate`, candidateById.get(r.candidateId)?.firmId, r.firmId);
-      for (const version of r.versions) if (version.tailoring) same(`${version.id} tailoring`, version.tailoring.firmId, r.firmId);
-    }
     for (const r of allRecords) same(`${r.id} candidate`, candidateById.get(r.candidateId)?.firmId, r.firmId);
     for (const d of allDocuments) same(`${d.id} candidate`, candidateById.get(d.candidateId)?.firmId, d.firmId);
     for (const m of allMessages) same(`${m.id} candidate`, candidateById.get(m.candidateId)?.firmId, m.firmId);

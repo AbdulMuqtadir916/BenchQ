@@ -1,6 +1,8 @@
 import { vi } from "vitest";
 import { ledgerApi } from "@/lib/api/analytics";
+import { candidatesApi } from "@/lib/api/candidates";
 import { jobsApi } from "@/lib/api/jobs";
+import { fixtureCandidates } from "@/test/fixtures/candidates";
 import { liveSession } from "@/lib/api/live-session";
 import { platformApi } from "@/lib/api/platform";
 import { sessionApi } from "@/lib/api/session";
@@ -39,7 +41,24 @@ export function stubJob(firmId: string, candidateId: string, n: number, title: s
   });
 }
 
+/**
+ * TESTS ONLY: answer candidate reads from the test fixture (candidates are only the backend's, decided 2026-11-11).
+ * Pass the adapter a test re-imported after `vi.resetModules()`, so the mocks it loaded call the stubbed copy.
+ */
+export function stubCandidateReads(api: typeof candidatesApi = candidatesApi): void {
+  vi.spyOn(api, "list").mockImplementation((firmId) => {
+    injectedFailure("candidates.list");
+    return mockResult(inFirm(fixtureCandidates, firmId));
+  });
+  vi.spyOn(api, "byId").mockImplementation(async (firmId, id) => {
+    const candidate = inFirm(fixtureCandidates, firmId).find((row) => row.id === id);
+    if (!candidate) throw new ApiError("Not found.", "NOT_FOUND", 404);
+    return mockResult(candidate);
+  });
+}
+
 export function stubBackendReads(): void {
+  stubCandidateReads();
   const newestFirst = (rows: typeof invites) => [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   vi.spyOn(sessionApi, "current").mockImplementation(async () => liveSession());
   vi.spyOn(sessionApi, "firmBySlug").mockImplementation(firmBySlugForTest);

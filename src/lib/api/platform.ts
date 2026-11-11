@@ -123,7 +123,7 @@ export const platformApi = {
     deactivate: unavailable<[string], PlatformUser>(),
   },
   candidates: {
-    /** Firm, status and BDE of every candidate, for usage counts (07 Q45). Candidates are still mocks, read under the real signed-in principal. */
+    /** Firm, status and BDE of every candidate, for usage counts (07 Q45). None until the backend counts them: candidates are the backend's, with no mock (2026-11-11). */
     usage: async (): Promise<CandidateUsageRow[]> => (await usageMock()).usage(),
   },
 };

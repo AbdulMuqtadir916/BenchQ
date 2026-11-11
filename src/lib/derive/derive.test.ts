@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import candidatesSeed from "@/mocks/data/candidates.json";
+import candidatesSeed from "@/test/fixtures/candidates.json";
 import applicationsSeed from "@/mocks/data/applications.json";
 import { arrayOf } from "@/lib/api/client";
 import { CandidateSchema } from "@/lib/schemas/candidate";

@@ -12,7 +12,7 @@ vi.mock("@/lib/stores/session-store", async (importOriginal) => {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firms } from "@/mocks/team";
-import { allCandidates } from "@/mocks/candidates";
+import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import { setStubJobs, stubBackendReads, stubJob } from "@/mocks/fixture-backend";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 import { useSession } from "@/lib/stores/session-store";

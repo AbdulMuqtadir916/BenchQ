@@ -84,12 +84,18 @@ def test_the_provider_is_a_platform_setting_and_must_be_registered(api_client, t
 
 
 def test_the_demo_reset_works_after_a_search(test_db):
-    """P3: a demo candidate's search and its jobs go before the candidate."""
+    """P3: a candidate's search and its jobs in a demo firm go before the candidate. The seed makes no candidates
+    (decided 2026-11-11), so this one is onboarded by its BDE's manager, as the app would."""
     from backend.models.candidates import Candidate
     from backend.models.job_search import JobPosting, ScrapeJob
+    from backend.models.tenancy import User
     from backend.scripts import seed_demo
     seed_demo.seed(test_db)
-    candidate = test_db.query(Candidate).filter(Candidate.bde_id.isnot(None)).first()
+    bde = test_db.query(User).filter(User.role == "BDE", User.manager_id.isnot(None), User.is_active.is_(True)).first()
+    candidate = Candidate(firm_id=bde.firm_id, manager_id=bde.manager_id, bde_id=bde.id, created_by_user_id=bde.manager_id,
+                          work_auth="H1B")
+    test_db.add(candidate)
+    test_db.flush()
     batch = pipeline.open_batch(test_db, firm_id=candidate.firm_id, candidate_id=candidate.id,
                                 user_id=candidate.bde_id, query="Java Developer", country="us", provider="fake")
     test_db.add(JobPosting(firm_id=candidate.firm_id, candidate_id=candidate.id, batch_id=batch.batch_id,

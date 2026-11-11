@@ -117,7 +117,7 @@ tailored claim can point back to the original résumé text as evidence.
 
 | # | Assumption |
 |---|---|
-| A1 | The "Try a sample" résumés on step 1 appear only when the module runs on mocks (demo). |
+| A1 | ~~The "Try a sample" résumés on step 1 appear only when the module runs on mocks (demo).~~ Removed 2026-11-11 with the candidates mock: a candidate is only made from a real résumé. |
 | A2 | A new candidate starts `ON_BENCH`, `benchStartDate` = creation time. |
 | A3 | `needsSponsorship` and `needsTransfer` are derived from the work authorization card (H-1B → transfer; H-1B, H4 EAD, OPT, CPT, TN → sponsorship). The screen has no separate checkboxes. The flow works them out and sends them; the backend only checks they were sent (decided 2026-11-05). |
 | A4 | "Works N similar profiles" on step 5 = the BDE's candidates in a working status whose "Marketed as" matches, ignoring case. |

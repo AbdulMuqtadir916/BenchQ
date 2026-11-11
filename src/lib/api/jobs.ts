@@ -6,6 +6,9 @@ import { toBackendId } from "./dto/demo-ids";
 import { CapturedPostingDto, FirmJobDto, FirmJobListDto, JobSearchesDto, toBackendCapture, toCapturedJob, toFirmJob, toJobSearches } from "./dto/jobs";
 import { http } from "./http";
 
+/** The most jobs one list read returns (the backend's FIRM_LIST_MAX). */
+export const JOBS_LIST_MAX = 400;
+
 export interface JobListParams {
   limit?: number;
   /** One candidate's jobs only (docs/02 §6.z). */
@@ -22,7 +25,8 @@ const firmPath = (firmId: string) => `/api/firms/${toBackendId(firmId)}`;
 const candidatePath = (firmId: string, candidateId: string) => `${firmPath(firmId)}/candidates/${toBackendId(candidateId)}`;
 const live = {
   list: async (firmId: string, params?: JobListParams): Promise<Job[]> => {
-    const query = { limit: params?.limit, candidate_id: params?.candidateId ? toBackendId(params.candidateId) : undefined };
+    // The backend answers at most 400 (routes_job_search.py FIRM_LIST_MAX): a larger ask is a 422, so it is capped here.
+    const query = { limit: Math.min(params?.limit ?? JOBS_LIST_MAX, JOBS_LIST_MAX), candidate_id: params?.candidateId ? toBackendId(params.candidateId) : undefined };
     const { items } = await http.get(`${firmPath(firmId)}/job-postings`, FirmJobListDto, { query });
     return items.map((item) => toFirmJob(item, firmId));
   },
