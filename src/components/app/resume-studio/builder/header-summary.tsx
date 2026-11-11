@@ -1,5 +1,8 @@
 "use client";
 
+import { useId } from "react";
+import { Input } from "@/components/ui/input";
+import { isProfileLinkField, normalizeProfileLink, PROFILE_LINK_ERROR } from "@/lib/resume-doc/profile-link";
 import type { ResumeDocument, ResumeHeader } from "@/lib/schemas/resume-document";
 import { stripTags } from "@/lib/resume-doc/rich-text";
 import { useDocActions } from "../use-doc-actions";
@@ -16,6 +19,22 @@ const CONTACT: Array<{ key: Exclude<keyof ResumeHeader, "workAuthorization">; la
   { key: "github", label: "GitHub", placeholder: "github.com/…" },
 ];
 
+function LinkField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
+  const id = useId();
+  const normalized = normalizeProfileLink(value);
+  const invalid = normalized === null;
+  return (
+    <div className="min-w-0">
+      <label htmlFor={id}><FieldLabel>{label}</FieldLabel></label>
+      <Input id={id} type="url" inputMode="url" value={value} placeholder={placeholder}
+        aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-error` : undefined}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={() => { if (normalized !== null && normalized !== value) onChange(normalized); }} />
+      {invalid ? <p id={`${id}-error`} className="text-caption text-[var(--color-danger-fg)]">{PROFILE_LINK_ERROR}</p> : null}
+    </div>
+  );
+}
+
 export function HeaderFields({ doc }: { doc: ResumeDocument }) {
   const a = useDocActions();
   return (
@@ -23,7 +42,9 @@ export function HeaderFields({ doc }: { doc: ResumeDocument }) {
       <TextField label="Full name" value={doc.fullName} onChange={(v) => a.setTop("fullName", v)} />
       <TextField label="Title" value={doc.title} onChange={(v) => a.setTop("title", v)} placeholder="Headline, e.g. Senior Java Developer" />
       <div className="grid gap-3 sm:grid-cols-2">
-        {CONTACT.map((f) => (
+        {CONTACT.map((f) => isProfileLinkField(f.key) ? (
+          <LinkField key={f.key} label={f.label} value={doc.header[f.key]} onChange={(v) => a.setHeader(f.key, v)} placeholder={f.placeholder} />
+        ) : (
           <TextField key={f.key} label={f.label} value={doc.header[f.key]} onChange={(v) => a.setHeader(f.key, v)} placeholder={f.placeholder} />
         ))}
       </div>

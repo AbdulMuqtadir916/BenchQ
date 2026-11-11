@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Search, Users } from "lucide-react";
 import type { Candidate } from "@/lib/schemas/candidate";
@@ -33,26 +32,25 @@ interface GridProps {
   showBde: boolean;
   status: { tone: (c: Candidate) => TagTone; label: (c: Candidate) => string };
   toolbar: React.ReactNode;
+  search: { value: string; onChange: (value: string) => void };
+  returnTo: string;
   /** Shown instead of "No candidates yet" when the list is empty (for example because filters left none). */
   emptyState?: React.ReactNode;
 }
 
 /** Card view of the bench — one card per candidate, whole card opens the profile. */
-export function CandidateCardGrid({ rows, isLoading, error, onRetry, showBde, status, toolbar, emptyState }: GridProps) {
+export function CandidateCardGrid({ rows, isLoading, error, onRetry, showBde, status, toolbar, emptyState, search, returnTo }: GridProps) {
   const toHref = useHref();
   const reduce = useReducedMotion() ?? false;
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const visible = q ? rows.filter((r) => `${r.candidate.fullName} ${r.candidate.primaryRole ?? ""} ${r.candidate.city ?? ""}`.toLowerCase().includes(q)) : rows;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full flex-1 sm:max-w-72">
           <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-3)]" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search candidates…" aria-label="Search candidates" className="pl-9" />
+          <Input value={search.value} onChange={(e) => search.onChange(e.target.value)} placeholder="Search candidates…" aria-label="Search candidates" className="pl-9" />
         </div>
-        <span className="ml-auto text-mono-sm text-[var(--color-text-3)]" aria-live="polite">{visible.length} candidates</span>
+        <span className="ml-auto text-mono-sm text-[var(--color-text-3)]" aria-live="polite">{rows.length} candidates</span>
         {toolbar}
       </div>
 
@@ -62,19 +60,15 @@ export function CandidateCardGrid({ rows, isLoading, error, onRetry, showBde, st
         <div role="status" aria-label="Loading candidates" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }, (_, i) => <div key={i} className="bq-card space-y-3 p-4"><div className="flex gap-3"><Skeleton className="h-11 w-11" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-24" /></div></div><Skeleton className="h-10 w-full" /></div>)}
         </div>
-      ) : visible.length === 0 ? (
-        rows.length ? (
-          <EmptyState variant="filtered" icon={Search} title="No candidates match" description="Try a different name, role or city." />
-        ) : (
-          emptyState ?? <EmptyState icon={Users} title="No candidates yet" description="Add a candidate to start building their bench profile." />
-        )
+      ) : rows.length === 0 ? (
+        emptyState ?? <EmptyState icon={Users} title="No candidates yet" description="Add a candidate to start building their bench profile." />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {visible.map((r, i) => {
+          {rows.map((r, i) => {
             const c = r.candidate;
             return (
               <motion.li key={c.id} className="flex" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: Math.min(i, 9) * 0.03, ease: EASE_OUT }}>
-                <Link href={toHref("candidates.detail", { id: c.id })} className="bq-card flex w-full flex-col gap-3 p-4 transition-shadow hover:shadow-[var(--shadow-md)]">
+                <Link href={toHref("candidates.detail", { id: c.id }, { returnTo })} className="bq-card flex w-full flex-col gap-3 p-4 transition-shadow hover:shadow-[var(--shadow-md)]">
                   <div className="flex items-start gap-3">
                     <CandidateAvatar name={c.fullName} colorKey={c.id} />
                     <div className="min-w-0 flex-1">

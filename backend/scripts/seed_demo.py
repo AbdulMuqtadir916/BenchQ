@@ -174,9 +174,18 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             accepted_at=created + timedelta(hours=1) if i["status"] == "ACCEPTED" else None,
             revoked_at=created + timedelta(hours=1) if i["status"] == "REVOKED" else None)
     for c in _load("candidates.json"):
-        if _add_missing(db, Candidate, demo_id(c["id"]), **_candidate_fields(c)):
-            added["candidates"] += 1
-            _form_base(db, db.get(Candidate, demo_id(c["id"])), c)
+        row_id = demo_id(c["id"])
+        if db.get(Candidate, row_id) is not None:
+            continue
+        # Keep this object until its first version is written. A candidate's name, email, phone and location are not
+        # `candidates` columns (07 Q57): the model holds them on the object, and the session references a flushed object
+        # only weakly, so letting it go and re-reading the row (what `_add_missing` + `db.get` did) lost them and wrote
+        # every version 1 blank (BUG-011).
+        candidate = Candidate(id=row_id, **_candidate_fields(c))
+        db.add(candidate)
+        db.flush()
+        added["candidates"] += 1
+        _form_base(db, candidate, c)
     return added
 
 

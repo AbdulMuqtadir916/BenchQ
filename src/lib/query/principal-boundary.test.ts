@@ -3,7 +3,7 @@ import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { candidatesApi } from "@/lib/api/candidates";
 import { useSession } from "@/lib/stores/session-store";
 import { queryKeys } from "./keys";
-import { clearCacheOnPrincipalChange } from "./principal-boundary";
+import { clearCacheOnPrincipalChange, principalKey } from "./principal-boundary";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 
 const FIRM = "firm_hts";
@@ -50,6 +50,14 @@ describe("principal change clears the query cache (sign-in, sign-out, an account
     useSession.getState().setSession(await signInAs("user_kiran"));
     expect(client.getQueryCache().getAll()).toEqual([]);
     unsubscribe();
+  });
+
+  it("distinguishes successive support sessions for the same firm", () => {
+    const platform = { kind: "platform", userId: "platform-admin", role: "PLATFORM_ADMIN" } as const;
+    const view = { firmId: FIRM, reason: "Support", startedAt: "2026-11-11T00:00:00Z", expiresAt: "2026-11-11T01:00:00Z" };
+    const first = principalKey({ ...platform, support: { ...view, id: "view-a" } });
+    const second = principalKey({ ...platform, support: { ...view, id: "view-b" } });
+    expect(first).not.toBe(second);
   });
 
   it("keeps the cache when the same principal is set again (no needless refetch)", async () => {

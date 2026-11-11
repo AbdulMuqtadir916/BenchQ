@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import type { ShortcutHint } from "@/lib/list-shortcuts";
 
 /**
  * UI store — sidebar collapse, table density, command palette open.
@@ -27,6 +28,7 @@ interface UiState {
   closeCommandPalette: () => void;
 
   hintSheetOpen: boolean;
+  pageShortcuts: { pathname: string; hints: readonly ShortcutHint[] } | null;
   openHintSheet: () => void;
   closeHintSheet: () => void;
 
@@ -78,6 +80,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   closeCommandPalette: () => set({ commandPaletteOpen: false }),
 
   hintSheetOpen: false,
+  pageShortcuts: null,
   openHintSheet: () => set({ hintSheetOpen: true }),
   closeHintSheet: () => set({ hintSheetOpen: false }),
 
