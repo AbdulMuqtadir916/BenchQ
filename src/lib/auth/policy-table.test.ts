@@ -31,7 +31,6 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["application.move", "Y Y Y - - -"],
   ["resume.edit", "Y Y Y - - -"],
   ["outreach.act", "Y Y Y - - -"],
-  ["followup.act", "Y Y Y - - -"],
   // team (Q15)
   ["member.invite", "Y - - - - -"],
   ["member.remove", "Y - - - - -"],
