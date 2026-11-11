@@ -3,6 +3,16 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Job screens on the backend (`integrate/jobs`, Zuhair; job search PR 3)
+
+Decided 2026-11-11 (grilling rounds 1–3). In progress; rows are added as the work lands. Opened as a PR only after
+PR 1 and PR 2 merge.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Access (Abdul) | `backend/auth/access.py` | Two rows: `GET /api/firms/{firm_id}/job-postings` and `…/job-postings/{posting_id}`, both `FIRM`. | The job screens' firm-level reads; `test_access.py` refuses an unclassified route. Scoping inside is the routes' (`_visible`). | **Pending: Abdul** |
+| Support view tests (Abdul) | `backend/tests/test_support_views.py` | `/api/firms/{acme}/job-postings` added to the reads a support view answers. | A support view reads the job screens like the firm's owner. | **Pending: Abdul** |
+
 ## Job postings repoint (`feat/job-postings-repoint`, Zuhair; job search PR 2)
 
 Decided 2026-11-10 (grilling Q1–Q17). In progress; rows are added as the work lands.

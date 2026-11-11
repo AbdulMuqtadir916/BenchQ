@@ -8,6 +8,10 @@ candidate's is the same 404 as a missing one.
                                    location?}`: 201, or 200 with the job the candidate already has (job search PR 2)
 - GET  …/job-postings?page=&size=  the candidate's jobs, newest first, in the common fields
 - GET  …/job-postings/{posting_id} one job, with its description
+Firm level (job search PR 3, docs/02 §6.z), for the job screens:
+- GET  /firms/{firm_id}/job-postings?candidate_id=&limit=  the jobs of every candidate the principal sees, one item per
+                                   job (the content hash), newest first, each with the visible `candidate_ids`
+- GET  /firms/{firm_id}/job-postings/{posting_id}          one of those, with its description
 Who (decided 2026-11-10): a search, only the candidate's assigned BDE (`job.search` + `can_search_jobs`); reads,
 anyone who can see the candidate. A support view reads only (backend/auth/access.py). The country is the candidate's
 résumé country (`Candidate.country`), never a request field.
@@ -22,7 +26,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
-from backend.api.routes_candidates import _candidate, _member_of
+from backend.api.routes_candidates import _candidate, _member_of, _visible
 from backend.auth.policy import can_search_jobs
 from backend.auth.scoping import scoped
 from backend.auth.sessions import Principal
@@ -30,13 +34,17 @@ from backend.job_monitor import JobAlreadyRunningError, launch_background
 from backend.job_search import limits, pipeline, providers
 from backend.job_search.country import search_country
 from backend.job_search.text import safe_url, typed_text
+from backend.models.candidates import Candidate
 from backend.models.db import get_db, utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
 
-router = APIRouter(prefix="/firms/{firm_id}/candidates/{candidate_id}", tags=["job search"])
+# The firm in the prefix; a candidate's routes add CANDIDATE, the firm-level reads don't (job search PR 3).
+router = APIRouter(prefix="/firms/{firm_id}", tags=["job search"])
+CANDIDATE = "/candidates/{candidate_id}"
 
 HISTORY = 50
 PAGE_SIZE_MAX = 100
+FIRM_LIST_MAX = 400          # what the job screens ask for (docs/02 §6.z)
 
 
 class SearchBody(BaseModel):
@@ -122,7 +130,7 @@ def _link_run(db: DbSession, firm_id: uuid.UUID, batch_id: uuid.UUID, run_id: st
     db.commit()
 
 
-@router.post("/job-searches", status_code=202, summary="Search jobs for a candidate (in the background)")
+@router.post(CANDIDATE + "/job-searches", status_code=202, summary="Search jobs for a candidate (in the background)")
 async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: SearchBody,
                        principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     """Async so the background task starts on the app's loop; everything that touches the database runs in a worker
@@ -161,7 +169,7 @@ def _search_json(row: ScrapeJob, now=None) -> dict:
             "finished_at": row.finished_at.isoformat() if row.finished_at else None}
 
 
-@router.get("/job-searches", summary="A candidate's job searches and today's usage")
+@router.get(CANDIDATE + "/job-searches", summary="A candidate's job searches and today's usage")
 def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Principal = Depends(current_principal),
                   db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
@@ -177,7 +185,7 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
             "usage": limits.usage(db, firm_id, candidate.id, candidate.bde_id, now)}
 
 
-@router.post("/job-postings", status_code=201, summary="Capture one job for a candidate (by hand or the extension)")
+@router.post(CANDIDATE + "/job-postings", status_code=201, summary="Capture one job for a candidate (by hand or the extension)")
 def capture_job(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: CaptureBody, response: Response,
                 principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     """The candidate's BDE only, like a search (decided 2026-11-10); 20 captures per BDE per day. The same job again
@@ -218,7 +226,7 @@ def _posting_json(row: JobPosting, with_description: bool) -> dict:
     return out
 
 
-@router.get("/job-postings", summary="A candidate's jobs, newest first")
+@router.get(CANDIDATE + "/job-postings", summary="A candidate's jobs, newest first")
 def list_postings(firm_id: uuid.UUID, candidate_id: uuid.UUID, page: int = Query(1, ge=1, le=1000),
                   size: int = Query(50, ge=1, le=PAGE_SIZE_MAX), principal: Principal = Depends(current_principal),
                   db: DbSession = Depends(get_db)):
@@ -231,7 +239,7 @@ def list_postings(firm_id: uuid.UUID, candidate_id: uuid.UUID, page: int = Query
             "size": size}
 
 
-@router.get("/job-postings/{posting_id}", summary="One of a candidate's jobs, with its description")
+@router.get(CANDIDATE + "/job-postings/{posting_id}", summary="One of a candidate's jobs, with its description")
 def get_posting(firm_id: uuid.UUID, candidate_id: uuid.UUID, posting_id: uuid.UUID,
                 principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
@@ -241,3 +249,58 @@ def get_posting(firm_id: uuid.UUID, candidate_id: uuid.UUID, posting_id: uuid.UU
     if row is None:
         raise HTTPException(status_code=404, detail="Not found.")
     return _posting_json(row, with_description=True)
+
+
+# ── Firm level (job search PR 3, docs/02 §6.z): the job screens' list and job page ──
+
+def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
+    """One job, from the visible postings that share its content hash: the newest seen row's fields, and the
+    candidates it was found or captured for. A posting's own candidate and batch aren't the job's, so they're left
+    out."""
+    newest = max(rows, key=lambda row: (row.last_seen_at, str(row.id)))
+    out = _posting_json(newest, with_description)
+    out.pop("candidate_id")
+    out.pop("batch_id")
+    out["candidate_ids"] = sorted({str(row.candidate_id) for row in rows})
+    return out
+
+
+@router.get("/job-postings", summary="The jobs of every candidate the principal sees, one per job, newest first")
+def list_firm_jobs(firm_id: uuid.UUID, candidate_id: uuid.UUID | None = None,
+                   limit: int = Query(FIRM_LIST_MAX, ge=1, le=FIRM_LIST_MAX),
+                   principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    """The owner and a viewer see the firm's, a manager their BDEs' candidates', a BDE their own (`_visible`, 07
+    Q47); `candidate_id` narrows to one of those (another is 404). One item per `job_id`: a job found for two
+    candidates is one item with both in `candidate_ids`."""
+    _member_of(firm_id, principal)
+    if candidate_id is not None:
+        candidates = [_candidate(db, firm_id, principal, candidate_id).id]
+    else:
+        candidates = _visible(db, firm_id, principal).with_entities(Candidate.id)
+    postings = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id.in_(candidates))
+    newest = func.max(JobPosting.discovered_at)
+    keys = [key for key, _ in postings.with_entities(JobPosting.job_id, newest).group_by(JobPosting.job_id)
+            .order_by(newest.desc(), JobPosting.job_id).limit(limit).all()]
+    by_job: dict[str, list[JobPosting]] = {key: [] for key in keys}
+    for row in postings.filter(JobPosting.job_id.in_(keys)).all() if keys else []:
+        by_job[row.job_id].append(row)
+    return {"items": [_job_json(by_job[key], with_description=False) for key in keys]}
+
+
+@router.get("/job-postings/{posting_id}", summary="One job a candidate the principal sees has, with its description")
+def get_firm_job(firm_id: uuid.UUID, posting_id: uuid.UUID, principal: Principal = Depends(current_principal),
+                 db: DbSession = Depends(get_db)):
+    """The posting, if its candidate is one the principal sees (else 404, never confirming it exists), with the
+    visible candidates that have the same job."""
+    _member_of(firm_id, principal)
+    visible = _visible(db, firm_id, principal).with_entities(Candidate.id)
+    row = scoped(db, JobPosting, firm_id).filter(JobPosting.id == posting_id,
+                                                 JobPosting.candidate_id.in_(visible)).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not found.")
+    rows = scoped(db, JobPosting, firm_id).filter(JobPosting.job_id == row.job_id,
+                                                  JobPosting.candidate_id.in_(visible)).all()
+    out = _job_json(rows, with_description=True)
+    # The page is this posting's: its own fields, even when another candidate's copy was seen more recently.
+    out.update({k: v for k, v in _posting_json(row, with_description=True).items() if k not in ("candidate_id", "batch_id")})
+    return out

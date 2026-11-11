@@ -1137,6 +1137,8 @@ export const JobSchema = z.object({
   provenance: JobProvenanceSchema,
 
   isActive: z.boolean(),
+  // The candidates this job was found or captured for, only the ones the viewer may see (job search PR 3, §6.z).
+  candidateIds: z.array(z.string()),
 });
 ```
 
@@ -1171,7 +1173,7 @@ export const JobMarkSchema = z.object({
 - Endpoints: `GET /api/job-marks` (the signed-in user's), `PUT /api/job-marks/:jobId/:kind`,
   `DELETE /api/job-marks/:jobId/:kind`.
 
-### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migrations 0020, 0022, 0023; backend only, no frontend schema/screen yet)
+### 6.y `job_postings` — the job-search module's own jobs table (decided 2026-11-09; migrations 0020, 0022, 0023; on the screens: §6.z)
 
 > Zuhair's track. Deliberately **not** `jobs`: this is a separate, candidate+batch-scoped table
 > (`backend/models/job_search.py`), not the existing shared-pool `jobs` table above (`backend/models/db.py`) or its
@@ -1318,6 +1320,71 @@ export const JobMarkSchema = z.object({
     routes still answer. The clean-up PR deletes it.
   - **Known limit:** the search runs in the API process. A restart loses a search in flight (its batch shows as an
     `internal` error after 15 minutes and the BDE searches again); a real job queue is the deployment work's.
+
+### 6.z Job search on the screens (job search PR 3; approved by Zuhair as product 2026-11-11)
+
+> The existing job screens read `job_postings` through `src/lib/api/jobs.ts` and a DTO mapper
+> (`src/lib/api/dto/jobs.ts`); no screen is redesigned. Live with `NEXT_PUBLIC_LIVE_MODULES=jobs`.
+
+**Reads (firm level, PR 3):** `GET /api/firms/{firm}/job-postings?candidate_id=&limit=` (limit 1–400, default 400)
+and `GET /api/firms/{firm}/job-postings/{id}`. Both read only the candidates the signed-in person may see (the owner
+and a viewer: the whole firm; a manager: their BDEs' candidates; a BDE: their own; a support view: read-only, like
+the firm's owner). The list has **one item per job** (`job_postings.job_id`, the content hash), newest first, with
+`candidate_ids`: the visible candidates it was found or captured for. Its fields are the newest of those rows. One
+job's read is the same plus `description`; a posting outside the person's scope is 404.
+
+**`Job` from a posting (the mapper; nothing invented):**
+
+| `Job` | From the posting |
+|---|---|
+| `id`, `title`, `description`, `applyUrl`, `postedAt` | as sent (`postedAt` only when it is a date-time) |
+| `company` | built from the name alone: everything else unknown (`null`), `clientType: 'UNKNOWN'` |
+| `city` / `state` | the location text / `null` (the screens print the text alone) |
+| `remoteMode` | `REMOTE` when the location says remote, else `ONSITE` |
+| `employmentType` | a known value, else `null` |
+| `allowedWorkAuth` | `[]`: **unknown**, and the screens show a job with unknown work authorization |
+| pay, `applicantCount`, `excludesC2C` | `null` / `null` / `false` |
+| `requirements` | the skills, as `PREFERRED` `SKILL`s, none a blocker |
+| `provenance.sourceType` | a provider: `AGGREGATOR`; `manual`: `MANUAL`; `extension`: `USER_SUBMITTED` |
+| `isActive` | not `is_closed` |
+| `candidateIds` | `candidate_ids` |
+
+**"Find jobs" (a candidate's search, from `GET` / `POST …/candidates/{id}/job-searches`, §6.y):**
+
+```ts
+// src/lib/schemas/job-search.ts
+export const JobSearchSchema = z.object({
+  id: z.string(),                                   // the batch
+  kind: z.enum(['SEARCH', 'CAPTURE']),
+  state: z.enum(['RUNNING', 'SUCCESS', 'EMPTY', 'ERROR']),
+  query: z.string().nullable(),                     // the role searched; null for a capture
+  newCount: z.number().int(),                       // jobs saved
+  seenAgainCount: z.number().int(),                 // jobs the candidate already had, refreshed
+  overLimitCount: z.number().int(),                 // jobs left out by today's 100
+  errorCode: z.enum(['timeout', 'provider_unavailable', 'provider_rejected', 'bad_response', 'too_large',
+                     'internal']).nullable(),       // set when state is ERROR; the screen words it
+  startedAt: z.string().datetime(),
+  finishedAt: z.string().datetime().nullable(),
+});
+
+export const JobSearchUsageSchema = z.object({     // today, since 6:30 PM IST; every number counted by the backend
+  jobsToday: z.number().int(), jobsCap: z.number().int(),                  // new jobs for this candidate / 100
+  searchesToday: z.number().int().nullable(), searchesCap: z.number().int(), // the candidate's BDE's / 20 (null: no BDE)
+  capturesToday: z.number().int().nullable(), capturesCap: z.number().int(), // the candidate's BDE's / 20
+  resetsAt: z.string().datetime(),
+});
+
+export const JobSearchesSchema = z.object({
+  running: JobSearchSchema.nullable(),
+  searches: z.array(JobSearchSchema),               // newest first, searches and captures
+  usage: JobSearchUsageSchema,
+});
+```
+
+Only the candidate's BDE starts one (`canSearchJobs`), for the candidate's main role, else the first target role.
+The screen polls the searches every 3 s while one runs. A capture names its candidate (`CaptureJob.candidateId`) and
+sends only the link, title, company, location and description; the same job again is the job the candidate already
+has.
 
 ## 7. Matching & scoring
 

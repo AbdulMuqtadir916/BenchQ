@@ -120,6 +120,8 @@ CASES: dict[str, Case] = {
         as_bde=True, body=lambda i: {"source": "manual", "title": "Java Developer", "company": "Example Corp",
                                      "description": f"Captured job {uuid.uuid4()}", "url": "https://jobs.example.test/c"}),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/job-postings": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/job-postings/{posting_id}": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": Case(),
 
