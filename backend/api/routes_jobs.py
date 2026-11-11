@@ -1032,8 +1032,9 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
             except Exception as e:
                 logger.warning(f"on-save auto-score launch failed for {job.id}: {e}")
 
-    # "Applied" is a compound action that can create an Application and a Company alongside
-    # the status change; report what it created so the Feed's Undo can reverse all of it.
+    # "Applied" on an old pool job can create a Company alongside the status change, never an Application (one names
+    # a candidate's posting since 2026-11-11): `created_application_id` stays null. Reported so the Feed's Undo can
+    # reverse what was created.
     created_application_id = None
     created_company_id = None
 

@@ -1076,7 +1076,7 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     tailored = None
     if app.job_id:
         tailored = (scoped(db, Resume, firm_id)
-                    .filter(Resume.job_id == app.job_id, Resume.category == "TAILORED",
+                    .filter(Resume.job_id == _document_job_id(app), Resume.category == "TAILORED",
                             Resume.candidate_id == app.candidate_id, Resume.deleted_at.is_(None))
                     .order_by(Resume.created_at.desc(), Resume.version.desc()).first())
     cv_name = (tailored.name if tailored else None) or app.cv_version_used
@@ -1114,13 +1114,24 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     return {"text": "\n".join(L)}
 
 
+def _document_job_id(app):
+    """The job a candidate's documents (tailored résumés, cover letters) name for `app`. They still name the old `jobs`
+    row until they move onto postings (#124); a posting moved from one keeps its id as `old_job_id`."""
+    old = (app.posting.content or {}).get("old_job_id") if app.posting is not None else None
+    try:
+        return uuid.UUID(str(old)) if old else app.job_id
+    except ValueError:
+        return app.job_id
+
+
 def _application_responses(db, firm_id, apps):
     """Enrich every response consistently, batching candidate/job-scoped documents."""
     from backend.models.db import build_company_lookup, Resume, CoverLetter
     if not apps:
         return []
     lookup = build_company_lookup(db)
-    job_ids = {app.job_id for app in apps}
+    document_job = {app.id: _document_job_id(app) for app in apps}
+    job_ids = set(document_job.values())
     candidate_scope = Resume.candidate_id.in_({app.candidate_id for app in apps if app.candidate_id})
     if any(app.candidate_id is None for app in apps):
         candidate_scope = candidate_scope | Resume.candidate_id.is_(None)
@@ -1141,8 +1152,8 @@ def _application_responses(db, firm_id, apps):
     # application without one falls back to the newest tailored résumé for its candidate and job (docs §4.7).
     own_ids = {app.resume_id for app in apps if app.resume_id}
     own = {r.id: r for r in scoped(db, Resume, firm_id).filter(Resume.id.in_(own_ids)).all()} if own_ids else {}
-    return [_app_to_dict(app, lookup, own.get(app.resume_id) or tailored.get((app.candidate_id, app.job_id)),
-                         (app.candidate_id, app.job_id) in with_letter) for app in apps]
+    return [_app_to_dict(app, lookup, own.get(app.resume_id) or tailored.get((app.candidate_id, document_job[app.id])),
+                         (app.candidate_id, document_job[app.id]) in with_letter) for app in apps]
 
 
 def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=False) -> dict:

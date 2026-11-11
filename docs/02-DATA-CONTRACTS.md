@@ -1454,8 +1454,7 @@ Each entry is `{question, answer, kind, key?, built?, replaced?, also?, type?}`:
 | `key` | On `FIXED` and `EDITED`: what the question asks, a fixed name that doesn't change with the wording, so a reader (the extension) matches by it. A new question gets a new key |
 | `built` | On `EDITED`: the built answer a reset gives back; `null` when the version and the profile don't answer it |
 | `replaced` | On `FIXED`: the answer of the user's edit that stopped applying when the built answer changed (07 Q15). The extension ignores it |
-| `also` | On `CUSTOM`, when there are any: the other wordings the answer is for (07 Q41), so a reader matches any of them. On `FIXED` and `EDITED` in the extension's read (not with `editor`): the other wordings forms use for a question with no field type of its own (`ALSO` in `backend/candidates/autofill.py`: visa transfer, work settings, employment types, industries, locations,
-field of study, GPA, languages, travel) |
+| `also` | On `CUSTOM`, when there are any: the other wordings the answer is for (07 Q41), so a reader matches any of them. On `FIXED` and `EDITED` in the extension's read (not with `editor`): the other wordings forms use for a question with no field type of its own (`ALSO` in `backend/candidates/autofill.py`: visa transfer, work settings, employment types, industries, locations, field of study, GPA, languages, travel) |
 | `type` | With `&editor=true` only (§8.3), on `FIXED` and `EDITED`: `text`, `texts`, `number`, `boolean`, `date` or `entries` |
 
 The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`, `address-city`, `address-region`,

@@ -345,6 +345,7 @@ def test_each_education_line_ranks_by_the_written_rules(line, level):
 
 
 FIELD_LINES = [
+    ("M.S. Computer Science (Certificate in Data Science)", "Computer Science"),
     ("B.Tech in Computer Science and Engineering", "Computer Science and Engineering"),
     ("Master of Science in Information Systems", "Information Systems"),
     ("Master's in Computer Science", "Computer Science"),

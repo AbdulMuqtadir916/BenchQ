@@ -1,3 +1,4 @@
+import { holdsSensitiveNumber } from "./never-fill";
 import { KEY_TYPES } from "./answer-keys";
 import { fieldLabel } from "./form-memory";
 import { matchBank } from "./match";
@@ -66,7 +67,8 @@ const label = (saved: string | undefined, typed: string) => (saved ? `Update the
  * answers the picked résumé gave (the route checks the one shown hasn't changed since). */
 export function saveOffer(row: ReviewRow, bank: BankEntry[], built: ReadonlyMap<string, unknown>): SaveOffer | null {
   const typed = row.field.current.trim();
-  if (!typed || typed.length > MAX_ANSWER || row.status === "blocked" || row.isUnsaved || row.field.kind === "file") return null;
+  if (!typed || typed.length > MAX_ANSWER || row.status === "blocked" || row.isUnsaved || row.field.kind === "file"
+    || holdsSensitiveNumber(typed)) return null;
   const type = typeOf(row.field);
   if (type) {
     const key = KEY_OF_TYPE.get(type);

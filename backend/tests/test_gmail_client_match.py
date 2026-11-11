@@ -5,10 +5,8 @@ from unittest.mock import MagicMock
 def _app(company, title, status="applied"):
     app = MagicMock()
     app.status = status
-    job = MagicMock()
-    job.company = company
-    job.title = title
-    app.job = job
+    app.posting.source = "manual"
+    app.posting.content = {"company": company, "title": title}
     return app
 
 
@@ -102,8 +100,7 @@ def test_matcher_picks_the_correct_company():
         body="Thank you for applying.",
         sender_domain="amazon.com",
     )
-    assert matched is not None
-    assert matched.job.company == "Amazon"
+    assert matched is apps[1]
 
 
 def test_matcher_returns_none_when_no_company_matches_sender():

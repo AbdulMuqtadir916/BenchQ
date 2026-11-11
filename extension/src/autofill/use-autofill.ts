@@ -241,6 +241,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   // The picked résumé's built answers by key, as it sent them: a save says which one the BDE was shown (docs/02 §8.3).
   const built = useRef<Map<string, unknown>>(new Map());
   const history = useRef<HistoryRecords>({ education: [], work: [] });
+  /** The newest scan's page, for the check a next page runs between renders (followPage). */
+  const latestSignals = useRef<Parameters<typeof checkJob>[1]>(null);
   // The picked résumé's file, by version: a version's file never changes, so it's fetched once. Null: it has none.
   const files = useRef<{ resumeId: string; found: { mimeType: string; data: string } | null } | null>(null);
   // The name of the file Autofill attaches to the résumé upload, while the picked résumé has one.
@@ -336,6 +338,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
         setAttachment(file?.name ?? null);
         frames.current = page;
         setSignals(page.signals);
+        latestSignals.current = page.signals;
         setBankEmpty(answers.length === 0);
         setAnsweredFrom(resumeId);
         setReviewedFor({ applicationId, candidateId, resumeId });
@@ -680,8 +683,11 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       setStep(null);
     }
     await scan(undefined, true);
+    const page = latestSignals.current;
+    const isOtherJob = page !== null && checkJob(job, page).conflict && !confirmedHosts.includes(hostOf(page.url));
+    if (isOtherJob) return;
     if (memory.current.autoSteps && !busy.current && (shownRows.current ?? []).some(isFillable)) await autofill();
-  }, [autofill, scan, settle]);
+  }, [autofill, confirmedHosts, job, scan, settle]);
   useEffect(() => {
     followPageRef.current = followPage;
   }, [followPage]);

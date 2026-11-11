@@ -368,7 +368,7 @@ function App() {
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
       onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
       onAdded={(application) => {
-        void loadJobs(selectedCandidate.id);
+        loadJobs(selectedCandidate.id).catch(() => undefined);
         void openJob(application);
       }} />
   ) : null;

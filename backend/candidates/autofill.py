@@ -411,7 +411,8 @@ def _field_of_study(degree: str) -> str | None:
     degree = text(degree)
     if not degree or _is_certificate(degree):
         return None
-    found = _FIELD_AFTER.search(degree)
+    # A note in parentheses ("(Certificate in Data Science)") isn't searched for the separator.
+    found = _FIELD_AFTER.search(re.sub(r"\([^)]*\)", lambda note: " " * len(note.group()), degree))
     rest = degree[found.end():] if found else (_FIELD_AFTER_CODE.match(degree) or [None, None])[1]
     if not rest:
         return None

@@ -130,17 +130,17 @@ def test_patch_job_emoji_status_round_trips(client, test_db):
     assert r.json()["status"] == EMOJI
 
 
-def test_patch_job_applied_creates_application_and_company_once(client, test_db):
+def test_patch_job_applied_creates_the_company_once_and_no_application(client, test_db):
     from backend.models.db import Application, Company
     job = make_job(test_db, company="Northwind")
     r1 = assert_clean(client.patch(f"/api/jobs/{job.id}", json={"status": "applied"}), 200)
-    assert r1.json()["created_application_id"]
+    assert r1.json()["created_application_id"] is None      # an application names a candidate's posting now
     assert r1.json()["created_company_id"]
     # A second "applied" must not create a duplicate application or company.
     r2 = assert_clean(client.patch(f"/api/jobs/{job.id}", json={"status": "applied"}), 200)
     assert r2.json()["created_application_id"] is None
     assert r2.json()["created_company_id"] is None
-    assert test_db.query(Application).count() == 1
+    assert test_db.query(Application).count() == 0
     assert test_db.query(Company).filter(Company.name == "Northwind").count() == 1
 
 
