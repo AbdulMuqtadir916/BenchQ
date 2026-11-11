@@ -310,6 +310,8 @@ DEFAULT_SETTINGS = {
     "tracer_links_enabled": ("false", "Enable URL rewriting in PDF generation with tracking links"),
     "tracer_links_base_url": ("", "Public base URL for tracer links (e.g., https://yourdomain.com)"),
     "tracer_links_url_style": ("path", "URL format: path or param. Token: random or job_id. Combinations: path, param, path_jobid, param_jobid"),
+    # Job search (backend/job_search/providers/): the source every firm's BDE searches; one of the registered providers.
+    "job_search_provider": ("freehire", "The job source a BDE's search uses, the same for every firm: one of the registered providers (backend/job_search/providers/)"),
     "dedup_tracking_params": (json.dumps([
         "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "mode",
         "src", "source", "ref", "refid", "refsrc", "refsource",
@@ -429,6 +431,14 @@ _DEPTHS = {"light", "full"}
 # Every effort any provider takes; llm_client drops a value the chosen provider lacks.
 _EFFORTS = {""} | {e for values in REASONING_EFFORTS.values() for e in values}
 
+
+def _job_search_providers() -> set[str]:
+    from backend.job_search.providers import REGISTRY
+    return set(REGISTRY)
+
+
+_JOB_SEARCH_PROVIDERS = _job_search_providers()
+
 ENUM_SETTING_VALUES = {
     "llm_provider": _LLM_PROVIDERS,
     "llm_fallback_provider": _LLM_PROVIDERS,
@@ -450,6 +460,7 @@ ENUM_SETTING_VALUES = {
     "on_save_action": {"off"} | _DEPTHS,
     "tailor_auto_quick_score": {"off", "false", "no", "0", "true", "yes", "1", ""} | _DEPTHS,
     "tracer_links_url_style": {"path", "param", "path_jobid", "param_jobid"},
+    "job_search_provider": _JOB_SEARCH_PROVIDERS,
 }
 
 

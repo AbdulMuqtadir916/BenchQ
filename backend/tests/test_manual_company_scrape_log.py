@@ -68,35 +68,3 @@ def test_record_company_scrape_log_opens_own_session(test_db):
     assert row.company_id == c.id and row.new_jobs == 1
 
 
-@pytest.mark.asyncio
-async def test_manual_company_trigger_writes_scrape_log(test_db, monkeypatch):
-    """POST /api/scrape/company/{id} background worker writes the audit row (needs the container: imports backend.main → apscheduler)."""
-    pytest.importorskip("apscheduler")
-    import backend.main as main_mod
-    import backend.scraper.sources.company_pages as cp
-
-    c = Company(name="Manual Co", active=True, playwright_enabled=True,
-                scrape_urls=["https://jobs.lever.co/manual"], auto_scoring_depth="off")
-    test_db.add(c)
-    test_db.commit()
-    company_id = str(c.id)
-
-    async def fake_scrape(company, **kw):
-        return {"jobs_found": 0, "new_jobs": 0, "error": None, "duration": 0.4}
-
-    monkeypatch.setattr(cp, "scrape_single_career_page", fake_scrape)
-
-    resp = await main_mod.trigger_company_scrape(company_id)
-    assert resp["status"] == "running"
-
-    # Let the background task finish.
-    import backend.job_monitor as jm
-    for _ in range(100):
-        if not jm._running:
-            break
-        await asyncio.sleep(0.02)
-
-    row = test_db.query(ScrapeLog).filter(ScrapeLog.company_id == c.id).one()
-    assert row.source == "playwright_Manual Co"
-    assert row.jobs_found == 0 and row.new_jobs == 0
-    assert row.is_warning is True

@@ -7,7 +7,7 @@ from backend.models.candidates import Candidate, CandidateJob, CandidateMailbox,
 from backend.models.db import Application, Job, Search, utcnow
 from backend.models.tenancy import Firm, LedgerEntry, User
 from backend.tests.auth_support import make_user
-from backend.tests.resume_support import make_version
+from backend.tests.resume_support import make_posting, make_version
 
 
 @pytest.fixture
@@ -43,8 +43,10 @@ def _ids(world):
 
 
 def test_one_application_per_candidate_per_job_with_the_tailored_resume(test_db, world):
+    # The tailored résumé names the candidate's job posting (0023); the application still the old pool's job.
+    posting = make_posting(test_db, world["firm"].id, world["candidate"].id, world["bde"].id)
     tailored = make_version(test_db, world["firm"].id, candidate=world["candidate"], category="TAILORED",
-                            job_id=world["job"].id, name="Tailored")
+                            job_id=posting.id, name="Tailored")
     app = dict(firm_id=world["firm"].id, job_id=world["job"].id, candidate_id=world["candidate"].id)
     test_db.add(Application(**app, resume_id=tailored.id, submitted_by_user_id=world["bde"].id))
     test_db.flush()

@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import firm from "@/mocks/data/firm.json";
 import invites from "@/mocks/data/invites.json";
-import candidates from "@/mocks/data/candidates.json";
 import plans from "@/mocks/data/plans.json";
 import platformUsers from "@/mocks/data/platform-users.json";
 import { fromBackendId, toBackendId } from "./demo-ids";
@@ -27,7 +26,8 @@ function uuid5(name: string): string {
 }
 
 function expectedMap(): Record<string, string> {
-  const ids = [...plans, ...firm.firms, ...firm.users, ...platformUsers, ...invites, ...candidates].map((row) => row.id);
+  // No candidates: the seed makes none (decided 2026-11-11); a candidate only comes from onboarding.
+  const ids = [...plans, ...firm.firms, ...firm.users, ...platformUsers, ...invites].map((row) => row.id);
   return Object.fromEntries(ids.sort().map((fixtureId) => [fixtureId, uuid5(fixtureId)]));
 }
 

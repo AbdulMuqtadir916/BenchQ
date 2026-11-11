@@ -1,0 +1,105 @@
+"""The job search's daily caps (decided 2026-11-10), counted from rows, never stored:
+
+- 100 **new** jobs per candidate per day: `job_postings` rows discovered since the day started, captures left out
+  by how they were first saved (`first_source` manual / extension). A job seen again only refreshes its row and
+  doesn't count; a captured job a search later refreshes stays a capture (Abdul's comment on PR 2: counting the
+  latest `source` let it take a search's place, 101).
+- 20 search attempts per BDE per day, any outcome: their `scrape_jobs` search rows started since the day started,
+  running ones included.
+- 20 captures per BDE per day (job search PR 2): their `scrape_jobs` capture rows since the day started.
+
+A search's row is `running` while it runs (migration 0022). One left `running` by a restart or a dead worker is marked
+`error` (`internal`) once it is older than `RUNNING_FOR_AT_MOST`: written, with its error code and ledger entry, when
+the BDE next starts a search (`pipeline.expire_lost`); a read only shows it as that error (`is_lost`), since reads write
+nothing (a support view reads too).
+It never blocks the candidate.
+
+The day starts at 6:30 PM IST, the start of the BDE's shift, so one night's work is one day."""
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
+from sqlalchemy import func, text
+
+from backend.auth.scoping import scoped
+from backend.job_search.providers.capture import CAPTURE_SOURCES
+from backend.models.db import utcnow
+from backend.models.job_search import JobPosting, ScrapeJob
+
+JOBS_PER_CANDIDATE_PER_DAY = 100
+ATTEMPTS_PER_BDE_PER_DAY = 20
+CAPTURES_PER_BDE_PER_DAY = 20
+JOBS_PER_SEARCH = 100            # always asked for, even with less room left (Q28)
+JOB_TYPE = "job_search"          # job_runs.job_type (the background launcher's own record of the task)
+IST = ZoneInfo("Asia/Kolkata")
+DAY_STARTS = time(18, 30)
+# A search still `running` after this long was lost (a restart, a dead worker); it is marked `error` and stops blocking.
+RUNNING_FOR_AT_MOST = timedelta(minutes=15)
+
+
+def day_start(now: datetime | None = None) -> datetime:
+    """The last 6:30 PM IST at or before `now`."""
+    local = (now or utcnow()).astimezone(IST)
+    start = datetime.combine(local.date(), DAY_STARTS, tzinfo=IST)
+    return start if local >= start else start - timedelta(days=1)
+
+
+def next_reset(now: datetime | None = None) -> datetime:
+    return day_start(now) + timedelta(days=1)
+
+
+def jobs_saved_today(db, firm_id, candidate_id, now: datetime | None = None) -> int:
+    return scoped(db, JobPosting, firm_id, func.count(JobPosting.id)).filter(
+        JobPosting.candidate_id == candidate_id, JobPosting.discovered_at >= day_start(now),
+        JobPosting.first_source.notin_(CAPTURE_SOURCES)).scalar()
+
+
+def is_lost(batch: ScrapeJob, now: datetime | None = None) -> bool:
+    return batch.state == "running" and batch.created_at < (now or utcnow()) - RUNNING_FOR_AT_MOST
+
+
+def running_search(db, firm_id, candidate_id, now: datetime | None = None) -> ScrapeJob | None:
+    """The candidate's search still running, whichever worker runs it (a lost one doesn't count)."""
+    return scoped(db, ScrapeJob, firm_id).filter(
+        ScrapeJob.candidate_id == candidate_id, ScrapeJob.state == "running",
+        ScrapeJob.kind == "search", ScrapeJob.created_at >= (now or utcnow()) - RUNNING_FOR_AT_MOST,
+    ).order_by(ScrapeJob.created_at.desc()).first()
+
+
+def lock_bde(db, user_id) -> None:
+    """Hold the BDE's admission lock until the transaction ends (a Postgres advisory lock on their id; the users row
+    isn't touched). Taken after the candidate's row, in every route (searches and captures), so two of one BDE's
+    requests for different candidates, on any worker, count the daily caps in turn (Abdul's review, P2)."""
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(user_id)})
+
+
+def _lock_key(user_id) -> int:
+    """A signed 64-bit key from the user's id, in its own namespace (the top bits say "job search BDE")."""
+    import uuid as _uuid
+    return ((0x4A53 << 48) | (_uuid.UUID(str(user_id)).int & 0xFFFFFFFFFFFF)) - (1 << 63)
+
+
+def _today(db, firm_id, user_id, kind: str, now: datetime | None = None) -> int:
+    """The BDE's searches or captures started since the day started, whatever became of them: counted by start."""
+    return scoped(db, ScrapeJob, firm_id, func.count(ScrapeJob.id)).filter(
+        ScrapeJob.user_id == user_id, ScrapeJob.kind == kind, ScrapeJob.created_at >= day_start(now)).scalar()
+
+
+def attempts_today(db, firm_id, user_id, now: datetime | None = None) -> int:
+    return _today(db, firm_id, user_id, "search", now)
+
+
+def captures_today(db, firm_id, user_id, now: datetime | None = None) -> int:
+    return _today(db, firm_id, user_id, "capture", now)
+
+
+def usage(db, firm_id, candidate_id, bde_id, now: datetime | None = None) -> dict:
+    """Today's numbers for the candidate's search panel. `attempts_today` is the candidate's BDE's (None without one)."""
+    return {
+        "jobs_saved_today": jobs_saved_today(db, firm_id, candidate_id, now),
+        "jobs_cap": JOBS_PER_CANDIDATE_PER_DAY,
+        "attempts_today": attempts_today(db, firm_id, bde_id, now) if bde_id else None,
+        "attempts_cap": ATTEMPTS_PER_BDE_PER_DAY,
+        "captures_today": captures_today(db, firm_id, bde_id, now) if bde_id else None,
+        "captures_cap": CAPTURES_PER_BDE_PER_DAY,
+        "resets_at": next_reset(now).isoformat(),
+    }

@@ -124,11 +124,12 @@ def test_delete_search_twice_is_404_the_second_time(client, test_db):
 
 
 @pytest.mark.parametrize("mode", ["extension", "linkedin_extension"])
-def test_extension_searches_refuse_delete_run_and_acknowledge(client, test_db, mode):
+def test_extension_searches_refuse_delete_and_acknowledge(client, test_db, mode):
     s = make_search(test_db, name=f"Ext {mode}", search_mode=mode)
     assert_clean(client.delete(f"/api/searches/{s.id}"), 409)
-    assert_clean(client.post(f"/api/searches/{s.id}/run"), 409)
+    # run: retired with the old pool (410, job search PR 2)
     assert_clean(client.post(f"/api/searches/{s.id}/acknowledge"), 409)
+
 
 
 def test_delete_search_orphans_its_jobs_and_scrape_logs(client, test_db):
@@ -144,42 +145,6 @@ def test_delete_search_orphans_its_jobs_and_scrape_logs(client, test_db):
     assert test_db.query(ScrapeLog).count() == 1
     assert test_db.query(ScrapeLog).first().search_id is None
 
-
-def test_run_search_missing_id_is_404(client):
-    assert_clean(client.post(f"/api/searches/{MISSING_UUID}/run"), 404)
-
-
-def test_run_search_second_trigger_on_the_same_scope_is_409(client, test_db, monkeypatch):
-    import asyncio
-    import backend.scraper.orchestrator as orch
-    gate = asyncio.Event()
-
-    async def _slow(search_id, auto_score=None):
-        await gate.wait()
-        return {}
-    monkeypatch.setattr(orch, "_run_search_by_id", _slow, raising=False)
-
-    s = make_search(test_db)
-    assert_clean(client.post(f"/api/searches/{s.id}/run"), 202)
-    assert_clean(client.post(f"/api/searches/{s.id}/run"), 409)
-    gate.set()
-
-
-def test_run_two_different_searches_at_once_is_allowed(client, test_db, monkeypatch):
-    import asyncio
-    import backend.scraper.orchestrator as orch
-    gate = asyncio.Event()
-
-    async def _slow(search_id, auto_score=None):
-        await gate.wait()
-        return {}
-    monkeypatch.setattr(orch, "_run_search_by_id", _slow, raising=False)
-
-    a = make_search(test_db, name="A")
-    b = make_search(test_db, name="B")
-    assert_clean(client.post(f"/api/searches/{a.id}/run"), 202)
-    assert_clean(client.post(f"/api/searches/{b.id}/run"), 202)
-    gate.set()
 
 
 def test_search_test_result_unknown_run_id_is_404(client):
@@ -350,26 +315,6 @@ def test_bulk_activate_none_tier_selects_untiered_companies(client, test_db):
 def test_list_companies_query_contract(client, qs, expected):
     assert_clean(client.get(f"/api/companies?{qs}"), expected)
 
-
-def test_scrape_company_missing_id_is_404(client):
-    assert_clean(client.post(f"/api/scrape/company/{MISSING_UUID}"), 404)
-
-
-def test_scrape_company_second_trigger_on_the_same_scope_is_409(client, test_db, monkeypatch):
-    import asyncio
-    import backend.scraper.sources.company_pages as cp
-    gate = asyncio.Event()
-
-    async def _slow(company):
-        await gate.wait()
-        return {}
-    monkeypatch.setattr(cp, "scrape_single_career_page", _slow, raising=False)
-    monkeypatch.setattr(cp, "record_company_scrape_log", lambda *a, **k: None, raising=False)
-
-    c = make_company(test_db)
-    assert_clean(client.post(f"/api/scrape/company/{c.id}"), 202)
-    assert_clean(client.post(f"/api/scrape/company/{c.id}"), 409)
-    gate.set()
 
 
 # ── R4 fix-loop regression (R4-T1-19) ────────────────────────────────────────

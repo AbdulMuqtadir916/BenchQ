@@ -46,16 +46,33 @@ def support_view_json(view: SupportView) -> dict:
     }
 
 
+# What a platform admin reading the ledger (the audit, or a support view) sees instead of a firm's own content:
+# entity_type → (label, or None to keep it; summary). The entry still says what happened, to whom, by whom and when.
+# A job search's role and country, and a job's title and company, are the firm's business (job search PR 1,
+# Abdul's review, P2).
+_RESTRICTED = {
+    "email": (None, "Candidate inbox activity (content restricted)."),
+    "job_search": ("Job search", "Searched jobs (content restricted)."),
+    "job_posting": ("Captured job", "Captured a job (content restricted)."),        # job search PR 2
+}
+
+
 def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
-    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case."""
+    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case. `hide_email`: the reader is a platform
+    admin, so a restricted entry's content is replaced (`_RESTRICTED`)."""
+    restricted = _RESTRICTED.get(entry.entity_type) if hide_email else None
+    # A hand-off's note is what the firm wrote about its candidate: not for a platform admin (CodeAnt on #135, done at
+    # Abdul's request). The entry itself (who was moved where) stays.
+    note = None if restricted or (hide_email and entry.action == "ASSIGN") else entry.note
     return {
         "id": str(entry.id), "firm_id": str(entry.firm_id) if entry.firm_id else None,
         "candidate_id": str(entry.candidate_id) if entry.candidate_id else None,
         "actor_user_id": str(entry.actor_user_id) if entry.actor_user_id else None, "actor_type": entry.actor_type,
         "actor_name": entry.actor_name, "entity_type": entry.entity_type, "entity_id": entry.entity_id,
-        "entity_label": entry.entity_label, "action": entry.action,
-        "summary": "Candidate inbox activity (content restricted)." if hide_email and entry.entity_type == "email" else entry.summary,
-        "note": None if hide_email and entry.entity_type == "email" else entry.note,
+        "entity_label": (restricted[0] or entry.entity_label) if restricted else entry.entity_label,
+        "action": entry.action,
+        "summary": restricted[1] if restricted else entry.summary,
+        "note": note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
         "created_at": _iso(entry.created_at),
     }

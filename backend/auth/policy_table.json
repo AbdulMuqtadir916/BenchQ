@@ -25,6 +25,7 @@
     "invite.revoke": "- - - - Y Y",
     "job.apply": "Y Y Y - - -",
     "job.capture": "Y Y Y - - -",
+    "job.search": "- - Y - - -",
     "member.changeManager": "Y - - - - -",
     "member.changeRole": "Y - - - - -",
     "member.deactivate": "Y - - - - -",

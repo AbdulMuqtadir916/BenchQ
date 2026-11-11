@@ -62,9 +62,9 @@ async def test_track_llm_call_job_id(test_db):
     from backend.analyzer.llm_logger import track_llm_call
     from backend.models.db import LlmCallLog
 
-    from backend.tests.r4_support import make_job
+    from backend.tests.resume_support import make_target_posting
     jid = uuid.uuid4()
-    make_job(test_db, id=jid)   # llm_call_log.job_id is a real foreign key on Postgres
+    make_target_posting(test_db, id=jid)   # llm_call_log.job_id is a real foreign key on Postgres
     async with track_llm_call("score_full", "claude_api", "claude-sonnet-4-6", job_id=jid) as tracker:
         tracker.usage = {"input_tokens": 100, "output_tokens": 10,
                          "cache_read_tokens": 0, "cache_write_tokens": 0}

@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { ResumeRemovalSchema, type ResumeRemoval, type ResumeShelf } from "@/lib/schemas/resume";
 import type { OpenedResume, ResumeDocument, ResumeSaveResult } from "@/lib/schemas/resume-document";
-import { isLive } from "./config";
 import { ResumeShelfDto, ResumeVersionDto, toOpenedResume, toResumeShelf } from "./dto/resumes";
 import { toBackendContent } from "./dto/resume-content";
 import { fromBackendId, toBackendId } from "./dto/demo-ids";
@@ -21,8 +20,6 @@ export class DuplicateUploadError extends ApiError {
     this.isHidden = isHidden;
   }
 }
-
-const mock = () => import("@/mocks/resumes").then((m) => m.resumesMock);
 
 /** backend/api/routes_firm_resumes.py (the firm's, read-only) and routes_candidate_resumes.py (a candidate's). */
 const firmPath = (firmId: string, versionId?: string) => `/api/firms/${toBackendId(firmId)}/resumes${versionId ? `/${toBackendId(versionId)}` : ""}`;
@@ -117,44 +114,34 @@ const Ack = z.object({ id: z.string() });
 const Uploaded = z.object({ restored: z.boolean() });
 
 /**
- * Firm-scoped (docs/07 T5): every call names the firm, and the backend/mock serves only that firm's rows, in the
- * principal's scope. Live with `NEXT_PUBLIC_LIVE_MODULES=resumes` (résumé versioning PR 7).
+ * Firm-scoped (docs/07 T5): every call names the firm, and the backend serves only that firm's rows, in the principal's
+ * scope. Résumés come only from the backend: there is no mock (decided 2026-11-11).
  */
 export const resumesApi = {
   /** Every base and résumé of the candidates the principal sees (the Resume Builder library). */
-  shelf: async (firmId: string): Promise<ResumeShelf> => (isLive("resumes") ? live.shelf(firmId) : (await mock()).shelf(firmId)),
+  shelf: (firmId: string): Promise<ResumeShelf> => live.shelf(firmId),
 
   /** One candidate's bases and résumés (their Résumés tab, an application's "résumé sent"). */
-  shelfByCandidate: async (firmId: string, candidateId: string): Promise<ResumeShelf> =>
-    isLive("resumes") ? live.shelfByCandidate(firmId, candidateId) : (await mock()).shelfByCandidate(firmId, candidateId),
+  shelfByCandidate: (firmId: string, candidateId: string): Promise<ResumeShelf> => live.shelfByCandidate(firmId, candidateId),
 
   /** One version with its text, for the studio: its id alone names it. */
-  open: async (firmId: string, versionId: string): Promise<OpenedResume> =>
-    isLive("resumes") ? live.open(firmId, versionId) : (await mock()).open(firmId, versionId),
+  open: (firmId: string, versionId: string): Promise<OpenedResume> => live.open(firmId, versionId),
 
   /** Save the studio's edit of `versionId` as its résumé's next version (§4.3); a `notice` when another came first.
    *  `loadShelf` loads the candidate's list afterwards (default: a plain read). */
-  save: async (firmId: string, versionId: string, doc: ResumeDocument, loadShelf?: ShelfLoader): Promise<ResumeSaveResult> =>
-    isLive("resumes") ? live.save(firmId, versionId, doc, loadShelf) : (await mock()).save(firmId, versionId, doc),
+  save: (firmId: string, versionId: string, doc: ResumeDocument, loadShelf?: ShelfLoader): Promise<ResumeSaveResult> => live.save(firmId, versionId, doc, loadShelf),
 
   /** "Use this as the base?" Yes, and picking a base: a base's v1 makes it active; any other version promotes. */
-  useAsBase: async (firmId: string, candidateId: string, versionId: string): Promise<void> =>
-    isLive("resumes") ? live.useAsBase(firmId, candidateId, versionId) : (await mock()).useAsBase(firmId, candidateId, versionId),
+  useAsBase: (firmId: string, candidateId: string, versionId: string): Promise<void> => live.useAsBase(firmId, candidateId, versionId),
 
   /** The BDE's later résumé (§4.6): a new active base. `restored` when the same file brought back a deleted base. */
-  upload: async (firmId: string, candidateId: string, file: File): Promise<{ restored: boolean; fileName: string }> =>
-    isLive("resumes") ? live.upload(firmId, candidateId, file) : (await mock()).upload(firmId, candidateId, file.name),
+  upload: (firmId: string, candidateId: string, file: File): Promise<{ restored: boolean; fileName: string }> => live.upload(firmId, candidateId, file),
 
   /** What deleting a base or a version would do (the warning), and doing it (§4.7). */
-  baseRemoval: async (firmId: string, candidateId: string, baseId: string): Promise<ResumeRemoval> =>
-    isLive("resumes") ? live.baseRemoval(firmId, candidateId, baseId) : (await mock()).baseRemoval(firmId, candidateId, baseId),
-  versionRemoval: async (firmId: string, candidateId: string, versionId: string): Promise<ResumeRemoval> =>
-    isLive("resumes") ? live.versionRemoval(firmId, candidateId, versionId) : (await mock()).versionRemoval(firmId, candidateId, versionId),
-  deleteBase: async (firmId: string, candidateId: string, baseId: string, keepUsed: boolean): Promise<ResumeRemoval> =>
-    isLive("resumes") ? live.deleteBase(firmId, candidateId, baseId, keepUsed) : (await mock()).deleteBase(firmId, candidateId, baseId, keepUsed),
-  deleteVersion: async (firmId: string, candidateId: string, versionId: string): Promise<ResumeRemoval> =>
-    isLive("resumes") ? live.deleteVersion(firmId, candidateId, versionId) : (await mock()).deleteVersion(firmId, candidateId, versionId),
+  baseRemoval: (firmId: string, candidateId: string, baseId: string): Promise<ResumeRemoval> => live.baseRemoval(firmId, candidateId, baseId),
+  versionRemoval: (firmId: string, candidateId: string, versionId: string): Promise<ResumeRemoval> => live.versionRemoval(firmId, candidateId, versionId),
+  deleteBase: (firmId: string, candidateId: string, baseId: string, keepUsed: boolean): Promise<ResumeRemoval> => live.deleteBase(firmId, candidateId, baseId, keepUsed),
+  deleteVersion: (firmId: string, candidateId: string, versionId: string): Promise<ResumeRemoval> => live.deleteVersion(firmId, candidateId, versionId),
   /** Show a hidden base again; it isn't made active. */
-  showBase: async (firmId: string, candidateId: string, baseId: string): Promise<{ number: number }> =>
-    isLive("resumes") ? live.showBase(firmId, candidateId, baseId) : (await mock()).showBase(firmId, candidateId, baseId),
+  showBase: (firmId: string, candidateId: string, baseId: string): Promise<{ number: number }> => live.showBase(firmId, candidateId, baseId),
 };
