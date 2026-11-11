@@ -1,5 +1,6 @@
 import type { PageApi } from "../autofill/types";
 import { createFiller } from "./fill";
+import { addEntry } from "./entries";
 import { readJob } from "./job";
 import { readFields, scanDocument, waitForQuiet, type Registry } from "./scan";
 
@@ -24,6 +25,7 @@ if (scope.__benchqAutofill?.version !== __PAGE_BUILD__) {
     },
     read: () => (registry ? readFields(document, registry) : null),
     readJob: () => readJob(document),
+    addEntry: (kind) => addEntry(document, kind),
     ...createFiller(() => registry),
   };
 }

@@ -4,11 +4,11 @@ import { withResumeFile } from "./documents";
 import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./form-memory";
 import { checkJob, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
-import { answersFromResume } from "./resume-answers";
-import { buildReview, suggestedRow } from "./review";
+import { answersFromResume, historyOf, type HistoryRecords } from "./resume-answers";
+import { buildReview, suggestedRow, typeOf, withHistory } from "./review";
 import { builtAnswers, saveOffer } from "./save-answer";
 import {
-  chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills,
+  addEntryIn, chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills,
   type TabScan,
 } from "./tab-bridge";
 import type {
@@ -22,6 +22,9 @@ const TOP_FRAME = 0;
 const LATE_CHECK_MS = 300;
 /** A run fills what it found, then once more for questions its answers brought out, like "If yes, which visa?". */
 const PASSES = 2;
+/** "Add another" (#132): at most this many blocks a run adds, with a pause for each block to appear. */
+const MAX_ENTRIES = 5;
+const ENTRY_MS = 700;
 /** Once the résumé is attached, the form is read every 400 ms until it has been still for three looks, after five at
  * least (2 s) and 30 at most: a site that reads the file (Lever's "Analyzing resume…") fills fields of its own first. */
 const SETTLE = { every: 400, least: 5, still: 3, most: 30 };
@@ -237,6 +240,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const bank = useRef<{ resumeId: string | null; entries: BankEntry[]; file: ResumeFile | null } | null>(null);
   // The picked résumé's built answers by key, as it sent them: a save says which one the BDE was shown (docs/02 §8.3).
   const built = useRef<Map<string, unknown>>(new Map());
+  const history = useRef<HistoryRecords>({ education: [], work: [] });
   // The picked résumé's file, by version: a version's file never changes, so it's fetched once. Null: it has none.
   const files = useRef<{ resumeId: string; found: { mimeType: string; data: string } | null } | null>(null);
   // The name of the file Autofill attaches to the résumé upload, while the picked résumé has one.
@@ -254,6 +258,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       const entries = await getResumeAnswers(firmId, candidateId, resumeId);
       if (entries) {
         built.current = builtAnswers(entries);
+        history.current = historyOf(entries);
         return withJobSite(answersFromResume(entries), job);
       }
       setError(ANSWERS_UNAVAILABLE);
@@ -295,7 +300,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
 
   const review = useCallback((fields: TabField[], answers: BankEntry[], justFilled?: ReadonlySet<string>) => {
     const withSaveOffer = withSaveOfferIn(memory.current, built.current);
-    const reviewed = withResumeFile(buildReview(fields, answers, job), bank.current?.file ?? null);
+    const reviewed = withResumeFile(withHistory(buildReview(fields, answers, job), history.current), bank.current?.file ?? null);
     const next = withMemory(reviewed, memory.current, resume.current, justFilled).map((row) => withSaveOffer(row, answers));
     showRows(next);
     const { settled } = memory.current;
@@ -618,6 +623,25 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
 
   /** Fills the form from the picked résumé. After a change of résumé, the file BenchQ attached for the old one comes off
    * first, then the old one's fills the new one doesn't answer go back, then the new one's answers and file go on. */
+  /** "Add another" (#132): when the résumé has more schools or jobs than the form shows blocks for, the form's own Add
+   * button makes the rest (at most MAX_ENTRIES), and they fill from the next records. A form with no such block, or no
+   * Add button, is left as it is. */
+  const addEntries = useCallback(async () => {
+    let added = false;
+    for (const [kind, type] of [["education", "education-school"], ["work", "current-company"]] as const) {
+      const blocks = (shownRows.current ?? []).filter((row) => typeOf(row.field) === type).length;
+      const wanted = Math.min(history.current[kind].length, MAX_ENTRIES);
+      for (let count = blocks; blocks > 0 && count < wanted; count += 1) {
+        if (!(await addEntryIn(tabId, kind).catch(() => false))) break;
+        added = true;
+        await new Promise((resolve) => setTimeout(resolve, ENTRY_MS));
+      }
+    }
+    if (!added) return;
+    await scan(undefined, true);
+    await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
+  }, [fillRows, scan, tabId]);
+
   const autofill = useCallback(async () => {
     if (busy.current || needsConfirmation) return;
     memory.current.autoSteps = true;
@@ -628,10 +652,11 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       if (stale.length > 0) await takeBackStale(stale);
       setStep(null);
       await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
+      await addEntries();
     } finally {
       setStep(null);
     }
-  }, [fillRows, needsConfirmation, removeOldFiles, takeBackStale]);
+  }, [addEntries, fillRows, needsConfirmation, removeOldFiles, takeBackStale]);
 
   /** The page moved on: a new page or step of the form, or fields that came or went. A fresh look first. When most of
    * the fields are new, it's the form's next step rather than a question an answer brought out; once the BDE has run

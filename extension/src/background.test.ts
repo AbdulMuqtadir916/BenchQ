@@ -186,3 +186,12 @@ describe("following a tab", () => {
     expect(stored(tabId)).toBeDefined();
   });
 });
+
+describe("using the tab that shows the job (#130)", () => {
+  it("connects that tab, and a tab connected to the same job before lets go", async () => {
+    const before = await open();
+    expect(await send({ type: "connect-tab", connection: details, tabId: 42 })).toEqual({ ok: true, tabId: 42 });
+    expect(stored(42)).toMatchObject({ applicationId: details.applicationId, tabId: 42, confirmedHosts: [] });
+    expect(stored(before)).toBeUndefined();
+  });
+});

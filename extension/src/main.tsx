@@ -324,6 +324,13 @@ function App() {
     }
   };
   // A job BenchQ can connect opens in a connected tab, and the panel scans it. If it's open already, this goes to its tab.
+  const connectThisTab = async (job: Application) => {
+    setError("");
+    const details = session && connectionFor(job, session.principal.user_id);
+    if (!details || !activeBrowserTab) return;
+    const reply = await sendToBackground({ type: "connect-tab", connection: details, tabId: activeBrowserTab.id }).catch(() => null);
+    if (!reply?.ok) setError("Could not use this tab. Try Open job.");
+  };
   const openJobLink = (job: Application) => {
     if (isConnectable(job)) {
       return (
@@ -359,6 +366,7 @@ function App() {
   const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
     <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} candidateId={selectedCandidate.id}
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
+      onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job) void connectThisTab(job); }}
       onAdded={(application) => {
         void loadJobs(selectedCandidate.id);
         void openJob(application);

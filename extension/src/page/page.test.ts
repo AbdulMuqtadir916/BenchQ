@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { documentOf } from "../autofill/documents";
+import { addEntry } from "./entries";
 import { createFiller } from "./fill";
 import { readFields, scanDocument, waitForQuiet, type Registry } from "./scan";
 
@@ -1191,5 +1192,21 @@ describe("fields inside components (shadow DOM)", () => {
     } finally {
       document.removeEventListener("input", listener);
     }
+  });
+});
+
+describe("adding a school or job block (#132)", () => {
+  it("clicks the form's Add button for that kind, by its own words or its section's heading", () => {
+    document.body.innerHTML = `<button id="cart">Add to cart</button><section><h3>Education</h3><button id="edu">+ Add another</button></section>`
+      + `<button id="work">Add work experience</button>`;
+    const clicked: string[] = [];
+    for (const id of ["cart", "edu", "work"]) element(`#${id}`).addEventListener("click", () => clicked.push(id));
+    expect([addEntry(document, "education"), addEntry(document, "work")]).toEqual([true, true]);
+    expect(clicked).toEqual(["edu", "work"]);
+  });
+
+  it("finds nothing on a form without one", () => {
+    document.body.innerHTML = `<h3>Education</h3><input aria-label="School"><button>Submit application</button>`;
+    expect(addEntry(document, "education")).toBe(false);
   });
 });

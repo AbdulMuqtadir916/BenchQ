@@ -146,7 +146,7 @@ function hostLabel(element: Element): string {
 }
 
 /** The nearest heading or legend above a field: the section it sits in. */
-function sectionHeading(element: Element): string {
+export function sectionHeading(element: Element): string {
   let node: Element | null = element;
   for (let depth = 0; node && depth < MAX_HEADING_DEPTH && !node.matches("body"); depth += 1) {
     for (let previous = node.previousElementSibling; previous; previous = previous.previousElementSibling) {

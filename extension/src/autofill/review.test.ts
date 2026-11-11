@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildReview } from "./review";
+import { buildReview, withHistory } from "./review";
 import type { BankEntry, ReviewRow, TabField } from "./types";
 
 const field = (label: string, overrides: Partial<TabField> = {}): TabField => ({
@@ -530,5 +530,22 @@ describe("suggestions for a question nothing answers", () => {
     const offered = review(field("Are you available to work on public holidays?", radio), bank).suggestions!;
     expect(offered).toHaveLength(3);
     expect(offered[0]!.question).toBe("Can you work holidays?");
+  });
+});
+
+describe("a school or job block that repeats (#132)", () => {
+  const history = { education: [{ school: "Osmania University", degree: "MS" }, { school: "JNTU", degree: "BTech" }], work: [] };
+
+  it("fills the n-th block from the résumé's n-th school, and leaves a block past the last one to the BDE", () => {
+    const fields = ["School", "School", "School"].map((label, n) => field(label, { id: `f${n}` }));
+    const base = buildReview(fields, [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]);
+    const rows = withHistory(base, history);
+    expect(rows[0]).toEqual(base[0]);
+    expect(rows.slice(1).map((row) => [row.status, row.proposed ?? null])).toEqual([["ready", "JNTU"], ["manual", null]]);
+  });
+
+  it("leaves a form with one block as it was", () => {
+    const rows = buildReview([field("School")], [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]);
+    expect(withHistory(rows, history)).toEqual(rows);
   });
 });

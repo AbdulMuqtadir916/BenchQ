@@ -1,3 +1,4 @@
+import type { HistoryRecords } from "./resume-answers";
 import { bankForType, closestBankEntry, indexBankByType } from "../engine/bank";
 import { classifyField } from "../engine/classify";
 import { manualOnlyReason, type EngineFieldType } from "../engine/field-types";
@@ -161,6 +162,36 @@ function suggestionsFor(field: TabField, label: string, type: EngineFieldType | 
 }
 
 /** The row a suggestion the BDE picked makes: ready to fill, or why the answer doesn't fit this field. */
+const recordText = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+
+/** Which value of a school or job record a field of a history block takes. */
+const FROM_RECORD: Partial<Record<string, [keyof HistoryRecords, (record: Record<string, unknown>) => string]>> = {
+  "education-school": ["education", (record) => recordText(record.school)],
+  "education-degree": ["education", (record) => recordText(record.degree)],
+  "graduation-year": ["education", (record) => recordText(record.graduation_date).match(/\b(19|20)\d{2}\b/)?.[0] ?? ""],
+  "current-company": ["work", (record) => recordText(record.company)],
+  "current-title": ["work", (record) => recordText(record.title)],
+};
+
+/** A form that repeats a school or job block (or grew one with "Add another", #132) asks for the next school or job in
+ * each: the n-th "School" takes the résumé's n-th school, not the first one again. A block past the résumé's last one
+ * is left to the BDE. The first block keeps what it was given. */
+export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewRow[] {
+  const seen = new Map<string, number>();
+  return rows.map((row) => {
+    const type = typeOf(row.field);
+    const from = type ? FROM_RECORD[type] : undefined;
+    if (!type || !from) return row;
+    const index = seen.get(type) ?? 0;
+    seen.set(type, index + 1);
+    if (index === 0) return row;
+    const record = history[from[0]][index];
+    const value = record ? from[1](record) : "";
+    const base = { key: row.key, field: row.field, isUnsaved: row.isUnsaved };
+    return value ? rowFor(base, value) : { ...base, status: "manual", reason: "The résumé has no entry for this block." };
+  });
+}
+
 export function suggestedRow({ key, field, isUnsaved }: ReviewRow, entry: BankEntry): ReviewRow {
   return rowFor({ key, field, isUnsaved }, entry.answer, entry);
 }

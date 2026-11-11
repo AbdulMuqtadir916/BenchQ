@@ -67,6 +67,18 @@ function workedOut(bank: BankEntry[]): BankEntry[] {
   return out;
 }
 
+/** The résumé's schools and jobs, one record each in the résumé's order (#132): `education-history` and `work-history`. */
+export type HistoryRecords = { education: Record<string, unknown>[]; work: Record<string, unknown>[] };
+
+export function historyOf(entries: unknown): HistoryRecords {
+  const list = Array.isArray(entries) ? entries : [];
+  const recordsOf = (key: string) => {
+    const answer = (list.find((entry) => (entry as { key?: unknown } | null)?.key === key) as { answer?: unknown } | undefined)?.answer;
+    return Array.isArray(answer) ? answer.filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null) : [];
+  };
+  return { education: recordsOf("education-history"), work: recordsOf("work-history") };
+}
+
 /** The answers in `entries`, as the network gave them: anything that isn't a question with an answer is skipped, and a
  * question is answered once. */
 export function answersFromResume(entries: unknown): BankEntry[] {

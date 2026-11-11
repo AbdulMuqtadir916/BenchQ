@@ -340,7 +340,7 @@ def create_application(
     Logging a job with no candidate (the old pool's hand log) is retired: 410."""
     from backend.api.routes_candidates import _candidate
     from backend.applications.saving import add_job, ensure_saved
-    from backend.auth.policy import can
+    from backend.auth.policy import can, can_add_job
     from backend.models.job_search import JobPosting
     from backend.models.tenancy import User
 
@@ -350,6 +350,8 @@ def create_application(
         if data.candidate_id is None:
             raise HTTPException(status_code=400, detail="Adding a job needs its candidate (candidate_id).")
         candidate = _candidate(db, firm_id, principal, data.candidate_id, lock=True)
+        if not can_add_job(principal, candidate):
+            raise HTTPException(status_code=403, detail="Only the candidate's BDE adds jobs for them.")
         actor = db.get(User, principal.user_id)
         posting, job_created = add_job(db, firm_id=firm_id, actor=actor, candidate=candidate, source=data.job.source,
                                        job=data.job.model_dump(exclude={"source"}))

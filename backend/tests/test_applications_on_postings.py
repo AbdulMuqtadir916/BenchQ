@@ -130,6 +130,13 @@ def test_a_job_is_added_only_for_a_candidate_in_scope_and_never_by_a_viewer(anon
     assert _add(anonymous_client, world, candidate, who="rohan").status_code == 403
 
 
+def test_only_the_candidates_bde_adds_a_job_for_them(anonymous_client, world):
+    candidate = _candidate(anonymous_client, world)                                    # Adnan's, on Fatima's team
+    assert _add(anonymous_client, world, candidate, who="fatima").status_code == 403   # their manager
+    assert _add(anonymous_client, world, candidate, who="vikram").status_code in (403, 404)
+    assert _add(anonymous_client, world, candidate, who="adnan").status_code == 201
+
+
 # ── Saving one of the candidate's jobs, and reading applications ───────────
 
 def test_saving_names_one_of_the_candidates_own_postings(anonymous_client, test_db, world):

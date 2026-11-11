@@ -123,6 +123,22 @@ describe("adding the job on this page", () => {
     expect(host.querySelector("[data-slot='add-job']")).not.toBeNull();
   });
 
+  it("offers to use this tab on one of the candidate's saved jobs (#130)", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const onUseTab = vi.fn();
+    const saved = { id: "app-9", title: "Senior QA Engineer", company: "Acme Bank", location: null, url: page.url };
+    await act(async () => {
+      root!.render(<AddJobCard tab={{ id: 7, url: `${page.url}/apply` }} candidateId="cand-1" candidateName="Priya" knownUrls={[page.url]}
+        knownJobs={[saved]} onAdded={vi.fn()} onUseTab={onUseTab} />);
+    });
+    expect(host.querySelector("[data-slot='add-job']")).toBeNull();
+    await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='use-tab-run']")!.click(); });
+    expect(onUseTab).toHaveBeenCalledWith(saved);
+    expect(readJobPage).not.toHaveBeenCalled();
+  });
+
   it("doesn't look at a page that is already one of the candidate's jobs", async () => {
     await show(vi.fn(), [page.url]);
     expect(readJobPage).not.toHaveBeenCalled();

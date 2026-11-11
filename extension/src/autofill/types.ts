@@ -96,6 +96,8 @@ export type PageJob = {
 export type PageApi = {
   version: string;
   readJob(): PageJob;
+  /** Clicks the form's "Add another" for a kind of history entry (#132): whether one was found. */
+  addEntry(kind: "education" | "work"): boolean;
   scan(): Promise<FrameScan>;
   read(): FrameRead | null;
   fill(request: FillRequest): Promise<FillResult>;
@@ -130,6 +132,8 @@ export type NewConnection = Omit<Connection, "tabId" | "confirmedHosts">;
 
 export type PanelMessage =
   | { type: "open-job"; connection: NewConnection }
+  /** Connect a tab that already shows the job (one the BDE opened by hand), instead of opening it again. */
+  | { type: "connect-tab"; connection: NewConnection; tabId: number }
   | { type: "disconnect-tab"; tabId: number }
   | { type: "disconnect-job"; applicationId: string }
   | { type: "confirm-host"; tabId: number; host: string }

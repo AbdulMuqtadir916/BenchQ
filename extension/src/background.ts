@@ -47,6 +47,14 @@ async function handle(message: PanelMessage): Promise<PanelReply> {
   switch (message.type) {
     case "open-job":
       return { ok: true, tabId: await openJob(message.connection) };
+    case "connect-tab": {
+      // One tab per application: a tab connected to it before lets go.
+      const before = (await allConnections()).filter((item) => item.applicationId === message.connection.applicationId
+        && item.userId === message.connection.userId && item.tabId !== message.tabId);
+      await chrome.storage.session.remove(before.map(({ tabId }) => connectionKey(tabId)));
+      await saveConnection({ ...message.connection, tabId: message.tabId, confirmedHosts: [] });
+      return { ok: true, tabId: message.tabId };
+    }
     case "disconnect-tab":
       await removeConnection(message.tabId);
       return { ok: true };

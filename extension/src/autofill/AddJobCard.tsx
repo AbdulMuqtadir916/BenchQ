@@ -6,7 +6,7 @@ import { sameCompany, sameListing } from "./job-check";
 import { readJobPage } from "./tab-bridge";
 import type { PageJob } from "./types";
 
-type KnownJob = { title: string | null; company: string | null; location: string | null; url?: string | null };
+type KnownJob = { id?: string; title: string | null; company: string | null; location: string | null; url?: string | null };
 
 type AddJobCardProps = {
   /** The tab the BDE is looking at. */
@@ -18,6 +18,8 @@ type AddJobCardProps = {
   /** The candidate's jobs: a page showing one of them (the same company and role) isn't offered, whatever its link. */
   knownJobs?: readonly KnownJob[];
   onAdded: (application: Application) => void;
+  /** Connects this tab to the saved job it shows (#130): offered instead of adding it again. */
+  onUseTab?: (job: KnownJob) => void;
 };
 
 /** When the page is read again while it shows no job yet: pages that build themselves after they load. */
@@ -85,7 +87,7 @@ export const offersPage = (url: string | undefined, knownUrls: readonly string[]
  * the candidate's jobs and a Saved application at once; the same job again is the one they have. Then the tab connects
  * to it, ready for Autofill.
  */
-export default function AddJobCard({ tab, candidateId, candidateName, knownUrls, knownJobs = [], onAdded }: AddJobCardProps) {
+export default function AddJobCard({ tab, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab }: AddJobCardProps) {
   const tabId = tab && offersPage(tab.url, knownUrls) ? tab.id : null;
   const [job, setJob] = useState<PageJob | null>(null);
   const [state, setState] = useState<{ status: "idle" | "confirming" | "adding" | "added" | "error"; text?: string }>({ status: "idle" });
@@ -103,7 +105,17 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
     return () => timers.forEach(clearTimeout);
   }, [tabId]);
 
-  if (tabId === null || !job || knownJobs.some((known) => sameListing(job, known) || sharesJobId(job, known))) return null;
+  const isWebPage = Boolean(tab && /^https?:\/\//i.test(tab.url) && !tab.url.startsWith(BENCHQ_URL));
+  const saved = (isWebPage && knownJobs.find((known) => known.url && isSameJob(tab!.url, known.url)))
+    || (job ? knownJobs.find((known) => sameListing(job, known) || sharesJobId(job, known)) : undefined);
+  if (saved) {
+    return onUseTab ? <section data-slot="use-tab" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="use-tab-title">
+      <h2 id="use-tab-title" className="text-sm font-[550]">{candidateName}&apos;s job is on this page</h2>
+      <p className={SOFT_TEXT}>{[saved.title, saved.company].filter(Boolean).join(" · ")}</p>
+      <button type="button" data-slot="use-tab-run" className={button("primary")} onClick={() => onUseTab(saved)}>Use this tab for Autofill</button>
+    </section> : null;
+  }
+  if (tabId === null || !job) return null;
 
   const cancel = () => setState({ status: "idle" });
   const add = async () => {
