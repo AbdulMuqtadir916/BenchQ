@@ -41,7 +41,7 @@ The ledger's DTO sits in `dto/session.ts` because `/admin/audit` uses it too. A 
 `GET /api/firms/{firm_id}/ledger` scopes the query to the session's firm, then applies the
 BDE or Manager scope before ordering by `created_at` descending and `id` ascending. For the Ledger screen, pass the
 last row’s original `created_at` and `id` as `cursor_at` and `cursor_id` to continue the scan. Existing callers can still use
-`offset`. Cursor requests require both fields, a timestamp with a timezone, and zero offset.
+`offset`. Cursor requests require both fields and a timestamp with a timezone; an `offset` with a cursor skips that many rows after the cursor boundary.
 See [the route](../../backend/api/routes_ledger.py) for the optional filters and full query.
 
 The rules it follows, which every track follows:

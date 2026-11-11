@@ -48,6 +48,8 @@ Current main removed Follow-ups (BUG-009), excludes Saved jobs from the replacem
 | Added | `src/components/app/resume-studio/studio-topbar.test.ts` | Regression coverage. Gate Tailor with AI and disable Save for invalid profile links |
 | Modified | `src/components/app/resume-studio/studio-topbar.tsx` | Gate Tailor with AI and disable Save for invalid profile links |
 | Modified | `src/components/app/support/support-banner.tsx` | Hide a stale forbidden banner and refresh its server session |
+| Added | `src/components/app/support/banner-state.test.ts` | Regression coverage. Decide when the 403 support banner waits, shows, is stale or is absent |
+| Added | `src/components/app/support/banner-state.ts` | Decide when the 403 support banner waits, shows, is stale or is absent |
 | Modified | `src/components/command/command-palette.tsx` | Use approved action groups, candidate results and recent items |
 | Modified | `src/components/command/keyboard-hint-sheet.tsx` | Show shortcuts registered by the current page |
 | Added | `src/components/command/palette-results.test.ts` | Regression coverage. Derive palette groups for empty and nonempty searches |
@@ -102,4 +104,4 @@ Current main removed Follow-ups (BUG-009), excludes Saved jobs from the replacem
 
 ## Checks
 
-Local, 2026-11-11: `pnpm typecheck`, `pnpm lint` and `pnpm test` (769 tests) pass. Backend on PostgreSQL: the first full run passed 4,297 and failed 1 (the route-logging sweep sent an offset with a cursor); that is fixed, and the full suite was rerun: 4,299 passed, 0 failed. See the PR description and GitHub checks for the expanded branch. Full browser verification was performed on the testing branch before porting the fixes to current main.
+Local, 2026-11-11: `pnpm typecheck`, `pnpm lint` and `pnpm test` (774 tests) pass. Backend on PostgreSQL: the first full run passed 4,297 and failed 1 (the route-logging sweep sent an offset with a cursor); that is fixed, and the full suite was rerun: 4,299 passed, 0 failed. See the PR description and GitHub checks for the expanded branch. Full browser verification was performed on the testing branch before porting the fixes to current main.
