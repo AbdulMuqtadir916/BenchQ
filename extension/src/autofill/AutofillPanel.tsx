@@ -89,7 +89,9 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     setReadyContext(context);
     if (readyContext !== null) setPendingFill({ context, resumeId: picked?.id ?? null });
   }
-  const isSelectionSyncing = pendingFill !== null && !(error && !scanning);
+  // A queued fill (a résumé pick, another application) waits for its review. On a site BenchQ may not read there is no review
+  // to wait for until access is given, so the wait stays queued but no longer holds the panel, or Mark applied, busy.
+  const isSelectionSyncing = pendingFill !== null && !(error && !scanning) && !state.needsAccess;
   // A run is busy from its first step (taking the old file off) to its last fill.
   const isWorking = filling || Boolean(step) || isSelectionSyncing;
   const reviewMatches = canReview && reviewedFor?.applicationId === connection.applicationId

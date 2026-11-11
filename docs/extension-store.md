@@ -80,9 +80,10 @@ Draft answers, to be confirmed by the owner:
   activity such as keystrokes or clicks, or personal communications.
 - **Certify:** data is not sold; not used for anything unrelated to the single purpose; not used for creditworthiness or
   lending.
-- **Where it goes:** to the user's own BenchQ account (www.benchq.io), and, when the user presses Autofill or picks a
-  different résumé for the job (which fills the form again from that résumé, and attaches its file), into the
-  employer's application page in the connected tab. That page can read the filled answers and any attached résumé file,
+- **Where it goes:** to the user's own BenchQ account (www.benchq.io), and, when the user presses Autofill, picks a
+  different résumé for the job (which fills the form again from that résumé, and attaches its file), or uses a field's
+  Replace, Replace all or Use button (which writes a saved answer into that field), into the employer's application page
+  in the connected tab. That page can read the filled answers and any attached résumé file,
   and may save or upload them before the user submits. Nothing is sent anywhere else.
 - **Privacy policy URL:** required. It must be a public page. Draft in section 4.
 
@@ -96,8 +97,9 @@ Draft answers, to be confirmed by the owner:
 >
 > *What it sends, and where.* The résumé answers it uses to fill a form come from your BenchQ account, and the recorded
 > form goes back to your BenchQ account, both over HTTPS to www.benchq.io. Your sign-in is the BenchQ session cookie, which
-> the browser keeps and the extension never reads. When you press Autofill, or pick a different résumé for the job (which
-> fills the form again from that résumé), the candidate's answers (and the résumé file, if attached) are written into the employer's application page in that tab: the page can read them and may save or
+> the browser keeps and the extension never reads. When you press Autofill, pick a different résumé for the job (which
+> fills the form again from that résumé), or use a field's Replace, Replace all or Use button (which writes a saved answer
+> into that field), the candidate's answers (and the résumé file, if attached) are written into the employer's application page in that tab: the page can read them and may save or
 > upload them before you submit, as with anything typed into a form. That can include answers a candidate has saved to
 > self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay questions. When you
 > mark the application applied, BenchQ records the form as filled. Answers to questions BenchQ recognises as
@@ -110,7 +112,7 @@ Draft answers, to be confirmed by the owner:
 > candidate you picked (an ID, not their details), and when it last reloaded itself after an update. Nothing else is
 > stored, and none of it leaves the device.
 >
-> *Your control.* Filling starts only when you press Autofill or pick a résumé for the job, and you submit every form yourself. You can remove BenchQ's access to any site in
+> *Your control.* Filling starts only when you press Autofill, pick a résumé for the job, or use a field's Replace or Use button, and you submit every form yourself. You can remove BenchQ's access to any site in
 > chrome://extensions, and uninstall at any time. For BenchQ account data, contact **[support email]**.
 
 Fill in the support email, and publish it at a stable public address, for example `https://www.benchq.io/privacy`. (A page

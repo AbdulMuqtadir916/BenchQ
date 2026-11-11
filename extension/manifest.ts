@@ -52,7 +52,12 @@ export function storeProblem(manifest: { host_permissions?: string[]; optional_h
 /** The manifest for one build: the fixed parts in manifest.base.json, then the sites. The required sites are BenchQ and
  * the known boards and application systems; every other https site is optional, for the panel to ask about. */
 export function buildManifest({ benchqUrl, isStore }: ManifestOptions) {
-  const origin = new URL(benchqUrl).origin;
+  const url = new URL(benchqUrl);
+  const origin = url.origin;
+  // The bundle calls `${origin}/api/...`, so a store build's BENCHQ_URL is a bare origin: no path, query, fragment or login.
+  if (isStore && (url.pathname !== "/" || url.search || url.hash || url.username || url.password)) {
+    throw new Error(`Not a store manifest: BENCHQ_URL must be a bare origin such as ${hosts.storeOrigin}, not ${benchqUrl}.`);
+  }
   // The store build is checked against the one origin it is meant for, not against a list of bad ones: any other
   // spelling of a local address, or a staging site, fails here.
   if (isStore && origin !== hosts.storeOrigin) {

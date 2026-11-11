@@ -38,7 +38,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), pageScript(), manifest(benchqUrl, isStore)],
     define: {
-      __BENCHQ_URL__: JSON.stringify(benchqUrl),
+      // The origin only: the extension calls `${origin}/api/...`, whatever else the variable held.
+      __BENCHQ_URL__: JSON.stringify(new URL(benchqUrl).origin),
       __PAGE_BUILD__: JSON.stringify(Date.now().toString(36)),
     },
     build: {
