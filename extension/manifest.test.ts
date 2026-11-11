@@ -39,6 +39,19 @@ describe("the extension's manifest", () => {
     expect(storeProblem({ host_permissions: ["https://a.test/*", ...KNOWN_SITES] })).toBeNull();
   });
 
+  it("refuses any address on this machine, however it is written", () => {
+    for (const host of ["https://127.0.0.2/*", "https://localhost:8443/*", "https://app.localhost/*", "https://0.0.0.0/*", "https://[::1]/*", "https://[::1]:3000/*"]) {
+      expect(storeProblem({ host_permissions: [host] }), host).toMatch(/not local/);
+    }
+    expect(() => buildManifest({ benchqUrl: "https://127.0.0.2", isStore: true })).toThrow(/Not a store manifest/);
+  });
+
+  it("checks the optional sites too: all of https is allowed there, a local or plain http one is not", () => {
+    expect(storeProblem({ host_permissions: ["https://a.test/*"], optional_host_permissions: ["https://*/*"] })).toBeNull();
+    expect(storeProblem({ host_permissions: ["https://a.test/*"], optional_host_permissions: ["http://*/*"] })).toMatch(/optional_host_permissions/);
+    expect(storeProblem({ host_permissions: ["https://a.test/*"], optional_host_permissions: ["https://localhost/*"] })).toMatch(/optional_host_permissions/);
+  });
+
   it("names every site as a domain and its subdomains, over https", () => {
     for (const site of KNOWN_SITES) expect(site).toMatch(/^https:\/\/\*\.[a-z0-9.-]+\/\*$/);
   });

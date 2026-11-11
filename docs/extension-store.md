@@ -12,11 +12,11 @@ correct. The privacy text in particular needs a person who is responsible for it
 2. Developer account ($5, one time) at the Chrome Web Store developer dashboard.
 3. Build the store package: `npm run build:store` in `extension/`, then zip the contents of `extension/dist`.
 4. **First upload by hand** (Items, New item). This creates the item and its permanent ID. Visibility: **Unlisted**.
-5. Fill in the listing (sections 1 to 5 below) and submit for review.
-6. Put `chrome-extension://<the item's ID>` in the production backend's `ALLOWED_ORIGINS`, next to the website's own
-   address. Without it every write the extension makes (Mark applied) is refused with 403 "Cross-origin request refused"
-   (`backend/auth/access.py`). Never `chrome-extension://*`.
-7. Add the four GitHub secrets (section 6). From then on a push to `main` that changes `extension/**` uploads the next
+5. Put `chrome-extension://<the item's ID>` in the production backend's `ALLOWED_ORIGINS`, next to the website's own
+   address, **before submitting**: the reviewer marks a job applied, and without it every write the extension makes is
+   refused with 403 "Cross-origin request refused" (`backend/auth/access.py`). Never `chrome-extension://*`.
+6. Fill in the listing (sections 1 to 5 below) and submit for review.
+7. Add the five GitHub secrets (section 6). From then on a push to `main` that changes `extension/**` uploads the next
    version by itself.
 
 A pinned `"key"` is **not** needed for the store: the store owns the ID. It only keeps the ID the same for people who load
@@ -106,23 +106,27 @@ with a **demo account on an environment Google can reach** (www.benchq.io with i
 
 Use a demo account that holds only made-up candidates.
 
-## 6. The four GitHub secrets (one-time)
+## 6. The five GitHub secrets (one-time)
 
-The workflow reads `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and `CHROME_REFRESH_TOKEN`
-(GitHub, Settings, Secrets and variables, Actions). Create the environment `chrome-web-store` too, with a required
+The workflow reads `CHROME_EXTENSION_ID`, `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET` and
+`CHROME_REFRESH_TOKEN` (GitHub, Settings, Secrets and variables, Actions), and uploads only when all five are set. They
+reach the upload step only, never install, tests or build. It uses the Chrome Web Store API V2 (`chrome-webstore-upload-cli`
+4.x): Google supported V1 only until 2026-10-15. A manual run publishes from `main` only. Create the environment `chrome-web-store` too, with a required
 reviewer if you want an approval before each upload.
 
 1. **Extension ID:** the 32-letter ID on the item in the dashboard (after the first upload).
+   **Publisher ID:** your developer account's ID (not the extension's), in the dashboard's address when signed in. V2
+   needs it.
 2. In Google Cloud Console, create a project and **enable the Chrome Web Store API**.
 3. OAuth consent screen: External, add yourself as a test user. Credentials, Create OAuth client ID, type **Desktop app**.
    The client ID and secret are `CHROME_CLIENT_ID` and `CHROME_CLIENT_SECRET`.
 4. Get a **refresh token** for the scope `https://www.googleapis.com/auth/chromewebstore` by signing in with the Google
    account that owns the developer account (the upload tool's own README describes the steps). That is
    `CHROME_REFRESH_TOKEN`.
-5. Treat all four as secrets. Never put them in `extension/.env.store` or any committed file.
+5. Treat all five as secrets. Never put them in `extension/.env.store` or any committed file.
 
 ## 7. After approval
 
 The first approved version goes live to people who have the unlisted link; later versions update their browsers by
 themselves. If an upload is refused for a version number, note that the workflow already stamps
-`major.minor.<run number>`; raise `major.minor` in `extension/manifest.base.json` for a bigger release.
+`major.minor.<run number>.<attempt>`, so a re-run gets its own version; raise `major.minor` in `extension/manifest.base.json` for a bigger release.

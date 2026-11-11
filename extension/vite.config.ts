@@ -17,7 +17,7 @@ function pageScript(): Plugin {
   };
 }
 
-/** dist/manifest.json, written for this build's BenchQ address. A store build (BENCHQ_STORE=1) must be https and name
+/** dist/manifest.json, written for this build's BenchQ address. A store build (`--mode store`) must be https and name
  * its sites; anything else is a local build, which may point at localhost. */
 function manifest(benchqUrl: string, isStore: boolean): Plugin {
   return {
@@ -32,7 +32,8 @@ function manifest(benchqUrl: string, isStore: boolean): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const benchqUrl = env.BENCHQ_URL || "http://localhost:3000";
-  const isStore = (process.env.BENCHQ_STORE ?? env.BENCHQ_STORE) === "1";
+  // `npm run build:store` is `--mode store`; nothing in the shell can turn the store checks off for it.
+  const isStore = mode === "store";
   if (isStore && !benchqUrl.startsWith("https://")) throw new Error("A store build needs BENCHQ_URL to be the https address of BenchQ.");
   return {
     plugins: [react(), pageScript(), manifest(benchqUrl, isStore)],

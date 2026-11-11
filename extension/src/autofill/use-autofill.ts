@@ -183,6 +183,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const [access, setAccess] = useState<SiteAccess | null>(null);
   const [isAccessDenied, setIsAccessDenied] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
+  // The site asked about last, and whether Chrome's prompt is open: a second click while it is waits for the first.
+  const accessKey = useRef("");
+  const asking = useRef(false);
   const [bankEmpty, setBankEmpty] = useState(false);
   const [unreadableFrames, setUnreadableFrames] = useState(0);
   const [signals, setSignals] = useState<PageSignals | null>(null);
@@ -245,8 +248,19 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     try {
       const missing = await missingAccess(tabId);
       if (isCurrent()) {
-        setAccess((was) => (was?.origins.join() === missing?.origins.join() ? was : missing));
-        if (!missing) setIsAccessDenied(false);
+        const key = missing?.origins.join() ?? "";
+        // Another site, or none: a "no" given on the last one says nothing about this one.
+        if (key !== accessKey.current) {
+          accessKey.current = key;
+          setAccess(missing);
+          setIsAccessDenied(false);
+        }
+        // The last page's review isn't this page's: clear it, so Autofill and Mark applied can't act on it here.
+        if (missing) {
+          shownRows.current = null;
+          setRows(null);
+          setReviewedFor(null);
+        }
       }
       if (missing) return null;
       return { ...await scanTab(tabId), pending: await undoCount(tabId) };
@@ -339,12 +353,17 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   /** The BDE's click on Allow: Chrome's own prompt, which needs this click, so the request comes before anything is awaited.
    * Once allowed, the page is scanned as if it had been on the list all along. */
   const allowAccess = useCallback(async () => {
-    if (!access) return;
+    if (!access || asking.current) return;
+    asking.current = true;
     setIsAsking(true);
-    const granted = await requestAccess(access).catch(() => false);
-    setIsAsking(false);
-    setIsAccessDenied(!granted);
-    if (granted) await scan();
+    try {
+      const granted = await requestAccess(access).catch(() => false);
+      setIsAccessDenied(!granted);
+      if (granted) await scan();
+    } finally {
+      asking.current = false;
+      setIsAsking(false);
+    }
   }, [access, scan]);
 
   /** A look at the form between scans: what the BDE has filled since, and whether fields came or went. The page has no

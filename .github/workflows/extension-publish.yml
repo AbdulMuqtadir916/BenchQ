@@ -1,5 +1,6 @@
 # Publishes the Chrome extension to the Chrome Web Store. It runs only when something under extension/ changes on main
-# (or by hand), so a backend or frontend change never re-uploads it. The store reviews each upload before it goes live.
+# (or by hand, from main only), so a backend or frontend change never re-uploads it. The store reviews each upload before
+# it goes live.
 name: Publish extension
 
 on:
@@ -10,6 +11,10 @@ on:
       - ".github/workflows/extension-publish.yml"
   workflow_dispatch:
 
+# Read the code, nothing more: the upload talks to Google, not to GitHub.
+permissions:
+  contents: read
+
 # One upload at a time; a newer push waits instead of cancelling an upload in progress.
 concurrency:
   group: extension-publish
@@ -17,29 +22,28 @@ concurrency:
 
 jobs:
   publish:
+    # A manual run can be started on any branch; only main's reviewed code may be published.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Create an environment named chrome-web-store in the repository settings to require an approval before each upload.
     environment: chrome-web-store
-    env:
-      # Repository secrets (Settings, Secrets and variables, Actions). Without them the job builds and keeps the zip, and
-      # uploads nothing.
-      EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
-      CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
-      CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
-      REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: extension/package-lock.json
+      # No store credentials in any step before the upload: installing, testing and building run without them.
       - run: npm ci --prefix extension
       - run: npm --prefix extension run test
       # The store build: https://www.benchq.io from extension/.env.store, no local address, no all-sites access.
       - run: npm --prefix extension run build:store
-      # The store refuses a version it already has, so each upload gets the next one: the manifest's major.minor, then this run's number.
+      # The store refuses a version it already has. Each run gets the next one, and a re-run of the same run (a retry
+      # after a failed upload) gets its own: major.minor from the manifest, then the run number, then the attempt.
       - name: Stamp the version
         run: |
           node -e '
@@ -47,7 +51,7 @@ jobs:
             const path = "extension/dist/manifest.json";
             const manifest = JSON.parse(fs.readFileSync(path, "utf8"));
             const [major, minor] = manifest.version.split(".");
-            manifest.version = `${major}.${minor}.${process.env.GITHUB_RUN_NUMBER}`;
+            manifest.version = `${major}.${minor}.${process.env.GITHUB_RUN_NUMBER}.${process.env.GITHUB_RUN_ATTEMPT}`;
             fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + "\n");
             console.log("version", manifest.version);
           '
@@ -57,9 +61,32 @@ jobs:
         with:
           name: benchq-extension
           path: extension/benchq-extension.zip
+      # All five are needed. Repository secrets (Settings, Secrets and variables, Actions); see docs/extension-store.md.
+      - name: Check the store credentials
+        id: store
+        env:
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: |
+          if [ -n "$EXTENSION_ID" ] && [ -n "$PUBLISHER_ID" ] && [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] && [ -n "$REFRESH_TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      # Chrome Web Store API V2 (V1 was supported until 2026-10-15): CLI 4.x, which needs the publisher ID. With no
+      # command it uploads, then submits the upload for review and publishing.
       - name: Upload to the Chrome Web Store and submit for review
-        if: ${{ env.EXTENSION_ID != '' && env.REFRESH_TOKEN != '' }}
-        run: npx --yes chrome-webstore-upload-cli@3.5.0 upload --source extension/benchq-extension.zip --auto-publish
+        if: steps.store.outputs.ready == 'true'
+        env:
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: npx --yes chrome-webstore-upload-cli@4.0.2 --source extension/benchq-extension.zip
       - name: No store credentials
-        if: ${{ env.EXTENSION_ID == '' || env.REFRESH_TOKEN == '' }}
-        run: echo "No Chrome Web Store secrets are set, so nothing was uploaded. The built zip is attached to this run."
+        if: steps.store.outputs.ready != 'true'
+        run: echo "Not every Chrome Web Store secret is set, so nothing was uploaded. The built zip is attached to this run."
