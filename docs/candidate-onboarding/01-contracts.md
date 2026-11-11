@@ -1,5 +1,7 @@
 # 01 — Contracts, schemas and mock data
 
+> **Superseded in part (2026-11-11, 07 Q63):** BDE capacity (Q46) was removed: no `bdeCapacity`, no `firmSettings.edit`, no capacity form, no "At capacity" figure, no `deriveBdeLoad`. Read the capacity parts below as history.
+
 **Owner:** — · **Depends on:** nothing · **Branch:** `feat/onboarding-01-contracts` · **Size:** one PR, docs first
 
 Every later module builds on the shapes defined here. This module changes contracts and keeps the app working

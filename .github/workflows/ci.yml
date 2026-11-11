@@ -46,6 +46,8 @@ jobs:
       - run: npm ci --prefix extension
       - run: npm --prefix extension run test
       - run: npm --prefix extension run build
+      # The store's own build: https only, no local address, no all-sites access. Fails here instead of in review.
+      - run: npm --prefix extension run build:store
 
   backend:
     runs-on: ubuntu-latest
