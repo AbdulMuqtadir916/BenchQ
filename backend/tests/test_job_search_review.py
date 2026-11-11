@@ -203,3 +203,41 @@ def test_a_lost_search_keeps_its_error_code_and_gets_its_ledger_entry(anonymous_
                                                  LedgerEntry.entity_id == str(lost)).all()
     assert entry.actor_user_id == world["people"]["adnan"].id and "failed (internal)" in entry.summary
     assert entry.candidate_id == uuid.UUID(adnans["id"])
+
+
+# ── Abdul's comment on PR 2 (#124), fixed in PR 1: the lock wait is off the event loop ──
+
+def test_a_search_waiting_for_the_bdes_lock_does_not_stall_other_requests(anonymous_client, world, adnans, fake,
+                                                                          launched):
+    """P2: a search admitted while another transaction holds the BDE's lock waits in a worker thread, not on the API
+    event loop, so other requests on the worker still answer (before: they waited until the lock was let go)."""
+    import time
+
+    from sqlalchemy import text
+
+    from backend.job_search import limits
+    from backend.models.db import engine
+    search = _poster(anonymous_client, world, adnans, "job-searches", {"query": "Java Developer"})
+    key = limits._lock_key(world["people"]["adnan"].id)
+    held, results = threading.Event(), {}
+
+    def hold_the_lock():
+        with engine.connect() as conn, conn.begin():
+            conn.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+            held.set()
+            time.sleep(3)
+
+    holder = threading.Thread(target=hold_the_lock)
+    holder.start()
+    held.wait(10)
+    searcher = threading.Thread(target=lambda: results.setdefault("search", search()))
+    searcher.start()
+    time.sleep(0.5)                                     # the search is now waiting for the lock
+    started = time.monotonic()
+    assert anonymous_client.get("/health").status_code == 200
+    answered_in = time.monotonic() - started
+    assert "search" not in results                      # still waiting: the lock is held
+    holder.join(10)
+    searcher.join(20)
+    assert results["search"].status_code == 202
+    assert answered_in < 1.5, f"another request waited {answered_in:.1f}s behind the search's lock wait"
