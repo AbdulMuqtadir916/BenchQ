@@ -6,7 +6,7 @@ import {
   type UploadDocument,
 } from "@/lib/schemas/document";
 import documentsSeed from "./data/documents.json";
-import { allCandidates } from "./candidates";
+import { candidatesApi } from "@/lib/api/candidates";
 import { currentUser } from "./auth";
 import { findInFirm, inFirm, mockResult } from "./_shared";
 import { firmScoped } from "./membership";
@@ -18,8 +18,9 @@ export const documentsMock = firmScoped("documents", {
   byCandidate: (firmId: string, candidateId: string): Promise<CandidateDocument[]> =>
     mockResult(inFirm(allDocuments, firmId).filter((document) => document.candidateId === candidateId)),
 
-  upload: (firmId: string, candidateId: string, body: UploadDocument): Promise<CandidateDocument> => {
-    const candidate = findInFirm(allCandidates, firmId, candidateId, "Candidate");
+  upload: async (firmId: string, candidateId: string, body: UploadDocument): Promise<CandidateDocument> => {
+    // A candidate the principal sees, from the backend (no candidates mock): another is its 404.
+    const candidate = await candidatesApi.byId(firmId, candidateId);
     const id = `doc_local_${Date.now().toString(36)}`;
     const document = CandidateDocumentSchema.parse({
       ...UploadDocumentSchema.parse(body),

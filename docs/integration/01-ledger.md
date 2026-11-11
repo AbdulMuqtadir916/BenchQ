@@ -1,6 +1,6 @@
 # Module 01 — Ledger, the worked example
 
-**Owner:** Abdul · **Depends on:** F1–F4 · **Module name:** `ledger` · **Status:** live behind flag
+**Owner:** Abdul · **Depends on:** F1–F4 · **Module name:** `ledger` · **Status:** live
 
 The ledger is the firm's record of who did what. It is the first module on the real backend, and it is
 built to be copied: every firm-scoped module takes the same steps, in the same files. Read this before
@@ -20,14 +20,14 @@ and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 | 2. Write | `backend/auth/ledger.py` `record()` | Every write a person makes calls it **in the same transaction** as the change; the caller commits |
 | 3. Read route | `backend/api/routes_ledger.py` | `GET /api/firms/{firm_id}/ledger?limit&offset` |
 | 4. Access class | `backend/auth/access.py` `ROUTE_ACCESS` | `F`: firm users, and a Super Admin inside a support view of the firm for GET only; a Super Admin without one and a suspended firm's users are refused before the route runs |
-| 5. Firm scoping | `backend/auth/scoping.py` `reader_firm_id`, `scoped()`, `own_scope()` | The firm comes from the session, never the request; the path's firm must equal it, or 404 |
+| 5. Firm scoping | `backend/auth/scoping.py` `reader_firm_id`, `scoped()`, `own_scope()`, `team_scope()` | The firm comes from the session, never the request; the path's firm must equal it, or 404 |
 | 6. Lint | `backend/tests/test_firm_scoping_lint.py` | Fails any route that queries a firm-owned model without `scoped()` |
-| 7. Backend tests | `backend/tests/test_ledger.py`, `backend/tests/ledger_support.py` | Each role's view, BDE own scope, paging, another firm 404, Super Admin 403, signed out 401, a write shows up |
+| 7. Backend tests | `backend/tests/test_ledger.py`, `backend/tests/ledger_support.py` | Each role's view, Manager team scope, BDE own scope, paging, another firm 404, Super Admin 403, signed out 401, a write shows up |
 | 8. Serializer | `backend/auth/serialize.py` `ledger_entry_json` | The frontend's type in snake_case |
 | 9. DTO + mapper | `src/lib/api/dto/session.ts` `LedgerEntryDto`, `toLedgerEntry` | Parses the wire shape, maps ids (`fromBackendId`) and timestamps (`toIso`) |
-| 10. Adapter | `src/lib/api/analytics.ts` `ledgerApi` | The live branch behind `isLive("ledger")`; the firm id goes out through `toBackendId` |
+| 10. Adapter | `src/lib/api/analytics.ts` `ledgerApi` | Live adapter, single-page reads and bounded pagination; the firm id goes out through `toBackendId` |
 | 11. Adapter test | `src/lib/api/live-ledger.test.ts` | URL and query, mapping, empty, error |
-| 12. Screen | `src/app/[firm]/(app)/(manage)/ledger/page.tsx` | **Unchanged.** It already handled skeleton, empty and error |
+| 12. Screen | `src/app/[firm]/(app)/(manage)/ledger/page.tsx` | Actor filter, search, sort and page in the URL; skeleton, empty and error states |
 
 The ledger's DTO sits in `dto/session.ts` because `/admin/audit` uses it too. A new module creates
 `src/lib/api/dto/<module>.ts`.
@@ -38,19 +38,11 @@ The ledger's DTO sits in `dto/session.ts` because `/admin/audit` uses it too. A 
 
 ### The route
 
-```python
-@router.get("/ledger")
-def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
-                principal: Principal = Depends(current_principal), my_firm: uuid.UUID = Depends(reader_firm_id),
-                db: DbSession = Depends(get_db)):
-    if firm_id != my_firm:
-        raise HTTPException(status_code=404, detail="Not found.")      # never confirm another firm exists
-    entries = scoped(db, LedgerEntry, my_firm)                         # firm_id = :firm, always
-    if (actor := own_scope(principal)) is not None:                    # a BDE: only their own rows
-        entries = entries.filter(LedgerEntry.actor_user_id == actor)
-    entries = entries.order_by(LedgerEntry.created_at.desc(), LedgerEntry.id).offset(offset).limit(limit)
-    return [ledger_entry_json(e) for e in entries]
-```
+`GET /api/firms/{firm_id}/ledger` scopes the query to the session's firm, then applies the
+BDE or Manager scope before ordering by `created_at` descending and `id` ascending. For the Ledger screen, pass the
+last row’s original `created_at` and `id` as `cursor_at` and `cursor_id` to continue the scan. Existing callers can still use
+`offset`. Cursor requests require both fields and a timestamp with a timezone; an `offset` with a cursor skips that many rows after the cursor boundary.
+See [the route](../../backend/api/routes_ledger.py) for the optional filters and full query.
 
 The rules it follows, which every track follows:
 
@@ -60,11 +52,11 @@ The rules it follows, which every track follows:
 - **Every firm-owned query goes through `scoped()`** (or `scoped_jobs()` for the shared job pool). If a
   function truly must see every firm (a platform route, a background worker given ids its route already
   checked), add it to `ALLOWED` in the lint with the reason. The reviewer reads that list.
-- **`own` scope is enforced on the server.** A BDE reads only their own work (07 §2.2): add
-  `<owner column> == own_scope(principal)` when it isn't None. The frontend's `scopeLedger` /
-  `scopeApplications` apply the same rule for UX only.
+- **Role scope is enforced on the server.** BDEs see their own entries plus ASSIGN entries about
+  candidates they currently handle (Q52). Managers see their own entries, entries by direct reports, and
+  ASSIGN entries for candidates they manage (Q47). Owner, Viewer and an active support view get the firm scope.
 - **Every new endpoint gets a `ROUTE_ACCESS` line.** `test_access.py` fails on a route without one.
-- **Ordering is stable:** a timestamp plus the id, so paging never repeats or skips a row.
+- **Cursor ordering is stable across newer inserts:** the last row’s timestamp and id identify the page boundary.
 
 ### Writes log to the ledger
 
@@ -116,28 +108,15 @@ locally").
 
 ## The frontend, step by step
 
-```ts
-// src/lib/api/analytics.ts
-const live = {
-  list: async (firmId: string, params?: { limit?: number; offset?: number }) =>
-    (await http.get(`/api/firms/${toBackendId(firmId)}/ledger`, arrayOf(LedgerEntryDto), { query: params })).map(toLedgerEntry),
-};
-
-export const ledgerApi = {
-  list: async (firmId: string, params?: { limit?: number; offset?: number }): Promise<LedgerEntry[]> =>
-    isLive("ledger") ? live.list(firmId, params) : (await mock()).list(firmId, params),
-};
-```
-
 - **The firm id is the URL's.** The hook reads it from firm context (`useFirmId`) and the query key starts
   with it. The adapter translates a seeded demo firm's fixture id to its backend UUID with `toBackendId`;
   the mapper translates ids back with `fromBackendId` (`mapId`), so the modules still on mocks keep
   finding their rows.
 - **The backend's shape stops at the DTO.** No snake_case past `toLedgerEntry`, and the result is parsed
   by the frontend's own `LedgerEntrySchema`.
-- **The screen doesn't change.** If it would have to, stop and ask (CLAUDE.md).
-- **The mock stays** until F6 makes live the default. Then the `isLive` branch, `src/mocks/ledger.ts` and
-  `src/mocks/data/ledger.json` are deleted together.
+- **The Ledger screen reads in batches.** The adapter requests up to 500 at a time. The screen
+  shows the latest 2,000 at most and explains when older entries remain. Actor counts use the loaded
+  scope, and the table total counts every filtered row across its pages.
 
 ### Try it
 
@@ -145,7 +124,7 @@ The ledger is always the backend's (F6): no switch. Start the backend, seed the 
 sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 
 - An OWNER sees sign-ins and invites (the events the backend records today).
-- A BDE sees only their own entries (their own sign-ins).
+- A Manager sees their team's entries. A BDE sees their own entries and assignments for their candidates.
 - Stop the backend and retry: the error state, then recovery.
 - A seeded firm's mock ledger entries are not on the backend. The live ledger shows only real events.
 
@@ -161,16 +140,15 @@ sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 - **AI runs are logged elsewhere** today (`JobRun`, `llm_call_log`). Track 04 writes `AI_GENERATE` entries.
 - The screen renders `modelId · promptVersion`. A row with a model and no prompt version shows a dangling
   "·". Track 04 must always send both.
-- The page asks for the newest 100 entries. Paging past 100 comes with the screen's own filters.
 - **A deleted résumé version's content is kept** (soft delete, `resumes.deleted_at`; résumé versioning PR 6, Zuhair
   Baig's suggestion 2026-11-03, built 2026-11-04). The ledger can show it. See
   [06-open-decisions.md](./06-open-decisions.md) D10.
 
 ## Acceptance criteria
 
-- [x] `GET /api/firms/{firm_id}/ledger`: the firm's entries, newest first; a BDE's own only; another firm 404
+- [x] `GET /api/firms/{firm_id}/ledger`: the firm's entries, newest first; a MANAGER's team only (07 Q59); a BDE's own only; another firm 404
 - [x] `ledger_entries` covered by the scoping lint
-- [x] Adapter live behind `ledger`, mapping tested; screen unchanged
+- [x] Adapter live, mapping and paging tested
 - [ ] Clicked through as OWNER and BDE on the live backend (the PR's test plan)
 - [ ] Mock deleted (with F6)
 

@@ -29,7 +29,9 @@ from backend.auth.policy import can_assign_to, require
 from backend.auth.scoping import own_scope, scoped, team_scope
 from backend.auth.sessions import Principal
 from backend.candidates.first_base import first_base
+from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
+from backend.candidates import profile
 from backend.candidates.serialize import candidate_json
 from backend.models.candidates import (EMPLOYMENT_TYPES, REMOTE_MODES, WORK_AUTHS, WORKING_STATUSES, Candidate,
                                        ResumeParse)
@@ -62,7 +64,7 @@ class CreateCandidateBody(BaseModel):
     primary_role: Required200
     email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]
     phone: Required200
-    linkedin_url: str | None = Field(default=None, max_length=500)
+    linkedin_url: ProfileLink = None
     city: str | None = Text200
     state: str | None = Text200
     country: Required200
@@ -92,7 +94,7 @@ class CreateCandidateBody(BaseModel):
 
 
 class UpdateCandidateBody(BaseModel):
-    """The frontend's UpdateCandidateSchema: the submission facts a BDE edits."""
+    """The frontend's UpdateCandidateSchema: the submission facts the owner or the candidate's manager edits (07 Q56)."""
     work_auth: WorkAuth | None = None
     work_auth_expiry: datetime | None = None
     rate_target: float | None = Field(default=None, gt=0)
@@ -214,7 +216,9 @@ async def parse_resume(firm_id: uuid.UUID, file: UploadFile = File(...),
 def list_candidates(firm_id: uuid.UUID, principal: Principal = Depends(current_principal),
                     db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
-    return [candidate_json(c) for c in _visible(db, firm_id, principal).order_by(Candidate.created_at.desc())]
+    rows = _visible(db, firm_id, principal).order_by(Candidate.created_at.desc()).all()
+    profile.prime(db, firm_id, rows)            # the résumé's fields for the whole list in one query (07 Q57)
+    return [candidate_json(c) for c in rows]
 
 
 @router.get("/{candidate_id}", summary="One candidate, if in the principal's scope")
@@ -228,7 +232,7 @@ def get_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
 def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
                      principal: Principal = Depends(require("candidate.create")), db: DbSession = Depends(get_db)):
     """One transaction: the candidate (ON_BENCH), the kept résumé parse with the candidate's first base résumé and its
-    version 1 (a MANUAL base from the form alone when no file was given), their Record (one UNVERIFIED claim per item,
+    version 1 (07 Q58: never without the résumé), their Record (one UNVERIFIED claim per item,
     07 Q49), and the CREATE and ASSIGN ledger entries."""
     _member_of(firm_id, principal)
     email = body.email.lower()
@@ -240,13 +244,14 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     manager, bde = _target(db, firm_id, principal, None, body.manager_id, body.bde_id)
     if bde is not None:
         _check_limit(db, firm)
-    parse = None
-    if body.resume_parse_id is not None:
-        parse = scoped(db, ResumeParse, firm_id).filter(
-            ResumeParse.id == body.resume_parse_id, ResumeParse.candidate_id.is_(None),
-            ResumeParse.expires_at > utcnow()).with_for_update().first()
-        if parse is None:
-            raise HTTPException(status_code=404, detail="That résumé read has expired. Upload it again.")
+    # 07 Q58 (Abdul, 2026-11-06): a candidate is onboarded only with their résumé.
+    if body.resume_parse_id is None:
+        raise _bad("Upload the candidate's résumé first: a candidate can't be added without one.")
+    parse = scoped(db, ResumeParse, firm_id).filter(
+        ResumeParse.id == body.resume_parse_id, ResumeParse.candidate_id.is_(None),
+        ResumeParse.expires_at > utcnow()).with_for_update().first()
+    if parse is None:
+        raise HTTPException(status_code=404, detail="That résumé read has expired. Upload it again.")
 
     now = utcnow()
     candidate = Candidate(
@@ -268,10 +273,9 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     )
     db.add(candidate)
     db.flush()
-    if parse is not None:
-        parse.candidate_id, parse.expires_at = candidate.id, None
+    parse.candidate_id, parse.expires_at = candidate.id, None
     # Their first base résumé and its version 1, in this same transaction (resume-versioning.md §4.2): from the file
-    # and the form, or from the form alone when no file was given (a MANUAL base, so every candidate has one). Then
+    # and the form. Then
     # their Record: one UNVERIFIED claim per item of that version (docs/team/zuhair.md §1.3).
     base, version = first_base(parse, candidate, body, principal.user_id)
     db.add(base)
@@ -290,7 +294,8 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
 
 @router.patch("/{candidate_id}", summary="Edit a candidate's submission facts")
 def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCandidateBody,
-                     principal: Principal = Depends(require("candidate.edit")), db: DbSession = Depends(get_db)):
+                     principal: Principal = Depends(require("candidate.editProfile")), db: DbSession = Depends(get_db)):
+    """07 Q56: the owner and the candidate's manager edit the profile; the BDE edits only the résumés (Q55)."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     changes = body.model_dump(exclude_unset=True)

@@ -171,6 +171,16 @@ def list_users(firm_id: uuid.UUID | None = None, db: DbSession = Depends(get_db)
     return [user_json(u) for u in query.order_by(User.created_at, User.name)]
 
 
+@router.get("/candidate-usage", summary="Each candidate's firm, status and BDE: the seat and limit counts")
+def candidate_usage(db: DbSession = Depends(get_db)):
+    """Counts only (07 Q45): no name or other detail of a candidate reaches the platform tier. The platform overview
+    derives seats and limits from these (bot review on #135: with the candidates mock gone it showed no candidates)."""
+    from backend.models.candidates import Candidate
+    rows = db.query(Candidate.firm_id, Candidate.status, Candidate.bde_id).all()
+    return [{"firm_id": str(firm_id), "status": status, "bde_id": str(bde_id) if bde_id else None}
+            for firm_id, status, bde_id in rows]
+
+
 @router.get("/team", summary="The platform team (Super Admins)")
 def list_team(db: DbSession = Depends(get_db)):
     return [platform_user_json(a) for a in db.query(PlatformUser).order_by(PlatformUser.created_at, PlatformUser.name)]

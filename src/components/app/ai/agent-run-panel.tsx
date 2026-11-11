@@ -43,7 +43,7 @@ export function AgentRunPanel({
         <div>
           <h3 className="text-h3 text-[var(--color-text)]">{title}</h3>
           <p className="mt-1 text-caption text-[var(--color-text-3)]">
-            Generated content arrives as Unverified and requires evidence review.
+            Read generated content over before you send it.
           </p>
         </div>
         {status === "running" ? (

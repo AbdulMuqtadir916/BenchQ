@@ -1,5 +1,6 @@
 """A firm's ledger (backend/api/routes_ledger.py; docs/integration/01-ledger.md): the firm's own entries, newest
-first; a BDE's own entries only; another firm's ledger and a Super Admin get no answer."""
+first; a MANAGER's team only (07 Q59); a BDE's own entries only; another firm's ledger and a Super Admin get no
+answer."""
 from datetime import timedelta
 
 import pytest
@@ -64,9 +65,8 @@ def test_the_owner_sees_the_firms_entries_newest_first(api_client, accounts, led
     assert _summaries(api_client.get(_url(accounts.firm_id))) == ["Ben edit", "Bea edit", "Owner edit"]
 
 
-@pytest.mark.parametrize("role", ["manager", "viewer"])
-def test_a_manager_and_a_viewer_see_the_whole_firm(anonymous_client, accounts, ledger, role):
-    resp = anonymous_client.get(_url(accounts.firm_id), headers=ledger[role])
+def test_a_viewer_sees_the_whole_firm(anonymous_client, accounts, ledger):
+    resp = anonymous_client.get(_url(accounts.firm_id), headers=ledger["viewer"])
     assert _summaries(resp) == ["Ben edit", "Bea edit", "Owner edit"]
 
 
@@ -141,6 +141,64 @@ def _assign(firm_id, actor, candidate, summary, minutes_ago, note=None):
     return entry
 
 
+def test_manager_scope_excludes_non_assignment_events_on_managed_candidates(anonymous_client, accounts, ledger, test_db):
+    from backend.models.tenancy import User
+    firm = test_db.get(Firm, accounts.firm_id)
+    owner = test_db.get(User, accounts.user_id)
+    first = make_user(test_db, firm, email="first@acme.test", role="MANAGER")
+    second = make_user(test_db, firm, email="second@acme.test", role="MANAGER")
+    bea = ledger["bde_user"]
+    bea.manager_id = first.id
+    ben = test_db.query(User).filter(User.email == "bde2@acme.test").one()
+    ben.manager_id = second.id
+    candidate = _candidate(test_db, firm, second, ben, "Ravi")
+    assignment = _assign(firm.id, owner, candidate, "Assigned Ravi", 4)
+    edit = _entry(firm.id, owner, "Owner edited Ravi", 1)
+    edit.entity_id, edit.candidate_id = str(candidate.id), candidate.id
+    test_db.add_all([assignment, edit])
+    test_db.commit()
+
+    def entries(manager, query=""):
+        response = anonymous_client.get(_url(firm.id, query), headers=_session_for(test_db, manager))
+        assert response.status_code == 200
+        return response.json()
+
+    first_entries = entries(first)
+    second_entries = entries(second)
+    assert [row["summary"] for row in first_entries] == ["Bea edit"]
+    assert [row["summary"] for row in second_entries] == ["Ben edit", "Assigned Ravi"]
+    assert {row["id"] for row in first_entries}.isdisjoint(row["id"] for row in second_entries)
+    assert str(assignment.id) == second_entries[1]["id"]
+
+
+def test_ledger_cursor_stays_stable_after_insert(anonymous_client, accounts, test_db):
+    """A newer insert cannot repeat the boundary row, including when older rows share a timestamp."""
+    import uuid
+    from urllib.parse import urlencode
+
+    firm = test_db.get(Firm, accounts.firm_id)
+    stamp = utcnow() - timedelta(minutes=2)
+    first, second = [_entry(firm.id, None, label, 2) for label in ("First", "Second")]
+    for number, row in enumerate((first, second), start=1):
+        row.id = uuid.UUID(int=number)
+        row.created_at = stamp
+    test_db.add_all([first, second])
+    test_db.commit()
+    headers = _cookie(accounts.firm_token)
+    path = _url(firm.id)
+    head = anonymous_client.get(f"{path}?limit=1", headers=headers)
+    assert head.status_code == 200
+    boundary = head.json()[0]
+    assert boundary["id"] == str(first.id)
+
+    test_db.add(_entry(firm.id, None, "Newer insert", 0))
+    test_db.commit()
+    query = urlencode({"limit": 1, "cursor_at": boundary["created_at"], "cursor_id": boundary["id"]})
+    tail = anonymous_client.get(f"{path}?{query}", headers=headers)
+    assert tail.status_code == 200
+    assert [entry["id"] for entry in tail.json()] == [str(second.id)]
+
+
 @pytest.fixture
 def assignments(test_db, accounts, ledger):
     """Bea works Asha (assigned by a manager); Ben works Ravi; Kiran is in the manager's queue. Plus a manager's
@@ -162,7 +220,7 @@ def assignments(test_db, accounts, ledger):
         update,
     ])
     test_db.commit()
-    return {"asha": asha, "ravi": ravi}
+    return {"asha": asha, "ravi": ravi, "manager": manager}
 
 
 def test_a_bde_also_sees_who_assigned_them_their_candidates(anonymous_client, accounts, ledger, assignments):
@@ -204,3 +262,97 @@ def test_filters_by_candidate_their_whole_activity(api_client, accounts, ledger,
     test_db.commit()
     assert _summaries(api_client.get(_url(accounts.firm_id, f"?candidate_id={asha.id}"))) == \
         ["Applied for Asha", "Mira edited Asha", "Assigned Asha to Bea"]
+
+
+# 07 Q59: a MANAGER reads their own team, not the firm.
+
+@pytest.fixture
+def teams(test_db, accounts, ledger, assignments):
+    """Mira manages Bea and Cara, and the candidates Asha and Kiran. Zed manages Ben and the candidate Ravi."""
+    from backend.models.tenancy import User
+    acme = test_db.get(Firm, accounts.firm_id)
+    owner = test_db.get(User, accounts.user_id)
+    mira, bea, asha, ravi = assignments["manager"], ledger["bde_user"], assignments["asha"], assignments["ravi"]
+    ben = test_db.query(User).filter(User.email == "bde2@acme.test").one()
+    cara = make_user(test_db, acme, email="cara@acme.test", role="BDE", name="Cara")
+    zed = make_user(test_db, acme, email="zed@acme.test", role="MANAGER", name="Zed")
+    bea.manager_id = cara.manager_id = mira.id
+    ben.manager_id = ravi.manager_id = zed.id
+    owner_edit = _entry(acme.id, owner, "Owner edited Asha", 9)
+    owner_edit.entity_id, owner_edit.candidate_id = str(asha.id), asha.id
+    zed_assign = _assign(acme.id, zed, ravi, "Zed moved Ravi", 10)
+    test_db.add_all([
+        _entry(acme.id, cara, "Cara edit", 1.5),
+        _entry(acme.id, zed, "Zed edit", 0),
+        _assign(acme.id, owner, asha, "Owner moved Asha", 8),
+        owner_edit, zed_assign,
+        _entry(acme.id, None, "System sync", 0.5),
+    ])
+    test_db.commit()
+    return {"mira": _session_for(test_db, mira), "zed": _session_for(test_db, zed), "cara": _session_for(test_db, cara),
+            "asha": asha, "ravi": ravi}
+
+
+MIRAS_LEDGER = ["Cara edit", "Bea edit", "Mira edited Asha", "Assigned Ravi to Ben", "Assigned Asha to Bea",
+                "Kiran to Mira's queue", "Owner moved Asha"]
+ZEDS_LEDGER = ["Zed edit", "Ben edit", "Assigned Ravi to Ben", "Zed moved Ravi"]
+
+
+def test_a_manager_sees_their_team_and_the_assignments_of_their_candidates(anonymous_client, accounts, teams):
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["mira"])) == MIRAS_LEDGER
+
+
+def test_a_manager_sees_nothing_of_another_team_or_the_firm(anonymous_client, accounts, teams):
+    seen = _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["mira"]))
+    for hidden in ("Zed edit", "Ben edit", "Zed moved Ravi", "Owner edit", "Owner edited Asha", "System sync"):
+        assert hidden not in seen
+
+
+def test_the_other_manager_sees_their_own_team(anonymous_client, accounts, teams):
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["zed"])) == ZEDS_LEDGER
+
+
+@pytest.mark.parametrize("query", ["?entity_type=candidate&entity_id={ravi}", "?entity_id={ravi}", "?candidate_id={ravi}"])
+def test_a_managers_filters_stay_inside_their_team(anonymous_client, accounts, teams, query):
+    """Another team's candidate, whatever the filter: nothing of theirs, only what Mira did herself (she assigned
+    Ravi before he moved to Zed). "Zed moved Ravi" stays hidden."""
+    resp = anonymous_client.get(_url(accounts.firm_id, query.format(ravi=teams["ravi"].id)), headers=teams["mira"])
+    assert _summaries(resp) == ["Assigned Ravi to Ben"]
+
+
+def test_a_managers_action_filter_stays_inside_their_team(anonymous_client, accounts, teams):
+    resp = anonymous_client.get(_url(accounts.firm_id, "?action=ASSIGN"), headers=teams["mira"])
+    assert _summaries(resp) == [s for s in MIRAS_LEDGER if "edit" not in s]
+
+
+def test_a_manager_reads_the_handoff_note_on_their_candidate(anonymous_client, accounts, teams):
+    """The Owner's assignment shows on the candidate page, as the frontend's handoff note asks for it."""
+    query = f"?entity_type=candidate&entity_id={teams['asha'].id}&action=ASSIGN&limit=1"
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id, query), headers=teams["mira"])) == ["Assigned Asha to Bea"]
+
+
+def test_a_bde_never_sees_a_teammates_work(anonymous_client, accounts, ledger, teams):
+    seen = _summaries(anonymous_client.get(_url(accounts.firm_id), headers=teams["cara"]))
+    assert seen == ["Cara edit"]
+    assert "Cara edit" not in _summaries(anonymous_client.get(_url(accounts.firm_id), headers=ledger["bde"]))
+
+
+def test_the_owner_and_a_viewer_still_see_every_team(anonymous_client, api_client, accounts, ledger, teams):
+    owner = _summaries(api_client.get(_url(accounts.firm_id)))
+    assert "Zed edit" in owner and "Cara edit" in owner and "System sync" in owner
+    assert _summaries(anonymous_client.get(_url(accounts.firm_id), headers=ledger["viewer"])) == owner
+
+
+def test_ledger_cursor_accepts_an_offset_and_still_needs_both_fields(anonymous_client, accounts, ledger, test_db):
+    """An offset after a cursor skips rows past it; a half cursor or a cursor without a timezone is refused."""
+    firm = test_db.get(Firm, accounts.firm_id)
+    headers = _cookie(accounts.firm_token)
+    path = _url(firm.id)
+    newest = anonymous_client.get(f"{path}?limit=1", headers=headers).json()[0]
+    pair = {"cursor_at": newest["created_at"], "cursor_id": newest["id"]}
+    after = anonymous_client.get(path, params=pair, headers=headers).json()
+    skipped = anonymous_client.get(path, params={**pair, "offset": 1}, headers=headers)
+    assert skipped.status_code == 200
+    assert [e["id"] for e in skipped.json()] == [e["id"] for e in after[1:]]
+    assert anonymous_client.get(path, params={"cursor_at": newest["created_at"]}, headers=headers).status_code == 422
+    assert anonymous_client.get(path, params={**pair, "cursor_at": "2026-01-01T00:00:00"}, headers=headers).status_code == 422

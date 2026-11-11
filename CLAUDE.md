@@ -244,7 +244,8 @@ A stopped task with a clear question beats a confident wrong implementation.
 > Update this section when a phase ends. Status lives in the board, decisions in the 07 docs.
 
 **Foundation done (F1–F7, 2026-10-26).** The session, the team, invites, `/admin` and the ledger run on the
-backend. Every other module runs on mock data under the real signed-in user. Phase B fix PRs 3–14 and Phase S
+backend. Candidates, résumés and jobs run only on the backend, with no mocks and no demo candidates (2026-11-11, job
+search PR 3). Every other module runs on mock data under the real signed-in user. Phase B fix PRs 3–14 and Phase S
 stay paused.
 
 **Next (2026-10-29): the team plan in `docs/team/`.** Abdul builds the candidate core tables (migration 0007) first;
@@ -256,6 +257,6 @@ own (`docs/team/README.md` §3); `candidates` changes are confirmed with Abdul.
 a five-step new-candidate flow). Modules 01–07 in `docs/candidate-onboarding/`; frontend 01–05 run on mocks, 06 is the
 backend Candidates track (Zuhair).
 
-**Decisions** (Q1–Q55: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
-rules, the firm hierarchy, password recovery by approval, who changes a candidate's résumés) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
+**Decisions** (Q1–Q62: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
+rules, the firm hierarchy, password recovery by approval, who changes a candidate's résumés, what a Manager reads in the ledger (Q59)) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
 The system contracts in `docs/02` §3.2 are approved and not built.

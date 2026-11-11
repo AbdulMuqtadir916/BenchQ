@@ -22,12 +22,13 @@ import { isBde, isManager } from "./roles";
 export type FirmAction =
   | "candidate.create"
   | "candidate.edit"
+  | "candidate.editProfile"
   | "job.capture"
   | "job.apply"
+  | "job.search"
   | "application.move"
   | "resume.edit"
   | "outreach.act"
-  | "followup.act"
   | "email.retry"
   | "email.reclassify";
 
@@ -63,7 +64,7 @@ export type PlatformAction =
 
 export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
 
-export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "job.capture", "job.apply", "application.move", "resume.edit", "outreach.act", "followup.act", "email.retry", "email.reclassify"];
+export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search", "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify"];
 export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "firmSettings.edit", "notification.approve"];
 export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
 export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
@@ -77,14 +78,17 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   /** 07 Q41: only the OWNER and MANAGERs add candidates; a BDE no longer does. */
   "candidate.create": OWNER_AND_MANAGER,
   "candidate.edit": ALL_ACTING,
+  /** 07 Q56: the profile (submission facts) is the OWNER's and MANAGER's; a BDE edits only the résumés (Q55). */
+  "candidate.editProfile": OWNER_AND_MANAGER,
   "email.retry": ALL_ACTING,
   "email.reclassify": OWNER_AND_MANAGER,
   "job.capture": ALL_ACTING,
   "job.apply": ALL_ACTING,
+  /** Decided 2026-11-10: only the candidate's assigned BDE searches jobs for them (`canSearchJobs`). */
+  "job.search": ["BDE"],
   "application.move": ALL_ACTING,
   "resume.edit": ALL_ACTING,
   "outreach.act": ALL_ACTING,
-  "followup.act": ALL_ACTING,
   "member.invite": OWNER_ONLY,
   "member.remove": OWNER_ONLY,
   "member.changeRole": OWNER_ONLY,
@@ -159,6 +163,15 @@ export function canManageResume(principal: Principal, candidate: { bdeId: string
 }
 
 /**
+ * Who runs a job search for a candidate (decided 2026-11-10): only its assigned BDE; not the OWNER or a MANAGER, and
+ * nobody while it has no BDE. The backend's `can_search_jobs` is the same rule.
+ */
+export function canSearchJobs(principal: Principal, candidate: { bdeId: string | null }): boolean {
+  return can(principal, "job.search") && principal.kind === "firm" && candidate.bdeId !== null
+    && candidate.bdeId === principal.userId;
+}
+
+/**
  * Whose work a page shows (07 §2.2 data scope, Q47): the OWNER, a VIEWER and a support view see the whole firm; a
  * MANAGER their team (the candidates they manage, and their BDEs' work); a BDE their own (assigned candidates, their
  * applications and follow-ups). Records outside the scope are not rendered.
@@ -181,6 +194,7 @@ export const hasTeamScope = (principal: Principal): boolean => scopeOf(principal
 /**
  * A MANAGER's team (Q40): themself, the BDEs who report to them, and the BDE of any candidate they manage. The last
  * keeps the team whole while the live team doesn't yet carry `managerId` (docs/candidate-onboarding/06-backend.md PR 1).
+ * The backend's ledger limit counts only the reports, so a BDE with no manager can differ there (07 Q59).
  */
 export function teamMemberIds(managerId: string, users: readonly Pick<User, "id" | "role" | "managerId">[], candidates: readonly { managerId: string; bdeId: string | null }[]): Set<string> {
   const ids = new Set([managerId]);
@@ -233,8 +247,9 @@ export interface TeamContext {
 
 /**
  * The ledger a principal sees (07 §2.2 `ledger`): a BDE, the entries they made and the ASSIGN entries about the
- * candidates they work now (07 Q52: who assigned them, and the note); a MANAGER, the entries their team made and every
- * entry about a candidate they manage; everyone else the firm's. The backend enforces the same (routes_ledger.py).
+ * candidates they work now (07 Q52: who assigned them, and the note); a MANAGER, the entries their team made and the
+ * ASSIGN entries about the candidates they manage (07 Q59); everyone else the firm's. The backend enforces this
+ * (routes_ledger.py); here it is UX.
  */
 export function scopeLedger<T extends { actorUserId: string | null; entityType: string; entityId: string; action: string }>(
   principal: Principal,
@@ -249,26 +264,9 @@ export function scopeLedger<T extends { actorUserId: string | null; entityType: 
   if (scope.kind === "team") {
     const team = teamMemberIds(scope.managerId, context.users, context.candidates);
     const managed = new Set(scopeCandidates(principal, context.candidates).map((candidate) => candidate.id));
-    return entries.filter((entry) => (entry.actorUserId !== null && team.has(entry.actorUserId)) || (entry.entityType === "candidate" && managed.has(entry.entityId)));
+    return entries.filter((entry) => (entry.actorUserId !== null && team.has(entry.actorUserId)) || (entry.action === "ASSIGN" && entry.entityType === "candidate" && managed.has(entry.entityId)));
   }
   return [...entries];
-}
-
-/** The follow-ups to load: one person's for a BDE, the whole firm's (undefined) otherwise (a MANAGER's are then narrowed by `scopeFollowups`). */
-export function scopeFollowupsUserId(principal: Principal): string | undefined {
-  const scope = scopeOf(principal);
-  return scope.kind === "own" ? scope.userId : undefined;
-}
-
-/** Follow-ups in scope: a MANAGER's team's, a BDE's own, the firm's for everyone else. */
-export function scopeFollowups<T extends { assignedToUserId: string }>(principal: Principal, followups: readonly T[], context: TeamContext): T[] {
-  const scope = scopeOf(principal);
-  if (scope.kind === "own") return followups.filter((followup) => followup.assignedToUserId === scope.userId);
-  if (scope.kind === "team") {
-    const team = teamMemberIds(scope.managerId, context.users, context.candidates);
-    return followups.filter((followup) => team.has(followup.assignedToUserId));
-  }
-  return [...followups];
 }
 
 /** The firm's people a page shows: a MANAGER sees themself and their team (Q47); everyone else the whole firm. */

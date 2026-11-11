@@ -42,6 +42,7 @@ it. Everyone else reads it.
 | `candidates` | **Abdul approves**, Zuhair changes | Every change to `candidates` is confirmed with Abdul first, whoever makes it |
 | `resume_parses` | Zuhair | |
 | `searches` (candidate columns), `candidate_jobs`, `jobs`, `companies`, `job_locations`, `firm_jobs` | Zuhair | `jobs` is the shared pool (07 Q37) |
+| `job_postings`, `scrape_jobs` (new, 0020) | Zuhair | The job-search module's own tables, separate from `jobs`; see [zuhair.md](./zuhair.md) |
 | `favorite_jobs` | Samad | Written by the BDE in the app and read by the extension |
 | `resumes`, `cover_letters`, `tracer_links`, `tracer_click_events` | Zuhair | |
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
@@ -106,5 +107,13 @@ it. Everyone else reads it.
 | 0012 | Samad | Candidate Gmail OAuth/sync and provenance | Merged #104 |
 | 0013 | Zuhair | Résumé versioning PR 6: old résumé rows converted or deleted, the approved `resumes` / `resume_parses` drops, `base_resume_id` and `candidate_id` required. Follows 0012 (Samad's) | `feat/drop-legacy-resume-columns` |
 | 0014 | Samad | Candidate email classification | Merged #111 |
-| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
-| 0016+ | — | Claim the next number here in your PR | — |
+| 0015 | Zuhair | Candidates final schema: `persona`, `skills`, `summary_state` removed (`preferred_industries`, `deal_breakers` flat; `claims` and `evidence` dropped (no claim states), the ledger's `claim_state` and `evidence_ids` dropped, no `OTHER` work authorization, `base_resumes.source` `MANUAL`. Follows 0014 | `feat/candidates-final-schema` |
+| 0016 | Zuhair | `firms.truth_guard_mode` and its CHECK dropped (claim-era setting; no claim states) | `integrate/resumes` |
+| 0017 | Zuhair | The résumé's fields leave `candidates` (`full_name`, `email`, `phone`, `linkedin_url`, `city`, `state`, `country`; 07 Q57): a MANUAL base for every candidate without one, empty header fields filled, then the drop | `integrate/resumes` |
+| 0018 | Zuhair | No MANUAL bases (07 Q58): each becomes an UPLOAD base with a generated résumé file; a placeholder next to a real upload is removed; the checks allow UPLOAD and PROMOTED only | `integrate/resumes` |
+| 0019 | Zuhair | Résumé autofill: `resumes.autofill`, the entries the user typed (`{}` on every version; the built answers aren't stored), `candidates.qa_bank` dropped | `feat/resume-autofill` |
+| 0020 | Zuhair | Job-search tables: `job_postings` and `scrape_jobs` | PR #122 |
+| 0021 | Arbaz | `applications.form_data`: the form the extension saw when a job was marked applied. Follows 0020 (Zuhair's) | `feat/apply-extension-autofill` |
+| 0022 | Zuhair | Job search: `scrape_jobs.user_id` (who ran the search, for the BDE's daily attempts; filled in for rows a downgrade kept), `running` + `finished_at`, and the indexes for the caps and the history. Follows 0021 (Arbaz's) | `feat/job-search-pipeline` |
+| 0023 | Zuhair | Job search PR 2: `resumes` / `cover_letters` / `job_runs` / `llm_call_log` point at `job_postings`; `scrape_jobs.kind`; `job_postings.first_source`; `UNIQUE (firm_id, candidate_id, id)` on `job_postings`. Follows 0022 | `feat/job-postings-repoint` |
+| 0024+ | — | Claim the next number here in your PR | — |

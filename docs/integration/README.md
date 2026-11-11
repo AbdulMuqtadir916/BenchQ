@@ -179,7 +179,7 @@ dependencies are live; only switching the adapter to live waits.
 | Track | Module | Depends on | Owner | Status |
 |---|---|---|---|---|
 | 01 | [Ledger](./01-ledger.md) — the new `ledger_entries` table, not `activity_log_v2` (07 §6.6). **The worked example: copy it** | F1–F4 | Abdul | Live behind flag (`session,ledger`) |
-| 02 | [Jobs (+ companies, capture, job marks)](./02-jobs.md); searches and jobs per candidate (Q53b) | F1–F7; 0007 | Zuhair (2nd) | Not started |
+| 02 | [Jobs](./02-jobs.md): searches and jobs per candidate (Q53b), capture; no companies module (2026-11-11) | F1–F7; 0007 | Zuhair (2nd) | Built (job search PRs #123, #124, #135) |
 | — | Candidates (D1), with the firm hierarchy and onboarding: [`docs/candidate-onboarding/06-backend.md`](../candidate-onboarding/06-backend.md) | F1–F7; D1 (option 1, Q50) | Abdul (from Zuhair, 2026-10-27) | Built (PRs 1–5, 2026-10-27). Frontend live behind flag (`session,ledger,candidates`, onboarding 07b, 2026-10-28); the mock stays until Tracks 03/04 |
 | — | Admin API (firms, plans, users, invites, platform team, audit) | F1–F7 | Uzair (after F7) | In progress: create firm, invites, read lists live behind flag (#36, #39, #40); firm edits, suspend, plans, limits, user deactivate, platform-team invites not started |
 | 03 | [Applications](./03-applications.md) (10 statuses, D3) | Candidates, D3, 0007 | Samad | Backend foundation merged (#100); live frontend integration remains separate |

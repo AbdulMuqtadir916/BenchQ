@@ -45,6 +45,14 @@ export function deriveMatchScore(candidate: Candidate, job: Job): number {
   return Math.max(40, Math.min(98, Math.round(45 + sim * 53)));
 }
 
+/**
+ * A job shown for a candidate (docs/02 §6.z): one found or captured for them, whose work authorization allows
+ * theirs or is unknown (a searched job's is: it is shown, never hidden as if it were refused).
+ */
+export function isJobForCandidate(job: Pick<Job, "candidateIds" | "allowedWorkAuth">, candidate: Pick<Candidate, "id" | "workAuth">): boolean {
+  return job.candidateIds.includes(candidate.id) && (job.allowedWorkAuth.length === 0 || job.allowedWorkAuth.includes(candidate.workAuth));
+}
+
 /** Rank a candidate's best not-yet-applied jobs. */
 export function rankJobsForCandidate(
   candidate: Candidate,
@@ -54,7 +62,7 @@ export function rankJobsForCandidate(
 ): Array<{ job: Job; score: number }> {
   return jobs
     .filter((j) => j.isActive && !appliedJobIds.has(j.id) && j.dedupe.duplicateOfJobId === null)
-    .filter((j) => j.allowedWorkAuth.includes(candidate.workAuth))
+    .filter((j) => isJobForCandidate(j, candidate))
     .map((job) => ({ job, score: deriveMatchScore(candidate, job) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
