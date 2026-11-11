@@ -1278,7 +1278,8 @@ export const JobMarkSchema = z.object({
   - **Background:** `POST` commits the batch `running`, then launches the search through
     `job_monitor.launch_background` (four at once per worker) and returns 202 `{batch_id, run_id}`; a launch that
     fails deletes the batch (503, not an attempt). The task asks the source only while its batch exists and is
-    `running` (Abdul's second review, P2), and finishes it. One search per candidate at a
+    `running` (Abdul's second review, P2), and finishes it. The admission (its locks and checks) runs in a worker thread,
+    never on the event loop, so waiting for a lock can't stall other requests (Abdul's comment on PR 2). One search per candidate at a
     time (409), checked from the `running` row with the candidate row locked, so it holds across workers. The BDE
     is locked too (a Postgres advisory lock on their id, after the candidate), so two of their searches for
     different candidates count the 20 attempts in turn (Abdul's review, P2).

@@ -16,6 +16,7 @@ import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.concurrency import run_in_threadpool
 from pydantic import AfterValidator, BaseModel, StringConstraints
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
@@ -78,15 +79,11 @@ def _resets(now) -> str:
     return f"resets {limits.next_reset(now).astimezone(limits.IST):%I:%M %p} IST".replace("resets 0", "resets ")
 
 
-@router.post("/job-searches", status_code=202, summary="Search jobs for a candidate (in the background)")
-async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: SearchBody,
-                       principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
-    """Async so the background task starts on the app's loop. Another firm or a candidate out of scope is 404 before
-    anything else (never confirm it exists); then `can_search_jobs` (job.search, the candidate's BDE) is 403. The checks
-    and the `running` batch row are one transaction with the candidate row locked, so two POSTs for one candidate take
-    turns: the second sees the first one's `running` row and gets 409, on any worker. The BDE is locked too (a Postgres
-    lock on their id, after the candidate's), so two searches of theirs for different candidates count their 20
-    attempts in turn (Abdul's review, P2)."""
+def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, query: str, principal: Principal) -> dict:
+    """The search's admission, in one transaction, committed: the checks, then its `running` batch row. Blocking (it
+    waits for the candidate's row and the BDE's lock), so it runs in a worker thread, never on the event loop (Abdul's
+    comment on PR 2: a wait there stalled every request on the worker until the lock's holder, whose release needs
+    the loop, timed out). Returns the background task's arguments."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     if not can_search_jobs(principal, candidate):
@@ -106,29 +103,47 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
         raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today; {_resets(now)}.")
     provider = providers.active(db)
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
-                                query=body.query, country=country, provider=provider.name)
-    batch_id = batch.batch_id
-    # The batch is committed before the search is launched, so a launched search always has its row (Abdul's review,
-    # P2); the task also checks it is still `running` before asking the source. A crash between the two leaves the
-    # row `running`, and it becomes an `internal` error after 15 minutes, like a restart.
+                                query=query, country=country, provider=provider.name)
+    task = {"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
+            "batch_id": batch.batch_id, "query": query, "country": country, "provider_name": provider.name}
+    # Committed before the search is launched, so a launched search always has its row (Abdul's review, P2); the task
+    # also checks it is still `running` before asking the source. A crash between the two leaves the row `running`,
+    # and it becomes an `internal` error after 15 minutes, like a restart.
     db.commit()
+    return task
+
+
+def _link_run(db: DbSession, firm_id: uuid.UUID, batch_id: uuid.UUID, run_id: str) -> None:
+    """The run → batch link, both ways: the batch names its run. Committed."""
+    batch = scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.batch_id == batch_id).one()
+    batch.meta = {**(batch.meta or {}), "run_id": str(run_id)}
+    db.commit()
+
+
+@router.post("/job-searches", status_code=202, summary="Search jobs for a candidate (in the background)")
+async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: SearchBody,
+                       principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    """Async so the background task starts on the app's loop; everything that touches the database runs in a worker
+    thread (`_admit`, `_link_run`), so a lock wait never blocks the loop. Another firm or a candidate out of scope is
+    404 before anything else (never confirm it exists); then `can_search_jobs` (job.search, the candidate's BDE) is
+    403. The checks and the `running` batch row are one transaction with the candidate row locked, so two POSTs for one
+    candidate take turns: the second sees the first one's `running` row and gets 409, on any worker. The BDE is locked
+    too (a Postgres lock on their id, after the candidate's), so two searches of theirs for different candidates count
+    their 20 attempts in turn (Abdul's review, P2)."""
+    task = await run_in_threadpool(_admit, db, firm_id, candidate_id, body.query, principal)
+    batch_id = task["batch_id"]
     try:
         # The run names nothing of the firm's (no meta; its scope is the opaque batch id): Super Admin's monitor lists
         # runs across firms without a support view, so the search's details stay in the firm's own `scrape_jobs` row,
         # which names the run (Abdul's review, P1).
-        run_id = launch_background(
-            limits.JOB_TYPE, pipeline.run_search, scope_key=str(batch_id),
-            func_kwargs={"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
-                         "batch_id": batch_id, "query": body.query, "country": country,
-                         "provider_name": provider.name})
+        run_id = launch_background(limits.JOB_TYPE, pipeline.run_search, scope_key=str(batch_id), func_kwargs=task)
     except Exception as error:
         # Never started: the row goes, so it isn't one of the BDE's 20 attempts and doesn't block the candidate.
-        pipeline.discard_batch(db, firm_id, batch_id)
+        await run_in_threadpool(pipeline.discard_batch, db, firm_id, batch_id)
         if isinstance(error, JobAlreadyRunningError):
             raise HTTPException(status_code=409, detail="A search for this candidate is already running.") from None
         raise HTTPException(status_code=503, detail="The search couldn't start; try again.") from None
-    batch.meta = {**batch.meta, "run_id": str(run_id)}      # the run → batch link, both ways
-    db.commit()
+    await run_in_threadpool(_link_run, db, firm_id, batch_id, run_id)
     return {"batch_id": str(batch_id), "run_id": str(run_id)}
 
 
