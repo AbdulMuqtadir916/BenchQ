@@ -14,7 +14,7 @@ from fastapi import Depends, HTTPException
 from backend.auth.sessions import Principal
 
 FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search",
-                "application.move", "resume.edit", "outreach.act", "followup.act", "email.retry", "email.reclassify")
+                "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
                 "candidate.assign", "firmSettings.edit", "notification.approve")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
@@ -38,7 +38,6 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "application.move": _ALL_ACTING,
     "resume.edit": _ALL_ACTING,
     "outreach.act": _ALL_ACTING,
-    "followup.act": _ALL_ACTING,
     "member.invite": _OWNER_ONLY,
     "member.remove": _OWNER_ONLY,
     "member.changeRole": _OWNER_ONLY,

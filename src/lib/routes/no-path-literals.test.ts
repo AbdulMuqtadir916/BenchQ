@@ -73,7 +73,7 @@ describe("no path literals outside src/lib/routes", () => {
     const forms = [
       'a href="/candidates"',
       "<Link href={`/candidates/${id}`}>",
-      'href: "/followups"',
+      'href: "/outreach"',
       'backHref = "/dashboard"',
       'router.push("/jobs")',
       "r.push(`/jobs/${id}`)",

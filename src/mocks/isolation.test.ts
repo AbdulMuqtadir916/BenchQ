@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { applicationsApi, followupsApi } from "@/lib/api/applications";
+import { applicationsApi } from "@/lib/api/applications";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
 import { inboxApi } from "@/lib/api/inbox";
@@ -37,10 +37,9 @@ beforeAll(() => {
 const candidateOf = (firmId: string) => fixtureCandidates.find((candidate) => candidate.firmId === firmId)!;
 
 describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
-  it("lists: applications, follow-ups", async () => {
+  it("lists: applications", async () => {
     await as(mine);
     expect(onlyFirm(await applicationsApi.list(mine), mine)).toBe(true);
-    expect(onlyFirm(await followupsApi.list(mine), mine)).toBe(true);
   });
 
   it("reads by id or candidate: the other firm's records are 404", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isOwner } from "@/lib/auth/roles";
 import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
-import { allApplications, allFollowups } from "./applications";
+import { allApplications } from "./applications";
 import { allRecords } from "./records";
 import { allDocuments } from "./documents";
 import { allMessages } from "./inbox";
@@ -17,7 +17,6 @@ const invites = invitesAt(FIXTURE_NOW);
 const firmIds = new Set(firms.map((firm) => firm.id));
 const byId = <T extends { id: string }>(rows: readonly T[]) => new Map(rows.map((row) => [row.id, row]));
 const candidateById = byId(allCandidates);
-const applicationById = byId(allApplications);
 
 describe("firms, plans, users and invites", () => {
   it("has the four fixture firms, one per status the app must handle", () => {
@@ -78,7 +77,6 @@ describe("firmId on every firm-scoped record", () => {
   const tables = {
     candidates: allCandidates,
     applications: allApplications,
-    followups: allFollowups,
     records: allRecords,
     documents: allDocuments,
     inboxMessages: allMessages,
@@ -94,7 +92,6 @@ describe("firmId on every firm-scoped record", () => {
     for (const a of allApplications) {
       same(`${a.id} candidate`, candidateById.get(a.candidateId)?.firmId, a.firmId);
     }
-    for (const f of allFollowups) same(`${f.id} application`, applicationById.get(f.applicationId)?.firmId, f.firmId);
     for (const r of allRecords) same(`${r.id} candidate`, candidateById.get(r.candidateId)?.firmId, r.firmId);
     for (const d of allDocuments) same(`${d.id} candidate`, candidateById.get(d.candidateId)?.firmId, d.firmId);
     for (const m of allMessages) same(`${m.id} candidate`, candidateById.get(m.candidateId)?.firmId, m.firmId);

@@ -6,7 +6,6 @@ import { Archive } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import type { InboxMessage } from "@/lib/schemas/inbox";
-import { useFollowups } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
 import { cn } from "@/lib/cn";
 import { ApplicationCardFace } from "./application-card";
@@ -28,7 +27,6 @@ interface ApplicationBoardProps {
 /** The pipeline as columns. Drag a card one stage forward; anything else snaps back with the reason. */
 export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals, onOpen, showClosed = false }: ApplicationBoardProps) {
   const teamQuery = useTeam();
-  const followupsQuery = useFollowups();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   // Enter opens a card; Space picks it up to move with the arrow keys.
@@ -39,18 +37,7 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, signals,
     return (id: string) => map.get(id) ?? "Unassigned";
   }, [teamQuery.data]);
 
-  const nextFollowup = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const task of followupsQuery.data ?? []) {
-      if (task.state !== "PENDING" && task.state !== "SNOOZED") continue;
-      const due = task.snoozedUntil ?? task.dueAt;
-      const current = map.get(task.applicationId);
-      if (!current || due < current) map.set(task.applicationId, due);
-    }
-    return map;
-  }, [followupsQuery.data]);
-
-  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), followUpDue: nextFollowup.get(app.id), signal: signals?.get(app.id) });
+  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), signal: signals?.get(app.id) });
   const active = apps.find((a) => a.id === activeId) ?? null;
   const columns: Array<{ id: string; statuses: ApplicationStatus[] }> = [
     ...PIPELINE.map((s) => ({ id: s, statuses: [s] })),

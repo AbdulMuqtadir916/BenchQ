@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { applicationsApi, followupsApi } from "@/lib/api/applications";
+import { applicationsApi } from "@/lib/api/applications";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
 import { inboxApi } from "@/lib/api/inbox";
@@ -9,7 +9,7 @@ import { stubCandidateReads } from "./fixture-backend";
 import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import { allJobMarks, jobMarksMock } from "./job-marks";
 import { jobMarksApi } from "@/lib/api/job-marks";
-import { allApplications, applicationsMock, followupsMock } from "./applications";
+import { allApplications, applicationsMock } from "./applications";
 import { recordsMock } from "./records";
 import { allDocuments, documentsMock } from "./documents";
 import { allMessages, inboxMock } from "./inbox";
@@ -48,7 +48,6 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["applications", "list", (f) => applicationsApi.list(f), false],
   ["applications", "byId", (f, i) => applicationsApi.byId(f, i.application), false],
   ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "WITHDRAWN", note: null }), true],
-  ["followups", "list", (f) => followupsApi.list(f), false],
   ["records", "byCandidate", (f, i) => recordsApi.byCandidate(f, i.candidate), false],
   ["documents", "byCandidate", (f, i) => documentsApi.byCandidate(f, i.candidate), false],
   ["documents", "upload", (f, i) => documentsApi.upload(f, i.candidate, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null } as never), true],
@@ -64,7 +63,7 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
 ];
 
 const MOCKS: Record<(typeof FIRM_SCOPED_RESOURCES)[number], object> = {
-  applications: applicationsMock, followups: followupsMock,
+  applications: applicationsMock,
   records: recordsMock, documents: documentsMock, inbox: inboxMock, agents: agentsMock, jobMarks: jobMarksMock,
 };
 /** Mock methods that take no firm (they work on text alone). */

@@ -47,7 +47,7 @@ describe("route registry", () => {
   it("keeps every URL when pages sit in route groups ((workspace), (manage), (app), (studio))", () => {
     const pages = pagePaths();
     expect(pages.some((path) => path.includes("(") || path.includes(")"))).toBe(false);
-    for (const url of ["/dashboard", "/candidates", "/candidates/[id]", "/jobs", "/applications", "/resumes", "/resumes/[id]", "/outreach", "/followups", "/analytics", "/ledger", "/settings/team", "/focus", "/welcome"]) {
+    for (const url of ["/dashboard", "/candidates", "/candidates/[id]", "/jobs", "/applications", "/resumes", "/resumes/[id]", "/outreach", "/managers", "/bdes", "/ledger", "/settings/team", "/focus", "/welcome"]) {
       expect(pages, url).toContain(`/[firm]${url}`);
     }
   });
@@ -103,8 +103,13 @@ describe("route registry", () => {
   });
 
   it("only shows nav items a role can open", () => {
-    expect(navFor(asRole("BDE"), "workspace").map((r) => r.id)).not.toContain("analytics");
-    expect(navFor(asRole("VIEWER"), "workspace").map((r) => r.id)).not.toContain("followups");
+    expect(navFor(asRole("BDE"), "workspace").map((r) => r.id)).not.toContain("managers");
+    expect(navFor(asRole("MANAGER"), "workspace").map((r) => r.id)).not.toContain("managers");
+    expect(navFor(asRole("MANAGER"), "workspace").map((r) => r.id).slice(0, 2)).toEqual(["dashboard", "bdes"]);
+    expect(navFor(asRole("OWNER"), "workspace").map((r) => r.id)).not.toContain("bdes");
+    expect(navFor(asRole("BDE"), "workspace").map((r) => r.id)).not.toContain("bdes");
+    expect(navFor(asRole("OWNER"), "workspace").map((r) => r.id).slice(0, 3)).toEqual(["dashboard", "managers", "candidates"]);
+    expect(navFor(asRole("OWNER"), "workspace").map((r) => r.id)).not.toContain("followups"); // removed (07 Q61)
     expect(navFor(asRole("MANAGER"), "settings").map((r) => r.id)).toEqual(["settings.team", "settings.templates", "settings.preferences"]);
     expect(navFor(asRole("BDE"), "settings").map((r) => r.id)).toEqual(["settings.preferences"]);
     expect(navFor(asRole("MANAGER"), "preferences").map((r) => r.id)).toContain("notifications");
@@ -156,7 +161,7 @@ describe("hrefFor", () => {
   });
 
   it("accepts a route object, as the sidebar and palette hold", () => {
-    expect(hrefFor(routeById("followups"), { firm: S })).toBe("/acme/followups");
+    expect(hrefFor(routeById("outreach"), { firm: S })).toBe("/acme/outreach");
   });
 
   it("round-trips: every route's link matches back to the same route", () => {
@@ -178,6 +183,8 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["candidates", "full", "team", "assigned", "read"],
   ["candidates.new", "full", "full", "none", "none"], // 07 Q41: a BDE no longer adds candidates
   ["candidates.detail", "full", "team", "assigned", "read"],
+  ["managers", "full", "none", "none", "none"],
+  ["bdes", "none", "team", "none", "none"], // a manager's own BDEs
   ["jobs", "full", "full", "full", "read"],
   ["jobs.detail", "full", "full", "full", "read"],
   ["jobs.capture", "none", "none", "full", "none"], // a BDE captures for their own candidate (job search PR 3)
@@ -186,9 +193,7 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["resumes", "full", "team", "assigned", "read"],
   ["resumes.studio", "full", "team", "assigned", "read"],
   ["outreach", "full", "team", "own", "read"],
-  ["followups", "full", "team", "own", "none"],
   ["focus", "full", "full", "full", "none"],
-  ["analytics", "full", "team", "none", "read"],
   ["ledger", "full", "team", "own", "read"],
   ["settings", "full", "full", "full", "full"], // index: redirects to the first allowed section
   ["settings.firm", "full", "none", "none", "none"],
@@ -291,7 +296,7 @@ describe("accessForPath (fails closed)", () => {
   });
 
   it("returns the route's own access for registered paths, ignoring query and hash", () => {
-    expect(accessForPath(f("/analytics?range=7d"), asRole("BDE"))).toEqual({ route: routeById("analytics"), access: "none" });
+    expect(accessForPath(f("/managers?view=cards"), asRole("BDE"))).toEqual({ route: routeById("managers"), access: "none" });
     expect(accessForPath(f("/candidates/cand_01#notes"), asRole("BDE")).access).toBe("assigned");
     expect(accessForPath(f("/resumes/new"), asRole("VIEWER")).access).toBe("read");
   });
@@ -361,8 +366,8 @@ describe("isRouteActive (matches on route ids, not paths)", () => {
 const SUPPORT_TABLE: ReadonlyArray<readonly [RouteId, Access]> = [
   ["welcome", "none"], ["dashboard", "read"], ["candidates", "read"], ["candidates.new", "none"], ["candidates.detail", "read"],
   ["jobs", "read"], ["jobs.detail", "read"], ["jobs.capture", "none"], ["applications", "read"], ["applications.detail", "read"],
-  ["resumes", "read"], ["resumes.studio", "read"], ["outreach", "read"], ["followups", "read"], ["focus", "none"],
-  ["analytics", "read"], ["ledger", "read"], ["settings", "read"], ["settings.firm", "read"], ["settings.team", "read"],
+  ["resumes", "read"], ["resumes.studio", "read"], ["outreach", "read"], ["focus", "none"],
+  ["managers", "read"], ["bdes", "none"], ["ledger", "read"], ["settings", "read"], ["settings.firm", "read"], ["settings.team", "read"],
   ["settings.templates", "read"], ["settings.preferences", "none"], ["notifications", "none"], ["notifications.requests", "none"],
 ];
 
@@ -415,8 +420,10 @@ describe("admin nav and keys (docs/04 §14.1)", () => {
     const keys = (principal: Principal, area: "firm" | "platform") => Object.fromEntries(shortcutsFor(principal, area).map(({ key, route }) => [key, route.id]));
     expect(keys(admin, "platform")).toEqual({ o: "admin", f: "admin.firms", p: "admin.plans", a: "admin.audit", s: "admin.system", t: "admin.team" });
     expect(keys(admin, "firm")).toEqual({});
-    expect(keys(inSupport, "firm")).toEqual({ d: "dashboard", c: "candidates", j: "jobs", a: "applications", f: "followups" });
-    expect(keys(asRole("OWNER"), "firm")).toMatchObject({ a: "applications", f: "followups" });
+    expect(keys(inSupport, "firm")).toEqual({ d: "dashboard", m: "managers", c: "candidates", j: "jobs", a: "applications" });
+    expect(keys(asRole("MANAGER"), "firm")).not.toHaveProperty("m");
+    expect(keys(asRole("OWNER"), "firm")).toMatchObject({ a: "applications" });
+    expect(keys(asRole("OWNER"), "firm")).not.toHaveProperty("f");
     expect(keys(asRole("OWNER"), "platform")).toEqual({});
   });
 
