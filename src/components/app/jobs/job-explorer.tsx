@@ -7,7 +7,6 @@ import {
   BriefcaseBusiness,
   Check,
   CircleHelp,
-  Clock3,
   Copy,
   ExternalLink,
   Eye,
@@ -39,6 +38,7 @@ import { useCan } from "@/lib/auth/permissions";
 import { useHref } from "@/lib/routes/use-href";
 import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
 import { jobLocation } from "@/lib/format/job";
+import { SourcePreview } from "@/components/app/jobs/source-preview";
 
 const REMOTE_OPTIONS: SelectOption[] = [
   { value: "ALL", label: "Any work mode" },
@@ -384,41 +384,6 @@ function JobDetailHeader({
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) {
-  const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl;
-  const lines = job.description.split("\n").filter(Boolean);
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface-2)] p-4">
-      <article className="mx-auto max-w-3xl overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]">
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <PortalLogo portal={portal} domain={job.company.domain} size={32} />
-            <div className="min-w-0"><div className="text-body-strong text-[var(--color-text)]">Source preview · {PORTALS[portal].label}</div><div className="truncate text-caption text-[var(--color-text-3)]">{sourceUrl ?? job.company.websiteUrl ?? "Source URL unavailable"}</div></div>
-          </div>
-          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">Open original<ArrowUpRight size={13} /></a> : null}
-        </header>
-        <div className="p-5">
-          <div className="mb-5 flex items-start gap-3">
-            <PortalLogo portal="COMPANY" domain={job.company.domain} size={40} />
-            <div><h3 className="text-h2 text-[var(--color-text)]">{job.title}</h3><p className="mt-0.5 text-sm text-[var(--color-text-2)]">{job.company.name} · {jobLocation(job)}</p><p className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><Clock3 size={12} />Posted {job.postedAt ? formatRelative(job.postedAt) : "recently"}{job.applicantCount ? ` · ${job.applicantCount} applicants` : ""}</p></div>
-          </div>
-          <div className="space-y-3 text-sm leading-6 text-[var(--color-text-2)]">
-            {lines.map((line, index) => {
-              const isHeading = /^(Responsibilities|Requirements|Nice to have):?$/.test(line);
-              if (isHeading) return <h4 key={`${line}-${index}`} className="pt-2 text-body-strong text-[var(--color-text)]">{line.replace(/:$/, "")}</h4>;
-              if (line.startsWith("- ")) return <p key={`${line}-${index}`} className="flex gap-2"><span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[var(--color-primary)]" /><span>{line.slice(2)}</span></p>;
-              return <p key={`${line}-${index}`}>{line}</p>;
-            })}
-          </div>
-          <div className="mt-6 flex flex-wrap gap-1.5 border-t border-[var(--color-border)] pt-4">
-            {job.requirements.slice(0, 8).map((requirement) => <Tag key={requirement.id} tone={requirement.kind === "MANDATORY" ? "blue" : "neutral"}>{requirement.value}</Tag>)}
-          </div>
-        </div>
-      </article>
     </div>
   );
 }
