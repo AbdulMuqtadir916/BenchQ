@@ -9,10 +9,10 @@ import { toBackendId } from "./demo-ids";
 const [assigned, queued] = sample.list.map((row) => toCandidate(CandidateDto.parse(row)));
 
 describe("the backend candidate → Candidate", () => {
-  it("parses the sample into the frontend's schema, translating seeded ids back to fixture ids", () => {
+  it("parses the sample into the frontend's schema: a candidate keeps its backend id (none is seeded), its people their fixture ids", () => {
     expect(CandidateSchema.parse(assigned)).toEqual(assigned);
     expect(assigned).toMatchObject({ firmId: "firm_hts", managerId: "user_fatima", fullName: "Meera Krishnan", status: "ON_BENCH" });
-    expect(assigned!.id).toMatch(/^cand_/);
+    expect(assigned!.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(assigned!.bdeId).toMatch(/^user_/);
   });
 

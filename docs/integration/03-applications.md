@@ -93,7 +93,7 @@ error. Never silently map `SCREENING` → `interview` or `PLACED` → `offer`.
       `GET /api/applications/{id}` if the backend adds one — or add it to the backend (a small
       route reusing `_app_to_dict`; agree with the backend owner first)
 - [ ] `applicationsApi.updateStatus`: validate the target, `PATCH { status }`, map the response
-- [ ] With `NEXT_PUBLIC_LIVE_MODULES=jobs,companies,applications`: kanban drag between supported
+- [ ] With `NEXT_PUBLIC_LIVE_MODULES=applications` (jobs are always the backend's since job search PR 3): kanban drag between supported
       columns persists across reload; an unsupported drag rolls back with a message; table and
       calendar views; application detail timeline; candidate pipeline counts
 - [ ] Delete the applications mock half and its JSON; update `src/lib/derive/derive.test.ts`

@@ -1,7 +1,7 @@
 """No per-BDE capacity: drop `firms.bde_capacity` (docs/07 Q63, reverses Q46).
 
-Revision ID: 0022
-Revises: 0021
+Revision ID: 0024
+Revises: 0023
 Create Date: 2026-11-11 12:00:00.000000
 
 The plan's two limits (BDE seats, assigned candidates) are the only caps. A BDE may hold any number of candidates,
@@ -12,8 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = '0022'
-down_revision = '0021'
+revision = '0024'
+down_revision = '0023'
 branch_labels = None
 depends_on = None
 

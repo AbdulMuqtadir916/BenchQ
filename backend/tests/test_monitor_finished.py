@@ -9,8 +9,10 @@ pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
 
 def _run(test_db, job_id, job_type, status, finished_at):
-    if test_db.get(Job, job_id) is None:   # job_runs.target_job_id is a real foreign key on Postgres
-        make_job(test_db, id=job_id)
+    from backend.models.job_search import JobPosting
+    from backend.tests.resume_support import make_target_posting
+    if test_db.get(JobPosting, job_id) is None:   # job_runs.target_job_id names a job posting (0023)
+        make_target_posting(test_db, id=job_id)
     r = JobRun(job_type=job_type, trigger="manual", status=status,
                target_job_id=job_id, finished_at=finished_at)
     test_db.add(r)

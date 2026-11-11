@@ -27,6 +27,7 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["email.reclassify", "Y Y - - - -"],
   ["job.capture", "Y Y Y - - -"],
   ["job.apply", "Y Y Y - - -"],
+  ["job.search", "- - Y - - -"],
   ["application.move", "Y Y Y - - -"],
   ["resume.edit", "Y Y Y - - -"],
   ["outreach.act", "Y Y Y - - -"],

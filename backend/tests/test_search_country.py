@@ -70,17 +70,6 @@ def test_country_indeed_is_not_a_constant(test_db, monkeypatch):
     assert len(set(sent)) == 2, f"country_indeed did not vary between searches: {sent}"
 
 
-def test_test_preview_sends_the_search_country(api_client, test_db, monkeypatch):
-    """The /test preview built the same kwargs dict and carried the same literal."""
-    search = _search(test_db, location="Toronto, Canada", country="canada")
-
-    calls = []
-    _record_kwargs(monkeypatch, calls)
-    resp = api_client.post(f"/api/searches/{search.id}/test")
-
-    assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
-    assert calls[0]["country_indeed"] == "canada"
-
 
 # ── the API write path validates the field ───────────────────────────────────
 

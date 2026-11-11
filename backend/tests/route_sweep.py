@@ -49,7 +49,8 @@ SEED_OVERRIDES = {
     "base_resumes": {"is_active": True, "deleted_at": None, "archived_at": None},
     "resumes": {"category": "BASE", "job_id": None, "deleted_at": None},
     "support_views": {"ended_at": None},
-    "scrape_jobs": {"error": None, "batch_id": SEED_BATCH},   # error only on an error row; the seed's is 'success'
+    # error only on an error row, finished_at on every row but a running one; the seed's is 'success'
+    "scrape_jobs": {"error": None, "batch_id": SEED_BATCH, "finished_at": datetime.now(timezone.utc)},
     # job_id is a SHA256 hex digest (ck_job_postings_job_id_sha256), and batch_id references scrape_jobs.batch_id,
     # not its id, so the seeded posting names the seeded batch.
     "job_postings": {"job_id": "0" * 64, "batch_id": SEED_BATCH},
@@ -59,7 +60,7 @@ ID_ALIASES = {"app": "applications", "cl": "cover_letters", "base": "base_resume
               "attempt": "candidate_google_oauth_attempts", "interview": "interviews", "manager": "users",
               "bde": "users", "user": "users", "owner": "users", "firm": "firms", "plan": "plans",
               "resume": "resumes", "base_resume": "base_resumes", "notification": "notifications", "run": "job_runs",
-              "review": "application_reviews"}
+              "review": "application_reviews", "posting": "job_postings"}
 JOB_URL = "https://jobs.example.test/posting/1"
 # Values the routes check in code, not in their schema, by field name.
 FIELD_VALUES = {"role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",

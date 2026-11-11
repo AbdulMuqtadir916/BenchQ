@@ -311,6 +311,9 @@ Rejection reasons must be real and varied: `NO_FUNCTIONING_WEBSITE`,
 
 ### 4.4 Jobs — 400
 
+> **Removed 2026-11-11 (job search PR 3):** jobs come only from the backend (`job_postings`, docs/02 §6.z). The
+> fixture below no longer exists; it is kept here as the record of what it held.
+
 | Field | Spread |
 |---|---|
 | `provenance.sourceType` | 180 CONNECTOR · 90 AGGREGATOR · 95 USER_SUBMITTED · 35 MANUAL |

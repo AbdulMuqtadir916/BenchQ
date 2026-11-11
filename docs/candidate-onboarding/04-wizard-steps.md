@@ -74,7 +74,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
   the new file's, edited or not; one it lacks is left empty. Rates, availability, preferences and the
   assignment stay (`applyDraft`, 2026-11-06).
 - Parse error: "Couldn't read this résumé. Try another file, or enter the details yourself." with Try again and Skip.
-- "Try a sample" chips: only when the parse adapter runs on mocks (assumption A1).
+- ~~"Try a sample" chips: only when the parse adapter runs on mocks (assumption A1).~~ Removed 2026-11-11: no mock.
 - No way past step 1 without a résumé (07 Q58): no Skip, and the parse error offers only Try again or another file.
 - Copy under the heading: "Drop it in and BenchQ fills the profile for you. Everything it pulls out stays editable, and
   **nothing is saved until you create the candidate**." (Q49 — not "sent anywhere".)
@@ -133,7 +133,7 @@ not inline in components.
 
 Adapter `src/lib/api/resume-parse.ts`: `parse(firmId, file): Promise<ResumeDraft>`, hook `useParseResume()` in
 `src/lib/hooks/`. On mocks it returns one of three fixtures in **Zuhair's snake_case format**
-(`src/mocks/data/resume-parses.json`, named like the screen's samples) and runs it through the real mapper, so the
+(`src/test/fixtures/resume-parses.json` since 2026-11-11, named like the screen's samples) and runs it through the real mapper, so the
 mapper is tested before the backend exists. Mapper: `src/lib/api/dto/resume-parse.ts` (`BackendResumeParseSchema` +
 `toResumeDraft()`), with tests fed by those fixtures.
 

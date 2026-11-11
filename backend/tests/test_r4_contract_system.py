@@ -89,7 +89,8 @@ TRIGGERS = [
 ]
 
 
-@pytest.mark.parametrize("path", TRIGGERS)
+# The old pool's scrape and backfill triggers are retired (410, job search PR 2).
+@pytest.mark.parametrize("path", [p for p in TRIGGERS if p not in ("/api/scrape/run-all", "/api/jobs/backfill-descriptions")])
 def test_every_trigger_is_409_while_its_job_type_is_running(client, path):
     """Occupy the scope key by hand, then confirm the endpoint refuses politely."""
     import backend.job_monitor as jm
@@ -114,57 +115,11 @@ def test_every_trigger_is_409_while_its_job_type_is_running(client, path):
     assert job_type in r.json()["detail"]
 
 
-def test_analyze_job_trigger_is_409_for_the_same_scope(client, test_db, monkeypatch):
-    import asyncio
-    import backend.analyzer.cv_scorer as scorer
-    gate = asyncio.Event()
-
-    async def _slow(job_id, cv_ids=None, depth="full", *, firm_id):
-        await gate.wait()
-        return "done"
-    monkeypatch.setattr(scorer, "score_single_job", _slow)
-
-    job = make_job(test_db)
-    assert_clean(client.post(f"/api/analyze/{job.id}"), 202)
-    assert_clean(client.post(f"/api/analyze/{job.id}"), 409)
-    gate.set()
-
-
-def test_analyze_job_different_cv_sets_are_different_scopes(client, test_db, monkeypatch):
-    import asyncio
-    import backend.analyzer.cv_scorer as scorer
-    gate = asyncio.Event()
-
-    async def _slow(job_id, cv_ids=None, depth="full", *, firm_id):
-        await gate.wait()
-        return "done"
-    monkeypatch.setattr(scorer, "score_single_job", _slow)
-
-    job = make_job(test_db)
-    assert_clean(client.post(f"/api/analyze/{job.id}", json={"cv_ids": ["a"]}), 202)
-    assert_clean(client.post(f"/api/analyze/{job.id}", json={"cv_ids": ["b"]}), 202)
-    gate.set()
-
 
 def test_analyze_trigger_with_a_malformed_job_id_never_500s(client):
     """`uuid.UUID(job_id)` runs before the job even exists — a bad id must be clean."""
     assert_no_leak(client.post("/api/analyze/not-a-uuid"))
 
-
-def test_analyze_trigger_with_a_malformed_job_id_is_404_or_422(client):
-    assert client.post("/api/analyze/not-a-uuid").status_code in (404, 422)
-
-
-@pytest.mark.parametrize("depth", ["banana", "", "FULL", "5"])
-def test_analyze_trigger_accepts_any_depth_string(client, test_db, monkeypatch, depth):
-    """Current contract: `depth` is a free query string, normalised downstream."""
-    import backend.analyzer.cv_scorer as scorer
-
-    async def _noop(job_id, cv_ids=None, depth="full", *, firm_id):
-        return "done"
-    monkeypatch.setattr(scorer, "score_single_job", _noop)
-    job = make_job(test_db)
-    assert_clean(client.post(f"/api/analyze/{job.id}?depth={depth}"), 202)
 
 
 # ══ Monitor ══════════════════════════════════════════════════════════════════
@@ -426,7 +381,3 @@ def test_health_entities_still_answers_for_a_sane_window(client, test_db):
     assert r.json()["count"] == 0
 
 
-@pytest.mark.parametrize("bad", ["not-a-uuid", "1", "abc-def"])
-def test_analyze_trigger_malformed_job_id_is_404(client, bad):
-    """R4-T1-23: uuid.UUID(job_id) ran inside the launch call, before any lookup."""
-    assert_clean(client.post(f"/api/analyze/{bad}"), 404)

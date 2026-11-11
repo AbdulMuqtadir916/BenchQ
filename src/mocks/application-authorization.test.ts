@@ -1,8 +1,14 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { stubCandidateReads } from "@/mocks/fixture-backend";
 import { ApiError } from "@/lib/api/client";
 import { applicationsApi } from "@/lib/api/applications";
 import { signInAs, signOutForTest } from "./sign-in-as";
 import { allApplications } from "./applications";
+
+// Candidates are the backend's (no candidates mock): reads are answered from the test fixture.
+beforeAll(() => {
+  stubCandidateReads();
+});
 
 /**
  * Moving an application is a real write (docs/07 §2.2, applications.detail): the mock backend refuses

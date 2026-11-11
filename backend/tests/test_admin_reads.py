@@ -37,7 +37,18 @@ def test_audit_lists_platform_and_firm_entries_newest_first(api_client, accounts
     assert len(api_client.get("/api/admin/audit", params={"limit": 1}).json()) == 1
 
 
-@pytest.mark.parametrize("path", ["/api/admin/users", "/api/admin/team", "/api/admin/audit"])
+@pytest.mark.parametrize("path", ["/api/admin/users", "/api/admin/team", "/api/admin/audit", "/api/admin/candidate-usage"])
 def test_only_a_super_admin_reads_them(anonymous_client, accounts, path):
     assert anonymous_client.get(path).status_code == 401
     assert anonymous_client.get(path, headers={"cookie": f"bq_session={accounts.firm_token}"}).status_code == 403
+
+
+def test_candidate_usage_is_counts_only(api_client, test_db, accounts):
+    """Each candidate's firm, status and BDE, nothing about who they are (bot review on #135)."""
+    from backend.tests.resume_support import make_version
+    make_version(test_db, accounts.firm_id, candidate_name="A made-up candidate")
+    test_db.commit()
+    rows = api_client.get("/api/admin/candidate-usage").json()
+    assert rows and all(set(row) == {"firm_id", "status", "bde_id"} for row in rows)
+    assert str(accounts.firm_id) in {row["firm_id"] for row in rows}
+

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, BadgeCheck, CalendarCheck, Clock3, FileText, MapPin, Percent, Send, Sparkles, Zap, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CalendarCheck, Clock3, FileText, MapPin, Percent, Send, Zap, type LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { Candidate, CandidateStats } from "@/lib/schemas/candidate";
 import type { CandidateStatus } from "@/lib/schemas/enums";
@@ -15,6 +15,7 @@ import { Can } from "@/lib/auth/can";
 import type { CandidateTabId } from "./candidate-tabs";
 import { ReassignAction } from "./reassign-dialog";
 import { useHref } from "@/lib/routes/use-href";
+import { FindJobs, type FindJobsSearch } from "@/components/app/candidate/find-jobs";
 
 const STATUS: Record<CandidateStatus, { label: string; tone: TagTone }> = {
   ON_BENCH: { label: "On bench", tone: "blue" },
@@ -34,12 +35,13 @@ interface CandidateHeaderProps {
   canAct: boolean;
   /** The active base's newest version; null when the candidate has no base yet (the button then opens the Résumés tab). */
   resumeHref: string | null;
-  onFindJobs: () => void;
+  /** "Find jobs", only for the candidate's BDE (`canSearchJobs`, docs/02 §6.z); absent, no button. */
+  search?: FindJobsSearch;
   onOpenTab: (tab: CandidateTabId) => void;
 }
 
 /** Who this is, where they stand, and the two actions a BDE takes most. Every number opens the rows behind it. */
-export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct, resumeHref, onFindJobs, onOpenTab }: CandidateHeaderProps) {
+export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct, resumeHref, search, onOpenTab }: CandidateHeaderProps) {
   const toHref = useHref();
   const reduce = useReducedMotion() ?? false;
   const place = [candidate.city, candidate.state].filter(Boolean).join(", ");
@@ -87,11 +89,11 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <Can action="candidate.assign"><ReassignAction candidate={candidate} /></Can>
+          {search ? <FindJobs candidate={candidate} resumeHref={resumeHref} search={search} /> : null}
           {canAct ? (
             <>
-              <Button variant="secondary" onClick={onFindJobs}><Sparkles size={14} aria-hidden />Find jobs</Button>
               {resumeHref ? (
                 <Button asChild><Link href={resumeHref}><FileText size={14} aria-hidden />Build resume</Link></Button>
               ) : (

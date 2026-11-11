@@ -13,7 +13,7 @@ from fastapi import Depends, HTTPException
 
 from backend.auth.sessions import Principal
 
-FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply",
+FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search",
                 "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
                 "candidate.assign", "notification.approve")
@@ -34,6 +34,7 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "email.reclassify": _OWNER_AND_MANAGER,
     "job.capture": _ALL_ACTING,
     "job.apply": _ALL_ACTING,
+    "job.search": ("BDE",),                      # decided 2026-11-10: only the candidate's BDE (can_search_jobs)
     "application.move": _ALL_ACTING,
     "resume.edit": _ALL_ACTING,
     "outreach.act": _ALL_ACTING,
@@ -121,6 +122,13 @@ def can_manage_resume(principal: Principal, candidate) -> bool:
     """What only `candidate`'s BDE does with their résumés (07 Q55): upload a later résumé, delete or hide, show again,
     tailor. The Python mirror of `canManageResume`."""
     return (can(principal, "resume.edit") and principal.kind == "firm" and candidate.bde_id is not None
+            and candidate.bde_id == principal.user_id)
+
+
+def can_search_jobs(principal: Principal, candidate) -> bool:
+    """Who runs a job search for `candidate` (decided 2026-11-10): only its assigned BDE. Not the OWNER or a MANAGER,
+    and nobody while it has no BDE. The Python mirror of `canSearchJobs`."""
+    return (can(principal, "job.search") and principal.kind == "firm" and candidate.bde_id is not None
             and candidate.bde_id == principal.user_id)
 
 
