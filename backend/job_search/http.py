@@ -26,8 +26,8 @@ class _Retry(Exception):
         self.code = code
 
 
-async def _once(url: str, params: dict, headers: dict) -> dict:
-    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=False, transport=transport) as client:
+async def _once(url: str, params: dict, headers: dict, timeout: float) -> dict:
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, transport=transport) as client:
         async with client.stream("GET", url, params=params, headers=headers) as resp:
             status = resp.status_code
             if status == 429 or status >= 500:
@@ -51,9 +51,9 @@ async def _once(url: str, params: dict, headers: dict) -> dict:
     return payload
 
 
-async def _attempt(url: str, params: dict, headers: dict) -> dict:
+async def _attempt(url: str, params: dict, headers: dict, timeout: float) -> dict:
     try:
-        return await asyncio.wait_for(_once(url, params, headers), timeout=TIMEOUT_SECONDS)
+        return await asyncio.wait_for(_once(url, params, headers, timeout), timeout=timeout)
     except (asyncio.TimeoutError, httpx.TimeoutException):
         raise _Retry("timeout") from None
     except httpx.TransportError:
@@ -61,19 +61,22 @@ async def _attempt(url: str, params: dict, headers: dict) -> dict:
 
 
 async def get_json(url: str, params: dict, *, headers: dict | None = None, source: str = "") -> dict:
-    """The source's JSON object, or `ProviderError`. Logs the outcome by code and timing only."""
+    """The source's JSON object, or `ProviderError`. Logs the outcome by code and timing only. `TIMEOUT_SECONDS` is the
+    whole call, the retry and its wait included: a retry gets what is left, and none when too little is (CodeRabbit and
+    CodeAnt on #135: each attempt had its own 20 s, so a call could take 42 s)."""
     started = time.monotonic()
+    deadline = started + TIMEOUT_SECONDS
     headers = headers or {}
     for attempt in (1, 2):
         try:
-            payload = await _attempt(url, params, headers)
+            payload = await _attempt(url, params, headers, max(deadline - time.monotonic(), 0.001))
             logger.info("job search source=%s attempt=%d ok ms=%d", source, attempt,
                         (time.monotonic() - started) * 1000)
             return payload
         except _Retry as retry:
             logger.warning("job search source=%s attempt=%d code=%s ms=%d", source, attempt, retry.code,
                            (time.monotonic() - started) * 1000)
-            if attempt == 2:
+            if attempt == 2 or deadline - time.monotonic() <= RETRY_DELAY_SECONDS:
                 raise ProviderError(retry.code) from None
             await asyncio.sleep(RETRY_DELAY_SECONDS)
         except ProviderError as error:

@@ -66,7 +66,6 @@ NOT_REACHED: dict[str, str] = {
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": "403: Only BenchQ can resend or revoke the owner's invite",
     "PATCH /api/firms/{firm_id}/members/{user_id}/manager": "404: Not found",
     "POST /api/invites/{token}/accept": "410: This invite link isn't valid",
-    "POST /api/jobs/bulk-update": "422: updates must be an object",
     "GET /api/jobs/{job_id}/live-page": "502: Posting is rendered client-side — needs the extension",
     "POST /api/notifications/{notification_id}/password-reset-decision": "404: Notification not found",
     "POST /api/notifications/{notification_id}/password-reset-link": "404: Notification not found",
@@ -84,7 +83,7 @@ NOT_REACHED.update({route: "410: the old job pool is retired" for route in (
     "PATCH /api/jobs/{job_id}", "POST /api/scrape/run-all", "POST /api/analyze/{job_id}",
     "POST /api/jobs/backfill-descriptions", "POST /api/scrape/company/{company_id}", "POST /api/searches/{search_id}/run",
     "POST /api/searches/{search_id}/test", "POST /api/companies/{company_id}/test-scrape", "POST /api/cover-letters",
-    "POST /api/cover-letters/generate")})
+    "POST /api/cover-letters/generate", "POST /api/jobs/bulk-update")})
 # A letter's job is a job posting since 0023; the sweep's `job_id` names the old pool's seeded job, so this is 404.
 NOT_REACHED["PATCH /api/cover-letters/{cl_id}"] = "404: Job not found"
 

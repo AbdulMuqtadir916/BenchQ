@@ -139,7 +139,7 @@ CASES: dict[str, Case] = {
     "GET /api/jobs/{job_id}/cached-page": Case(),
     "GET /api/jobs/{job_id}/frame-check": Case(),
     "GET /api/jobs/{job_id}/live-page": Case(),
-    "POST /api/jobs/bulk-update": Case(body=lambda i: {"job_ids": [str(i["job"])], "updates": {"status": "saved"}},
+    "POST /api/jobs/bulk-update": Case(retired=True, body=lambda i: {"job_ids": [str(i["job"])], "updates": {"status": "saved"}},
                                        body_ids=True, bulk=True),
     "POST /api/jobs/manual": Case(retired=True, body=lambda i: {"title": "Manual role", "company": "Manual Co", "url": _new("manual")}),
     "POST /api/jobs/save-from-extension": Case(retired=True, body=lambda i: {"title": "Captured role", "company": "Captured Co",
@@ -222,9 +222,7 @@ KNOWN_GAPS: dict[str, Gap] = {
 
 # Routes that are isolated (they're in CASES), except on a job both firms link to. test_isolation checks the gap is
 # still there, so the entry fails once the Jobs track closes it.
-SHARED_JOB_GAPS: dict[str, Gap] = {
-    "POST /api/jobs/bulk-update": _SHARED_JOB,
-}
+SHARED_JOB_GAPS: dict[str, Gap] = {}     # bulk-update was the last; it is retired (job search PR 2)
 
 # ── The other classes: why each is open to more than one firm ─────────────────
 SIGNED_IN_CASES: dict[str, Case] = {
