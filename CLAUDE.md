@@ -244,7 +244,8 @@ A stopped task with a clear question beats a confident wrong implementation.
 > Update this section when a phase ends. Status lives in the board, decisions in the 07 docs.
 
 **Foundation done (F1–F7, 2026-10-26).** The session, the team, invites, `/admin` and the ledger run on the
-backend. Every other module runs on mock data under the real signed-in user. Phase B fix PRs 3–14 and Phase S
+backend. Candidates, résumés and jobs run only on the backend, with no mocks and no demo candidates (2026-11-11, job
+search PR 3). Every other module runs on mock data under the real signed-in user. Phase B fix PRs 3–14 and Phase S
 stay paused.
 
 **Next (2026-10-29): the team plan in `docs/team/`.** Abdul builds the candidate core tables (migration 0007) first;

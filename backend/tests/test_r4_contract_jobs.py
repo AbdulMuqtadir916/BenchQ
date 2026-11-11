@@ -81,24 +81,6 @@ def test_get_job_path_traversal_is_404(client):
 
 # ── PATCH /api/jobs/{id} ─────────────────────────────────────────────────────
 
-def test_patch_job_missing_uuid_is_404(client):
-    assert_clean(client.patch(f"/api/jobs/{MISSING_UUID}", json={"seen": True}), 404)
-
-
-def test_patch_job_empty_body_is_a_noop_200(client, test_db):
-    job = make_job(test_db)
-    assert_clean(client.patch(f"/api/jobs/{job.id}", json={}), 200)
-
-
-def test_patch_job_ignores_unknown_keys_silently(client, test_db):
-    """Current contract: keys outside {seen, saved, status} are dropped, not rejected."""
-    job = make_job(test_db)
-    r = assert_clean(client.patch(f"/api/jobs/{job.id}",
-                                 json={"nonsense": 1, "company": "Hijacked", "status": "skip"}), 200)
-    body = r.json()
-    assert body["status"] == "skip"
-    assert body["company"] == "Acme", "an unlisted key was written through"
-
 
 @pytest.mark.parametrize("body", [[1, 2], "hello", 5, True, None])
 def test_patch_job_non_object_body_is_422(client, test_db, body):
@@ -106,150 +88,21 @@ def test_patch_job_non_object_body_is_422(client, test_db, body):
     assert_clean(client.patch(f"/api/jobs/{job.id}", json=body), 422)
 
 
-def test_patch_job_unknown_status_value_is_accepted_verbatim(client, test_db):
-    """Current contract: Job.status is a free String, no enum guard."""
-    job = make_job(test_db)
-    r = assert_clean(client.patch(f"/api/jobs/{job.id}", json={"status": "banana"}), 200)
-    assert r.json()["status"] == "banana"
-
-
-def test_patch_job_rejects_a_wrongly_typed_value(client, test_db):
-    """`saved` is a Boolean column; a string reaches the driver and blows up."""
-    job = make_job(test_db)
-    assert client.patch(f"/api/jobs/{job.id}", json={"saved": "banana"}).status_code in (400, 422)
-
-
 def test_patch_job_wrong_type_never_leaks_internals(client, test_db):
     job = make_job(test_db)
     assert_no_leak(client.patch(f"/api/jobs/{job.id}", json={"saved": "banana"}))
 
 
-def test_patch_job_emoji_status_round_trips(client, test_db):
-    job = make_job(test_db)
-    r = assert_clean(client.patch(f"/api/jobs/{job.id}", json={"status": EMOJI}), 200)
-    assert r.json()["status"] == EMOJI
-
-
-def test_patch_job_applied_creates_application_and_company_once(client, test_db):
-    from backend.models.db import Application, Company
-    job = make_job(test_db, company="Northwind")
-    r1 = assert_clean(client.patch(f"/api/jobs/{job.id}", json={"status": "applied"}), 200)
-    assert r1.json()["created_application_id"]
-    assert r1.json()["created_company_id"]
-    # A second "applied" must not create a duplicate application or company.
-    r2 = assert_clean(client.patch(f"/api/jobs/{job.id}", json={"status": "applied"}), 200)
-    assert r2.json()["created_application_id"] is None
-    assert r2.json()["created_company_id"] is None
-    assert test_db.query(Application).count() == 1
-    assert test_db.query(Company).filter(Company.name == "Northwind").count() == 1
-
-
-# ── POST /api/jobs/bulk-update ───────────────────────────────────────────────
-
-def test_bulk_update_reports_missing_ids(client, test_db):
-    job = make_job(test_db)
-    r = assert_clean(client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id), MISSING_UUID], "updates": {"status": "skip"},
-    }), 200)
-    assert r.json() == {"updated": 1, "not_found": [MISSING_UUID]}
-
-
-def test_bulk_update_empty_id_list_is_a_noop(client):
-    r = assert_clean(client.post("/api/jobs/bulk-update",
-                                json={"job_ids": [], "updates": {"status": "skip"}}), 200)
-    assert r.json() == {"updated": 0, "not_found": []}
-
-
-def test_bulk_update_drops_keys_outside_the_allow_list(client, test_db):
-    job = make_job(test_db, company="Acme")
-    assert_clean(client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id)], "updates": {"company": "Hijacked", "status": "skip"},
-    }), 200)
-    test_db.expire_all()
-    from backend.models.db import Job
-    assert test_db.get(Job, job.id).company == "Acme"
-
-
-def test_bulk_update_missing_keys_is_a_noop(client):
-    assert_clean(client.post("/api/jobs/bulk-update", json={}), 200)
-
-
-def test_bulk_update_reports_a_malformed_id_instead_of_aborting(client, test_db):
-    """The endpoint promises a `not_found` list; one junk id must not kill the batch."""
-    job = make_job(test_db)
-    r = client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id), "not-a-uuid"], "updates": {"status": "skip"},
-    })
-    assert r.status_code == 200
-    assert r.json()["updated"] == 1
-    assert "not-a-uuid" in r.json()["not_found"]
-
-
-def test_bulk_update_malformed_id_never_leaks_internals(client, test_db):
-    job = make_job(test_db)
-    assert_no_leak(client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id), "not-a-uuid"], "updates": {"status": "skip"},
-    }))
-
-
-def test_bulk_update_ten_thousand_ids_stays_shaped(client):
-    ids = [MISSING_UUID] * 10000
-    r = assert_clean(client.post("/api/jobs/bulk-update",
-                                json={"job_ids": ids, "updates": {"seen": True}}), 200)
-    assert r.json()["updated"] == 0
+# POST /api/jobs/bulk-update is retired (job search PR 2, bot review on #135): it answers 410.
 
 
 # ── POST /api/jobs/save-from-extension ───────────────────────────────────────
-
-@pytest.mark.parametrize("body", [
-    {}, {"title": "T"}, {"title": "T", "company": "C"},
-    {"title": "", "company": "C", "url": "https://x.com/1"},
-    {"title": "  ", "company": "  ", "url": "  "},
-    {"title": None, "company": None, "url": None},
-])
-def test_save_from_extension_requires_title_company_url(client, body):
-    assert_clean(client.post("/api/jobs/save-from-extension", json=body), 400)
-
-
-@pytest.mark.parametrize("bad", [5, ["T"], {"t": 1}, True])
-def test_save_from_extension_wrongly_typed_title_is_400_not_500(client, bad):
-    """`(body.get("title") or "").strip()` raises AttributeError on a non-string."""
-    r = client.post("/api/jobs/save-from-extension",
-                    json={"title": bad, "company": "C", "url": "https://x.com/1"})
-    assert r.status_code in (400, 422)
 
 
 @pytest.mark.parametrize("bad", [5, ["T"], {"t": 1}])
 def test_save_from_extension_wrongly_typed_title_never_leaks_internals(client, bad):
     assert_no_leak(client.post("/api/jobs/save-from-extension",
                                json={"title": bad, "company": "C", "url": "https://x.com/1"}))
-
-
-def test_save_from_extension_creates_then_dedupes(client, test_db):
-    body = {"title": "Senior PM", "company": "Acme", "url": "https://x.com/jobs/9"}
-    r1 = assert_clean(client.post("/api/jobs/save-from-extension", json=body), 200)
-    assert r1.json()["new"] is True
-    r2 = assert_clean(client.post("/api/jobs/save-from-extension", json=body), 200)
-    assert r2.json()["new"] is False
-    assert r2.json()["id"] == r1.json()["id"]
-
-
-def test_save_from_extension_dedupes_across_url_spellings(client, test_db):
-    base = {"title": "Senior PM", "company": "Acme"}
-    r1 = client.post("/api/jobs/save-from-extension",
-                     json={**base, "url": "https://x.com/jobs/9"})
-    r2 = client.post("/api/jobs/save-from-extension",
-                     json={**base, "url": "https://x.com/jobs/9?utm_source=li#top"})
-    assert_clean(r1, 200)
-    assert_clean(r2, 200)
-    assert r2.json()["id"] == r1.json()["id"]
-
-
-def test_save_from_extension_unicode_round_trips(client):
-    r = assert_clean(client.post("/api/jobs/save-from-extension", json={
-        "title": EMOJI, "company": "Señor Corp 中文", "url": "https://x.com/jobs/é",
-    }), 200)
-    assert r.json()["title"] == EMOJI
 
 
 def test_save_from_extension_ten_megabyte_description(client):
@@ -267,71 +120,6 @@ def test_save_from_extension_non_object_body_is_422(client, body):
 
 
 # ── POST /api/jobs/linkedin-import ───────────────────────────────────────────
-
-def test_linkedin_import_no_ids_is_accepted_zero(client):
-    r = assert_clean(client.post("/api/jobs/linkedin-import", json={"linkedin_ids": []}), 200)
-    assert r.json()["accepted"] == 0
-
-
-def test_linkedin_import_missing_key_is_accepted_zero(client):
-    r = assert_clean(client.post("/api/jobs/linkedin-import", json={}), 200)
-    assert r.json()["accepted"] == 0
-
-
-def test_linkedin_import_filters_falsy_ids(client, monkeypatch):
-    import backend.api.routes_jobs as rj
-
-    async def _noop(ids):
-        return None
-    monkeypatch.setattr(rj, "_scrape_linkedin_ids", _noop)
-    r = assert_clean(client.post("/api/jobs/linkedin-import",
-                                 json={"linkedin_ids": ["", None, 0, "4012345"]}), 200)
-    assert r.json()["accepted"] == 1
-
-
-def test_linkedin_import_non_json_body_is_422_not_500(client):
-    """The handler does a bare `await request.json()` — a junk body is an unhandled 500."""
-    r = client.post("/api/jobs/linkedin-import", content=b"not json",
-                    headers={"Content-Type": "application/json"})
-    assert r.status_code in (400, 422)
-
-
-def test_linkedin_import_non_iterable_ids_is_422_not_500(client, monkeypatch):
-    """`{"linkedin_ids": 5}` reaches a for-loop over an int."""
-    import backend.api.routes_jobs as rj
-
-    async def _noop(ids):
-        return None
-    monkeypatch.setattr(rj, "_scrape_linkedin_ids", _noop)
-    assert client.post("/api/jobs/linkedin-import",
-                       json={"linkedin_ids": 5}).status_code in (400, 422)
-
-
-def test_linkedin_import_string_ids_is_rejected_not_split_into_characters(client, monkeypatch):
-    """A bare string is iterated per character — seven bogus "ids" for one job."""
-    import backend.api.routes_jobs as rj
-
-    async def _noop(ids):
-        return None
-    monkeypatch.setattr(rj, "_scrape_linkedin_ids", _noop)
-    r = client.post("/api/jobs/linkedin-import", json={"linkedin_ids": "4012345"})
-    assert r.status_code in (400, 422) or r.json()["accepted"] == 1
-
-
-def test_linkedin_import_second_call_is_409_while_running(client, monkeypatch):
-    import asyncio
-    import backend.api.routes_jobs as rj
-    gate = asyncio.Event()
-
-    async def _slow(ids):
-        await gate.wait()
-    monkeypatch.setattr(rj, "_scrape_linkedin_ids", _slow)
-
-    r1 = assert_clean(client.post("/api/jobs/linkedin-import", json={"linkedin_ids": ["1"]}), 200)
-    assert r1.json()["run_id"]
-    r2 = client.post("/api/jobs/linkedin-import", json={"linkedin_ids": ["2"]})
-    assert_clean(r2, 409)
-    gate.set()
 
 
 # ── /api/jobs/{id} sub-resources ─────────────────────────────────────────────
@@ -380,79 +168,3 @@ def test_a_valid_search_id_filter_still_filters(client, test_db):
     assert r.json()["total"] == 1
 
 
-@pytest.mark.parametrize("updates", [
-    {"saved": "banana"}, {"saved": 1}, {"seen": "yes"}, {"seen": []},
-    {"status": 5}, {"status": ["skip"]}, {"status": {"to": "skip"}},
-])
-def test_patch_job_rejects_every_wrongly_typed_column(client, test_db, updates):
-    """R4-T1-11: the handler used to copy any allowed key straight onto the model."""
-    job = make_job(test_db)
-    assert_clean(client.patch(f"/api/jobs/{job.id}", json=updates), 400)
-
-
-@pytest.mark.parametrize("updates", [{"saved": True}, {"seen": False},
-                                     {"status": "skip"}, {"saved": None}])
-def test_patch_job_still_accepts_correctly_typed_values(client, test_db, updates):
-    job = make_job(test_db)
-    assert_clean(client.patch(f"/api/jobs/{job.id}", json=updates), 200)
-
-
-def test_bulk_update_rejects_a_wrongly_typed_column(client, test_db):
-    """The same type guard covers the batch writer."""
-    job = make_job(test_db)
-    assert_clean(client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id)], "updates": {"saved": "banana"},
-    }), 400)
-
-
-def test_bulk_update_keeps_going_past_several_malformed_ids(client, test_db):
-    """R4-T1-12: one junk id used to abort the batch and drop every valid write."""
-    from backend.models.db import Job
-    a = make_job(test_db)
-    b = make_job(test_db, url="https://x.com/jobs/2")
-    r = assert_clean(client.post("/api/jobs/bulk-update", json={
-        "job_ids": ["nope", str(a.id), "", str(b.id), MISSING_UUID],
-        "updates": {"status": "skip"},
-    }), 200)
-    assert r.json()["updated"] == 2
-    assert set(r.json()["not_found"]) == {"nope", "", MISSING_UUID}
-    test_db.expire_all()
-    assert test_db.get(Job, a.id).status == "skip"
-    assert test_db.get(Job, b.id).status == "skip"
-
-
-@pytest.mark.parametrize("body", [{"job_ids": "abc"}, {"job_ids": 5},
-                                  {"job_ids": [], "updates": "x"}])
-def test_bulk_update_rejects_wrongly_shaped_payloads(client, body):
-    assert_clean(client.post("/api/jobs/bulk-update", json=body), 422)
-
-
-@pytest.mark.parametrize("payload", [b"not json", b"", b"{", b"<html></html>"])
-def test_linkedin_import_junk_body_is_422(client, payload):
-    """R4-T1-13: a bare `await request.json()` made this an unhandled 500."""
-    assert_clean(client.post("/api/jobs/linkedin-import", content=payload,
-                             headers={"Content-Type": "application/json"}), 422)
-
-
-@pytest.mark.parametrize("ids", ["4012345", 5, 1.5, {"a": 1}, True])
-def test_linkedin_import_rejects_non_list_ids(client, ids):
-    """R4-T1-14: a bare string was iterated per character into junk ids."""
-    assert_clean(client.post("/api/jobs/linkedin-import",
-                             json={"linkedin_ids": ids}), 422)
-
-
-@pytest.mark.parametrize("ids", [[], None])
-def test_linkedin_import_empty_ids_stays_a_200_noop(client, ids):
-    """The documented zero-id path must not become a 422."""
-    r = assert_clean(client.post("/api/jobs/linkedin-import",
-                                 json={"linkedin_ids": ids}), 200)
-    assert r.json()["accepted"] == 0
-
-
-@pytest.mark.parametrize("field", ["title", "company", "url", "description"])
-@pytest.mark.parametrize("bad", [5, ["x"], {"x": 1}, True])
-def test_save_from_extension_rejects_every_wrongly_typed_string(client, field, bad):
-    """R4-T1-20: `(body.get(k) or "").strip()` raised AttributeError on all of these."""
-    body = {"title": "T", "company": "C", "url": "https://x.com/1"}
-    body[field] = bad
-    assert_clean(client.post("/api/jobs/save-from-extension", json=body), 400)

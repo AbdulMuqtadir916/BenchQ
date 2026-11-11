@@ -63,6 +63,34 @@ Uses React, TypeScript, Vite, Tailwind v4 (through PostCSS, as the website does)
 - Whether the candidate may work in the US is worked out from their status, and where they live from the city and state.
 - Nothing is stored: the answers and the file stay in the panel's memory while the tab is reviewed.
 
+## Repoint `applications.job_id` onto `job_postings` (yours; decided 2026-11-11 by Zuhair)
+
+First given to Samad (2026-11-10, job search grilling Q2, Q5–Q7, Q16), moved to you 2026-11-11. `applications` stays
+Samad's table (`docs/team/README.md` §3): confirm the change with him and log it in
+`cross-area-changes.md`. Until it lands, a job found by a candidate's search can't be Saved or applied to, and the
+extension's saved and applied lists only show old pool jobs.
+
+The old `jobs` pool is being retired: jobs now come from a candidate's search (`job_postings`, docs/02
+§6.y). Zuhair's PR 2 repoints his own tables (`resumes`, `cover_letters`, `job_runs`, `llm_call_log`) and adds
+`UNIQUE (firm_id, candidate_id, id)` on `job_postings` as your key's target. Your PR, from main **after** his PR 2
+merges:
+- **Migration** (the next free number; recheck the head): `applications (firm_id, candidate_id, job_id)` →
+  `job_postings (firm_id, candidate_id, id)` ON DELETE RESTRICT, so an application can only name its own
+  candidate's job. `applications.candidate_id` becomes NOT NULL (rows from before 0007 are gone). No data is
+  copied: no real firm uses BenchQ yet, so the migration refuses to run while any application still points at
+  `jobs` ("clear your local test applications first").
+- **The column keeps its name** `job_id`, now meaning `job_postings.id`. Careful: `job_postings.job_id` is the
+  posting's content hash, not a row id (docs/02 §6.y).
+- **Reading the job:** a posting's fields come from its provider:
+  `providers.reader_for(posting.source).read(posting.content)` (`backend/job_search/providers/`) gives `title`,
+  `company`, `description` (plain text), `apply_url`, `location`. Never read `content` directly.
+- **Keep the application JSON the same** (`title`, `company`, `url`, …) so your extension (saved and applied
+  lists, mark applied) works unchanged. Saving a job is `POST /api/applications` with `job_id` = the posting's
+  `id`.
+- **Also yours:** the ledger labels, the prep page and `inbox/application_matching.py`, which read `app.job`, so the
+  link keeps working there. `favorite_jobs` (also on `jobs`) is not part of this: it stays Samad's.
+- Log what you change outside your area in `cross-area-changes.md`.
+
 ## Build and setup
 
 - `npm run ext:build` — builds the standalone extension.

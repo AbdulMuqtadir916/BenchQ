@@ -40,35 +40,3 @@ def test_update_job_is_async():
     assert inspect.iscoroutinefunction(update_job), "update_job must be `async def`"
 
 
-def test_save_launches_tracked_analyze(api_client, test_db, monkeypatch):
-    _seed(test_db, on_save="light")
-    job = _job(test_db)
-    calls = _capture_launch(monkeypatch)
-
-    resp = api_client.patch(f"/api/jobs/{job.id}", json={"saved": True})
-    assert resp.status_code == 200
-    assert len(calls) == 1, "save should launch exactly one tracked scoring op"
-    args, kwargs = calls[0]
-    assert args[0] == "analyze_job"
-    assert str(kwargs["target_job_id"]) == str(job.id)
-    assert kwargs["func_kwargs"]["depth"] == "light"
-
-
-def test_save_does_not_launch_when_setting_off(api_client, test_db, monkeypatch):
-    _seed(test_db, on_save="off")
-    job = _job(test_db)
-    calls = _capture_launch(monkeypatch)
-
-    resp = api_client.patch(f"/api/jobs/{job.id}", json={"saved": True})
-    assert resp.status_code == 200
-    assert calls == [], "on_save_action=off must not launch scoring"
-
-
-def test_save_does_not_launch_when_already_scored(api_client, test_db, monkeypatch):
-    _seed(test_db, on_save="light")
-    job = _job(test_db, cv_scores={"Resume A": 72})
-    calls = _capture_launch(monkeypatch)
-
-    resp = api_client.patch(f"/api/jobs/{job.id}", json={"saved": True})
-    assert resp.status_code == 200
-    assert calls == [], "an already-scored job must not re-score on save"

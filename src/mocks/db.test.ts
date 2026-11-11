@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubCandidateReads } from "./fixture-backend";
+import { fixtureCandidates } from "@/test/fixtures/candidates";
 
 /**
  * docs/03 §3.3: the demo data persists in this browser. Each "reload" is a fresh set of mock modules
@@ -30,12 +32,14 @@ let storage: StubStorage;
 async function load(now = T0, email?: string) {
   vi.resetModules();
   g.__BENCHQ_DEMO_NOW__ = now;
-  const [db, signIn, applications, candidates, documents, inbox, tenancy, team, demo] = await Promise.all([
-    import("./db"), import("./sign-in-as"), import("./applications"), import("./candidates"), import("./documents"), import("./inbox"),
-    import("./tenancy"), import("./team"), import("./demo-data"),
+  const [db, signIn, applications, documents, inbox, tenancy, team, demo, candidatesModule] = await Promise.all([
+    import("./db"), import("./sign-in-as"), import("./applications"), import("./documents"), import("./inbox"),
+    import("./tenancy"), import("./team"), import("./demo-data"), import("@/lib/api/candidates"),
   ]);
+  // Candidates are the backend's (no candidates mock): the mocks just loaded read the test fixture through it.
+  stubCandidateReads(candidatesModule.candidatesApi);
   if (email) await signIn.signInAs(email);
-  return { db, signIn, applications, candidates, documents, inbox, tenancy, team, demo };
+  return { db, signIn, applications, documents, inbox, tenancy, team, demo };
 }
 const stored = () => JSON.parse(storage.getItem(KEY) ?? "null") as { version: string; seededAt: string; tables: Record<string, unknown[]> } | null;
 const ADNAN = "user_adnan"; // seeded account ids (./sign-in-as.ts)
@@ -91,10 +95,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
   it("persists every write the mock backend accepts, in the table it changed", async () => {
     // The manager: the profile edit is the owner's and manager's (07 Q56); documents and the inbox are theirs too.
     const m = await load(T0, FATIMA);
-    const candidate = m.candidates.allCandidates.find((c) => c.firmId === "firm_hts")!;
-    await m.candidates.candidatesMock.update("firm_hts", candidate.id, { noticePeriodDays: 45 } as never);
-    m.db.flush();
-    expect(Object.keys(stored()!.tables)).toContain("candidates");
+    const candidate = fixtureCandidates.find((c) => c.firmId === "firm_hts")!;
 
     const doc = await m.documents.documentsMock.upload("firm_hts", candidate.id, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null });
     m.db.flush();
@@ -112,8 +113,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
     expect(Object.keys(stored()!.tables)).toContain("inboxMessages");
 
     const reloaded = await load(at(1), ADNAN);
-    expect(reloaded.candidates.allCandidates.find((c) => c.id === candidate.id)?.noticePeriodDays).toBe(45);
-    await expect(reloaded.candidates.candidatesMock.update("firm_hts", candidate.id, { noticePeriodDays: 30 } as never)).rejects.toMatchObject({ status: 403 });
+    expect(reloaded.inbox.allMessages.find((row) => row.id === message.id)?.isRead).toBe(true);
   });
 
   it("reset (Super Admin only) wipes every change and re-anchors to now; nobody else may reset", async () => {
@@ -179,7 +179,7 @@ describe("relative fixture dates once the data persists (docs/03 §3.3)", () => 
     const { deriveFirmUsage, effectiveInviteStatus } = await import("@/lib/derive/tenancy");
     const stl = () => day3.team.firms.find((firm) => firm.id === "firm_stl")!;
     const usage = (m: typeof day3, now: string) =>
-      deriveFirmUsage(m.team.firms.find((firm) => firm.id === "firm_stl")!, { users: m.team.allUsers, invites: m.tenancy.invites, candidates: m.candidates.allCandidates }, new Date(now));
+      deriveFirmUsage(m.team.firms.find((firm) => firm.id === "firm_stl")!, { users: m.team.allUsers, invites: m.tenancy.invites, candidates: fixtureCandidates }, new Date(now));
     expect(day3.tenancy.invites.find((invite) => invite.id === "inv_stl_01")?.expiresAt).toBe(at(5));
     expect(effectiveInviteStatus(day3.tenancy.invites.find((invite) => invite.id === "inv_stl_01")!, new Date(at(3)))).toBe("PENDING");
     expect(usage(day3, at(3))).toMatchObject({ seatsUsed: 4, seatLimit: stl().seatLimit });
@@ -201,7 +201,7 @@ describe("relative fixture dates once the data persists (docs/03 §3.3)", () => 
   it("anchors inbox connections to the seeding instant (12 days before it), and keeps them across reloads", async () => {
     const seeded = await load(T0, ADNAN);
     const connectedId = (await import("./data/inbox.json")).default.initiallyConnected[0] as string;
-    const firmId = seeded.candidates.allCandidates.find((c) => c.id === connectedId)!.firmId;
+    const firmId = fixtureCandidates.find((c) => c.id === connectedId)!.firmId;
     const session = firmId === "firm_hts" ? seeded : await load(T0, ADNAN);
     const inbox = await session.inbox.inboxMock.byCandidate(firmId, connectedId);
     expect(inbox.connection?.connectedAt).toBe(at(-12));

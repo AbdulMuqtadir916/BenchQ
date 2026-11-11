@@ -56,30 +56,11 @@ def test_the_seed_loads_the_mocks_world_and_is_idempotent(test_db):
     test_db.commit()
     firm = json.loads((DATA / "firm.json").read_text())
     assert added == {"plans": 3, "firms": len(firm["firms"]), "users": len(firm["users"]), "platform_users": 1,
-                     "invites": len(json.loads((DATA / "invites.json").read_text())),
-                     "candidates": len(json.loads((DATA / "candidates.json").read_text()))}
+                     "invites": len(json.loads((DATA / "invites.json").read_text()))}
+    # No demo candidates (decided 2026-11-11): a candidate is only ever made from a real résumé, by onboarding.
+    from backend.models.candidates import Candidate
+    assert test_db.query(Candidate).count() == 0
     assert set(seed_demo.seed(test_db).values()) == {0}
-
-
-@needs_mock_data
-def test_every_seeded_candidates_first_version_carries_the_fixtures_details(test_db):
-    """BUG-011: name, email, phone, city, state, country and LinkedIn live in the candidate's active base résumé, version 1
-    (07 Q57), and the seed must write them there. They are not `candidates` columns: the model holds them on the new
-    object until version 1 is written, so a seed that lets that object go (the session keeps only a weak reference after
-    the flush) wrote every version 1 blank, and every demo candidate had no name."""
-    from backend.models.db import Resume
-
-    seed_demo.seed(test_db)
-    test_db.commit()
-    wrong = []
-    for fixture in json.loads((DATA / "candidates.json").read_text()):
-        v1 = test_db.query(Resume).filter(
-            Resume.candidate_id == seed_demo.demo_id(fixture["id"]), Resume.category == "BASE", Resume.version == 1).one()
-        for column, key in (("full_name", "fullName"), ("email", "email"), ("phone", "phone"), ("city", "city"),
-                            ("state", "state"), ("country", "country"), ("linkedin", "linkedinUrl")):
-            if (getattr(v1, column) or None) != (fixture[key] or None):
-                wrong.append((fixture["id"], column, getattr(v1, column), fixture[key]))
-    assert wrong == []
 
 
 def test_ids_are_the_same_on_every_machine():
