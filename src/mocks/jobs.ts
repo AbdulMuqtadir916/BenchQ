@@ -108,7 +108,11 @@ function settle(now = new Date()): void {
     const theirs = capturedJobs.filter(isCandidates(search.candidateId));
     const savedToday = theirs.filter((job) => job.provenance.sourceType === "AGGREGATOR" && new Date(job.provenance.ingestedAt) >= start).length;
     const known = new Set(theirs.map((job) => job.dedupe.contentHash));
-    const fresh = inFirm(fixtureJobs, search.firmId).filter((job) => !known.has(`ctnh_${hash(job.description)}`)).slice(0, JOBS_PER_SEARCH);
+    // Like a real search, the role's jobs first: fixture jobs whose title shares a word with the query.
+    const words = (search.query ?? "").toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2);
+    const matches = (job: Job) => words.some((word) => job.title.toLowerCase().includes(word));
+    const unseen = inFirm(fixtureJobs, search.firmId).filter((job) => !known.has(`ctnh_${hash(job.description)}`));
+    const fresh = [...unseen.filter(matches), ...unseen.filter((job) => !matches(job))].slice(0, JOBS_PER_SEARCH);
     const room = Math.max(0, CAPS.jobs - savedToday);
     for (const job of fresh.slice(0, room)) {
       capturedJobs.unshift(knownLittle({ id: newId("job", now), firmId: search.firmId, title: job.title, companyName: job.company.name, location: job.remoteMode === "REMOTE" ? "Remote" : [job.city, job.state].filter(Boolean).join(", "), description: job.description, url: job.applyUrl ?? job.provenance.sourceUrl ?? `https://jobs.example.test/${job.id}`, candidateId: search.candidateId, sourceType: "AGGREGATOR", at: now }));

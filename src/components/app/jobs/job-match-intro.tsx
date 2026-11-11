@@ -78,10 +78,12 @@ export function JobMatchIntro({ candidate, jobs, applications, isReady, isSearch
   }, [onDone]);
 
   const first = candidate?.fullName.split(" ")[0] ?? "the candidate";
+  // A first search: no jobs yet to count, so no "0 of 0" while it runs; the counts appear once its jobs arrive.
+  const isWaitingForJobs = isSearching && stats.active === 0;
   const stages = [
     { label: `Reading ${first}'s profile`, done: `Read ${first}'s profile`, detail: candidate ? [candidate.primaryRole, ...candidate.targetRoles].filter(Boolean).slice(0, 4).join(" · ") : "" },
-    { label: "Checking work authorization", done: "Filtered by work authorization", detail: <><CountUp to={stats.eligible} duration={step} /> of {stats.active} open roles accept this visa</> },
-    { label: `Scoring ${stats.eligible} roles against the profile`, done: `Scored ${stats.eligible} roles`, detail: <><CountUp to={stats.strong} duration={step} /> strong matches (70+)</> },
+    { label: "Checking work authorization", done: "Filtered by work authorization", detail: isWaitingForJobs ? "Waiting for the search's jobs" : <><CountUp to={stats.eligible} duration={step} /> of {stats.active} open roles accept this visa</> },
+    { label: isWaitingForJobs ? "Scoring roles against the profile" : `Scoring ${stats.eligible} roles against the profile`, done: isWaitingForJobs ? "Scoring when the jobs arrive" : `Scored ${stats.eligible} roles`, detail: isWaitingForJobs ? "Waiting for the search's jobs" : <><CountUp to={stats.strong} duration={step} /> strong matches (70+)</> },
     { label: isSearching ? "Searching for new jobs…" : "Ranking the best matches", done: "Ranked the best matches", detail: stats.best ? `Top match ${stats.best.score} — ${stats.best.job.title} at ${stats.best.job.company.name}` : "No eligible roles right now" },
   ];
 
@@ -130,7 +132,7 @@ export function JobMatchIntro({ candidate, jobs, applications, isReady, isSearch
           const isActive = isRunning && stage === i;
           return (
             <motion.li
-              key={s.done}
+              key={i}
               initial={reduce ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: isDone || isActive ? 1 : 0.45, y: 0 }}
               transition={{ duration: 0.3, delay: reduce ? 0 : i * 0.06, ease: EASE_OUT }}

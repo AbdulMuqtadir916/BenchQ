@@ -30,6 +30,9 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
     () => scopeCandidates(principal, candidatesQuery.data ?? []).filter((candidate) => canSearchJobs(principal, candidate)).map((candidate) => ({ value: candidate.id, label: candidate.fullName })),
     [candidatesQuery.data, principal],
   );
+  // A first, choosable "Choose the candidate" entry: the list opens on it, so the keyboard can step to a candidate
+  // (a disabled entry can't take focus). Choosing it and saving says "Choose the candidate."
+  const choices = useMemo<SelectOption[]>(() => [{ value: "", label: "Choose the candidate" }, ...options], [options]);
   const [candidateId, setCandidateId] = useState("");
   const [problem, setProblem] = useState<{ message: string; jobId?: string } | null>(null);
   const chosen = candidateId || (options.length === 1 ? options[0]!.value : "");
@@ -82,7 +85,7 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
             <p className="text-sm text-[var(--color-text-2)]">You have no candidates to capture a job for. A job is captured for a candidate you are the BDE of.</p>
           ) : (
             <FieldLabel label="Candidate">
-              <Select value={chosen} options={[{ value: "", label: "Choose the candidate", disabled: true }, ...options]} onValueChange={setCandidateId} aria-label="Candidate" />
+              <Select value={chosen} options={choices} onValueChange={setCandidateId} aria-label="Candidate" />
             </FieldLabel>
           )}
         </section>

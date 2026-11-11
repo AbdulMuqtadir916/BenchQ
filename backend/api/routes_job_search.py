@@ -254,6 +254,14 @@ def get_posting(firm_id: uuid.UUID, candidate_id: uuid.UUID, posting_id: uuid.UU
 
 # ── Firm level (job search PR 3, docs/02 §6.z): the job screens' list and job page ──
 
+def _id_or_404(value: str) -> uuid.UUID:
+    """An id from the URL: a malformed one is the same 404 as a missing one, never a 422 (07 F7, principle 4)."""
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found.") from None
+
+
 def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
     """One job, from the visible postings that share its content hash: the newest seen row's fields, and the
     candidates it was found or captured for. A posting's own candidate and batch aren't the job's, so they're left
@@ -267,7 +275,7 @@ def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
 
 
 @router.get("/job-postings", summary="The jobs of every candidate the principal sees, one per job, newest first")
-def list_firm_jobs(firm_id: uuid.UUID, candidate_id: uuid.UUID | None = None,
+def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
                    limit: int = Query(FIRM_LIST_MAX, ge=1, le=FIRM_LIST_MAX),
                    principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     """The owner and a viewer see the firm's, a manager their BDEs' candidates', a BDE their own (`_visible`, 07
@@ -275,7 +283,7 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: uuid.UUID | None = None,
     candidates is one item with both in `candidate_ids`."""
     _member_of(firm_id, principal)
     if candidate_id is not None:
-        candidates = [_candidate(db, firm_id, principal, candidate_id).id]
+        candidates = [_candidate(db, firm_id, principal, _id_or_404(candidate_id)).id]
     else:
         candidates = _visible(db, firm_id, principal).with_entities(Candidate.id)
     postings = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id.in_(candidates))
@@ -289,13 +297,13 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: uuid.UUID | None = None,
 
 
 @router.get("/job-postings/{posting_id}", summary="One job a candidate the principal sees has, with its description")
-def get_firm_job(firm_id: uuid.UUID, posting_id: uuid.UUID, principal: Principal = Depends(current_principal),
+def get_firm_job(firm_id: uuid.UUID, posting_id: str, principal: Principal = Depends(current_principal),
                  db: DbSession = Depends(get_db)):
     """The posting, if its candidate is one the principal sees (else 404, never confirming it exists), with the
     visible candidates that have the same job."""
     _member_of(firm_id, principal)
     visible = _visible(db, firm_id, principal).with_entities(Candidate.id)
-    row = scoped(db, JobPosting, firm_id).filter(JobPosting.id == posting_id,
+    row = scoped(db, JobPosting, firm_id).filter(JobPosting.id == _id_or_404(posting_id),
                                                  JobPosting.candidate_id.in_(visible)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Not found.")

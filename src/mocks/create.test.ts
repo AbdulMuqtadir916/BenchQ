@@ -254,7 +254,9 @@ describe("Find jobs (the mock's search, docs/02 §6.z)", () => {
     expect(done.running).toBeNull();
     expect(done.searches[0]).toMatchObject({ state: "SUCCESS", newCount: 5 });
     expect(done.usage).toMatchObject({ jobsToday: 5, jobsCap: 100, searchesToday: 1, searchesCap: 20, capturesToday: 0, resetsAt: "2026-11-12T13:00:00.000Z" });
-    expect(await m.jobs.list(FIRM, { candidateId: "cand_03" })).toHaveLength(5);
+    const found = await m.jobs.list(FIRM, { candidateId: "cand_03" });
+    expect(found).toHaveLength(5);
+    expect(found.some((row) => /data|engineer/i.test(row.title))).toBe(true); // the role's jobs first, like a real search
   });
 
   it("only the candidate's BDE searches", async () => {

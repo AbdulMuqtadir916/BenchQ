@@ -89,6 +89,9 @@ def test_a_job_outside_the_principals_candidates_is_not_found(anonymous_client, 
     assert _one(anonymous_client, world, "vikram", jobs["own"]["id"]).status_code == 404
     assert _one(anonymous_client, world, "priya", jobs["shared_a"]["id"]).status_code == 404
     assert _one(anonymous_client, world, "owner", "00000000-0000-0000-0000-000000000000").status_code == 404
+    # A malformed id (an old pool job's, from an application) is the same 404, not a 422.
+    assert _one(anonymous_client, world, "owner", "job_001").status_code == 404
+    assert _list(anonymous_client, world, "owner", candidate_id="cand_01").status_code == 404
 
 
 def test_a_firm_with_no_jobs_lists_none(anonymous_client, world, adnans):

@@ -31,10 +31,11 @@ describe("Find jobs (docs/02 §6.z)", () => {
     expect(usageLine(searches({ searchesToday: null, capturesToday: null }))).toBe("47/100 jobs · resets 6:30 PM IST");
   });
 
-  it("is disabled with the reason: no role, no country, or the day's searches used", () => {
+  it("is disabled with the reason: no role, no country, the day's searches used, or the day's new jobs", () => {
     expect(blockedReason(candidate, searches())).toBeNull();
     expect(blockedReason({ ...candidate, primaryRole: null, targetRoles: [] }, searches())).toBe("Add a target role first");
     expect(blockedReason({ ...candidate, country: null }, searches())).toBe("Add the candidate's country on their résumé");
     expect(blockedReason(candidate, searches({ searchesToday: 20 }))).toBe("20/20 searches today · resets 6:30 PM IST");
+    expect(blockedReason(candidate, searches({ jobsToday: 100 }))).toBe("100/100 new jobs today · resets 6:30 PM IST");
   });
 });

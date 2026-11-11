@@ -53,6 +53,8 @@ export function blockedReason(candidate: Pick<Candidate, "primaryRole" | "target
   if (usage && usage.searchesToday !== null && usage.searchesToday >= usage.searchesCap) {
     return `${usage.searchesToday}/${usage.searchesCap} searches today · resets ${resetTime(usage.resetsAt)}`;
   }
+  // The backend refuses a search once the candidate has today's new jobs (429): say so before the press.
+  if (usage && usage.jobsToday >= usage.jobsCap) return `${usage.jobsToday}/${usage.jobsCap} new jobs today · resets ${resetTime(usage.resetsAt)}`;
   return null;
 }
 
