@@ -62,21 +62,24 @@ async def _attempt(url: str, params: dict, headers: dict, timeout: float) -> dic
 
 async def get_json(url: str, params: dict, *, headers: dict | None = None, source: str = "",
                    timeout: float | None = None, attempts: int = 2) -> dict:
-    """The source's JSON object, or `ProviderError`. Logs the outcome by code and timing only. A page waiting on the
-    call (a job's full posting, job search PR 3) passes a shorter `timeout` and one attempt."""
+    """The source's JSON object, or `ProviderError`. Logs the outcome by code and timing only. `timeout` (default
+    `TIMEOUT_SECONDS`) is the whole call, the retry and its wait included: a retry gets what is left, and none when too
+    little is (CodeRabbit and CodeAnt on #135). A page waiting on the call (a job's full posting, job search PR 3)
+    passes a shorter `timeout` and one attempt."""
     started = time.monotonic()
     headers = headers or {}
     timeout = TIMEOUT_SECONDS if timeout is None else timeout       # read now: tests and settings may change it
+    deadline = started + timeout
     for attempt in range(1, attempts + 1):
         try:
-            payload = await _attempt(url, params, headers, timeout)
+            payload = await _attempt(url, params, headers, max(deadline - time.monotonic(), 0.001))
             logger.info("job search source=%s attempt=%d ok ms=%d", source, attempt,
                         (time.monotonic() - started) * 1000)
             return payload
         except _Retry as retry:
             logger.warning("job search source=%s attempt=%d code=%s ms=%d", source, attempt, retry.code,
                            (time.monotonic() - started) * 1000)
-            if attempt == attempts:
+            if attempt == attempts or deadline - time.monotonic() <= RETRY_DELAY_SECONDS:
                 raise ProviderError(retry.code) from None
             await asyncio.sleep(RETRY_DELAY_SECONDS)
         except ProviderError as error:

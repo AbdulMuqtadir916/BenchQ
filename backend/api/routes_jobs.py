@@ -946,6 +946,7 @@ def _validate_job_updates(updates: dict, allowed: set) -> None:
 @router.post("/bulk-update")
 def bulk_update_jobs(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Bulk update multiple jobs at once (status, seen, saved); returns {"updated": count, "not_found": [<ids>]} so the frontend can reconcile stale client-side selections."""
+    retired()  # job search PR 2 (bot review on #135): it still wrote the old pool's rows, which no list shows
     import uuid as _uuid
     job_ids = body.get("job_ids") or []
     updates = body.get("updates") or {}

@@ -257,14 +257,25 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
     marks its `job_runs` row failed."""
     provider = REGISTRY[provider_name]
     started = time.monotonic()
-    request = await asyncio.to_thread(_running_request, firm_id, candidate_id, batch_id)
+    ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
+               country=country)
+    try:
+        request = await asyncio.to_thread(_running_request, firm_id, candidate_id, batch_id)
+    except Exception as error:          # a database blip: the batch ends as an error now, not `running` for 15 minutes
+        logger.error("job search batch=%s candidate=%s start check failed %s", batch_id, candidate_id,
+                     type(error).__name__)
+        try:
+            await asyncio.to_thread(_save_error, provider=provider.name, code="internal", **ids)
+        except Exception as save_error:
+            logger.error("job search batch=%s candidate=%s error not saved %s", batch_id, candidate_id,
+                         type(save_error).__name__)
+        mark_run_failed("internal")
+        return "failed: internal"
     if request is None:
         logger.warning("job search batch=%s candidate=%s not running at start; source not asked", batch_id,
                        candidate_id)
         return "dropped: the search was no longer running"
     cursor, exhausted = request.get("cursor"), bool(request.get("exhausted"))
-    ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
-               country=country)
     try:
         # The source had nothing more for this role today: finish empty without asking again.
         result = SearchResult(jobs=[], metadata={"exhausted": True}) if exhausted else \

@@ -129,7 +129,7 @@ def test_the_next_day_starts_from_the_top(world, adnans, fake, test_db):
     ("POST", "/api/scrape/company/{id}"), ("POST", "/api/jobs/backfill-descriptions"),
     ("POST", "/api/searches/{id}/run"), ("POST", "/api/searches/{id}/test"),
     ("POST", "/api/companies/{id}/test-scrape"), ("POST", "/api/cover-letters"),
-    ("POST", "/api/cover-letters/generate")])
+    ("POST", "/api/cover-letters/generate"), ("POST", "/api/jobs/bulk-update")])
 def test_the_old_pools_write_routes_are_retired(api_client, method, path):
     r = api_client.request(method, path.replace("{id}", str(uuid.uuid4())), json={})
     assert r.status_code == 410, (path, r.status_code, r.text)

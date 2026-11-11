@@ -47,12 +47,4 @@ def test_another_firms_job_is_not_found(api_client, jobs, method, path):
     assert resp.status_code == 404, resp.text
 
 
-
-def test_bulk_update_reports_another_firms_job_as_not_found(api_client, jobs, test_db):
-    theirs = str(jobs["theirs"].id)
-    out = api_client.post("/api/jobs/bulk-update", json={"job_ids": [theirs], "status": "saved"}).json()
-    assert out["not_found"] == [theirs]
-    test_db.expire_all()
-    assert test_db.get(Job, jobs["theirs"].id).status == "new"
-
-
+# POST /api/jobs/bulk-update is retired (job search PR 2): its 410 is tested in test_job_search_capture.py.

@@ -138,14 +138,20 @@ def _to_dict(cl: CoverLetter, include_json_data: bool = False, ctx: dict | None 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
 def _build_ctx(rows: list[CoverLetter], db: Session, firm_id) -> dict:
-    """Batch-load the job, its application stage and the source resume name for a set of letters — three queries total rather than three per row."""
-    from backend.models.db import Application, Job, Resume
+    """Batch-load the job, its application stage and the source resume name for a set of letters — three queries total
+    rather than three per row. A letter's job is one of the firm's job postings (migration 0023), read through its
+    provider like every job read (bot review on #135: it still read the old pool, so a linked letter lost its job)."""
+    from backend.job_search import providers
+    from backend.models.db import Application, Resume
+    from backend.models.job_search import JobPosting
     job_ids = {cl.job_id for cl in rows if cl.job_id}
     res_ids = {cl.resume_id for cl in rows if cl.resume_id}
     jobs, stages, names = {}, {}, {}
     if job_ids:
-        for j in scoped_jobs(db, firm_id).filter(Job.id.in_(job_ids)).all():
-            jobs[j.id] = j
+        for posting in scoped(db, JobPosting, firm_id).filter(JobPosting.id.in_(job_ids)).all():
+            reader = providers.reader_for(posting.source)
+            jobs[posting.id] = reader.read(posting.content or {}) if reader else None
+        # An application names a posting once Arbaz's repoint lands (docs/team/arbaz.md); until then none match.
         for a in (scoped(db, Application, firm_id)
                     .filter(Application.job_id.in_(job_ids))
                     .order_by(Application.updated_at.desc()).all()):
@@ -155,12 +161,12 @@ def _build_ctx(rows: list[CoverLetter], db: Session, firm_id) -> dict:
             names[r.id] = r.name
     out = {}
     for cl in rows:
-        j = jobs.get(cl.job_id)
+        job = jobs.get(cl.job_id)
         out[cl.id] = {
-            "company": j.company if j else None,
-            "title": j.title if j else None,
-            "job_url": j.url if j else None,
-            "job_status": j.status if j else None,
+            "company": (job.company or None) if job else None,
+            "title": (job.title or None) if job else None,
+            "job_url": job.apply_url if job else None,
+            "job_status": None,                        # a posting has no status (docs/02 §6.y)
             "stage": stages.get(cl.job_id),
             "source_name": names.get(cl.resume_id) or ("Persona" if cl.from_persona else None),
         }

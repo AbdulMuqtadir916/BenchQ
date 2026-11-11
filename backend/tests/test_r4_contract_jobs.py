@@ -88,66 +88,12 @@ def test_patch_job_non_object_body_is_422(client, test_db, body):
     assert_clean(client.patch(f"/api/jobs/{job.id}", json=body), 422)
 
 
-
 def test_patch_job_wrong_type_never_leaks_internals(client, test_db):
     job = make_job(test_db)
     assert_no_leak(client.patch(f"/api/jobs/{job.id}", json={"saved": "banana"}))
 
 
-
-# ── POST /api/jobs/bulk-update ───────────────────────────────────────────────
-
-def test_bulk_update_reports_missing_ids(client, test_db):
-    job = make_job(test_db)
-    r = assert_clean(client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id), MISSING_UUID], "updates": {"status": "skip"},
-    }), 200)
-    assert r.json() == {"updated": 1, "not_found": [MISSING_UUID]}
-
-
-def test_bulk_update_empty_id_list_is_a_noop(client):
-    r = assert_clean(client.post("/api/jobs/bulk-update",
-                                json={"job_ids": [], "updates": {"status": "skip"}}), 200)
-    assert r.json() == {"updated": 0, "not_found": []}
-
-
-def test_bulk_update_drops_keys_outside_the_allow_list(client, test_db):
-    job = make_job(test_db, company="Acme")
-    assert_clean(client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id)], "updates": {"company": "Hijacked", "status": "skip"},
-    }), 200)
-    test_db.expire_all()
-    from backend.models.db import Job
-    assert test_db.get(Job, job.id).company == "Acme"
-
-
-def test_bulk_update_missing_keys_is_a_noop(client):
-    assert_clean(client.post("/api/jobs/bulk-update", json={}), 200)
-
-
-def test_bulk_update_reports_a_malformed_id_instead_of_aborting(client, test_db):
-    """The endpoint promises a `not_found` list; one junk id must not kill the batch."""
-    job = make_job(test_db)
-    r = client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id), "not-a-uuid"], "updates": {"status": "skip"},
-    })
-    assert r.status_code == 200
-    assert r.json()["updated"] == 1
-    assert "not-a-uuid" in r.json()["not_found"]
-
-
-def test_bulk_update_malformed_id_never_leaks_internals(client, test_db):
-    job = make_job(test_db)
-    assert_no_leak(client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id), "not-a-uuid"], "updates": {"status": "skip"},
-    }))
-
-
-def test_bulk_update_ten_thousand_ids_stays_shaped(client):
-    ids = [MISSING_UUID] * 10000
-    r = assert_clean(client.post("/api/jobs/bulk-update",
-                                json={"job_ids": ids, "updates": {"seen": True}}), 200)
-    assert r.json()["updated"] == 0
+# POST /api/jobs/bulk-update is retired (job search PR 2, bot review on #135): it answers 410.
 
 
 # ── POST /api/jobs/save-from-extension ───────────────────────────────────────
@@ -157,7 +103,6 @@ def test_bulk_update_ten_thousand_ids_stays_shaped(client):
 def test_save_from_extension_wrongly_typed_title_never_leaks_internals(client, bad):
     assert_no_leak(client.post("/api/jobs/save-from-extension",
                                json={"title": bad, "company": "C", "url": "https://x.com/1"}))
-
 
 
 def test_save_from_extension_ten_megabyte_description(client):
@@ -221,36 +166,5 @@ def test_a_valid_search_id_filter_still_filters(client, test_db):
     make_job(test_db, url="https://x.com/other")
     r = assert_clean(client.get(f"/api/jobs?search_id={search.id}"), 200)
     assert r.json()["total"] == 1
-
-
-
-def test_bulk_update_rejects_a_wrongly_typed_column(client, test_db):
-    """The same type guard covers the batch writer."""
-    job = make_job(test_db)
-    assert_clean(client.post("/api/jobs/bulk-update", json={
-        "job_ids": [str(job.id)], "updates": {"saved": "banana"},
-    }), 400)
-
-
-def test_bulk_update_keeps_going_past_several_malformed_ids(client, test_db):
-    """R4-T1-12: one junk id used to abort the batch and drop every valid write."""
-    from backend.models.db import Job
-    a = make_job(test_db)
-    b = make_job(test_db, url="https://x.com/jobs/2")
-    r = assert_clean(client.post("/api/jobs/bulk-update", json={
-        "job_ids": ["nope", str(a.id), "", str(b.id), MISSING_UUID],
-        "updates": {"status": "skip"},
-    }), 200)
-    assert r.json()["updated"] == 2
-    assert set(r.json()["not_found"]) == {"nope", "", MISSING_UUID}
-    test_db.expire_all()
-    assert test_db.get(Job, a.id).status == "skip"
-    assert test_db.get(Job, b.id).status == "skip"
-
-
-@pytest.mark.parametrize("body", [{"job_ids": "abc"}, {"job_ids": 5},
-                                  {"job_ids": [], "updates": "x"}])
-def test_bulk_update_rejects_wrongly_shaped_payloads(client, body):
-    assert_clean(client.post("/api/jobs/bulk-update", json=body), 422)
 
 

@@ -279,3 +279,23 @@ def test_linking_the_run_keeps_what_a_search_saving_at_that_moment_wrote(world, 
     with SessionLocal() as db:
         meta = db.query(ScrapeJob.meta).filter(ScrapeJob.batch_id == batch_id).scalar()
     assert meta["run_id"] == "run-1" and meta["next_cursor"] == "page-2"
+
+
+# ── The bot reviews on #135 (CodeRabbit, CodeAnt), PR 1's part ──
+
+def test_a_failed_start_check_ends_the_search_as_an_error_not_running(world, adnans, fake, test_db, monkeypatch):
+    """A database blip on the task's first read: the batch is an `internal` error at once, not `running` for 15
+    minutes blocking the candidate's next search, and the source is not asked."""
+    from backend.models.job_search import ScrapeJob
+    batch_id = _open(world, adnans)
+
+    def blip(*args):
+        raise RuntimeError("the database went away")
+    monkeypatch.setattr(pipeline, "_running_request", blip)
+    result = asyncio.run(pipeline.run_search(
+        firm_id=world["firm"].id, candidate_id=uuid.UUID(adnans["id"]), user_id=world["people"]["adnan"].id,
+        batch_id=batch_id, query="Java Developer", country="us", provider_name="fake"))
+    test_db.expire_all()
+    batch = test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == batch_id).one()
+    assert result == "failed: internal" and fake.calls == []
+    assert batch.state == "error" and batch.meta["error_code"] == "internal"

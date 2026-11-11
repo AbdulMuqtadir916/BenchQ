@@ -97,3 +97,21 @@ def test_base_resume_without_stub_stays_random(test_db):
     assert link.token != "0li"        # not the deterministic 0{stub} shape
 
 
+
+
+def test_a_letter_linked_to_a_job_posting_shows_its_job(api_client, test_db):
+    """Since 0023 a letter's job is a job posting: its company, title and link come from the posting, read through its
+    provider (bot review on #135: they were read from the old pool, so a linked letter showed none)."""
+    from backend.models.db import CoverLetter
+    from backend.tests.resume_support import make_posting
+    resume = make_version(test_db, DEFAULT_FIRM_ID)
+    candidate_id = resume.candidate_id
+    posting = make_posting(test_db, DEFAULT_FIRM_ID, candidate_id, resume.created_by_user_id, 1, title="Data Engineer")
+    letter = CoverLetter(firm_id=DEFAULT_FIRM_ID, name="Letter", resume_id=resume.id)
+    test_db.add(letter)
+    test_db.commit()
+    r = api_client.patch(f"/api/cover-letters/{letter.id}", json={"job_id": str(posting.id)})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["title"] == "Data Engineer 1" and body["company"] == "Acme"
+    assert body["job_url"] == "https://jobs.example.test/1" and body["job_status"] is None
