@@ -28,7 +28,7 @@ from backend.auth.sessions import Principal
 from backend.job_monitor import JobAlreadyRunningError, launch_background
 from backend.job_search import limits, pipeline, providers
 from backend.job_search.country import search_country
-from backend.job_search.text import safe_url
+from backend.job_search.text import safe_url, typed_text
 from backend.models.db import get_db, utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
 
@@ -39,7 +39,9 @@ PAGE_SIZE_MAX = 100
 
 
 class SearchBody(BaseModel):
-    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    # One line of text: a control character (NUL, tab, a line break inside it) is a 422 before anything is written.
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+                     AfterValidator(typed_text)]
 
 
 def _http_url(value: str) -> str:
@@ -48,16 +50,24 @@ def _http_url(value: str) -> str:
     return value.strip()
 
 
-Line = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
+def _lines(value: str) -> str:
+    return typed_text(value, multiline=True)
+
+
+# Typed fields refuse control characters (422 before anything is written; Abdul's second review of PR 1, P2): one
+# line for the title, company, location and link; the description keeps its tabs and line breaks.
+Line = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300), AfterValidator(typed_text)]
 
 
 class CaptureBody(BaseModel):
     source: Literal["manual", "extension"]
     title: Line
     company: Line
-    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100_000)]
-    url: Annotated[str, StringConstraints(max_length=2048), AfterValidator(_http_url)]
-    location: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
+    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100_000),
+                           AfterValidator(_lines)]
+    url: Annotated[str, StringConstraints(max_length=2048), AfterValidator(typed_text), AfterValidator(_http_url)]
+    location: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300),
+                        AfterValidator(typed_text)] | None = None
 
 
 def _too_many(detail: str) -> HTTPException:
@@ -87,7 +97,7 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
                                                     "résumé first.")
     limits.lock_bde(db, principal.user_id)
     now = utcnow()
-    limits.expire_stale(db, firm_id, candidate.id, now)
+    pipeline.expire_lost(db, firm_id, candidate.id, now)
     if limits.running_search(db, firm_id, candidate.id, now) is not None:
         raise HTTPException(status_code=409, detail="A search for this candidate is already running.")
     if limits.jobs_saved_today(db, firm_id, candidate.id, now) >= limits.JOBS_PER_CANDIDATE_PER_DAY:
@@ -97,22 +107,29 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
     provider = providers.active(db)
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
                                 query=body.query, country=country, provider=provider.name)
+    batch_id = batch.batch_id
+    # The batch is committed before the search is launched, so a launched search always has its row (Abdul's review,
+    # P2); the task also checks it is still `running` before asking the source. A crash between the two leaves the
+    # row `running`, and it becomes an `internal` error after 15 minutes, like a restart.
+    db.commit()
     try:
-        # The task starts only after this handler returns, so it always finds the batch committed. The run names
-        # nothing of the firm's (no meta; its scope is the opaque batch id): Super Admin's monitor lists runs across
-        # firms without a support view, so the search's details stay in the firm's own `scrape_jobs` row, which
-        # names the run (Abdul's review, P1).
+        # The run names nothing of the firm's (no meta; its scope is the opaque batch id): Super Admin's monitor lists
+        # runs across firms without a support view, so the search's details stay in the firm's own `scrape_jobs` row,
+        # which names the run (Abdul's review, P1).
         run_id = launch_background(
-            limits.JOB_TYPE, pipeline.run_search, scope_key=str(batch.batch_id),
+            limits.JOB_TYPE, pipeline.run_search, scope_key=str(batch_id),
             func_kwargs={"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
-                         "batch_id": batch.batch_id, "query": body.query, "country": country,
+                         "batch_id": batch_id, "query": body.query, "country": country,
                          "provider_name": provider.name})
-    except JobAlreadyRunningError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="A search for this candidate is already running.") from None
+    except Exception as error:
+        # Never started: the row goes, so it isn't one of the BDE's 20 attempts and doesn't block the candidate.
+        pipeline.discard_batch(db, firm_id, batch_id)
+        if isinstance(error, JobAlreadyRunningError):
+            raise HTTPException(status_code=409, detail="A search for this candidate is already running.") from None
+        raise HTTPException(status_code=503, detail="The search couldn't start; try again.") from None
     batch.meta = {**batch.meta, "run_id": str(run_id)}      # the run → batch link, both ways
     db.commit()
-    return {"batch_id": str(batch.batch_id), "run_id": str(run_id)}
+    return {"batch_id": str(batch_id), "run_id": str(run_id)}
 
 
 def _search_json(row: ScrapeJob, now=None) -> dict:

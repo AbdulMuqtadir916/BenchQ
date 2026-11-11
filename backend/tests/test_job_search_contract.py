@@ -42,6 +42,34 @@ def test_a_capture_body_of_the_wrong_shape_is_422(anonymous_client, world, adnan
     assert r.status_code == 422, r.text
 
 
+@pytest.mark.parametrize("over", [{"title": "Java\x00Developer"}, {"company": "Example\nCorp"}, {"location": "Re\x07mote"},
+                                  {"url": "https://jobs.example.test/x\x00y"}, {"description": "A made-up\x00 job."}])
+def test_a_capture_with_a_control_character_is_422_with_nothing_written(anonymous_client, world, adnans, test_db,
+                                                                         over):
+    """Abdul's second review of PR 1 (P2), for the capture's fields too."""
+    r = anonymous_client.post(_url(world, adnans, "job-postings"), json=_capture_body(**over),
+                              headers=world["as"]["adnan"])
+    assert r.status_code == 422, r.text
+    assert _rows(test_db, adnans) == ([], [])
+
+
+def test_a_captured_description_keeps_its_line_breaks(anonymous_client, world, adnans):
+    r = anonymous_client.post(_url(world, adnans, "job-postings"),
+                              json=_capture_body(description="Line one.\n\tLine two."), headers=world["as"]["adnan"])
+    assert r.status_code == 201, r.text
+
+
+def test_the_platform_audit_shows_no_captured_job_text(api_client, anonymous_client, world, adnans):
+    r = anonymous_client.post(_url(world, adnans, "job-postings"),
+                              json=_capture_body(title="Very Private Title", company="Very Private Co"),
+                              headers=world["as"]["adnan"])
+    assert r.status_code == 201
+    audit = api_client.get("/api/admin/audit")
+    assert "Very Private" not in audit.text
+    entry = next(e for e in audit.json() if e["entity_id"] == r.json()["id"])
+    assert (entry["entity_label"], entry["summary"]) == ("Captured job", "Captured a job (content restricted).")
+
+
 @pytest.mark.parametrize("tail", ["job-searches", "job-postings", f"job-postings/{uuid.uuid4()}"])
 def test_a_malformed_candidate_id_is_422_and_a_missing_one_404(anonymous_client, world, tail):
     base = f"/api/firms/{world['firm'].id}/candidates"
@@ -125,7 +153,7 @@ def test_a_provider_error_after_a_lost_batch_writes_nothing(anonymous_client, wo
     test_db.expire_all()
     batches, _ = _rows(test_db, adnans)
     lost_row = next(b for b in batches if b.batch_id == lost)
-    assert lost_row.meta.get("error_code") is None                          # the late task didn't overwrite it
+    assert lost_row.meta.get("error_code") == "internal"                    # as it was lost; not the late timeout
 
 
 # ── concurrency ──────────────────────────────────────────────────────────────

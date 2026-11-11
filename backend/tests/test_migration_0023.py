@@ -60,3 +60,30 @@ def test_downgrade_points_back_at_jobs_and_drops_captures(scratch_db):
     assert _fks(engine, "cover_letters")["cover_letters_job_id_fkey"] == "jobs"
     assert "resumes_job_id_fkey" in _fks(engine, "resumes")
     assert "kind" not in {c["name"] for c in inspect(engine).get_columns("scrape_jobs")}
+
+
+def test_upgrade_runs_again_after_a_downgrade_that_kept_searches(scratch_db):
+    """Abdul's review of PR 1 (P2), for 0023 and 0022 together: searches and their jobs kept by a downgrade (to 0022,
+    and on to 0021) upgrade again; a capture doesn't survive the way down."""
+    name, engine = scratch_db
+    _ok(_alembic(name, "upgrade", "0023"))
+    firm_id, candidate_id, _ = _firm_and_candidate(engine)
+    search, captured = uuid.uuid4(), uuid.uuid4()
+    with engine.begin() as conn:
+        for batch_id, kind, n in ((search, "search", "a"), (captured, "capture", "b")):
+            conn.execute(text(
+                "INSERT INTO scrape_jobs (id, firm_id, candidate_id, user_id, batch_id, state, finished_at, kind) "
+                "VALUES (:id, :firm_id, :candidate_id, :user_id, :batch_id, 'success', now(), :kind)"),
+                {"id": uuid.uuid4(), "firm_id": firm_id, "candidate_id": candidate_id,
+                 "user_id": _owner_id(engine, firm_id), "batch_id": batch_id, "kind": kind})
+            conn.execute(text(
+                "INSERT INTO job_postings (id, firm_id, candidate_id, batch_id, source, job_id, content) VALUES "
+                "(:id, :firm_id, :candidate_id, :batch_id, 'freehire', :job_id, '{}'::jsonb)"),
+                {"id": uuid.uuid4(), "firm_id": firm_id, "candidate_id": candidate_id, "batch_id": batch_id,
+                 "job_id": n * 64})
+    for down in ("0022", "0021"):
+        _ok(_alembic(name, "downgrade", down))
+        _ok(_alembic(name, "upgrade", "0023"))
+        with engine.connect() as conn:
+            assert conn.execute(text("SELECT batch_id, kind FROM scrape_jobs")).all() == [(search, "search")]
+            assert conn.execute(text("SELECT count(*) FROM job_postings")).scalar() == 1
