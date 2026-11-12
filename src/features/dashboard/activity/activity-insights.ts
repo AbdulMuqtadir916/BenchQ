@@ -1,6 +1,6 @@
 import { isBde } from "@/lib/auth/roles";
 import { reachedStatuses } from "@/lib/derive/funnel";
-import { benchDays, roleKey } from "@/lib/derive/list-filters";
+import { applicationDate, benchDays, roleKey } from "@/lib/derive/list-filters";
 import { isWorkingCandidate } from "@/lib/derive/tenancy";
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
@@ -43,7 +43,7 @@ export function compareActivity(applications: readonly Application[], window: Wi
     applications: changeFrom(now.applications, before.applications),
     responses: changeFrom(now.responses, before.responses),
     interviews: changeFrom(now.interviews, before.interviews),
-    placements: changeFrom(now.placements, before.placements),
+    offers: changeFrom(now.offers, before.offers),
   };
 }
 
@@ -57,9 +57,8 @@ export interface StageSpeed {
 
 const STEPS: { label: string; from: (app: Application) => string | null; to: (app: Application) => string | null }[] = [
   { label: "Applied → response", from: (app) => app.appliedAt, to: (app) => app.firstResponseAt },
-  { label: "Response → interview", from: (app) => app.firstResponseAt, to: (app) => app.interviewAt },
-  { label: "Interview → offer", from: (app) => app.interviewAt, to: (app) => app.offerAt },
-  { label: "Offer → placed", from: (app) => app.offerAt, to: (app) => (app.status === "PLACED" ? app.closedAt : null) },
+  { label: "Response → interview", from: (app) => app.firstResponseAt, to: (app) => applicationDate(app, "interview") },
+  { label: "Interview → offer", from: (app) => applicationDate(app, "interview"), to: (app) => applicationDate(app, "offer") },
 ];
 
 /** How long each step took, for the steps finished in the period. The slowest is where applications wait. */
@@ -81,12 +80,12 @@ export function stageSpeeds(applications: readonly Application[], window: Window
   return speeds;
 }
 
-/** Days to fill, end to end: submission to placement, for placements in the period. */
-export function averageDaysToPlace(applications: readonly Application[], window: Window): number | null {
+/** Days to an offer, end to end: submission to offer, for offers in the period. Offer is the last stage. */
+export function averageDaysToOffer(applications: readonly Application[], window: Window): number | null {
   const spans = applications.flatMap((app) => {
     const start = at(app.appliedAt);
-    const end = at(app.closedAt);
-    return app.status === "PLACED" && start !== null && end !== null && end >= start && isIn(end, window) ? [(end - start) / DAY_MS] : [];
+    const end = at(applicationDate(app, "offer"));
+    return start !== null && end !== null && end >= start && isIn(end, window) ? [(end - start) / DAY_MS] : [];
   });
   return spans.length ? Math.round(spans.reduce((sum, days) => sum + days, 0) / spans.length) : null;
 }
@@ -96,21 +95,21 @@ export interface Ratios {
   submissionToInterviewPct: number | null;
   /** Of those interviewed, the share with an offer. */
   interviewToOfferPct: number | null;
-  /** Applications submitted for each placement in the period. */
-  applicationsPerPlacement: number | null;
+  /** Applications submitted for each offer in the period. */
+  applicationsPerOffer: number | null;
 }
 
 const pct = (part: number, whole: number) => (whole ? Math.round((100 * part) / whole) : null);
 
 export function ratios(applications: readonly Application[], window: Window): Ratios {
   const submitted = submittedIn(applications, window);
-  const interviewed = submitted.filter((app) => app.interviewAt);
-  const offered = interviewed.filter((app) => app.offerAt);
-  const placements = countActivity(applications, window).placements;
+  const interviewed = submitted.filter((app) => applicationDate(app, "interview"));
+  const offered = interviewed.filter((app) => applicationDate(app, "offer"));
+  const offers = countActivity(applications, window).offers;
   return {
     submissionToInterviewPct: pct(interviewed.length, submitted.length),
     interviewToOfferPct: pct(offered.length, interviewed.length),
-    applicationsPerPlacement: placements ? Math.round(submitted.length / placements) : null,
+    applicationsPerOffer: offers ? Math.round(submitted.length / offers) : null,
   };
 }
 
@@ -224,7 +223,7 @@ export function sourceEffectiveness(applications: readonly Application[], jobs: 
 
 export interface CandidateProgress {
   candidate: Candidate;
-  /** How far their best application got: 0 for none submitted, then 1 (Applied) to 6 (Placed). */
+  /** How far their best application got: 0 for none submitted, then 1 (Applied) to 7 (Offer). */
   stage: number;
   /** Submitted for them in the last 24 hours. */
   today: number;

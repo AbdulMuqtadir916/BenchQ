@@ -504,12 +504,24 @@ def list_applications(
     principal: Principal = Depends(current_principal),
 ):
     from sqlalchemy.orm import selectinload
-    from backend.api.routes_candidates import _candidate
 
-    q = scoped(db, Application, firm_id).options(selectinload(Application.interviews), selectinload(Application.reviews))
-    from backend.api.routes_candidates import _visible
+    q = _application_scope(db, firm_id, principal, status=status, candidate_id=candidate_id, tracked_only=tracked_only)
+    q = q.options(selectinload(Application.interviews), selectinload(Application.reviews))
+
+    total = q.count()
+    apps = q.order_by(desc(Application.updated_at), Application.id).offset(offset).limit(limit).all()
+
+    return {"total": total, "applications": _application_responses(db, firm_id, apps)}
+
+
+def _application_scope(db, firm_id, principal, *, status=None, candidate_id=None, tracked_only=False):
+    """The rows a principal may list: firm, role scope (BDE own / MANAGER team), optional candidate and status.
+    Shared by the list and the counts so their numbers can never disagree (PR 4, DEBUG D-20)."""
+    from backend.api.routes_candidates import _candidate, _visible
     from backend.models.candidates import Candidate
     from backend.auth.scoping import own_scope, team_scope
+
+    q = scoped(db, Application, firm_id)
     visible_candidates = _visible(db, firm_id, principal).with_entities(Candidate.id)
     if tracked_only or own_scope(principal) is not None or team_scope(principal) is not None:
         q = q.filter(Application.candidate_id.in_(visible_candidates))
@@ -519,11 +531,23 @@ def list_applications(
     if candidate_uuid is not None:
         candidate = _candidate(db, firm_id, principal, candidate_uuid)
         q = q.filter(Application.candidate_id == candidate.id)
+    return q
 
-    total = q.count()
-    apps = q.order_by(desc(Application.updated_at), Application.id).offset(offset).limit(limit).all()
 
-    return {"total": total, "applications": _application_responses(db, firm_id, apps)}
+@router.get("/counts")
+def count_applications(
+    candidate_id: Optional[str] = None,
+    tracked_only: bool = False,
+    db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+    principal: Principal = Depends(current_principal),
+):
+    """Applications per stored status, over exactly the list's scope. Counters use this, never a partial list."""
+    from sqlalchemy import func
+
+    q = _application_scope(db, firm_id, principal, candidate_id=candidate_id, tracked_only=tracked_only)
+    rows = q.with_entities(Application.status, func.count()).group_by(Application.status).all()
+    by_status = {status or "": count for status, count in rows}
+    return {"total": sum(by_status.values()), "by_status": by_status}
 
 
 @router.get("/{app_id}")
@@ -553,6 +577,25 @@ def move_candidate_application_status(app_id: str, updates: dict,
         raise
 
 
+@router.post("/{app_id}/status-events/{event_id}/undo")
+def undo_automatic_status(app_id: str, event_id: str, updates: dict,
+                          principal: Principal = Depends(current_principal),
+                          db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
+    """Undo the latest automatic (email) status change with a compensating event (PR 4, DEBUG D-12)."""
+    from backend.applications.tracking import accessible_application, undo_email_decision
+    try:
+        app = accessible_application(db, firm_id, principal, app_id, lock=True)
+        if set(updates) - {"expected_revision", "command_id"}:
+            raise HTTPException(400, "Unexpected undo fields.")
+        undo_email_decision(db, app, principal, event_id=event_id, expected_revision=updates.get("expected_revision"),
+                            command_id=updates.get("command_id"))
+        db.commit()
+        return _application_responses(db, firm_id, [app])[0]
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.patch("/{app_id}/review")
 def resolve_application_review(app_id: str, updates: dict,
                                 principal: Principal = Depends(current_principal),
@@ -563,6 +606,8 @@ def resolve_application_review(app_id: str, updates: dict,
         app = accessible_application(db, firm_id, principal, app_id, lock=True)
         if set(updates) - {"review_id", "status", "expected_revision", "expected_review_revision", "note", "command_id"}:
             raise HTTPException(400, "Unexpected review fields.")
+        if updates.get("status") == "saved":
+            raise HTTPException(400, "A review can set any stage except Saved.")
         review_id = uuid_filter(updates.get("review_id"), "review_id")
         review = scoped(db, ApplicationReview, firm_id).filter_by(
             id=review_id, application_id=app.id, candidate_id=app.candidate_id).with_for_update().first()
@@ -1298,6 +1343,8 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
                             for r in a.reviews if r.state == "PENDING"],
         "applied_at": a.applied_at.isoformat() if a.applied_at else None,
         "cv_version_used": a.cv_version_used,
+        # The exact résumé version sent with the application (set when it moved to Applied with one, e.g. the extension).
+        "resume_id": str(a.resume_id) if a.resume_id else None,
         "notes": a.notes,
         "next_action": a.next_action,
         "next_action_date": a.next_action_date.isoformat() if a.next_action_date else None,

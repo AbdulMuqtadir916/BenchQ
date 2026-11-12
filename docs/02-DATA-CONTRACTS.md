@@ -216,6 +216,39 @@ foundation wording that allowed new `other` stage selections, and any older modu
 status to Applied or map generic Interview to a confirmed booking. No such code/data conversion occurs in this
 change. UI vocabulary/read compatibility and any new DTO details await Abdul’s sign-off before PR 4.
 
+#### PR 4 as built (2026-11-06, branch `codex/pr4-code-correction`) — for Abdul's sign-off
+
+Frontend vocabulary (`src/lib/schemas/enums.ts`): `ApplicationStatus` = the ten target values above (selectable, the only
+values a command writes); `LegacyApplicationStatus` = `RESPONSE`, `SCREENING`, `INTERVIEW`, `PLACED`, `REJECTED`,
+`WITHDRAWN`, `EXPIRED`, `OTHER`, `PHONE_SCREEN`, `FINAL_ROUND`, `UNKNOWN` (read-only, labelled "(legacy)", never hidden,
+never guessed into a target); `StoredApplicationStatus` = either, used by `Application.status` and history events. The
+mapper converts the ten exactly (upper case), maps the legacy table above, and turns blank/unknown into `UNKNOWN`.
+
+New/changed fields and endpoints:
+
+| Contract | Shape | Notes |
+|---|---|---|
+| `Application.statusRevision` | int ≥ 0 | server `status_revision`; sent back as `expected_revision` on every move |
+| `Application.pendingReviewCount` | int ≥ 0 | length of server `pending_reviews`; a manual move is refused (409) while > 0 |
+| `ApplicationEvent.source` / `.revision` / `.emailId` | `ui \| bde_review \| email_classifier \| email_undo` / int / id | `isAutomated` is true only for `email_classifier` |
+| `GET /api/applications/counts?candidate_id=` | `{total, by_status}` | same scope as the list (firm, role, candidate) |
+| `GET /api/applications` (frontend use) | all pages, 500 per request, de-duplicated | board/counters never built from a truncated list |
+| `POST /api/applications/{id}/status-events/{event_id}/undo` | body `{expected_revision, command_id}` → application | only the latest `email_classifier` event; compensating `email_undo` event; idempotent by command id |
+| `GET …/candidates/{id}/email-reviews` | `{reviews[], next_cursor, total_count}`; review adds `subject`, `from_name`, `received_at`, `created_at` | newest first; cursor `"<created_at>\|<id>"`; support view: count only |
+| `PATCH …/inbox-messages/{id}/review` | unchanged body | Dismiss never links or checks an application; `SET_STATUS` accepts every stage except `saved` |
+| Inbox message JSON | adds `content_revision`, `classification_version` | echoed by review/retry commands |
+| `email_classifications.outcome` | adds `AUTO_APPLIED` | migration **0025** (renumbered 0016 → 0022 → 0026 → 0025 as main took those numbers; after main's 0024); guarded downgrade |
+| Review reasons | adds `FORWARDED_EMAIL`, `INSUFFICIENT_CONTENT`, `CONFIDENCE_DISAGREEMENT`, `EMAIL_ALREADY_APPLIED`, `AUTOMATIC_CHANGE_UNDONE` | frontend labels in `review-reason.ts` |
+| `GET /api/stats/llm-costs` | adds `candidate_email_classification.{unpriced_calls, unconfirmed_calls}` | unknown cost is never summed as 0 |
+| `POST …/candidates/{id}/inbox-messages/{message_id}/review/open` (#127) | → `{review_id}` | `application.move`; opens a `MANUAL_REVIEW` for an email classified Other (Irrelevant), or returns the pending one; 409 when the email isn't a current Other result |
+| Other (Irrelevant) mail (#127) | shown, not hidden | decided 2026-11-07: a confident Other is listed in the Inbox as Irrelevant with subject and sender in clear (no longer encrypted); `other_purge_after` is still set to 30 days and the purge stays gated and OFF; mail linked to an application is never purged. Mail hidden before #127 stays hidden |
+| Classifier request (#127) | masked | `backend/inbox/masking.py`: before any network call the subject and body are masked in three layers (the candidate's and sender's known values; validated patterns for IN/US/GB phones, Aadhaar, bank, IFSC, UPI, PAN, addresses; Presidio 2.2.362 with `en_core_web_lg`, threshold 0.4, no network). It fails closed: if masking can't run, nothing is sent |
+| Applications: stage dates (live mapper) | `firstResponseAt`, `interviewAt`, `offerAt` | the backend stores none: read off `status_transitions` and `interviews` (first move out of Applied, not back to Saved; earliest booking not cancelled, else first move to Interview scheduled; first move to Offer or legacy Placed) |
+
+Automatic writes (switches OFF by default): the five approved targets at ≥ 0.8 (decision value = the lower of the
+provider's two numbers), Gmail-verified sender, unique match, fresh email, plus one narrow rule pending sign-off
+(DEBUG D-14): an `applied` email on an `incomplete_application` returns it to Applied. Offer and Move On always review.
+
 ---
 
 ## 3. Session & tenancy
@@ -1722,7 +1755,9 @@ unchanged in this PR; their live DTO integration and display changes belong to l
 - `resume_id` on that move is the résumé version the form was sent with: the one the extension's answers came from.
   Only a move to `applied` may send it, and it must be one of the application's candidate's versions, not deleted;
   anything else returns 400 and changes nothing. It becomes the application's `resume_id`, the résumé the application
-  shows as sent. A move back to Saved leaves it.
+  shows as sent. A move back to Saved leaves it. Every application response carries it as `resume_id` (the version's
+  id, or `null` when none was recorded, e.g. a move to Applied by hand); the frontend maps it to
+  `Application.resumeVersionId` for the "Résumé sent" panel (added 2026-11-12, #127, Abdul's review).
 - `applications.form_data` (migration 0021, nullable JSONB) is what the employer's form held when the BDE marked the
   job applied from the extension: `{fields: [{label, value, required, source}]}`, `source` being `autofill` or `bde`.
   Only a move to `applied` may send it; at most 200 fields, labels up to 500 characters, values up to 4000; anything
@@ -2094,7 +2129,8 @@ or activation of external processing/purge/automation. Exact legacy/UI status ma
   content_revision, category, finite confidence/probabilities, model/provider/prompt/category identity,
   normalized sender_auth_result, receive_time_verified, reason/outcome and created_at. Unique email/result version;
   database trigger rejects updates and permits deletion only after explicit content tombstoning. No raw prompts,
-  bodies or authentication headers. Other is retained hidden/encrypted, not a new application status.
+  bodies or authentication headers. Other is retained hidden/encrypted, not a new application status. **Changed by #127
+  (2026-11-07): Other is shown as Irrelevant, not hidden or encrypted; see "PR 4 as built" in §2.1.**
 - inbox_messages: classification_state PENDING/PROCESSING/DONE/ERROR/EXCLUDED, attempts/result version,
   content_revision, lease owner/expiry, next retry and safe error; normalized sender verdict UNKNOWN/PASS/FAIL,
   receive-time provenance, hidden_at and other_purge_after. Hidden subject/sender values are encrypted too.

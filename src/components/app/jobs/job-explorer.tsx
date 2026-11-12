@@ -37,6 +37,8 @@ import { PORTALS, PortalLogo, SOURCE_KEYS, portalForJob, type PortalKey } from "
 import { useCan } from "@/lib/auth/permissions";
 import { useHref } from "@/lib/routes/use-href";
 import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
+import { savedJobKey, usePendingSavedJobs, useToggleSavedJob } from "@/lib/hooks/use-applications";
+import { ApiError } from "@/lib/api/client";
 import { jobLocation } from "@/lib/format/job";
 import { SourcePreview } from "@/components/app/jobs/source-preview";
 
@@ -108,19 +110,35 @@ export function JobExplorer({
   const [scoreFloor, setScoreFloor] = useState(startingCandidateId ? "70" : "0");
   const [sort, setSort] = useState(startingCandidateId ? "MATCH" : "NEWEST");
   const [selectedId, setSelectedId] = useState("");
-  // Save / Hide are the person's own (docs/02 §6.x), kept by the server; only the acting roles get them.
+  // Hide is the person's own (docs/02 §6.x). Save is for a candidate: the job becomes a Saved application
+  // (favourite + Saved draft on the backend) and stays in this list. Only the acting roles get them.
   const canMark = useCan("job.apply");
-  const { savedIds, hiddenIds } = useJobMarks();
+  const { hiddenIds } = useJobMarks();
   const toggleMark = useToggleJobMark();
+  const toggleSavedJob = useToggleSavedJob();
+  const pendingSaves = usePendingSavedJobs();
   const [showHidden, setShowHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const context = lockedCandidate ?? candidates.find((candidate) => candidate.id === candidateId) ?? null;
-  const appliedIds = useMemo(
-    () => new Set(context ? applications.filter((application) => application.candidateId === context.id).map((application) => application.jobId) : []),
+  const contextApplications = useMemo(
+    () => (context ? applications.filter((application) => application.candidateId === context.id) : []),
     [applications, context],
   );
+  // A Saved job stays in the feed (heart filled); a job that has moved past Saved has left it.
+  const appliedIds = useMemo(
+    () => new Set(contextApplications.filter((application) => application.status !== "SAVED").map((application) => application.jobId)),
+    [contextApplications],
+  );
+  const savedApplications = useMemo(
+    () => new Map(contextApplications.filter((application) => application.status === "SAVED").map((application) => [application.jobId, application.id])),
+    [contextApplications],
+  );
+  const isSaved = (jobId: string) => {
+    const pending = context ? pendingSaves.get(savedJobKey(context.id, jobId)) : undefined;
+    return pending ?? savedApplications.has(jobId);
+  };
 
   const rows = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
@@ -147,11 +165,32 @@ export function JobExplorer({
 
   const selected = rows.find(({ job }) => job.id === selectedId) ?? rows[0] ?? null;
   const arrivedToday = rows.filter(({ job }) => job.postedAt && renderedAt - new Date(job.postedAt).getTime() < 86_400_000).length;
+  // A save error belongs to the candidate it was for: another candidate in context never shows it.
+  const failedFor = toggleSavedJob.variables && ("save" in toggleSavedJob.variables ? toggleSavedJob.variables.save.candidateId : toggleSavedJob.variables.unsave.candidateId);
+  const saveError = toggleSavedJob.error && failedFor === context?.id
+    ? toggleSavedJob.error instanceof ApiError && toggleSavedJob.error.status === 404
+      ? `This job is not in ${context?.fullName ?? "this candidate"}'s job list, so it can't be saved for them yet.`
+      : toggleSavedJob.error.message
+    : null;
   const activeFilterCount = [portal !== "ALL", remote !== "ALL", Number(scoreFloor) > 0, Boolean(query)].filter(Boolean).length;
 
-  function toggleSaved(id: string) {
-    toggleMark.mutate({ jobId: id, kind: "SAVED", on: !savedIds.has(id) });
+  /** Heart: save the job for the candidate in context, or remove the untouched Saved draft again. */
+  function toggleSaved(job: Job) {
+    if (!context || pendingSaves.has(savedJobKey(context.id, job.id))) return;
+    const applicationId = savedApplications.get(job.id);
+    if (applicationId) toggleSavedJob.mutate({ unsave: { applicationId, jobId: job.id, candidateId: context.id } });
+    else saveJob(job);
   }
+
+  function saveJob(job: Job) {
+    if (!context || savedApplications.has(job.id) || pendingSaves.has(savedJobKey(context.id, job.id))) return;
+    toggleSavedJob.mutate({
+      save: { candidateId: context.id, jobId: job.id, title: job.title, company: job.company.name, url: job.applyUrl ?? job.provenance.sourceUrl ?? "" },
+    });
+  }
+
+  /** Opening a job's source means the BDE is working on it: it is saved for the candidate in context. */
+  const onOpenSource = canMark && context ? (job: Job) => saveJob(job) : null;
 
   /** Hide a job from your own feed, or bring it back while hidden jobs are shown. */
   function toggleHidden(id: string) {
@@ -213,6 +252,8 @@ export function JobExplorer({
         </div>
       ) : null}
 
+      {saveError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{saveError}</p> : null}
+
       <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xs)] lg:grid lg:h-[calc(100dvh-260px)] lg:min-h-[510px] lg:grid-cols-[minmax(350px,42%)_minmax(0,1fr)]">
         <div className="min-h-[360px] border-b border-[var(--color-border)] lg:min-h-0 lg:border-b-0 lg:border-r">
           <div className="flex h-9 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 text-caption text-[var(--color-text-3)]">
@@ -271,8 +312,16 @@ export function JobExplorer({
                       </button>
                       {canMark ? (
                         <div className="flex flex-col border-l border-[var(--color-border)]">
-                          <button type="button" aria-label={savedIds.has(job.id) ? "Unsave job" : "Save job"} aria-pressed={savedIds.has(job.id)} onClick={() => toggleSaved(job.id)} className="flex flex-1 items-center justify-center text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-danger-fg)]">
-                            <Heart size={14} fill={savedIds.has(job.id) ? "currentColor" : "none"} />
+                          <button
+                            type="button"
+                            aria-label={!context ? "Choose a candidate to save this job" : isSaved(job.id) ? `Remove from ${context.fullName}'s Saved` : `Save for ${context.fullName}`}
+                            title={!context ? "Choose a candidate to save this job" : undefined}
+                            aria-pressed={isSaved(job.id)}
+                            disabled={!context}
+                            onClick={() => toggleSaved(job)}
+                            className={cn("flex flex-1 items-center justify-center text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-danger-fg)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-[var(--color-text-3)]", isSaved(job.id) && "text-[var(--color-danger-fg)]")}
+                          >
+                            <Heart size={14} fill={isSaved(job.id) ? "currentColor" : "none"} />
                           </button>
                           <button type="button" aria-label={hiddenIds.has(job.id) ? "Unhide job" : "Hide job"} onClick={() => toggleHidden(job.id)} className="flex flex-1 items-center justify-center border-t border-[var(--color-border)] text-[var(--color-text-3)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]">
                             {hiddenIds.has(job.id) ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -303,8 +352,9 @@ export function JobExplorer({
                 onCopy={() => copyJobLink(selected.job)}
                 isHidden={hiddenIds.has(selected.job.id)}
                 onHide={canMark ? () => toggleHidden(selected.job.id) : null}
+                onOpenSource={onOpenSource}
               />
-              <SourcePreview job={selected.job} portal={selected.portal} />
+              <SourcePreview job={selected.job} portal={selected.portal} onOpenSource={onOpenSource} />
             </motion.div>
           ) : (
             <div className="flex h-full min-h-[520px] items-center justify-center p-8 text-center">
@@ -332,6 +382,7 @@ function JobDetailHeader({
   onCopy,
   isHidden,
   onHide,
+  onOpenSource,
 }: {
   job: Job;
   score: number | null;
@@ -344,6 +395,8 @@ function JobDetailHeader({
   isHidden: boolean;
   /** Null for a read-only viewer: no Hide in the menu. */
   onHide: (() => void) | null;
+  /** Saves the job for the candidate in context when its source is opened; null when nothing is saved. */
+  onOpenSource: ((job: Job) => void) | null;
 }) {
   const toHref = useHref();
   // A read-only viewer (VIEWER, a support view) gets the job's details, never "Tailor & apply".
@@ -365,7 +418,7 @@ function JobDetailHeader({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer">Open source<ExternalLink size={13} /></a></Button>
+          <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)}>Open source<ExternalLink size={13} /></a></Button>
           {context && canApply ? <Button size="sm"><Sparkles size={13} />Tailor & apply</Button> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
           <Button variant="secondary" size="icon" aria-label="More job actions" aria-expanded={menuOpen} onClick={onMenuToggle}><MoreHorizontal size={15} /></Button>
         </div>
@@ -382,7 +435,7 @@ function JobDetailHeader({
         {menuOpen ? (
           <motion.div initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.985 }} transition={POPOVER_TRANSITION} className="absolute right-5 top-16 z-30 w-56 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-md)]">
             <button type="button" onClick={onCopy} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]">{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? "Link copied" : "Copy job link"}</button>
-            <a href={sourceUrl} target="_blank" rel="noreferrer" className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"><ExternalLink size={14} />Open in new tab</a>
+            <a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"><ExternalLink size={14} />Open in new tab</a>
             {onHide ? (
               <button type="button" onClick={onHide} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-danger-fg)] hover:bg-[var(--color-danger-bg)]">{isHidden ? <><Eye size={14} />Unhide this job</> : <><EyeOff size={14} />Hide this job</>}</button>
             ) : null}
