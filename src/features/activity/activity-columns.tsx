@@ -6,6 +6,7 @@ import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { ActionTag, ActorTag } from "@/components/app/ledger-tags";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { actorDisplay } from "./actor";
+import { candidateLabel } from "./candidate-label";
 
 interface ActivityColumnOptions {
   /** The Super Admin's log reads every firm, so each row names its own. */
@@ -57,10 +58,10 @@ export function activityColumns(isExactTime: boolean, { hasFirm, hasNoCandidate,
     }] : []),
     ...(hasNoCandidate ? [] : [{
       id: "candidate",
-      accessorFn: (entry: LedgerEntry) => entry.candidateName ?? "",
+      accessorFn: (entry: LedgerEntry) => candidateLabel(entry),
       header: "Candidate",
       enableSorting: false,
-      cell: ({ row }: { row: { original: LedgerEntry } }) => <span className="whitespace-nowrap text-[var(--color-text-2)]">{row.original.candidateName ?? "—"}</span>,
+      cell: ({ row }: { row: { original: LedgerEntry } }) => <span className="whitespace-nowrap text-[var(--color-text-2)]">{candidateLabel(row.original)}</span>,
     }]),
     {
       id: "summary",
