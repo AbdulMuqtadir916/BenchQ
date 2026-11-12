@@ -69,7 +69,7 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, onOpen, 
     if (!canAct) return; // nothing is draggable then; and the backend refuses a VIEWER's write anyway
     const app = apps.find((a) => a.id === String(event.active.id));
     const to = String(event.over?.id ?? "");
-    if (!app || to === app.status) return;
+    if (!app || !event.over || to === app.status) return; // dropped outside every column: nothing to do
     if (!isSelectable(to as StoredApplicationStatus)) {
       setRefusal("Older statuses are read-only. Choose a current stage instead.");
       return;

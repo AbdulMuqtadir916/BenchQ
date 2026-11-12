@@ -52,6 +52,11 @@ describe("the list filters agree with the dashboard", () => {
     expect(filterApplications(applications, appsFilter({ candidate: "c2", status: "MOVE_ON" }), candidates, NOW).map((a) => a.id)).toEqual(["5"]);
   });
 
+  it("keeps the submission date of a job moved back to Saved; a draft has none", () => {
+    const saved = [app({ id: "6", status: "SAVED", appliedAt: daysAgo(3) }), app({ id: "7", status: "SAVED", appliedAt: null })];
+    expect(filterApplications(saved, appsFilter({ period: "30d" }), candidates, NOW).map((a) => a.id)).toEqual(["6"]);
+  });
+
   it("falls back to no filter for a stale or hand-edited link", () => {
     expect(appsFilter({ status: "NOPE", period: "5y", view: "grid" })).toMatchObject({ status: "", period: "", view: "kanban" });
     expect(candidatesFilter({ bench: "forever", status: "x" })).toMatchObject({ bench: "", status: "ALL" });

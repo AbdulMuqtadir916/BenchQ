@@ -28,8 +28,8 @@ One migration, now **0025** (was 0016, then 0022, then 0026, as main took those 
 | `backend/analyzer/llm_logger.py` | Optional `cost_usd` and `db` (savepoint, never commits the caller's transaction) — owner: Abdul |
 | `backend/main.py` | `llm-costs` adds `candidate_email_classification.{unpriced_calls, unconfirmed_calls}` |
 | `backend/config.py`, `backend/.env.example` | Automation, setup-recovery and historical switches (all default off) |
-| `backend/models/db.py`, `backend/migrations/versions/0016_email_outcome_auto_applied.py` | Outcome `AUTO_APPLIED`; guarded downgrade (renumbered from 0015 after main's 0015) |
-| Tests (new) | `test_pr4_backfill.py`, `test_migration_0016.py`, `test_pr4_classifier_gate.py`, `test_pr4_confidence.py`, `test_pr4_email_parts.py`, `test_pr4_spend.py`, `test_pr4_match_eligibility.py`, `test_pr4_counts.py`, `test_pr4_review_api.py`, `test_pr4_automation.py`, `test_migration_0016.py` |
+| `backend/models/db.py`, `backend/migrations/versions/0025_email_outcome_auto_applied.py` | Outcome `AUTO_APPLIED`; guarded downgrade (renumbered 0015 → 0016 → 0022 → 0026 → 0025 as main took those numbers) |
+| Tests (new) | `test_pr4_backfill.py`, `test_migration_0025.py`, `test_pr4_classifier_gate.py`, `test_pr4_confidence.py`, `test_pr4_email_parts.py`, `test_pr4_spend.py`, `test_pr4_match_eligibility.py`, `test_pr4_counts.py`, `test_pr4_review_api.py`, `test_pr4_automation.py`, `test_migration_0016.py` |
 | Tests (changed) | `test_pr3_provider.py` (mismatched confidence is no longer a failure; Gmail ARC cases), `isolation_cases.py`/`isolation_support.py` (counts and Undo routes, automatic-change fixture), `conftest.py` (every candidate-email switch off per test; no `.env` inheritance), `test_pr3_pipeline.py` (stub accepts `aliases`), `test_inbox_ai_spend.py` (from main: a classifier that isn't set up now leaves the email waiting, T1.1) |
 
 ## Frontend
@@ -150,5 +150,5 @@ migration table and `FIXTURE_VERSION`. Umamah's #126 (extension) merged without 
 Sign-offs needed at review: G2 status mapping, G3 contracts, G4 Incomplete → Applied, G6 migration, G7 logger, G8
 endpoint (all Abdul). Board column paging deferred (D-20 note). Jobs: the backend has no per-candidate job list yet (Zuhair), so saving a
 job that is not linked to the candidate is refused with a clear message; the job detail page's personal "Save" bookmark
-and Hide are still mock marks; hand capture is refused while `jobs` is live (no backend endpoint). Classifying mail imported before switch-on is a later PR
-(D-23).
+and Hide are still mock marks; hand capture is refused while `jobs` is live (no backend endpoint). Mail imported before switch-on is classified by the historical batches behind
+`CANDIDATE_EMAIL_HISTORICAL_ENABLED` (off by default; review only, D-23).

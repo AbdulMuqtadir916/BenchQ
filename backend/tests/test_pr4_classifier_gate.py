@@ -7,7 +7,7 @@ from backend.ai.config import ai_config
 from backend.inbox import classification_worker as worker, classifier_pause
 from backend.inbox.decider import DeciderError
 from backend.models.candidates import InboxMessage
-from backend.models.db import JobRun, Setting, utcnow
+from backend.models.db import JobRun, LlmCallLog, Setting, utcnow
 from backend.tests.test_pr3_matching import matching_case, mailbox_case, email  # noqa: F401 (fixtures)
 from backend.tests.test_pr3_pipeline import decision, pipeline  # noqa: F401 (fixture)
 
@@ -117,6 +117,40 @@ def test_inconclusive_probe_keeps_the_pause_and_the_attempt(test_db, pipeline):
     wait = datetime.fromisoformat(pause.meta['next_probe_at']) - utcnow()
     assert pause.status == 'running' and timedelta(minutes=10) < wait <= timedelta(minutes=15)
     assert pause.meta['probe_failures'] == 0
+    row = _row(test_db, message_id)
+    assert (row.classification_state, row.classification_attempts) == ('PENDING', 0)
+
+
+def _masking_fails(monkeypatch):
+    def broken(*args, **kwargs):
+        raise RuntimeError('synthetic masking failure')
+    monkeypatch.setattr(worker, 'build_request', broken)
+
+
+def test_a_masking_failure_sends_nothing_costs_nothing_and_retries_later(test_db, pipeline, monkeypatch):
+    """CodeRabbit #127: the request is masked before the dispatch is marked, so a masking failure is never a call."""
+    _, _, message_id = pipeline
+    _masking_fails(monkeypatch)
+    sent = []
+    monkeypatch.setattr(worker, 'classify', lambda *args, **kwargs: sent.append(args) or decision())
+    assert not worker.process_one(message_id)
+    row = _row(test_db, message_id)
+    assert sent == [] and (row.classification_state, row.classification_error) == ('PENDING', 'MASKING_FAILED')
+    assert row.classification_next_retry_at is not None
+    assert test_db.query(LlmCallLog).filter_by(purpose='email_classification').count() == 0
+    job = test_db.query(JobRun).filter_by(job_type='candidate_email_classification').one()
+    assert 'dispatch_started' not in job.meta and job.meta['error_code'] == 'MASKING_FAILED'
+
+
+def test_a_masking_failure_during_a_probe_keeps_the_pause_and_the_attempt(test_db, pipeline, monkeypatch):
+    _, _, message_id = pipeline
+    with worker.SessionLocal() as db:
+        classifier_pause.record_pause(db, CFG, 'PROVIDER_AUTH_REJECTED')
+    _make_probe_due(test_db)
+    _masking_fails(monkeypatch)
+    assert not worker.process_one(message_id)
+    pause = _pause_meta(test_db)
+    assert pause.status == 'running' and pause.meta['probe_failures'] == 0 and not pause.meta.get('cleared_at')
     row = _row(test_db, message_id)
     assert (row.classification_state, row.classification_attempts) == ('PENDING', 0)
 

@@ -34,9 +34,10 @@ function firstReached(app: Application, stage: ApplicationStatus): string | null
   return times[0] ?? null;
 }
 
-/** The date a filter's period is about. A saved job was never submitted. */
+/** The date a filter's period is about. A Saved draft was never submitted (no appliedAt); a job moved back to Saved
+ * keeps the date it was submitted. */
 export function applicationDate(app: Application, by: ApplicationDate): string | null {
-  if (by === "applied") return app.status === "SAVED" ? null : app.appliedAt;
+  if (by === "applied") return app.appliedAt;
   if (by === "response") return app.firstResponseAt;
   if (by === "interview") return app.interviewAt ?? firstReached(app, "INTERVIEW_SCHEDULED");
   return app.offerAt ?? firstReached(app, "OFFER");

@@ -11,6 +11,9 @@ import { BackendApplicationListSchema, BackendApplicationSchema, toApplication, 
 
 const mock = () => import("@/mocks/applications");
 const PAGE = 500;
+/** Reads of the whole list before giving up when rows keep moving between pages while it is read. */
+const LIST_READS = 3;
+type BackendApplicationRow = z.infer<typeof BackendApplicationListSchema>["applications"][number];
 
 /** Counts per status, computed by the server over the same scope as the list (DEBUG D-20). */
 export type ApplicationCounts = { total: number; byStatus: Partial<Record<StoredApplicationStatus, number>> };
@@ -25,15 +28,21 @@ const BackendUnsavedSchema = z.object({ favorite: z.literal(false) });
 const live = {
   /** Every page, in the server's stable order, so no board or counter is ever built from a truncated list. */
   list: async (firmId: string, params?: { candidateId?: string }): Promise<Application[]> => {
-    const rows = [];
-    for (let offset = 0; ; offset += PAGE) {
-      const query = { limit: PAGE, offset, ...(params?.candidateId ? { candidate_id: toBackendId(params.candidateId) } : {}) };
-      const page = await http.get("/api/applications", BackendApplicationListSchema, { query });
-      rows.push(...page.applications);
-      if (page.applications.length < PAGE || rows.length >= page.total) break;
+    // Pages are offsets over rows ordered by their latest change, so a row changed mid-read can move to a page already
+    // read and be missed. Fewer distinct rows than the server's total means that happened: the whole list is read again.
+    for (let attempt = 1; ; attempt += 1) {
+      const rows = new Map<string, BackendApplicationRow>();
+      let total = 0;
+      for (let offset = 0; ; offset += PAGE) {
+        const query = { limit: PAGE, offset, ...(params?.candidateId ? { candidate_id: toBackendId(params.candidateId) } : {}) };
+        const page = await http.get("/api/applications", BackendApplicationListSchema, { query });
+        total = page.total;
+        for (const row of page.applications) rows.set(row.id, row); // a row moved between pages appears once
+        if (page.applications.length < PAGE || offset + PAGE >= page.total) break;
+      }
+      if (rows.size >= total) return toApplications([...rows.values()], firmId);
+      if (attempt === LIST_READS) throw new ApiError("The applications kept changing while they loaded. Try again.", "CONFLICT", 409);
     }
-    // Pages are read in the server's order; a row moved between pages mid-read must not appear twice.
-    return toApplications([...new Map(rows.map((row) => [row.id, row])).values()], firmId);
   },
 
   byId: async (firmId: string, id: string): Promise<Application> => {

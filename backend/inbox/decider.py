@@ -92,12 +92,14 @@ def is_configured(cfg) -> bool:
     return cfg.provider == 'openrouter' and bool(cfg.model) and bool(cfg.api_key)
 
 
-def classify(subject, body, cfg, known=None, *, post=None):
+def classify(subject, body, cfg, known=None, *, post=None, request=None):
+    """`request`: the masked request when the caller built it already (the worker masks before marking the dispatch)."""
     if not is_configured(cfg):
         raise DeciderError('CLASSIFIER_NOT_CONFIGURED')
     send = post or httpx.post
     # Masked before the try: a masking failure must not look like a provider error, and nothing is sent.
-    request = build_request(subject, body, cfg, known)
+    if request is None:
+        request = build_request(subject, body, cfg, known)
     try:
         response = send(ENDPOINT, headers={'Authorization': 'Bearer ' + cfg.api_key},
                         json=request, timeout=35, follow_redirects=False)

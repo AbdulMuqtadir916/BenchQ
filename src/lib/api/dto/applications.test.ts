@@ -67,6 +67,15 @@ describe("applications DTO mapper", () => {
     expect(rejected?.firstResponseAt).toBe("2026-11-03T12:00:00.000Z");
   });
 
+  it("leaves an undone automatic move, and the Undo that took it back, out of the stage dates", () => {
+    const automatic = { ...move("applied", "screening_call", "03T10:00"), source: "email_classifier", event_id: "auto-1" };
+    const undo = { ...move("screening_call", "applied", "03T11:00"), source: "email_undo", event_id: "undo-1", undo_event_id: "auto-1" };
+    const undone = toApplication(row({ status: "applied", status_transitions: [move("saved", "applied", "01T09:00"), automatic, undo] }), "firm_1");
+    expect(undone?.firstResponseAt).toBeNull();
+    const kept = toApplication(row({ status: "screening_call", status_transitions: [move("saved", "applied", "01T09:00"), automatic] }), "firm_1");
+    expect(kept?.firstResponseAt).toBe("2026-11-03T10:00:00.000Z");
+  });
+
   it("dates the interview by the earliest booking that wasn't cancelled, before the history", () => {
     const application = toApplication(row({
       status: "interview_scheduled",

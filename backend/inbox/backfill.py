@@ -22,7 +22,8 @@ from backend.models.candidates import CandidateMailbox, InboxMessage
 from backend.models.db import JobRun, utcnow
 from backend.models.tenancy import Firm
 
-SETUP_ERRORS = ('CLASSIFIER_NOT_CONFIGURED', 'PROVIDER_AUTH_REJECTED')
+# MASKING_FAILED: the request could not be masked, so nothing was sent (the email is not at fault).
+SETUP_ERRORS = ('CLASSIFIER_NOT_CONFIGURED', 'PROVIDER_AUTH_REJECTED', 'MASKING_FAILED')
 RECOVERY = 'candidate_email_setup_recovery'
 HISTORICAL = 'candidate_email_historical'
 BATCH = 20

@@ -38,7 +38,9 @@ def purge_due(*, limit=100):
             latest = scoped(db, EmailClassification, message.firm_id).filter_by(
                 inbox_message_id=message.id, result_version=message.classification_version,
                 content_revision=message.content_revision).first()
-            review = scoped(db, ApplicationReview, message.firm_id).filter_by(inbox_message_id=message.id).first()
+            # Only a pending review keeps the email: one a BDE dismissed is erased on schedule like any Other mail.
+            review = scoped(db, ApplicationReview, message.firm_id).filter_by(
+                inbox_message_id=message.id, state='PENDING').first()
             known_job = scoped(db, EmailClassification, message.firm_id).filter(
                 EmailClassification.inbox_message_id == message.id, EmailClassification.category != 'other').first()
             # A visible email can be linked to an application (by the matcher or a BDE): linked mail is never erased.

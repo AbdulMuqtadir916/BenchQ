@@ -8,7 +8,7 @@ import { can, canManageResume, canSearchJobs } from "@/lib/auth/permissions";
 import { useJobSearches, useStartJobSearch } from "@/lib/hooks/use-jobs";
 import { blockedReason, searchRole, type FindJobsSearch } from "@/components/app/candidate/find-jobs";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
+import { moveFailure, useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { EASE_OUT } from "@/lib/motion";
 import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
@@ -102,12 +102,16 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
 
   const moveApplication = useCallback(
     (applicationId: string, to: ApplicationStatus, note: string | null = null) => {
-      const app = ws.applications.find((a) => a.id === applicationId);
-      if (!updateStatus.mutate({ id: applicationId, status: to, note })) {
+      const name = ws.applications.find((a) => a.id === applicationId)?.companyNameAtApply || "Application";
+      // Said once the server has the move; a failed move snaps back and says why instead.
+      const started = updateStatus.mutate({ id: applicationId, status: to, note }, {
+        onSuccess: () => setToast(`${name} moved to ${STATUS_LABEL[to]}`),
+        onError: (error) => setToast(`${name} didn't move to ${STATUS_LABEL[to]}: ${moveFailure(error)}`),
+      });
+      if (!started) {
         setToast("Saving… wait for the current move of this application to finish.");
         return false;
       }
-      setToast(`${app?.companyNameAtApply ?? "Application"} moved to ${STATUS_LABEL[to]}`);
       return true;
     },
     [ws.applications, updateStatus],

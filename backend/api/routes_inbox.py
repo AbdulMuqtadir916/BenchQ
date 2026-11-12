@@ -726,6 +726,11 @@ def review_candidate_email(candidate_id: uuid.UUID, message_id: uuid.UUID, body:
             move(db, app, principal, status=status, expected_revision=body.expected_application_revision,
                  command_id=body.command_id, note=body.note, review=review)
         else:
+            # Link only: the email is about this application and its status stays as it is. Resolved like Dismiss.
+            review.state = 'RESOLVED'
+            review.resolved_at = utcnow()
+            review.resolved_by_user_id = principal.user_id
+            review.note = body.note
             review.revision += 1
             _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=review.id,
                    summary='Reviewed candidate email linkage/disposition; no automatic status change.')

@@ -22,15 +22,20 @@ function undoFailure(error: Error): string {
   return error.message;
 }
 
+type NoticeProps = { application: Application; canAct: boolean; onOpenEmail?: (emailId: string) => void };
+
 /** "Moved automatically from an email" with the source email and a compensating Undo (DEBUG D-12). */
-export function AutomaticChangeNotice({ application, canAct, onOpenEmail }: { application: Application; canAct: boolean; onOpenEmail?: (emailId: string) => void }) {
+export function AutomaticChangeNotice({ application, canAct, onOpenEmail }: NoticeProps) {
+  const event = latestAutomaticChange(application);
+  // Keyed by the event: a later automatic change starts with its own Undo state and command id.
+  return event ? <AutomaticChangeBody key={event.id} application={application} event={event} canAct={canAct} onOpenEmail={onOpenEmail} /> : null;
+}
+
+function AutomaticChangeBody({ application, event, canAct, onOpenEmail }: NoticeProps & { event: ApplicationEvent }) {
   const undo = useUndoAutomaticChange();
   const command = useRef<string | null>(null);
-  const event = latestAutomaticChange(application);
-  if (!event) return null;
 
   function run() {
-    if (!event) return;
     command.current ??= newCommandId(); // the same click retried reuses its id: never two undos
     undo.mutate({ applicationId: application.id, eventId: event.id, expectedRevision: application.statusRevision, commandId: command.current });
   }

@@ -230,6 +230,29 @@ def test_purge_requires_both_flags_and_30_days(test_db, pipeline, monkeypatch):
     test_db.expire_all()
     row = test_db.get(InboxMessage, message_id)
     assert row.deleted_at and row.classification_state == 'EXCLUDED'
+
+
+def test_purge_waits_for_a_pending_review_but_not_for_a_dismissed_one(test_db, pipeline, monkeypatch):
+    """CodeRabbit #127: a review a BDE dismissed no longer keeps unlinked Other mail past its purge date."""
+    from backend.inbox.retention import purge_due
+    _, _, message_id = pipeline
+    assert worker.process_one(message_id, provider=lambda *a: decision('other'))
+    test_db.expire_all()
+    result = test_db.query(EmailClassification).one()
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_ENABLED', True)
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_EVALUATED', True)
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID', result.prompt_version)
+    row = test_db.get(InboxMessage, message_id)
+    row.other_purge_after, row.application_id = utcnow() - timedelta(seconds=1), None
+    review = ApplicationReview(firm_id=row.firm_id, candidate_id=row.candidate_id, inbox_message_id=row.id,
+                               classification_id=result.id, classification_version=result.result_version,
+                               reason='MANUAL_REVIEW')
+    test_db.add(review)
+    test_db.commit()
+    assert purge_due() == 0  # a BDE is still deciding
+    review.state = 'RESOLVED'  # dismissed: not about an application
+    test_db.commit()
+    assert purge_due() == 1
     assert row.subject == row.snippet == row.from_email == '' and row.body is None
     assert row.provider_message_id and row.source_address
     assert not test_db.query(EmailClassification).first()

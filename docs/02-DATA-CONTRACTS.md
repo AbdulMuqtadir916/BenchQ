@@ -30,7 +30,7 @@ firm → BDE → candidate hierarchy that JobNavigator has no concept of.
 | **Scoring record** — provider, depth (`light` \| `full`), keyword analysis, requirement mapping, ATS tips | `ScoringRecord` attached to a `Match` | The light/full split is a genuinely good cost control. Light for bulk ranking, full only when the BDE opens a job. |
 | **Dedup hash** — URL-based and content-based, tracking params stripped before hashing | `Job.dedupe.urlHash` + `contentHash` | Same requirement, same solution. Reposts across sources are constant. |
 | **H-1B sponsorship indicator**, LCA data per company | `Company.h1b` block | **The single most valuable borrow.** Work authorisation is the central filter in bench sales; JobNavigator already models it. |
-| **Persona** — profile grounding AI answers for autofill | `Candidate.preferredIndustries`, `dealBreakers`, the base résumé's summary, `qaBank` (the `persona` field was dropped in migration 0016) | Maps onto the screening-question prefill panel. |
+| **Persona** — profile grounding AI answers for autofill | `Candidate.preferredIndustries`, `dealBreakers`, the base résumé's summary, `qaBank` (the `persona` field was dropped in migration 0015) | Maps onto the screening-question prefill panel. |
 | **Q&A Bank** — reusable question/answer pairs | `QaBankEntry[]` per candidate | This *is* the prefill panel. Reusing answers across applications is a real time saving. |
 | **Tracer links** — unique per resume/letter combo, open/click tracking | `ResumeVersion.tracer` | Lets a BDE see whether a submission was opened. Free signal. |
 | **Template selection + tailoring history per job** | `ResumeVersion.templateId` + `tailoring` | Same shape. |
@@ -234,7 +234,7 @@ New/changed fields and endpoints:
 | `GET /api/applications/counts?candidate_id=` | `{total, by_status}` | same scope as the list (firm, role, candidate) |
 | `GET /api/applications` (frontend use) | all pages, 500 per request, de-duplicated | board/counters never built from a truncated list |
 | `POST /api/applications/{id}/status-events/{event_id}/undo` | body `{expected_revision, command_id}` → application | only the latest `email_classifier` event; compensating `email_undo` event; idempotent by command id |
-| `GET …/candidates/{id}/email-reviews` | `{reviews[], next_cursor, total_count}`; review adds `subject`, `from_name`, `received_at`, `created_at` | newest first; cursor `"<created_at>|<id>"`; support view: count only |
+| `GET …/candidates/{id}/email-reviews` | `{reviews[], next_cursor, total_count}`; review adds `subject`, `from_name`, `received_at`, `created_at` | newest first; cursor `"<created_at>\|<id>"`; support view: count only |
 | `PATCH …/inbox-messages/{id}/review` | unchanged body | Dismiss never links or checks an application; `SET_STATUS` accepts every stage except `saved` |
 | Inbox message JSON | adds `content_revision`, `classification_version` | echoed by review/retry commands |
 | `email_classifications.outcome` | adds `AUTO_APPLIED` | migration **0025** (renumbered 0016 → 0022 → 0026 → 0025 as main took those numbers; after main's 0024); guarded downgrade |
@@ -780,7 +780,7 @@ shiftWindow: z.object({
 
 > **Status: approved by the product owner on 2026-10-26** (07 §0 Q40–Q50; Q51 on 2026-10-27). Plan and modules:
 > `docs/candidate-onboarding/`. **Schemas in onboarding module 01; the derivations (seats, limit, load) change in
-> module 02.** The Q50 fields (`workSettings`, `preferredLocations`, `contactNotes`) are final since migration 0016 (2026-11-04).
+> module 02.** The Q50 fields (`workSettings`, `preferredLocations`, `contactNotes`) are final since migration 0015 (2026-11-04).
 
 The firm's layers are fixed: **OWNER → MANAGER → BDE → candidate** (Q40).
 
@@ -943,7 +943,7 @@ export const ResumeDraftSchema = z.object({
 });
 ```
 
-**Candidates final schema — 2026-11-04 (Zuhair; Abdul reviews with the PR), migration 0016.** `persona` is removed
+**Candidates final schema — 2026-11-04 (Zuhair; Abdul reviews with the PR), migration 0015.** `persona` is removed
 from the candidate: `preferredIndustries` and `dealBreakers` are flat lists, `will_relocate` and `notice_period_days`
 inside it were stale copies of `willingToRelocate` and `noticePeriodDays`, `toneNotes` was never filled, and the summary
 is the active base résumé's (`resumes.summary`). `candidates.skills` and `summary_state` are removed too (the skills are the
@@ -1982,7 +1982,7 @@ export const LedgerEntrySchema = z.object({
   note: z.string().nullable(),            // the handoff note on an ASSIGN entry; null on every other entry (§3.4)
   modelId: z.string().nullable(),
   promptVersion: z.string().nullable(),
-  // No evidenceIds or claimState: the ledger's columns are dropped in migration 0016 (Abdul, 2026-11-06).
+  // No evidenceIds or claimState: the ledger's columns are dropped in migration 0015 (Abdul, 2026-11-06).
   createdAt: z.string().datetime(),
 });
 

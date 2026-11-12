@@ -14,7 +14,7 @@ Branch `feat/inbox-masking-and-review` (#127, supersedes #116 on `codex/pr4-code
 - **Next:** merge #127; then T6.1 production activation. Coordinate with Arbaz's #129 (migration order, `app.job.title`
   in `tracking.py`; see the per-file report's "Remaining limits").
 - **Approvals still needed (not obtained by implementing):** Abdul — G2 status mapping, G3 contracts, G4 Incomplete →
-  Applied, G6 migration 0016, G7 logger change, G8 endpoint decision. Samad's go-ahead to build them was given; their
+  Applied, G6 migration 0025, G7 logger change, G8 endpoint decision. Samad's go-ahead to build them was given; their
   sign-off happens at PR review.
 - **Local only (not for the PR):** automation, setup recovery and real-mail switches are on in `cloned/backend/.env`;
   `.claude/launch.json` pnpm path; `.env.local`.
@@ -27,7 +27,7 @@ Branch `feat/inbox-masking-and-review` (#127, supersedes #116 on `codex/pr4-code
 - [ ] G3 Contracts in docs/02 (`statusRevision`, counts endpoint, review list fields, Undo API, new review reasons)
 - [ ] G4 Abdul decides Incomplete → Applied
 - [x] G5 Dedicated test Gmail + test candidate; approval to write classifier settings in the dev DB (Samad, 2026-11-06)
-- [ ] G6 Abdul approves the `AUTO_APPLIED` migration (0016)
+- [ ] G6 Abdul approves the `AUTO_APPLIED` migration (0025)
 - [ ] G7 Logger owner informed (`cost_usd`, `db` arguments) — not yet; deferred by Samad until after testing
 - [ ] G8 Abdul accepts the endpoint decision — not yet; deferred by Samad until after testing
 

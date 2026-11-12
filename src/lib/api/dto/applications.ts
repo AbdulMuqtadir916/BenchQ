@@ -19,6 +19,7 @@ const TransitionDto = z.object({
   actor_user_id: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   event_id: z.string().optional(),
+  undo_event_id: z.string().nullable().optional(),
   revision: z.number().int().nullable().optional(),
   email_id: z.string().nullable().optional(),
 });
@@ -98,7 +99,10 @@ function toEvents(dto: BackendApplication): ApplicationEvent[] {
  * - offer: the first move to Offer, or to a legacy Placed (D6: a placement reached Offer).
  */
 function stageDates(dto: BackendApplication): Pick<Application, "firstResponseAt" | "interviewAt" | "offerAt"> {
+  const undone = new Set(dto.status_transitions.flatMap((move) => (move.undo_event_id ? [move.undo_event_id] : [])));
   const moves = dto.status_transitions
+    // An undone automatic move never happened as far as the stage dates go, nor did the Undo that took it back.
+    .filter((move) => move.source !== "email_undo" && !(move.event_id && undone.has(move.event_id)))
     .map((move) => ({ from: move.from ? toFrontendStatus(move.from) : null, to: toFrontendStatus(move.to), at: toIsoOrNull(move.at) }))
     .filter((move): move is typeof move & { at: string } => move.at !== null)
     .sort((a, b) => a.at.localeCompare(b.at));

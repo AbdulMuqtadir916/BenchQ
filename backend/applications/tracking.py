@@ -301,6 +301,11 @@ def undo_email_decision(db, app, principal, *, event_id, expected_revision, comm
     undo_id = uuid.uuid4()
     payload['event_id'] = str(undo_id)
     app.status = original.from_status
+    if original.from_status == 'saved' and scoped(db, FavoriteJob, app.firm_id).filter_by(
+            candidate_id=app.candidate_id, job_id=app.job_id).first() is None:
+        # Back to Saved: the favorite the automatic change removed comes back, as a Saved move adds it (never twice).
+        db.add(FavoriteJob(firm_id=app.firm_id, candidate_id=app.candidate_id, job_id=app.job_id,
+                           marked_by_user_id=actor.id))
     app.status_revision += 1
     app.status_effective_at = now
     app.last_manual_change_at = now

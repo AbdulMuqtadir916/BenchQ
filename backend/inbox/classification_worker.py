@@ -4,6 +4,7 @@ One HTTP attempt per lease; no session/row lock is held across provider I/O.
 PENDING rows are the queue, so import/enqueue crashes are recovered by the sweep.
 """
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import time
 from datetime import timedelta
 import logging
@@ -20,8 +21,8 @@ from backend.analyzer.llm_logger import log_llm_call
 from backend.auth.scoping import scoped
 from backend.inbox.application_matching import (ai_input, company_aliases, email_parts, has_too_little_text,
                                                 matching_application_id, submitted_applications)
-from backend.inbox.decider import (DeciderError, classify, config_identity, decision_value, is_configured,
-                                  values_disagree)
+from backend.inbox.decider import (DeciderError, build_request, classify, config_identity, decision_value,
+                                  is_configured, values_disagree)
 from backend.inbox import backfill, classifier_pause
 from backend.inbox.decider_categories import CATEGORY_VERSION, CONFIDENCE_THRESHOLD
 from backend.inbox.policy import review_reason
@@ -186,6 +187,16 @@ def process_one(message_id, *, provider=None, aliases=None):
             parts = email_parts(row)
             subject, body = parts.subject, parts.current
             known = _known_identity(db, row, box)
+            text = ai_input(parts)
+            send = provider
+            if send is None:
+                # Masked before the dispatch is marked: a masking failure sends nothing, so it is never counted as a
+                # possible charge and never settles a probe. It retries with backoff; setup recovery requeues it.
+                try:
+                    request = build_request(subject, text, cfg, known)
+                except Exception:
+                    raise DeciderError('MASKING_FAILED', retryable=True) from None
+                send = partial(classify, request=request)
             # Committed before the request: "dispatch started; charge unknown" (DEBUG D-15). A crash after this
             # point is counted as possibly charged, never as free.
             started = scoped(db, JobRun, snapshot.firm_id).filter_by(id=snapshot.job_id).one()
@@ -193,7 +204,7 @@ def process_one(message_id, *, provider=None, aliases=None):
             db.commit()
         sent_at = time.monotonic()
         try:
-            result = (provider or classify)(subject, ai_input(parts), cfg, known)
+            result = send(subject, text, cfg, known)
         finally:
             duration_ms = int((time.monotonic() - sent_at) * 1000)
     except DeciderError as exc:
