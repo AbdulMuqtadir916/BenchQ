@@ -40,8 +40,7 @@ ALLOWED = {
     ("routes_cover_letters.py", "_generate_inner"): "worker; ids checked by generate_cover_letter",
     ("routes_admin.py", "list_audit"): "platform route: the ledger across the platform and every firm",
     ("routes_admin_activity.py", "_rows"): "platform route: the activity log across every firm",
-    ("routes_admin_activity.py", "list_activity"): "platform route: names the candidates on a page of that log",
-    ("routes_admin_activity.py", "candidates"): "platform route: the candidates on that log",
+    ("routes_admin_activity.py", "_named"): "platform route: names the candidates on a page of that log, and lists the ones on it, one firm at a time",
 }
 
 
