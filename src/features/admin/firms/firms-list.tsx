@@ -12,9 +12,10 @@ import { DataTable } from "@/components/app/data-table";
 import { EmptyState } from "@/components/app/empty-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { hasCustomLimits, lastActivityAt, ownerStatus, usageOf, type OwnerStatus } from "@/lib/derive/platform";
+import { billingState, todayInIndia, type BillingState } from "@/lib/derive/billing";
+import { lastActivityAt, ownerStatus, usageOf, type OwnerStatus } from "@/lib/derive/platform";
 import type { FirmUsage } from "@/lib/derive/tenancy";
-import { usePlans } from "@/lib/hooks/use-platform";
+import { useBillingPeriods, usePlans } from "@/lib/hooks/use-platform";
 import { useNow } from "@/lib/hooks/use-now";
 import { usePageKey } from "@/lib/hooks/use-page-key";
 import { queryGroup } from "@/lib/query/query-group";
@@ -23,7 +24,8 @@ import { useUrlState } from "@/lib/routes/use-url-state";
 import type { Firm } from "@/lib/schemas/session";
 import { FirmStatus } from "@/lib/schemas/tenancy";
 import { AdminDate, AdminTime } from "../admin-time";
-import { CustomLimitsBadge, FIRM_STATUS_LABEL, FirmStatusBadge, OverLimitBadge } from "../firm-badges";
+import { FIRM_STATUS_LABEL, FirmStatusBadge, OverLimitBadge } from "../firm-badges";
+import { BillingBadge } from "../billing-badge";
 import { usePlatformData } from "../use-platform-data";
 
 const PAGE_SIZE = 20;
@@ -43,7 +45,7 @@ interface FirmRow {
   usage: FirmUsage;
   owner: OwnerStatus;
   lastActivity: string | null;
-  isCustom: boolean;
+  billing: BillingState;
 }
 
 const SORTS: Record<z.infer<typeof FirmsQuery>["sort"], { label: string; compare: (a: FirmRow, b: FirmRow) => number }> = {
@@ -67,7 +69,8 @@ export function FirmsList() {
   const [query, setQuery] = useUrlState(FirmsQuery);
   const platform = usePlatformData();
   const plans = usePlans();
-  const group = queryGroup(platform.queries.firms, platform.queries.users, platform.queries.invites, platform.queries.candidates, platform.queries.ledger, plans);
+  const billing = useBillingPeriods();
+  const group = queryGroup(platform.queries.firms, platform.queries.users, platform.queries.invites, platform.queries.candidates, platform.queries.ledger, plans, billing);
 
   const canCreate = useCan("firm.create");
   const newFirm = useCallback(() => router.push(toHref("admin.firms.new")), [router, toHref]);
@@ -75,16 +78,16 @@ export function FirmsList() {
 
   const allRows = useMemo<FirmRow[]>(() => {
     const data = platform.data;
-    if (!data || !plans.data) return [];
+    if (!data || !plans.data || !billing.data) return [];
     return data.firms.map((firm) => ({
       firm,
       planName: plans.data.find((plan) => plan.id === firm.planId)?.name ?? "Unknown plan",
       usage: usageOf(firm, data, now),
       owner: ownerStatus(firm.id, data, now),
       lastActivity: lastActivityAt(firm.id, data.ledger),
-      isCustom: hasCustomLimits(firm.id, data.ledger),
+      billing: billingState(firm.id, billing.data, todayInIndia(now)),
     }));
-  }, [platform.data, plans.data, now]);
+  }, [platform.data, plans.data, billing.data, now]);
 
   const rows = useMemo(() => {
     const q = query.q.trim().toLowerCase();
@@ -117,13 +120,9 @@ export function FirmsList() {
         id: "plan",
         header: "Plan",
         enableSorting: false,
-        cell: ({ row }) => (
-          <span className="flex flex-wrap items-center gap-1.5">
-            {row.original.planName}
-            {row.original.isCustom ? <CustomLimitsBadge /> : null}
-          </span>
-        ),
+        cell: ({ row }) => row.original.planName,
       },
+      { id: "billing", header: "Billing", enableSorting: false, cell: ({ row }) => <BillingBadge state={row.original.billing} /> },
       {
         id: "seats",
         header: "BDE seats",

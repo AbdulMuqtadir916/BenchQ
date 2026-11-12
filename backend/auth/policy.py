@@ -17,8 +17,8 @@ FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "
                 "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
                 "candidate.assign", "notification.approve")
-PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
-                    "invite.revoke", "platformTeam.manage", "platform.notification.approve")
+PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "billing.edit",
+                    "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve")
 ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + ("team.view",) + PLATFORM_ACTIONS
 
 _ALL_ACTING = ("OWNER", "MANAGER", "BDE")

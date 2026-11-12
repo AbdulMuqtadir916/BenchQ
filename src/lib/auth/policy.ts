@@ -55,6 +55,7 @@ export type PlatformAction =
   | "firm.suspend"
   | "firm.viewWorkspace"
   | "plan.edit"
+  | "billing.edit"
   | "invite.resend"
   | "invite.revoke"
   | "platformTeam.manage"
@@ -64,7 +65,7 @@ export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
 
 export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search", "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify"];
 export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "notification.approve"];
-export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
+export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "billing.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
 export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
 
 const ALL_ACTING: readonly FirmRole[] = ["OWNER", "MANAGER", "BDE"];

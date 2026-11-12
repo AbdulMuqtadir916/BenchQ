@@ -89,6 +89,7 @@ NOT_REACHED["PATCH /api/cover-letters/{cl_id}"] = "404: Job not found"
 
 # "METHOD path" -> the state a seeded row needs for the route to do its work, set just before its request.
 ROUTE_STATE = {
+    "POST /api/admin/firms/{firm_id}/reactivate": {"firms": {"status": "SUSPENDED"}},
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry":
         {"inbox_messages": {"classification_state": "ERROR"}},
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify":

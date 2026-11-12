@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { activeNavId, routeById, type RouteId } from "@/lib/routes/registry";
 import { useHref } from "@/lib/routes/use-href";
-import { CustomLimitsBadge, FirmStatusBadge, OverLimitBadge } from "../firm-badges";
+import { FirmStatusBadge, OverLimitBadge } from "../firm-badges";
 import { ChangeSlugDialog, EditFirmDialog, ReactivateFirmDialog, SuspendFirmDialog } from "./firm-actions";
 import { SupportDialog } from "../support-dialog";
 import { useFirmDetail } from "./use-firm-detail";
@@ -73,7 +73,6 @@ export function FirmShell({ children }: { children: ReactNode }) {
               <span className="text-mono-sm text-[var(--color-text-3)]">{detail.firm.slug}</span>
               <FirmStatusBadge status={detail.firm.status} />
               {detail.usage.isOverLimit ? <OverLimitBadge /> : null}
-              {detail.isCustom ? <CustomLimitsBadge /> : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

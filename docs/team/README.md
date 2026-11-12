@@ -117,4 +117,5 @@ it. Everyone else reads it.
 | 0022 | Zuhair | Job search: `scrape_jobs.user_id` (who ran the search, for the BDE's daily attempts; filled in for rows a downgrade kept), `running` + `finished_at`, and the indexes for the caps and the history. Follows 0021 (Arbaz's) | `feat/job-search-pipeline` |
 | 0023 | Zuhair | Job search PR 2: `resumes` / `cover_letters` / `job_runs` / `llm_call_log` point at `job_postings`; `scrape_jobs.kind`; `job_postings.first_source`; `UNIQUE (firm_id, candidate_id, id)` on `job_postings`. Follows 0022 | `feat/job-postings-repoint` |
 | 0024 | Abdul | Drop `firms.bde_capacity` (07 Q63, reverses Q46) | `feat/firm-settings-cleanup` |
-| 0025+ | — | Claim the next number here in your PR | — |
+| 0025 | Abdul | Billing records: `plans.price_cents_per_seat`, `firm_billing_periods` (07 Q64–Q66) | `feat/billing-records` |
+| 0026+ | — | Claim the next number here in your PR | — |

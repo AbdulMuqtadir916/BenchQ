@@ -178,6 +178,13 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/admin/firms": A,
     "POST /api/admin/firms": A,
     "GET /api/admin/firms/{firm_id}": A,
+    "PATCH /api/admin/firms/{firm_id}/seats": A,          # BDE count (07 Q64)
+    "POST /api/admin/firms/{firm_id}/suspend": A,
+    "POST /api/admin/firms/{firm_id}/reactivate": A,
+    "PATCH /api/admin/plans/{plan_id}": A,
+    "GET /api/admin/billing-periods": A,                 # billing records: Super Admin only (07 Q65-Q66)
+    "POST /api/admin/firms/{firm_id}/billing-periods": A,
+    "PATCH /api/admin/billing-periods/{period_id}": A,
     "GET /api/admin/invites": A,
     "POST /api/admin/invites/{invite_id}/resend": A,
     "POST /api/admin/invites/{invite_id}/revoke": A,

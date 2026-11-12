@@ -779,6 +779,51 @@ handoff note. Changing a BDE's manager logs `UPDATE` on the `user`.
 
 ---
 
+### 3.5 Billing records — APPROVED 2026-11-12 (07 Q64–Q66)
+
+Super Admin only. No payment provider, no invoice, no GST, no trial. The amount is USD and **calculated by the backend**,
+never typed and never stored as a literal in a fixture.
+
+```ts
+// The one base plan (07 Q64). The frontend's PlanSchema (§3.1) gains the price and loses the features list.
+Plan = {
+  id, name, isActive,
+  seatLimit: 10,                    // BDEs, the default for a new firm; a new firm's candidateLimit starts at 10 × seatLimit
+  candidateLimit: 100,              // a new firm starts here; the Super Admin then sets each firm's own (07 Q67)
+  priceCentsPerSeat: 3500,          // $35.00 per BDE per period, integer cents; Super Admin only
+}
+// The plan has no features list (dropped, 07 Q64). The firm carries its own `priceCentsPerSeat`, copied from the plan
+// and edited per firm; it appears only in /api/admin responses, never in the session or any firm-side read.
+// Fixed in code, not fields: 10 candidates per BDE as a new firm's starting limit (backend/auth/billing.py), 100 new jobs per candidate per day
+// (backend/job_search/limits.py), a 30-day period.
+
+// One row per firm per 30 days (07 Q65). A snapshot: later changes to the plan or the firm never rewrite it.
+BillingPeriod = {
+  id, firmId,
+  startsOn: date, endsOn: date,     // endsOn = startsOn + 30 days; the next period starts the day after endsOn
+  seatLimit: number,                // BDEs billed
+  candidateLimit: number,           // the firm's limit when the period was billed (07 Q67); does not change the amount
+  jobsPerCandidatePerDay: 100,
+  priceCentsPerSeat: number,
+  amountCents: number,              // seatLimit × priceCentsPerSeat, written by the backend
+  status: "UNPAID" | "PAID",
+  paidOn: date | null,
+  note: string | null,
+  createdAt,
+}
+```
+
+- `Firm.seatLimit` is the billed BDE count. `Firm.candidateLimit` is always `candidatesPerSeat × seatLimit`; the backend
+  writes both together. Neither is ever set to a free number.
+- **Start next 30 days** creates a period from the firm's current limits and price. **Mark paid / unpaid** edits only the
+  current-or-past period's `status`, `paidOn` and `note`.
+- A BDE-count change updates the **current** period's snapshot and amount in the same transaction, and logs
+  `PLAN_CHANGED` (entity `firm_limits`) with the old and new counts. There is no proration.
+- **Derived, not stored:** `isPaymentOverdue(firm, periods, today)` = the firm has at least one period and none with
+  `status = PAID` has `startsOn <= today <= endsOn`. A firm with no period is "No billing period", never overdue.
+- **Nothing here reaches a firm user:** `firm_json`, the session and every firm-side response omit price, amount and
+  periods. A test asserts it.
+
 ## 4. Candidate
 
 ```ts

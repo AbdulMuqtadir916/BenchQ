@@ -3,26 +3,29 @@
 import { Can } from "@/lib/auth/can";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { History, Layers, SlidersHorizontal } from "lucide-react";
+import { History, Users } from "lucide-react";
 import { DataTable } from "@/components/app/data-table";
 import { EmptyState } from "@/components/app/empty-state";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  CANDIDATES_PER_SEAT, JOBS_PER_CANDIDATE_PER_DAY, candidateLimitFor, formatUsd, parseUsdToCents, periodAmountCents,
+} from "@/lib/derive/billing";
 import { planHistory } from "@/lib/derive/platform";
 import type { FirmUsage } from "@/lib/derive/tenancy";
-import { useAdjustLimits, useChangePlan } from "@/lib/hooks/use-platform";
+import { useSetSeats } from "@/lib/hooks/use-platform";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { AdminDialog, Field, errorMessage, fieldAria } from "../admin-dialog";
 import { AdminTime } from "../admin-time";
-import { CustomLimitsBadge } from "../firm-badges";
+import { BillingPeriods } from "./billing-periods";
 import { useFirmDetail, type FirmDetail } from "./use-firm-detail";
 
 /**
- * /admin/firms/[firmId]/plan (docs/04 §14.5 Plan tab): the effective limits, Change plan (copies the
- * plan's limits, A3) and Adjust limits (custom limits, 07 Q29–Q30). Both are allowed over current
- * usage, with a warning first (A4: never auto-remove). History is derived from PLAN_CHANGED (A14).
+ * /admin/firms/[firmId]/plan (docs/04 §14.5, 07 Q64–Q65): the firm's BDE count and candidate limit (set separately; a new firm starts at ten
+ * candidates per BDE, 100 jobs per candidate per day), its price per BDE, its 30-day billing periods and the history
+ * of count changes. Changing the count is allowed over current usage, with a warning first (A4: never auto-remove).
  */
 export function FirmPlanTab() {
   const { detail } = useFirmDetail();
@@ -30,11 +33,11 @@ export function FirmPlanTab() {
   return <FirmPlan detail={detail} />;
 }
 
-/** The warning a lower limit gets: what will be over, and that nothing is removed. */
-function overWarnings(usage: FirmUsage, limits: { seatLimit: number; candidateLimit: number }): string[] {
+/** The warning a lower count gets: what will be over, and that nothing is removed. */
+function overWarnings(usage: FirmUsage, seatLimit: number, candidateLimit: number): string[] {
   const warnings: string[] = [];
-  if (usage.seatsUsed > limits.seatLimit) warnings.push(`This firm will be over its seat limit (${usage.seatsUsed} / ${limits.seatLimit}).`);
-  if (usage.assignedCandidates > limits.candidateLimit) warnings.push(`This firm will be over its candidate limit (${usage.assignedCandidates} / ${limits.candidateLimit}).`);
+  if (usage.seatsUsed > seatLimit) warnings.push(`This firm will be over its BDE limit (${usage.seatsUsed} / ${seatLimit}).`);
+  if (usage.assignedCandidates > candidateLimit) warnings.push(`This firm will be over its candidate limit (${usage.assignedCandidates} / ${candidateLimit}).`);
   return warnings;
 }
 
@@ -43,14 +46,14 @@ function OverWarning({ warnings }: { warnings: string[] }) {
   return (
     <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-warning-fg)] bg-[var(--color-warning-bg)] p-3 text-sm text-[var(--color-warning-fg)]">
       {warnings.map((warning) => <p key={warning}>{warning}</p>)}
-      <p className="mt-1">Existing users keep working; new additions will be blocked.</p>
+      <p className="mt-1">Existing users keep working; new BDE invites and assignments will be blocked until it is under.</p>
     </div>
   );
 }
 
 function FirmPlan({ detail }: { detail: FirmDetail }) {
-  const { firm, plan, usage, isCustom, data } = detail;
-  const [dialog, setDialog] = useState<"plan" | "limits" | null>(null);
+  const { firm, plan, usage, data } = detail;
+  const [isChanging, setIsChanging] = useState(false);
   const history = planHistory(firm.id, data.ledger);
 
   return (
@@ -58,33 +61,31 @@ function FirmPlan({ detail }: { detail: FirmDetail }) {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="flex flex-wrap items-center gap-2 text-h3 text-[var(--color-text)]">
-              {plan?.name ?? "Unknown plan"} {isCustom ? <CustomLimitsBadge /> : null}
-            </h2>
+            <h2 className="text-h3 text-[var(--color-text)]">{plan?.name ?? "Base plan"}</h2>
             <p className="mt-1 text-sm text-[var(--color-text-2)]">
-              <span className="tabular">{firm.seatLimit}</span> BDE seats · <span className="tabular">{firm.candidateLimit}</span> active candidates
-              {isCustom && plan ? <span className="text-[var(--color-text-3)]"> (plan: {plan.seatLimit} BDE seats, {plan.candidateLimit} candidates)</span> : null}
+              <span className="tabular">{firm.seatLimit}</span> BDEs · <span className="tabular">{firm.candidateLimit}</span> candidates · <span className="tabular">{JOBS_PER_CANDIDATE_PER_DAY}</span> new jobs per candidate per day
+            </p>
+            <p className="mt-1 text-sm text-[var(--color-text-2)]">
+              <span className="tabular">{formatUsd(firm.priceCentsPerSeat)}</span> per BDE · <span className="tabular text-[var(--color-text)]">{formatUsd(periodAmountCents(firm.seatLimit, firm.priceCentsPerSeat))}</span> for 30 days
             </p>
             <p className="mt-1 text-caption text-[var(--color-text-3)]">
-              In use: {usage.seatsUsed} BDE seats, {usage.assignedCandidates} assigned candidates.
+              In use: {usage.seatsUsed} BDEs, {usage.assignedCandidates} assigned candidates.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Can action="firm.edit">
-              <Button variant="secondary" size="sm" onClick={() => setDialog("plan")}><Layers size={14} aria-hidden /> Change plan</Button>
-              <Button variant="secondary" size="sm" onClick={() => setDialog("limits")}><SlidersHorizontal size={14} aria-hidden /> Adjust limits</Button>
-            </Can>
-          </div>
+          <Can action="firm.edit">
+            <Button variant="secondary" size="sm" onClick={() => setIsChanging(true)}><Users size={14} aria-hidden /> Change limits</Button>
+          </Can>
         </div>
       </Card>
+
+      <BillingPeriods detail={detail} />
 
       <section aria-labelledby="plan-history-heading">
         <h2 id="plan-history-heading" className="mb-3 text-h3 text-[var(--color-text)]">History</h2>
         <HistoryTable entries={history} />
       </section>
 
-      {dialog === "plan" ? <ChangePlanDialog detail={detail} onClose={() => setDialog(null)} /> : null}
-      {dialog === "limits" ? <AdjustLimitsDialog detail={detail} onClose={() => setDialog(null)} /> : null}
+      {isChanging ? <SeatsDialog detail={detail} onClose={() => setIsChanging(false)} /> : null}
     </div>
   );
 }
@@ -94,7 +95,7 @@ function HistoryTable({ entries }: { entries: LedgerEntry[] }) {
     () => [
       { id: "when", header: "When", enableSorting: false, cell: ({ row }) => <AdminTime iso={row.original.createdAt} /> },
       { id: "by", header: "By", enableSorting: false, cell: ({ row }) => row.original.actorName },
-      { id: "kind", header: "Change", enableSorting: false, cell: ({ row }) => (row.original.entityType === "firm_limits" ? "Custom limits" : "Plan") },
+      { id: "kind", header: "Change", enableSorting: false, cell: ({ row }) => (row.original.entityType === "firm_limits" ? "Limits" : "Plan") },
       { id: "summary", header: "Before → after", enableSorting: false, cell: ({ row }) => <span className="text-[var(--color-text)]">{row.original.summary}</span> },
     ],
     [],
@@ -107,77 +108,60 @@ function HistoryTable({ entries }: { entries: LedgerEntry[] }) {
       isRowSelectable={false}
       hasToolbar={false}
       label="Plan history"
-      emptyState={<EmptyState icon={History} variant="filtered" title="No plan changes" description="The firm is still on the plan it was created with." />}
+      emptyState={<EmptyState icon={History} variant="filtered" title="No changes" description="The firm still has the limits it was created with." />}
     />
   );
 }
 
-function ChangePlanDialog({ detail, onClose }: { detail: FirmDetail; onClose: () => void }) {
-  const { firm, plans, usage } = detail;
-  const change = useChangePlan(firm.id);
-  const offered = plans.filter((plan) => plan.isActive || plan.id === firm.planId);
-  const [planId, setPlanId] = useState(offered.find((plan) => plan.id !== firm.planId)?.id ?? firm.planId);
-  const target = offered.find((plan) => plan.id === planId);
-  const isSame = !target || (target.id === firm.planId && target.seatLimit === firm.seatLimit && target.candidateLimit === firm.candidateLimit);
-  return (
-    <AdminDialog
-      open
-      onClose={onClose}
-      title="Change plan"
-      description={<p>The firm gets the new plan&apos;s limits. Later edits to the plan don&apos;t change this firm.</p>}
-      confirmLabel="Change plan"
-      pendingLabel="Changing…"
-      isPending={change.isPending}
-      canConfirm={!isSame}
-      error={errorMessage(change.error)}
-      onConfirm={() => change.mutate(planId, { onSuccess: onClose })}
-    >
-      <Field id="change-plan" label="Plan" hint={target ? `New limits: ${target.seatLimit} BDE seats, ${target.candidateLimit} assigned candidates.` : undefined}>
-        <select {...fieldAria("change-plan", null, true)} value={planId} onChange={(event) => setPlanId(event.target.value)} className="bq-input w-full">
-          {offered.map((plan) => (
-            <option key={plan.id} value={plan.id}>{plan.name}{plan.id === firm.planId ? " (current)" : ""}</option>
-          ))}
-        </select>
-      </Field>
-      {target ? <OverWarning warnings={overWarnings(usage, target)} /> : null}
-    </AdminDialog>
-  );
-}
-
-const parseLimit = (value: string) => (/^\d+$/.test(value.trim()) ? Number(value.trim()) : Number.NaN);
-
-function AdjustLimitsDialog({ detail, onClose }: { detail: FirmDetail; onClose: () => void }) {
+function SeatsDialog({ detail, onClose }: { detail: FirmDetail; onClose: () => void }) {
   const { firm, usage } = detail;
-  const adjust = useAdjustLimits(firm.id);
-  const [seats, setSeats] = useState(String(firm.seatLimit));
-  const [candidates, setCandidates] = useState(String(firm.candidateLimit));
-  const limits = { seatLimit: parseLimit(seats), candidateLimit: parseLimit(candidates) };
-  const seatError = Number.isInteger(limits.seatLimit) && limits.seatLimit >= 1 ? null : "A whole number, at least 1.";
-  const candidateError = Number.isInteger(limits.candidateLimit) && limits.candidateLimit >= 1 ? null : "A whole number, at least 1.";
-  const isValid = !seatError && !candidateError;
-  const isSame = limits.seatLimit === firm.seatLimit && limits.candidateLimit === firm.candidateLimit;
+  const setSeats = useSetSeats(firm.id);
+  const [seats, setSeatsText] = useState(String(firm.seatLimit));
+  const [candidates, setCandidatesText] = useState(String(firm.candidateLimit));
+  const [price, setPrice] = useState((firm.priceCentsPerSeat / 100).toFixed(2));
+  const seatLimit = /^\d+$/.test(seats.trim()) ? Number(seats.trim()) : Number.NaN;
+  const candidateLimit = /^\d+$/.test(candidates.trim()) ? Number(candidates.trim()) : Number.NaN;
+  const candidateError = Number.isInteger(candidateLimit) && candidateLimit <= 100000 ? null : "A whole number from 0 to 100000.";
+  const priceCents = parseUsdToCents(price);
+  const seatError = Number.isInteger(seatLimit) && seatLimit >= 1 && seatLimit <= 1000 ? null : "A whole number from 1 to 1000.";
+  const priceError = priceCents === null ? "A price in dollars, for example 35 or 35.50." : null;
+  const isValid = !seatError && !candidateError && !priceError;
+  const isSame = seatLimit === firm.seatLimit && candidateLimit === firm.candidateLimit && priceCents === firm.priceCentsPerSeat;
   return (
     <AdminDialog
       open
       onClose={onClose}
-      title="Adjust limits"
-      description={<p>Set limits different from the plan&apos;s. The firm is marked &ldquo;custom limits&rdquo; until its plan is changed again.</p>}
-      confirmLabel="Save limits"
+      title="Change limits"
+      description={<p>The candidate limit is its own number: changing the BDE count never moves it. A period running now takes the new numbers, with no proration.</p>}
+      confirmLabel="Save"
       pendingLabel="Saving…"
-      isPending={adjust.isPending}
+      isPending={setSeats.isPending}
       canConfirm={isValid && !isSame}
-      error={errorMessage(adjust.error)}
-      onConfirm={() => adjust.mutate(limits, { onSuccess: onClose })}
+      error={errorMessage(setSeats.error)}
+      onConfirm={() => priceCents !== null && setSeats.mutate({ seatLimit, candidateLimit, priceCentsPerSeat: priceCents }, { onSuccess: onClose })}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field id="limit-seats" label="BDE seat limit" error={seatError}>
-          <Input {...fieldAria("limit-seats", seatError)} inputMode="numeric" value={seats} onChange={(event) => setSeats(event.target.value)} />
+        <Field
+          id="firm-seats"
+          label="BDEs"
+          error={seatError}
+          hint={isValid ? `${formatUsd(periodAmountCents(seatLimit, priceCents ?? 0))} for 30 days` : undefined}
+        >
+          <Input {...fieldAria("firm-seats", seatError)} inputMode="numeric" value={seats} onChange={(event) => setSeatsText(event.target.value)} />
         </Field>
-        <Field id="limit-candidates" label="Active candidate limit" error={candidateError}>
-          <Input {...fieldAria("limit-candidates", candidateError)} inputMode="numeric" value={candidates} onChange={(event) => setCandidates(event.target.value)} />
+        <Field
+          id="firm-candidates"
+          label="Candidate limit"
+          error={candidateError}
+          hint={Number.isInteger(seatLimit) ? `${CANDIDATES_PER_SEAT} per BDE would be ${candidateLimitFor(seatLimit)}.` : undefined}
+        >
+          <Input {...fieldAria("firm-candidates", candidateError)} inputMode="numeric" value={candidates} onChange={(event) => setCandidatesText(event.target.value)} />
+        </Field>
+        <Field id="firm-price" label="Price per BDE (USD)" error={priceError}>
+          <Input {...fieldAria("firm-price", priceError)} inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} />
         </Field>
       </div>
-      {isValid ? <OverWarning warnings={overWarnings(usage, limits)} /> : null}
+      {isValid ? <OverWarning warnings={overWarnings(usage, seatLimit, candidateLimit)} /> : null}
     </AdminDialog>
   );
 }

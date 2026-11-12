@@ -13,7 +13,7 @@ These tables exist only through Alembic (migrations/versions/0003_auth_tenancy.p
 import uuid
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
+    Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
     text,
 )
 from sqlalchemy import event
@@ -77,13 +77,15 @@ class Plan(Base):
     name = Column(String, nullable=False, unique=True)
     seat_limit = Column(Integer, nullable=False)
     candidate_limit = Column(Integer, nullable=False)
-    features = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))  # display labels only (A15)
+    features = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))  # unused since 07 Q64 (no features list)
+    price_cents_per_seat = Column(Integer, nullable=False, server_default=text("3500"))   # USD cents per BDE per period (Q64)
     is_active = Column(Boolean, nullable=False, server_default=text("true"))      # false = hidden from new firms
     created_at = _created_at()
     updated_at = _updated_at()
 
     __table_args__ = (
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_plans_limits_not_negative"),
+        CheckConstraint("price_cents_per_seat >= 0", name="ck_plans_price_not_negative"),
     )
 
 
@@ -97,7 +99,8 @@ class Firm(Base):
     status = Column(String, nullable=False, server_default=text("'ONBOARDING'"))
     plan_id = Column(UUID(as_uuid=True), _restrict("plans.id"), nullable=False, index=True)  # required (A16)
     seat_limit = Column(Integer, nullable=False)          # effective limits, copied from the plan (A3)
-    candidate_limit = Column(Integer, nullable=False)
+    candidate_limit = Column(Integer, nullable=False)     # set by the Super Admin; starts at CANDIDATES_PER_SEAT × seat_limit (07 Q67)
+    price_cents_per_seat = Column(Integer, nullable=False, server_default=text("3500"))   # Super Admin only, never serialized to a firm
     contact_phone = Column(String, nullable=True)
     logo_url = Column(String, nullable=True)
     primary_timezone = Column(String, nullable=False, server_default=text("'Asia/Kolkata'"))
@@ -111,6 +114,41 @@ class Firm(Base):
         CheckConstraint(_in("status", FIRM_STATUSES), name="ck_firms_status"),
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_firms_limits_not_negative"),
         CheckConstraint("application_expiry_days > 0", name="ck_firms_application_expiry_days_positive"),
+        CheckConstraint("price_cents_per_seat >= 0", name="ck_firms_price_not_negative"),
+    )
+
+
+BILLING_STATUSES = ("UNPAID", "PAID")
+
+
+class BillingPeriod(Base):
+    """One 30-day period of a firm's billing record (07 Q65, docs/02 §3.5): a snapshot of the numbers it was billed on.
+    Super Admin only; nothing here reaches a firm user. The amount is the BDE count times the price, enforced here."""
+    __tablename__ = "firm_billing_periods"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
+    starts_on = Column(Date, nullable=False)
+    ends_on = Column(Date, nullable=False)
+    seat_limit = Column(Integer, nullable=False)
+    candidate_limit = Column(Integer, nullable=False)
+    jobs_per_candidate_per_day = Column(Integer, nullable=False)
+    price_cents_per_seat = Column(Integer, nullable=False)
+    amount_cents = Column(Integer, nullable=False)
+    status = Column(String, nullable=False, server_default=text("'UNPAID'"))
+    paid_on = Column(Date, nullable=True)
+    note = Column(Text, nullable=True)
+    created_at = _created_at()
+    updated_at = _updated_at()
+
+    __table_args__ = (
+        UniqueConstraint("firm_id", "starts_on", name="uq_firm_billing_periods_firm_start"),
+        CheckConstraint(_in("status", BILLING_STATUSES), name="ck_firm_billing_periods_status"),
+        CheckConstraint("ends_on = starts_on + 30", name="ck_firm_billing_periods_30_days"),
+        CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0 AND price_cents_per_seat >= 0",
+                        name="ck_firm_billing_periods_not_negative"),
+        CheckConstraint("amount_cents = seat_limit * price_cents_per_seat", name="ck_firm_billing_periods_amount"),
+        CheckConstraint("(status = 'PAID') = (paid_on IS NOT NULL)", name="ck_firm_billing_periods_paid_on"),
     )
 
 

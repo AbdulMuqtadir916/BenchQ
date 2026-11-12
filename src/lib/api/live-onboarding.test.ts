@@ -165,7 +165,7 @@ describe("the team and /admin on the live backend", () => {
   });
 
   it("creates a firm with the plan's backend id and returns the firm", async () => {
-    routes.push(on("POST", "/api/admin/firms", 201, { firm: firmDto(NEW_FIRM, "northwind"), invite: inviteDto({ firm_id: NEW_FIRM, id: NEW_USER }), invite_token: "t" }));
+    routes.push(on("POST", "/api/admin/firms", 201, { firm: { ...firmDto(NEW_FIRM, "northwind"), price_cents_per_seat: 3500 }, invite: inviteDto({ firm_id: NEW_FIRM, id: NEW_USER }), invite_token: "t" }));
     const firm = await platformApi.firms.create({
       name: "Northwind", slug: "northwind", planId: "plan_starter", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York",
       contactPhone: null, ownerName: "Nora North", ownerEmail: "nora@northwind.test",
@@ -175,6 +175,44 @@ describe("the team and /admin on the live backend", () => {
       name: "Northwind", slug: "northwind", plan_id: STARTER, primary_timezone: "Asia/Kolkata", client_timezone: "America/New_York",
       contact_phone: null, owner_name: "Nora North", owner_email: "nora@northwind.test",
     });
+  });
+
+  it("sets a firm's BDE count and price (07 Q64) and suspends and reactivates it", async () => {
+    const adminFirm = (over: Record<string, unknown> = {}) => ({ ...firmDto(HTS, "hyderabad-tech-staffing"), price_cents_per_seat: 4000, ...over });
+    routes.push(
+      on("PATCH", `/api/admin/firms/${HTS}/seats`, 200, adminFirm({ seat_limit: 12, candidate_limit: 120 })),
+      on("POST", `/api/admin/firms/${HTS}/suspend`, 200, adminFirm({ status: "SUSPENDED" })),
+      on("POST", `/api/admin/firms/${HTS}/reactivate`, 200, adminFirm()),
+    );
+    const seats = await platformApi.firms.setSeats("firm_hts", { seatLimit: 12, candidateLimit: 120, priceCentsPerSeat: 4000 });
+    expect([seats.seatLimit, seats.candidateLimit, seats.priceCentsPerSeat]).toEqual([12, 120, 4000]);
+    expect(calls[0].body).toEqual({ seat_limit: 12, candidate_limit: 120, price_cents_per_seat: 4000 });
+    expect((await platformApi.firms.suspend("firm_hts", "Unpaid since October")).status).toBe("SUSPENDED");
+    expect(calls[1].body).toEqual({ reason: "Unpaid since October" });
+    expect((await platformApi.firms.reactivate("firm_hts")).status).toBe("ACTIVE");
+  });
+
+  it("edits the base plan and reads, starts and marks billing periods (07 Q65)", async () => {
+    const periodDto = (over: Record<string, unknown> = {}) => ({
+      id: "11111111-1111-4111-8111-111111111111", firm_id: HTS, starts_on: "2026-11-12", ends_on: "2026-12-12", seat_limit: 10,
+      candidate_limit: 100, jobs_per_candidate_per_day: 100, price_cents_per_seat: 3500, amount_cents: 35000, status: "UNPAID",
+      paid_on: null, note: null, created_at: "2026-11-12T10:00:00+00:00", ...over,
+    });
+    routes.push(
+      on("PATCH", `/api/admin/plans/${STARTER}`, 200, { id: STARTER, name: "Starter", seat_limit: 8, candidate_limit: 80, price_cents_per_seat: 4000, is_active: true }),
+      on("GET", "/api/admin/billing-periods", 200, [periodDto()]),
+      on("POST", `/api/admin/firms/${HTS}/billing-periods`, 201, periodDto({ note: "First" })),
+      on("PATCH", "/api/admin/billing-periods/11111111-1111-4111-8111-111111111111", 200, periodDto({ status: "PAID", paid_on: "2026-11-13" })),
+    );
+    const plan = await platformApi.plans.update("plan_starter", { seatLimit: 8, priceCentsPerSeat: 4000 });
+    expect([plan.seatLimit, plan.candidateLimit, plan.priceCentsPerSeat]).toEqual([8, 80, 4000]);
+    expect(calls[0].body).toEqual({ seat_limit: 8, price_cents_per_seat: 4000 });
+    const [listed] = await platformApi.billing.list();
+    expect([listed.firmId, listed.amountCents, listed.status]).toEqual(["firm_hts", 35000, "UNPAID"]);
+    expect((await platformApi.billing.start("firm_hts", { startsOn: "2026-11-12", note: "First" })).note).toBe("First");
+    expect(calls[2].body).toEqual({ starts_on: "2026-11-12", note: "First" });
+    const paid = await platformApi.billing.edit(listed.id, { status: "PAID", paidOn: "2026-11-13" });
+    expect([paid.status, paid.paidOn]).toEqual(["PAID", "2026-11-13"]);
   });
 
   it("copies a link by resending: the old link stops (07 Q38)", async () => {
@@ -195,7 +233,7 @@ describe("the team and /admin on the live backend", () => {
   it("reads users, plans, the team and the audit log", async () => {
     routes.push(
       on("GET", `/api/admin/users?firm_id=${HTS}`, 200, [userDto(IMRAN, HTS)]),
-      on("GET", "/api/admin/plans", 200, [{ id: STARTER, name: "Starter", seat_limit: 5, candidate_limit: 50, features: [], is_active: true }]),
+      on("GET", "/api/admin/plans", 200, [{ id: STARTER, name: "Starter", seat_limit: 5, candidate_limit: 50, price_cents_per_seat: 3500, is_active: true }]),
       on("GET", "/api/admin/team", 200, [{ id: demoIds.padm_sana, name: "Sana", email: "sana@admin.benchq.test", role: "PLATFORM_ADMIN", is_active: true, last_active_at: null }]),
       on("GET", "/api/admin/audit", 200, [{
         id: "le1", firm_id: HTS, actor_user_id: demoIds.padm_sana, actor_type: "PLATFORM_ADMIN", actor_name: "Sana", entity_type: "firm",
@@ -210,8 +248,7 @@ describe("the team and /admin on the live backend", () => {
   });
 
   it("says what the backend can't do yet, without calling it", async () => {
-    await expect(platformApi.firms.suspend("firm_hts", "Unpaid")).rejects.toMatchObject({ status: 501 });
-    await expect(platformApi.plans.create({ name: "X", seatLimit: 1, candidateLimit: 1, features: [] })).rejects.toMatchObject({ status: 501 });
+    await expect(platformApi.firms.update("firm_hts", { name: "X", contactPhone: null, primaryTimezone: "Asia/Kolkata", clientTimezone: "Asia/Kolkata" })).rejects.toMatchObject({ status: 501 });
     await expect(platformApi.team.invite("x@benchq.test")).rejects.toMatchObject({ status: 501 });
     expect(calls).toEqual([]);
   });

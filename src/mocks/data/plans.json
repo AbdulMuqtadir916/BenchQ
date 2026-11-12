@@ -4,33 +4,23 @@
     "name": "Starter",
     "seatLimit": 4,
     "candidateLimit": 25,
-    "features": [
-      "Resume Builder",
-      "Application tracking"
-    ],
-    "isActive": true
+    "isActive": true,
+    "priceCentsPerSeat": 3500
   },
   {
     "id": "plan_growth",
     "name": "Growth",
     "seatLimit": 10,
     "candidateLimit": 100,
-    "features": [
-      "Everything in Starter",
-      "Analytics",
-      "Outreach and follow-ups"
-    ],
-    "isActive": true
+    "isActive": true,
+    "priceCentsPerSeat": 3500
   },
   {
     "id": "plan_scale",
     "name": "Scale",
     "seatLimit": 25,
     "candidateLimit": 300,
-    "features": [
-      "Everything in Growth",
-      "Priority support"
-    ],
-    "isActive": true
+    "isActive": true,
+    "priceCentsPerSeat": 3500
   }
 ]

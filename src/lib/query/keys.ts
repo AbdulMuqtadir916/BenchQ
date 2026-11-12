@@ -59,6 +59,7 @@ export const queryKeys = {
     users: (firmId?: string) => ["platform", "users", firmId ?? "all"] as const,
     invites: (firmId?: string | null) => ["platform", "invites", firmId === undefined ? "all" : (firmId ?? "platform")] as const,
     plans: () => ["platform", "plans"] as const,
+    billing: (firmId?: string) => ["platform", "billing", firmId ?? "all"] as const,
     audit: () => ["platform", "audit"] as const,
     team: () => ["platform", "team"] as const,
     candidateUsage: () => ["platform", "candidateUsage"] as const,

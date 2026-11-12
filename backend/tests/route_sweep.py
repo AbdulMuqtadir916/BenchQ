@@ -49,6 +49,10 @@ SEED_OVERRIDES = {
     "base_resumes": {"is_active": True, "deleted_at": None, "archived_at": None},
     "resumes": {"category": "BASE", "job_id": None, "deleted_at": None},
     "support_views": {"ended_at": None},
+    # A billing period is 30 days (ck_firm_billing_periods_30_days); the seed's amount is 1 x 1. It ended long ago, so the
+    # sweep's "start the next period" (which starts today) comes after it.
+    "firm_billing_periods": {"starts_on": date.today() - timedelta(days=100), "ends_on": date.today() - timedelta(days=70),
+                             "status": "UNPAID"},
     # error only on an error row, finished_at on every row but a running one; the seed's is 'success'
     "scrape_jobs": {"error": None, "batch_id": SEED_BATCH, "finished_at": datetime.now(timezone.utc)},
     # job_id is a SHA256 hex digest (ck_job_postings_job_id_sha256), and batch_id references scrape_jobs.batch_id,
@@ -60,7 +64,7 @@ ID_ALIASES = {"app": "applications", "cl": "cover_letters", "base": "base_resume
               "attempt": "candidate_google_oauth_attempts", "interview": "interviews", "manager": "users",
               "bde": "users", "user": "users", "owner": "users", "firm": "firms", "plan": "plans",
               "resume": "resumes", "base_resume": "base_resumes", "notification": "notifications", "run": "job_runs",
-              "review": "application_reviews", "posting": "job_postings"}
+              "review": "application_reviews", "posting": "job_postings", "period": "firm_billing_periods"}
 JOB_URL = "https://jobs.example.test/posting/1"
 # Values the routes check in code, not in their schema, by field name.
 FIELD_VALUES = {"role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",

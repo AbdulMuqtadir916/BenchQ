@@ -73,7 +73,7 @@ function Overview({ detail }: { detail: FirmDetail }) {
       <Card>
         <h2 className="mb-2 text-h3 text-[var(--color-text)]">Plan and usage</h2>
         <dl className="divide-y divide-[var(--color-border)]">
-          <Row label="Plan">{plan?.name ?? "Unknown plan"}{detail.isCustom ? " · custom limits" : ""}</Row>
+          <Row label="Plan">{plan?.name ?? "Unknown plan"}</Row>
         </dl>
         <Usage label="BDE seats used" used={usage.seatsUsed} limit={usage.seatLimit} isOver={usage.isOverSeatLimit} detail={`${activeBdes} active BDE${activeBdes === 1 ? "" : "s"} + ${pendingInvites} pending BDE invite${pendingInvites === 1 ? "" : "s"}`} />
         <Usage label="Assigned candidates" used={usage.assignedCandidates} limit={usage.candidateLimit} isOver={usage.isOverCandidateLimit} detail="With a BDE, and on bench, interviewing or at offer" />

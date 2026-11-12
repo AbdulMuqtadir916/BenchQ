@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { slugProblem, suggestSlug } from "@/lib/derive/platform";
+import { CANDIDATES_PER_SEAT, candidateLimitFor, formatUsd, periodAmountCents } from "@/lib/derive/billing";
 import { useCreateFirm, usePlans, usePlatformFirms } from "@/lib/hooks/use-platform";
 import { queryGroup } from "@/lib/query/query-group";
 import { useHref } from "@/lib/routes/use-href";
@@ -25,6 +26,8 @@ interface Form {
   name: string;
   slug: string;
   planId: string;
+  seatLimit: string;
+  candidateLimit: string;
   primaryTimezone: string;
   clientTimezone: string;
   contactPhone: string;
@@ -32,10 +35,11 @@ interface Form {
   ownerEmail: string;
 }
 
-const EMPTY: Form = { name: "", slug: "", planId: "", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", contactPhone: "", ownerName: "", ownerEmail: "" };
+const EMPTY: Form = { name: "", slug: "", planId: "", seatLimit: "", candidateLimit: "", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", contactPhone: "", ownerName: "", ownerEmail: "" };
 
 /**
- * /admin/firms/new (docs/04 §14.4). Creates the firm (ONBOARDING) with the plan's limits copied, and
+ * /admin/firms/new (docs/04 §14.4). Creates the firm (ONBOARDING) with a BDE count (the plan's by default; 10 candidates
+ * per BDE follow, 07 Q64) and the plan's price copied, and
  * the OWNER's 7-day invite. Application expiry takes its default: the OWNER
  * changes them in settings/firm. Esc or Cancel goes back to the list, confirming if anything was typed.
  */
@@ -59,10 +63,16 @@ export function CreateFirm() {
   const taken = useMemo(() => (create.isSuccess ? [] : (firms.data ?? []).map((firm) => firm.slug)), [firms.data, create.isSuccess]);
   const isEdited = JSON.stringify(form) !== JSON.stringify(EMPTY);
 
+  const seatsText = form.seatLimit.trim();
+  const seats = seatsText === "" ? (plan?.seatLimit ?? 0) : /^\d+$/.test(seatsText) ? Number(seatsText) : Number.NaN;
+  const candidatesText = form.candidateLimit.trim();
+  const candidates = candidatesText === "" ? candidateLimitFor(seats) : /^\d+$/.test(candidatesText) ? Number(candidatesText) : Number.NaN;
   const errors = {
     name: form.name.trim() ? null : "Enter the firm's name.",
     slug: slugProblem(form.slug, taken),
     planId: plan ? null : "Choose a plan.",
+    seatLimit: seatsText === "" || (Number.isInteger(seats) && seats >= 1 && seats <= 1000) ? null : "A whole number from 1 to 1000.",
+    candidateLimit: candidatesText === "" || (Number.isInteger(candidates) && candidates <= 100000) ? null : "A whole number from 0 to 100000.",
     ownerName: form.ownerName.trim() ? null : "Enter the owner's name.",
     ownerEmail: EMAIL.test(form.ownerEmail.trim()) ? null : "Enter a valid email address.",
   };
@@ -87,7 +97,7 @@ export function CreateFirm() {
     setIsSubmitted(true);
     if (!isValid || create.isPending) return;
     create.mutate(
-      { ...form, planId, contactPhone: form.contactPhone.trim() || null },
+      { ...form, planId, seatLimit: seatsText === "" ? undefined : seats, candidateLimit: candidatesText === "" ? undefined : candidates, contactPhone: form.contactPhone.trim() || null },
       {
         onSuccess: (firm) => {
           showToast(`Firm created. Invite sent to ${form.ownerEmail.trim().toLowerCase()}.`);
@@ -137,11 +147,27 @@ export function CreateFirm() {
               id="firm-plan"
               label="Plan"
               error={shown("planId")}
-              hint={plan ? `Copied onto the firm: ${plan.seatLimit} BDE seats, ${plan.candidateLimit} active candidates.` : "No plan is offered to new firms. Show one on Plans first."}
+              hint={plan ? `Price copied onto the firm: ${formatUsd(plan.priceCentsPerSeat)} per BDE.` : "No plan is offered to new firms."}
             >
               <select {...fieldAria("firm-plan", shown("planId"), true)} value={planId} onChange={(event) => set("planId", event.target.value)} className="bq-input w-full">
                 {activePlans.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
+            </Field>
+            <Field
+              id="firm-seats"
+              label="BDEs"
+              error={shown("seatLimit")}
+              hint={plan && !errors.seatLimit ? `${formatUsd(periodAmountCents(seats, plan.priceCentsPerSeat))} for 30 days` : undefined}
+            >
+              <Input {...fieldAria("firm-seats", shown("seatLimit"))} inputMode="numeric" placeholder={plan ? String(plan.seatLimit) : undefined} value={form.seatLimit} onChange={(event) => set("seatLimit", event.target.value)} />
+            </Field>
+            <Field
+              id="firm-candidates"
+              label="Candidate limit"
+              error={shown("candidateLimit")}
+              hint={`How many candidates can be assigned to BDEs. Leave empty for ${CANDIDATES_PER_SEAT} per BDE (${candidateLimitFor(seats)}).`}
+            >
+              <Input {...fieldAria("firm-candidates", shown("candidateLimit"))} inputMode="numeric" placeholder={String(candidateLimitFor(seats))} value={form.candidateLimit} onChange={(event) => set("candidateLimit", event.target.value)} />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="firm-tz" label="Primary timezone">

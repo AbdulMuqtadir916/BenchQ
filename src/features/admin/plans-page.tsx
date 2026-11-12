@@ -3,46 +3,38 @@
 import { useCan } from "@/lib/auth/permissions";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Eye, EyeOff, Layers, Pencil, Plus } from "lucide-react";
+import { Eye, EyeOff, Layers, Pencil } from "lucide-react";
 import { DataTable } from "@/components/app/data-table";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tag } from "@/components/ui/tag";
+import { CANDIDATES_PER_SEAT, JOBS_PER_CANDIDATE_PER_DAY, candidateLimitFor, formatUsd, parseUsdToCents } from "@/lib/derive/billing";
 import { firmsOnPlan } from "@/lib/derive/platform";
-import { useCreatePlan, usePlans, usePlatformFirms, useSetPlanActive, useUpdatePlan } from "@/lib/hooks/use-platform";
+import { usePlans, usePlatformFirms, useUpdatePlan } from "@/lib/hooks/use-platform";
 import { queryGroup } from "@/lib/query/query-group";
 import type { Plan } from "@/lib/schemas/tenancy";
 import { AdminDialog, Field, errorMessage, fieldAria } from "./admin-dialog";
 
 /**
- * /admin/plans (docs/04 §14.6): the plan catalogue. A plan is a template (A3): editing it never
- * changes existing firms. No prices, no billing. Writes CREATE / UPDATE on `plan`, firmId null.
+ * /admin/plans (docs/04 §14.6, 07 Q64): the base plan. A firm's BDE count is the only thing that varies; a BDE brings
+ * 10 candidates, and each candidate fetches 100 new jobs a day (fixed). Editing the plan changes firms created later,
+ * never existing ones (A3). Super Admin only: the price appears nowhere a firm can open.
  */
 export function PlansPage() {
   const plans = usePlans();
   const firms = usePlatformFirms();
   const group = queryGroup(plans, firms);
-  const setActive = useSetPlanActive();
-  const [editing, setEditing] = useState<Plan | "new" | null>(null);
+  const [editing, setEditing] = useState<Plan | null>(null);
   const canEdit = useCan("plan.edit");
 
   const columns = useMemo<ColumnDef<Plan, unknown>[]>(
     () => [
       { id: "name", header: "Plan", enableSorting: false, cell: ({ row }) => <span className="font-[600] text-[var(--color-text)]">{row.original.name}</span> },
-      { id: "seats", header: "BDE seat limit", enableSorting: false, cell: ({ row }) => <span className="tabular">{row.original.seatLimit}</span> },
-      { id: "candidates", header: "Candidate limit", enableSorting: false, cell: ({ row }) => <span className="tabular">{row.original.candidateLimit}</span> },
-      {
-        id: "features",
-        header: "Features",
-        enableSorting: false,
-        cell: ({ row }) => (
-          <span className="flex flex-wrap gap-1">
-            {row.original.features.length ? row.original.features.map((feature) => <Tag key={feature}>{feature}</Tag>) : <span className="text-[var(--color-text-3)]">—</span>}
-          </span>
-        ),
-      },
+      { id: "seats", header: "BDEs", enableSorting: false, cell: ({ row }) => <span className="tabular">{row.original.seatLimit}</span> },
+      { id: "candidates", header: "Candidates", enableSorting: false, cell: ({ row }) => <span className="tabular">{row.original.candidateLimit}</span> },
+      { id: "price", header: "Price per BDE", enableSorting: false, cell: ({ row }) => <span className="tabular">{formatUsd(row.original.priceCentsPerSeat)}</span> },
       {
         id: "status",
         header: "Status",
@@ -54,27 +46,18 @@ export function PlansPage() {
         id: "actions",
         header: "",
         enableSorting: false,
-        cell: ({ row }) => !canEdit ? null : (
-          <span className="inline-flex gap-1">
-            <Button variant="ghost" size="sm" onClick={() => setEditing(row.original)}><Pencil size={13} aria-hidden /> Edit</Button>
-            <Button variant="ghost" size="sm" disabled={setActive.isPending} onClick={() => setActive.mutate({ planId: row.original.id, isActive: !row.original.isActive })}>
-              {row.original.isActive ? <><EyeOff size={13} aria-hidden /> Hide</> : <><Eye size={13} aria-hidden /> Show</>}
-            </Button>
-          </span>
-        ),
+        cell: ({ row }) => !canEdit ? null : <Button variant="ghost" size="sm" onClick={() => setEditing(row.original)}><Pencil size={13} aria-hidden /> Edit</Button>,
       },
     ],
-    [firms.data, setActive, canEdit],
+    [firms.data, canEdit],
   );
 
   return (
     <div className="bq-page">
       <PageHeader
         title="Plans"
-        subtitle="Templates for a firm's limits. Assigning a plan copies its limits onto the firm."
-        actions={canEdit ? <Button onClick={() => setEditing("new")}><Plus size={14} aria-hidden /> New plan</Button> : undefined}
+        subtitle={`The base plan: a new firm starts with this BDE count and ${CANDIDATES_PER_SEAT} candidates per BDE; ${JOBS_PER_CANDIDATE_PER_DAY} new jobs per candidate per day, 30-day periods.`}
       />
-      {setActive.isError ? <p role="alert" className="mb-3 text-sm text-[var(--color-danger-fg)]">{errorMessage(setActive.error)}</p> : null}
       <DataTable
         columns={columns}
         data={plans.data ?? []}
@@ -85,60 +68,53 @@ export function PlansPage() {
         isRowSelectable={false}
         hasToolbar={false}
         label="Plans"
-        emptyState={<EmptyState icon={Layers} title="No plans yet" description="Create a plan to offer it to new firms." action={canEdit ? <Button onClick={() => setEditing("new")}><Plus size={14} aria-hidden /> New plan</Button> : undefined} />}
+        emptyState={<EmptyState icon={Layers} title="No plan" description="There is no base plan to offer new firms." />}
       />
-      {editing ? <PlanDialog plan={editing === "new" ? null : editing} onClose={() => setEditing(null)} /> : null}
+      {editing ? <PlanDialog plan={editing} onClose={() => setEditing(null)} /> : null}
     </div>
   );
 }
 
-const parseLimit = (value: string) => (/^\d+$/.test(value.trim()) ? Number(value.trim()) : Number.NaN);
-
-function PlanDialog({ plan, onClose }: { plan: Plan | null; onClose: () => void }) {
-  const create = useCreatePlan();
-  const update = useUpdatePlan(plan?.id ?? "");
-  const mutation = plan ? update : create;
-  const [name, setName] = useState(plan?.name ?? "");
-  const [seats, setSeats] = useState(plan ? String(plan.seatLimit) : "");
-  const [candidates, setCandidates] = useState(plan ? String(plan.candidateLimit) : "");
-  const [features, setFeatures] = useState(plan?.features.join("\n") ?? "");
-  const input = { name: name.trim(), seatLimit: parseLimit(seats), candidateLimit: parseLimit(candidates), features: features.split("\n").map((line) => line.trim()).filter(Boolean) };
-  const nameError = input.name ? null : "Enter a name.";
-  const seatError = input.seatLimit >= 1 ? null : "A whole number, at least 1.";
-  const candidateError = input.candidateLimit >= 1 ? null : "A whole number, at least 1.";
+function PlanDialog({ plan, onClose }: { plan: Plan; onClose: () => void }) {
+  const update = useUpdatePlan(plan.id);
+  const [name, setName] = useState(plan.name);
+  const [seats, setSeats] = useState(String(plan.seatLimit));
+  const [price, setPrice] = useState((plan.priceCentsPerSeat / 100).toFixed(2));
+  const seatLimit = /^\d+$/.test(seats.trim()) ? Number(seats.trim()) : Number.NaN;
+  const priceCents = parseUsdToCents(price);
+  const nameError = name.trim() ? null : "Enter a name.";
+  const seatError = Number.isInteger(seatLimit) && seatLimit >= 1 && seatLimit <= 1000 ? null : "A whole number from 1 to 1000.";
+  const priceError = priceCents === null ? "A price in dollars, for example 35 or 35.50." : null;
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const isValid = !nameError && !seatError && !candidateError;
+  const isValid = !nameError && !seatError && !priceError;
   const shown = (error: string | null) => (isSubmitted ? error : null);
 
   return (
     <AdminDialog
       open
       onClose={onClose}
-      title={plan ? `Edit ${plan.name}` : "New plan"}
-      description={plan ? <p><strong>Changes apply to firms assigned this plan from now on. Existing firms keep their current limits.</strong></p> : <p>New plans are offered to new firms straight away.</p>}
-      confirmLabel={plan ? "Save plan" : "Create plan"}
-      pendingLabel={plan ? "Saving…" : "Creating…"}
-      isPending={mutation.isPending}
-      error={errorMessage(mutation.error)}
+      title={`Edit ${plan.name}`}
+      description={<p><strong>Changes apply to firms created from now on. Existing firms keep their BDE count and price.</strong></p>}
+      confirmLabel="Save plan"
+      pendingLabel="Saving…"
+      isPending={update.isPending}
+      error={errorMessage(update.error)}
       onConfirm={() => {
         setIsSubmitted(true);
-        if (isValid) mutation.mutate(input, { onSuccess: onClose });
+        if (isValid && priceCents !== null) update.mutate({ name: name.trim(), seatLimit, priceCentsPerSeat: priceCents }, { onSuccess: onClose });
       }}
     >
       <Field id="plan-name" label="Name" error={shown(nameError)}>
         <Input {...fieldAria("plan-name", shown(nameError))} value={name} onChange={(event) => setName(event.target.value)} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field id="plan-seats" label="BDE seat limit" error={shown(seatError)}>
+        <Field id="plan-seats" label="BDEs for a new firm" error={shown(seatError)} hint={!seatError ? `${candidateLimitFor(seatLimit)} candidates` : undefined}>
           <Input {...fieldAria("plan-seats", shown(seatError))} inputMode="numeric" value={seats} onChange={(event) => setSeats(event.target.value)} />
         </Field>
-        <Field id="plan-candidates" label="Active candidate limit" error={shown(candidateError)}>
-          <Input {...fieldAria("plan-candidates", shown(candidateError))} inputMode="numeric" value={candidates} onChange={(event) => setCandidates(event.target.value)} />
+        <Field id="plan-price" label="Price per BDE (USD)" error={shown(priceError)}>
+          <Input {...fieldAria("plan-price", shown(priceError))} inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} />
         </Field>
       </div>
-      <Field id="plan-features" label="Features" hint="One per line. Labels only: nothing is switched on or off by them.">
-        <textarea {...fieldAria("plan-features", null, true)} rows={4} value={features} onChange={(event) => setFeatures(event.target.value)} className="bq-input h-auto w-full py-2" />
-      </Field>
     </AdminDialog>
   );
 }

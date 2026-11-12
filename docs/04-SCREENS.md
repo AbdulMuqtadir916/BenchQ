@@ -834,18 +834,22 @@ Suspend shows only for ACTIVE firms; Reactivate only for SUSPENDED.
 
 Empty: members "No users yet — the owner hasn't accepted their invite."; invites "No pending invites."
 
-### Plan tab — `/admin/firms/[firmId]/plan`
+### Plan tab — `/admin/firms/[firmId]/plan` (07 Q64–Q65, billing is Super Admin only)
 
-- **Current:** plan name and the firm's effective limits.
-- **Change plan:** select a plan → preview shows the new limits and, if current usage exceeds them, a warning:
-  "This firm will be over its seat limit (7 / 4). Existing users keep working; new additions will be blocked."
-  Allowed (A4: never auto-remove). Confirm writes `PLAN_CHANGED` with before → after in the summary (A14).
-- **Custom limits:** "Adjust limits" sets limits different from the plan's (e.g. Starter with 6 seats; the
-  Firm holds the effective limits, A3). Same over-limit preview as a plan change. Logged as `PLAN_CHANGED`
-  with before → after; the firm is marked "custom limits" on this tab, the firm header and the firms list.
-  The mark is derived (07 Q30): the firm's latest `PLAN_CHANGED` is a limits adjustment (`entityType:
-  "firm_limits"`); a plan change (`entityType: "firm"`) clears it.
+- **Current:** the firm's BDE count, its candidate limit (set by the Super Admin; a new firm starts at 10 per BDE), 100 new jobs per candidate per day (fixed),
+  the price per BDE and the amount for 30 days (BDE count × price, calculated), and what is in use.
+- **Change limits:** BDEs, the candidate limit (its own field; changing BDEs never moves it, the hint shows what 10 per
+  BDE would be) and the price per BDE; the hint shows the new amount. If current usage exceeds the new numbers, a warning: "This firm will be over its
+  BDE limit (7 / 4). Existing users keep working; new BDE invites and assignments will be blocked until it is under."
+  Allowed (A4: never auto-remove). Logged as `PLAN_CHANGED` (`entityType: "firm_limits"`), counts only, in the
+  firm's ledger. A period running today takes the new numbers, no proration.
+- **Billing:** the firm's 30-day periods, newest first: dates, BDEs, candidates, price per BDE, amount, Paid / Unpaid,
+  note. **Start next 30 days** (a start date, empty = the day after the last ends, or today for the first) and **Mark
+  paid / Edit** per period. Badge: **Payment overdue** (the firm has had a period and no paid one covers today),
+  **Paid**, or **No billing period** (never overdue). Nothing here reaches a firm.
 - **History:** derived from this firm's `PLAN_CHANGED` entries: date, by whom, before → after.
+
+The firms list has a **Billing** column with the same badge. Suspending stays manual (`firm.suspend`).
 
 ### Activity tab — `/admin/firms/[firmId]/activity`
 
@@ -853,19 +857,17 @@ This firm's ledger, newest first, every action including support views (`ADMIN_A
 `ADMIN_ACCESS_END`, with admin name and reason). Filters in the URL: action type, actor type, date range.
 Read-only.
 
-## 14.6 `/admin/plans` — Plan catalogue
+## 14.6 `/admin/plans` — The base plan (07 Q64)
 
-**Table:** name · seat limit · candidate limit · features (labels) · status (Active / Hidden) · firms on
-this plan (derived count).
+**Table:** name · BDEs (the count a new firm starts with) · candidates (10 per BDE) · price per BDE (USD) · status ·
+firms on this plan (derived count). **Action:** Edit (name, BDEs for a new firm, price per BDE); no New plan, no Hide,
+no features list.
 
-**Actions:** New plan · Edit · Hide (isActive false) / Show.
+The edit dialog states plainly: "Changes apply to firms created from now on. Existing firms keep their BDE count and
+price." (A3)
 
-The edit dialog states plainly: "Changes apply to firms assigned this plan from now on. Existing firms keep
-their current limits." (A3)
-
-Writes `CREATE` / `UPDATE` with `entityType: "plan"` (lowercase, like every ledger entity type), `firmId` null.
-
-No prices, no billing fields.
+Writes `PLAN_CHANGED` with `entityType: "plan"`, `firmId` null. The price is Super Admin only: no firm-side screen
+or response shows it.
 
 ## 14.7 `/admin/audit` — Platform audit log
 
@@ -922,7 +924,7 @@ view (A12).
 1. **System and AI spend:** `/admin/system` is a placeholder; `HealthCheck`, `ScraperRun` and `AiUsage`
    contracts are drafted for sign-off separately; the demo-data reset moves onto the placeholder; AI spend is
    hidden on the overview until its contract is approved (14.9).
-2. **Custom limits** per firm: allowed, logged as `PLAN_CHANGED`, the firm marked "custom limits" (14.5).
+2. **Custom limits** per firm: *replaced by 07 Q64:* the Super Admin sets a firm's BDE count directly (14.5); there is no "custom limits" mark.
 3. **View workspace** of an ONBOARDING firm with no users: allowed; it shows empty states.
 4. **Suspend:** ACTIVE firms only.
 5. **Stalled onboarding** shows in Needs attention after 7 days.

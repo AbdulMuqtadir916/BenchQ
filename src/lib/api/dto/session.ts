@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { LedgerEntrySchema, type LedgerEntry } from "@/lib/schemas/analytics";
 import { FirmSchema, SessionSchema, UserSchema, type Firm, type Session, type User } from "@/lib/schemas/session";
-import { InviteSchema, PlanSchema, PlatformUserSchema, type Invite, type Plan, type PlatformUser } from "@/lib/schemas/tenancy";
+import {
+  BillingPeriodSchema, InviteSchema, PlanSchema, PlatformUserSchema, type BillingPeriod, type Invite, type Plan, type PlatformUser,
+} from "@/lib/schemas/tenancy";
 import { fromBackendId } from "./demo-ids";
 import { toIso, toIsoOrNull } from "./shared";
 
@@ -92,8 +94,24 @@ export const PlanDto = z.object({
   name: z.string(),
   seat_limit: z.number(),
   candidate_limit: z.number(),
-  features: z.array(z.string()),
+  price_cents_per_seat: z.number(),
   is_active: z.boolean(),
+});
+
+export const BillingPeriodDto = z.object({
+  id,
+  firm_id: id,
+  starts_on: z.string(),
+  ends_on: z.string(),
+  seat_limit: z.number(),
+  candidate_limit: z.number(),
+  jobs_per_candidate_per_day: z.number(),
+  price_cents_per_seat: z.number(),
+  amount_cents: z.number(),
+  status: z.string(),
+  paid_on: z.string().nullable(),
+  note: z.string().nullable(),
+  created_at: z.string(),
 });
 
 export const LedgerEntryDto = z.object({
@@ -128,7 +146,9 @@ export const InviteLookupDto = z.union([
 
 /** What creating a firm or sending / resending an invite returns: the link's token, shown once (07 Q38). */
 export const InviteWithTokenDto = z.object({ invite: InviteDto, invite_token: z.string() });
-export const CreatedFirmDto = InviteWithTokenDto.extend({ firm: FirmDto });
+/** A firm as the Super Admin reads it: the firm plus its price per BDE (07 Q66). No firm-side response has the price. */
+export const AdminFirmDto = FirmDto.extend({ price_cents_per_seat: z.number() });
+export const CreatedFirmDto = InviteWithTokenDto.extend({ firm: AdminFirmDto });
 
 /** What exiting a support view returns (backend/api/routes_support.py): the session, and the firm it was of. */
 export const SupportExitDto = z.object({ session: SessionDto, firm_id: nullableId });
@@ -153,6 +173,11 @@ export function toFirm(dto: z.infer<typeof FirmDto>): Firm {
     contactPhone: dto.contact_phone,
     createdAt: toIso(dto.created_at),
   });
+}
+
+export type AdminFirm = Firm & { priceCentsPerSeat: number };
+export function toAdminFirm(dto: z.infer<typeof AdminFirmDto>): AdminFirm {
+  return { ...toFirm(dto), priceCentsPerSeat: dto.price_cents_per_seat };
 }
 
 export function toUser(dto: z.infer<typeof UserDto>): User {
@@ -232,8 +257,26 @@ export function toPlan(dto: z.infer<typeof PlanDto>): Plan {
     name: dto.name,
     seatLimit: dto.seat_limit,
     candidateLimit: dto.candidate_limit,
-    features: dto.features,
+    priceCentsPerSeat: dto.price_cents_per_seat,
     isActive: dto.is_active,
+  });
+}
+
+export function toBillingPeriod(dto: z.infer<typeof BillingPeriodDto>): BillingPeriod {
+  return BillingPeriodSchema.parse({
+    id: dto.id,
+    firmId: mapId(dto.firm_id),
+    startsOn: dto.starts_on,
+    endsOn: dto.ends_on,
+    seatLimit: dto.seat_limit,
+    candidateLimit: dto.candidate_limit,
+    jobsPerCandidatePerDay: dto.jobs_per_candidate_per_day,
+    priceCentsPerSeat: dto.price_cents_per_seat,
+    amountCents: dto.amount_cents,
+    status: dto.status,
+    paidOn: dto.paid_on,
+    note: dto.note,
+    createdAt: toIso(dto.created_at),
   });
 }
 

@@ -133,12 +133,13 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
 
     for p in _load("plans.json"):
         added["plans"] += _add_missing(db, Plan, demo_id(p["id"]), name=p["name"], seat_limit=p["seatLimit"],
-                                       candidate_limit=p["candidateLimit"], features=p["features"],
+                                       candidate_limit=p["candidateLimit"], price_cents_per_seat=p["priceCentsPerSeat"],
                                        is_active=p["isActive"])
     for f in firm_data["firms"]:
         added["firms"] += _add_missing(
             db, Firm, demo_id(f["id"]), name=f["name"], slug=f["slug"], status=f["status"],
             plan_id=demo_id(f["planId"]), seat_limit=f["seatLimit"], candidate_limit=f["candidateLimit"],
+            price_cents_per_seat=3500,
             contact_phone=f["contactPhone"], logo_url=f["logoUrl"], primary_timezone=f["primaryTimezone"],
             client_timezone=f["clientTimezone"],
             application_expiry_days=f["applicationExpiryDays"],

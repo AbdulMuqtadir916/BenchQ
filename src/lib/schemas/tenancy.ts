@@ -27,17 +27,43 @@ export const SlugSchema = z
 export const FirmStatus = z.enum(["ONBOARDING", "ACTIVE", "SUSPENDED"]);
 export type FirmStatus = z.infer<typeof FirmStatus>;
 
-/** A plan is a template (A3): its limits are copied onto a firm when assigned. No prices (no billing). */
+/**
+ * The base plan (docs/02 §3.5, 07 Q64): a template (A3) whose numbers are copied onto a firm when it is created.
+ * `candidateLimit` is always 10 × `seatLimit`. The price is the Super Admin's: no firm-side response carries it.
+ */
 export const PlanSchema = z.object({
   id: z.string(),
   name: z.string(),
   seatLimit: z.number().int().positive(),
   candidateLimit: z.number().int().positive(),
-  /** Display labels only (A15). */
-  features: z.array(z.string()),
+  /** USD cents per BDE per 30-day period. */
+  priceCentsPerSeat: z.number().int().nonnegative(),
   isActive: z.boolean(),
 });
 export type Plan = z.infer<typeof PlanSchema>;
+
+export const BillingStatus = z.enum(["UNPAID", "PAID"]);
+export type BillingStatus = z.infer<typeof BillingStatus>;
+
+/** One 30-day period of a firm's billing record (docs/02 §3.5, 07 Q65): a snapshot, so later changes never rewrite it. */
+export const BillingPeriodSchema = z.object({
+  id: z.string(),
+  firmId: z.string(),
+  /** Dates, `YYYY-MM-DD`. `endsOn` is `startsOn` + 30 days. */
+  startsOn: z.string(),
+  endsOn: z.string(),
+  seatLimit: z.number().int().nonnegative(),
+  candidateLimit: z.number().int().nonnegative(),
+  jobsPerCandidatePerDay: z.number().int().positive(),
+  priceCentsPerSeat: z.number().int().nonnegative(),
+  /** `seatLimit` × `priceCentsPerSeat`, written by the backend. */
+  amountCents: z.number().int().nonnegative(),
+  status: BillingStatus,
+  paidOn: z.string().nullable(),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type BillingPeriod = z.infer<typeof BillingPeriodSchema>;
 
 export const PlatformRole = z.literal("PLATFORM_ADMIN");
 

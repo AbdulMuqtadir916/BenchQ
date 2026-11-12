@@ -10,20 +10,24 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth import ledger, support
+from backend.auth.billing import candidate_limit_for
 from backend.auth.invites import (bad_request, check_email_free, conflict, invite_json, normal_email, resend_invite,
                                   revoke_invite, send_invite, slug_problem)
 from backend.auth.policy import require
-from backend.auth.serialize import firm_json, ledger_entry_json, platform_user_json, user_json
+from backend.auth.serialize import admin_firm_json, ledger_entry_json, platform_user_json, user_json
 from backend.auth.sessions import Principal
 from backend.models.db import get_db, utcnow
 from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, User
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+MAX_SEATS = 1000
+
 
 def plan_json(plan: Plan) -> dict:
     return {"id": str(plan.id), "name": plan.name, "seat_limit": plan.seat_limit,
-            "candidate_limit": plan.candidate_limit, "features": list(plan.features or []), "is_active": plan.is_active}
+            "candidate_limit": plan.candidate_limit, "price_cents_per_seat": plan.price_cents_per_seat,
+            "is_active": plan.is_active}
 
 
 def _not_found(what: str) -> HTTPException:
@@ -59,6 +63,8 @@ class CreateFirmBody(BaseModel):
     name: str = Field(max_length=200)
     slug: str = Field(max_length=64)
     plan_id: uuid.UUID
+    seat_limit: int | None = Field(default=None, ge=1, le=MAX_SEATS)     # BDEs; the plan's count when left out (Q64)
+    candidate_limit: int | None = Field(default=None, ge=0, le=100_000)   # 10 per BDE when left out (Q67)
     primary_timezone: str = Field(default="Asia/Kolkata", max_length=64)
     client_timezone: str = Field(default="America/New_York", max_length=64)
     contact_phone: str | None = Field(default=None, max_length=40)
@@ -68,12 +74,12 @@ class CreateFirmBody(BaseModel):
 
 @router.get("/firms", summary="Every firm")
 def list_firms(db: DbSession = Depends(get_db)):
-    return [firm_json(f) for f in db.query(Firm).order_by(Firm.created_at, Firm.name)]
+    return [admin_firm_json(f) for f in db.query(Firm).order_by(Firm.created_at, Firm.name)]
 
 
 @router.get("/firms/{firm_id}", summary="One firm")
 def get_firm(firm_id: uuid.UUID, db: DbSession = Depends(get_db)):
-    return firm_json(_get(db, Firm, firm_id, "Firm"))
+    return admin_firm_json(_get(db, Firm, firm_id, "Firm"))
 
 
 @router.post("/firms", status_code=201, summary="Create a firm and invite its owner")
@@ -98,13 +104,16 @@ def create_firm(body: CreateFirmBody, principal: Principal = Depends(require("fi
         raise _not_found("Plan")
     if not plan.is_active:
         raise bad_request("That plan isn't offered to new firms.")
-    if plan.seat_limit < 1:
+    seats = body.seat_limit if body.seat_limit is not None else plan.seat_limit
+    if seats < 1:
         raise bad_request("That plan has no seats, so its owner can't be invited.")
     email = normal_email(body.owner_email)
     check_email_free(db, email, now)
 
-    firm = Firm(name=name, slug=body.slug, status="ONBOARDING", plan_id=plan.id, seat_limit=plan.seat_limit,
-                candidate_limit=plan.candidate_limit, contact_phone=(body.contact_phone or "").strip() or None,
+    firm = Firm(name=name, slug=body.slug, status="ONBOARDING", plan_id=plan.id, seat_limit=seats,
+                candidate_limit=(body.candidate_limit if body.candidate_limit is not None else candidate_limit_for(seats)),
+                price_cents_per_seat=plan.price_cents_per_seat,
+                contact_phone=(body.contact_phone or "").strip() or None,
                 primary_timezone=_timezone(body.primary_timezone), client_timezone=_timezone(body.client_timezone))
     db.add(firm)
     try:
@@ -113,7 +122,7 @@ def create_firm(body: CreateFirmBody, principal: Principal = Depends(require("fi
         db.rollback()
         raise bad_request("Another firm already uses this slug.")
     ledger.record(db, actor=admin, action="FIRM_CREATED", entity_type="firm", entity_id=firm.id, entity_label=name,
-                  summary=f"Created firm on {plan.name} ({plan.seat_limit} BDE seats, {plan.candidate_limit} candidates)",
+                  summary=f"Created firm on {plan.name} ({seats} BDE seats, {firm.candidate_limit} candidates)",
                   firm_id=firm.id)
     invite, token = send_invite(db, inviter=admin, firm=firm, email=email, role="OWNER", invitee_name=owner_name,
                                 summary=f"Invited {owner_name} ({email}) as OWNER", now=now)
@@ -122,7 +131,7 @@ def create_firm(body: CreateFirmBody, principal: Principal = Depends(require("fi
     except IntegrityError:              # the same email, invited a moment ago by someone else
         db.rollback()
         raise conflict("Someone with this email already has an account or a pending invite.")
-    return {"firm": firm_json(firm), "invite": invite_json(invite, now), "invite_token": token}
+    return {"firm": admin_firm_json(firm), "invite": invite_json(invite, now), "invite_token": token}
 
 
 # ── Invites ──────────────────────────────────────────────────────────────────
