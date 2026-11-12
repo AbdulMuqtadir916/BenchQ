@@ -161,7 +161,7 @@ def get_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID
                editor: bool = False, principal: Principal = Depends(current_principal),
                db: DbSession = Depends(get_db)):
     """With `?autofill=true`, also its autofill: every question a form can ask, built for this read (docs/02 §8.1);
-    with `&editor=true` as the Autofill screen reads it, the unanswered questions and each answer's type too (§8.3)."""
+    with `&editor=true` as the Autofill screen reads it, the unanswered questions and each answer's type too (§8.4)."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
     row = versions.candidate_version(db, candidate, resume_id)
@@ -169,7 +169,7 @@ def get_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID
 
 
 class AutofillIn(BaseModel):
-    """A change to one version's autofill (docs/02 §8.3): `edit` by key, with `built`, each edited key's built answer
+    """A change to one version's autofill (docs/02 §8.4): `edit` by key, with `built`, each edited key's built answer
     as the user was shown it, and `answered`, each edited or reset key's answer as the user was shown it (their edit,
     else the built one); `reset` keys; `add` questions with their answers; `remove` questions; `only_this` keeps it to
     this version instead of every job of the candidate (07 Q30)."""

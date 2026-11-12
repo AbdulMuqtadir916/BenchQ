@@ -28,7 +28,7 @@ const MAX_ENTRIES = 5;
 const ENTRY_MS = 700;
 
 /** A résumé's answers with what came with them, kept together: its built answers by key (a save says which one the BDE
- * was shown, docs/02 §8.3) and its school and job records (`withHistory`). */
+ * was shown, docs/02 §8.4) and its school and job records (`withHistory`). */
 type Answers = { entries: BankEntry[]; built: Map<string, unknown>; answered: Map<string, unknown>; history: HistoryRecords };
 const NO_HISTORY: HistoryRecords = { education: [], work: [] };
 const noAnswers = (): Answers => ({ entries: [], built: new Map(), answered: new Map(), history: NO_HISTORY });

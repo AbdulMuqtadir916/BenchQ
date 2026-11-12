@@ -1,4 +1,4 @@
-"""The Autofill screen's read and save (07 Q7, Q14, Q15, Q30, Q34, Q40–Q45; docs/02 §8.3): every question with its type,
+"""The Autofill screen's read and save (07 Q7, Q14, Q15, Q30, Q34, Q40–Q45; docs/02 §8.4): every question with its type,
 an edit that stopped applying marked, and one route that changes a version's answers in place, for the rest of its
 résumé too unless "Only this job"."""
 import re
@@ -16,7 +16,7 @@ WHY = "Why do you want to work here?"
 
 
 def _patch(client, world, candidate, version_id, body, who="adnan"):
-    """A save as the screen sends it: with the answer it showed for each edited or reset question (docs/02 §8.3), read
+    """A save as the screen sends it: with the answer it showed for each edited or reset question (docs/02 §8.4), read
     first, unless the test names them (`answered` in `body`)."""
     keys = [*body.get("edit", {}), *body.get("reset", [])] if isinstance(body, dict) else []
     if keys and "answered" not in body:

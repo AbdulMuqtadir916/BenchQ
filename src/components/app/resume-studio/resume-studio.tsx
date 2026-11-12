@@ -11,7 +11,6 @@ import { StudioTopbar } from "./studio-topbar";
 import { StatusBar } from "./status-bar";
 import { ViewerOutline } from "./viewer-outline";
 import { SelectionToolbar } from "./selection-toolbar";
-import { useTailorRun } from "./tailor-run";
 import { usePrintExport } from "./print-export";
 import { stepTemplate } from "./templates";
 import { useStudio, type StudioTab } from "./studio-store";
@@ -41,8 +40,8 @@ const SWITCH_MS = 1500;
  * Viewer mode: the page itself, editable in place. Autofill answers (its own route, `isAutofill`): what the extension
  * fills from this version. A switch to or from it replaces the URL, so closing goes back to where the studio was opened.
  */
-export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSave, isSaving = false, isAutofill = false, hrefs }: {
-  name: string; subtitle: string; canEdit: boolean; canTailor: boolean; onClose: () => void; onSave?: () => void;
+export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false, isAutofill = false, hrefs }: {
+  name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void;
   isSaving?: boolean; isAutofill?: boolean;
   /** Absent for an unsaved draft, which has no Autofill tab. */
   hrefs?: StudioHrefs;
@@ -62,7 +61,6 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
     const id = useStudio.getState().doc?.resumeId;
     if (id) lastShown = { id, at: Date.now() };
   }, []);
-  const tailor = useTailorRun();
   const exporter = usePrintExport(doc, resumeFileName(name));
   const [isConfirmingClose, setConfirmingClose] = useState(false);
   // Leaving the Autofill tab (another tab, Close, Esc) drops an answer being written there, which isn't the document's,
@@ -143,13 +141,10 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
         name={name}
         subtitle={subtitle}
         canEdit={canEdit}
-        canTailor={canTailor}
-        isTailoring={tailor.isRunning}
         onSave={onSave && saveDocument}
         isSaving={isSaving}
         isSaveBlocked={hasInvalidLinks}
         onClose={close}
-        onTailor={tailor.start}
         onExport={exporter.print}
         tab={tab}
         onTab={selectTab}
@@ -178,7 +173,6 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
 
       <StatusBar doc={doc} showWords={!isAutofill} />
       {!isAutofill && (isEditable || (canEdit && mode === "build")) ? <SelectionToolbar scopeRef={rootRef} /> : null}
-      {tailor.panel}
       {exporter.portal}
       <ConfirmDialog open={isConfirmingClose} title="Discard unsaved changes?" confirmLabel="Discard" tone="danger" cancelLabel="Keep editing"
         onCancel={() => setConfirmingClose(false)} onConfirm={() => { setConfirmingClose(false); onClose(); }}>

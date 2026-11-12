@@ -11,7 +11,7 @@ docs/02 §8.1): every question an application form can ask, answered in two part
   the read marks the edit as `replaced` (07 Q15). The questions the user added are a list, oldest first (07 Q40), each
   with the other wordings it answers (`also`, Q41). A save and a promote copy the entries, as tailoring will (docs/02
   §8.1); on the new version an edit applies only where its built answer is still `over`. `change()` is how the
-  Autofill screen's save writes them (`PATCH …/resumes/{id}/autofill`, docs/02 §8.3).
+  Autofill screen's save writes them (`PATCH …/resumes/{id}/autofill`, docs/02 §8.4).
 
 `merged()` is what `GET …/resumes/{id}?autofill=true` returns: every question once, with its `kind` (FIXED; EDITED,
 with `built`, the answer reset gives back; CUSTOM, with `also`) and, for a question built here, its `key`: a fixed
@@ -189,7 +189,7 @@ ALSO: dict[str, list[str]] = {
     "floor-rate": ["Floor rate", "What is the lowest rate you would accept?", "Minimum acceptable rate", "Minimum rate",
                    "Lowest acceptable rate", "Minimum hourly rate"],
 }
-# How much one version keeps (docs/02 §8.3): a question, a text answer, a list's items and each item, the questions
+# How much one version keeps (docs/02 §8.4): a question, a text answer, a list's items and each item, the questions
 # the user adds.
 MAX_QUESTION, MAX_ANSWER, MAX_ITEMS, MAX_ITEM, MAX_CUSTOM = 300, 4000, 100, 300, 200
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

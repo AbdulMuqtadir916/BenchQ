@@ -153,7 +153,7 @@ export const resumesApi = {
   /** Show a hidden base again; it isn't made active. */
   showBase: (firmId: string, candidateId: string, baseId: string): Promise<{ number: number }> => live.showBase(firmId, candidateId, baseId),
 
-  /** One version's autofill for the Autofill screen (docs/02 §8.3): every question, the unanswered ones too. */
+  /** One version's autofill for the Autofill screen (docs/02 §8.4): every question, the unanswered ones too. */
   autofill: (firmId: string, versionId: string): Promise<ResumeAutofill> => live.autofill(firmId, versionId),
   /** Change a version's autofill in place (07 Q7); for the rest of its résumé that answers the same unless `onlyThis`. */
   saveAutofill: (firmId: string, candidateId: string, versionId: string, change: AutofillChange): Promise<AutofillSaveResult> =>

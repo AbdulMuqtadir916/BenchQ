@@ -55,7 +55,7 @@ candidate instead. The owner of each part decides:
 | Autofill (`backend/api/routes_autofill.py`, `backend/autofill_schema.py`): the extension | Samad | §4, §5 |
 | Cover letters (`backend/api/routes_cover_letters.py`, `backend/analyzer/cover_letter_generator.py`) | Zuhair | §6 |
 | Job scoring (`backend/analyzer/cv_scorer.py`) | Zuhair | §7 |
-| Old tailoring, kept unwired (`backend/analyzer/legacy_tailoring.py`, `persona_tailor_prompt`) | Zuhair | §7 |
+| Old tailoring (`legacy_tailoring.py`, `persona_tailor_prompt`): deleted by tailoring part 2 (2026-11-12) | Zuhair | §7 |
 | `/api/persona` (GET, PATCH, `POST /qa-bank`), the seed's singleton (`backend/seed.py`) | Abdul (clean-up) | §8 |
 
 ## 4. Autofill: fixed answers (`GET /api/autofill/config` → `project_answers`)
@@ -136,7 +136,8 @@ them is planned; its contract goes in docs/02 first.
 - **Job scoring** (`cv_scorer.py`): the virtual "Persona" résumé (`_get_persona_text`, the reserved `"persona"` id in
   `companies.selected_resume_ids` and in explicit cv ids) is removed. Scoring reads the candidates' active base
   versions only, as it already does for real résumés.
-- **Old tailoring** (`legacy_tailoring.py`, unwired): "persona as base" and `persona_tailor_prompt` are not ported.
+- **Old tailoring** (`legacy_tailoring.py`): deleted with its seed rows by tailoring part 2 (2026-11-12); "persona
+  as base" and `persona_tailor_prompt` were not ported.
   Tailoring (zuhair.md §3) starts from the candidate's active base version. The persona's "rich pool" idea becomes
   that version's own columns.
 
@@ -144,7 +145,7 @@ them is planned; its contract goes in docs/02 first.
 
 When §4 to §7 are built and nothing reads `personas`, one migration:
 - drops the `personas` table and `cover_letters.from_persona`;
-- deletes the `persona_tailor_prompt` setting.
+- deletes the `persona_tailor_prompt` row a database still holds (it is no longer seeded, 2026-11-12).
 
 The same PR removes `backend/api/routes_persona.py` and its three routes (`access.py`, `isolation_cases.py`), the
 `Persona` model, the seed's singleton, and their tests. Until then, nothing new reads `personas`.

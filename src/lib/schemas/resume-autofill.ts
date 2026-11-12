@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * One résumé version's autofill on the Autofill screen (docs/02 §8.3): every question an application form can ask,
+ * One résumé version's autofill on the Autofill screen (docs/02 §8.4): every question an application form can ask,
  * built from the version and the candidate's profile, with the user's edits of those answers and their own questions.
  * The backend builds it on each read; only the user's entries are stored.
  */

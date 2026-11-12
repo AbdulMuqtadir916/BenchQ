@@ -6,7 +6,7 @@ import type { AutofillChange } from "@/lib/schemas/resume-autofill";
 import { queryKeys } from "@/lib/query/keys";
 import { useFirmId } from "@/lib/tenancy/firm-context";
 
-/** One version's autofill, for the Autofill screen (docs/02 §8.3). */
+/** One version's autofill, for the Autofill screen (docs/02 §8.4). */
 export function useResumeAutofill(versionId: string) {
   const firmId = useFirmId();
   return useQuery({

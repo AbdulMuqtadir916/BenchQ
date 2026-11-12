@@ -8,7 +8,7 @@ import type { BankEntry, ReviewRow } from "./types";
 
 /**
  * What an answer the BDE typed saves as, for next time (07 Q18–Q22, Q58), as phase 3's save route takes it (docs/02
- * §8.3): a field of one of BenchQ's own questions is an edit of that question's key, sent with the built answer the BDE
+ * §8.4): a field of one of BenchQ's own questions is an edit of that question's key, sent with the built answer the BDE
  * was shown; any other field is a question of their own, in the form's words, or the saved one it matched. A field
  * BenchQ works out (authorized to work, where they live, a first name from the full one) can't be saved: those facts
  * are changed in BenchQ. A saved answer that's the same isn't offered; a different one offers to update it.
@@ -90,7 +90,7 @@ const label = (saved: string | undefined, typed: string) => (saved ? `Update the
 
 /** What saving `row`'s typed value would do, or null when there's nothing to offer. `built` holds, by key, the built
  * answers the picked résumé gave, and `answered` (when given) the answers it gave, an edit or the built one: both go
- * with the save, so the route refuses one over an answer changed since (docs/02 §8.3). */
+ * with the save, so the route refuses one over an answer changed since (docs/02 §8.4). */
 export function saveOffer(row: ReviewRow, bank: BankEntry[], built: ReadonlyMap<string, unknown>,
   answered?: ReadonlyMap<string, unknown>): SaveOffer | null {
   const typed = row.field.current.trim();

@@ -1,7 +1,7 @@
 import type { AutofillAnswer, AutofillAnswerType, AutofillChange, AutofillEntry } from "@/lib/schemas/resume-autofill";
 
 /**
- * The Autofill tab's editing of a version's autofill (docs/02 §8.3, docs/04): the editor's draft and what it saves. How
+ * The Autofill tab's editing of a version's autofill (docs/02 §8.4, docs/04): the editor's draft and what it saves. How
  * the tab lays the answers out is `autofill-view.ts`. Pure, so the rules are tested without rendering the tab.
  */
 
@@ -24,7 +24,7 @@ const isRealDate = (value: string) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(time) && new Date(time).toISOString().startsWith(value);
 };
 
-/** The editor's text as the question's type takes it (docs/02 §8.3), or what's wrong with it. A custom question's
+/** The editor's text as the question's type takes it (docs/02 §8.4), or what's wrong with it. A custom question's
  * answer is text. */
 export function parseDraft(draft: string, type: AutofillAnswerType | null): Parsed {
   const value = draft.trim();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AutofillVersionDto, toAutofillChangeBody, toVersionAutofill } from "./resume-autofill";
 
-describe("the Autofill screen's DTO (docs/02 §8.3)", () => {
+describe("the Autofill screen's DTO (docs/02 §8.4)", () => {
   it("maps the read, leaving the version's other fields out", () => {
     const version = AutofillVersionDto.parse({
       id: "v1", candidate_id: "c1", full_name: "Ravi Teja",

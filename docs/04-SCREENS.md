@@ -442,6 +442,15 @@ Virtualise past 100 rows. 500 rows must scroll at 60fps.
 **Empty:** no jobs captured → a card explaining the two capture paths with a link to `/jobs/capture`.
 Filtered to nothing → clear-filters state.
 
+**Tailoring (tailoring part 3, docs/02 §8.3).** With a candidate picked, their BDE gets **Tailor** in the job pane
+(the same control on the job page opened for that candidate, and as the sparkle in the dashboard queue): a picker
+beside it lists the candidate's visible bases' versions (default the active base's v1; a version whose base is hidden
+is shown unavailable with the reason). "Tailor again" plus **Open tailored** once a copy exists for that base and job;
+dimmed while that tailoring runs; a refused start says why in one line. **The tailoring panel**, on every firm page
+(the studio and Focus mode included), lists the BDE's tailorings running or finished in the last 30 minutes: the open
+one with its real step and timer, the rest as rows (step and timer, or **Open**, or the reason and **Try again**);
+**Hide** folds it to a pill, **×** dismisses a finished row. Nothing shows for someone with no tailorings.
+
 ### 5.2 `/jobs/capture`
 
 > **Since job search PR 3 (docs/02 §6.z):** one form, the candidate's BDE's only: the candidate (one of theirs), the
@@ -472,6 +481,11 @@ the match panel (`ScoringRecord` — requirement-by-requirement HAVE / MISSING /
 card (H-1B / LCA data, client type, prior applications from this firm), and the action stack
 (`Tailor resume`, `Mark applied`, `Start outreach`, `Save`, `Dismiss`).
 
+**For one candidate (`?candidate=<id>`, 2026-11-12).** A link from a candidate's screen (the dashboard queue, the
+candidate's matches, the job pane, a capture) names the candidate. The page then reads that candidate's own job
+(another candidate's is not-found), shows "For <candidate>" instead of the scoring dropdown, and acts for them.
+Opened without one (⌘K, "All candidates"), the dropdown only scores. **Only that candidate's jobs (Zuhair, 2026-11-12).** A screen about one candidate reads only that candidate's jobs (`useJobs({ candidateId })`, the backend's per-candidate read); each job's id is that candidate's own posting. Only screens that span candidates (the Jobs page's "All candidates", the owner's dashboard, ⌘K) read more than one candidate's.
+
 If the match is `LIGHT` depth, the panel shows a `Run full analysis` action that upgrades it —
 matching the JobNavigator cost-control split. The upgrade is an AI simulation per
 `03-MOCK-DATA.md §5`: staged progress, 2–5s.
@@ -499,7 +513,7 @@ first, so nothing overlaps. Labels fold into their icons as the window narrows (
 1024px, the tabs and Save on a phone). The Autofill tab keeps Save and drops Tailor and Export, which act on the page.
 
 ```
-┌ ✕ │ Base [Base]   [ Builder | Viewer | Autofill answers ]   Unsaved changes [Save]  [Tailor with AI] [Export PDF] ┐
+┌ ✕ │ Base [Base]   [ Builder | Viewer | Autofill answers ]   Unsaved changes [Save]  [Export PDF]                  ┐
 ├──────────────────────────────┬─────────────────────────────────────────────────────────────────┤
 │ ▸ Header                     │ Template ‹ Classic Serif ▾ ›   − Fit · 91% +   2 pages · Letter  │
 │ ▸ Summary                    │ ┌─────────────────────────────┐                                 │
@@ -529,12 +543,13 @@ first, so nothing overlaps. Labels fold into their icons as the window narrows (
 - **Templates** — six styles (Classic Serif, Modern, Minimal, Executive, Compact, Two Column). The
   ‹ › arrows (or `[` `]`) step through them; the name opens a strip of live thumbnails rendered from
   this resume's own content. The page is always white in both themes — it is the printed document.
-- **AI output** — a rewrite from the selection toolbar or a **Tailor with AI** run flashes the text it changed.
+- **AI output** — a rewrite from the selection toolbar flashes the text it changed. The studio doesn't tailor: a
+  tailoring starts from a job (§5, tailoring part 3 Q2).
 - **Export PDF** prints a clean copy of the page through the browser's print dialog.
 
 **Export.** Any résumé that is not deleted can be exported (no claim states, no export block).
 
-**The Autofill answers tab — `/resumes/[id]/autofill`** (07 Q6, Q13; docs/02 §8.3). The studio's third tab, with its
+**The Autofill answers tab — `/resumes/[id]/autofill`** (07 Q6, Q13; docs/02 §8.4). The studio's third tab, with its
 access; also opened from **Autofill** on each version of the résumé tree. It shows what the extension fills on
 application forms from this version, every question once, by topic:
 
@@ -647,6 +662,15 @@ against the selected candidate:
 │   [T] Tailor    [A] Applied    [O] Outreach    [S] Skip      │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+The queue is the selected candidate's own jobs, read again when the candidate changes (2026-11-12: only that
+candidate's jobs). While they load it shows a skeleton; a failed read shows the error with Retry; a candidate with no
+unapplied jobs shows "No jobs to work".
+
+**The BDE's only** (07 Q64). **T** starts a real tailoring of the active base for this job and moves on at once; it
+runs in the tailoring panel. A refused start says why under the actions. On the last job T waits for the answer, so
+a refused start keeps that job open with the reason. The summary's "Tailored" counts the run's tailorings that saved a
+résumé, and says how many are still tailoring.
 
 Single keystroke per decision, auto-advance, progress across the top. `Esc` exits and returns to
 the dashboard with a session summary: jobs reviewed, applications logged, time spent.

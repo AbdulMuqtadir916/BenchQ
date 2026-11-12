@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDot, CloudCheck, Download, FileCheck2, FileUser, LoaderCircle, Save, Sparkles, X } from "lucide-react";
+import { CircleDot, CloudCheck, Download, FileCheck2, FileUser, LoaderCircle, Save, X } from "lucide-react";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
@@ -14,15 +14,11 @@ interface StudioTopbarProps {
   subtitle: string;
   /** May edit and save (07 Q55 `canChangeResume`): the BDE once assigned; before that the OWNER and the candidate's MANAGER. */
   canEdit: boolean;
-  /** May tailor (07 Q55 `canManageResume`): only the candidate's assigned BDE, never the owner or manager. */
-  canTailor: boolean;
-  isTailoring: boolean;
   /** Saving makes the next version (§4.3). Absent where there is nothing to save to (a new, unsaved draft). */
   isSaveBlocked?: boolean;
   onSave?: () => void;
   isSaving?: boolean;
   onClose: () => void;
-  onTailor: () => void;
   onExport: () => void;
   tab: StudioTab;
   onTab: (tab: StudioTab) => void;
@@ -37,7 +33,7 @@ interface StudioTopbarProps {
  * accessible names. The Autofill tab keeps Save (a draft may be waiting); Tailor and Export act on the page, so they
  * stay with the Builder and the Viewer.
  */
-export function StudioTopbar({ doc, name, subtitle, canEdit, canTailor, isTailoring, onSave, isSaving = false, isSaveBlocked = false, onClose, onTailor, onExport, tab, onTab, hasAutofill }: StudioTopbarProps) {
+export function StudioTopbar({ doc, name, subtitle, canEdit, onSave, isSaving = false, isSaveBlocked = false, onClose, onExport, tab, onTab, hasAutofill }: StudioTopbarProps) {
   const Icon = doc.isMaster ? FileUser : FileCheck2;
   const isOnPage = tab !== "autofill";
 
@@ -70,12 +66,6 @@ export function StudioTopbar({ doc, name, subtitle, canEdit, canTailor, isTailor
 
       <div className="flex flex-1 basis-0 items-center justify-end gap-2">
         {canEdit && onSave ? <SaveControl onSave={onSave} isSaving={isSaving} isSaveBlocked={isSaveBlocked} /> : null}
-        {canTailor && isOnPage ? (
-          <Button variant="secondary" size="sm" onClick={onTailor} disabled={isTailoring} aria-label="Tailor with AI" title="Tailor with AI" className="hidden shrink-0 md:inline-flex">
-            {isTailoring ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
-            <span className="hidden xl:inline">Tailor with AI</span>
-          </Button>
-        ) : null}
         {isOnPage ? (
           <Button size="sm" onClick={onExport} aria-label="Export PDF" title="Download as PDF" className="shrink-0">
             <Download size={14} aria-hidden />

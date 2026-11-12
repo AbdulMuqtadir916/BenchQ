@@ -133,7 +133,7 @@ export async function getResumeFile(firmId: string, candidateId: string, resumeI
   }
 }
 
-/** Keeps answers the BDE typed on a résumé version's autofill, for next time: phase 3's save route (docs/02 §8.3). */
+/** Keeps answers the BDE typed on a résumé version's autofill, for next time: phase 3's save route (docs/02 §8.4). */
 export const saveResumeAnswers = (firmId: string, candidateId: string, resumeId: string, change: object) =>
   request<unknown>(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}/autofill`, { method: "PATCH", body: JSON.stringify(change) });
 

@@ -88,7 +88,7 @@ it. Everyone else reads it.
 | Inbox design (D8) | `docs/integration/06-open-decisions.md` D8, Samad's plan |
 | Applications (D3, 10 statuses) | `docs/integration/03-applications.md` |
 | Jobs, scraping | `docs/integration/02-jobs.md` |
-| Résumés, tailoring | `docs/integration/04-resumes-and-tailoring.md` |
+| Résumés, tailoring | [tailoring.md](./tailoring.md) (the tailoring module); `docs/integration/04-resumes-and-tailoring.md` is history |
 | `personas` is to be dropped: what `candidates` and `resumes` hold instead, and a suggested mapping | [persona-to-candidates.md](./persona-to-candidates.md) |
 | Connecting a module to the frontend | `docs/integration/README.md` "The workflow for one module" |
 | Password recovery approvals and Notifications inbox | [umamah.md](./umamah.md) |

@@ -103,7 +103,7 @@ const ROUTE_DEFS = [
   { id: "resumes.autofill", path: "/[firm]/resumes/[id]/autofill", title: "Autofill answers", area: "firm", shell: "studio", access: firm(roles("full", "team", "assigned", "read")) },
   { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 7, icon: Mail }, palette: true },
   { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 8, icon: ScrollText }, palette: true },
-  { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", palette: true, access: firm(roles("full", "full", "full", "none"), "none") },
+  { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", palette: true, access: firm(roles("none", "none", "full", "none"), "none") }, // BDE only (Zuhair 2026-11-12, replaces Q3)
 
   // Preferences
   // Super Admin only, and only when NEXT_PUBLIC_SHOW_DEV_ROUTES=true (devOnly): in the admin sidebar's Preferences.

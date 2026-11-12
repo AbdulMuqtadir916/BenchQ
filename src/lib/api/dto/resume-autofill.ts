@@ -8,7 +8,7 @@ import {
 } from "@/lib/schemas/resume-autofill";
 import { fromBackendId } from "./demo-ids";
 
-/** One entry of `GET …/resumes/{id}?autofill=true&editor=true` (backend/candidates/autofill.py `merged`, docs/02 §8.3). */
+/** One entry of `GET …/resumes/{id}?autofill=true&editor=true` (backend/candidates/autofill.py `merged`, docs/02 §8.4). */
 const AutofillEntryDto = z.object({
   question: z.string(),
   answer: AutofillAnswerSchema,
