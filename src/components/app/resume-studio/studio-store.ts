@@ -21,6 +21,13 @@ interface StudioState {
   /** A notice to show once the next document has loaded (a save moves to the new version, and loading clears notices). */
   pendingNotice: { text: string; tone: "info" | "ai" | "danger" } | null;
   pageCount: number;
+  /**
+   * Shrink type and spacing, in steps down to fixed minimums, to fit one page. A view choice like the template: held
+   * here for the open résumé, read by the preview and Export PDF. Saving it per résumé needs a stored field (open).
+   */
+  fitOnePage: boolean;
+  /** With fitOnePage on and still more than a page at the minimums: about how many lines to trim. */
+  fitOverflowLines: number | null;
   notice: { text: string; tone: "info" | "ai" | "danger" } | null;
   /** Field that just changed under AI — the paper and the field flash it once. */
   flashId: string | null;
@@ -41,6 +48,8 @@ interface StudioState {
   flash: (fieldId: string) => void;
   requestFocus: (fieldId: string) => void;
   setPageCount: (pages: number) => void;
+  setFitOnePage: (fit: boolean) => void;
+  setFitOverflowLines: (lines: number | null) => void;
   notify: (text: string, tone?: "info" | "ai" | "danger") => void;
 }
 
@@ -55,11 +64,13 @@ export const useStudio = create<StudioState>((set) => ({
   askUseAsBase: null,
   pendingNotice: null,
   pageCount: 1,
+  fitOnePage: false,
+  fitOverflowLines: null,
   notice: null,
   flashId: null,
   focusRequest: null,
 
-  load: (doc, mode, keepLayout = false) => set((s) => ({ doc, mode, isDirty: false, galleryOpen: false, openSections: keepLayout ? s.openSections : { header: true }, openEntries: keepLayout ? s.openEntries : {}, flashId: null, focusRequest: null, notice: null })),
+  load: (doc, mode, keepLayout = false) => set((s) => ({ doc, mode, isDirty: false, galleryOpen: false, openSections: keepLayout ? s.openSections : { header: true }, openEntries: keepLayout ? s.openEntries : {}, fitOnePage: keepLayout ? s.fitOnePage : false, fitOverflowLines: null, flashId: null, focusRequest: null, notice: null })),
   setMode: (mode) => set({ mode }),
   setAskUseAsBase: (askUseAsBase) => set({ askUseAsBase }),
   setPendingNotice: (pendingNotice) => set({ pendingNotice }),
@@ -76,6 +87,8 @@ export const useStudio = create<StudioState>((set) => ({
   },
   requestFocus: (fieldId) => set({ focusRequest: { fieldId, nonce: Date.now() } }),
   setPageCount: (pageCount) => set({ pageCount }),
+  setFitOnePage: (fitOnePage) => set({ fitOnePage }),
+  setFitOverflowLines: (fitOverflowLines) => set({ fitOverflowLines }),
   notify: (text, tone = "info") => {
     const notice = { text, tone };
     set({ notice });
