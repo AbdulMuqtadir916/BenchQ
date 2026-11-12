@@ -5,6 +5,8 @@ describe("résumé links", () => {
   it("links an email with mailto:", () => {
     expect(emailLink(" asha@example.com ")).toEqual({ href: "mailto:asha@example.com", label: "asha@example.com", isExternal: false });
     expect(emailLink("not an email")).toBeNull();
+    expect(emailLink("a@b.co?bcc=x@evil.test")).toBeNull();
+    expect(emailLink("a@b.co,x@evil.test")).toBeNull();
   });
 
   describe("phone numbers in E.164", () => {
@@ -20,7 +22,7 @@ describe("résumé links", () => {
       ["0091 93989 16410", "", "+919398916410"],
     ])("%s in %s → %s", (phone, country, e164) => expect(toE164(phone, country)).toBe(e164));
 
-    it.each([["8897437444", "Narnia"], ["555-0102", "US"], ["call me", "US"], ["+12", ""]])("refuses %s in %s", (phone, country) => {
+    it.each([["8897437444", "Narnia"], ["555-0102", "US"], ["call me", "US"], ["+12", ""], ["+00000000", ""]])("refuses %s in %s", (phone, country) => {
       expect(toE164(phone, country)).toBeNull();
     });
 
@@ -28,9 +30,13 @@ describe("résumé links", () => {
       expect(phoneLink("88974 37444", "India")).toEqual({ href: "tel:+918897437444", label: "88974 37444", isExternal: false });
     });
 
-    it("falls back to the bare digits when the country is unknown", () => {
-      expect(phoneLink("88974 37444", "")?.href).toBe("tel:8897437444");
+    it("doesn't link a number it can't put in E.164", () => {
+      expect(phoneLink("88974 37444", "")).toBeNull();
       expect(phoneLink("call me", "")).toBeNull();
+    });
+
+    it("keeps a ten-digit Indian number that starts with 91", () => {
+      expect(toE164("9123456789", "India")).toBe("+919123456789");
     });
   });
 
@@ -41,6 +47,11 @@ describe("résumé links", () => {
     ["github", "http://github.com/asha/repo", "https://github.com/asha/repo", "github.com/asha"],
   ] as const)("normalizes %s %s to https", (kind, value, href, label) => {
     expect(profileLink(kind, value)).toEqual({ href, label, isExternal: true });
+  });
+
+  it("gives a LinkedIn label only to LinkedIn itself", () => {
+    expect(profileLink("linkedin", "https://evil-linkedin.com/in/asha/x")?.label).toBe("evil-linkedin.com/in/asha/x");
+    expect(profileLink("linkedin", "https://in.linkedin.com/in/asha")?.label).toBe("linkedin.com/in/asha");
   });
 
   it("labels project links with something readable on paper", () => {

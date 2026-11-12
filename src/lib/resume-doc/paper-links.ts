@@ -10,7 +10,8 @@ export interface PaperLink {
   isExternal: boolean;
 }
 
-const EMAIL = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>".]+$/;
+/** A plain address: no `?`, `&`, `,` or `%`, so nothing can turn into mailto options (a hidden `?bcc=`). */
+const EMAIL = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 
 export function emailLink(value: string): PaperLink | null {
   const email = value.trim();
@@ -34,6 +35,9 @@ const CALLING_CODES: Record<string, string> = {
   "nz": "64", "nzl": "64", "new zealand": "64",
 };
 
+/** The longest national number (without the trunk 0) per calling code: longer digits must include the code. */
+const NATIONAL_MAX: Record<string, number> = { "91": 10, "44": 10, "61": 9, "49": 11, "353": 9, "65": 8, "971": 9, "92": 10, "880": 10, "64": 10 };
+
 /** The calling code for a country field, or null when it isn't one we know. */
 export function callingCode(country: string): string | null {
   return CALLING_CODES[country.trim().toLowerCase().replace(/\./g, "")] ?? null;
@@ -50,7 +54,7 @@ export function toE164(value: string, country: string): string | null {
   let digits = phone.replace(/\D/g, "");
   if (phone.startsWith("+") || phone.startsWith("00")) {
     if (phone.startsWith("00")) digits = digits.slice(2);
-    return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
+    return digits.length >= 8 && digits.length <= 15 && digits[0] !== "0" ? `+${digits}` : null;
   }
   const code = callingCode(country);
   if (!code) return null;
@@ -58,21 +62,21 @@ export function toE164(value: string, country: string): string | null {
     if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
     return digits.length === 10 ? `+1${digits}` : null;
   }
-  if (digits.startsWith(code) && digits.length - code.length >= 8) digits = digits.slice(code.length);
+  // "91 98765 43210" includes the code; "9123456789" (ten digits) is a national number that happens to start with 91.
+  if (digits.startsWith(code) && digits.length > (NATIONAL_MAX[code] ?? 10)) digits = digits.slice(code.length);
   else if (digits.startsWith("0")) digits = digits.slice(1);
   const e164 = `${code}${digits}`;
   return digits.length >= 6 && e164.length <= 15 ? `+${e164}` : null;
 }
 
 /**
- * A phone → tel: in E.164; the printed text stays as the user typed it. With no country code to be had, the bare
- * digits still dial within the candidate's own country.
+ * A phone → tel: in E.164; the printed text stays as the user typed it. With no country code to be had, no link: a
+ * bare national number would dial differently from the reader's country.
  */
 export function phoneLink(value: string, country = ""): PaperLink | null {
   const phone = value.trim();
-  const digits = phone.replace(/\D/g, "");
-  const dial = toE164(phone, country) ?? (/^[\d\s().\-/]+$/.test(phone) && digits.length >= 7 && digits.length <= 15 ? digits : null);
-  return dial ? { href: `tel:${dial}`, label: phone, isExternal: false } : null;
+  const e164 = toE164(phone, country);
+  return e164 ? { href: `tel:${e164}`, label: phone, isExternal: false } : null;
 }
 
 /** An https URL: `https://` added when the scheme is missing, and `http://` upgraded. */
@@ -99,7 +103,7 @@ export function profileLink(kind: "linkedin" | "github", value: string): PaperLi
   const host = hostOf(url);
   const [first, second] = pathParts(url);
   let label = shortUrl(url);
-  if (kind === "linkedin" && host.endsWith("linkedin.com") && first && second) label = `linkedin.com/${first}/${second}`;
+  if (kind === "linkedin" && (host === "linkedin.com" || host.endsWith(".linkedin.com")) && first && second) label = `linkedin.com/${first}/${second}`;
   if (kind === "github" && host === "github.com" && first) label = `github.com/${first}`;
   return { href: url.href, label, isExternal: true };
 }

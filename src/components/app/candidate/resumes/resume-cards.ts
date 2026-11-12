@@ -22,16 +22,16 @@ export function titleCase(text: string): string {
 
 /** The cards in order: the main résumé first, then the rest as they were made. */
 export function resumeCards(bases: readonly TreeBase[], primaryRole: string | null | undefined): ResumeCard[] {
-  const titles = bases.map((node) => titleCase(roleOf(node.resume?.name, primaryRole) ?? "Résumé"));
+  // Ordered first, then numbered, so the main résumé is never the "(2)" of its role.
+  const ordered = [...bases.filter((b) => b.base.isActive), ...bases.filter((b) => !b.base.isActive)];
   const seen = new Map<string, number>();
-  const cards = bases.map((node, i) => {
-    const base = titles[i]!;
-    const n = (seen.get(base) ?? 0) + 1;
-    seen.set(base, n);
+  return ordered.map((node) => {
+    const role = titleCase(roleOf(node.resume?.name, primaryRole) ?? "Résumé");
+    const n = (seen.get(role) ?? 0) + 1;
+    seen.set(role, n);
     const [latest = null, ...older] = node.versions;
-    return { node, title: n > 1 ? `${base} (${n})` : base, isMain: node.base.isActive, latest, older };
+    return { node, title: n > 1 ? `${role} (${n})` : role, isMain: node.base.isActive, latest, older };
   });
-  return [...cards.filter((c) => c.isMain), ...cards.filter((c) => !c.isMain)];
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

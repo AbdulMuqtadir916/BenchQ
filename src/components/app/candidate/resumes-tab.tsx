@@ -57,7 +57,7 @@ export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct
   if (!cards.length && !(canUpload && hiddenCards.length)) {
     return (
       <EmptyState icon={FileText} title="No résumé yet"
-        description={canUpload || canCreate ? "Upload the candidate's résumé file, or build one from scratch." : "The candidate's recruiter adds their first résumé."}
+        description={canUpload && canCreate ? "Upload the candidate's résumé file, or build one from scratch." : canUpload ? "Upload the candidate's résumé file." : canCreate ? "Build the candidate's résumé from scratch." : "The candidate's recruiter adds their first résumé."}
         action={canUpload || canCreate ? (
           <div className="flex flex-wrap justify-center gap-2">
             {canUpload ? <UploadResume candidateId={candidate.id} label="Upload a file" /> : null}

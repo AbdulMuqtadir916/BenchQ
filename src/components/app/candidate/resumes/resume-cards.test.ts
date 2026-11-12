@@ -27,7 +27,8 @@ describe("the Résumés tab's cards", () => {
 
   it("tells two résumés for the same role apart", () => {
     const same = resumeCards(candidate!.bases.map((b) => ({ ...b, resume: b.resume && { ...b.resume, name: "Base" } })), "Java Developer");
-    expect(same.map((c) => c.title).sort()).toEqual(["Java Developer", "Java Developer (2)"]);
+    expect(same.map((c) => c.title)).toEqual(["Java Developer", "Java Developer (2)"]);
+    expect(same[0]!.isMain).toBe(true);
   });
 
   it("splits the newest version from the older ones", () => {
