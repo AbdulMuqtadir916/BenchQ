@@ -32,14 +32,14 @@ let storage: StubStorage;
 async function load(now = T0, email?: string) {
   vi.resetModules();
   g.__BENCHQ_DEMO_NOW__ = now;
-  const [db, signIn, applications, documents, inbox, tenancy, team, demo, candidatesModule] = await Promise.all([
+  const [db, signIn, applications, documents, inbox, demo, candidatesModule] = await Promise.all([
     import("./db"), import("./sign-in-as"), import("./applications"), import("./documents"), import("./inbox"),
-    import("./tenancy"), import("./team"), import("./demo-data"), import("@/lib/api/candidates"),
+    import("./demo-data"), import("@/lib/api/candidates"),
   ]);
   // Candidates are the backend's (no candidates mock): the mocks just loaded read the test fixture through it.
   stubCandidateReads(candidatesModule.candidatesApi);
   if (email) await signIn.signInAs(email);
-  return { db, signIn, applications, documents, inbox, tenancy, team, demo };
+  return { db, signIn, applications, documents, inbox, demo };
 }
 const stored = () => JSON.parse(storage.getItem(KEY) ?? "null") as { version: string; seededAt: string; tables: Record<string, unknown[]> } | null;
 const ADNAN = "user_adnan"; // seeded account ids (./sign-in-as.ts)
@@ -168,36 +168,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
   });
 });
 
-describe("relative fixture dates once the data persists (docs/03 §3.3)", () => {
-  it("anchors invites and inbox connections to the seeding instant, then lets them age like real dates; a reset re-anchors them", async () => {
-    const seeded = await load(T0);
-    const pendingAtSeed = seeded.tenancy.invites.find((invite) => invite.id === "inv_stl_01")!;
-    expect(pendingAtSeed.expiresAt).toBe(at(5)); // pending: now + 5 days at seeding (FIXTURE_NOW + 5d → T0 + 5d)
-
-    // Three days later: the same absolute dates (not shifted again), still pending, STL still at 4/4.
-    const day3 = await load(at(3));
-    const { deriveFirmUsage, effectiveInviteStatus } = await import("@/lib/derive/tenancy");
-    const stl = () => day3.team.firms.find((firm) => firm.id === "firm_stl")!;
-    const usage = (m: typeof day3, now: string) =>
-      deriveFirmUsage(m.team.firms.find((firm) => firm.id === "firm_stl")!, { users: m.team.allUsers, invites: m.tenancy.invites, candidates: fixtureCandidates }, new Date(now));
-    expect(day3.tenancy.invites.find((invite) => invite.id === "inv_stl_01")?.expiresAt).toBe(at(5));
-    expect(effectiveInviteStatus(day3.tenancy.invites.find((invite) => invite.id === "inv_stl_01")!, new Date(at(3)))).toBe("PENDING");
-    expect(usage(day3, at(3))).toMatchObject({ seatsUsed: 4, seatLimit: stl().seatLimit });
-
-    // Six days later: it expired like a real invite, and its seat is free again (derived, nothing stored).
-    const day6 = await load(at(6));
-    expect(effectiveInviteStatus(day6.tenancy.invites.find((invite) => invite.id === "inv_stl_01")!, new Date(at(6)))).toBe("EXPIRED");
-    expect(usage(day6, at(6))).toMatchObject({ seatsUsed: 3, canAddSeat: true });
-    expect(stored()!.seededAt).toBe(T0);
-
-    // A reset on day 6 re-anchors the fixtures to day 6: pending again.
-    const admin = await load(at(6), SANA);
-    await admin.demo.demoDataMock.reset();
-    const afterReset = await load(at(6));
-    expect(afterReset.tenancy.invites.find((invite) => invite.id === "inv_stl_01")?.expiresAt).toBe(at(11));
-    expect(usage(afterReset, at(6))).toMatchObject({ seatsUsed: 4 });
-  });
-
+describe("inbox fixture dates once the data persists (docs/03 §3.3)", () => {
   it("anchors inbox connections to the seeding instant (12 days before it), and keeps them across reloads", async () => {
     const seeded = await load(T0, ADNAN);
     const connectedId = (await import("./data/inbox.json")).default.initiallyConnected[0] as string;

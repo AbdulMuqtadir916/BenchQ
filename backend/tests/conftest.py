@@ -290,27 +290,7 @@ def anonymous_client(api_client):
         yield client
 
 
-# ── httpx + Telegram mock fixtures ───────────────────────────────────────
-
-@pytest.fixture
-def mock_httpx(monkeypatch):
-    """Replace httpx.AsyncClient with a MagicMock returning a canned response; returns {"client", "response"} for inspection."""
-    resp = MagicMock()
-    resp.status_code = 200
-    resp.json = MagicMock(return_value={})
-    resp.text = ""
-    resp.raise_for_status = MagicMock()
-
-    client = MagicMock()
-    client.get = AsyncMock(return_value=resp)
-    client.post = AsyncMock(return_value=resp)
-    client.__aenter__ = AsyncMock(return_value=client)
-    client.__aexit__ = AsyncMock(return_value=False)
-
-    import httpx
-    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: client)
-    return {"client": client, "response": resp}
-
+# ── Telegram mock fixture ───────────────────────────────────────
 
 @pytest.fixture
 def mock_telegram(monkeypatch):
