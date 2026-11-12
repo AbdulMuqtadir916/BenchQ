@@ -81,7 +81,7 @@ def _start_of(day: date, zone: str):
 
 
 def _limit_to_reader(entries, db: DbSession, principal: Principal, firm_id: uuid.UUID, *, picked: bool):
-    """What the role may read (07 Q52, Q59). `picked`: a candidate is chosen, so the rows on it from while it was
+    """What the role may read (07 Q52, Q64). `picked`: a candidate is chosen, so the rows on it from while it was
     theirs count too."""
     bde, manager = own_scope(principal), team_scope(principal)
     if bde is not None:
