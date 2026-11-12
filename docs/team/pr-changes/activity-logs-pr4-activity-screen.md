@@ -70,6 +70,7 @@ that page with the Activity screen, which pages, sorts and searches on the serve
   The table gains server paging (`page.count`, which also leaves sorting to the server) and `countLabel` for this screen.
   The backend still accepts main's two-field paging (`cursor_at` + `cursor_id`) beside the Activity screen's `cursor`.
 - **Removed, because only the old page used them:** the whole-ledger loader (`ledgerApi.listAll`, `useLedgerAll`, its
-  query key and `LEDGER_MAX_ENTRIES`), the cap notice (`ledger-cap-notice`), the actor filter helpers (`ledger-actors`)
-  and the old page's URL schema (`ledger-list-query`), with their tests. The general `loadAllPages` helper stays.
+  query key and `LEDGER_MAX_ENTRIES`), the cap notice (`ledger-cap-notice`), the actor filter helpers (`ledger-actors`),
+  the old page's URL schema (`ledger-list-query`) and the page-by-page reader it used (`paging.ts`, `loadAllPages`),
+  with their tests.
 - **Candidate names** in the log come from the résumé (`profile.prime`, 07 Q57), since main moved them off `candidates`.
