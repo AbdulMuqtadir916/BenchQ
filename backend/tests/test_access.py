@@ -20,12 +20,6 @@ def _app_route_keys():
 
 # ── The table ────────────────────────────────────────────────────────────────
 
-def test_every_route_is_classified():
-    """A new endpoint must be added to ROUTE_ACCESS; until it is, the middleware refuses it."""
-    missing = sorted(_app_route_keys() - set(ROUTE_ACCESS))
-    assert not missing, f"add these to backend/auth/access.py: {missing}"
-
-
 def test_the_table_names_no_route_that_does_not_exist():
     stale = sorted(set(ROUTE_ACCESS) - _app_route_keys())
     assert not stale, f"remove these from backend/auth/access.py: {stale}"

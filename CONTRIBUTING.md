@@ -18,8 +18,8 @@ in **Owner** on the row you take.
 - **No stacked PRs.** If your work needs another open PR, wait for it to merge, then rebase onto the base
   branch.
 - **Merge commits only**, never squash or rebase-merge, so each PR stays one unit in the history.
-- Fill in the PR template. CI (typecheck, lint, tests, build, and backend tests on Postgres) must be green
-  before review. Run the same commands locally first (`docs/integration/README.md`, "Running locally").
+- Fill in the PR template. CI runs the checks that apply to the files changed by the PR. `CI required` reports
+  whether those checks passed. Run the applicable commands locally before review (`docs/integration/README.md`, "Running locally").
 - Keep your branch current by merging or rebasing the base branch. Never force-push someone else's branch.
 
 ## Reviews
