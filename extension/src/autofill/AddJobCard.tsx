@@ -119,6 +119,20 @@ function isOtherRequisition(found: PageJob, known: KnownJob): boolean {
 export const isSavedJob = (found: PageJob, known: KnownJob) =>
   (sameListing(found, known) && !isOtherRequisition(found, known)) || sharesJobId(found, known);
 
+const MODE_LABEL = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" } as const;
+const PER = { hour: "an hour", day: "a day", week: "a week", month: "a month", year: "a year" } as const;
+const amount = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+/** What the page stated besides its title, company and place, as the card shows it before the BDE adds the job:
+ * "Remote · Full-time · USD 120,000–150,000 a year · Posted 2026-11-10 · Req R123456". */
+export function detailsOf(job: PageJob): string {
+  const pay = job.salaryMin === undefined ? "" : [job.salaryCurrency, job.salaryMax !== undefined && job.salaryMax !== job.salaryMin
+    ? `${amount(job.salaryMin)}–${amount(job.salaryMax)}` : amount(job.salaryMin), job.salaryPeriod ? PER[job.salaryPeriod] : ""]
+    .filter(Boolean).join(" ");
+  return [job.workMode ? MODE_LABEL[job.workMode] : "", job.employmentType ?? "", pay, job.postedAt ? `Posted ${job.postedAt}` : "",
+    job.requisitionId ? `Req ${job.requisitionId}` : ""].filter(Boolean).join(" · ");
+}
+
 /** Whether the panel looks at the page at all: a web page that isn't BenchQ's own and isn't one of the candidate's jobs. */
 export const offersPage = (url: string | undefined, knownUrls: readonly string[]) =>
   Boolean(url && /^https?:\/\//i.test(url) && !url.startsWith(BENCHQ_URL) && !knownUrls.some((known) => isSameJob(url, known)));
@@ -216,13 +230,14 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
       setState({ status: "added", text: application.application_created ? `Added to ${candidateName}'s Saved jobs.` : `Already in ${candidateName}'s jobs.` });
       onAdded(application);
     } catch (error) {
-      setState({ status: "error", text: `Couldn't add this job (${error instanceof Error ? error.message : "unknown error"}).` });
+      setState({ status: "error", text: `Couldn't add this job. ${error instanceof Error ? error.message : "Try again."}` });
     }
   };
 
   return <section data-slot="add-job" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-title">
     <h2 id="add-job-title" className="text-sm font-[550]">A job on this page</h2>
     <p className={SOFT_TEXT}>{[job.title, job.company, job.location].filter(Boolean).join(" · ")}</p>
+    {detailsOf(job) ? <p data-slot="add-job-details" className={MUTED_TEXT}>{detailsOf(job)}</p> : null}
     {state.status === "confirming"
       ? <div role="group" aria-labelledby="add-job-ask" className="grid gap-2"
         onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); cancel(); } }}>

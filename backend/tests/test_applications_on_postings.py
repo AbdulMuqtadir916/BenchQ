@@ -122,6 +122,28 @@ def test_a_job_code_from_another_employer_or_another_requisition_is_another_job(
     assert (same["id"], same["job_created"]) == (first["id"], False)
 
 
+def test_an_added_job_keeps_what_its_page_stated_and_refuses_what_doesnt_hold(anonymous_client, test_db, world):
+    """The extension's deterministic reading (2026-11-12): validated details stay flat in `content`; nothing else."""
+    from backend.applications.postings import pay_text, posting_job
+    from backend.models.job_search import JobPosting
+    candidate = _candidate(anonymous_client, world)
+    details = {"work_mode": "hybrid", "employment_type": "Full-time, Contract", "salary_min": 120000.0,
+               "salary_max": 150000, "salary_currency": "USD", "salary_period": "year", "posted_at": "2026-11-10",
+               "requisition_id": "R123456"}
+    added = _add(anonymous_client, world, candidate, {**JOB, "source": "extension", **details})
+    assert added.status_code == 201, added.text
+    posting = test_db.query(JobPosting).one()
+    assert {key: posting.content[key] for key in details} == {**details, "salary_min": 120000}
+    job = posting_job(posting)
+    assert (job.work_mode, job.salary_period, job.requisition_id) == ("hybrid", "year", "R123456")
+    assert pay_text(job) == "USD 120,000–150,000 a year"
+    for wrong in ({"work_mode": "sometimes"}, {"employment_type": "Gig"}, {"salary_min": 9, "salary_max": 5},
+                  {"salary_currency": "usd", "salary_min": 5}, {"salary_period": "year"}, {"posted_at": "2999-01-01"},
+                  {"requisition_id": "<b>"}):
+        refused = _add(anonymous_client, world, candidate, {**JOB, "source": "extension", "title": "Other", **wrong})
+        assert refused.status_code == 422, (wrong, refused.text)
+
+
 def test_adding_a_job_already_applied_to_keeps_its_application(anonymous_client, test_db, world):
     candidate = _candidate(anonymous_client, world)
     first = _add(anonymous_client, world, candidate).json()

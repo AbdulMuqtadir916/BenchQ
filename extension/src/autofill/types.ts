@@ -91,6 +91,11 @@ export type PageJob = {
   /** The codes the page gives its job (its JobPosting identifier, a "Job ID:" line), lowercase, and the other links it
    * gives itself (canonical, og:url), for knowing a job the candidate already has. */
   ids?: string[]; links?: string[];
+  /** What the page states besides (`src/page/job-details.ts`), each only when it says it: how the job is done, its
+   * employment type ("Full-time, Contract"), its pay (the currency only when named, the period only when said), when it
+   * was posted (YYYY-MM-DD) and its requisition ID. */
+  workMode?: "remote" | "hybrid" | "onsite"; employmentType?: string; salaryMin?: number; salaryMax?: number;
+  salaryCurrency?: string; salaryPeriod?: "hour" | "day" | "week" | "month" | "year"; postedAt?: string; requisitionId?: string;
 };
 
 export type PageApi = {

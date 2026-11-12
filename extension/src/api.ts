@@ -44,9 +44,27 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${BENCHQ_URL}${path}`, {
     ...init, credentials: "include", cache: "no-store",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  }).catch(() => {
+    throw Object.assign(new Error("BenchQ can't be reached. Check your connection, or that BenchQ is running, and try again."), { status: 0 });
   });
-  if (!response.ok) throw Object.assign(new Error(response.status === 401 ? "SESSION_EXPIRED" : `Request failed (${response.status})`), { status: response.status });
+  if (!response.ok) throw Object.assign(new Error(response.status === 401 ? "SESSION_EXPIRED" : await failureOf(response)), { status: response.status });
   return response;
+}
+
+/** What went wrong, in words the BDE can act on: BenchQ's own reason when it gives one for a refused request, else what
+ * the answer means. Never a bare status code. */
+async function failureOf(response: Response): Promise<string> {
+  const detail = response.status < 500
+    ? await response.json().then((body: { detail?: unknown }) => (typeof body?.detail === "string" ? body.detail : ""), () => "")
+    : "";
+  if (detail) return detail;
+  if (response.status === 403) return "You don't have access to this. Ask your manager if you should.";
+  if (response.status === 404) return "BenchQ couldn't find this any more. Refresh and try again.";
+  if (response.status === 409) return "This changed in BenchQ meanwhile. Refresh and try again.";
+  if (response.status === 413) return "That's too large for BenchQ to take.";
+  if (response.status === 429) return "Too many requests just now. Wait a moment and try again.";
+  if (response.status >= 500) return "BenchQ had a problem on its side. Try again in a moment.";
+  return "BenchQ couldn't take this as it was sent. Refresh the page and try again.";
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -142,7 +160,12 @@ export const addJob = (candidateId: string, job: PageJob) => request<Application
     method: "POST",
     body: JSON.stringify({
       candidate_id: candidateId,
-      job: { source: "extension", title: job.title, company: job.company, description: job.description, url: job.url, location: job.location },
+      job: {
+        source: "extension", title: job.title, company: job.company, description: job.description, url: job.url, location: job.location,
+        // What the page stated besides; a detail it didn't state is left out (JSON drops undefined).
+        work_mode: job.workMode, employment_type: job.employmentType, salary_min: job.salaryMin, salary_max: job.salaryMax,
+        salary_currency: job.salaryCurrency, salary_period: job.salaryPeriod, posted_at: job.postedAt, requisition_id: job.requisitionId,
+      },
     }),
   });
 

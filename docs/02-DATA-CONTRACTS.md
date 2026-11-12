@@ -1326,7 +1326,12 @@ export const JobMarkSchema = z.object({
     day. A capture is its own batch (`scrape_jobs.kind = 'capture'`, finished at once) with one posting and a ledger
     entry (entity `job_posting`, restricted for a platform admin like a search's); the same job again (same hash) returns the posting the candidate has
     (200; the body's `created` is false, true on a 201, PR 3), even at the cap: only a capture that would create a posting counts against the 20 (Abdul's comment on PR
-    2). An `extension` description is read as HTML. Captures aren't search attempts and don't use the 100-new cap.
+    2). An `extension` description is read as HTML. A job the extension adds may also carry what its page states, each
+    only when stated and validated (decided 2026-11-12), flat in `content`: `work_mode` (`remote` | `hybrid` |
+    `onsite`), `employment_type` ("Full-time", "Part-time", "Contract", "Contract-to-hire", "Temporary", "Internship",
+    "Per diem", "Volunteer", "Seasonal"; several joined with ", "), `salary_min`, `salary_max` (numbers),
+    `salary_currency` (ISO 4217, only when named), `salary_period` (`hour` | `day` | `week` | `month` | `year`, only
+    when said), `posted_at` (YYYY-MM-DD) and `requisition_id`. Older rows without them read as before. Captures aren't search attempts and don't use the 100-new cap.
     A search that finds a captured job merges into that row (`source` and `content` become the provider's), and it
     still stays out of the 100: the cap counts `first_source`, which never changes (Abdul's comment on PR 2).
   - **A repeated search continues (job search PR 2):** a provider returns `next_cursor`; the same role (case and

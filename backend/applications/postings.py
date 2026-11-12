@@ -37,9 +37,14 @@ class PostingJob:
     posted_at: str | None = None
     employment_type: str | None = None
     source: str = ""
-    # The pay a moved job listed (`legacy`); no other source sends one yet.
-    salary_min: int | None = None
-    salary_max: int | None = None
+    # The pay a moved job listed (`legacy`, whole dollars) or a page stated (`extension`, its currency and period only
+    # when named); how and where the job is done; its requisition ID (decided 2026-11-12). None when not stated.
+    salary_min: int | float | None = None
+    salary_max: int | float | None = None
+    salary_currency: str | None = None
+    salary_period: str | None = None
+    work_mode: str | None = None
+    requisition_id: str | None = None
 
 
 EMPTY = PostingJob()
@@ -94,16 +99,37 @@ def read_content(source: str, content) -> PostingJob:
                               employment_type=fields.employment_type, source=source)
     found = content if isinstance(content, dict) else {}
     description = plain_text(found.get("description")) if source == "extension" else _text(found.get("description"))
-    salary = {key: _amount(found.get(key)) for key in ("salary_min", "salary_max")} if source == LEGACY else {}
+    period, mode = _text(found.get("salary_period")), _text(found.get("work_mode"))
+    currency = _text(found.get("salary_currency"))
     return PostingJob(title=_text(found.get("title")), company=_text(found.get("company")), description=description,
                       url=safe_url(found.get("url")), location=_text(found.get("location")) or None,
                       posted_at=_text(found.get("posted_at")) or None,
-                      employment_type=_text(found.get("employment_type")) or None, source=source, **salary)
+                      employment_type=_text(found.get("employment_type")) or None, source=source,
+                      salary_min=_amount(found.get("salary_min")), salary_max=_amount(found.get("salary_max")),
+                      salary_currency=currency if re.fullmatch(r"[A-Z]{3}", currency) else None,
+                      salary_period=period if period in PAY_PERIODS else None,
+                      work_mode=mode if mode in ("remote", "hybrid", "onsite") else None,
+                      requisition_id=_text(found.get("requisition_id"))[:60] or None)
 
 
-def _amount(value) -> int | None:
-    """A salary bound as stored: a whole, non-negative number, else none."""
-    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+PAY_PERIODS = {"hour": "an hour", "day": "a day", "week": "a week", "month": "a month", "year": "a year"}
+
+
+def _amount(value) -> int | float | None:
+    """A pay bound as stored: a non-negative number, else none."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value < float("inf"):
+        return None
+    return int(value) if float(value).is_integer() else value
+
+
+def pay_text(job: PostingJob) -> str:
+    """The pay a posting states, as words: "USD 120,000–150,000 a year", "65 an hour"; "" when it states none."""
+    low, high = job.salary_min, job.salary_max
+    if low is None and high is None:
+        return ""
+    amounts = [f"{value:,.2f}".removesuffix(".00") for value in dict.fromkeys(v for v in (low, high) if v is not None)]
+    return " ".join(part for part in (job.salary_currency, "–".join(amounts), PAY_PERIODS.get(job.salary_period or ""))
+                    if part)
 
 
 def posting_job(posting) -> PostingJob:

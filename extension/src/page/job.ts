@@ -1,4 +1,5 @@
 import type { PageJob } from "../autofill/types";
+import { DETAIL_KEYS, microdataDetails, modeIn, pageDetails, postingDetails, type JobDetails } from "./job-details";
 import { collapse, textOf } from "./labels";
 
 /** The job a page shows, for adding it to a candidate's jobs (the add-job plan, decided 2026-11-11): the page's own
@@ -69,7 +70,9 @@ export function isJobListLink(url: string): boolean {
 const hasApply = (doc: Document) => Array.from(doc.querySelectorAll("a, button, [role='button'], input[type='submit']"))
   .some((control) => {
     const label = collapse(control.textContent || control.getAttribute("value") || "");
-    return label.length <= 40 && /\bapply\b/i.test(label);
+    // SmartRecruiters' Apply says "I'm interested"; its id says apply (st-apply).
+    return (label.length <= 40 && /\bapply\b|\bi[’']?m interested\b/i.test(label))
+      || /(?:^|[-_\s])apply(?:[-_\s]|$)/i.test(`${control.id} ${control.getAttribute("data-sr-track") ?? ""}`);
   });
 
 type JsonRecord = Record<string, unknown>;
@@ -91,7 +94,14 @@ function jobPostingsIn(node: unknown, out: JsonRecord[] = []): JsonRecord[] {
   return out;
 }
 
-const text = (value: unknown) => (typeof value === "string" ? collapse(value) : "");
+/** A JobPosting's text, its HTML entities read ("Strategy &amp; Business" is "Strategy & Business"). */
+const text = (value: unknown) => {
+  if (typeof value !== "string") return "";
+  if (!value.includes("&")) return collapse(value);
+  const area = document.createElement("textarea");
+  area.innerHTML = value;
+  return collapse(area.value);
+};
 
 /** "Dallas, TX" from a JobPosting's place, or "Remote" for a telecommute job with no place. */
 function placeOf(posting: JsonRecord): string {
@@ -103,7 +113,10 @@ function placeOf(posting: JsonRecord): string {
     return parts.length ? [parts.join(", ")] : [];
   });
   if (named.length) return [...new Set(named)].join("; ");
-  return text(posting.jobLocationType).toUpperCase() === "TELECOMMUTE" ? "Remote" : "";
+  const required = (Array.isArray(posting.applicantLocationRequirements) ? posting.applicantLocationRequirements
+    : [posting.applicantLocationRequirements]).map((place) => text((place as JsonRecord | undefined)?.name)).filter(Boolean);
+  if (text(posting.jobLocationType).toUpperCase() !== "TELECOMMUTE") return required.join("; ");
+  return required.length ? `Remote (${required.join("; ")})` : "Remote";
 }
 
 /** The codes a JobPosting gives its job: its identifier, one value or several. */
@@ -152,6 +165,7 @@ function fromPosting(posting: JsonRecord): Omit<PageJob, "url" | "isJobPage"> {
     location: placeOf(posting) || null,
     ids: identifiersOf(posting),
     links: typeof posting.url === "string" ? [posting.url] : [],
+    ...postingDetails(posting),
   };
 }
 
@@ -169,15 +183,24 @@ function companyFromTitle(pageTitle: string, jobTitle: string): string {
     .find((part) => part && part.length <= MAX_COMPANY && !/^(careers?|jobs?|job board)$/i.test(part) && !JOB_SITES.test(part)) ?? "";
 }
 
+/** The company a page's own logo names: "Discord Logo" gives "Discord". */
+function logoCompany(doc: Document): string {
+  for (const image of Array.from(doc.querySelectorAll("img[alt]"))) {
+    const name = /^(.{2,60}?)\s+logo$/i.exec(collapse(image.getAttribute("alt") ?? ""))?.[1];
+    if (name && !JOB_SITES.test(name)) return name;
+  }
+  return "";
+}
+
 function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"> {
   const meta = (property: string) => collapse(doc.querySelector(`meta[property='${property}']`)?.getAttribute("content") ?? "");
-  const heading = doc.querySelector("h1");
+  const heading = Array.from(doc.querySelectorAll("h1")).find((h1) => collapse(textOf(h1)));
   const main = doc.querySelector("main, [role='main'], article") ?? doc.body;
   const title = (heading ? collapse(textOf(heading)) : "") || meta("og:title") || collapse(doc.title);
   const siteName = meta("og:site_name");
   return {
     title,
-    company: (JOB_SITES.test(siteName) ? "" : siteName) || companyFromTitle(collapse(doc.title), title)
+    company: (JOB_SITES.test(siteName) ? "" : siteName) || companyFromTitle(collapse(doc.title), title) || logoCompany(doc)
       || new URL(url).hostname.replace(/^www\./, ""),
     description: main ? (main as HTMLElement).innerText?.trim() ?? collapse(textOf(main)) : "",
     location: null,
@@ -195,12 +218,27 @@ export function readJob(doc: Document, url = doc.URL): PageJob {
   const isJobPage = !isList && (Boolean(found?.title) || (isJobLink(url) && hasApply(doc)));
   if (!isJobPage) return { title: "", company: "", description: "", location: null, url, isJobPage };
   const page = fromPage(doc, url);
+  const title = (found?.title || page.title).slice(0, MAX_LINE);
+  // What the JobPosting states first, else what the page's own lines state (job-details.ts); nothing it doesn't state.
+  const stated = pageDetails(doc, title);
+  const micro = microdataDetails(doc);
+  const location = (found?.location ?? micro.location ?? stated.location ?? page.location)?.slice(0, MAX_LINE) ?? null;
+  const details: JobDetails = {};
+  for (const key of DETAIL_KEYS) {
+    const value = found?.[key] ?? micro[key] ?? stated[key];
+    if (value !== undefined) Object.assign(details, { [key]: value });
+  }
+  // How the job is done: what the page itself says first ("Hybrid"), since a JobPosting marks any remote-friendly job
+  // TELECOMMUTE; then that mark; then the place ("Remote (US)").
+  const workMode = stated.workMode ?? found?.workMode ?? (location ? modeIn(location) : undefined);
   return {
     isJobPage,
-    title: (found?.title || page.title).slice(0, MAX_LINE),
+    title,
     company: (found?.company || page.company).slice(0, MAX_LINE),
     description: (found?.description || page.description).slice(0, MAX_DESCRIPTION),
-    location: (found?.location ?? page.location)?.slice(0, MAX_LINE) ?? null,
+    location,
+    ...details,
+    ...(workMode ? { workMode } : {}),
     url,
     ids: [...new Set([...(found?.ids ?? []), ...idsInText(doc)].map((id) => id.toLowerCase()))].slice(0, MAX_IDS),
     links: [...new Set([...(found?.links ?? []), ...linksOf(doc)])].slice(0, MAX_IDS),

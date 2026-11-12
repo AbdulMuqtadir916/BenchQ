@@ -1,9 +1,10 @@
 """Application management endpoints."""
 import logging
 import uuid
+from datetime import date, timedelta
 from typing import Annotated, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import AfterValidator, BaseModel, StringConstraints
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from backend.models.db import get_db, Application, Job, Company, Setting, utcnow, SessionLocal
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 
 VALID_STATUSES = {"applied", "interview", "offer", "rejected"}
 from backend.applications.tracking import STATUSES as CANDIDATE_STATUSES
-from backend.applications.postings import posting_job, safe_url
+from backend.applications.postings import pay_text, posting_job, safe_url
 
 
 def _parse_dt(value):
@@ -53,6 +54,30 @@ def _http_url(value: str) -> str:
 _Line = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
 
 
+EMPLOYMENT_TYPES = ("Full-time", "Part-time", "Contract", "Contract-to-hire", "Temporary", "Internship", "Per diem",
+                    "Volunteer", "Seasonal")
+
+
+def _employment(value: str) -> str:
+    parts = list(dict.fromkeys(part.strip() for part in value.split(",")))
+    if not parts or len(parts) > 4 or any(part not in EMPLOYMENT_TYPES for part in parts):
+        raise ValueError(f"employment types from: {', '.join(EMPLOYMENT_TYPES)}")
+    return ", ".join(parts)
+
+
+def _posted(value: str) -> str:
+    try:
+        day = date.fromisoformat(value)
+    except ValueError:
+        raise ValueError("a date as YYYY-MM-DD") from None
+    if day.year < 2000 or day > date.today() + timedelta(days=1):
+        raise ValueError("a posting date that has come")
+    return day.isoformat()
+
+
+_Amount = Annotated[float, Field(gt=0, le=10_000_000), AfterValidator(lambda value: int(value) if value.is_integer() else value)]
+
+
 class AddedJob(BaseModel):
     """A job the BDE adds for a candidate (the add-job plan, decided 2026-11-11), as job search PR 2 (#124) captures one:
     `manual` (by hand) or `extension`, whose description may be the employer's HTML."""
@@ -62,6 +87,25 @@ class AddedJob(BaseModel):
     description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100_000)]
     url: Annotated[str, StringConstraints(max_length=2048), AfterValidator(_http_url)]
     location: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
+    # What the page stated besides (the extension's deterministic reading, decided 2026-11-12), each only when stated;
+    # kept flat in `content` beside the capture's fields, as a moved job keeps its salary bounds.
+    work_mode: Literal["remote", "hybrid", "onsite"] | None = None
+    employment_type: Annotated[str, StringConstraints(max_length=100), AfterValidator(_employment)] | None = None
+    salary_min: _Amount | None = None
+    salary_max: _Amount | None = None
+    salary_currency: Annotated[str, StringConstraints(pattern=r"^[A-Z]{3}$")] | None = None
+    salary_period: Literal["hour", "day", "week", "month", "year"] | None = None
+    posted_at: Annotated[str, StringConstraints(max_length=10), AfterValidator(_posted)] | None = None
+    requisition_id: Annotated[str, StringConstraints(strip_whitespace=True, max_length=60,
+                                                    pattern=r"^[A-Za-z0-9][A-Za-z0-9_.#/-]*$")] | None = None
+
+    @model_validator(mode="after")
+    def _pay_holds_together(self):
+        if self.salary_min is not None and self.salary_max is not None and self.salary_min > self.salary_max:
+            raise ValueError("salary_min is above salary_max")
+        if (self.salary_currency or self.salary_period) and self.salary_min is None and self.salary_max is None:
+            raise ValueError("salary_currency and salary_period go with a salary")
+        return self
 
 
 class ApplicationCreate(BaseModel):
@@ -1113,6 +1157,16 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     add("- Title: " + title)
     if job.location:
         add("- Location: " + job.location)
+    if job.work_mode:
+        add("- Work mode: " + {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}[job.work_mode])
+    if job.employment_type:
+        add("- Employment type: " + job.employment_type)
+    if pay_text(job):
+        add("- Listed salary: " + pay_text(job))
+    if job.posted_at:
+        add("- Posted: " + job.posted_at)
+    if job.requisition_id:
+        add("- Requisition ID: " + job.requisition_id)
     if job.url:
         add("- Posting: " + job.url)
     add("- Stage: " + (app.status or "applied").capitalize())
