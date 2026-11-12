@@ -204,7 +204,8 @@ function KeptGroup({ rows, isFilling, onGoTo, onReplace }: RowActions & { rows: 
 export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListOptions, onChoose, onSuggest, onSave }: ReviewListProps) {
   const actions = { isFilling, onGoTo, onListOptions, onChoose, onSuggest, onSave };
   // Answers the BDE typed and can keep come first, in sight, until they're saved (07 Q58).
-  const isOffered = (row: ReviewRow) => typeof row.saveOffer === "object" && Boolean(onSave);
+  // A saved one stays there, saying so, rather than folding away the moment it's kept.
+  const isOffered = (row: ReviewRow) => (typeof row.saveOffer === "object" || row.saveOffer === "saved") && Boolean(onSave);
   const isKept = (row: ReviewRow) => row.status === "kept";
   const typed = rows.filter((row) => !isUpload(row) && !isKept(row) && !isOffered(row));
   const needed = typed.filter((row) => !isFilled(row));

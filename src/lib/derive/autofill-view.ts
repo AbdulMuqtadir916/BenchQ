@@ -182,20 +182,20 @@ export function recordLines(key: string | null, record: Record<string, unknown>)
 
 export type AutofillShow = "all" | "missing" | "review" | "yours";
 
-const SHOWN: Record<AutofillShow, (status: AutofillStatus) => boolean> = {
+const SHOWN: Record<AutofillShow, (entry: AutofillEntry) => boolean> = {
   all: () => true,
-  missing: (status) => status === "missing",
-  review: (status) => status === "review",
-  yours: (status) => status === "edited" || status === "custom",
+  // Missing by the answer there is now, whatever else needs a look (an edit that stopped applying, 07 Q15).
+  missing: (entry) => entry.answer == null,
+  review: (entry) => statusOf(entry) === "review",
+  yours: (entry) => statusOf(entry) === "edited" || statusOf(entry) === "custom",
 };
 
 export type AutofillSummary = { total: number; answered: number; missing: number; review: number; yours: number };
 
 /** Counted from the entries, never stored. "Answered" is any question the extension has an answer to. */
 export function summarize(entries: readonly AutofillEntry[]): AutofillSummary {
-  const statuses = entries.map(statusOf);
-  const count = (show: AutofillShow) => statuses.filter(SHOWN[show]).length;
-  return { total: entries.length, answered: statuses.filter((status) => status !== "missing").length, missing: count("missing"), review: count("review"), yours: count("yours") };
+  const count = (show: AutofillShow) => entries.filter(SHOWN[show]).length;
+  return { total: entries.length, answered: entries.length - count("missing"), missing: count("missing"), review: count("review"), yours: count("yours") };
 }
 
 const words = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
@@ -223,7 +223,7 @@ const NO_DRAFTS: ReadonlySet<string> = new Set();
  * either never closes an editor and drops what it holds. */
 export function autofillSections(entries: readonly AutofillEntry[], show: AutofillShow, query: string,
   drafts: ReadonlySet<string> = NO_DRAFTS): AutofillSection[] {
-  const shown = entries.filter((entry) => drafts.has(draftRowOf(entry)) || (SHOWN[show](statusOf(entry)) && matchesSearch(entry, query)));
+  const shown = entries.filter((entry) => drafts.has(draftRowOf(entry)) || (SHOWN[show](entry) && matchesSearch(entry, query)));
   const isOpenList = (show === "all" && words(query).length === 0) || drafts.has(ADD_ROW);
   return AUTOFILL_TOPICS
     .map(({ id, title }) => ({ id, title, entries: shown.filter((entry) => topicOf(entry) === id) }))

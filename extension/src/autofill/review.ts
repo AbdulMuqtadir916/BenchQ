@@ -212,20 +212,39 @@ export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewR
     ordered.set(kind, next);
     return next;
   };
-  // Each field's block, by kind: a block ends where a question it already asked comes again (school, degree, school:
-  // the second school starts the next block), so a block that lacks a field never shifts the next one's record.
-  const blocks = new Map<keyof HistoryRecords, { index: number; asked: Set<string> }>();
-  return rows.map((row) => {
+  // Each field's place among its kind's records. A form that asks block by block (school, degree, school, degree) starts
+  // a block where a question it already asked comes again, so a block that lacks a field never shifts the next one's
+  // record. A form that asks question by question (every school, then every degree) counts each question.
+  const asked = rows.map((row) => {
     const type = typeOf(row.field);
     const from = type ? FROM_RECORD[type] : undefined;
-    if (!type || !from) return row;
-    let block = blocks.get(from[0]);
-    if (!block || block.asked.has(type)) {
-      block = { index: (block?.index ?? -1) + 1, asked: new Set() };
-      blocks.set(from[0], block);
+    return type && from ? { type, from } : null;
+  });
+  const byQuestion = new Set<keyof HistoryRecords>();
+  for (const kind of new Set(asked.flatMap((one) => (one ? [one.from[0]] : [])))) {
+    const order = asked.flatMap((one) => (one?.from[0] === kind ? [one.type] : []));
+    const runs = order.filter((type, n) => n === 0 || order[n - 1] !== type);
+    if (new Set(runs).size === runs.length) byQuestion.add(kind);
+  }
+  const blocks = new Map<keyof HistoryRecords, { index: number; asked: Set<string> }>();
+  const counts = new Map<string, number>();
+  return rows.map((row, n) => {
+    const one = asked[n];
+    if (!one) return row;
+    const { type, from } = one;
+    let index: number;
+    if (byQuestion.has(from[0])) {
+      index = counts.get(type) ?? 0;
+      counts.set(type, index + 1);
+    } else {
+      let block = blocks.get(from[0]);
+      if (!block || block.asked.has(type)) {
+        block = { index: (block?.index ?? -1) + 1, asked: new Set() };
+        blocks.set(from[0], block);
+      }
+      block.asked.add(type);
+      index = block.index;
     }
-    block.asked.add(type);
-    const index = block.index;
     if (!takesRecord(row)) return row;
     const base = { key: row.key, field: row.field, isUnsaved: row.isUnsaved };
     if (index === 0 && row.status !== "manual") {

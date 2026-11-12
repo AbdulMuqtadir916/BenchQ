@@ -1728,9 +1728,11 @@ records such as the work history, shown but never edited here, 07 Q42).
 
 - `edit` by key: each answer as its `type` takes it (text up to 4000 characters, a list of up to 100 texts of up to
   300, a number from 0, `true`/`false`, a real date). An edit equal to the built answer is no edit. `built` carries, for
-  each edited key, the built answer the user was shown; a missing one is 400 and a different one 409. `answered`,
-  optional, carries each edited or reset key's answer as the user was shown it (their edit, else the built one); a
-  different one is 409, so a save never replaces an answer saved after the page opened (another tab, the extension).
+  each edited key, the built answer the user was shown; a missing one is 400 and a different one 409. `answered`
+  carries each edited or reset key's answer as the user was shown it (their edit, else the built one, null for none): a
+  missing one is 400 and a different one 409, so a save never replaces an answer saved after the page opened (another
+  tab, the extension). An added or removed question's answer the user was shown may go there too, by its words (null
+  for a new question), with the same 409.
 - `reset` keys drop their edits (the built answer shows again). `add` sets the user's questions: one that is already
   there (compared without capitals, spacing or punctuation, its `also` too, 07 Q43) gets the new answer; a new one goes
   last. A question in a fixed question's words is refused: its answer is edited instead. `remove` drops questions.
@@ -1759,8 +1761,11 @@ export const AutofillEntrySchema = z.object({
 export const ResumeAutofillSchema = z.object({ versionId: z.string(), candidateId: z.string(), entries: z.array(AutofillEntrySchema) });
 export const AutofillChangeSchema = z.object({
   edit: z.record(z.string(), AutofillAnswerSchema), built: z.record(z.string(), AutofillAnswerSchema),
+  answered: z.record(z.string(), AutofillAnswerSchema).optional(),
   reset: z.array(z.string()), add: z.record(z.string(), z.string()), remove: z.array(z.string()), onlyThis: z.boolean(),
 });
+// The save's result as the app reads it: the route answers `autofill` as the version's entries (a list), which the DTO
+// gives the version's and the candidate's ids.
 export const AutofillSaveResultSchema = z.object({ autofill: ResumeAutofillSchema, changed: z.number().int() });
 ```
 

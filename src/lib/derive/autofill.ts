@@ -19,7 +19,10 @@ export function draftOf(answer: AutofillAnswer | undefined): string {
 export type Parsed = { answer: AutofillAnswer } | { error: string };
 
 const MAX_TEXT = 4000;
-const isRealDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
+const isRealDate = (value: string) => {
+  const time = Date.parse(`${value}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(time) && new Date(time).toISOString().startsWith(value);
+};
 
 /** The editor's text as the question's type takes it (docs/02 §8.3), or what's wrong with it. A custom question's
  * answer is text. */

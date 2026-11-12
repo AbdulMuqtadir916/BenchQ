@@ -553,6 +553,14 @@ describe("a school or job block that repeats (#132)", () => {
       .toEqual(["Osmania University", "MS", "JNTU", "IIT", "PhD", "2022"]);
   });
 
+  it("counts each question on a form that asks every school, then every degree (CodeRabbit #129)", () => {
+    const fields = ["School", "School", "Degree", "Degree"].map((label, n) => field(label, { id: `g${n}` }));
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" },
+      { ...entry("What is your highest degree?", "MS"), key: "education-degree" }];
+    expect(withHistory(buildReview(fields, bank), history).map((row) => row.proposed ?? null))
+      .toEqual(["Osmania University", "JNTU", "MS", "BTech"]);
+  });
+
   it("starts from the school the first block already holds, and keeps a row the review held back for another reason", () => {
     const fields = [field("School", { id: "f0", current: "JNTU" }), field("School", { id: "f1" })];
     const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }];

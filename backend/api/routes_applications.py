@@ -538,7 +538,8 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
             db.delete(app)
         db.commit()
         return {
-            "favorite": False,
+            # One kept (it has a history or notes) stays Saved, so it's still the favourite.
+            "favorite": not untouched,
             "application_id": application_id,
             "application_preserved": not untouched,
             "status": application_status if not untouched else None,

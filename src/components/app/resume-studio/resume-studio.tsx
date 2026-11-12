@@ -81,16 +81,18 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
     if (onSave) leaveAutofill(onSave);
   }, [leaveAutofill, onSave]);
   const selectTab = useCallback((next: StudioTab) => {
-    if (next === tab) return;
+    // A save under way moves the studio to the new version on the tab it started from: no switch until it's done.
+    if (next === tab || isSaving) return;
     if (next === "autofill") {
       if (hrefs) router.replace(hrefs.autofill, { scroll: false });
       return;
     }
     leaveAutofill(() => {
       setMode(next);
-      if (isAutofill && hrefs) router.replace(next === "view" ? hrefs.view : hrefs.build, { scroll: false });
+      // The URL keeps the tab (?mode=view), so a reload or a save comes back to it.
+      if (hrefs) router.replace(next === "view" ? hrefs.view : hrefs.build, { scroll: false });
     });
-  }, [tab, hrefs, isAutofill, router, setMode, leaveAutofill]);
+  }, [tab, hrefs, isSaving, router, setMode, leaveAutofill]);
   // A list of records on the Autofill tab (the work history…) is changed in the Builder: its section opens there.
   const editInBuilder = useCallback((section: ResumeSectionKey) => {
     useStudio.getState().toggleSection(section, true);

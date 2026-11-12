@@ -914,3 +914,14 @@ def test_prep_bundle_has_no_salary_line_since_a_posting_holds_no_salary(client, 
     app, _ = _make_app(test_db, salary_min=100000, salary_max=140000)
     text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
     assert "Listed salary" not in text
+
+
+def test_prep_bundle_lists_the_salary_a_moved_job_kept(client, test_db):
+    """CodeRabbit #129: a posting moved from the old jobs keeps the old job's pay (`legacy`), and prep lists it."""
+    app, _ = _make_app(test_db)
+    posting = app.posting
+    posting.source = "legacy"
+    posting.content = {**(posting.content or {}), "salary_min": 100000, "salary_max": 140000}
+    test_db.commit()
+    text = assert_clean(client.get(f"/api/applications/{app.id}/prep"), 200).json()["text"]
+    assert "Listed salary" in text

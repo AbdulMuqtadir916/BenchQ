@@ -31,13 +31,13 @@ export const staysOutOfSavedForm = (reason: string) => !KEPT_REASONS.has(reason)
 
 /** A US Social Security number written in groups (123-45-6789, 123 45 6789), or alone as nine digits, never one the
  * SSA doesn't issue (000, 666 or 9xx first; 00 or 0000 after). */
-const SSN_WRITTEN = /\b(?!000|666|9\d\d)\d{3}([- ])(?!00)\d{2}\1(?!0000)\d{4}\b/;
+const SSN_WRITTEN = /\b(?!000|666|9\d\d)\d{3}([-. ])(?!00)\d{2}\1(?!0000)\d{4}\b/;
 const SSN_ALONE = /^(?!000|666|9\d\d)\d{3}(?!00)\d{2}(?!0000)\d{4}$/;
 /** A nine-digit SSN inside running text ("My SSN is 123456789"): a word of its own, not part of a link, a name or a
  * longer run of digits (linkedin.com/in/ravi-123456789). */
 const SSN_IN_TEXT = /(?<![\w/.-])(?!000|666|9\d\d)\d{3}(?!00)\d{2}(?!0000)\d{4}(?![\w/-]|\.\w)/;
 /** A run of 13 to 19 digits, spaced or dashed as a card number is written. */
-const CARD_DIGITS = /\b(?:\d[ -]?){12,18}\d\b/g;
+const CARD_DIGITS = /\b(?:\d[ .-]?){12,18}\d\b/g;
 
 /** The check every payment card number passes (Luhn). */
 function passesCardCheck(digits: string): boolean {

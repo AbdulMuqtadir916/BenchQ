@@ -122,8 +122,8 @@ def can_add_job(principal: Principal, candidate) -> bool:
     """Who adds a job for `candidate` and saves it for them (the add-job plan, decided 2026-11-11): only the candidate's
     BDE, who applies for them. Not the OWNER or a MANAGER, a VIEWER or a support view. Checked with the candidate row
     locked."""
-    return (can(principal, "job.capture") and principal.kind == "firm" and candidate.bde_id is not None
-            and candidate.bde_id == principal.user_id)
+    return (can(principal, "job.capture") and principal.kind == "firm" and principal.role == "BDE"
+            and candidate.bde_id is not None and candidate.bde_id == principal.user_id)
 
 
 def can_manage_resume(principal: Principal, candidate) -> bool:

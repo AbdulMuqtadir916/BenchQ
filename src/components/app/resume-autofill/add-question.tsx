@@ -76,11 +76,11 @@ export function AddQuestion({ entries, available, isSaving, onSave, onPickQuesti
           <div className="space-y-1">
             <label htmlFor={`${id}-question`} className="text-label text-[var(--color-text-2)]">Question, as forms ask it</label>
             <Input id={`${id}-question`} autoFocus={available.length === 0} placeholder="Why do you want to work here?" value={question} maxLength={300}
-              onChange={(event) => setQuestion(event.target.value)} className="w-full" />
+              readOnly={isSaving} onChange={(event) => setQuestion(event.target.value)} className="w-full" />
           </div>
           <div className="space-y-1">
             <label htmlFor={`${id}-answer`} className="text-label text-[var(--color-text-2)]">Answer</label>
-            <textarea id={`${id}-answer`} rows={3} value={answer} maxLength={4000} onChange={(event) => setAnswer(event.target.value)}
+            <textarea id={`${id}-answer`} rows={3} value={answer} maxLength={4000} readOnly={isSaving} onChange={(event) => setAnswer(event.target.value)}
               aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined}
               className="bq-input h-auto w-full py-2 text-body" placeholder="The answer the extension fills" />
           </div>

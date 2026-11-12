@@ -52,6 +52,14 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
   const isDirty = useStudio((s) => s.isDirty);
   const [view, setView] = useUrlState(AutofillView);
   const [search, setSearch] = useState(view.q);
+  // A search the URL brings (back, forward, a link) shows in the field; one typed reaches the URL below. `written` is the
+  // last one typed that reached it, so its own echo doesn't undo newer typing.
+  const [urlSearch, setUrlSearch] = useState(view.q);
+  const [written, setWritten] = useState(view.q);
+  if (view.q !== urlSearch) {
+    setUrlSearch(view.q);
+    if (view.q !== written) setSearch(view.q);
+  }
   const [isStale, setIsStale] = useState(false);
   // One of BenchQ's questions picked from Add a question: its row opens its editor (the list shows every question).
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -67,7 +75,10 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
   // The search reaches the URL once typing pauses, so each key doesn't replace the page's address.
   useEffect(() => {
     if (search === view.q) return;
-    const timer = window.setTimeout(() => setView({ q: search }), 250);
+    const timer = window.setTimeout(() => {
+      setWritten(search);
+      setView({ q: search });
+    }, 250);
     return () => window.clearTimeout(timer);
   }, [search, view.q, setView]);
 

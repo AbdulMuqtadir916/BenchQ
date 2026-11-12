@@ -121,14 +121,20 @@ function uploadPurpose(input: Element): string {
   return "";
 }
 
+/** A component holding several fields (an address: street, city, ZIP), whose label names them all. */
+function holdsSeveralFields(element: Element): boolean {
+  const root = element.getRootNode();
+  return root instanceof ShadowRoot && root.querySelectorAll("input, select, textarea").length > 1;
+}
+
 export function rawLabel(element: HTMLElement): string {
   const own = collapse(ownLabel(element));
   // An upload's own label is often just its button: "Attach".
   const isVague = (element as HTMLInputElement).type === "file" && (!own || UPLOAD_BUTTON.test(own));
   return (isVague && uploadPurpose(element))
     || own
-    || hostLabel(element)
-    || nearbyText(element)
+    // A component holding several fields names them all: each field's own words come first there.
+    || (holdsSeveralFields(element) ? nearbyText(element) || hostLabel(element) : hostLabel(element) || nearbyText(element))
     || element.getAttribute("placeholder")
     || element.getAttribute("title")
     || "";

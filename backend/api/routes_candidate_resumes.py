@@ -190,7 +190,7 @@ def save_resume_autofill(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id:
     résumé unless `only_this` (Q30, Q44). 409 when an edited question's built answer isn't the one the user was shown.
     Answers with the version's autofill as the screen reads it and how many versions changed."""
     if len(body.edit) + len(body.reset) > len(autofill_answers.QUESTIONS) or \
-            len(body.answered) > len(autofill_answers.QUESTIONS) or \
+            len(body.answered) > len(autofill_answers.QUESTIONS) + autofill_answers.MAX_CUSTOM or \
             len(body.add) + len(body.remove) > autofill_answers.MAX_CUSTOM:
         raise HTTPException(status_code=400, detail="That's more than one résumé holds.")
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_change_resume)
@@ -200,8 +200,10 @@ def save_resume_autofill(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id:
         change = autofill_answers.checked_change(body.edit, body.reset, body.add, body.remove)
         if missing := [key for key in change["edit"] if key not in body.built]:
             raise autofill_answers.Refused(f"Send the built answer you were shown for {', '.join(missing)}.")
+        if missing := [key for key in [*change["edit"], *change["reset"]] if key not in body.answered]:
+            raise autofill_answers.Refused(f"Send the answer you were shown for {', '.join(missing)}.")
         if autofill_answers.unseen(candidate, row, change["edit"], body.built, today, answered=body.answered,
-                                   reset=change["reset"]):
+                                   reset=change["reset"], added=change["add"], removed=change["remove"]):
             raise HTTPException(status_code=409, detail="An answer changed since you opened this page. Reload it "
                                                         "and make your change again.")
         changed = versions.save_autofill(db, actor, candidate, row, change, only_this=body.only_this, today=today)

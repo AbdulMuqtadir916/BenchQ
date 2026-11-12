@@ -75,6 +75,16 @@ def _words(text) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", str(text or "").lower()))
 
 
+def _same_place(here, there) -> bool:
+    """Places that may be one: they share a word, or one isn't named. Two "city, region" places compare their cities,
+    so Dallas, TX and Austin, TX are two places although they share a state."""
+    here, there = str(here or ""), str(there or "")
+    if "," in here and "," in there:
+        here, there = here.split(",")[0], there.split(",")[0]
+    ours, theirs = _words(here), _words(there)
+    return not ours or not theirs or bool(ours & theirs)
+
+
 def _same_role(content: dict, fields, url) -> bool:
     """The same title word for word (any order, any punctuation), places that share a word or aren't both named, and
     links that don't name two jobs: two requisitions for one role on the same employer's site are two jobs (codes from
@@ -84,8 +94,7 @@ def _same_role(content: dict, fields, url) -> bool:
     codes, theirs = _link_ids(url), _link_ids(content.get("url"))
     if codes and theirs and not codes & theirs and _employer_part(url) == _employer_part(content.get("url")):
         return False
-    here, there = _words(content.get("location")), _words(fields.location)
-    return not here or not there or bool(here & there)
+    return _same_place(content.get("location"), fields.location)
 
 
 def add_job(db, *, firm_id, actor, candidate, source: str, job: dict) -> tuple[JobPosting, bool]:

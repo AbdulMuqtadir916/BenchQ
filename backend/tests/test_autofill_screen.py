@@ -16,6 +16,15 @@ WHY = "Why do you want to work here?"
 
 
 def _patch(client, world, candidate, version_id, body, who="adnan"):
+    """A save as the screen sends it: with the answer it showed for each edited or reset question (docs/02 §8.3), read
+    first, unless the test names them (`answered` in `body`)."""
+    keys = [*body.get("edit", {}), *body.get("reset", [])] if isinstance(body, dict) else []
+    if keys and "answered" not in body:
+        try:
+            shown = _editor(client, world, candidate, version_id, who)
+            body = {**body, "answered": {key: (shown.get(key) or {}).get("answer") for key in keys}}
+        except Exception:  # a caller who may not read it: the route refuses them first
+            pass
     return client.patch(_url(world, candidate, f"/{version_id}/autofill"), json=body, headers=world["as"][who])
 
 
@@ -138,6 +147,23 @@ def test_a_save_over_an_answer_saved_after_the_page_opened_is_refused(anonymous_
     seen = {**second, "answered": {"professional-title": "Senior"}}
     assert _patch(anonymous_client, world, c, v1["id"], seen).status_code == 200
     assert _editor(anonymous_client, world, c, v1["id"])["professional-title"]["answer"] == "Lead"
+
+
+def test_a_save_without_the_answer_shown_is_refused(anonymous_client, test_db, world):
+    """CodeRabbit #129: every edited or reset question carries the answer the user was shown; one changed since is 409,
+    for a question of the user's own too."""
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")
+    v1 = _v(anonymous_client, world, c, who="adnan")
+    title = _editor(anonymous_client, world, c, v1["id"])["professional-title"]["answer"]
+    bare = {"edit": {"professional-title": "Lead"}, "built": {"professional-title": title}, "answered": {}}
+    r = _patch(anonymous_client, world, c, v1["id"], bare)
+    assert (r.status_code, r.json()["detail"]) == (400, "Send the answer you were shown for professional-title.")
+    own = {"add": {"Why us?": "Payments."}, "answered": {"Why us?": None}}
+    assert _patch(anonymous_client, world, c, v1["id"], own).status_code == 200
+    stale = {"add": {"Why us?": "Lending."}, "answered": {"Why us?": None}}
+    assert _patch(anonymous_client, world, c, v1["id"], stale).status_code == 409
+    assert _patch(anonymous_client, world, c, v1["id"], {"remove": ["Why us?"], "answered": {"Why us?": "Lending."}}).status_code == 409
+    assert _patch(anonymous_client, world, c, v1["id"], {"remove": ["Why us?"], "answered": {"Why us?": "Payments."}}).status_code == 200
 
 
 def test_an_added_question_said_again_in_other_words_changes_its_answer_and_can_be_removed(anonymous_client, test_db,

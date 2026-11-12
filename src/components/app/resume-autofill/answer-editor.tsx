@@ -41,7 +41,7 @@ export function AnswerEditor({ question, type, initial, isMultiline, suggestions
       event.preventDefault();
       event.stopPropagation();
       onCancel();
-    } else if (event.key === "Enter" && (!isBox || event.metaKey || event.ctrlKey)) {
+    } else if (event.key === "Enter" && !(event.target instanceof HTMLButtonElement) && (!isBox || event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       submit();
     }
@@ -53,6 +53,8 @@ export function AnswerEditor({ question, type, initial, isMultiline, suggestions
     "aria-describedby": error ? `${id}-error` : type === "texts" ? `${id}-hint` : undefined,
     autoFocus: true,
     value: draft,
+    // What's saving stays what was sent: an answer changed meanwhile would close with the editor.
+    readOnly: isSaving,
   };
 
   return (

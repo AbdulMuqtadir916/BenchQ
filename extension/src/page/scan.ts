@@ -236,7 +236,13 @@ function collectSlots(doc: Document): Slot[] {
   const slots: Slot[] = [];
   const groups = new Map<string, HTMLInputElement[]>();
   const ariaGroups = new Map<Element, AriaGroup>();
-  const forms = Array.from(doc.forms);
+  // Each form by itself, one in a component too (doc.forms lists only the page's own).
+  const formIds = new Map<HTMLFormElement, number>();
+  const formOf = (form: HTMLFormElement | null) => {
+    if (!form) return -1;
+    if (!formIds.has(form)) formIds.set(form, formIds.size);
+    return formIds.get(form)!;
+  };
   // Radios of one name in two components are two groups: a component's names are its own.
   const trees = new Map<Node, number>();
   const treeOf = (element: Element) => {
@@ -269,7 +275,7 @@ function collectSlots(doc: Document): Slot[] {
         if (!value || value === "on") slots.push(element);
         continue;
       }
-      const key = `${treeOf(element)}${element.form ? forms.indexOf(element.form) : -1}:${element.type}:${element.name}`;
+      const key = `${treeOf(element)}${formOf(element.form)}:${element.type}:${element.name}`;
       const group = groups.get(key);
       if (group) group.push(element);
       else {
@@ -290,7 +296,13 @@ function customControls(doc: Document): HTMLElement[] {
 
 /** What a scan reads: the form's controls, then its dropdowns built from other elements. */
 function formControls(doc: Document) {
-  return CAPTCHA_FRAME.test(doc.URL) ? { slots: [], custom: [] } : { slots: collectSlots(doc), custom: customControls(doc) };
+  if (CAPTCHA_FRAME.test(doc.URL)) return { slots: [], custom: [] };
+  const slots = collectSlots(doc);
+  // A dropdown component whose own input the scan already has (inside its shadow root) is that input: one field. One
+  // whose input is hidden or left out stays the field.
+  const controls = slots.flat().flatMap((slot) => (slot instanceof Node ? [slot] : slot.aria));
+  const custom = customControls(doc).filter((host) => !host.shadowRoot || !controls.some((control) => host.shadowRoot!.contains(control)));
+  return { slots, custom };
 }
 
 function shapeOf(doc: Document): Shape {

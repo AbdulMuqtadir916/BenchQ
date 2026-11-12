@@ -16,6 +16,7 @@ import hashlib
 import html
 import logging
 import re
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -63,9 +64,14 @@ def plain_text(value) -> str:
 
 
 def safe_url(value) -> str | None:
-    """An http(s) link, or None: never a script, a data URL or a relative path."""
+    """An http(s) link with a host, or None: never a script, a data URL, a relative path or `https://?x`."""
     url = _text(value)
-    return url if re.match(r"^https?://[^\s/]", url, re.IGNORECASE) and len(url) <= MAX_URL else None
+    if not re.match(r"^https?://[^\s/]", url, re.IGNORECASE) or len(url) > MAX_URL:
+        return None
+    try:
+        return url if urlsplit(url).hostname else None
+    except ValueError:
+        return None
 
 
 def _provider_reader(source: str):

@@ -23,7 +23,9 @@ export function useSaveResumeAutofill(versionId: string) {
   return useMutation({
     mutationFn: ({ candidateId, change }: { candidateId: string; change: AutofillChange }) =>
       resumesApi.saveAutofill(firmId, candidateId, versionId, change),
-    onSuccess: ({ autofill, changed }) => {
+    onSuccess: async ({ autofill, changed }) => {
+      // A read still on its way would bring the answers from before the save back over these.
+      await queryClient.cancelQueries({ queryKey: queryKeys.resumes.autofill(firmId, versionId) });
       queryClient.setQueryData(queryKeys.resumes.autofill(firmId, versionId), autofill);
       if (changed > 1) {
         void queryClient.invalidateQueries({

@@ -584,9 +584,13 @@ def merged(candidate, version, today: date | None = None, *, editor: bool = Fals
     # A question the user added in words a fixed question took later shows only while that one has no answer: each
     # question once.
     shown = {entry["question"] for entry in out if entry["answer"] is not None}
+    own = [entry for entry in added if entry["question"] not in shown]
+    # The editor lists an unanswered fixed question as a placeholder: an added question in its words stands for it.
+    asked = {entry["question"] for entry in own}
+    out = [entry for entry in out if entry["answer"] is not None or entry["question"] not in asked]
     out.extend({"question": entry["question"], "answer": entry["answer"], "kind": CUSTOM,
                 **({"also": entry["also"]} if entry["also"] else {})}
-               for entry in added if entry["question"] not in shown)
+               for entry in own)
     return out
 
 
@@ -650,7 +654,7 @@ def checked_change(edit: Mapping, reset: list, add: Mapping, remove: list) -> di
 
 
 def unseen(candidate, version, edited: Mapping, shown_built: Mapping, today: date, *, answered: Mapping | None = None,
-           reset=()) -> list[str]:
+           reset=(), added=(), removed=()) -> list[str]:
     """The edited keys whose built answer now isn't the one the user was shown (`shown_built`), and the edited or reset
     keys whose answer (an edit, else the built one) now isn't the one they were shown (`answered`, when sent): saving
     over it would replace an answer they never saw, such as a rate the manager changed meanwhile (Abdul's fourth
@@ -661,6 +665,11 @@ def unseen(candidate, version, edited: Mapping, shown_built: Mapping, today: dat
         now = shown(candidate, version, today)
         stale += [key for key in dict.fromkeys([*edited, *reset])
                   if key in answered and key not in stale and not _same(answered[key], now.get(key))]
+        # A question of the user's own, added again or removed: the answer it had then (none, for a new one) must
+        # still be its answer.
+        stale += [question for question in dict.fromkeys([*added, *removed])
+                  if question in answered and question not in stale
+                  and not _same(answered[question], now.get(("custom", wording(question))))]
     return stale
 
 

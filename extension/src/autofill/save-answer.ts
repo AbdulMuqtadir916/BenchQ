@@ -42,6 +42,8 @@ const SAVABLE: Record<string, Kind> = {
 const KEY_OF_TYPE = new Map(Object.entries(KEY_TYPES).flatMap(([key, type]) => (type && key in SAVABLE ? [[type, key] as const] : [])));
 const MAX_ANSWER = 4000;
 const NUMBERS = /\d[\d,]*(?:\.\d+)?/g;
+/** A number as people write one: 1200, 1,200 or 95.50, never 9,5,0. */
+const WRITTEN_NUMBER = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/;
 /** A pay that isn't hourly: BenchQ keeps the rate per hour. */
 const NOT_HOURLY = /\b(?:year|yearly|yr|annual|annually|annum|month|monthly|week|weekly|salary)\b/i;
 /** A pay given per hour, which a salary isn't. */
@@ -63,9 +65,9 @@ function valueFor(key: string, typed: string): unknown {
       if (RATES.has(key) && NOT_HOURLY.test(typed)) return null;
       if (key === "salary-expectation" && HOURLY.test(typed)) return null;
       if (key === "notice-period-days" && !/^\s*\d+\s*(days?)?\s*$/i.test(typed)) return null;
-      // One number, written out: "$95k" or "90-100" can't be saved as one without a guess.
+      // One number, written out: "$95k", "90-100", "-5" or "9,5,0" can't be saved as one without a guess.
       const found = typed.match(NUMBERS) ?? [];
-      if (found.length !== 1 || THOUSANDS.test(typed)) return null;
+      if (found.length !== 1 || THOUSANDS.test(typed) || /-\s*\d/.test(typed) || !WRITTEN_NUMBER.test(found[0]!)) return null;
       const value = Number(found[0]!.replace(/,/g, ""));
       if ((RATES.has(key) && value > MAX_RATE) || (key === "salary-expectation" && value < MIN_SALARY)) return null;
       return value;

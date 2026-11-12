@@ -694,12 +694,15 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
    * Add button, is left as it is. */
   const addEntries = useCallback(async () => {
     const blocksOf = (type: string) => (shownRows.current ?? []).filter((row) => typeOf(row.field) === type).length;
+    // Bound to the résumé picked when it starts: another one picked meanwhile stops it, so the old one's records stay off.
+    const picked = resume.current;
     let added = false;
     for (const [kind, type] of [["education", "education-school"], ["work", "current-company"]] as const) {
       const wanted = Math.min((bank.current?.history ?? NO_HISTORY)[kind].length, MAX_ENTRIES);
       let blocks = blocksOf(type);
       while (blocks > 0 && blocks < wanted && await addEntryIn(tabId, kind).catch(() => false)) {
         await new Promise((resolve) => setTimeout(resolve, ENTRY_MS));
+        if (resume.current !== picked) return;
         await scan(undefined, true);
         const now = blocksOf(type);
         if (now <= blocks) break;      // The click made no block: the form wants this one finished first.
@@ -707,7 +710,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
         added = true;
       }
     }
-    if (added) await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
+    if (added && resume.current === picked) await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
   }, [fillRows, scan, tabId]);
 
   const autofill = useCallback(async () => {
@@ -836,9 +839,14 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
    * picked résumé only. The answers load again, so the next form that asks it is filled. A résumé picked while it saved
    * keeps its own review: this save's outcome changes nothing on it. */
   const saveAnswer = useCallback(async (row: ReviewRow, isOnlyThisResume: boolean): Promise<boolean> => {
-    const offer = row.saveOffer;
-    if (!offer || offer === "saved" || !firmId || !resumeId || busy.current) return false;
+    if (!row.saveOffer || row.saveOffer === "saved" || !firmId || !resumeId || busy.current) return false;
     const picked = resume.current;
+    // The field may have changed since the last look: look again, and save what it holds now (or nothing).
+    await scan();
+    const fresh = (shownRows.current ?? []).find((shown) => memoKeyOf(shown) === memoKeyOf(row));
+    const offer = fresh?.saveOffer;
+    if (resume.current !== picked || !offer || offer === "saved") return false;
+    const value = fresh!.field.current.trim();
     try {
       await saveResumeAnswers(firmId, candidateId, resumeId, { ...offer.change, only_this: isOnlyThisResume });
     } catch (e) {
@@ -854,7 +862,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       return false;
     }
     if (resume.current !== picked) return true;
-    memory.current.saved.set(memoKeyOf(row), { resumeId, value: row.field.current.trim() });
+    memory.current.saved.set(memoKeyOf(row), { resumeId, value });
     await scan();
     return true;
   }, [candidateId, firmId, onSessionExpired, resumeId, scan]);
