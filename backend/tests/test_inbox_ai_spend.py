@@ -38,10 +38,12 @@ def test_a_classifier_that_isnt_set_up_sent_nothing_and_costs_nothing(test_db, p
     from types import SimpleNamespace
     monkeypatch.setattr(worker, "ai_config", lambda *a, **kw: SimpleNamespace(
         provider="openrouter", model="", api_key="", prompts={}, preset_id=None, preset_version=None))
-    assert not worker.process_one(message_id)                # the real classify: refuses before sending
+    assert not worker.process_one(message_id)                # refused before any claim or provider call
     assert test_db.query(LlmCallLog).filter_by(purpose="email_classification").count() == 0
     test_db.expire_all()
-    assert test_db.get(InboxMessage, message_id).classification_error == "CLASSIFIER_NOT_CONFIGURED"
+    # PR 4 (T1.1, DEBUG D-02/D-03): a missing configuration leaves the email waiting, never failed.
+    row = test_db.get(InboxMessage, message_id)
+    assert (row.classification_state, row.classification_attempts, row.classification_error) == ("PENDING", 0, None)
 
 
 def test_a_failure_logs_the_email_id_and_code_never_the_errors_text(test_db, pipeline, caplog):
