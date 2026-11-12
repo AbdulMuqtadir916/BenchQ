@@ -3,6 +3,9 @@
 CATEGORY_VERSION = "2026-10-31.1"
 QUESTION_KEY = "application_email_category"
 CONFIDENCE_THRESHOLD = 0.8
+# Provider confidence vs the chosen category's probability: a larger gap routes the email to review
+# (CONFIDENCE_DISAGREEMENT). A routing parameter, part of config_identity; tuned with labelled data.
+DISAGREEMENT_LIMIT = 0.10
 
 CATEGORIES = {
     "applied": "A confirmation email stating that the candidate's job application has been received.",
