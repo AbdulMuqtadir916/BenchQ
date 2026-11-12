@@ -321,6 +321,92 @@ def test_a_row_added_while_paging_doesnt_shift_the_next_page(anonymous_client, t
     assert [row["summary"] for row in rest] == ["0"]
 
 
+def _at(test_db, world, summary, moment):
+    entry = ledger.record(test_db, actor=world.bea, action="UPDATE", entity_type="user", entity_id=world.bea.id,
+                          entity_label="Bea", summary=summary, firm_id=world.id, candidate_id=None, at=moment)
+    test_db.commit()
+    return entry
+
+
+def test_rows_at_the_same_moment_keep_one_order_whichever_way_they_are_paged(anonymous_client, test_db, world):
+    """Two actions can land on exactly the same microsecond. Newest first, then lowest id first: the same order on every
+    read, by offset, by the page marker and by the marker's two fields, so none is repeated or skipped."""
+    moment = datetime(2026, 3, 3, 12, 0, tzinfo=timezone.utc)
+    entries = [_at(test_db, world, str(number), moment) for number in range(5)]
+    expected = [entry.summary for entry in sorted(entries, key=lambda entry: entry.id)]
+    whole = [row["summary"] for row in _read(anonymous_client, world, world.owner)]
+    assert whole == expected
+    assert [row["summary"] for row in _read(anonymous_client, world, world.owner)] == expected       # and again
+
+    by_offset = []
+    for offset in (0, 2, 4):
+        by_offset += [row["summary"] for row in _read(anonymous_client, world, world.owner, f"?limit=2&offset={offset}")]
+    assert by_offset == expected
+
+    by_marker, cursor = [], None
+    while rows := _read(anonymous_client, world, world.owner, "?limit=2" + (f"&cursor={cursor}" if cursor else "")):
+        by_marker += [row["summary"] for row in rows]
+        cursor = rows[-1]["cursor"]
+    assert by_marker == expected
+
+    by_fields, last = [], None
+    while rows := _read(anonymous_client, world, world.owner, "?limit=2" + (
+            f"&cursor_at={last['created_at'].replace('+', '%2B')}&cursor_id={last['id']}" if last else "")):
+        by_fields += [row["summary"] for row in rows]
+        last = rows[-1]
+    assert by_fields == expected
+
+
+def test_a_page_marker_keeps_the_microseconds_of_its_row(anonymous_client, test_db, world):
+    """Rows a microsecond apart are three rows on three pages: the marker must not round the time."""
+    base = datetime(2026, 3, 3, 12, 0, tzinfo=timezone.utc)
+    for number in (1, 2, 3):
+        _at(test_db, world, f"+{number}us", base + timedelta(microseconds=number))
+    first = _read(anonymous_client, world, world.owner, "?limit=1")[0]
+    assert first["summary"] == "+3us" and first["created_at"].endswith(".000003+00:00")
+    seen, cursor = [first["summary"]], first["cursor"]
+    while rows := _read(anonymous_client, world, world.owner, f"?limit=1&cursor={cursor}"):
+        seen.append(rows[0]["summary"])
+        cursor = rows[0]["cursor"]
+    assert seen == ["+3us", "+2us", "+1us"]
+    second = _read(anonymous_client, world, world.owner, "?limit=1&offset=1")[0]
+    rest = _read(anonymous_client, world, world.owner, "?limit=5&cursor_at=" + second["created_at"].replace("+", "%2B")
+                 + f"&cursor_id={second['id']}")
+    assert [row["summary"] for row in rest] == ["+1us"]
+
+
+def _set_zone(test_db, world, zone):
+    test_db.get(Firm, world.id).primary_timezone = zone
+    test_db.commit()
+
+
+def test_a_day_ends_at_the_firms_midnight_to_the_microsecond(anonymous_client, test_db, world):
+    """Asia/Kolkata midnight is 18:30 UTC: the last microsecond before it is still the 3rd, the moment itself the 4th."""
+    one = timedelta(microseconds=1)
+    midnight = datetime(2026, 3, 3, 18, 30, tzinfo=timezone.utc)                 # 00:00 on the 4th in Kolkata
+    for name, moment in (("end of 3rd", midnight - one), ("start of 4th", midnight),
+                         ("end of 4th", midnight + timedelta(days=1) - one), ("start of 5th", midnight + timedelta(days=1))):
+        _at(test_db, world, name, moment)
+    owner = world.owner
+    day = lambda d: _summaries(anonymous_client, world, owner, f"?from_date=2026-03-{d}&to_date=2026-03-{d}")
+    assert day("03") == ["end of 3rd"]
+    assert day("04") == ["end of 4th", "start of 4th"]
+    assert day("05") == ["start of 5th"]
+    assert _summaries(anonymous_client, world, owner, "?from_date=2026-03-03&to_date=2026-03-04") == [
+        "end of 4th", "start of 4th", "end of 3rd"]
+
+
+def test_a_day_when_the_clocks_change_is_23_hours_long(anonymous_client, test_db, world):
+    """New York on 8 March 2026: 02:00 jumps to 03:00, so that day runs 05:00 UTC to 04:00 UTC the next day."""
+    _set_zone(test_db, world, "America/New_York")
+    one = timedelta(microseconds=1)
+    start, end = datetime(2026, 3, 8, 5, 0, tzinfo=timezone.utc), datetime(2026, 3, 9, 4, 0, tzinfo=timezone.utc)
+    for name, moment in (("end of 7th", start - one), ("start of 8th", start), ("end of 8th", end - one), ("start of 9th", end)):
+        _at(test_db, world, name, moment)
+    day = lambda d: _summaries(anonymous_client, world, world.owner, f"?from_date=2026-03-{d}&to_date=2026-03-{d}")
+    assert (day("07"), day("08"), day("09")) == (["end of 7th"], ["end of 8th", "start of 8th"], ["start of 9th"])
+
+
 @pytest.mark.parametrize("cursor", ["nonsense", "12_notauuid", "x_y", f"99999999999999999999_{uuid.uuid4()}"])
 def test_a_bad_cursor_is_refused(api_client, world, cursor):
     assert api_client.get(f"{world.url}?cursor={cursor}").status_code == 400
