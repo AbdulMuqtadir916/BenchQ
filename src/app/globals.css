@@ -429,8 +429,10 @@ button:disabled { cursor: not-allowed; }
 .rt-compact { --rt-size: 11.5px; --rt-leading: 1.35; --rt-size-name: 22px; --rt-size-title: 12px; --rt-size-small: 10.5px; --rt-size-h: 10.5px; --rt-gap: 10px; --rt-pad-x: 44px; --rt-pad-y: 40px; --rt-accent: var(--color-resume-green); --rt-h-color: var(--color-resume-green); }
 .rt-sidebar { --rt-accent: var(--color-resume-teal); --rt-h-color: var(--color-resume-teal); --rt-side: 248px; padding: 0; background: linear-gradient(to right, var(--color-resume-tint) var(--rt-side), var(--color-paper) var(--rt-side)); }
 .rt-cols { display: grid; grid-template-columns: var(--rt-side) 1fr; }
-.rt-cols > aside { padding: calc(48px * var(--rt-s)) 24px; }
-.rt-cols > .rt-main { padding: calc(48px * var(--rt-s)) 44px calc(48px * var(--rt-s)) 36px; }
+/* The columns' top and bottom padding is the page margin here: Fit to one page shrinks it, never below the floor. */
+.rt-sidebar { --rt-col-pad-y: max(calc(48px * var(--rt-s)), min(48px, var(--paper-margin-min))); }
+.rt-cols > aside { padding: var(--rt-col-pad-y) 24px; }
+.rt-cols > .rt-main { padding: var(--rt-col-pad-y) 44px var(--rt-col-pad-y) 36px; }
 .rt-sidebar .rt-contacts { flex-direction: column; gap: 3px; margin-top: 0; }
 .rt-sidebar .rt-contact + .rt-contact::before { content: none; }
 .rt-sidebar aside .rt-section:first-child { margin-top: 0; }
