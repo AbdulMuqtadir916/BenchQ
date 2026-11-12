@@ -55,6 +55,11 @@ export type CandidatesSearchState = z.infer<typeof CandidatesSearch>;
 export const isReachedStage = (status: string): status is ReachedStage => (REACHED_STAGES as readonly string[]).includes(status);
 
 /** A manager's BDEs page: the name search and the period its numbers cover. */
+/** The job page opened for one candidate (`?candidate=`): it reads that candidate's own job and acts for them. */
+export const JobDetailSearch = z.object({
+  candidate: z.string().catch(""),
+});
+
 export const BdesSearch = z.object({
   q: z.string().catch(""),
   period: z.enum(LIST_PERIODS).catch("30d"),

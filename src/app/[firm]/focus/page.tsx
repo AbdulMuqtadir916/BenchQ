@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, Send, Mail, SkipForward, X, Clock, Check } from "lucide-react";
+import { Sparkles, Send, Mail, SkipForward, X, Clock, Check, Briefcase } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
@@ -13,6 +13,9 @@ import { rankJobsForCandidate } from "@/lib/derive";
 import { MatchScore } from "@/components/app/match-score";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/app/empty-state";
+import { ErrorState } from "@/components/app/error-state";
 import { useHref } from "@/lib/routes/use-href";
 import { jobLocation } from "@/lib/format/job";
 
@@ -20,7 +23,6 @@ export default function FocusModePage() {
   const toHref = useHref();
   const principal = useSignedInPrincipal();
   const candidatesQuery = useCandidates();
-  const jobsQuery = useJobs({ limit: 400 });
   const applicationsQuery = useApplications();
 
   const myCandidates = useMemo(() => {
@@ -31,6 +33,9 @@ export default function FocusModePage() {
 
   const [candidateId, setCandidateId] = useState<string>("");
   const candidate = myCandidates.find((c) => c.id === candidateId) ?? myCandidates[0] ?? null;
+  // Only the selected candidate's jobs, read again when the dropdown changes (Zuhair 2026-11-12): each job's id is
+  // that candidate's own posting.
+  const jobsQuery = useJobs({ limit: 400, candidateId: candidate?.id }, { isEnabled: Boolean(candidate) });
 
   const queue = useMemo(() => {
     if (!candidate) return [];
@@ -92,8 +97,14 @@ export default function FocusModePage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 items-center justify-center">
-        {!candidate ? (
+        {candidatesQuery.isPending || (candidate && jobsQuery.isPending) ? (
+          <div role="status" aria-label="Loading the queue" className="w-full space-y-3"><Skeleton className="h-8 w-2/3" /><Skeleton className="h-48 w-full" /></div>
+        ) : candidatesQuery.error || jobsQuery.error ? (
+          <ErrorState error={(candidatesQuery.error ?? jobsQuery.error)!} onRetry={() => void (candidatesQuery.error ? candidatesQuery.refetch() : jobsQuery.refetch())} />
+        ) : !candidate ? (
           <p className="text-[var(--color-text-3)]">Assign a candidate to run the queue.</p>
+        ) : queue.length === 0 ? (
+          <EmptyState icon={Briefcase} title="No jobs to work" description={`${candidate.fullName} has no unapplied jobs yet. Run "Find jobs" on their page first.`} />
         ) : finished || !current ? (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-8 text-center shadow-[var(--shadow-lg)]">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-bg)] text-[var(--color-success-fg)]"><Check size={22} aria-hidden /></div>

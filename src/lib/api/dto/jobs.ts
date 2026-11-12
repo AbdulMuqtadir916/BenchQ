@@ -37,6 +37,8 @@ export const FirmJobListDto = z.object({ items: z.array(FirmJobDto) });
 
 /** `POST …/candidates/{id}/job-postings`: the candidate's posting, and whether this call created it. */
 export const CapturedPostingDto = z.object({ ...posting, candidate_id: z.string(), created: z.boolean() });
+/** GET …/candidates/{id}/job-postings/{posting_id}: one of the candidate's own jobs. */
+export const CandidatePostingDto = z.object({ ...posting, candidate_id: z.string() });
 export type CapturedPostingDto = z.infer<typeof CapturedPostingDto>;
 
 const normalise = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -125,6 +127,7 @@ export function toJob(dto: z.infer<z.ZodObject<typeof posting>>, firmId: string,
 
 export const toFirmJob = (dto: FirmJobDto, firmId: string): Job => toJob(dto, firmId, dto.candidate_ids.map(fromBackendId));
 export const toCapturedJob = (dto: CapturedPostingDto, firmId: string): Job => toJob(dto, firmId, [fromBackendId(dto.candidate_id)]);
+export const toCandidateJob = (dto: z.infer<typeof CandidatePostingDto>, firmId: string): Job => toJob(dto, firmId, [fromBackendId(dto.candidate_id)]);
 
 /** What the capture form sends, as `CaptureBody` (backend/api/routes_job_search.py). */
 export function toBackendCapture(body: CaptureJob) {

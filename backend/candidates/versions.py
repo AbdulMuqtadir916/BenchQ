@@ -230,8 +230,30 @@ def listing_many(db, firm_id, candidate_ids) -> dict:
                                                 "made_by_lead": base.created_by_user_id in leads
                                                 or any(v["made_by_lead"] for v in versions),
                                                 "versions": versions})
+    jobs = _job_names(db, firm_id, {j for (_, _, j) in tailored})
     for (cid, b, j), v in tailored.items():
-        out[cid]["tailored"].append({"candidate_id": str(cid), "base_resume_id": str(b), "job_id": str(j), "versions": v})
+        out[cid]["tailored"].append({"candidate_id": str(cid), "base_resume_id": str(b), "job_id": str(j),
+                                     "job": jobs.get(j), "versions": v})
+    return out
+
+
+def _job_names(db, firm_id, job_ids) -> dict:
+    """{posting id: {"title", "company"}} for the tailored résumés' jobs, so a list names each copy by its own job
+    without the screen loading any jobs (Zuhair 2026-11-12: a candidate's screens read only that candidate's jobs).
+    Only the two fields are read, never the posting's description; each source's reader cleans them."""
+    if not job_ids:
+        return {}
+    from backend.job_search import providers
+    from backend.models.job_search import JobPosting
+    rows = scoped(db, JobPosting, firm_id).filter(JobPosting.id.in_(job_ids)) \
+        .with_entities(JobPosting.id, JobPosting.source, JobPosting.content["title"].astext,
+                       JobPosting.content["company"].astext).all()
+    out = {}
+    for posting_id, source, title, company in rows:
+        reader = providers.reader_for(source)
+        fields = reader.read({"title": title, "company": company}) if reader else None
+        out[posting_id] = {"title": fields.title if fields else (title or ""),
+                           "company": fields.company if fields else (company or "")}
     return out
 
 

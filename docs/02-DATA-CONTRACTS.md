@@ -1546,6 +1546,7 @@ export const ResumeSchema = z.object({
   name: z.string(),
   isMaster: z.boolean(),
   targetJobId: z.string().nullable(),
+  targetJob: z.object({ title: z.string(), company: z.string() }).nullable(), // §8.1, 2026-11-12
   templateId: z.string(),
   versions: z.array(ResumeVersionSchema),
   latestVersionId: z.string(),
@@ -1566,6 +1567,9 @@ every edit as a new row; the frontend keeps its `Resume.versions[]` model, fille
 rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateId` ← `template`, `name` ← `name`,
 `versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
 `ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
+`targetJob` ← the listing's `job` on a tailored group: `{title, company}` of its own job posting, read by the backend
+(null on a base, or from a backend that doesn't send it). Added 2026-11-12 (tailoring part 3, Zuhair): a list names a
+tailored copy without the screen loading any jobs (only a candidate's own jobs are read, docs/04 §5.3).
 
 **`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK; this contract signed off
 by Abdul 2026-11-08 in issue 119, the `key` added with his OK):** `GET …/resumes/{id}?autofill=true`, on the

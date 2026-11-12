@@ -140,6 +140,22 @@ id), `backend/job_monitor.py` (`firm_id`, the gate), `backend/main.py` (the rout
 
 ## 8. Part 3 and later
 
+**Part 3, step 1: only that candidate's jobs (Zuhair, 2026-11-12; built).** Before any tailoring screen: a screen
+about one candidate reads only that candidate's jobs, so every job id a Tailor button sends is the candidate's own
+posting (the route's 404 for another candidate's stays as the safety net). Only screens that span candidates (the
+Jobs page's "All candidates", the owner's dashboard, ⌘K) read more.
+- Focus mode: the selected candidate's jobs, read again on a switch; skeleton, error and empty states added.
+- The BDE dashboard's queue: its candidate's jobs (it read the BDE's newest 300 to show 6).
+- The job page: `?candidate=<id>` from a candidate's screen reads that candidate's own job (`GET …/candidates/{id}/
+  job-postings/{posting_id}`) and acts for them; the links from the queue, the candidate's matches, the job pane and
+  the capture form carry it.
+- Tailored résumé names: the résumé listing sends each tailored group's `job` (`{title, company}`,
+  `versions._job_names`), so the tree and the studio no longer read the firm's newest 1000 jobs to name a copy, and
+  a job shared by two candidates no longer leaves a copy unnamed.
+- The job's text: the tailoring reads the posting through its source's reader (`runs.posting_text`, the job pages'
+  `providers.reader_for(source).read()`), so a freehire.me or extension description's HTML reaches the model as plain
+  text, a typed one as typed; "no description" (422) is checked on that text. It read `content["description"]` raw.
+
 **Part 3, the frontend:**
 - the studio's tailoring (`tailor-run.tsx`, `useAgentRun`) and the job pane run the real thing;
 - a base picker and the re-tailor confirmation;

@@ -30,6 +30,7 @@ from backend.auth.scoping import scoped
 from backend.candidates import autofill, versions
 from backend.candidates.values import text
 from backend.job_monitor import get_all_running, mark_run_failed
+from backend.job_search import providers
 from backend.logging_setup import run_id as current_run_id
 from backend.models.candidates import BaseResume, Candidate
 from backend.models.db import JobRun, Resume, SessionLocal
@@ -200,13 +201,24 @@ def candidate_posting(db, candidate, job_posting_id) -> JobPosting:
     return posting
 
 
+def posting_text(posting: JobPosting) -> tuple[str, str]:
+    """(description, title) as the job pages show them: read by the posting's own source, so a freehire.me or an
+    extension description's HTML reaches the model as plain text (Zuhair 2026-11-12). Empty when no reader knows the
+    source."""
+    reader = providers.reader_for(posting.source)
+    if reader is None:
+        return "", ""
+    fields = reader.read(posting.content or {})
+    return text(fields.description), text(fields.title)
+
+
 def admit(db, candidate, actor: User, job_posting_id, base_resume_id=None) -> dict:
     """The checks before a tailoring starts, the candidate row locked by the caller; the run's meta. Raises the
     route's answer: 404, 409 (no usable base; the same base and job running), 422 (no description), 429 (the BDE has
     MOST_RUNNING_PER_BDE running)."""
     base, _ = tailored_from(db, candidate, base_resume_id)
     posting = candidate_posting(db, candidate, job_posting_id)
-    if not text((posting.content or {}).get("description")):
+    if not posting_text(posting)[0]:
         raise HTTPException(status_code=422, detail="This job has no description to tailor the résumé to.")
     expire_lost(db, candidate.firm_id)
     running = [row.meta or {} for row in _running(db, candidate.firm_id)]
@@ -246,8 +258,7 @@ def _inputs(firm_id, candidate_id, base_resume_id, job_posting_id) -> tuple:
             logger.error("Résumé tailor isn't set up: %s", e)
             raise _Stop(SETUP)
         content = versions.content_of(v1)
-        found = (setup, content, text((posting.content or {}).get("description")),
-                 text((posting.content or {}).get("title")))
+        found = (setup, content, *posting_text(posting))
         db.commit()                           # nothing held while the model works
         return found
     finally:
@@ -319,9 +330,9 @@ async def run_tailoring(firm_id, candidate_id, base_resume_id, job_posting_id, u
     """One tailoring, launched by the route through launch_background (job type JOB_TYPE, the tailor's gate)."""
     run_id = uuid.UUID(current_run_id.get())       # launch_background's wrapper sets it for its task
     try:
-        setup, content, posting_text, job_title = await asyncio.to_thread(
+        setup, content, job_text, job_title = await asyncio.to_thread(
             _inputs, firm_id, candidate_id, base_resume_id, job_posting_id)
-        tailored = await tailor_version(content, posting_text, job_title, setup=setup, firm_id=firm_id)
+        tailored = await tailor_version(content, job_text, job_title, setup=setup, firm_id=firm_id)
         version = await asyncio.to_thread(_finish, run_id, firm_id, candidate_id, base_resume_id, job_posting_id,
                                       user_id, setup, tailored, job_title)
     except (_Stop, TailorFailed) as e:

@@ -30,6 +30,8 @@ export const queryKeys = {
     searches: (firmId: string, candidateId: string) => [firmId, "jobs", "searches", candidateId] as const,
     /** The search this tab started for the candidate, until its outcome is read (never fetched: set on the start). */
     startedSearch: (firmId: string, candidateId: string) => [firmId, "jobs", "started", candidateId] as const,
+    /** One of a candidate's own jobs (the job page opened for that candidate): under the job's detail key. */
+    candidateDetail: (firmId: string, candidateId: string, id: string) => [firmId, "jobs", "detail", id, candidateId] as const,
   },
   applications: resource("applications"),
   resumes: {

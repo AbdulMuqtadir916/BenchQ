@@ -68,7 +68,16 @@ async function render(component: ComponentType, failing: Resource[]): Promise<st
   const tree = () => renderToString(createElement(QueryClientProvider, { client }, createElement(FirmProvider, { firm: firms.find((firm) => firm.id === "firm_hts")! } as ComponentProps<typeof FirmProvider>, createElement(component))));
   tree(); // creates the queries the dashboard reads
   fault.__BENCHQ_MOCK_FAIL__ = failing.map((resource) => `${resource}.list`);
-  await Promise.all(client.getQueryCache().getAll().map((query) => query.fetch().catch(() => undefined)));
+  // A query that waits for another (the BDE's queue reads its candidate's jobs once the candidates are in) is created
+  // by a later render: settle what's new, render, until nothing new appears.
+  for (let pass = 0; pass < 3; pass++) {
+    // A disabled query (`enabled: false`, e.g. no candidate yet) is never fetched by the app, so it isn't here either.
+    const fresh = client.getQueryCache().getAll().filter((query) => (query.options as { enabled?: unknown }).enabled !== false
+      && query.state.dataUpdatedAt === 0 && query.state.errorUpdatedAt === 0);
+    if (fresh.length === 0) break;
+    await Promise.all(fresh.map((query) => query.fetch().catch(() => undefined)));
+    tree();
+  }
   fault.__BENCHQ_MOCK_FAIL__ = [];
   return tree();
 }
@@ -105,6 +114,21 @@ describe.each(DASHBOARDS)("$name dashboard (docs/04 §13)", { timeout: 20_000 },
     expect(count(html, ">Retry<")).toBe(hit.length);
     for (const [, group] of hit) for (const label of group.labels) expect(html, label).not.toContain(label);
     for (const [, group] of Object.entries(groups).filter(([, g]) => !g.reads.includes(failing))) for (const label of group.labels) expect(html, label).toContain(label);
+  });
+
+  it("reads jobs only for one candidate, never every candidate's (Zuhair 2026-11-12)", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const tree = () => renderToString(createElement(QueryClientProvider, { client }, createElement(FirmProvider, { firm: firms.find((firm) => firm.id === "firm_hts")! } as ComponentProps<typeof FirmProvider>, createElement(component))));
+    tree();
+    for (let pass = 0; pass < 3; pass++) {
+      const fresh = client.getQueryCache().getAll().filter((query) => (query.options as { enabled?: unknown }).enabled !== false && query.state.dataUpdatedAt === 0);
+      if (fresh.length === 0) break;
+      await Promise.all(fresh.map((query) => query.fetch().catch(() => undefined)));
+      tree();
+    }
+    const jobLists = client.getQueryCache().getAll().filter((query) => query.queryKey[1] === "jobs" && query.queryKey[2] === "list" && query.state.dataUpdatedAt > 0);
+    for (const query of jobLists) expect((query.queryKey[3] as { candidateId?: string }).candidateId).toBeTruthy();
+    if (queries.includes("jobs")) expect(jobLists.length).toBeGreaterThan(0);
   });
 
   it("every query failing: one page-level error, no cards", async () => {

@@ -472,6 +472,11 @@ the match panel (`ScoringRecord` — requirement-by-requirement HAVE / MISSING /
 card (H-1B / LCA data, client type, prior applications from this firm), and the action stack
 (`Tailor resume`, `Mark applied`, `Start outreach`, `Save`, `Dismiss`).
 
+**For one candidate (`?candidate=<id>`, 2026-11-12).** A link from a candidate's screen (the dashboard queue, the
+candidate's matches, the job pane, a capture) names the candidate. The page then reads that candidate's own job
+(another candidate's is not-found), shows "For <candidate>" instead of the scoring dropdown, and acts for them.
+Opened without one (⌘K, "All candidates"), the dropdown only scores. **Only that candidate's jobs (Zuhair, 2026-11-12).** A screen about one candidate reads only that candidate's jobs (`useJobs({ candidateId })`, the backend's per-candidate read); each job's id is that candidate's own posting. Only screens that span candidates (the Jobs page's "All candidates", the owner's dashboard, ⌘K) read more than one candidate's.
+
 If the match is `LIGHT` depth, the panel shows a `Run full analysis` action that upgrades it —
 matching the JobNavigator cost-control split. The upgrade is an AI simulation per
 `03-MOCK-DATA.md §5`: staged progress, 2–5s.
@@ -597,6 +602,10 @@ against the selected candidate:
 │   [T] Tailor    [A] Applied    [O] Outreach    [S] Skip      │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+The queue is the selected candidate's own jobs, read again when the candidate changes (2026-11-12: only that
+candidate's jobs). While they load it shows a skeleton; a failed read shows the error with Retry; a candidate with no
+unapplied jobs shows "No jobs to work".
 
 Single keystroke per decision, auto-advance, progress across the top. `Esc` exits and returns to
 the dashboard with a session summary: jobs reviewed, applications logged, time spent.

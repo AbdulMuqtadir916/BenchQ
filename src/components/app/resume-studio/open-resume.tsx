@@ -41,7 +41,7 @@ export function OpenResume({ id, initialMode }: { id: string; initialMode: Studi
   const candidateQuery = useCandidate(candidateId);
   const shelfQuery = useResumeShelf(candidateId);
   const shown = useMemo(() => (candidateQuery.data ? [candidateQuery.data] : []), [candidateQuery.data]);
-  const labels = useTreeLabels(shown);
+  const labels = useTreeLabels(shown, shelfQuery.data);
   const loadedId = useStudio((s) => s.doc?.resumeId);
   const load = useStudio((s) => s.load);
   const setMode = useStudio((s) => s.setMode);

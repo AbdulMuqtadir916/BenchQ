@@ -100,7 +100,10 @@ def test_the_bde_tailors_and_a_tailored_v1_is_written(anonymous_client, test_db,
     assert (row.category, row.version, row.name, row.job_id) == ("TAILORED", 1, "Tailored", setup["posting"].id)
     assert str(row.base_resume_id) == setup["base"]["id"] and row.created_by_user_id == world["people"]["adnan"].id
     assert row.title == "Backend Developer specializing in Python"            # the tailored headline
-    assert [t["id"] for t in _listing(anonymous_client, world, setup["c"])["tailored"][0]["versions"]] == [str(row.id)]
+    tailored = _listing(anonymous_client, world, setup["c"])["tailored"][0]
+    assert [t["id"] for t in tailored["versions"]] == [str(row.id)]
+    # The listing names the copy by its own job, so no screen loads jobs to name it (Zuhair 2026-11-12).
+    assert tailored["job"] == {"title": "Dev 0", "company": "Acme"}
 
     run = test_db.get(JobRun, uuid.UUID(run_id))
     assert (run.status, run.firm_id, run.target_job_id) == ("completed", world["firm"].id, setup["posting"].id)
@@ -202,6 +205,26 @@ def test_a_job_with_no_description_is_refused(anonymous_client, test_db, world, 
     test_db.commit()
     r = _start(anonymous_client, world, setup)
     assert r.status_code == 422 and "no description" in r.json()["detail"]
+
+    # A freehire.me description that is only markup has no text either: read as the job page reads it.
+    setup["posting"].source = "freehire"
+    setup["posting"].content = {**setup["posting"].content, "description": "<p> </p><ul></ul>"}
+    test_db.commit()
+    assert _start(anonymous_client, world, setup).status_code == 422
+    assert launched == []
+
+
+def test_the_job_reaches_the_tailor_as_the_job_page_shows_it():
+    """Read by the posting's own source (Zuhair 2026-11-12): a search's HTML as plain text, a typed one as typed."""
+    from backend.models.job_search import JobPosting
+    html = JobPosting(source="freehire", content={"title": " Java <b>Dev</b> ", "company": "Acme",
+                                                  "description": "<p>Build <b>APIs</b>.</p><ul><li>Python</li></ul>"})
+    description, title = runs.posting_text(html)
+    assert "<" not in description and "Build APIs." in description and "Python" in description
+    assert title                                                   # the reader's own clean-up of the title
+    typed = JobPosting(source="manual", content={"title": "Dev", "description": "Needs a < b and a > c."})
+    assert runs.posting_text(typed) == ("Needs a < b and a > c.", "Dev")
+    assert runs.posting_text(JobPosting(source="nobody-knows", content={"description": "x"})) == ("", "")
 
 
 def test_a_hidden_base_or_no_active_base_is_refused(anonymous_client, test_db, world, launched, setup):

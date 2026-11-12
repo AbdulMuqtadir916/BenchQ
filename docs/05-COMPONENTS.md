@@ -107,7 +107,7 @@ defaults as fallback. Collapses to two panes under 1280px.
 ```ts
 {
   tree: TreeCandidate[];          // buildResumeTree(shelf) in src/lib/derive/resume-tree.ts
-  labels: { jobLabel(jobId): string; userName(userId): string | null };   // useTreeLabels()
+  labels: { job(jobId): { company; title } | null; candidate(id); userName(userId): string | null };   // useTreeLabels(candidates, shelf): a copy's job from the listing's targetJob, no jobs read
   candidateHeading?: (candidateId) => { name; role } | null;              // Resume Builder only
   showTailored?: boolean;         // default true
   canSeeHidden?: (candidateId) => boolean;   // canManageResume: the assigned BDE

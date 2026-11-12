@@ -348,7 +348,7 @@ function JobDetailHeader({
   const toHref = useHref();
   // A read-only viewer (VIEWER, a support view) gets the job's details, never "Tailor & apply".
   const canApply = useCan("job.apply");
-  const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl ?? toHref("jobs.detail", { id: job.id });
+  const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl ?? toHref("jobs.detail", { id: job.id }, { candidate: context?.id });
   return (
     <div className="relative border-b border-[var(--color-border)]">
       <div className="flex flex-wrap items-start justify-between gap-4 p-5">
@@ -366,7 +366,7 @@ function JobDetailHeader({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer">Open source<ExternalLink size={13} /></a></Button>
-          {context && canApply ? <Button size="sm"><Sparkles size={13} />Tailor & apply</Button> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
+          {context && canApply ? <Button size="sm"><Sparkles size={13} />Tailor & apply</Button> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id }, { candidate: context?.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
           <Button variant="secondary" size="icon" aria-label="More job actions" aria-expanded={menuOpen} onClick={onMenuToggle}><MoreHorizontal size={15} /></Button>
         </div>
       </div>

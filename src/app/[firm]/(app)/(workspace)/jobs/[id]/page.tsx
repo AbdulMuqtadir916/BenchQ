@@ -26,6 +26,8 @@ import { ErrorState } from "@/components/app/error-state";
 import { NotFoundState } from "@/components/app/not-found-state";
 import { isNotFoundError } from "@/lib/api/client";
 import { useHref } from "@/lib/routes/use-href";
+import { useUrlState } from "@/lib/routes/use-url-state";
+import { JobDetailSearch } from "@/lib/schemas/list-search";
 import { jobLocation } from "@/lib/format/job";
 
 const ANALYSIS_STAGES = [
@@ -49,7 +51,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const toHref = useHref();
   const { id } = use(params);
   const principal = useSignedInPrincipal();
-  const jobQuery = useJob(id);
+  // Opened from one candidate's screen, the page is that candidate's: their own job is read (another candidate's is
+  // not-found) and the page acts for them (Zuhair 2026-11-12). Opened without one, it reads the job for every
+  // candidate this person sees, and the dropdown only scores.
+  const [{ candidate: linkedId }] = useUrlState(JobDetailSearch);
+  const jobQuery = useJob(id, linkedId || undefined);
   const { savedIds } = useJobMarks();
   const toggleMark = useToggleJobMark();
   const candidatesQuery = useCandidates();
@@ -60,7 +66,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }, [candidatesQuery.data, principal]);
 
   const [candidateId, setCandidateId] = useState("");
-  const context = myCandidates.find((c) => c.id === candidateId) ?? null;
+  const context = myCandidates.find((c) => c.id === (linkedId || candidateId)) ?? null;
 
   const run = useAgentRun(ANALYSIS_STAGES.length);
   const canAct = can(principal, "job.apply");
@@ -124,10 +130,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <Card>
             <CardHeader><CardTitle>Match</CardTitle>{score !== null ? <MatchScore score={score} /> : null}</CardHeader>
-            <select value={candidateId} onChange={(e) => { setCandidateId(e.target.value); run.reset(); }} className="bq-input mb-3">
-              <option value="">Pick a candidate to score</option>
-              {myCandidates.map((c) => <option key={c.id} value={c.id}>{c.fullName}</option>)}
-            </select>
+            {linkedId ? (
+              <p className="mb-3 text-sm text-[var(--color-text-2)]">For <span className="font-[550] text-[var(--color-text)]">{context?.fullName ?? "this candidate"}</span></p>
+            ) : (
+              <select value={candidateId} onChange={(e) => { setCandidateId(e.target.value); run.reset(); }} className="bq-input mb-3" aria-label="Candidate to score">
+                <option value="">Pick a candidate to score</option>
+                {myCandidates.map((c) => <option key={c.id} value={c.id}>{c.fullName}</option>)}
+              </select>
+            )}
 
             {!context ? (
               <p className="text-caption text-[var(--color-text-3)]">Select a candidate to see requirement-by-requirement fit.</p>

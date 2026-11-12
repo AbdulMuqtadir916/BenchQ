@@ -3,6 +3,17 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé tailoring, part 3 step 1: only that candidate's jobs (`feat/resume-tailoring`, Zuhair)
+
+Zuhair's rule (2026-11-12): a screen about one candidate reads only that candidate's jobs ([tailoring.md](./tailoring.md)
+§8). Built 2026-11-12; these rows wait for their owners.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| BDE dashboard (candidate/dashboard owners) | `src/features/dashboard/bde-dashboard.tsx` | The queue reads its candidate's jobs only (it read the BDE's newest 300 to show 6); the jobs read waits for the candidate, and isn't counted while there is none. Its job links carry `?candidate=`. | A job shared by two of the BDE's candidates carried the other's posting id (tailoring answered 404); the newest 300 could leave this candidate's out. | **Pending** |
+| Dashboard tests (shared) | `src/features/dashboard/dashboard-errors.test.ts` | The render settles queries created by a later render (the queue's jobs wait for the candidates), skips disabled ones, and a new test checks the BDE dashboard reads jobs only for one candidate. | The same. | **Pending** |
+| Focus mode (shared) | `src/app/[firm]/focus/page.tsx` | The selected candidate's jobs only, read again on a switch; skeleton, error and "No jobs to work" states (it showed "Run complete" while loading). | The same, and the three states (CLAUDE.md). | **Pending** |
+
 ## Résumé tailoring (`feat/resume-tailoring`, Zuhair; part 1, the package; part 2, the wiring)
 
 The tailor's backend package ([tailoring.md](./tailoring.md)). Built 2026-11-12; these rows were not asked about
