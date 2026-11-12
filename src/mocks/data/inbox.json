@@ -13,7 +13,7 @@
       "receivedAt": "2026-10-01T04:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -29,7 +29,7 @@
       "receivedAt": "2026-10-01T04:17:53.704Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -45,7 +45,7 @@
       "receivedAt": "2026-10-01T04:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -61,7 +61,7 @@
       "receivedAt": "2026-10-01T03:17:53.705Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -77,7 +77,7 @@
       "receivedAt": "2026-10-01T02:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -93,7 +93,7 @@
       "receivedAt": "2026-10-01T02:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T14:00:00.000Z"
     },
     {
@@ -109,7 +109,7 @@
       "receivedAt": "2026-10-01T02:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -125,7 +125,7 @@
       "receivedAt": "2026-10-01T02:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -141,7 +141,7 @@
       "receivedAt": "2026-10-01T01:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -157,7 +157,7 @@
       "receivedAt": "2026-10-01T00:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -173,7 +173,7 @@
       "receivedAt": "2026-10-01T00:17:53.702Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -189,7 +189,7 @@
       "receivedAt": "2026-09-30T23:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -205,7 +205,7 @@
       "receivedAt": "2026-09-30T23:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -221,7 +221,7 @@
       "receivedAt": "2026-09-30T23:17:53.705Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -237,7 +237,7 @@
       "receivedAt": "2026-09-30T23:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -253,7 +253,7 @@
       "receivedAt": "2026-09-30T23:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -269,7 +269,7 @@
       "receivedAt": "2026-09-30T23:17:53.700Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -285,7 +285,7 @@
       "receivedAt": "2026-09-30T22:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -301,7 +301,7 @@
       "receivedAt": "2026-09-30T22:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T18:00:00.000Z"
     },
     {
@@ -317,7 +317,7 @@
       "receivedAt": "2026-09-30T22:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -333,7 +333,7 @@
       "receivedAt": "2026-09-30T21:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T15:30:00.000Z"
     },
     {
@@ -349,7 +349,7 @@
       "receivedAt": "2026-09-30T21:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -365,7 +365,7 @@
       "receivedAt": "2026-09-30T21:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -381,7 +381,7 @@
       "receivedAt": "2026-09-30T20:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -397,7 +397,7 @@
       "receivedAt": "2026-09-30T20:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -413,7 +413,7 @@
       "receivedAt": "2026-09-30T20:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -429,7 +429,7 @@
       "receivedAt": "2026-09-30T20:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -445,7 +445,7 @@
       "receivedAt": "2026-09-30T20:17:53.701Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T19:30:00.000Z"
     },
     {
@@ -461,7 +461,7 @@
       "receivedAt": "2026-09-30T19:17:53.705Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -477,7 +477,7 @@
       "receivedAt": "2026-09-30T19:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -493,7 +493,7 @@
       "receivedAt": "2026-09-30T19:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -509,7 +509,7 @@
       "receivedAt": "2026-09-30T19:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -525,7 +525,7 @@
       "receivedAt": "2026-09-30T19:17:53.702Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -541,7 +541,7 @@
       "receivedAt": "2026-09-30T18:17:53.705Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -557,7 +557,7 @@
       "receivedAt": "2026-09-30T18:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -573,7 +573,7 @@
       "receivedAt": "2026-09-30T17:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -589,7 +589,7 @@
       "receivedAt": "2026-09-30T17:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -605,7 +605,7 @@
       "receivedAt": "2026-09-30T17:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -621,7 +621,7 @@
       "receivedAt": "2026-09-30T16:17:53.704Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -637,7 +637,7 @@
       "receivedAt": "2026-09-30T15:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -653,7 +653,7 @@
       "receivedAt": "2026-09-30T15:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T14:00:00.000Z"
     },
     {
@@ -669,7 +669,7 @@
       "receivedAt": "2026-09-30T14:17:53.705Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T14:00:00.000Z"
     },
     {
@@ -685,7 +685,7 @@
       "receivedAt": "2026-09-30T14:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -701,7 +701,7 @@
       "receivedAt": "2026-09-30T14:17:53.705Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -717,7 +717,7 @@
       "receivedAt": "2026-09-30T14:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -733,7 +733,7 @@
       "receivedAt": "2026-09-30T14:17:53.703Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T14:00:00.000Z"
     },
     {
@@ -749,7 +749,7 @@
       "receivedAt": "2026-09-30T13:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -765,7 +765,7 @@
       "receivedAt": "2026-09-30T13:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -781,7 +781,7 @@
       "receivedAt": "2026-09-30T13:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -797,7 +797,7 @@
       "receivedAt": "2026-09-30T12:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -813,7 +813,7 @@
       "receivedAt": "2026-09-30T12:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -829,7 +829,7 @@
       "receivedAt": "2026-09-30T11:17:53.705Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T18:00:00.000Z"
     },
     {
@@ -845,7 +845,7 @@
       "receivedAt": "2026-09-30T11:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -861,7 +861,7 @@
       "receivedAt": "2026-09-30T10:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T14:00:00.000Z"
     },
     {
@@ -877,7 +877,7 @@
       "receivedAt": "2026-09-30T10:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -893,7 +893,7 @@
       "receivedAt": "2026-09-30T10:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -909,7 +909,7 @@
       "receivedAt": "2026-09-30T09:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -925,7 +925,7 @@
       "receivedAt": "2026-09-30T09:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -941,7 +941,7 @@
       "receivedAt": "2026-09-30T09:17:53.702Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -957,7 +957,7 @@
       "receivedAt": "2026-09-30T08:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -973,7 +973,7 @@
       "receivedAt": "2026-09-30T07:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -989,7 +989,7 @@
       "receivedAt": "2026-09-30T07:17:53.702Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1005,7 +1005,7 @@
       "receivedAt": "2026-09-30T07:17:53.702Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -1021,7 +1021,7 @@
       "receivedAt": "2026-09-30T06:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -1037,7 +1037,7 @@
       "receivedAt": "2026-09-30T06:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1053,7 +1053,7 @@
       "receivedAt": "2026-09-30T05:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1069,7 +1069,7 @@
       "receivedAt": "2026-09-30T05:17:53.703Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T19:30:00.000Z"
     },
     {
@@ -1085,7 +1085,7 @@
       "receivedAt": "2026-09-30T04:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -1101,7 +1101,7 @@
       "receivedAt": "2026-09-30T04:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -1117,7 +1117,7 @@
       "receivedAt": "2026-09-30T04:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -1133,7 +1133,7 @@
       "receivedAt": "2026-09-30T04:17:53.704Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1149,7 +1149,7 @@
       "receivedAt": "2026-09-30T04:17:53.703Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T15:30:00.000Z"
     },
     {
@@ -1165,7 +1165,7 @@
       "receivedAt": "2026-09-30T04:17:53.702Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1181,7 +1181,7 @@
       "receivedAt": "2026-09-30T03:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -1197,7 +1197,7 @@
       "receivedAt": "2026-09-30T03:17:53.702Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -1213,7 +1213,7 @@
       "receivedAt": "2026-09-30T03:17:53.702Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T19:30:00.000Z"
     },
     {
@@ -1229,7 +1229,7 @@
       "receivedAt": "2026-09-30T02:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -1245,7 +1245,7 @@
       "receivedAt": "2026-09-30T02:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -1261,7 +1261,7 @@
       "receivedAt": "2026-09-30T01:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -1277,7 +1277,7 @@
       "receivedAt": "2026-09-30T01:17:53.702Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -1293,7 +1293,7 @@
       "receivedAt": "2026-09-30T00:17:53.704Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1309,7 +1309,7 @@
       "receivedAt": "2026-09-30T00:17:53.704Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1325,7 +1325,7 @@
       "receivedAt": "2026-09-30T00:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -1341,7 +1341,7 @@
       "receivedAt": "2026-09-30T00:17:53.702Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1357,7 +1357,7 @@
       "receivedAt": "2026-09-29T17:56:42.335Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1389,7 +1389,7 @@
       "receivedAt": "2026-09-29T15:18:22.731Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -1405,7 +1405,7 @@
       "receivedAt": "2026-09-29T12:48:14.484Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1453,7 +1453,7 @@
       "receivedAt": "2026-09-29T06:49:43.432Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -1469,7 +1469,7 @@
       "receivedAt": "2026-09-29T03:32:53.384Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1501,7 +1501,7 @@
       "receivedAt": "2026-09-29T03:14:49.322Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1517,7 +1517,7 @@
       "receivedAt": "2026-09-29T00:19:56.500Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T15:30:00.000Z"
     },
     {
@@ -1533,7 +1533,7 @@
       "receivedAt": "2026-09-28T22:28:54.171Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -1549,7 +1549,7 @@
       "receivedAt": "2026-09-28T22:10:22.740Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1565,7 +1565,7 @@
       "receivedAt": "2026-09-28T22:02:54.386Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1581,7 +1581,7 @@
       "receivedAt": "2026-09-28T21:00:50.681Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -1597,7 +1597,7 @@
       "receivedAt": "2026-09-28T19:17:23.185Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1613,7 +1613,7 @@
       "receivedAt": "2026-09-28T17:38:03.811Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1629,7 +1629,7 @@
       "receivedAt": "2026-09-28T15:37:22.618Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -1645,7 +1645,7 @@
       "receivedAt": "2026-09-28T15:26:43.069Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -1661,7 +1661,7 @@
       "receivedAt": "2026-09-28T13:15:10.031Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1677,7 +1677,7 @@
       "receivedAt": "2026-09-28T09:33:38.497Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -1725,7 +1725,7 @@
       "receivedAt": "2026-09-28T02:12:06.148Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1741,7 +1741,7 @@
       "receivedAt": "2026-09-28T01:43:53.559Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -1789,7 +1789,7 @@
       "receivedAt": "2026-09-27T09:16:00.349Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1805,7 +1805,7 @@
       "receivedAt": "2026-09-27T05:09:32.064Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1821,7 +1821,7 @@
       "receivedAt": "2026-09-26T19:44:16.062Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1837,7 +1837,7 @@
       "receivedAt": "2026-09-26T18:49:17.993Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T19:30:00.000Z"
     },
     {
@@ -1853,7 +1853,7 @@
       "receivedAt": "2026-09-26T15:52:43.388Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -1885,7 +1885,7 @@
       "receivedAt": "2026-09-26T11:10:45.728Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1901,7 +1901,7 @@
       "receivedAt": "2026-09-26T05:14:04.937Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1917,7 +1917,7 @@
       "receivedAt": "2026-09-26T04:28:16.020Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1933,7 +1933,7 @@
       "receivedAt": "2026-09-26T04:10:11.753Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -1949,7 +1949,7 @@
       "receivedAt": "2026-09-26T04:04:45.294Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1965,7 +1965,7 @@
       "receivedAt": "2026-09-25T23:24:07.784Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1981,7 +1981,7 @@
       "receivedAt": "2026-09-25T23:07:37.470Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -1997,7 +1997,7 @@
       "receivedAt": "2026-09-25T22:44:25.221Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2013,7 +2013,7 @@
       "receivedAt": "2026-09-25T22:19:46.300Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2045,7 +2045,7 @@
       "receivedAt": "2026-09-25T14:56:02.393Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -2077,7 +2077,7 @@
       "receivedAt": "2026-09-25T10:05:01.092Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -2093,7 +2093,7 @@
       "receivedAt": "2026-09-25T07:23:40.070Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T15:30:00.000Z"
     },
     {
@@ -2109,7 +2109,7 @@
       "receivedAt": "2026-09-25T06:37:59.944Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2125,7 +2125,7 @@
       "receivedAt": "2026-09-25T04:55:40.920Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2189,7 +2189,7 @@
       "receivedAt": "2026-09-24T16:00:30.137Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2205,7 +2205,7 @@
       "receivedAt": "2026-09-24T14:26:27.778Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2221,7 +2221,7 @@
       "receivedAt": "2026-09-24T13:43:26.348Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2253,7 +2253,7 @@
       "receivedAt": "2026-09-24T11:14:44.884Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -2285,7 +2285,7 @@
       "receivedAt": "2026-09-24T06:11:57.029Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2301,7 +2301,7 @@
       "receivedAt": "2026-09-24T05:00:19.589Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2317,7 +2317,7 @@
       "receivedAt": "2026-09-23T22:46:50.529Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2365,7 +2365,7 @@
       "receivedAt": "2026-09-23T20:30:45.480Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2397,7 +2397,7 @@
       "receivedAt": "2026-09-23T16:19:37.289Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2429,7 +2429,7 @@
       "receivedAt": "2026-09-23T12:48:05.895Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2461,7 +2461,7 @@
       "receivedAt": "2026-09-23T11:40:03.822Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-23T13:40:03.822Z"
     },
     {
@@ -2493,7 +2493,7 @@
       "receivedAt": "2026-09-23T07:46:40.310Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2525,7 +2525,7 @@
       "receivedAt": "2026-09-23T03:46:32.702Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2557,7 +2557,7 @@
       "receivedAt": "2026-09-23T00:00:11.274Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2573,7 +2573,7 @@
       "receivedAt": "2026-09-22T23:30:25.185Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2589,7 +2589,7 @@
       "receivedAt": "2026-09-22T22:49:06.402Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2621,7 +2621,7 @@
       "receivedAt": "2026-09-22T21:48:26.669Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2653,7 +2653,7 @@
       "receivedAt": "2026-09-22T19:23:13.210Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2701,7 +2701,7 @@
       "receivedAt": "2026-09-22T15:10:28.946Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T19:30:00.000Z"
     },
     {
@@ -2717,7 +2717,7 @@
       "receivedAt": "2026-09-22T14:43:57.274Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2749,7 +2749,7 @@
       "receivedAt": "2026-09-22T13:14:46.487Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2781,7 +2781,7 @@
       "receivedAt": "2026-09-22T11:47:27.665Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2797,7 +2797,7 @@
       "receivedAt": "2026-09-22T09:50:50.772Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -2813,7 +2813,7 @@
       "receivedAt": "2026-09-22T09:41:26.679Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2829,7 +2829,7 @@
       "receivedAt": "2026-09-22T07:28:26.257Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2845,7 +2845,7 @@
       "receivedAt": "2026-09-22T07:09:08.841Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2861,7 +2861,7 @@
       "receivedAt": "2026-09-22T03:10:43.942Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2877,7 +2877,7 @@
       "receivedAt": "2026-09-22T02:05:44.482Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -2893,7 +2893,7 @@
       "receivedAt": "2026-09-22T01:04:14.085Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2941,7 +2941,7 @@
       "receivedAt": "2026-09-21T21:46:21.003Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -2957,7 +2957,7 @@
       "receivedAt": "2026-09-21T20:05:11.379Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-21T22:05:11.379Z"
     },
     {
@@ -2973,7 +2973,7 @@
       "receivedAt": "2026-09-21T17:07:08.270Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3005,7 +3005,7 @@
       "receivedAt": "2026-09-21T15:39:19.128Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -3037,7 +3037,7 @@
       "receivedAt": "2026-09-21T14:40:20.506Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3101,7 +3101,7 @@
       "receivedAt": "2026-09-21T10:11:14.341Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3117,7 +3117,7 @@
       "receivedAt": "2026-09-21T10:02:30.543Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3181,7 +3181,7 @@
       "receivedAt": "2026-09-21T03:05:20.141Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -3213,7 +3213,7 @@
       "receivedAt": "2026-09-20T21:55:44.436Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -3229,7 +3229,7 @@
       "receivedAt": "2026-09-20T20:27:08.275Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3245,7 +3245,7 @@
       "receivedAt": "2026-09-20T19:40:29.767Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3277,7 +3277,7 @@
       "receivedAt": "2026-09-20T16:24:29.674Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3293,7 +3293,7 @@
       "receivedAt": "2026-09-20T15:19:55.869Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-20T17:19:55.869Z"
     },
     {
@@ -3309,7 +3309,7 @@
       "receivedAt": "2026-09-20T14:29:02.809Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3341,7 +3341,7 @@
       "receivedAt": "2026-09-20T11:55:17.053Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3373,7 +3373,7 @@
       "receivedAt": "2026-09-20T09:39:54.887Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T18:00:00.000Z"
     },
     {
@@ -3389,7 +3389,7 @@
       "receivedAt": "2026-09-20T09:02:44.853Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3405,7 +3405,7 @@
       "receivedAt": "2026-09-20T06:36:44.941Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3421,7 +3421,7 @@
       "receivedAt": "2026-09-20T06:30:17.063Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3485,7 +3485,7 @@
       "receivedAt": "2026-09-19T23:58:11.324Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3549,7 +3549,7 @@
       "receivedAt": "2026-09-19T20:48:42.841Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-19T22:48:42.841Z"
     },
     {
@@ -3581,7 +3581,7 @@
       "receivedAt": "2026-09-19T16:23:58.980Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3597,7 +3597,7 @@
       "receivedAt": "2026-09-19T14:04:18.541Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -3645,7 +3645,7 @@
       "receivedAt": "2026-09-19T11:17:13.408Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -3661,7 +3661,7 @@
       "receivedAt": "2026-09-19T09:08:14.875Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-19T11:08:14.875Z"
     },
     {
@@ -3677,7 +3677,7 @@
       "receivedAt": "2026-09-19T06:58:57.123Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3725,7 +3725,7 @@
       "receivedAt": "2026-09-19T02:20:43.748Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-19T04:20:43.748Z"
     },
     {
@@ -3741,7 +3741,7 @@
       "receivedAt": "2026-09-18T23:53:20.461Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3757,7 +3757,7 @@
       "receivedAt": "2026-09-18T21:59:34.984Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3773,7 +3773,7 @@
       "receivedAt": "2026-09-18T20:38:33.111Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-18T22:38:33.111Z"
     },
     {
@@ -3789,7 +3789,7 @@
       "receivedAt": "2026-09-18T17:06:54.932Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3805,7 +3805,7 @@
       "receivedAt": "2026-09-18T14:58:26.175Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3821,7 +3821,7 @@
       "receivedAt": "2026-09-18T13:13:34.203Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3837,7 +3837,7 @@
       "receivedAt": "2026-09-18T11:14:42.163Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-18T13:14:42.163Z"
     },
     {
@@ -3853,7 +3853,7 @@
       "receivedAt": "2026-09-18T07:28:52.110Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3869,7 +3869,7 @@
       "receivedAt": "2026-09-18T05:18:58.369Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -3917,7 +3917,7 @@
       "receivedAt": "2026-09-17T19:55:49.159Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3933,7 +3933,7 @@
       "receivedAt": "2026-09-17T19:50:52.221Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T19:30:00.000Z"
     },
     {
@@ -3949,7 +3949,7 @@
       "receivedAt": "2026-09-17T17:38:03.480Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3981,7 +3981,7 @@
       "receivedAt": "2026-09-17T16:17:17.085Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -3997,7 +3997,7 @@
       "receivedAt": "2026-09-17T16:12:04.142Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4013,7 +4013,7 @@
       "receivedAt": "2026-09-17T16:07:34.950Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4045,7 +4045,7 @@
       "receivedAt": "2026-09-17T15:19:43.035Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4061,7 +4061,7 @@
       "receivedAt": "2026-09-17T13:44:13.334Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4077,7 +4077,7 @@
       "receivedAt": "2026-09-17T12:23:31.886Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4093,7 +4093,7 @@
       "receivedAt": "2026-09-17T10:39:40.908Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4109,7 +4109,7 @@
       "receivedAt": "2026-09-17T10:13:40.690Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -4125,7 +4125,7 @@
       "receivedAt": "2026-09-17T09:43:24.013Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4173,7 +4173,7 @@
       "receivedAt": "2026-09-17T05:34:11.098Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4189,7 +4189,7 @@
       "receivedAt": "2026-09-17T03:10:21.983Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4221,7 +4221,7 @@
       "receivedAt": "2026-09-17T01:07:09.818Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4253,7 +4253,7 @@
       "receivedAt": "2026-09-16T22:03:50.911Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4285,7 +4285,7 @@
       "receivedAt": "2026-09-16T21:09:04.076Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4301,7 +4301,7 @@
       "receivedAt": "2026-09-16T20:34:33.778Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4317,7 +4317,7 @@
       "receivedAt": "2026-09-16T18:58:27.769Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -4333,7 +4333,7 @@
       "receivedAt": "2026-09-16T15:23:29.147Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -4413,7 +4413,7 @@
       "receivedAt": "2026-09-16T08:17:26.544Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4429,7 +4429,7 @@
       "receivedAt": "2026-09-16T07:08:41.712Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4493,7 +4493,7 @@
       "receivedAt": "2026-09-16T02:09:41.754Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4525,7 +4525,7 @@
       "receivedAt": "2026-09-15T23:36:44.449Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4541,7 +4541,7 @@
       "receivedAt": "2026-09-15T21:40:06.259Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4557,7 +4557,7 @@
       "receivedAt": "2026-09-15T21:15:09.343Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4573,7 +4573,7 @@
       "receivedAt": "2026-09-15T19:06:28.392Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4605,7 +4605,7 @@
       "receivedAt": "2026-09-15T16:21:22.714Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -4637,7 +4637,7 @@
       "receivedAt": "2026-09-15T13:22:14.893Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4653,7 +4653,7 @@
       "receivedAt": "2026-09-15T12:45:15.868Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-15T14:45:15.868Z"
     },
     {
@@ -4685,7 +4685,7 @@
       "receivedAt": "2026-09-15T10:00:46.010Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4701,7 +4701,7 @@
       "receivedAt": "2026-09-15T09:28:16.982Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4717,7 +4717,7 @@
       "receivedAt": "2026-09-15T06:37:44.226Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4733,7 +4733,7 @@
       "receivedAt": "2026-09-15T01:19:24.144Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4749,7 +4749,7 @@
       "receivedAt": "2026-09-15T00:47:31.371Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -4765,7 +4765,7 @@
       "receivedAt": "2026-09-15T00:31:44.130Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4797,7 +4797,7 @@
       "receivedAt": "2026-09-14T21:19:22.470Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -4813,7 +4813,7 @@
       "receivedAt": "2026-09-14T21:00:32.079Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4845,7 +4845,7 @@
       "receivedAt": "2026-09-14T17:59:16.582Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T18:00:00.000Z"
     },
     {
@@ -4861,7 +4861,7 @@
       "receivedAt": "2026-09-14T17:45:11.121Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4877,7 +4877,7 @@
       "receivedAt": "2026-09-14T17:23:48.487Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4893,7 +4893,7 @@
       "receivedAt": "2026-09-14T17:16:18.211Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4925,7 +4925,7 @@
       "receivedAt": "2026-09-14T13:40:09.541Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -4957,7 +4957,7 @@
       "receivedAt": "2026-09-14T13:13:21.766Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -4973,7 +4973,7 @@
       "receivedAt": "2026-09-14T13:09:41.925Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -4989,7 +4989,7 @@
       "receivedAt": "2026-09-14T11:07:35.430Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5005,7 +5005,7 @@
       "receivedAt": "2026-09-14T10:52:39.115Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -5021,7 +5021,7 @@
       "receivedAt": "2026-09-14T09:10:29.331Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -5037,7 +5037,7 @@
       "receivedAt": "2026-09-14T07:35:20.037Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -5053,7 +5053,7 @@
       "receivedAt": "2026-09-14T05:16:52.890Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -5069,7 +5069,7 @@
       "receivedAt": "2026-09-14T02:18:59.618Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -5085,7 +5085,7 @@
       "receivedAt": "2026-09-14T01:51:13.295Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -5101,7 +5101,7 @@
       "receivedAt": "2026-09-14T01:02:35.383Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -5117,7 +5117,7 @@
       "receivedAt": "2026-09-14T00:17:10.041Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5149,7 +5149,7 @@
       "receivedAt": "2026-09-13T22:26:38.400Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -5165,7 +5165,7 @@
       "receivedAt": "2026-09-13T22:03:58.656Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5213,7 +5213,7 @@
       "receivedAt": "2026-09-13T20:15:59.792Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5245,7 +5245,7 @@
       "receivedAt": "2026-09-13T19:17:49.038Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -5261,7 +5261,7 @@
       "receivedAt": "2026-09-13T18:44:41.713Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -5277,7 +5277,7 @@
       "receivedAt": "2026-09-13T18:15:32.827Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T18:00:00.000Z"
     },
     {
@@ -5293,7 +5293,7 @@
       "receivedAt": "2026-09-13T17:43:37.179Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5309,7 +5309,7 @@
       "receivedAt": "2026-09-13T16:46:31.000Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T18:00:00.000Z"
     },
     {
@@ -5325,7 +5325,7 @@
       "receivedAt": "2026-09-13T16:36:52.570Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5341,7 +5341,7 @@
       "receivedAt": "2026-09-13T15:43:56.890Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5357,7 +5357,7 @@
       "receivedAt": "2026-09-13T14:39:42.835Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5389,7 +5389,7 @@
       "receivedAt": "2026-09-13T08:29:58.779Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5405,7 +5405,7 @@
       "receivedAt": "2026-09-13T07:57:09.368Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5421,7 +5421,7 @@
       "receivedAt": "2026-09-13T06:17:42.892Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -5437,7 +5437,7 @@
       "receivedAt": "2026-09-13T05:36:49.136Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T18:00:00.000Z"
     },
     {
@@ -5469,7 +5469,7 @@
       "receivedAt": "2026-09-13T02:54:39.397Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5485,7 +5485,7 @@
       "receivedAt": "2026-09-13T01:03:07.402Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -5517,7 +5517,7 @@
       "receivedAt": "2026-09-12T23:51:13.898Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5565,7 +5565,7 @@
       "receivedAt": "2026-09-12T16:34:59.828Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5597,7 +5597,7 @@
       "receivedAt": "2026-09-12T15:10:45.981Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5613,7 +5613,7 @@
       "receivedAt": "2026-09-12T15:01:00.734Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -5661,7 +5661,7 @@
       "receivedAt": "2026-09-12T12:48:53.520Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -5693,7 +5693,7 @@
       "receivedAt": "2026-09-12T10:05:02.666Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5709,7 +5709,7 @@
       "receivedAt": "2026-09-12T07:27:45.615Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -5725,7 +5725,7 @@
       "receivedAt": "2026-09-12T06:47:47.849Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5741,7 +5741,7 @@
       "receivedAt": "2026-09-12T05:36:34.882Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5757,7 +5757,7 @@
       "receivedAt": "2026-09-12T01:57:42.304Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5773,7 +5773,7 @@
       "receivedAt": "2026-09-12T01:02:31.459Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5789,7 +5789,7 @@
       "receivedAt": "2026-09-12T00:05:39.626Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5837,7 +5837,7 @@
       "receivedAt": "2026-09-11T20:34:16.143Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5869,7 +5869,7 @@
       "receivedAt": "2026-09-11T19:23:25.075Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5885,7 +5885,7 @@
       "receivedAt": "2026-09-11T19:03:06.582Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T15:30:00.000Z"
     },
     {
@@ -5901,7 +5901,7 @@
       "receivedAt": "2026-09-11T17:48:12.128Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -5917,7 +5917,7 @@
       "receivedAt": "2026-09-11T17:21:36.677Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5965,7 +5965,7 @@
       "receivedAt": "2026-09-11T13:09:29.513Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -5997,7 +5997,7 @@
       "receivedAt": "2026-09-11T11:59:20.406Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6013,7 +6013,7 @@
       "receivedAt": "2026-09-11T10:05:05.987Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6029,7 +6029,7 @@
       "receivedAt": "2026-09-11T10:03:42.671Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6045,7 +6045,7 @@
       "receivedAt": "2026-09-11T08:46:10.477Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6061,7 +6061,7 @@
       "receivedAt": "2026-09-11T06:28:34.461Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6077,7 +6077,7 @@
       "receivedAt": "2026-09-11T05:28:31.703Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6093,7 +6093,7 @@
       "receivedAt": "2026-09-11T05:17:42.874Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6125,7 +6125,7 @@
       "receivedAt": "2026-09-11T01:16:17.555Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-11T03:16:17.555Z"
     },
     {
@@ -6141,7 +6141,7 @@
       "receivedAt": "2026-09-10T20:01:59.042Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6173,7 +6173,7 @@
       "receivedAt": "2026-09-10T18:06:17.386Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -6221,7 +6221,7 @@
       "receivedAt": "2026-09-10T17:09:58.420Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6237,7 +6237,7 @@
       "receivedAt": "2026-09-10T17:00:35.224Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6301,7 +6301,7 @@
       "receivedAt": "2026-09-10T13:05:56.155Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6317,7 +6317,7 @@
       "receivedAt": "2026-09-10T11:58:04.464Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6333,7 +6333,7 @@
       "receivedAt": "2026-09-10T11:28:36.490Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6349,7 +6349,7 @@
       "receivedAt": "2026-09-10T11:21:04.037Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -6365,7 +6365,7 @@
       "receivedAt": "2026-09-10T11:12:40.011Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6381,7 +6381,7 @@
       "receivedAt": "2026-09-10T10:48:00.813Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T14:00:00.000Z"
     },
     {
@@ -6397,7 +6397,7 @@
       "receivedAt": "2026-09-10T09:27:55.669Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6461,7 +6461,7 @@
       "receivedAt": "2026-09-10T00:45:54.420Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6477,7 +6477,7 @@
       "receivedAt": "2026-09-09T23:45:49.334Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6557,7 +6557,7 @@
       "receivedAt": "2026-09-09T19:21:19.336Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6573,7 +6573,7 @@
       "receivedAt": "2026-09-09T18:26:18.379Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-09T20:26:18.379Z"
     },
     {
@@ -6589,7 +6589,7 @@
       "receivedAt": "2026-09-09T17:44:33.529Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-09T19:44:33.529Z"
     },
     {
@@ -6605,7 +6605,7 @@
       "receivedAt": "2026-09-09T17:43:01.203Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6621,7 +6621,7 @@
       "receivedAt": "2026-09-09T16:45:27.966Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6637,7 +6637,7 @@
       "receivedAt": "2026-09-09T16:11:53.893Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6653,7 +6653,7 @@
       "receivedAt": "2026-09-09T15:00:51.504Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6669,7 +6669,7 @@
       "receivedAt": "2026-09-09T13:33:50.147Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6685,7 +6685,7 @@
       "receivedAt": "2026-09-09T13:08:57.347Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -6717,7 +6717,7 @@
       "receivedAt": "2026-09-09T10:28:47.743Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T18:00:00.000Z"
     },
     {
@@ -6749,7 +6749,7 @@
       "receivedAt": "2026-09-09T08:59:18.684Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6765,7 +6765,7 @@
       "receivedAt": "2026-09-09T08:28:18.602Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6781,7 +6781,7 @@
       "receivedAt": "2026-09-09T07:28:20.469Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -6797,7 +6797,7 @@
       "receivedAt": "2026-09-09T06:31:27.236Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6813,7 +6813,7 @@
       "receivedAt": "2026-09-09T05:49:38.730Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6829,7 +6829,7 @@
       "receivedAt": "2026-09-08T23:56:16.234Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -6877,7 +6877,7 @@
       "receivedAt": "2026-09-08T23:04:44.938Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6893,7 +6893,7 @@
       "receivedAt": "2026-09-08T21:34:55.867Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6909,7 +6909,7 @@
       "receivedAt": "2026-09-08T20:35:46.679Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -6925,7 +6925,7 @@
       "receivedAt": "2026-09-08T20:33:20.587Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6941,7 +6941,7 @@
       "receivedAt": "2026-09-08T18:22:58.433Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -6957,7 +6957,7 @@
       "receivedAt": "2026-09-08T17:37:51.801Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -6989,7 +6989,7 @@
       "receivedAt": "2026-09-08T17:16:42.837Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T15:30:00.000Z"
     },
     {
@@ -7005,7 +7005,7 @@
       "receivedAt": "2026-09-08T14:15:01.344Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7021,7 +7021,7 @@
       "receivedAt": "2026-09-08T11:54:08.890Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7037,7 +7037,7 @@
       "receivedAt": "2026-09-08T11:36:16.226Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7069,7 +7069,7 @@
       "receivedAt": "2026-09-08T10:37:51.155Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7101,7 +7101,7 @@
       "receivedAt": "2026-09-08T10:23:35.732Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7117,7 +7117,7 @@
       "receivedAt": "2026-09-08T07:50:44.300Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7133,7 +7133,7 @@
       "receivedAt": "2026-09-08T07:10:27.984Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7181,7 +7181,7 @@
       "receivedAt": "2026-09-08T06:03:12.256Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-08T08:03:12.256Z"
     },
     {
@@ -7197,7 +7197,7 @@
       "receivedAt": "2026-09-08T05:26:45.656Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7213,7 +7213,7 @@
       "receivedAt": "2026-09-08T05:05:45.964Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -7261,7 +7261,7 @@
       "receivedAt": "2026-09-08T01:46:27.992Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7293,7 +7293,7 @@
       "receivedAt": "2026-09-07T23:13:59.937Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T15:30:00.000Z"
     },
     {
@@ -7309,7 +7309,7 @@
       "receivedAt": "2026-09-07T23:05:25.715Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -7325,7 +7325,7 @@
       "receivedAt": "2026-09-07T20:54:22.526Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -7341,7 +7341,7 @@
       "receivedAt": "2026-09-07T19:13:36.199Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -7357,7 +7357,7 @@
       "receivedAt": "2026-09-07T18:52:05.177Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7405,7 +7405,7 @@
       "receivedAt": "2026-09-07T14:57:03.787Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7421,7 +7421,7 @@
       "receivedAt": "2026-09-07T14:02:46.338Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7453,7 +7453,7 @@
       "receivedAt": "2026-09-07T11:58:54.005Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T18:00:00.000Z"
     },
     {
@@ -7469,7 +7469,7 @@
       "receivedAt": "2026-09-07T10:20:30.556Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -7485,7 +7485,7 @@
       "receivedAt": "2026-09-07T08:54:33.115Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7501,7 +7501,7 @@
       "receivedAt": "2026-09-07T08:27:35.405Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7533,7 +7533,7 @@
       "receivedAt": "2026-09-07T07:23:31.912Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -7549,7 +7549,7 @@
       "receivedAt": "2026-09-07T04:47:53.479Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T15:30:00.000Z"
     },
     {
@@ -7565,7 +7565,7 @@
       "receivedAt": "2026-09-07T04:42:04.228Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7581,7 +7581,7 @@
       "receivedAt": "2026-09-07T00:30:47.591Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7597,7 +7597,7 @@
       "receivedAt": "2026-09-07T00:24:29.810Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7613,7 +7613,7 @@
       "receivedAt": "2026-09-06T21:13:39.746Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7629,7 +7629,7 @@
       "receivedAt": "2026-09-06T19:16:57.465Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7645,7 +7645,7 @@
       "receivedAt": "2026-09-06T18:24:33.651Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-06T20:24:33.651Z"
     },
     {
@@ -7677,7 +7677,7 @@
       "receivedAt": "2026-09-06T14:51:49.311Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7725,7 +7725,7 @@
       "receivedAt": "2026-09-06T06:43:11.736Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -7741,7 +7741,7 @@
       "receivedAt": "2026-09-06T06:26:30.688Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7757,7 +7757,7 @@
       "receivedAt": "2026-09-06T06:05:23.498Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -7773,7 +7773,7 @@
       "receivedAt": "2026-09-06T04:29:34.029Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7837,7 +7837,7 @@
       "receivedAt": "2026-09-05T21:18:19.320Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7869,7 +7869,7 @@
       "receivedAt": "2026-09-05T16:58:15.745Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7885,7 +7885,7 @@
       "receivedAt": "2026-09-05T15:32:51.220Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7901,7 +7901,7 @@
       "receivedAt": "2026-09-05T13:16:13.476Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7949,7 +7949,7 @@
       "receivedAt": "2026-09-05T08:13:32.280Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7965,7 +7965,7 @@
       "receivedAt": "2026-09-05T07:06:24.890Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -7981,7 +7981,7 @@
       "receivedAt": "2026-09-05T06:56:34.162Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -7997,7 +7997,7 @@
       "receivedAt": "2026-09-05T06:19:52.798Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8029,7 +8029,7 @@
       "receivedAt": "2026-09-05T06:06:56.565Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-05T08:06:56.565Z"
     },
     {
@@ -8061,7 +8061,7 @@
       "receivedAt": "2026-09-04T19:46:44.741Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8093,7 +8093,7 @@
       "receivedAt": "2026-09-04T17:13:13.961Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8173,7 +8173,7 @@
       "receivedAt": "2026-09-04T14:58:22.805Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-04T16:58:22.805Z"
     },
     {
@@ -8189,7 +8189,7 @@
       "receivedAt": "2026-09-04T12:02:57.353Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8205,7 +8205,7 @@
       "receivedAt": "2026-09-04T10:44:02.754Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-04T12:44:02.754Z"
     },
     {
@@ -8221,7 +8221,7 @@
       "receivedAt": "2026-09-04T10:32:05.679Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8253,7 +8253,7 @@
       "receivedAt": "2026-09-04T10:04:04.218Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8269,7 +8269,7 @@
       "receivedAt": "2026-09-04T09:46:32.208Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8285,7 +8285,7 @@
       "receivedAt": "2026-09-04T08:47:52.446Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8317,7 +8317,7 @@
       "receivedAt": "2026-09-04T00:38:12.619Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8349,7 +8349,7 @@
       "receivedAt": "2026-09-03T22:38:26.281Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8365,7 +8365,7 @@
       "receivedAt": "2026-09-03T22:14:52.970Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8381,7 +8381,7 @@
       "receivedAt": "2026-09-03T20:50:01.727Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-03T22:50:01.727Z"
     },
     {
@@ -8397,7 +8397,7 @@
       "receivedAt": "2026-09-03T17:38:08.568Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8413,7 +8413,7 @@
       "receivedAt": "2026-09-03T17:29:43.028Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8429,7 +8429,7 @@
       "receivedAt": "2026-09-03T15:07:54.193Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8461,7 +8461,7 @@
       "receivedAt": "2026-09-03T13:39:13.867Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8477,7 +8477,7 @@
       "receivedAt": "2026-09-03T01:32:37.888Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8493,7 +8493,7 @@
       "receivedAt": "2026-09-03T00:52:39.785Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8509,7 +8509,7 @@
       "receivedAt": "2026-09-02T21:49:46.983Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8525,7 +8525,7 @@
       "receivedAt": "2026-09-02T21:13:45.257Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-02T23:13:45.257Z"
     },
     {
@@ -8541,7 +8541,7 @@
       "receivedAt": "2026-09-02T20:11:29.553Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8557,7 +8557,7 @@
       "receivedAt": "2026-09-02T14:59:25.117Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8573,7 +8573,7 @@
       "receivedAt": "2026-09-02T10:00:42.663Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8589,7 +8589,7 @@
       "receivedAt": "2026-09-02T09:07:06.967Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8621,7 +8621,7 @@
       "receivedAt": "2026-09-02T06:59:03.839Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8669,7 +8669,7 @@
       "receivedAt": "2026-09-01T23:34:04.856Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8733,7 +8733,7 @@
       "receivedAt": "2026-09-01T15:23:04.764Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8749,7 +8749,7 @@
       "receivedAt": "2026-09-01T14:08:36.466Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8765,7 +8765,7 @@
       "receivedAt": "2026-09-01T07:03:41.818Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8781,7 +8781,7 @@
       "receivedAt": "2026-08-31T20:02:59.316Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8813,7 +8813,7 @@
       "receivedAt": "2026-08-31T16:45:43.988Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8829,7 +8829,7 @@
       "receivedAt": "2026-08-31T13:28:53.655Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8845,7 +8845,7 @@
       "receivedAt": "2026-08-31T12:21:16.370Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8861,7 +8861,7 @@
       "receivedAt": "2026-08-31T12:19:38.450Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8877,7 +8877,7 @@
       "receivedAt": "2026-08-31T11:32:53.476Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8893,7 +8893,7 @@
       "receivedAt": "2026-08-31T10:17:24.256Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8925,7 +8925,7 @@
       "receivedAt": "2026-08-31T06:39:23.225Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -8941,7 +8941,7 @@
       "receivedAt": "2026-08-31T03:00:04.084Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -8973,7 +8973,7 @@
       "receivedAt": "2026-08-30T19:28:52.110Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9005,7 +9005,7 @@
       "receivedAt": "2026-08-30T16:12:26.644Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9037,7 +9037,7 @@
       "receivedAt": "2026-08-30T00:55:16.277Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9053,7 +9053,7 @@
       "receivedAt": "2026-08-29T10:54:21.350Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9069,7 +9069,7 @@
       "receivedAt": "2026-08-29T04:48:16.427Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9101,7 +9101,7 @@
       "receivedAt": "2026-08-29T02:42:46.185Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9117,7 +9117,7 @@
       "receivedAt": "2026-08-28T20:25:19.704Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9133,7 +9133,7 @@
       "receivedAt": "2026-08-28T19:58:29.677Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9165,7 +9165,7 @@
       "receivedAt": "2026-08-28T14:06:47.029Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9181,7 +9181,7 @@
       "receivedAt": "2026-08-28T11:58:56.250Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9197,7 +9197,7 @@
       "receivedAt": "2026-08-28T11:03:07.906Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9213,7 +9213,7 @@
       "receivedAt": "2026-08-28T08:03:59.989Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9245,7 +9245,7 @@
       "receivedAt": "2026-08-27T12:24:58.904Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9277,7 +9277,7 @@
       "receivedAt": "2026-08-26T12:25:19.437Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9293,7 +9293,7 @@
       "receivedAt": "2026-08-26T06:56:17.060Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9325,7 +9325,7 @@
       "receivedAt": "2026-08-25T07:23:52.183Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9469,7 +9469,7 @@
       "receivedAt": "2026-10-01T02:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T14:00:00.000Z"
     },
     {
@@ -9485,7 +9485,7 @@
       "receivedAt": "2026-09-30T23:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -9501,7 +9501,7 @@
       "receivedAt": "2026-09-30T22:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -9517,7 +9517,7 @@
       "receivedAt": "2026-09-30T21:17:53.704Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T15:30:00.000Z"
     },
     {
@@ -9533,7 +9533,7 @@
       "receivedAt": "2026-09-30T21:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -9549,7 +9549,7 @@
       "receivedAt": "2026-09-30T20:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -9565,7 +9565,7 @@
       "receivedAt": "2026-09-30T20:17:53.701Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T19:30:00.000Z"
     },
     {
@@ -9581,7 +9581,7 @@
       "receivedAt": "2026-09-30T19:17:53.705Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9597,7 +9597,7 @@
       "receivedAt": "2026-09-30T19:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -9613,7 +9613,7 @@
       "receivedAt": "2026-09-30T15:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T14:00:00.000Z"
     },
     {
@@ -9629,7 +9629,7 @@
       "receivedAt": "2026-09-30T09:17:53.702Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -9645,7 +9645,7 @@
       "receivedAt": "2026-09-30T07:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -9661,7 +9661,7 @@
       "receivedAt": "2026-09-30T07:17:53.702Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9677,7 +9677,7 @@
       "receivedAt": "2026-09-30T05:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9693,7 +9693,7 @@
       "receivedAt": "2026-09-30T04:17:53.705Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -9709,7 +9709,7 @@
       "receivedAt": "2026-09-30T04:17:53.703Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": false,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-04T15:30:00.000Z"
     },
     {
@@ -9725,7 +9725,7 @@
       "receivedAt": "2026-09-30T04:17:53.702Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9741,7 +9741,7 @@
       "receivedAt": "2026-09-30T03:17:53.702Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -9757,7 +9757,7 @@
       "receivedAt": "2026-09-30T02:17:53.703Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -9773,7 +9773,7 @@
       "receivedAt": "2026-09-30T00:17:53.704Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9789,7 +9789,7 @@
       "receivedAt": "2026-09-30T00:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -9805,7 +9805,7 @@
       "receivedAt": "2026-09-29T17:56:42.335Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9837,7 +9837,7 @@
       "receivedAt": "2026-09-29T06:49:43.432Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -9853,7 +9853,7 @@
       "receivedAt": "2026-09-28T22:28:54.171Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -9869,7 +9869,7 @@
       "receivedAt": "2026-09-28T22:10:22.740Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9885,7 +9885,7 @@
       "receivedAt": "2026-09-26T19:44:16.062Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9901,7 +9901,7 @@
       "receivedAt": "2026-09-26T15:52:43.388Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -9917,7 +9917,7 @@
       "receivedAt": "2026-09-26T05:14:04.937Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9933,7 +9933,7 @@
       "receivedAt": "2026-09-26T04:28:16.020Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -9965,7 +9965,7 @@
       "receivedAt": "2026-09-25T04:55:40.920Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -9981,7 +9981,7 @@
       "receivedAt": "2026-09-23T22:46:50.529Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10013,7 +10013,7 @@
       "receivedAt": "2026-09-23T20:30:45.480Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10029,7 +10029,7 @@
       "receivedAt": "2026-09-23T16:19:37.289Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10045,7 +10045,7 @@
       "receivedAt": "2026-09-23T12:48:05.895Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10093,7 +10093,7 @@
       "receivedAt": "2026-09-22T11:47:27.665Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10109,7 +10109,7 @@
       "receivedAt": "2026-09-22T07:09:08.841Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -10157,7 +10157,7 @@
       "receivedAt": "2026-09-20T15:19:55.869Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-20T17:19:55.869Z"
     },
     {
@@ -10237,7 +10237,7 @@
       "receivedAt": "2026-09-19T14:04:18.541Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -10253,7 +10253,7 @@
       "receivedAt": "2026-09-19T11:17:13.408Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -10269,7 +10269,7 @@
       "receivedAt": "2026-09-18T17:06:54.932Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10285,7 +10285,7 @@
       "receivedAt": "2026-09-18T13:13:34.203Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10301,7 +10301,7 @@
       "receivedAt": "2026-09-17T19:55:49.159Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10317,7 +10317,7 @@
       "receivedAt": "2026-09-17T12:23:31.886Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10365,7 +10365,7 @@
       "receivedAt": "2026-09-16T21:09:04.076Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10381,7 +10381,7 @@
       "receivedAt": "2026-09-16T18:58:27.769Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -10397,7 +10397,7 @@
       "receivedAt": "2026-09-16T15:23:29.147Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -10445,7 +10445,7 @@
       "receivedAt": "2026-09-16T02:09:41.754Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10461,7 +10461,7 @@
       "receivedAt": "2026-09-14T17:23:48.487Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10477,7 +10477,7 @@
       "receivedAt": "2026-09-14T13:09:41.925Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -10493,7 +10493,7 @@
       "receivedAt": "2026-09-14T01:02:35.383Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10509,7 +10509,7 @@
       "receivedAt": "2026-09-14T00:17:10.041Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10525,7 +10525,7 @@
       "receivedAt": "2026-09-13T22:26:38.400Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -10541,7 +10541,7 @@
       "receivedAt": "2026-09-13T19:17:49.038Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10557,7 +10557,7 @@
       "receivedAt": "2026-09-13T18:44:41.713Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -10573,7 +10573,7 @@
       "receivedAt": "2026-09-13T16:46:31.000Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T18:00:00.000Z"
     },
     {
@@ -10589,7 +10589,7 @@
       "receivedAt": "2026-09-13T08:29:58.779Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10605,7 +10605,7 @@
       "receivedAt": "2026-09-13T07:57:09.368Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10621,7 +10621,7 @@
       "receivedAt": "2026-09-13T06:17:42.892Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -10653,7 +10653,7 @@
       "receivedAt": "2026-09-12T12:48:53.520Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -10669,7 +10669,7 @@
       "receivedAt": "2026-09-11T17:21:36.677Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10685,7 +10685,7 @@
       "receivedAt": "2026-09-11T05:17:42.874Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10733,7 +10733,7 @@
       "receivedAt": "2026-09-10T17:09:58.420Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10813,7 +10813,7 @@
       "receivedAt": "2026-09-09T18:26:18.379Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-09T20:26:18.379Z"
     },
     {
@@ -10829,7 +10829,7 @@
       "receivedAt": "2026-09-09T17:43:01.203Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10845,7 +10845,7 @@
       "receivedAt": "2026-09-09T13:33:50.147Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10861,7 +10861,7 @@
       "receivedAt": "2026-09-09T13:08:57.347Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T18:00:00.000Z"
     },
     {
@@ -10877,7 +10877,7 @@
       "receivedAt": "2026-09-09T08:28:18.602Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -10893,7 +10893,7 @@
       "receivedAt": "2026-09-09T06:31:27.236Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10909,7 +10909,7 @@
       "receivedAt": "2026-09-09T05:49:38.730Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10925,7 +10925,7 @@
       "receivedAt": "2026-09-08T20:35:46.679Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-03T14:00:00.000Z"
     },
     {
@@ -10957,7 +10957,7 @@
       "receivedAt": "2026-09-08T07:10:27.984Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -10989,7 +10989,7 @@
       "receivedAt": "2026-09-08T05:26:45.656Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11005,7 +11005,7 @@
       "receivedAt": "2026-09-07T14:57:03.787Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11021,7 +11021,7 @@
       "receivedAt": "2026-09-07T14:02:46.338Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11037,7 +11037,7 @@
       "receivedAt": "2026-09-07T08:27:35.405Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11053,7 +11053,7 @@
       "receivedAt": "2026-09-07T04:42:04.228Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11069,7 +11069,7 @@
       "receivedAt": "2026-09-05T21:18:19.320Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11117,7 +11117,7 @@
       "receivedAt": "2026-09-04T17:13:13.961Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11149,7 +11149,7 @@
       "receivedAt": "2026-09-04T08:47:52.446Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11165,7 +11165,7 @@
       "receivedAt": "2026-09-03T01:32:37.888Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11181,7 +11181,7 @@
       "receivedAt": "2026-09-02T21:49:46.983Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11197,7 +11197,7 @@
       "receivedAt": "2026-09-02T21:13:45.257Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-09-02T23:13:45.257Z"
     },
     {
@@ -11213,7 +11213,7 @@
       "receivedAt": "2026-09-02T10:00:42.663Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11245,7 +11245,7 @@
       "receivedAt": "2026-08-31T20:02:59.316Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11261,7 +11261,7 @@
       "receivedAt": "2026-08-31T13:28:53.655Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11293,7 +11293,7 @@
       "receivedAt": "2026-08-29T02:42:46.185Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11309,7 +11309,7 @@
       "receivedAt": "2026-08-28T11:58:56.250Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11357,7 +11357,7 @@
       "receivedAt": "2026-08-25T07:23:52.183Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11373,7 +11373,7 @@
       "receivedAt": "2026-10-01T02:17:53.703Z",
       "signal": "SHORTLISTED",
       "isRead": false,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11389,7 +11389,7 @@
       "receivedAt": "2026-09-30T11:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -11405,7 +11405,7 @@
       "receivedAt": "2026-09-30T01:17:53.704Z",
       "signal": "CALL_REQUEST",
       "isRead": false,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": "2026-10-02T19:30:00.000Z"
     },
     {
@@ -11421,7 +11421,7 @@
       "receivedAt": "2026-09-28T01:43:53.559Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-02T15:30:00.000Z"
     },
     {
@@ -11437,7 +11437,7 @@
       "receivedAt": "2026-09-25T10:05:01.092Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11469,7 +11469,7 @@
       "receivedAt": "2026-09-23T07:46:40.310Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11485,7 +11485,7 @@
       "receivedAt": "2026-09-21T14:40:20.506Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11501,7 +11501,7 @@
       "receivedAt": "2026-09-18T21:59:34.984Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11549,7 +11549,7 @@
       "receivedAt": "2026-09-15T16:21:22.714Z",
       "signal": "REJECTED",
       "isRead": true,
-      "impliedStatus": "REJECTED",
+      "impliedStatus": "MOVE_ON",
       "scheduledFor": null
     },
     {
@@ -11581,7 +11581,7 @@
       "receivedAt": "2026-09-11T08:46:10.477Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11597,7 +11597,7 @@
       "receivedAt": "2026-09-08T18:22:58.433Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11613,7 +11613,7 @@
       "receivedAt": "2026-09-08T17:16:42.837Z",
       "signal": "INTERVIEW_SCHEDULED",
       "isRead": true,
-      "impliedStatus": "INTERVIEW",
+      "impliedStatus": "INTERVIEW_SCHEDULED",
       "scheduledFor": "2026-10-05T15:30:00.000Z"
     },
     {
@@ -11629,7 +11629,7 @@
       "receivedAt": "2026-09-08T10:37:51.155Z",
       "signal": "ASSESSMENT",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11645,7 +11645,7 @@
       "receivedAt": "2026-09-08T10:23:35.732Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11661,7 +11661,7 @@
       "receivedAt": "2026-09-04T10:32:05.679Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11677,7 +11677,7 @@
       "receivedAt": "2026-09-03T17:29:43.028Z",
       "signal": "SHORTLISTED",
       "isRead": true,
-      "impliedStatus": "SCREENING",
+      "impliedStatus": "SHORTLISTED",
       "scheduledFor": null
     },
     {
@@ -11693,7 +11693,7 @@
       "receivedAt": "2026-09-03T15:07:54.193Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {
@@ -11741,7 +11741,7 @@
       "receivedAt": "2026-08-28T11:03:07.906Z",
       "signal": "CALL_REQUEST",
       "isRead": true,
-      "impliedStatus": "RESPONSE",
+      "impliedStatus": "SCREENING_CALL",
       "scheduledFor": null
     },
     {

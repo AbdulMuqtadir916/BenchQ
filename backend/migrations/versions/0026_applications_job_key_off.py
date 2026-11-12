@@ -1,7 +1,7 @@
 """Applications let go of the old `jobs` pool (docs/02 §6.y; the add-job plan, decided 2026-11-11). Schema only.
 
 Revision ID: 0026
-Revises: 0024
+Revises: 0025
 Create Date: 2026-11-11 12:00:00.000000
 
 - `applications.job_id` stops referencing `jobs.id` (`applications_job_id_fkey` goes): it is about to name one of the
@@ -10,14 +10,13 @@ Create Date: 2026-11-11 12:00:00.000000
 
 Nothing is copied or changed in a row. A database with applications on old jobs moves them before 0027, whose new key
 refuses them otherwise: locally, `python -m backend.scripts.move_local_jobs_to_postings` (it copies each candidate's old
-jobs into `job_postings` and points the applications at them). Follows 0024 (firm capacity's) for
-now: 0025 is another PR's, merging first, and once it's on main this revises 0025.
+jobs into `job_postings` and points the applications at them). Follows 0025 (PR 4's email outcome).
 """
 from alembic import op
 
 
 revision = '0026'
-down_revision = '0024'
+down_revision = '0025'
 branch_labels = None
 depends_on = None
 

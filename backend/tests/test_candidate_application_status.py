@@ -235,6 +235,9 @@ def test_the_resume_sent_is_kept_with_the_application(api_client, test_db, accou
     assert response.status_code == 200, response.text
     test_db.expire_all()
     assert test_db.get(Application, application.id).resume_id == version.id
+    # The application data names it, so the "Résumé sent" panel can show the version the client received.
+    assert response.json()["resume_id"] == str(version.id)
+    assert api_client.get(f"/api/applications/{application.id}", headers=headers).json()["resume_id"] == str(version.id)
 
 
 @pytest.mark.parametrize("which", ["another candidate's", "deleted", "unknown", "malformed"])
