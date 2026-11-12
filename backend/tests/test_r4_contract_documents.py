@@ -1,13 +1,12 @@
 """R4-T1 · /api/cover-letters and /api/persona contract (the /api/resumes part went with its routes, PR 6).
 
-These three carry the largest free-form JSON blobs in the app (`json_data`,
-persona nodes), so wrong-typed and oversized payloads matter most here.
+The request-size limit for JSON is covered in test_body_limit.py.
 """
 import pytest
 
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
-    make_job, make_resume, make_persona, set_setting, big_string, EMOJI, MISSING_UUID,
+    make_job, make_resume, make_persona, set_setting, EMOJI, MISSING_UUID,
 )
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
@@ -21,12 +20,6 @@ PERSONA_NODES = ["contact", "work_auth", "demographics", "compensation",
 
 
 # ══ Cover letters ════════════════════════════════════════════════════════════
-
-
-def test_create_cover_letter_ten_megabyte_body(client):
-    r = client.post("/api/cover-letters",
-                    json={"name": "Big", "json_data": {"body": big_string(10)}})
-    assert_clean(r, 201, 400, 413, 422)
 
 
 def test_get_cover_letter_missing_id_is_404(client):
@@ -101,12 +94,6 @@ def test_patch_persona_non_object_body_is_422(client, test_db, body):
     assert_clean(client.patch("/api/persona", json=body), 422)
 
 
-def test_patch_persona_ten_megabyte_node(client, test_db):
-    make_persona(test_db)
-    r = client.patch("/api/persona", json={"resume_content": {"summary": big_string(10)}})
-    assert_clean(r, 200, 400, 413, 422)
-
-
 def test_patch_persona_unicode_round_trips(client, test_db):
     make_persona(test_db)
     r = assert_clean(client.patch("/api/persona", json={"contact": {"name": EMOJI}}), 200)
@@ -143,13 +130,6 @@ def test_qa_bank_wrongly_typed_fields_never_leak_internals(client, test_db, bad)
     assert_no_leak(client.post("/api/persona/qa-bank", json={"question": bad, "answer": "a"}))
 
 
-def test_qa_bank_ten_megabyte_answer(client, test_db):
-    make_persona(test_db)
-    r = client.post("/api/persona/qa-bank",
-                    json={"question": "q", "answer": big_string(10)})
-    assert_clean(r, 200, 400, 413, 422)
-
-
 # ── R4 fix-loop regressions (R4-T1-20) ───────────────────────────────────────
 
 
@@ -172,5 +152,3 @@ def test_qa_bank_still_appends_a_well_typed_pair(client, test_db):
 def test_cover_letters_malformed_job_id_filter_is_422_not_404(client):
     """R4-T1-09: the list used to answer "Not found" for a bad filter value."""
     assert_clean(client.get("/api/cover-letters?job_id=not-a-uuid"), 422)
-
-

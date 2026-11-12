@@ -133,11 +133,6 @@ MALFORMED_IDS = ["abc", "not-a-uuid", "1", "%20", "../etc/passwd", "éè", "0" *
 EMOJI = "\U0001f680 Señor PM — 中文 \U0001f9e0"
 
 
-def big_string(mb=10):
-    """A string of roughly `mb` megabytes."""
-    return "x" * (mb * 1024 * 1024)
-
-
 def make_job(db, **kw):
     from backend.models.db import Job
     from backend.scraper._shared.dedup import make_external_id

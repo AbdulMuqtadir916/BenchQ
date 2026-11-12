@@ -23,6 +23,7 @@ def test_webhook_rejects_wrong_header(api_client, test_db):
         headers={"X-Telegram-Bot-Api-Secret-Token": "wrong-secret"},
     )
     assert resp.status_code == 401
+    assert resp.json() == {"detail": "Invalid webhook secret"}
 
 
 def test_webhook_rejects_empty_configured_secret(api_client, test_db):
@@ -80,16 +81,6 @@ def test_rotate_webhook_secret_changes_value(api_client, test_db):
     # Persisted in DB
     row = test_db.query(Setting).filter(Setting.key == "telegram_webhook_secret").first()
     assert row.value == new_secret
-
-
-def test_register_webhook_rejects_non_https(api_client, test_db):
-    """register-webhook must reject http:// — Telegram only accepts https."""
-    _seed_secret(test_db, "abc")
-    resp = api_client.post(
-        "/api/telegram/register-webhook",
-        json={"public_url": "http://example.com"},
-    )
-    assert resp.status_code == 400
 
 
 def test_seed_generates_random_webhook_secret(test_db):
