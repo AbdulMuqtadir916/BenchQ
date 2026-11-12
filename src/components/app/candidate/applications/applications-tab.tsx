@@ -1,36 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { z } from "zod";
 import { Columns3, List, Send } from "lucide-react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
+import { ReviewQueue } from "./review-queue";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
 import { applicationsInScope, countApplications, describeApplicationCounts } from "@/lib/derive/application-counts";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { ApplicationList } from "./application-list";
+import { IrrelevantEmails, irrelevantEmails } from "./irrelevant-emails";
 
 type View = "board" | "list";
-type Scope = "active" | "all";
+/** The tab is in the URL (`applications_tab`), so Back from an email opened in BDE review returns to the queue. */
+const ScopeParam = z.enum(["active", "review", "irrelevant"]).catch("active");
+type Scope = z.infer<typeof ScopeParam>;
 
 /** Every submission for this candidate: a board to move stages, a list to scan fast. */
 export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; onMove: (id: string, to: ApplicationStatus) => void }) {
   const [view, setView] = useState<View>("board");
-  const [scope, setScope] = useState<Scope>("active");
+  const params = useSearchParams();
+  const scope = ScopeParam.parse(params.get("applications_tab") ?? "active");
+  // Switching tabs changes the page height; keep the switch row where it was on screen instead of letting the
+  // browser clamp the scroll position (which made the page jump up when a shorter tab opened).
+  const switchRef = useRef<HTMLDivElement>(null);
+  const switchTopBefore = useRef<number | null>(null);
+  const chooseScope = (next: Scope) => {
+    switchTopBefore.current = switchRef.current?.getBoundingClientRect().top ?? null;
+    // Same pattern as the Inbox filter: this entry's URL changes, the candidate page's other keys stay.
+    const url = new URL(window.location.href);
+    if (next === "active") url.searchParams.delete("applications_tab");
+    else url.searchParams.set("applications_tab", next);
+    window.history.replaceState(null, "", url.pathname + url.search);
+  };
+  const spacerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const before = switchTopBefore.current;
+    switchTopBefore.current = null;
+    const row = switchRef.current;
+    const spacer = spacerRef.current;
+    if (before === null || !row || !spacer) return;
+    spacer.style.height = "0px";
+    const scroller = scrollParent(row);
+    const shift = row.getBoundingClientRect().top - before;
+    if (Math.abs(shift) >= 1) scroller.scrollBy({ top: shift, behavior: "instant" });
+    // A shorter tab may leave too little page below to scroll back: add only the missing height, until the next switch.
+    const missing = row.getBoundingClientRect().top - before;
+    if (missing >= 1) {
+      spacer.style.height = `${Math.ceil(missing)}px`;
+      scroller.scrollBy({ top: missing, behavior: "instant" });
+    }
+  }, [scope]);
   const all = ws.applications;
-  // One Active rule for the count, the board and the list (PR #128): Saved and Placed are not active; All shows them.
-  const visible = applicationsInScope(all, scope);
+  // One rule for the count line, the board and the list (BUG-005, PR #128): a saved job is never active; every row shown is
+  // named in the line. Move On has its own column and counts as closed; the legacy closed values are left out.
+  const visible = applicationsInScope(all, "active");
   const [activePart = "", ...otherParts] = describeApplicationCounts(countApplications(all)).split(" · ");
+  const irrelevantCount = irrelevantEmails(ws.messages).length;
 
   if (ws.applicationsQuery.error) return <ErrorState error={ws.applicationsQuery.error} onRetry={() => void ws.applicationsQuery.refetch()} />;
   if (ws.applicationsQuery.isLoading) return <SkeletonList rows={6} />;
-  if (all.length === 0) {
-    return <EmptyState icon={Send} title="No applications yet" description="Find matching jobs and submit — every application shows up here with its status." action={actions.findJobs ? <button type="button" onClick={actions.findJobs} className="text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:underline">Find jobs</button> : undefined} />;
-  }
 
   const toggle = "inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 text-sm";
   return (
@@ -40,20 +76,20 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
           <span className="text-body-strong text-[var(--color-text)]">{activePart}</span> · {otherParts.join(" · ")} · {ws.suggestions.length > 0 ? `${ws.suggestions.length} recruiter ${ws.suggestions.length === 1 ? "email suggests" : "emails suggest"} a status update` : ws.inbox?.connection ? "pipeline matches the inbox" : "inbox not connected"}
         </p>
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">
-            {(["active", "all"] as const).map((s) => (
-              <button key={s} type="button" aria-pressed={scope === s} onClick={() => setScope(s)} className={cn(toggle, scope === s ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
-                {s === "active" ? "Active" : "All"}
+          <div ref={switchRef} className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">
+            {(["active", "review", "irrelevant"] as const).map((s) => (
+              <button key={s} type="button" aria-pressed={scope === s} onClick={() => chooseScope(s)} className={cn(toggle, scope === s ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
+                {s === "active" ? "Active" : s === "review" ? `BDE review ${ws.reviewTotal}` : `Irrelevant ${irrelevantCount}`}
               </button>
             ))}
           </div>
-          <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="View">
+          {scope === "active" ? <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="View">
             {([["board", "Board", Columns3], ["list", "List", List]] as const).map(([id, label, Icon]) => (
               <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} className={cn(toggle, view === id ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
                 <Icon size={14} aria-hidden />{label}
               </button>
             ))}
-          </div>
+          </div> : null}
         </div>
       </div>
 
@@ -71,11 +107,28 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
         </div>
       ) : null}
 
-      {view === "board" ? (
-        <ApplicationBoard apps={visible} onMove={onMove} canAct={canAct} signals={ws.signals} onOpen={actions.openApplication} showClosed={scope === "all"} />
+      {scope === "review" ? (
+        <ReviewQueue ws={ws} actions={actions} />
+      ) : scope === "irrelevant" ? (
+        <IrrelevantEmails ws={ws} actions={actions} />
+      ) : all.length === 0 ? (
+        // No applications yet: the tabs stay, so an email waiting in BDE review or Irrelevant is still reachable.
+        <EmptyState icon={Send} title="No applications yet" description="Find matching jobs and submit — every application shows up here with its status." action={actions.findJobs ? <button type="button" onClick={actions.findJobs} className="text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:underline">Find jobs</button> : undefined} />
+      ) : view === "board" ? (
+        <ApplicationBoard showReviewColumn={false} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} onOpen={actions.openApplication} />
       ) : (
-        <ApplicationList apps={visible} signals={ws.signals} onOpen={actions.openApplication} />
+        <ApplicationList apps={visible} onOpen={actions.openApplication} />
       )}
+      <div ref={spacerRef} aria-hidden className="-mt-4" />
     </div>
   );
+}
+
+/** The nearest element that scrolls vertically (the app shell's content area), else the page itself. */
+function scrollParent(el: HTMLElement): HTMLElement | Window {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node;
+  }
+  return window;
 }

@@ -80,7 +80,7 @@ Each has a test in `test_activity_logs.py`:
 
 ## Migration number
 
-0028 (renumbered 2026-11-12, after main's 0024, #127's 0025 and #129's 0026–0027; it was 0016, following Zuhair's 0015, #112).
+0028 (renumbered 2026-11-12, after main's 0024 and 0025 (#127) and #129's 0026–0027 (not merged yet); it was 0016, following Zuhair's 0015, #112).
 If another PR takes 0028 first (Zuhair's ATS score module may), this becomes the next free number: rename the file,
 `revision` / `down_revision`, the number in the tests and the row in the team README. 0015 dropped the ledger's `claim_state` and `evidence_ids`, so `activity_logs`
 doesn't have them either.
