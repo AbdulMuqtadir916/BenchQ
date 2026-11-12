@@ -24,8 +24,9 @@ type AddJobCardProps = {
   onUseTab?: (job: KnownJob) => void;
 };
 
-/** When the page is read again while it shows no job yet: pages that build themselves after they load. */
-const LOOK_AGAIN_MS = [1500, 4000];
+/** When the page is read again while it shows no job yet: pages that build themselves after they load, or after an
+ * app moves to another job in place, which can take a while to fetch it. Stops once the job is found. */
+const LOOK_AGAIN_MS = [1000, 2500, 5000, 9000, 15000];
 
 /** A link without its fragment or a trailing slash, so one job's page matches however it was opened. */
 const sameUrl = (url: string) => url.split("#")[0]!.replace(/\/+$/, "").toLowerCase();

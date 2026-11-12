@@ -64,7 +64,7 @@ export function fakeChrome() {
     webNavigation: {
       getAllFrames: vi.fn(async (): Promise<{ frameId: number; url: string }[] | null> => []),
       onCreatedNavigationTarget: new FakeEvent(), onCommitted: new FakeEvent(), onCompleted: new FakeEvent(),
-      onHistoryStateUpdated: new FakeEvent(),
+      onHistoryStateUpdated: new FakeEvent(), onReferenceFragmentUpdated: new FakeEvent(),
     },
   };
 }

@@ -34,7 +34,8 @@ export function useTabConnection(userId: string | null) {
     const onUpdated = (_tabId: number, change: { url?: string }) => {
       if (change.url) void refresh();
     };
-    // A page on such a site moves on without a `url` in onUpdated: its own navigation tells.
+    // A page on such a site moves on without a `url` in onUpdated: its own navigation tells. So does a page that changes
+    // its address in place (a single-page app's next job, a #route), which commits no new page: its history tells.
     const onCommitted = (details: { tabId: number; frameId: number }) => {
       if (details.frameId === 0 && details.tabId === shownTab) void refresh();
     };
@@ -43,11 +44,15 @@ export function useTabConnection(userId: string | null) {
     chrome.tabs.onActivated.addListener(onActivated);
     chrome.tabs.onUpdated.addListener(onUpdated);
     chrome.webNavigation.onCommitted.addListener(onCommitted);
+    chrome.webNavigation.onHistoryStateUpdated.addListener(onCommitted);
+    chrome.webNavigation.onReferenceFragmentUpdated.addListener(onCommitted);
     return () => {
       mounted = false;
       chrome.tabs.onActivated.removeListener(onActivated);
       chrome.tabs.onUpdated.removeListener(onUpdated);
       chrome.webNavigation.onCommitted.removeListener(onCommitted);
+      chrome.webNavigation.onHistoryStateUpdated.removeListener(onCommitted);
+      chrome.webNavigation.onReferenceFragmentUpdated.removeListener(onCommitted);
     };
   }, []);
 

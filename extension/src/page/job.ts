@@ -137,6 +137,15 @@ const idsInText = (doc: Document) => [...(doc.body?.textContent ?? "").slice(0, 
 const linksOf = (doc: Document) => [doc.querySelector<HTMLLinkElement>("link[rel='canonical']")?.href,
   doc.querySelector("meta[property='og:url']")?.getAttribute("content")].filter((link): link is string => Boolean(link));
 
+/** The job codes a link names: its job keys' values and the codes in its path (a long number, a UUID, R123456). */
+function codesOf(url: string): Set<string> {
+  const link = linkOf(url);
+  if (!link) return new Set();
+  const keyed = [...link.searchParams].filter(([key, value]) => JOB_KEY.test(key) && value.trim()).map(([, value]) => value);
+  const coded = link.pathname.match(/(?<![a-z0-9])(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d{5,}|(?:jr|req|r)[-_]?\d{4,})(?![a-z0-9])/gi) ?? [];
+  return new Set([...keyed, ...coded].map((code) => code.toLowerCase()));
+}
+
 /** The page's JobPostings, each once (a page may give its data twice). */
 function postingsOn(doc: Document): JsonRecord[] {
   const found: JsonRecord[] = [];
@@ -212,7 +221,13 @@ function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"
  * no job's page, whatever one of its jobs says, and neither is any other page: their text isn't read. `url` is the
  * page's own link. */
 export function readJob(doc: Document, url = doc.URL): PageJob {
-  const postings = postingsOn(doc);
+  // An app that shows another job in place can keep the last page's JobPosting data: a posting whose link names other
+  // job codes than this page's is that other page's (a refresh would read this one), so it's set aside.
+  const here = codesOf(url);
+  const postings = postingsOn(doc).filter((posting) => {
+    const theirs = codesOf(text(posting.url));
+    return here.size === 0 || theirs.size === 0 || [...theirs].some((code) => here.has(code));
+  });
   const found = postings.length === 1 ? fromPosting(postings[0]!) : null;
   const isList = postings.length > 1 || isJobListLink(url);
   const isJobPage = !isList && (Boolean(found?.title) || (isJobLink(url) && hasApply(doc)));

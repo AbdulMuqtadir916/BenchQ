@@ -37,7 +37,9 @@ def test_a_posting_reads_the_one_way_whatever_wrote_it():
                                      "salary_min": 120000, "salary_max": "lots"})
     assert (legacy.title, legacy.url, legacy.posted_at) == ("Java Developer", None, "2026-10-01T00:00:00+00:00")
     assert (legacy.salary_min, legacy.salary_max) == (120000, None)          # a moved job's pay, when it's a number
-    assert read_content("manual", {"title": "QA", "salary_min": 1}).salary_min is None
+    # An added job's pay, as the add route validated it (2026-11-12): read when it's a number, never when it isn't.
+    assert read_content("manual", {"title": "QA", "salary_min": 1}).salary_min == 1
+    assert read_content("extension", {"title": "QA", "salary_min": "lots", "salary_period": "fortnight"}).salary_min is None
     assert posting_job(None).title == "" and read_content("manual", None).title == ""
     assert job_hash("Acme", "QA  Lead", "Text") == job_hash(" acme", "qa lead", "text ")
     assert job_hash("Acme", "QA Lead", "Text") != job_hash("Acme", "QA Lead", "Other text")

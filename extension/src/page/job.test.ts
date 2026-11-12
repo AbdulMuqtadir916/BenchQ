@@ -31,6 +31,14 @@ describe("telling a job's page", () => {
     expect(readJob(pageOf(one), "https://acme.com/careers").isJobPage).toBe(false);
   });
 
+  it("sets aside JobPosting data an app kept from the job it showed before, and reads this one's", () => {
+    const stale = `<script type="application/ld+json">{"@type":"JobPosting","title":"Old Role","url":"https://jobs.acme.com/jobs/111111","hiringOrganization":"Acme","description":"<p>Old.</p>"}</script>`;
+    const body = "<main><h1>QA Engineer</h1><p>Test the payments API end to end, every day.</p><button>Apply now</button></main>";
+    const doc = new DOMParser().parseFromString(`<html><head>${stale}</head><body>${body}</body></html>`, "text/html");
+    expect(readJob(doc, "https://jobs.acme.com/jobs/222222")).toMatchObject({ isJobPage: true, title: "QA Engineer" });
+    expect(readJob(doc, "https://jobs.acme.com/jobs/111111")).toMatchObject({ isJobPage: true, title: "Old Role" });
+  });
+
   it("is a job's page when it publishes JobPosting data", () => {
     const doc = pageOf(`<script type="application/ld+json">{"@type":"JobPosting","title":"QA Engineer","hiringOrganization":{"name":"Acme"},"description":"<p>Test.</p>"}</script>`);
     expect(readJob(doc, "https://acme.com/anything")).toMatchObject({ isJobPage: true, title: "QA Engineer", company: "Acme" });
