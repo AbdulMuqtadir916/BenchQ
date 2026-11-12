@@ -193,7 +193,7 @@ def test_a_lost_search_keeps_its_error_code_and_gets_its_ledger_entry(anonymous_
                                                                       test_db):
     """P3: before and after it is written, the history says `error` / `internal`; one ledger entry, credited to the
     BDE who started it."""
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     lost = _open(world, adnans)
     _lose(test_db, lost)
 
@@ -205,8 +205,8 @@ def test_a_lost_search_keeps_its_error_code_and_gets_its_ledger_entry(anonymous_
     assert _post(anonymous_client, world, adnans).status_code == 202          # writes it
     assert shown() == ("error", "internal")
     test_db.expire_all()
-    (entry,) = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "job_search",
-                                                 LedgerEntry.entity_id == str(lost)).all()
+    (entry,) = test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "job_search",
+                                                 ActivityEntry.entity_id == str(lost)).all()
     assert entry.actor_user_id == world["people"]["adnan"].id and "failed (internal)" in entry.summary
     assert entry.candidate_id == uuid.UUID(adnans["id"])
 
@@ -319,13 +319,13 @@ def test_a_search_refreshing_a_job_keeps_its_whole_posting(world, adnans, fake, 
 
 def test_a_hand_off_note_is_not_shown_to_a_platform_admin():
     """CodeAnt on #135 (Abdul's file, at his request): the firm's note on an ASSIGN entry stays in the firm."""
-    import types
     from backend.auth.serialize import ledger_entry_json
-    entry = types.SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), candidate_id=uuid.uuid4(), actor_user_id=None,
-                                  actor_type="USER", actor_name="Manager", entity_type="candidate", entity_id="c1",
-                                  entity_label="A candidate", action="ASSIGN", summary="Assigned to a BDE.",
-                                  note="Over to you: they prefer remote roles.", model_id=None, prompt_version=None,
-                                  created_at=None)
+    from backend.models.tenancy import ActivityEntry
+    entry = ActivityEntry(id=uuid.uuid4(), firm_id=uuid.uuid4(), candidate_id=uuid.uuid4(), actor_user_id=None,
+                          actor_type="USER", actor_name="Manager", entity_type="candidate", entity_id="c1",
+                          entity_label="A candidate", action="ASSIGN", summary="Assigned to a BDE.",
+                          note="Over to you: they prefer remote roles.", model_id=None, prompt_version=None,
+                          created_at=None)
     assert ledger_entry_json(entry, hide_email=True)["note"] is None
     assert ledger_entry_json(entry, hide_email=True)["summary"] == "Assigned to a BDE."
     assert ledger_entry_json(entry)["note"] == "Over to you: they prefer remote roles."
