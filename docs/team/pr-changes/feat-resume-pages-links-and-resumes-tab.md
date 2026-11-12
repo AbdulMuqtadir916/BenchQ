@@ -21,7 +21,7 @@ Frontend only. No backend change, migration, new dependency, schema or contract 
    **not saved per résumé**: that needs a stored field (a contract and backend change, open).
 4. **Candidate Résumés tab redesign** (plain words, no internal terms). Header row with Upload résumé (moved off the tab bar); one closed card per résumé titled by its role, main résumé first with a
    "Main résumé" badge; "Updated … by … · N versions"; View, Download PDF, "Make main résumé", a ⋯ menu (Edit, Make
-   main, Delete); older versions and job copies behind links; plain-English dialogs;
+   main, Delete); all versions and job copies behind links; plain-English dialogs;
    empty state. The firm-wide Resume Builder page is unchanged. The résumé editor (Builder/Viewer) UI is unchanged.
 5. **Candidate header.** Find jobs / Build resume stay top-right, level with the name, from `md` (768px) up, and stack
    right-aligned below it.
@@ -31,7 +31,7 @@ Frontend only. No backend change, migration, new dependency, schema or contract 
 | Action | File | Purpose |
 | --- | --- | --- |
 | Modified | `src/app/globals.css` | Paper tokens (`--paper-margin`, fit floors), sheet/print CSS, link style, fit-scaled sizes |
-| Added | `src/lib/resume-doc/paginate.ts` (+ test) | Pack measured blocks onto pages, bullet-level splits |
+| Added | `src/lib/resume-doc/paginate.ts` (+ test) | Pack measured blocks onto pages, bullet-level splits; the Two Column side column is packed on its own |
 | Added | `src/lib/resume-doc/paper-links.ts` (+ test) | mailto/tel (E.164)/https links and short labels |
 | Added | `src/lib/resume-doc/fit.ts` (+ test) | Fit-to-one-page steps and floors |
 | Modified | `src/components/app/resume-studio/paper/resume-paper.tsx` | One sheet per page; measuring copy; fit step |
@@ -70,7 +70,6 @@ Frontend only. No backend change, migration, new dependency, schema or contract 
 - Fit to one page is not saved per résumé (needs a stored field — product/backend decision).
 - "Make a copy for a job" and "Create new résumé" are hidden (review): nothing creates a job copy yet, and the
   new-résumé screen can't save. `ResumesTab` keeps an `onMakeJobCopy` prop for when copies can be made.
-- The Two Column template's side column (contact, skills) sits on page 1 only and isn't paginated.
 - No "Upload new version" (an upload always adds a new résumé). No delete on job copies (the backend refuses it).
 - axe isn't installed in the repo, so no automated accessibility run.
 - Opening one résumé version took ~20s on the local backend (pre-existing; affects the editor too).

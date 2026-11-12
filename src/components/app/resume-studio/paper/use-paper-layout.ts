@@ -20,6 +20,8 @@ interface Options {
   /** Anything that changes what the paper holds or how it's set (the document, the template). */
   inputs: readonly unknown[];
   measureRef: RefObject<HTMLDivElement | null>;
+  /** The Two Column template's side column, measured and packed on its own beside the main column. */
+  asideRef?: RefObject<HTMLDivElement | null>;
   pagesRef: RefObject<HTMLDivElement | null>;
   onLayout?: (result: { printedPages: number; overflowLines: number | null }) => void;
 }
@@ -33,7 +35,7 @@ const samePages = (a: PageItem[][] | null, b: PageItem[][]) => JSON.stringify(a)
  * steps the type and spacing down (one render per step, before paint) until the résumé fits one page or the minimums
  * are reached. Inputs changing, or web fonts finishing loading, start the search again from the template's sizes.
  */
-export function usePaperLayout({ isEnabled, fitOnePage, inputs, measureRef, pagesRef, onLayout }: Options): Layout {
+export function usePaperLayout({ isEnabled, fitOnePage, inputs, measureRef, asideRef, pagesRef, onLayout }: Options): Layout {
   const [layout, setLayout] = useState<Layout>({ pages: null, step: 0, overflowLines: null });
   const [fontsVersion, setFontsVersion] = useState(0);
   const lastInputs = useRef<readonly unknown[]>([]);
@@ -55,10 +57,12 @@ export function usePaperLayout({ isEnabled, fitOnePage, inputs, measureRef, page
 
   useLayoutEffect(() => {
     const flow = measureRef.current;
+    const aside = asideRef?.current ?? null;
     if (!isEnabled || !flow) return;
     const measure = () => {
       const measured = measurePaper(flow);
       if (!measured) return;
+      const side = aside ? measurePaper(aside) : null;
       const was = layout;
       const key = [...inputs, fitOnePage, fontsVersion];
       const isNew = !sameInputs(lastInputs.current, key);
@@ -66,7 +70,9 @@ export function usePaperLayout({ isEnabled, fitOnePage, inputs, measureRef, page
 
       // A pixel of slack: sub-pixel positions round differently on the real sheet than in the measuring copy.
       const pageHeight = measured.pageHeight - SLACK_PX;
-      const tooTall = measured.contentHeight > pageHeight;
+      const sideHeight = side ? side.pageHeight - SLACK_PX : 0;
+      const overflow = Math.max(measured.contentHeight - pageHeight, side ? side.contentHeight - sideHeight : 0);
+      const tooTall = overflow > 0;
       let step = was.step;
       if (!fitOnePage || (isNew && step !== 0)) step = 0;
       else if (tooTall && step < MAX_FIT_STEP) step += 1;
@@ -75,8 +81,11 @@ export function usePaperLayout({ isEnabled, fitOnePage, inputs, measureRef, page
         return;
       }
 
-      const overflowLines = fitOnePage && tooTall ? linesToTrim(measured.contentHeight - pageHeight, measured.lineHeight) : null;
-      const pages = packPages(measured.blocks, pageHeight);
+      const overflowLines = fitOnePage && tooTall ? linesToTrim(overflow, measured.lineHeight) : null;
+      // The main column's pages and the side column's, sheet by sheet (their block ids never overlap).
+      const main = packPages(measured.blocks, pageHeight);
+      const sidePages = side ? packPages(side.blocks, sideHeight) : [];
+      const pages = Array.from({ length: Math.max(main.length, sidePages.length) }, (_, i) => [...(main[i] ?? []), ...(sidePages[i] ?? [])]);
       if (samePages(was.pages, pages) && was.overflowLines === overflowLines) return;
       if (!samePages(was.pages, pages)) {
         const mark = markFocus(pagesRef.current);
@@ -87,6 +96,7 @@ export function usePaperLayout({ isEnabled, fitOnePage, inputs, measureRef, page
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(flow);
+    if (aside) observer.observe(aside);
     return () => observer.disconnect();
   });
 

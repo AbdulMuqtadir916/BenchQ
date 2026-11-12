@@ -49,7 +49,7 @@ describe("a résumé card", () => {
 
   it("shows older versions and job copies only as links, closed", () => {
     const html = render(other!, bde);
-    expect(text(html)).toMatch(/See older versions \(\d\)/);
+    expect(text(html)).toMatch(/See all versions \(\d\)/);
     expect(text(html)).toContain("Copies made for specific jobs (1)");
     expect(text(html)).not.toContain("Version 1");
   });

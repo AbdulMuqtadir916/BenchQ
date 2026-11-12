@@ -75,7 +75,7 @@ export function ResumeCard({ card, labels, candidateName, actions, onMakeJobCopy
 
       {older.length || node.tailored.length ? (
         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
-          {older.length ? <Reveal label={`See older versions (${older.length})`} isOpen={openPart === "versions"} onToggle={() => toggle("versions")} controls={versionsId} /> : null}
+          {older.length ? <Reveal label={`See all versions (${node.versions.length})`} isOpen={openPart === "versions"} onToggle={() => toggle("versions")} controls={versionsId} /> : null}
           {node.tailored.length ? <Reveal label={copyCount(node.tailored)} isOpen={openPart === "copies"} onToggle={() => toggle("copies")} controls={copiesId} /> : null}
         </div>
       ) : null}

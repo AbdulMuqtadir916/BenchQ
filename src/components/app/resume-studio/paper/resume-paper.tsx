@@ -47,23 +47,25 @@ function Sections({ skip = [], ...blocks }: BlockProps & { skip?: readonly Order
 }
 
 /** One US Letter sheet holding the blocks in `only` (all of them when it's left out). */
-function Sheet({ template, isFirst, flowRef, label, style, ...blocks }: BlockProps & { template: ResumeTemplate; isFirst: boolean; flowRef?: Ref<HTMLDivElement>; label: string; style?: CSSProperties }) {
+function Sheet({ template, flowRef, asideRef, label, style, ...blocks }: BlockProps & { template: ResumeTemplate; flowRef?: Ref<HTMLDivElement>; asideRef?: Ref<HTMLDivElement>; label: string; style?: CSSProperties }) {
   const hasHeader = !blocks.only || blocks.only.has("header");
+  const hasContact = !blocks.only || blocks.only.has("contact");
   return (
     <article className={cn("rt", template.className)} aria-label={label} style={style}>
       {template.layout === "sidebar" ? (
         <div className="rt-cols">
           <aside>
-            {isFirst ? (
-              <>
-                <section className="rt-section">
+            {/* The side column paginates on its own: contact, then skill rows (the heading with the first row). */}
+            <div ref={asideRef} className="rt-flow">
+              {hasContact ? (
+                <section className="rt-section" data-rt-block="contact">
                   <h2 className="rt-h">Contact</h2>
                   <PaperContacts doc={blocks.doc} editable={blocks.editable} />
                 </section>
-                {/* Skills, second in the order, sits beside the summary; the rest follow the order in the main column. */}
-                <PaperSkills doc={blocks.doc} editable={blocks.editable} />
-              </>
-            ) : null}
+              ) : null}
+              {/* Skills, second in the order, sits beside the summary; the rest follow the order in the main column. */}
+              <PaperSkills {...blocks} />
+            </div>
           </aside>
           <div className="rt-main">
             <div ref={flowRef} className="rt-flow">
@@ -97,6 +99,7 @@ export function ResumePaper({ doc, editable = false, reportPages = false, pagina
   const template = templateById(templateId ?? doc.templateId);
   const isClient = useSyncExternalStore(noSubscribe, () => true, () => false);
   const measureRef = useRef<HTMLDivElement>(null);
+  const asideMeasureRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
   const setPageCount = useStudio((s) => s.setPageCount);
   const setFitOverflowLines = useStudio((s) => s.setFitOverflowLines);
@@ -112,6 +115,7 @@ export function ResumePaper({ doc, editable = false, reportPages = false, pagina
     fitOnePage,
     inputs: [doc, template.id, editable],
     measureRef,
+    asideRef: asideMeasureRef,
     pagesRef,
     onLayout: reportPages ? onLayout : undefined,
   });
@@ -126,13 +130,13 @@ export function ResumePaper({ doc, editable = false, reportPages = false, pagina
   return (
     <div ref={pagesRef} className={cn("rt-pages flex flex-col gap-6", className)} role="group" aria-label={name}>
       {layout.map((items, i) => (
-        <Sheet key={i} {...blocks} only={items ? itemsById(items) : undefined} isFirst={i === 0} label={`Page ${i + 1} of ${layout.length}`} />
+        <Sheet key={i} {...blocks} only={items ? itemsById(items) : undefined} label={`Page ${i + 1} of ${layout.length}`} />
       ))}
       {paginate && isClient
         ? createPortal(
             <div className="rt-measure" aria-hidden="true" inert>
               <PaperMeasureContext.Provider value>
-                <Sheet {...blocks} isFirst flowRef={measureRef} label="" />
+                <Sheet {...blocks} flowRef={measureRef} asideRef={asideMeasureRef} label="" />
               </PaperMeasureContext.Provider>
             </div>,
             document.body,
