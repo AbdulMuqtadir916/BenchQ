@@ -75,7 +75,6 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": F,
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": F,
     "PATCH /api/firms/{firm_id}/members/{user_id}/manager": F,   # OWNER only: member.changeManager (07 Q40)
-    "PATCH /api/firms/{firm_id}/settings": F,                    # OWNER only: firmSettings.edit (07 Q46)
     "POST /api/firms/{firm_id}/candidates/parse-resume": F,      # OWNER, MANAGER: candidate.create (07 Q41, Q49)
     "GET /api/firms/{firm_id}/candidates": F,                    # in the principal's scope (07 Q47)
     "POST /api/firms/{firm_id}/candidates": F,                   # OWNER, MANAGER: candidate.create + can_assign_to

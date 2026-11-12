@@ -38,7 +38,6 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["member.deactivate", "Y - - - - -"],
   ["member.changeManager", "Y - - - - -"],   // 07 Q40
   ["candidate.assign", "Y Y - - - -"],
-  ["firmSettings.edit", "Y - - - - -"],      // 07 Q46
   ["notification.approve", "Y Y - - - -"],  // 07 Q54; only the routed approver acts
   ["team.view", "Y Y - - - Y"],
   // platform (07 §2.3)
