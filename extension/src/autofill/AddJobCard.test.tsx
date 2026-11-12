@@ -190,6 +190,7 @@ describe("a site BenchQ may not read yet (#126)", () => {
     expect(looksLikeJobPage("https://acme.test/opportunities?gh_jid=8329677")).toBe(true);
     expect(looksLikeJobPage("https://mail.example.test/inbox/42")).toBe(false);
     expect(looksLikeJobPage("https://news.example.test/jobsearch-tips")).toBe(false);
+    for (const url of ["https://careers.acme.test/", "https://acme.test/careers", "https://acme.test/en/jobs/"]) expect(looksLikeJobPage(url), url).toBe(false);
   });
 });
 

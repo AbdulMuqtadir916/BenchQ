@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { addJob, BENCHQ_URL, type Application } from "../api";
+import { isJobLink } from "../page/job";
 import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CHECK, SPINNER_ICON } from "./icons";
 import { sameCompany, sameListing } from "./job-check";
@@ -116,16 +117,10 @@ export const isSavedJob = (found: PageJob, known: KnownJob) =>
 export const offersPage = (url: string | undefined, knownUrls: readonly string[]) =>
   Boolean(url && /^https?:\/\//i.test(url) && !url.startsWith(BENCHQ_URL) && !knownUrls.some((known) => isSameJob(url, known)));
 
-/** Words a job page's link has in its host or path: careers.acme.com, /jobs/123, /positions/…, /apply. */
-const JOB_WORDS = /(?:^|[^a-z])(?:jobs?|careers?|positions?|openings?|vacanc(?:y|ies)|requisitions?|apply|hiring|recruit(?:ing|ment)?|opportunit(?:y|ies))(?:[^a-z]|$)/i;
-
-/** Whether a link looks like a job's page: a job word in its host or path, or a query key that names a job. On a site
- * BenchQ can't read yet it can't tell from the page, so it asks for the site only on such a link, not on every site. */
-export function looksLikeJobPage(url: string): boolean {
-  const key = jobKeyOf(url);
-  if (!key) return false;
-  return key.ids.size > 0 || JOB_WORDS.test(new URL(url).hostname) || JOB_WORDS.test(key.path);
-}
+/** Whether a link is one job's page (`isJobLink`: the job named in its query or reached past a job word, never a careers
+ * home or a list of jobs). On a site BenchQ can't read yet it can't tell from the page, so it asks for the site only on
+ * such a link, not on every site. */
+export const looksLikeJobPage = (url: string) => isJobLink(url);
 
 /**
  * Add the job on this page to the candidate's jobs (the add-job plan, decided 2026-11-11). Shown only on a job's page

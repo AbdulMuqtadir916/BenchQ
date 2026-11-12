@@ -9,9 +9,61 @@ import { collapse, textOf } from "./labels";
 const MAX_DESCRIPTION = 100_000;
 const MAX_LINE = 300;
 
-/** A link that names one job: …/jobs/123, ?gh_jid=…, a jobs. or careers. site, or an application system's site. */
-const JOB_LINK = /\/(jobs?|careers?|positions?|openings?|vacanc(y|ies)|requisitions?|job-?details?|job-listing)\/|[?&](gh_jid|jk|jobid|job_id|currentjobid|reqid|req_id|job)=|\/\/(jobs|careers|apply)\.|(breezy\.hr|recruitee\.com|applytojob\.com|taleo\.net|myworkdayjobs\.com|icims\.com)\//i;
-export const isJobLink = (url: string) => JOB_LINK.test(url);
+/** A link's job, named in its query: Greenhouse's gh_jid, Indeed's jk and vjk, LinkedIn's currentJobId, Taleo's job… */
+const JOB_KEY = /^(?:gh_jid|jk|vjk|jl|jobid|job_id|currentjobid|reqid|req_id|requisitionid|job)$/i;
+/** Hosts whose links are job pages past their home: careers.acme.com, jobs.lever.co, application systems. */
+const JOB_HOST = /^(?:jobs|careers|apply)\.|(?:^|\.)(?:breezy\.hr|recruitee\.com|applytojob\.com|taleo\.net|myworkdayjobs\.com|icims\.com)$/i;
+/** A path's job word: /careers/…, /jobs/…, /job-details/…. */
+const JOB_PART = /^(?:jobs?|careers?|positions?|openings?|vacanc(?:y|ies)|requisitions?|opportunit(?:y|ies)|postings?|job-?(?:details?|listings?|openings?|opportunit(?:y|ies)|postings?))$/i;
+/** A part that makes a link a list of jobs: a search, its results, a team's or a place's jobs. */
+const LIST_PART = /(?:^|[-_.]|job)(?:search|results?)(?:[-_.]|$)|^(?:all|list|index|home|page|teams?|departments?|locations?|categor(?:y|ies)|benefits|culture|students?|university|faq|about|saved|alerts?)$/i;
+/** A language first ("en", "en-US") and an action last ("/job", "/apply"), which don't say which job. */
+const LANGUAGE = /^[a-z]{2}(?:[-_][a-z]{2,4})?$/i;
+const ACTION = /^(?:job|apply|applications?|details?|description|view|overview)$/i;
+
+function linkOf(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+function partsOf(link: URL): string[] {
+  const parts = link.pathname.split("/").filter(Boolean);
+  while (parts.length > 0 && LANGUAGE.test(parts[0]!)) parts.shift();
+  while (parts.length > 1 && ACTION.test(parts.at(-1)!)) parts.pop();
+  return parts;
+}
+
+const namesJobInQuery = (link: URL) => [...link.searchParams].some(([key, value]) => JOB_KEY.test(key) && value.trim() !== "");
+
+/** A path that ends at a job word (/careers, /en/jobs/) or at a list (/jobs/search, /careers/teams, /jobs/page/2). */
+function endsAtList(parts: string[]): boolean {
+  const last = parts.at(-1);
+  return !last || JOB_PART.test(last) || LIST_PART.test(last) || (/^\d{1,3}$/.test(last) && parts.at(-2)?.toLowerCase() === "page");
+}
+
+/** Whether a link is one job's page: the job named in its query, a path that goes past a job word to the job itself
+ * (/careers/qa-engineer, /jobs/123), or a job host's link past its home (jobs.lever.co/acme/5f1c). Never a careers
+ * home or a list of jobs. */
+export function isJobLink(url: string): boolean {
+  const link = linkOf(url);
+  if (!link) return false;
+  if (namesJobInQuery(link)) return true;
+  const parts = partsOf(link);
+  if (endsAtList(parts)) return false;
+  return parts.some((part) => JOB_PART.test(part)) || (JOB_HOST.test(link.hostname) && parts.length >= 2);
+}
+
+/** Whether a link is a careers home or a list of jobs: a job host's home (careers.acme.com/en), or a path that ends at a
+ * job word or a list. Not one that names a job in its query: LinkedIn's and Indeed's lists show the job they name. */
+export function isJobListLink(url: string): boolean {
+  const link = linkOf(url);
+  if (!link || namesJobInQuery(link)) return false;
+  const parts = partsOf(link);
+  return parts.length === 0 ? JOB_HOST.test(link.hostname) : endsAtList(parts);
+}
 
 /** An Apply button or link, as a job's page has. */
 const hasApply = (doc: Document) => Array.from(doc.querySelectorAll("a, button, [role='button'], input[type='submit']"))
@@ -22,19 +74,21 @@ const hasApply = (doc: Document) => Array.from(doc.querySelectorAll("a, button, 
 
 type JsonRecord = Record<string, unknown>;
 
-function jobPostingIn(node: unknown): JsonRecord | null {
+/** Every JobPosting in a piece of JSON-LD: one record, a list, a graph, or a list of jobs (ItemList) holding them. */
+function jobPostingsIn(node: unknown, out: JsonRecord[] = []): JsonRecord[] {
   if (Array.isArray(node)) {
-    for (const item of node) {
-      const found = jobPostingIn(item);
-      if (found) return found;
-    }
-    return null;
+    for (const item of node) jobPostingsIn(item, out);
+    return out;
   }
-  if (typeof node !== "object" || node === null) return null;
+  if (typeof node !== "object" || node === null) return out;
   const record = node as JsonRecord;
-  if (record["@graph"]) return jobPostingIn(record["@graph"]);
+  if (record["@graph"]) return jobPostingsIn(record["@graph"], out);
   const types = Array.isArray(record["@type"]) ? record["@type"] : [record["@type"]];
-  return types.includes("JobPosting") ? record : null;
+  if (types.includes("JobPosting")) out.push(record);
+  if (Array.isArray(record.itemListElement)) {
+    for (const item of record.itemListElement) jobPostingsIn((item as JsonRecord | null)?.item ?? item, out);
+  }
+  return out;
 }
 
 const text = (value: unknown) => (typeof value === "string" ? collapse(value) : "");
@@ -70,25 +124,35 @@ const idsInText = (doc: Document) => [...(doc.body?.textContent ?? "").slice(0, 
 const linksOf = (doc: Document) => [doc.querySelector<HTMLLinkElement>("link[rel='canonical']")?.href,
   doc.querySelector("meta[property='og:url']")?.getAttribute("content")].filter((link): link is string => Boolean(link));
 
-function fromStructuredData(doc: Document): Omit<PageJob, "url" | "isJobPage"> | null {
+/** The page's JobPostings, each once (a page may give its data twice). */
+function postingsOn(doc: Document): JsonRecord[] {
+  const found: JsonRecord[] = [];
   for (const script of Array.from(doc.querySelectorAll("script[type='application/ld+json']"))) {
     try {
-      const posting = jobPostingIn(JSON.parse(script.textContent ?? ""));
-      if (!posting) continue;
-      const organisation = posting.hiringOrganization;
-      return {
-        title: text(posting.title),
-        company: typeof organisation === "string" ? collapse(organisation) : text((organisation as JsonRecord | undefined)?.name),
-        description: typeof posting.description === "string" ? posting.description.trim() : "",
-        location: placeOf(posting) || null,
-        ids: identifiersOf(posting),
-        links: typeof posting.url === "string" ? [posting.url] : [],
-      };
+      jobPostingsIn(JSON.parse(script.textContent ?? ""), found);
     } catch {
       // A page's broken structured data gives nothing; the page itself is read instead.
     }
   }
-  return null;
+  const seen = new Set<string>();
+  return found.filter((posting) => {
+    const key = JSON.stringify([text(posting.title), text(posting.url), identifiersOf(posting)]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function fromPosting(posting: JsonRecord): Omit<PageJob, "url" | "isJobPage"> {
+  const organisation = posting.hiringOrganization;
+  return {
+    title: text(posting.title),
+    company: typeof organisation === "string" ? collapse(organisation) : text((organisation as JsonRecord | undefined)?.name),
+    description: typeof posting.description === "string" ? posting.description.trim() : "",
+    location: placeOf(posting) || null,
+    ids: identifiersOf(posting),
+    links: typeof posting.url === "string" ? [posting.url] : [],
+  };
 }
 
 /** Job sites a page may give as its site name, which isn't the hiring company. */
@@ -120,11 +184,15 @@ function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"
   };
 }
 
-/** The job on the page when the page is a job's page: it publishes JobPosting data, or it's on a job link and has an
- * Apply button. Any other page reads as no job, and its text isn't read. `url` is the page's own link. */
+/** The job on the page when the page is one job's page: it publishes one JobPosting, or it's on one job's link
+ * (`isJobLink`) and has an Apply button. A careers home or a list of jobs (`isJobListLink`, or several JobPostings) is
+ * no job's page, whatever one of its jobs says, and neither is any other page: their text isn't read. `url` is the
+ * page's own link. */
 export function readJob(doc: Document, url = doc.URL): PageJob {
-  const found = fromStructuredData(doc);
-  const isJobPage = Boolean(found?.title) || (isJobLink(url) && hasApply(doc));
+  const postings = postingsOn(doc);
+  const found = postings.length === 1 ? fromPosting(postings[0]!) : null;
+  const isList = postings.length > 1 || isJobListLink(url);
+  const isJobPage = !isList && (Boolean(found?.title) || (isJobLink(url) && hasApply(doc)));
   if (!isJobPage) return { title: "", company: "", description: "", location: null, url, isJobPage };
   const page = fromPage(doc, url);
   return {

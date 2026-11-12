@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { isJobLink, readJob } from "./job";
+import { isJobLink, isJobListLink, readJob } from "./job";
 
 const pageOf = (body: string) => new DOMParser().parseFromString(`<html><body>${body}</body></html>`, "text/html");
 
@@ -9,6 +9,26 @@ describe("telling a job's page", () => {
     for (const url of ["https://boards.greenhouse.io/acme/jobs/123", "https://jobs.lever.co/acme/5f1c", "https://acme.wd5.myworkdayjobs.com/en-US/External/job/Atlanta/QA_R1",
       "https://www.indeed.com/viewjob?jk=abc", "https://www.linkedin.com/jobs/view/123/", "https://acme.breezy.hr/p/qa-engineer"]) expect(isJobLink(url), url).toBe(true);
     for (const url of ["https://www.google.com/search?q=qa+jobs", "https://news.example.com/2026/11/story", "https://acme.com/about/"]) expect(isJobLink(url), url).toBe(false);
+  });
+
+  it("never takes a careers home or a list of jobs for one job's page", () => {
+    for (const url of ["https://careers.acme.com/", "https://careers.acme.com/en", "https://acme.com/careers", "https://acme.com/en/jobs/",
+      "https://jobs.lever.co/acme", "https://acme.com/careers/search?q=qa", "https://www.amazon.jobs/en/", "https://acme.com/jobs/page/2",
+      "https://careers-acme.icims.com/jobs/search?ss=1"]) expect(isJobLink(url), url).toBe(false);
+    for (const url of ["https://careers.acme.com/", "https://acme.com/careers", "https://acme.com/en/jobs/", "https://acme.com/careers/search?q=qa"]) {
+      expect(isJobListLink(url), url).toBe(true);
+    }
+    // A list that names its open job shows that job; a job's own link stays one, whatever words it holds.
+    for (const url of ["https://www.linkedin.com/jobs/search/?currentJobId=3912345678", "https://careers-acme.icims.com/jobs/1234/qa-engineer/job",
+      "https://www.google.com/about/careers/applications/jobs/results/123-qa-engineer", "https://research.acme.com/careers/research-scientist"]) {
+      expect(isJobLink(url), url).toBe(true);
+      expect(isJobListLink(url), url).toBe(false);
+    }
+    expect(readJob(pageOf("<h1>Join us</h1><main>Our teams.</main><a href='/apply'>Apply now</a>"), "https://careers.acme.com/").isJobPage).toBe(false);
+    const two = `<script type="application/ld+json">[{"@type":"JobPosting","title":"QA Engineer"},{"@type":"JobPosting","title":"SRE"}]</script>`;
+    expect(readJob(pageOf(two), "https://acme.com/jobs/qa").isJobPage).toBe(false);
+    const one = `<script type="application/ld+json">{"@type":"JobPosting","title":"QA Engineer","hiringOrganization":"Acme"}</script>`;
+    expect(readJob(pageOf(one), "https://acme.com/careers").isJobPage).toBe(false);
   });
 
   it("is a job's page when it publishes JobPosting data", () => {
