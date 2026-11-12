@@ -18,8 +18,8 @@ Next: PR 2, the ledger rules as tests.
 rebasing, and stacked one on the next: PR 1, PR 2, PR 3, PR 4, PR 5 parts 1–2 (two PRs), PR 6, PR 7. PR 5 part 3
 (cover letters) is dropped: cover letters are being removed from BenchQ. The
 manager-ledger decision is Q64 (`main` took Q56 and Q59). The migrations are 0028 (`activity_logs`), 0029 (sign-in
-events) and 0030 (old tables removed): `main` has 0024, #127 holds 0025 and #129 0026–0027, so 0028 follows `main`'s
-0024 until those merge. PR 1 and PR 2 are pushed to #113 and #115; the rest go up in order once agreed.
+events) and 0030 (old tables removed): `main` has 0025 (#127 merged) and #129 holds 0026–0027, so 0028 follows `main`'s
+0025 until #129 merges. PR 1 and PR 2 are pushed to #113 and #115; the rest go up in order once agreed.
 
 Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/password-reset-approval`), PR #105 to
 `main` (open, awaiting Abdul's review; backend suite 3705 passed). Change document: [pr-changes/feat-password-reset-notifications.md](./pr-changes/feat-password-reset-notifications.md).

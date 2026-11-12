@@ -605,7 +605,7 @@ def at_0015():
         conn.execute(text(f'CREATE DATABASE "{name}"'))
     url = _url_for(name)
     engine = create_engine(url, poolclass=NullPool)
-    _alembic(url, "upgrade", "0024")
+    _alembic(url, "upgrade", "0025")
     try:
         yield url, engine
     finally:
@@ -657,7 +657,7 @@ def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0015)
                              entity_label="y", action="CREATE", summary="Written after"))
         db.commit()
 
-    _alembic(url, "downgrade", "0024")
+    _alembic(url, "downgrade", "0025")
     with Session(engine) as db:
         assert db.execute(text("SELECT to_regclass('activity_logs')")).scalar() is None
         assert db.execute(text("SELECT count(*) FROM ledger_entries")).scalar() == 3

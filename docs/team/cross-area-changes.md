@@ -28,6 +28,58 @@ names the PR that makes the change. Rows are added to this table by each PR.
 | Models and startup (Abdul), PR 7 | `backend/models/db.py` (`ActivityLog`), `backend/models/tenancy.py` (`LedgerEntry`), `backend/main.py`, `backend/api/routes_admin.py` | The two old tables' models and the code that wrote or read them are removed: `activity_log_v2` (the old system log) and `ledger_entries`. Migration 0030 copies any row not already in `activity_logs`, stops if one is missing, then drops both. | `activity_logs` is the one log. | **Pending: Abdul** |
 | Tests that built old rows (several owners), PR 7 | `backend/tests/test_auth_tenancy_schema.py`, `test_migration_0006.py`, `test_r4_contract_system.py`, `test_r4_failure_injection.py`, `test_r4_live_contract.py`, `test_resume_versions.py`, `test_admin_reads.py` | They no longer build or read `LedgerEntry` / `ActivityLog`; they use `ActivityEntry`, or raw SQL where a migration test needs the old table. | The old models are gone. No expectation about behaviour changed. | **Pending: each test's owner** |
 
+## For Arbaz: merging #129 after #127
+
+#127 (PR 4) is expected to merge first. When you bring main into #129, these won't all show as git conflicts: they are
+lines #129's changes break at runtime. Each needs the change listed.
+
+| # | Where | What to do | Why |
+|---|---|---|---|
+| 1 | `backend/migrations/versions/` (your first migration) | Number yours **0026** and **0027**, and point the first one's `down_revision` at `'0025'` (#127's AUTO_APPLIED migration, after Abdul's 0024). The team README already lists 0026–0027 as yours. | Otherwise Alembic finds two heads after 0024 and the backend won't start. |
+| 2 | `backend/applications/tracking.py`, `apply_email_decision` (the automatic status change, ≈ l.254–258) | Remove the `FavoriteJob` lookup and delete (a Saved application is the favourite in #129); make the ledger's `entity_label=app.job.title or 'Application'` read `posting_job(app.posting).title or 'Application'`. | `FavoriteJob` and `Application.job` no longer exist after #129. |
+| 3 | `backend/applications/tracking.py`, `undo_email_decision` (Undo of an automatic change, ≈ l.304–319) | Remove the "back to Saved restores the favourite" block (`if original.from_status == 'saved' and … FavoriteJob …`); make `entity_label=app.job.title or 'Application'` read `posting_job(app.posting).title or 'Application'`. | Same: the table and the relationship are gone. Tests that pin the restored favourite (from your `cff6830`/`689fbc0`) go with it. |
+| 4 | `src/lib/api/applications.ts`, `BackendUnsavedSchema` (≈ l.25) | `z.object({ favorite: z.literal(false) })` → `z.object({ favorite: z.boolean() })`. | #129's un-favourite answers `favorite: not untouched`, so `true` for a kept application; the current check rejects it and the heart shows "returned data the app doesn't understand". |
+| 5 | Check after merging | Heart on a job from a search saves it as Saved (#127's heart already sends the posting id); un-heart an untouched Saved job removes it; un-heart one with history keeps it, without an error. The backend suite's automatic-change and Undo tests pass. | Abdul's item 3 on #127 is fixed by #129's save route. |
+
+## Abdul's review on #127: the résumé sent with an application (`feat/inbox-masking-and-review`)
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad; the field is filled by Arbaz's extension flow) | `backend/api/routes_applications.py` (`_app_to_dict`), `backend/tests/test_candidate_application_status.py`, `docs/02-DATA-CONTRACTS.md` §9 | Every application response adds `resume_id`: the version already stored on the application, or `null`. Read-only; no schema change. | Abdul's review (P2): the "Résumé sent" panel said "Not submitted yet" for every live application, because the backend never sent the stored value and the mapper set it to `null`. |
+
+## Main merged into PR 4 a third time — #135's job screens (`feat/inbox-masking-and-review`)
+
+Main brought Zuhair's #135: the job screens read `job_postings`, and the candidates, résumés and jobs mocks are gone.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Job screens (Zuhair) | `src/components/app/jobs/job-explorer.tsx`, `source-preview.tsx` (an optional `onOpenSource`) | The heart keeps PR 4's save to Applications (`useToggleSavedJob`) instead of #135's mock Save/Hide marks; everything else is #135's. The preview's Open original also saves, like PR 4's Open source. | Abdul's decision 1 on #135: the heart puts the job in Applications, and that flow belongs to #127. **Until Arbaz's #129 moves the save route onto `job_postings`, the heart gets "Job not found".** |
+| Migrations (Samad's 0025) | `backend/migrations/versions/0025_email_outcome_auto_applied.py`, `backend/tests/test_migration_0025.py`, this README (was 0026; **0025** after Abdul's 0024 merged, Arbaz's #129 takes 0026–0027) | PR 4's `AUTO_APPLIED` migration is 0025 (was 0016, 0022, 0026), after Abdul's 0024; Arbaz's open #129 takes 0026–0027. | Main took 0022–0023. Whichever of #127 and #129 merges second points its first migration's `down_revision` at the other's last one. |
+| Mock tests (shared) | `src/mocks/{isolation,membership,write-authorization}.test.ts`, `src/lib/derive/application-counts.test.ts` | #135's rows (no candidates, résumés or jobs mock) plus PR 4's applications rows (Move On, save, unsave). | Both sides' changes. |
+| Applications on `job_postings` (Arbaz, #129) | `backend/applications/tracking.py` | **For you:** #127 adds two new `app.job.title` uses (the automatic change's ledger label ≈ l.258, Undo's ≈ l.314). #129 removes `app.job`; whoever merges second makes them `posting_job(app.posting).title`. Git may merge them without a conflict. | Otherwise automatic status updates and Undo fail when they write the ledger. |
+
+## Main merged into PR 4 again — #128's application counts on the new stage list (`feat/inbox-masking-and-review`)
+
+Not agreed yet: Samad reviews. #128 (BUG-005) gave every screen one count of applications, written on the old stages, so on this
+branch Shortlisted or Interview scheduled wouldn't have counted as active and Move On not as closed.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `src/lib/derive/application-counts.ts` (+ test) | Active = submitted and not closed (`isActive` in status-meta, every stage Applied to Offer); closed = Move On and the legacy closed values; a legacy Placed on its own; `OPEN_STATUSES` is gone. The candidate's Active rows keep Saved and Move On (the PR 4 board has a column for each), and the line above the board names every row shown ("N active · M closed · S saved"). Saved is still never counted as active. | The stage list in docs/02 §2.1; the PR 4 tab has no "All" view, so hiding Saved would have left saved jobs nowhere on the candidate page. |
+| Applications (Samad) | `src/components/app/candidate/applications/applications-tab.tsx` | The BDE review and Irrelevant tabs and the scroll fix kept; the rows and the count line use the shared rule above. | As above. |
+
+## Main merged into PR 4 — the Activity dashboard on the new stage list (`feat/inbox-masking-and-review`)
+
+Not agreed yet: Umamah reviews. Main brought PR 8 (#125), built on the old stages; this branch replaced them (docs/02
+§2.1). Without a change the dashboard would count every new application as never shortlisted, interviewed or placed.
+Details: [pr8-owner-dashboard.md](./pr-changes/pr8-owner-dashboard.md), "Merged with PR 4's stage list".
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Activity dashboard (Umamah) | `src/lib/derive/funnel.ts` (`reachedStatuses`), `src/lib/schemas/list-search.ts` (`REACHED_STAGES`, `APPLICATION_DATES`), `src/lib/derive/list-filters.ts` (`applicationDate`) | Reached = every pipeline stage up to the furthest (D1, D6); the seven new stages; no `placed` date; interview and offer dated from the history when the record has no date. | New applications never hold the old names, and the live backend sends no stage dates. |
+| Activity dashboard (Umamah) | `src/features/dashboard/activity/{activity-numbers,activity-insights,activity-firm-cards,activity-tables,activity-team-cards}.ts(x)`, `owner-activity-views.tsx`, `src/features/managers/managers-list.tsx`, and their tests | Placements → Offers everywhere; "Offer → placed" removed; days to an offer; applications per offer; the per-BDE chart is Shortlisted / Interview scheduled / Offer. | Offer is the last stage on the new list; Placed is legacy. |
+| Dashboards (Umamah) | `src/features/dashboard/owner-dashboard.tsx`, `manager-dashboard.tsx`, `dashboard-errors.test.ts` | Finance tab: Offers this quarter and Time to offer, dated by reaching Offer; the per-BDE table's column says Offers (it already counted offers, D6), and its Interviews count the same way as the Activity dashboard (`applicationDate`, a skipped stage counts) in `src/lib/derive/bde-performance.ts`. | As above; on live data the column read 1 where the Activity tile read 3. |
+| Applications (Samad) | `src/lib/api/dto/applications.ts` (+ test) | `firstResponseAt`, `interviewAt` and `offerAt` are read off `status_transitions` and `interviews` instead of always `null`: the first move out of Applied (not back to Saved; Move On counts), the earliest booked interview not cancelled else the first move to Interview scheduled, the first move to Offer or a legacy Placed. **Not agreed yet: Samad reviews.** | The rule in [docs/integration/03-applications.md](../integration/03-applications.md) (field table), updated for the new stages; on live data Responses, % heard back, response rate and the Finance tab's Interviews showed 0. The `last_email_received` fallback is left out: the new inbox doesn't fill that column. |
 ## Job screens on the backend (`integrate/jobs`, Zuhair; job search PR 3)
 
 Decided 2026-11-11 (grilling rounds 1–3). In progress; rows are added as the work lands. Opened as a PR only after

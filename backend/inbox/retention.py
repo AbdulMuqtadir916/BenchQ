@@ -1,4 +1,4 @@
-"""Central readable-mail policy and independently gated hidden-Other erasure."""
+"""Central readable-mail policy and independently gated erasure of Other (Irrelevant) mail."""
 import logging
 
 from backend.inbox.decider_categories import CONFIDENCE_THRESHOLD
@@ -28,19 +28,29 @@ def purge_due(*, limit=100):
         return 0
     now = utcnow()
     with SessionLocal() as db:
+        # Other mail is shown as Irrelevant now, not hidden (2026-11-07); earlier hidden mail still qualifies.
         rows = db.query(InboxMessage).filter(
-            InboxMessage.deleted_at.is_(None), InboxMessage.hidden_at.isnot(None),
+            InboxMessage.deleted_at.is_(None), InboxMessage.other_purge_after.isnot(None),
             InboxMessage.other_purge_after <= now, InboxMessage.classification_state == 'DONE',
+            # Linked mail is never erased: left out here, before the limit, so it never holds up the rows behind it.
+            InboxMessage.application_id.is_(None),
         ).order_by(InboxMessage.other_purge_after).with_for_update(skip_locked=True).limit(min(limit, 500)).all()
         count = 0
         for message in rows:
             latest = scoped(db, EmailClassification, message.firm_id).filter_by(
                 inbox_message_id=message.id, result_version=message.classification_version,
                 content_revision=message.content_revision).first()
-            review = scoped(db, ApplicationReview, message.firm_id).filter_by(inbox_message_id=message.id).first()
+            # Only a pending review keeps the email: one a BDE dismissed is erased on schedule like any Other mail.
+            review = scoped(db, ApplicationReview, message.firm_id).filter_by(
+                inbox_message_id=message.id, state='PENDING').first()
             known_job = scoped(db, EmailClassification, message.firm_id).filter(
                 EmailClassification.inbox_message_id == message.id, EmailClassification.category != 'other').first()
-            if (not latest or latest.category != 'other' or latest.confidence < CONFIDENCE_THRESHOLD or review or known_job
+            # A visible email can be linked to an application (by the matcher or a BDE): linked mail is never erased.
+            # The latest result must still be Irrelevant: an Other sent to review (forwarded, too little text,
+            # disagreeing scores) never is, even after its review is dismissed (Abdul's review on #127).
+            if (not latest or latest.outcome != 'OTHER'
+                    or latest.category != 'other' or latest.confidence < CONFIDENCE_THRESHOLD or review or known_job
+                    or message.application_id is not None
                     or latest.prompt_version != config.CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID):
                 continue
             message.body = None
@@ -58,5 +68,5 @@ def purge_due(*, limit=100):
             count += 1
         db.commit()
         if rows:
-            logger.info("Email retention: purged %d of %d due hidden emails", count, len(rows))
+            logger.info("Email retention: purged %d of %d due Other emails", count, len(rows))
         return count

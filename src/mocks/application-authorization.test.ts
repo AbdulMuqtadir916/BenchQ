@@ -27,7 +27,7 @@ const failure = (promise: Promise<unknown>) =>
     () => "allowed",
     (error: unknown) => (error instanceof ApiError ? { status: error.status, code: error.code } : String(error)),
   );
-const move = (id: string) => applicationsApi.updateStatus("firm_hts", id, { status: "WITHDRAWN", note: null });
+const move = (id: string) => applicationsApi.updateStatus("firm_hts", id, { status: "MOVE_ON", note: null });
 
 describe("who may move an application (mock backend)", () => {
   it("refuses a VIEWER with 403 and changes nothing", async () => {

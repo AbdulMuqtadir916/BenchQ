@@ -60,7 +60,7 @@ describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
     const theirApplication = (await applicationsApi.list(other))[0]!;
     const theirDocuments = await documentsApi.byCandidate(other, theirCandidate.id);
     await as(mine);
-    expect(await is404(applicationsApi.updateStatus(mine, theirApplication.id, { status: "WITHDRAWN", note: null }))).toBe(true);
+    expect(await is404(applicationsApi.updateStatus(mine, theirApplication.id, { status: "MOVE_ON", note: null }))).toBe(true);
     expect(await is404(documentsApi.upload(mine, theirCandidate.id, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null } as never))).toBe(true);
     expect(await is404(inboxApi.connect(mine, theirCandidate.id))).toBe(true);
     if (theirDocuments[0]) expect(await is404(documentsApi.remove(mine, theirDocuments[0].id))).toBe(true);

@@ -12,8 +12,8 @@ import type { User } from "@/lib/schemas/session";
 
 /**
  * The numbers on the Activity dashboard, worked out from the records (CLAUDE.md: every number is derived).
- * One rule for the period everywhere: an application counts when it was submitted in the period, an interview when it
- * happened in it, a placement when it closed in it. Candidates and BDEs are counted as they are now.
+ * One rule for the period everywhere: an application counts when it was submitted in the period, an interview or an offer
+ * when it happened in it. Candidates and BDEs are counted as they are now.
  */
 
 export { LIST_PERIODS as PERIODS, type ListPeriod as Period } from "@/lib/schemas/list-search";
@@ -40,7 +40,7 @@ export interface ActivityCounts {
   /** Of those, how many heard back. */
   responses: number;
   interviews: number;
-  placements: number;
+  offers: number;
 }
 
 export function countActivity(applications: readonly Application[], window: Window): ActivityCounts {
@@ -49,7 +49,7 @@ export function countActivity(applications: readonly Application[], window: Wind
     applications: submitted.length,
     responses: submitted.filter((app) => app.firstResponseAt).length,
     interviews: applications.filter((app) => happenedIn(app, "interview", window)).length,
-    placements: applications.filter((app) => happenedIn(app, "placed", window)).length,
+    offers: applications.filter((app) => happenedIn(app, "offer", window)).length,
   };
 }
 
@@ -189,14 +189,14 @@ export interface BdeStageRow {
   applied: number;
   shortlisted: number;
   interview: number;
-  placed: number;
+  offer: number;
 }
 
 export function bdeStageRows(bdes: readonly User[], candidates: readonly Candidate[], applications: readonly Application[], window: Window): BdeStageRow[] {
   return bdes.map((bde) => {
     const mine = submittedIn(forCandidates(applications, candidates.filter((candidate) => candidate.bdeId === bde.id)), window);
     const reached = mine.map(reachedStatuses);
-    const count = (status: "SCREENING" | "INTERVIEW" | "PLACED") => reached.filter((set) => set.has(status)).length;
-    return { id: bde.id, name: bde.name, applied: mine.length, shortlisted: count("SCREENING"), interview: count("INTERVIEW"), placed: count("PLACED") };
+    const count = (status: "SHORTLISTED" | "INTERVIEW_SCHEDULED" | "OFFER") => reached.filter((set) => set.has(status)).length;
+    return { id: bde.id, name: bde.name, applied: mine.length, shortlisted: count("SHORTLISTED"), interview: count("INTERVIEW_SCHEDULED"), offer: count("OFFER") };
   });
 }

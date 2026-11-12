@@ -36,7 +36,7 @@ const managerColumns: ColumnDef<ManagerRow, unknown>[] = [
   },
   { id: "applications", accessorFn: (row) => row.counts.applications, header: "Applications", cell: ({ row }) => number(row.original.counts.applications) },
   { id: "interviews", accessorFn: (row) => row.counts.interviews, header: "Interviews", cell: ({ row }) => number(row.original.counts.interviews) },
-  { id: "placements", accessorFn: (row) => row.counts.placements, header: "Placements", cell: ({ row }) => number(row.original.counts.placements) },
+  { id: "offers", accessorFn: (row) => row.counts.offers, header: "Offers", cell: ({ row }) => number(row.original.counts.offers) },
   opens,
 ];
 
@@ -55,7 +55,7 @@ const bdeColumns: ColumnDef<BdeRow, unknown>[] = [
   { id: "responses", accessorFn: (row) => row.counts.responses, header: "Responses", cell: ({ row }) => number(row.original.counts.responses) },
   { id: "responseRate", accessorFn: (row) => (row.counts.applications ? row.counts.responses / row.counts.applications : -1), header: "Response rate", cell: ({ row }) => <span className="tabular text-[var(--color-text)]">{rate(row.original.counts.responses, row.original.counts.applications)}</span> },
   { id: "interviews", accessorFn: (row) => row.counts.interviews, header: "Interviews", cell: ({ row }) => number(row.original.counts.interviews) },
-  { id: "placements", accessorFn: (row) => row.counts.placements, header: "Placements", cell: ({ row }) => number(row.original.counts.placements) },
+  { id: "offers", accessorFn: (row) => row.counts.offers, header: "Offers", cell: ({ row }) => number(row.original.counts.offers) },
   opens,
 ];
 

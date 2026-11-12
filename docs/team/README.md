@@ -117,7 +117,9 @@ it. Everyone else reads it.
 | 0022 | Zuhair | Job search: `scrape_jobs.user_id` (who ran the search, for the BDE's daily attempts; filled in for rows a downgrade kept), `running` + `finished_at`, and the indexes for the caps and the history. Follows 0021 (Arbaz's) | `feat/job-search-pipeline` |
 | 0023 | Zuhair | Job search PR 2: `resumes` / `cover_letters` / `job_runs` / `llm_call_log` point at `job_postings`; `scrape_jobs.kind`; `job_postings.first_source`; `UNIQUE (firm_id, candidate_id, id)` on `job_postings`. Follows 0022 | `feat/job-postings-repoint` |
 | 0024 | Abdul | Drop `firms.bde_capacity` (07 Q63, reverses Q46) | `feat/firm-settings-cleanup` |
-| 0028 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows 0027 (#127 holds 0025 and #129 0026–0027); until those merge, its down revision is main's 0024 | `activity-log/pr3-new-table-and-endpoints` |
+| 0025 | Samad | `email_classifications.outcome` allows `AUTO_APPLIED` (PR 4 automatic status updates); downgrade refuses while automatic evidence exists. Renumbered from 0016, 0022 and 0026; follows Abdul's 0024 | `feat/inbox-masking-and-review` (PR 4) |
+| 0026–0027 | Arbaz | Applications on `job_postings` (#129) | `feat/autofill-screen` |
+| 0028 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows 0027 (#129's); until #129 merges, its down revision is main's 0025 | `activity-log/pr3-new-table-and-endpoints` |
 | 0029 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts. Follows 0028 | `activity-logs/pr6-signin-events-and-super-admin` |
 | 0030 | Mohammed Abdul Ahad Umamah | Remove `activity_log_v2` and `ledger_entries` after copying their rows into `activity_logs`. Follows 0029 | `activity-logs/pr7-remove-old-log-tables` |
 | 0031+ | — | Claim the next number here in your PR | — |
