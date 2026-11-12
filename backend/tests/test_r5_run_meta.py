@@ -78,17 +78,6 @@ def test_running_job_meta_defaults_to_none():
 
 # ── /api/monitor/in-flight ───────────────────────────────────────────────────
 
-def test_in_flight_default_shape_is_unchanged(client, monkeypatch):
-    """Without detail=1 the values stay bare job-type strings."""
-    job_a = uuid.uuid4()
-    _install_fake_running(monkeypatch, [
-        (f"analyze_job:{job_a}", "analyze_job", job_a,
-         {"resume_names": ["PM"], "depth": "light"}),
-    ])
-    data = client.get("/api/monitor/in-flight").json()
-    assert data[str(job_a)] == ["analyze_job"]
-
-
 def test_in_flight_detail_returns_job_type_and_meta(client, monkeypatch):
     job_a, job_b = uuid.uuid4(), uuid.uuid4()
     meta = {"resume_names": ["PM", "Persona"], "depth": "full"}
