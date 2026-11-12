@@ -26,9 +26,8 @@ BACKGROUND_LOGGING = {("activity.py", "log_activity"), ("analyzer/llm_logger.py"
 # a reason below is true of it.
 RETIRED = "the old job pool's write route: it answers 410 (job search PR 2) and goes with the pool in the clean-up PR"
 COVER_LETTERS_REMOVED = "cover letters are being removed from BenchQ (decided 2026-11-12), so nothing logs them"
-NOT_FIRM_ACTIVITY = "a Super Admin operation, not a firm's activity"
+NOT_FIRM_ACTIVITY = "Telegram calling in, with its own secret: no signed-in person to credit"
 PERSONA_REMOVED = "the Persona table is being removed; its fields live on the candidate, whose edits routes_candidates logs"
-REFERENCE_DATA = "global reference data, not a firm's record (07 tenancy: Company is global)"
 NO_READ_ENTRIES = "no ledger entry for reads and manual sync (Abdul, 2026-11-03)"
 NOTHING_SAVED = "saves nothing about a firm's records"
 
@@ -57,38 +56,8 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_inbox.py", "start_candidate_google_oauth"): "only starts Google's consent; confirm_mailbox logs the connection",
     ("api/routes_inbox.py", "cancel_mailbox"): "drops an unconfirmed attempt; nothing was connected",
 
-    ("api/routes_companies.py", "create_company"): REFERENCE_DATA,
-    ("api/routes_companies.py", "update_company"): REFERENCE_DATA,
-    ("api/routes_companies.py", "acknowledge_company_warning"): REFERENCE_DATA,
-    ("api/routes_companies.py", "delete_company"): REFERENCE_DATA,
-    ("api/routes_companies.py", "auto_create_from_jobs"): REFERENCE_DATA,
-    ("api/routes_companies.py", "bulk_activate"): REFERENCE_DATA,
-    ("api/routes_companies.py", "refresh_h1b_all"): REFERENCE_DATA,
-    ("api/routes_companies.py", "backfill_h1b_jobs"): REFERENCE_DATA,
-    ("api/routes_companies.py", "test_scrape_company"): REFERENCE_DATA,
 
-    ("api/routes_linkedin.py", "session_refresh"): NOT_FIRM_ACTIVITY,
-    ("api/routes_linkedin.py", "session_pin"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "create_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "update_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "acknowledge_search_warning"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "delete_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "trigger_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "test_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_settings.py", "update_settings"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_all_scrapes"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_email_check"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_h1b_refresh"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_job_cleanup"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_auto_reject"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_backfill_descriptions"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_db_backup"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_digest"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_company_scrape"): NOT_FIRM_ACTIVITY,
     ("main.py", "telegram_webhook"): NOT_FIRM_ACTIVITY,
-    ("main.py", "telegram_register_webhook"): NOT_FIRM_ACTIVITY,
-    ("main.py", "telegram_rotate_webhook_secret"): NOT_FIRM_ACTIVITY,
-    ("main.py", "telegram_test"): NOT_FIRM_ACTIVITY,
 }
 
 # (file, function) -> why it builds a ActivityEntry itself instead of calling backend/auth/ledger.py.
@@ -377,6 +346,16 @@ def test_a_route_added_with_api_route_or_add_api_route_is_a_write_route():
               "def c(): pass\nrouter.add_api_route('/c', c, methods=['PATCH'])\n"
               "@router.post('/d')\ndef d(): pass\n")
     assert sorted(name for _, name in _write_routes(_snippet(source))) == ["a", "c", "d"]
+
+
+def test_a_route_with_the_platform_action_dependency_counts_as_logging():
+    """A Super Admin's operation logs through `dependencies=[Depends(logs_platform_action(...))]` on the route."""
+    logged = _snippet("from fastapi import Depends\nfrom backend.auth.platform_actions import logs_platform_action\n"
+                      "@router.post('/x', dependencies=[Depends(logs_platform_action('Did x', entity_type='x'))])\ndef x(): pass\n"
+                      "@router.post('/y')\ndef y(): pass\n")
+    real = _logging_functions(_source_trees(SOURCE_FILES) + logged)
+    assert ("api/routes_example.py", "x") in real and ("api/routes_example.py", "y") not in real
+    assert ("auth/platform_actions.py", "logs_platform_action") in real
 
 
 def test_a_renamed_ledger_model_is_still_seen_when_built_or_read():

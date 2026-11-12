@@ -5,9 +5,10 @@ import os
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from backend.auth.platform_actions import logs_platform_action
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 from backend.scraper.sources.linkedin_extension import _SESSION_PATH
 
@@ -56,7 +57,7 @@ def session_status():
     }
 
 
-@router.post("/session/refresh", status_code=202)
+@router.post("/session/refresh", status_code=202, dependencies=[Depends(logs_platform_action("Started a LinkedIn session refresh", entity_type="linkedin_session"))])
 async def session_refresh():
     """Start the interactive login. Poll /session until phase leaves 'running'."""
     from backend import refresh_linkedin_session as rls
@@ -71,7 +72,7 @@ async def session_refresh():
     return {"run_id": run_id, "status": "running"}
 
 
-@router.post("/session/pin")
+@router.post("/session/pin", dependencies=[Depends(logs_platform_action("Pinned the LinkedIn session", entity_type="linkedin_session", action="UPDATE"))])
 def session_pin(body: PinIn):
     """Hand the emailed PIN to the waiting login (it polls PIN_FILE)."""
     digits = "".join(c for c in (body.pin or "") if c.isdigit())

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from backend.auth.platform_actions import logs_platform_action
 from backend.models.db import get_db, Company, Job, Application, Setting, ScrapeLog, is_acknowledged
 from backend.api.routes_auth import current_principal
 from backend.auth.scoping import firm_job_ids, scoped_jobs, viewed_firm_id
@@ -212,7 +213,7 @@ def list_companies(
     return out
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(logs_platform_action("Created a company", entity_type="company", action="CREATE"))])
 def create_company(data: CompanyCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     existing = db.query(Company).filter(func.lower(Company.name) == data.name.lower()).first()
     if existing:
@@ -242,7 +243,7 @@ def create_company(data: CompanyCreate, background_tasks: BackgroundTasks, db: S
     return _company_to_dict(company)
 
 
-@router.patch("/{company_id}")
+@router.patch("/{company_id}", dependencies=[Depends(logs_platform_action("Changed a company", entity_type="company", action="UPDATE", id_param="company_id", fields=True))])
 def update_company(company_id: str, updates: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
@@ -273,7 +274,7 @@ def update_company(company_id: str, updates: dict, background_tasks: BackgroundT
     return _company_to_dict(company, h1b=h1b)
 
 
-@router.post("/{company_id}/acknowledge")
+@router.post("/{company_id}/acknowledge", dependencies=[Depends(logs_platform_action("Acknowledged a company's warning", entity_type="company", action="UPDATE", id_param="company_id"))])
 def acknowledge_company_warning(company_id: str, db: Session = Depends(get_db)):
     """Mark this company's current scrape warning as seen so /api/health/entities stops counting it until a newer ScrapeLog row appears; the warning stays visible but muted, and a later failure raises it again with no expiry timer."""
     company = db.query(Company).filter(Company.id == company_id).first()
@@ -285,7 +286,7 @@ def acknowledge_company_warning(company_id: str, db: Session = Depends(get_db)):
             "warning_acknowledged_at": company.warning_acknowledged_at.isoformat()}
 
 
-@router.delete("/{company_id}")
+@router.delete("/{company_id}", dependencies=[Depends(logs_platform_action("Deleted a company", entity_type="company", action="DELETE", id_param="company_id"))])
 def delete_company(company_id: str, db: Session = Depends(get_db)):
     """Delete a company record; jobs already found under it are kept (they carry the company name, not an FK), so the feed is unaffected."""
     company = db.query(Company).filter(Company.id == company_id).first()
@@ -309,7 +310,7 @@ def delete_company(company_id: str, db: Session = Depends(get_db)):
     return {"deleted": True}
 
 
-@router.post("/auto-create-from-jobs")
+@router.post("/auto-create-from-jobs", dependencies=[Depends(logs_platform_action("Created companies from jobs", entity_type="company", action="CREATE"))])
 def auto_create_from_jobs(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Scan all Job.company distinct values and create inactive Company records for unmatched names."""
     default_resume_row = db.query(Setting).filter(Setting.key == "default_resume_id").first()
@@ -341,7 +342,7 @@ def auto_create_from_jobs(background_tasks: BackgroundTasks, db: Session = Depen
     return {"created": created}
 
 
-@router.post("/bulk-activate")
+@router.post("/bulk-activate", dependencies=[Depends(logs_platform_action("Activated companies in bulk", entity_type="company", action="UPDATE"))])
 def bulk_activate(data: BulkActivate, db: Session = Depends(get_db)):
     """Set companies active or inactive, optionally filtered by tiers."""
     q = db.query(Company)
@@ -365,7 +366,7 @@ def bulk_activate(data: BulkActivate, db: Session = Depends(get_db)):
     return {"updated": count, "active": data.active}
 
 
-@router.post("/refresh-h1b")
+@router.post("/refresh-h1b", dependencies=[Depends(logs_platform_action("Started an H-1B refresh for every company", entity_type="company"))])
 async def refresh_h1b_all(db: Session = Depends(get_db)):
     """Fetch H-1B data for all companies that haven't been checked yet, or re-check all."""
     from backend.analyzer.h1b_checker import resolve_company_h1b
@@ -385,7 +386,7 @@ async def refresh_h1b_all(db: Session = Depends(get_db)):
     return {"updated": updated}
 
 
-@router.post("/backfill-h1b-jobs")
+@router.post("/backfill-h1b-jobs", dependencies=[Depends(logs_platform_action("Started an H-1B backfill on jobs", entity_type="company"))])
 async def backfill_h1b_jobs(db: Session = Depends(get_db)):
     """Re-run check_job_h1b on all jobs with NULL h1b_verdict."""
     from backend.analyzer.h1b_checker import check_job_h1b
@@ -399,7 +400,7 @@ async def backfill_h1b_jobs(db: Session = Depends(get_db)):
     return {"updated": updated}
 
 
-@router.post("/{company_id}/test-scrape")
+@router.post("/{company_id}/test-scrape", dependencies=[Depends(logs_platform_action("Ran a test scrape of a company", entity_type="company", id_param="company_id"))])
 async def test_scrape_company(company_id: str, db: Session = Depends(get_db)):
     """Run Playwright scrape for a company and return results WITHOUT saving to DB."""
     retired()  # job search PR 2: the old pool's write routes answer 410

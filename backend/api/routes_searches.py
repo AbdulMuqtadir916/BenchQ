@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from backend.auth.platform_actions import logs_platform_action
 from backend.countries import (DEFAULT_COUNTRY, compose_location, normalize_country,
                                split_country_suffix, supported_countries)
 from backend.models.db import get_db, Search, Setting, ScrapeLog, Job, is_acknowledged
@@ -111,7 +112,7 @@ def _validated_location(location, country) -> str:
     return location
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(logs_platform_action("Created a search", entity_type="search", action="CREATE"))])
 def create_search(data: SearchCreate, db: Session = Depends(get_db)):
     payload = data.model_dump()
     payload["country"] = _validated_country(payload["country"])
@@ -127,7 +128,7 @@ def create_search(data: SearchCreate, db: Session = Depends(get_db)):
     return _search_to_dict(search)
 
 
-@router.patch("/{search_id}")
+@router.patch("/{search_id}", dependencies=[Depends(logs_platform_action("Changed a search", entity_type="search", action="UPDATE", id_param="search_id", fields=True))])
 def update_search(search_id: str, updates: dict, db: Session = Depends(get_db)):
     search = db.query(Search).filter(Search.id == search_id).first()
     if not search:
@@ -158,7 +159,7 @@ def update_search(search_id: str, updates: dict, db: Session = Depends(get_db)):
     return _search_to_dict(search)
 
 
-@router.post("/{search_id}/acknowledge")
+@router.post("/{search_id}/acknowledge", dependencies=[Depends(logs_platform_action("Acknowledged a search's warning", entity_type="search", action="UPDATE", id_param="search_id"))])
 def acknowledge_search_warning(search_id: str, db: Session = Depends(get_db)):
     """Mark this search's current scrape warning as seen so /api/health/entities stops counting it until a newer ScrapeLog row appears (muted, not hidden); the two seeded extension searches never scrape, so acknowledging one returns 409, the same guard /run and DELETE use."""
     search = db.query(Search).filter(Search.id == search_id).first()
@@ -177,7 +178,7 @@ def acknowledge_search_warning(search_id: str, db: Session = Depends(get_db)):
             "warning_acknowledged_at": search.warning_acknowledged_at.isoformat()}
 
 
-@router.delete("/{search_id}")
+@router.delete("/{search_id}", dependencies=[Depends(logs_platform_action("Deleted a search", entity_type="search", action="DELETE", id_param="search_id"))])
 def delete_search(search_id: str, db: Session = Depends(get_db)):
     search = db.query(Search).filter(Search.id == search_id).first()
     if not search:
@@ -207,7 +208,7 @@ def delete_search(search_id: str, db: Session = Depends(get_db)):
     return {"deleted": True}
 
 
-@router.post("/{search_id}/run", status_code=202)
+@router.post("/{search_id}/run", status_code=202, dependencies=[Depends(logs_platform_action("Started a search run", entity_type="search", id_param="search_id"))])
 async def trigger_search(search_id: str, auto_score: bool = None, db: Session = Depends(get_db)):
     """Trigger a single search in the background; returns immediately with a run_id pollable via /api/monitor/active (scope_key = search id); auto_score overrides the search's auto_scoring_depth when set."""
     retired()  # job search PR 2: the old pool's write routes answer 410
@@ -244,7 +245,7 @@ async def trigger_search(search_id: str, auto_score: bool = None, db: Session = 
         return JSONResponse(status_code=409, content={"detail": f"{e.job_type} is already running"})
 
 
-@router.post("/{search_id}/test")
+@router.post("/{search_id}/test", dependencies=[Depends(logs_platform_action("Tested a search", entity_type="search", id_param="search_id"))])
 async def test_search(search_id: str, db: Session = Depends(get_db)):
     """Run a search test: keyword mode runs synchronously and returns results directly, while slow modes (levels_fyi, linkedin_personal, jobright, freehire) launch in the background and return a run_id to poll."""
     retired()  # job search PR 2: the old pool's write routes answer 410
