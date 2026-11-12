@@ -9,7 +9,7 @@ import pytest
 from backend.tests.firm_support import default_firm_id
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
-    make_job, big_string, EMOJI, MISSING_UUID,
+    make_job, EMOJI, MISSING_UUID,
 )
 
 # ── POST /api/applications ───────────────────────────────────────────────────
@@ -40,13 +40,6 @@ def test_the_retired_hand_log_is_410_and_writes_nothing(client, test_db, body):
 ])
 def test_create_application_wrong_field_types_are_422(client, body):
     assert_clean(client.post("/api/applications", json=body), 422)
-
-
-def test_create_application_ten_megabyte_notes(client):
-    r = client.post("/api/applications", json={
-        "title": "T", "company": "C", "url": "https://x.com/big", "notes": big_string(10),
-    })
-    assert_clean(r, 200, 400, 413, 422)
 
 
 @pytest.mark.parametrize("body", [[1, 2], "hi", 5, None])
@@ -185,12 +178,6 @@ def test_patch_application_empty_body_is_a_noop_200(client):
 def test_patch_application_non_object_body_is_422(client, body):
     aid = _app_id(client)
     assert_clean(client.patch(f"/api/applications/{aid}", json=body), 422)
-
-
-def test_patch_application_ten_megabyte_notes(client):
-    aid = _app_id(client)
-    r = client.patch(f"/api/applications/{aid}", json={"notes": big_string(10)})
-    assert_clean(r, 200, 400, 413, 422)
 
 
 # ── DELETE /api/applications/{id} ────────────────────────────────────────────

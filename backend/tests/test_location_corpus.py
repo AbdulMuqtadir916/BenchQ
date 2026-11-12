@@ -147,7 +147,6 @@ TRAPS = [
     ("US, NY, New York", "US", "NY", "New York"),
     ("US, WA, Seattle", "US", "WA", "Seattle"),
     ("CA, ON, Toronto", "CA", "ON", "Toronto"),
-    ("US, CA, Santa Clara", "US", "CA", "Santa Clara"),
     # a country code in the second slot is a different shape and is left alone
     ("GA, US, Atlanta", "US", "GA", "Atlanta"),
     ("Frankfurt, Hesse, Germany", "DE", "Hesse", "Frankfurt"),

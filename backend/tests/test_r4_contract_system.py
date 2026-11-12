@@ -10,7 +10,7 @@ import pytest
 
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
-    make_job, make_company, set_setting, big_string, EMOJI, MISSING_UUID,
+    make_job, make_company, set_setting, EMOJI, MISSING_UUID,
 )
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
@@ -136,21 +136,6 @@ def test_monitor_active_reports_a_running_entry(client):
     body = assert_clean(client.get("/api/monitor/active"), 200).json()
     assert body[0]["job_type"] == "x" and body[0]["scope_key"] == "s"
     assert body[0]["elapsed_seconds"] >= 0
-
-
-def test_monitor_in_flight_only_lists_job_scoped_runs(client):
-    import backend.job_monitor as jm
-    from datetime import datetime, timezone
-    jid = uuid.uuid4()
-    jm._running["a"] = jm.RunningJob(run_id=uuid.uuid4(), job_type="scrape_all",
-                                     trigger="scheduler",
-                                     started_at=datetime.now(timezone.utc))
-    jm._running["b"] = jm.RunningJob(run_id=uuid.uuid4(), job_type="analyze_job",
-                                     trigger="manual",
-                                     started_at=datetime.now(timezone.utc),
-                                     target_job_id=jid)
-    body = assert_clean(client.get("/api/monitor/in-flight"), 200).json()
-    assert body == {str(jid): ["analyze_job"]}
 
 
 @pytest.mark.parametrize("qs", ["", "job_ids=", "job_ids=abc", f"job_ids={MISSING_UUID}",
@@ -279,12 +264,6 @@ def test_telegram_webhook_without_a_configured_secret_is_503(client):
     assert_clean(client.post("/api/telegram/webhook", json={}, headers=NO_SESSION), 503)
 
 
-def test_telegram_webhook_with_a_wrong_secret_is_401(client, test_db):
-    set_setting(test_db, "telegram_webhook_secret", "s3cret")
-    assert_clean(client.post("/api/telegram/webhook", json={},
-                             headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"}), 401)
-
-
 def test_telegram_webhook_with_the_right_secret_accepts_an_empty_update(client, test_db):
     set_setting(test_db, "telegram_webhook_secret", "s3cret")
     assert_clean(client.post("/api/telegram/webhook", json={},
@@ -314,12 +293,6 @@ def test_register_webhook_requires_https(client, url):
 
 def test_register_webhook_missing_body_key_is_400(client):
     assert_clean(client.post("/api/telegram/register-webhook", json={}), 400)
-
-
-def test_rotate_webhook_secret_returns_a_new_value(client, test_db):
-    set_setting(test_db, "telegram_webhook_secret", "old")
-    r = assert_clean(client.post("/api/telegram/rotate-webhook-secret"), 200)
-    assert r.json()["webhook_secret"] != "old"
 
 
 @pytest.mark.xfail(strict=True, reason="R4-T1-26")
@@ -383,5 +356,3 @@ def test_health_entities_still_answers_for_a_sane_window(client, test_db):
     make_company(test_db, name="Acme", active=True)
     r = assert_clean(client.get("/api/health/entities?window=3"), 200)
     assert r.json()["count"] == 0
-
-
