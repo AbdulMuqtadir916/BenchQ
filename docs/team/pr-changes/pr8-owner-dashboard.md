@@ -22,7 +22,7 @@ The same picture at every level, for whoever is in view:
 - **Cards:** candidates, then applications, interviews and placements, each against the same length of time before
   ("+3 vs the 30 days before"). The period can be 24 hours, 7, 30 or 90 days.
 - **The table:** managers, BDEs or candidates, busiest first, with a line naming the busiest. The BDE table shows
-  workload: candidates being worked against the firm's BDE capacity, amber at capacity.
+  workload: the number of candidates being worked (no capacity: 07 Q63 removed it; it was against the firm's BDE capacity, amber at capacity).
 - **Bench health:** the share placed (bench utilization), candidates on the bench by how long they have waited (under
   30, 30 to 60, over 60 days), and the five longest, each opening the candidate's profile.
 - **Needs attention:** candidates waiting for a BDE, BDEs with candidates and nothing submitted in the period, and
