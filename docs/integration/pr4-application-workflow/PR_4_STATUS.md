@@ -108,6 +108,22 @@ Branch `feat/inbox-masking-and-review` (#127, supersedes #116 on `codex/pr4-code
 ## Phase 6 — Activation (after merge)
 - [ ] T6.1 Activation checklist signed off
 
+## Release follow-ups
+
+From Abdul's review on #127 (2026-11-12, "follow-up fixes for the release plan"). Each was checked against the code
+at `bd0a1f5` before it was listed; all hold. Owner and PR are where they are known.
+
+| # | Follow-up | What happens today | Fix | Owner | PR |
+|---|---|---|---|---|---|
+| 1 | Stop in-flight sends when the classifier key is cleared | The send check compares a settings fingerprint that leaves out the API key (`decider.config_identity`), so an email being prepared still goes to OpenRouter with the old key | `_still_sendable` also compares the current key (present, and the one the work was claimed with) | Uzair | PR 4 follow-up |
+| 2 | Fix Save on live jobs | The heart sends a `job_postings` id; the save route looks in the old `jobs` table → 404 | The save route moves onto `job_postings` | Arbaz | #129 (see `docs/team/cross-area-changes.md`, "For Arbaz: merging #129 after #127") |
+| 3 | Keep the recruiter's place in BDE review | Opening a review email switches tab with `router.replace` and a fresh query, so it overwrites the history entry and drops `applications_tab`; Back skips the queue | Opening an email from the Applications tab adds a history entry and keeps the candidate page's other keys | Uzair | PR 4 follow-up |
+| 4 | Only mark the requested email as read | While a requested older email loads, the first email in the list stands in as the open one and is marked read if unread (`inbox-tab.tsx`) | Mark read only once the email shown is the one requested | Uzair | PR 4 follow-up |
+| 5 | Keep the sent résumé visible after deletion | A deleted résumé leaves the shelf, so "Resume sent" says it is no longer available | The backend returns the sent version for its application even after deletion; the panel opens it read-only | Uzair (backend part with Zuhair, résumés) | PR 4 follow-up |
+| 6 | Keep uncertain emails in review | The UI calls an email Irrelevant by category; an uncertain Other (low confidence, forwarded, disagreeing scores) goes to review on the backend but shows as Irrelevant, and the review form preselects Irrelevant | The inbox data carries the latest outcome; the Irrelevant list and the form's default use it | Uzair | PR 4 follow-up |
+| 7 | Keep older closed applications accessible | The candidate's Active board leaves out legacy closed values and there is no All tab (agreed with Abdul Muqtadir), so the candidate page can't open them; the firm-wide Applications board still shows them under "Older statuses" | A way to open them from the candidate page that isn't an All tab (e.g. a link to the Applications page filtered to the candidate, or an "older" list) | Uzair | PR 4 follow-up |
+| 8 | Close the Gmail info tip on Esc | Esc with the tip open left the candidate page (the page's capture-phase Esc-back ran first) | **Fixed:** an open tip counts as an overlay for page Esc handlers, and the tip closes itself on Esc | Uzair | #127 |
+
 ## Open questions
 - "How we use disconnect": unlinking a wrongly linked email? Not in PR 4 unless decided.
 - Saved as a review choice? (Selected: no.)
