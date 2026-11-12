@@ -53,7 +53,7 @@ describe("neverFillReason", () => {
 
 describe("a sensitive number in any field, kept out of the saved form", () => {
   it("finds a Social Security number or a payment card's number, however it's written", () => {
-    for (const value of ["123-45-6789", "123 45 6789", "123456789", "My SSN is 123-45-6789", "4111 1111 1111 1111",
+    for (const value of ["123-45-6789", "123 45 6789", "123456789", "My SSN is 123-45-6789", "My SSN is 123456789", "SSN: 123456789.", "4111 1111 1111 1111",
       "4111-1111-1111-1111", "5555555555554444", "378282246310005"]) {
       expect(holdsSensitiveNumber(value), value).toBe(true);
     }

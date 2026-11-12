@@ -6,7 +6,7 @@ import { checkJob, confirmationKey, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
 import { answersFromResume, historyOf, type HistoryRecords } from "./resume-answers";
 import { buildReview, suggestedRow, typeOf, withHistory } from "./review";
-import { builtAnswers, saveOffer } from "./save-answer";
+import { builtAnswers, saveOffer, shownAnswers } from "./save-answer";
 import { missingAccess, requestAccess, type SiteAccess } from "./site-access";
 import {
   addEntryIn, chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills,
@@ -29,9 +29,9 @@ const ENTRY_MS = 700;
 
 /** A résumé's answers with what came with them, kept together: its built answers by key (a save says which one the BDE
  * was shown, docs/02 §8.3) and its school and job records (`withHistory`). */
-type Answers = { entries: BankEntry[]; built: Map<string, unknown>; history: HistoryRecords };
+type Answers = { entries: BankEntry[]; built: Map<string, unknown>; answered: Map<string, unknown>; history: HistoryRecords };
 const NO_HISTORY: HistoryRecords = { education: [], work: [] };
-const noAnswers = (): Answers => ({ entries: [], built: new Map(), history: NO_HISTORY });
+const noAnswers = (): Answers => ({ entries: [], built: new Map(), answered: new Map(), history: NO_HISTORY });
 /** Once the résumé is attached, the form is read every 400 ms until it has been still for three looks, after five at
  * least (2 s) and 30 at most: a site that reads the file (Lever's "Analyzing resume…") fills fields of its own first. */
 const SETTLE = { every: 400, least: 5, still: 3, most: 30 };
@@ -103,15 +103,16 @@ type TabMemory = {
   filledFrom: Map<string, string | null>;
   // The file BenchQ attached to each upload: the Resume section still shows it when the site swaps the input for a chip.
   attached: Map<string, string>;
-  // What the BDE saved for next time, by field: the row says so while the field still holds it (07 Q58).
-  saved: Map<string, string>;
+  // What the BDE saved for next time, by field, and to which résumé: the row says so while the field still holds it and
+  // that résumé is picked (07 Q58).
+  saved: Map<string, { resumeId: string; value: string }>;
 };
 
 /** What a page load wipes. */
 const pageMemory = () => ({
   settled: new Map<string, string>(), handedBack: new Map<string, string>(), seen: new Map<string, string>(), edited: new Set<string>(),
   found: new Set<string>(), unmatched: new Set<string>(), filledFrom: new Map<string, string | null>(), attached: new Map<string, string>(),
-  saved: new Map<string, string>(),
+  saved: new Map<string, { resumeId: string; value: string }>(),
 });
 
 const tabMemory = new Map<string, TabMemory>();
@@ -198,12 +199,14 @@ function rememberedRow(row: ReviewRow, memory: TabMemory, resume: string | null,
 
 /** A field the BDE typed while BenchQ watched can be kept for next time (07 Q18, Q58): never one the form held before
  * BenchQ looked, and once saved the row says so while the field still holds what was saved. */
-function withSaveOfferIn(memory: TabMemory, built: ReadonlyMap<string, unknown>) {
+function withSaveOfferIn(memory: TabMemory, built: ReadonlyMap<string, unknown>, answered: ReadonlyMap<string, unknown>,
+  resumeId: string | null) {
   return (row: ReviewRow, answers: BankEntry[]): ReviewRow => {
     const key = memoKeyOf(row);
     if (!memory.edited.has(key) || memory.found.has(key)) return row;
-    if (memory.saved.get(key) === row.field.current.trim()) return { ...row, saveOffer: "saved" };
-    const offer = saveOffer(row, answers, built);
+    const saved = memory.saved.get(key);
+    if (saved && saved.resumeId === resumeId && saved.value === row.field.current.trim()) return { ...row, saveOffer: "saved" };
+    const offer = saveOffer(row, answers, built, answered);
     return offer ? { ...row, saveOffer: offer } : row;
   };
 }
@@ -272,7 +275,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     try {
       const entries = await getResumeAnswers(firmId, candidateId, resumeId);
       if (entries) {
-        return { entries: withJobSite(answersFromResume(entries), job), built: builtAnswers(entries), history: historyOf(entries) };
+        return { entries: withJobSite(answersFromResume(entries), job), built: builtAnswers(entries), answered: shownAnswers(entries), history: historyOf(entries) };
       }
       setError(ANSWERS_UNAVAILABLE);
       return null;
@@ -329,7 +332,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, []);
 
   const review = useCallback((fields: TabField[], answers: BankEntry[], justFilled?: ReadonlySet<string>) => {
-    const withSaveOffer = withSaveOfferIn(memory.current, bank.current?.built ?? new Map());
+    const withSaveOffer = withSaveOfferIn(memory.current, bank.current?.built ?? new Map(), bank.current?.answered ?? new Map(),
+      bank.current?.resumeId ?? null);
     const reviewed = withResumeFile(withHistory(buildReview(fields, answers, job), bank.current?.history ?? NO_HISTORY), bank.current?.file ?? null);
     const next = withMemory(reviewed, memory.current, resume.current, justFilled).map((row) => withSaveOffer(row, answers));
     showRows(next);
@@ -733,6 +737,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     const now = shownRows.current ?? [];
     const fresh = now.filter((row) => !before.has(memoKeyOf(row))).length;
     if (fresh === 0 || fresh * 2 < now.length || !now.some(isFillable)) return;
+    const picked = resume.current;
     busy.current = true;
     setStep(STEP_NEW_PAGE);
     try {
@@ -741,7 +746,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       busy.current = false;
       setStep(null);
     }
-    await scan(undefined, true);
+    // A résumé picked while the page settled had its look held back: look now with the one picked, and leave the
+    // filling to the BDE, since this step's run was for the other one.
+    await currentScan.current(undefined, true);
+    if (resume.current !== picked) return;
     const page = latestSignals.current;
     const pageCheck = page === null ? null : checkJob(job, page);
     const isOtherJob = page !== null && pageCheck !== null && pageCheck.conflict
@@ -824,25 +832,29 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     await scan(new Set());
   }, [scan, tabId]);
 
-  /** Keeps an answer the BDE typed on the picked résumé, for next time (07 Q58): for all of the candidate's jobs, or this
-   * one only. The answers load again, so the next form that asks it is filled. */
-  const saveAnswer = useCallback(async (row: ReviewRow, isOnlyThisJob: boolean): Promise<boolean> => {
+  /** Keeps an answer the BDE typed on the picked résumé, for next time (07 Q58): for all of the candidate's jobs, or the
+   * picked résumé only. The answers load again, so the next form that asks it is filled. A résumé picked while it saved
+   * keeps its own review: this save's outcome changes nothing on it. */
+  const saveAnswer = useCallback(async (row: ReviewRow, isOnlyThisResume: boolean): Promise<boolean> => {
     const offer = row.saveOffer;
     if (!offer || offer === "saved" || !firmId || !resumeId || busy.current) return false;
+    const picked = resume.current;
     try {
-      await saveResumeAnswers(firmId, candidateId, resumeId, { ...offer.change, only_this: isOnlyThisJob });
+      await saveResumeAnswers(firmId, candidateId, resumeId, { ...offer.change, only_this: isOnlyThisResume });
     } catch (e) {
       if (isSessionExpired(e)) {
         onSessionExpired();
         return false;
       }
+      if (resume.current !== picked) return false;
       // The answers changed in BenchQ meanwhile: a fresh look shows them, then the note says why nothing was saved.
       const isStale = (e as { status?: number }).status === 409;
       if (isStale) await scan();
       setError(isStale ? SAVE_STALE : SAVE_FAILED);
       return false;
     }
-    memory.current.saved.set(memoKeyOf(row), row.field.current.trim());
+    if (resume.current !== picked) return true;
+    memory.current.saved.set(memoKeyOf(row), { resumeId, value: row.field.current.trim() });
     await scan();
     return true;
   }, [candidateId, firmId, onSessionExpired, resumeId, scan]);

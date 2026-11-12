@@ -8,8 +8,8 @@ Create Date: 2026-11-11 12:00:00.000000
   candidate's `job_postings` instead (0027), through `uq_job_postings_firm_candidate_id`, which job search PR 2 (0023)
   made for it.
 
-Nothing is copied or changed in a row. A database with applications on old jobs moves them before 0027, which refuses
-until it's done: locally, `python -m backend.scripts.move_local_jobs_to_postings` (it copies each candidate's old
+Nothing is copied or changed in a row. A database with applications on old jobs moves them before 0027, whose new key
+refuses them otherwise: locally, `python -m backend.scripts.move_local_jobs_to_postings` (it copies each candidate's old
 jobs into `job_postings` and points the applications at them). Follows 0024 (firm capacity's) for
 now: 0025 is another PR's, merging first, and once it's on main this revises 0025.
 """

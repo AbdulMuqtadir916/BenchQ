@@ -35,8 +35,8 @@ def test_0027_refuses_until_the_applications_are_moved_and_then_links_them(scrat
     with engine.connect() as conn:          # 0026 changed no row
         assert conn.execute(text("SELECT job_id FROM applications WHERE id = :id"), {"id": app_id}).scalar() == job_id
 
-    refused = _alembic(name, "upgrade", "0027")
-    assert refused.returncode != 0 and "still name an old pool job" in refused.stderr
+    refused = _alembic(name, "upgrade", "0027")    # the new key refuses an application on an old job
+    assert refused.returncode != 0 and "fk_applications_job_posting" in refused.stderr
 
     with engine.begin() as conn:
         assert move(conn) == {"postings copied": 1, "batches": 1, "applications moved": 1}
@@ -71,7 +71,8 @@ def test_0027_refuses_until_the_applications_are_moved_and_then_links_them(scrat
     # Back down: 0027 lets go, the undo points the application at its old job again, and 0026 restores the old key.
     _ok(_alembic(name, "downgrade", "0026"))
     with engine.begin() as conn:
-        assert undo(conn) == {"applications moved back": 1, "postings dropped": 1, "batches dropped": 1}
+        assert undo(conn) == {"applications moved back": 1, "postings dropped": 1, "postings kept for documents": 0,
+                                "batches dropped": 1}
     _ok(_alembic(name, "downgrade", "0021"))
     with engine.connect() as conn:
         assert conn.execute(text("SELECT job_id FROM applications WHERE id = :id"), {"id": app_id}).scalar() == job_id

@@ -17,10 +17,14 @@ export function useTabConnection(userId: string | null) {
     let mounted = true;
     let windowId: number | undefined;
     let shownTab: number | undefined;
+    // Refreshes overlap (a page's address can take a moment to look up): only the latest one says which tab shows.
+    let latest = 0;
     const refresh = async () => {
+      const request = ++latest;
       const [current] = await chrome.tabs.query({ active: true, currentWindow: true });
       // Chrome hides the address of a page on a site BenchQ can't read yet (#126): its navigation still says it.
       const url = current?.id === undefined ? "" : current.url ?? await pageUrlOf(current.id).catch(() => "");
+      if (request !== latest) return;
       shownTab = current?.id;
       if (mounted) setTab(current?.id === undefined ? null : { id: current.id, url });
     };

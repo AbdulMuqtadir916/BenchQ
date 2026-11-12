@@ -122,6 +122,24 @@ def test_an_edit_over_an_answer_the_user_didnt_see_is_refused(anonymous_client, 
     assert _stored(test_db, v1["id"]).autofill == {}
 
 
+def test_a_save_over_an_answer_saved_after_the_page_opened_is_refused(anonymous_client, test_db, world):
+    """CodeRabbit #129: two tabs shown the same answer; the second save, sent with the answer it was shown, is a 409,
+    a reset too, until it's sent with the answer saved meanwhile."""
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")
+    v1 = _v(anonymous_client, world, c, who="adnan")
+    title = _editor(anonymous_client, world, c, v1["id"])["professional-title"]["answer"]
+    first = {"edit": {"professional-title": "Senior"}, "built": {"professional-title": title},
+             "answered": {"professional-title": title}}
+    assert _patch(anonymous_client, world, c, v1["id"], first).status_code == 200
+    second = {**first, "edit": {"professional-title": "Lead"}}
+    assert _patch(anonymous_client, world, c, v1["id"], second).status_code == 409
+    reset = {"reset": ["professional-title"], "answered": {"professional-title": title}}
+    assert _patch(anonymous_client, world, c, v1["id"], reset).status_code == 409
+    seen = {**second, "answered": {"professional-title": "Senior"}}
+    assert _patch(anonymous_client, world, c, v1["id"], seen).status_code == 200
+    assert _editor(anonymous_client, world, c, v1["id"])["professional-title"]["answer"] == "Lead"
+
+
 def test_an_added_question_said_again_in_other_words_changes_its_answer_and_can_be_removed(anonymous_client, test_db,
                                                                                           world):
     c = _candidate(anonymous_client, test_db, world, bde="adnan")

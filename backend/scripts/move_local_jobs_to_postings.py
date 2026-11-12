@@ -1,17 +1,18 @@
 """Move a local database's applications from the old `jobs` pool onto `job_postings` (the add-job plan, 2026-11-11).
 
-For a developer's own database, between migrations 0026 and 0027 (0027 refuses until this is done):
+For a developer's own database, between migrations 0026 and 0027 (0027's new key refuses applications on old jobs):
 
     python -m backend.scripts.move_local_jobs_to_postings            # copy and point, in one transaction
     python -m backend.scripts.move_local_jobs_to_postings --dry-run  # say what it would do; write nothing
-    python -m backend.scripts.move_local_jobs_to_postings --undo     # point back and drop the copies (before 0026's downgrade)
+    python -m backend.scripts.move_local_jobs_to_postings --undo     # point back and drop the copies no document names (before 0026's downgrade)
 
 - Every old job a candidate has (an application, or a search result in `candidate_jobs`) becomes one of that
   candidate's `job_postings`, source `legacy`, in one batch per candidate (a finished capture, `kind = 'capture'`, run
   by the candidate's BDE or, before one, its creator; `metadata.moved_locally = true`). Its `content` keeps the old job's title, company, description, link,
   location and salary bounds, `posted_at` (the old `discovered_at`), `old_job_id` and `old_source`, read by
-  `backend/applications/postings.py`. Its identity is the job search rule over the old job's id as well, so two old
-  jobs never fold into one posting. A copy already made is reused, so a second run changes nothing.
+  `backend/applications/postings.py`. Its identity is the job search rule, so a search that finds the job again
+  refreshes this copy; when the candidate already has a posting with that identity (two old jobs alike), the old job's
+  id joins it, so two old jobs never fold into one posting. A copy already made is reused, so a second run changes nothing.
 - Each application then names its candidate's copy.
 
 Refuses: a database not at 0026, one not on this machine (`db`, `localhost`), and an application with no candidate.
@@ -68,13 +69,16 @@ def move(conn) -> dict:
             "posted_at": job.discovered_at.isoformat() if job.discovered_at else None,
             "old_job_id": str(old_id), "old_source": job.source,
         }.items() if value not in (None, "")}
+        digest = job_hash(job.company or "", job.title or "", job.description or "")
+        if conn.execute(text("SELECT 1 FROM job_postings WHERE candidate_id = :candidate_id AND job_id = :digest"),
+                        {"candidate_id": candidate_id, "digest": digest}).first():
+            digest = job_hash(job.company or "", job.title or "", f"{job.description or ''}\x1f{old_id}")
         copies[(candidate_id, str(old_id))] = conn.execute(text(
             "INSERT INTO job_postings (firm_id, candidate_id, batch_id, source, first_source, job_id, content, "
             "discovered_at, last_seen_at) VALUES (:firm_id, :candidate_id, :batch_id, :legacy, :legacy, :digest, "
             "CAST(:content AS jsonb), COALESCE(:seen, now()), now()) RETURNING id"),
             {"firm_id": firm_id, "candidate_id": candidate_id, "batch_id": batches[(firm_id, candidate_id)],
-             "legacy": LEGACY, "digest": job_hash(job.company or "", job.title or "",
-                                                  f"{job.description or ''}\x1f{old_id}"),
+             "legacy": LEGACY, "digest": digest,
              "content": json.dumps(content), "seen": job.discovered_at}).scalar()
         made += 1
     pointed = 0
@@ -87,7 +91,9 @@ def move(conn) -> dict:
 
 
 def undo(conn) -> dict:
-    """Point applications back at their old jobs and drop the copies."""
+    """Point applications back at their old jobs and drop the copies, but one a tailored résumé or a cover letter
+    names: dropping it would take the résumé with it (its key cascades) and leave the letter without its job. A copy
+    kept is still the candidate's job, at 0024 too, and a later move reuses it."""
     added = conn.execute(text(
         "SELECT count(*) FROM applications a JOIN job_postings p ON p.id = a.job_id WHERE p.source <> :legacy"),
         {"legacy": LEGACY}).scalar()
@@ -96,10 +102,17 @@ def undo(conn) -> dict:
     pointed = conn.execute(text(
         "UPDATE applications a SET job_id = CAST(p.content->>'old_job_id' AS uuid) FROM job_postings p "
         "WHERE p.id = a.job_id AND p.source = :legacy"), {"legacy": LEGACY}).rowcount
-    dropped = conn.execute(text("DELETE FROM job_postings WHERE source = :legacy AND content ? 'old_job_id'"),
-                           {"legacy": LEGACY}).rowcount
-    batches = conn.execute(text("DELETE FROM scrape_jobs WHERE metadata->>'moved_locally' = 'true'")).rowcount
-    return {"applications moved back": pointed, "postings dropped": dropped, "batches dropped": batches}
+    dropped = conn.execute(text(
+        "DELETE FROM job_postings p WHERE p.source = :legacy AND p.content ? 'old_job_id' "
+        "AND NOT EXISTS (SELECT 1 FROM resumes r WHERE r.job_id = p.id) "
+        "AND NOT EXISTS (SELECT 1 FROM cover_letters c WHERE c.job_id = p.id)"), {"legacy": LEGACY}).rowcount
+    kept = conn.execute(text("SELECT count(*) FROM job_postings WHERE source = :legacy AND content ? 'old_job_id'"),
+                        {"legacy": LEGACY}).scalar()
+    batches = conn.execute(text(
+        "DELETE FROM scrape_jobs s WHERE s.metadata->>'moved_locally' = 'true' "
+        "AND NOT EXISTS (SELECT 1 FROM job_postings p WHERE p.batch_id = s.batch_id)")).rowcount
+    return {"applications moved back": pointed, "postings dropped": dropped, "postings kept for documents": kept,
+            "batches dropped": batches}
 
 
 def main(argv=None) -> None:

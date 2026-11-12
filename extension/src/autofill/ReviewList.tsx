@@ -18,7 +18,7 @@ type ReviewListProps = {
   /** Fills a field with one of the saved answers suggested for it. */
   onSuggest?: (row: ReviewRow, entry: BankEntry) => void;
   /** Keeps an answer the BDE typed for next time, for every job of the candidate or this one only (07 Q58). */
-  onSave?: (row: ReviewRow, isOnlyThisJob: boolean) => Promise<boolean>;
+  onSave?: (row: ReviewRow, isOnlyThisResume: boolean) => Promise<boolean>;
 };
 
 type RowActions = Pick<ReviewListProps, "isFilling" | "onGoTo" | "onListOptions" | "onChoose" | "onSuggest" | "onSave">;
@@ -42,22 +42,22 @@ const SAVE_BUTTON = `bq-secondary inline-flex min-h-[var(--control-sm)] max-w-fu
 const SAVED = "flex items-center gap-1 text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
 
 /** Keeping a typed answer for next time (07 Q58): the button says what saving does, saving a new answer or updating the
- * one saved before (Q21), and "Only this job" keeps it to the picked résumé (Q22). */
+ * one saved before (Q21), and "Only this résumé" keeps it to the picked résumé (Q22): that version, which other jobs may use too. */
 function SaveAnswer({ row, isFilling, onSave }: { row: ReviewRow; isFilling: boolean; onSave: NonNullable<ReviewListProps["onSave"]> }) {
-  const [isOnlyThisJob, setIsOnlyThisJob] = useState(false);
+  const [isOnlyThisResume, setIsOnlyThisResume] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const offer = row.saveOffer;
   if (offer === "saved") return <p data-slot="review-saved-note" className={`pl-[calc(var(--icon-md)+var(--spacing)*2)] ${SAVED}`}>{CHECK}Saved for next time</p>;
   if (!offer) return null;
   const save = async () => {
     setIsSaving(true);
-    await onSave(row, isOnlyThisJob);
+    await onSave(row, isOnlyThisResume);
     setIsSaving(false);
   };
   return <div data-slot="review-save" className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-[calc(var(--icon-md)+var(--spacing)*2)]">
     <button type="button" className={SAVE_BUTTON} disabled={isFilling || isSaving} onClick={() => void save()}>{isSaving ? "Saving…" : offer.label}</button>
     <label className="flex items-center gap-1 text-caption text-[var(--color-text-2)]">
-      <input type="checkbox" checked={isOnlyThisJob} onChange={(event) => setIsOnlyThisJob(event.target.checked)} />Only this job
+      <input type="checkbox" checked={isOnlyThisResume} onChange={(event) => setIsOnlyThisResume(event.target.checked)} />Only this résumé
     </label>
   </div>;
 }

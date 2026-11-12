@@ -211,11 +211,20 @@ export function matchesSearch(entry: AutofillEntry, query: string): boolean {
 
 export type AutofillSection = { id: AutofillTopicId; title: string; entries: AutofillEntry[] };
 
+/** The row an answer being written is on: the question's key, or the user's own question's words. */
+export const draftRowOf = (entry: AutofillEntry) => entry.key ?? `own:${entry.question}`;
+/** The row of a question being added (Add a question). */
+export const ADD_ROW = "add";
+const NO_DRAFTS: ReadonlySet<string> = new Set();
+
 /** The sections shown for a filter and a search, in the topics' order; a section with nothing to show is left out,
- * except "Your questions" on the unfiltered list, which holds "Add a question". */
-export function autofillSections(entries: readonly AutofillEntry[], show: AutofillShow, query: string): AutofillSection[] {
-  const shown = entries.filter((entry) => SHOWN[show](statusOf(entry)) && matchesSearch(entry, query));
-  const isOpenList = show === "all" && words(query).length === 0;
+ * except "Your questions" on the unfiltered list, which holds "Add a question". A row holding an answer being written
+ * (`drafts`) stays whatever the filter or search, "Your questions" too while a question is being added, so changing
+ * either never closes an editor and drops what it holds. */
+export function autofillSections(entries: readonly AutofillEntry[], show: AutofillShow, query: string,
+  drafts: ReadonlySet<string> = NO_DRAFTS): AutofillSection[] {
+  const shown = entries.filter((entry) => drafts.has(draftRowOf(entry)) || (SHOWN[show](statusOf(entry)) && matchesSearch(entry, query)));
+  const isOpenList = (show === "all" && words(query).length === 0) || drafts.has(ADD_ROW);
   return AUTOFILL_TOPICS
     .map(({ id, title }) => ({ id, title, entries: shown.filter((entry) => topicOf(entry) === id) }))
     .filter(({ id, entries: inTopic }) => inTopic.length > 0 || (id === "custom" && isOpenList));

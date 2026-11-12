@@ -33,7 +33,7 @@ def test_tracking_upgrade_and_rollback_preserve_legacy_status_and_history(scratc
                      {"id": application_id, "firm": DEFAULT_FIRM_ID, "job": job_id, "history": json.dumps(history)})
 
     for _ in range(2):
-        # A row from before 0007 has no candidate, so it goes no higher than 0026: 0027 refuses an application without.
+        # A row from before 0007 has no candidate, so it goes no higher than 0026: 0027's NOT NULL refuses an application without one.
         _ok(_alembic(name, "upgrade", "0026"))
         with engine.connect() as conn:
             app = conn.execute(text("SELECT status, status_transitions, status_revision, last_manual_change_at "

@@ -106,6 +106,22 @@ def test_the_same_job_code_in_another_link_is_the_job_they_have(anonymous_client
     assert (other.status_code, other.json()["job_created"]) == (201, True)
 
 
+def test_a_job_code_from_another_employer_or_another_requisition_is_another_job(anonymous_client, test_db, world):
+    """CodeRabbit #129: two employers on Workday share the site, not their codes; two requisitions for one role at one
+    employer are two jobs."""
+    candidate = _candidate(anonymous_client, world)
+    acme = {**JOB, "url": "https://acme.wd5.myworkdayjobs.com/External/job/Remote/QA-Engineer_R123456"}
+    first = _add(anonymous_client, world, candidate, acme).json()
+    globex = {**acme, "company": "Globex Corp", "url": "https://globex.wd1.myworkdayjobs.com/Careers/job/Remote/QA-Engineer_R123456"}
+    assert _add(anonymous_client, world, candidate, globex).json()["job_created"] is True
+    other = {**acme, "url": "https://acme.wd5.myworkdayjobs.com/External/job/Remote/QA-Engineer_R654321",
+             "description": "<p>Another team.</p>"}
+    again = _add(anonymous_client, world, candidate, other).json()
+    assert again["job_created"] is True and again["id"] != first["id"]
+    same = _add(anonymous_client, world, candidate, {**acme, "url": acme["url"] + "?source=LinkedIn"}).json()
+    assert (same["id"], same["job_created"]) == (first["id"], False)
+
+
 def test_adding_a_job_already_applied_to_keeps_its_application(anonymous_client, test_db, world):
     candidate = _candidate(anonymous_client, world)
     first = _add(anonymous_client, world, candidate).json()

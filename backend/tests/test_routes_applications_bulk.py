@@ -157,3 +157,15 @@ def test_bulk_delete_rejects_non_list_ids(api_client, test_db):
     """A malformed body is a 400 here too."""
     resp = api_client.post("/api/applications/bulk-delete", json={"ids": {"id": 1}})
     assert resp.status_code == 400, resp.text
+
+
+def test_bulk_update_refuses_undo_for_a_candidates_application(api_client, test_db):
+    """CodeRabbit #129: the status command has no Undo (PATCH refuses `undo` too), so a bulk Undo is 400, never a move."""
+    a = _make_app(test_db, "Bulk Undo", status="interview_scheduled")
+    before = (a.status, a.status_revision, len(a.status_transitions or []))
+    resp = api_client.post("/api/applications/bulk-update",
+                           json={"ids": [str(a.id)], "status": "applied", "undo": True, "expected_revisions": _revisions(a)})
+    assert resp.status_code == 400, resp.text
+    test_db.expire_all()
+    row = test_db.query(Application).filter(Application.id == a.id).first()
+    assert (row.status, row.status_revision, len(row.status_transitions or [])) == before

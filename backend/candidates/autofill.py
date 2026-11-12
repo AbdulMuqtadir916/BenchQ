@@ -649,11 +649,19 @@ def checked_change(edit: Mapping, reset: list, add: Mapping, remove: list) -> di
             "remove": [q.strip() for q in remove if isinstance(q, str) and q.strip()]}
 
 
-def unseen(candidate, version, edited: Mapping, shown_built: Mapping, today: date) -> list[str]:
-    """The edited keys whose built answer now isn't the one the user was shown (`shown_built`): saving over it would
-    replace an answer they never saw, such as a rate the manager changed meanwhile (Abdul's fourth review, §8.1)."""
+def unseen(candidate, version, edited: Mapping, shown_built: Mapping, today: date, *, answered: Mapping | None = None,
+           reset=()) -> list[str]:
+    """The edited keys whose built answer now isn't the one the user was shown (`shown_built`), and the edited or reset
+    keys whose answer (an edit, else the built one) now isn't the one they were shown (`answered`, when sent): saving
+    over it would replace an answer they never saw, such as a rate the manager changed meanwhile (Abdul's fourth
+    review, §8.1) or an answer saved from another tab after this page opened."""
     built = _answers(candidate, version, today)
-    return [key for key in edited if not _same(shown_built.get(key), built.get(key))]
+    stale = [key for key in edited if not _same(shown_built.get(key), built.get(key))]
+    if answered:
+        now = shown(candidate, version, today)
+        stale += [key for key in dict.fromkeys([*edited, *reset])
+                  if key in answered and key not in stale and not _same(answered[key], now.get(key))]
+    return stale
 
 
 def shown(candidate, version, today: date) -> dict:

@@ -36,7 +36,7 @@ describe("an answer in the editor", () => {
 
 describe("what a save sends (docs/02 §8.3)", () => {
   it("an edit carries the built answer the BDE was shown", () => {
-    expect(editChange(city, "Dallas", false)).toEqual({ edit: { "address-city": "Dallas" }, built: { "address-city": "Irving" }, reset: [], add: {}, remove: [], onlyThis: false });
+    expect(editChange(city, "Dallas", false)).toEqual({ edit: { "address-city": "Dallas" }, built: { "address-city": "Irving" }, answered: { "address-city": "Irving" }, reset: [], add: {}, remove: [], onlyThis: false });
     expect(editChange(rate, 90, true)).toMatchObject({ edit: { "pay-rate": 90 }, built: { "pay-rate": 85 }, onlyThis: true });
     expect(editChange(github, "github.com/ravi", false)).toMatchObject({ built: { "github-url": null } });
   });

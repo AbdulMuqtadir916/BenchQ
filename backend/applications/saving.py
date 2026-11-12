@@ -44,28 +44,45 @@ def _link_ids(url) -> set[str]:
     return {code.lower() for code in [*query, *_ID_IN_LINK.findall(link.path)] if len(code) >= 4}
 
 
-def _site(url) -> str:
+def _employer_part(url) -> tuple[str, str]:
+    """The part of a link one employer owns on a site many share: its host (Workday's acme.wd5.myworkdayjobs.com) and
+    the first step of its path (boards.greenhouse.io/acme/…). Empty for a link that can't be read."""
     try:
-        return ".".join((urlsplit(str(url or "")).hostname or "").lower().split(".")[-2:])
+        link = urlsplit(str(url or ""))
     except ValueError:
-        return ""
+        return "", ""
+    host = (link.hostname or "").lower().removeprefix("www.")
+    return host, link.path.strip("/").split("/")[0].lower()
+
+
+def _company(name) -> str:
+    return " ".join(str(name or "").split()).lower()
 
 
 def _same_job_code(content: dict, url: str, company: str | None) -> bool:
-    """A saved job whose link carries one of this link's job codes, on the same site or at the same company."""
+    """A saved job whose link carries one of this link's job codes, from the same employer: the same company, or the
+    same employer's part of one site (`_employer_part`). A requisition code is unique only inside one employer: two
+    employers on Workday with R123456 have two jobs."""
     if not _link_ids(url) & _link_ids(content.get("url")):
         return False
-    same_site = bool(_site(url)) and _site(url) == _site(content.get("url"))
-    return same_site or " ".join(str(content.get("company") or "").split()).lower() == " ".join((company or "").split()).lower()
+    here = _employer_part(url)
+    if here[0] and here == _employer_part(content.get("url")):
+        return True
+    return bool(_company(company)) and _company(content.get("company")) == _company(company)
 
 
 def _words(text) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", str(text or "").lower()))
 
 
-def _same_role(content: dict, fields) -> bool:
-    """The same title word for word (any order, any punctuation), and places that share a word or aren't both named."""
+def _same_role(content: dict, fields, url) -> bool:
+    """The same title word for word (any order, any punctuation), places that share a word or aren't both named, and
+    links that don't name two jobs: two requisitions for one role on the same employer's site are two jobs (codes from
+    two sites say nothing, since each site numbers its own)."""
     if not _words(fields.title) or _words(content.get("title")) != _words(fields.title):
+        return False
+    codes, theirs = _link_ids(url), _link_ids(content.get("url"))
+    if codes and theirs and not codes & theirs and _employer_part(url) == _employer_part(content.get("url")):
         return False
     here, there = _words(content.get("location")), _words(fields.location)
     return not here or not there or bool(here & there)
@@ -93,7 +110,7 @@ def add_job(db, *, firm_id, actor, candidate, source: str, job: dict) -> tuple[J
         same_company = scoped(db, JobPosting, firm_id).filter(
             JobPosting.candidate_id == candidate.id,
             func.lower(func.trim(JobPosting.content["company"].astext)) == " ".join(fields.company.split()).lower())
-        existing = next((posting for posting in same_company if _same_role(posting.content or {}, fields)), None)
+        existing = next((posting for posting in same_company if _same_role(posting.content or {}, fields, content.get("url"))), None)
     for code in sorted(_link_ids(content.get("url"))) if existing is None else []:
         # The same job by the code in its link (Greenhouse's 8329677 on the company's own careers site, too).
         coded = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id == candidate.id,

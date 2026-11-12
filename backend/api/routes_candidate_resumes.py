@@ -170,11 +170,13 @@ def get_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID
 
 class AutofillIn(BaseModel):
     """A change to one version's autofill (docs/02 §8.3): `edit` by key, with `built`, each edited key's built answer
-    as the user was shown it; `reset` keys; `add` questions with their answers; `remove` questions; `only_this` keeps
-    it to this version instead of every job of the candidate (07 Q30)."""
+    as the user was shown it, and `answered`, each edited or reset key's answer as the user was shown it (their edit,
+    else the built one); `reset` keys; `add` questions with their answers; `remove` questions; `only_this` keeps it to
+    this version instead of every job of the candidate (07 Q30)."""
     model_config = ConfigDict(extra="forbid")
     edit: dict[str, Any] = Field(default_factory=dict)
     built: dict[str, Any] = Field(default_factory=dict)
+    answered: dict[str, Any] = Field(default_factory=dict)
     reset: list[str] = Field(default_factory=list)
     add: dict[str, str] = Field(default_factory=dict)
     remove: list[str] = Field(default_factory=list)
@@ -188,6 +190,7 @@ def save_resume_autofill(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id:
     résumé unless `only_this` (Q30, Q44). 409 when an edited question's built answer isn't the one the user was shown.
     Answers with the version's autofill as the screen reads it and how many versions changed."""
     if len(body.edit) + len(body.reset) > len(autofill_answers.QUESTIONS) or \
+            len(body.answered) > len(autofill_answers.QUESTIONS) or \
             len(body.add) + len(body.remove) > autofill_answers.MAX_CUSTOM:
         raise HTTPException(status_code=400, detail="That's more than one résumé holds.")
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_change_resume)
@@ -197,7 +200,8 @@ def save_resume_autofill(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id:
         change = autofill_answers.checked_change(body.edit, body.reset, body.add, body.remove)
         if missing := [key for key in change["edit"] if key not in body.built]:
             raise autofill_answers.Refused(f"Send the built answer you were shown for {', '.join(missing)}.")
-        if autofill_answers.unseen(candidate, row, change["edit"], body.built, today):
+        if autofill_answers.unseen(candidate, row, change["edit"], body.built, today, answered=body.answered,
+                                   reset=change["reset"]):
             raise HTTPException(status_code=409, detail="An answer changed since you opened this page. Reload it "
                                                         "and make your change again.")
         changed = versions.save_autofill(db, actor, candidate, row, change, only_this=body.only_this, today=today)

@@ -8,12 +8,11 @@ Create Date: 2026-11-11 12:05:00.000000
   application names one of its own candidate's jobs, in its own firm; a job with an application can't be deleted.
 - `applications.candidate_id` is NOT NULL: every application is a candidate's.
 
-Refuses, changing nothing, while an application has no candidate or names anything but one of its candidate's
-postings (an old pool job): move them first. Locally, `python -m backend.scripts.move_local_jobs_to_postings`, run at
-0026, does that; a database with no such rows needs nothing. Follows 0026.
+Nothing is moved here: the app isn't live, so only a developer's database holds applications, and those were moved
+by `python -m backend.scripts.move_local_jobs_to_postings` (run at 0026). On a database that still has an application
+without a candidate or on an old pool job, the NOT NULL or the new key refuses it and the upgrade stops. Follows 0026.
 """
 from alembic import op
-import sqlalchemy as sa
 
 
 revision = '0027'
@@ -23,13 +22,6 @@ depends_on = None
 
 
 def upgrade():
-    unmoved = op.get_bind().execute(sa.text(
-        "SELECT count(*) FROM applications a WHERE a.candidate_id IS NULL OR NOT EXISTS ("
-        "SELECT 1 FROM job_postings p WHERE p.id = a.job_id AND p.candidate_id = a.candidate_id "
-        "AND p.firm_id = a.firm_id)")).scalar()
-    if unmoved:
-        raise RuntimeError(f"{unmoved} application(s) still name an old pool job (or no candidate). Move them first: "
-                           "at 0026, run `python -m backend.scripts.move_local_jobs_to_postings`, then upgrade again.")
     op.alter_column('applications', 'candidate_id', nullable=False)
     op.create_foreign_key('fk_applications_job_posting', 'applications', 'job_postings',
                           ['firm_id', 'candidate_id', 'job_id'], ['firm_id', 'candidate_id', 'id'], ondelete='RESTRICT')

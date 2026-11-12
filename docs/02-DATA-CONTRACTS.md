@@ -1722,13 +1722,15 @@ records such as the work history, shown but never edited here, 07 Q42).
 (`resume.edit` and `can_change_resume`), the candidate locked as a save locks it:
 
 ```json
-{ "edit": {"pay-rate": 90}, "built": {"pay-rate": 85}, "reset": ["github-url"],
-  "add": {"Why do you want to work here?": "Payments."}, "remove": ["Shift?"], "only_this": false }
+{ "edit": {"pay-rate": 90}, "built": {"pay-rate": 85}, "answered": {"pay-rate": 85, "github-url": "github.com/ravi"},
+  "reset": ["github-url"], "add": {"Why do you want to work here?": "Payments."}, "remove": ["Shift?"], "only_this": false }
 ```
 
 - `edit` by key: each answer as its `type` takes it (text up to 4000 characters, a list of up to 100 texts of up to
   300, a number from 0, `true`/`false`, a real date). An edit equal to the built answer is no edit. `built` carries, for
-  each edited key, the built answer the user was shown; a missing one is 400 and a different one 409.
+  each edited key, the built answer the user was shown; a missing one is 400 and a different one 409. `answered`,
+  optional, carries each edited or reset key's answer as the user was shown it (their edit, else the built one); a
+  different one is 409, so a save never replaces an answer saved after the page opened (another tab, the extension).
 - `reset` keys drop their edits (the built answer shows again). `add` sets the user's questions: one that is already
   there (compared without capitals, spacing or punctuation, its `also` too, 07 Q43) gets the new answer; a new one goes
   last. A question in a fixed question's words is refused: its answer is edited instead. `remove` drops questions.

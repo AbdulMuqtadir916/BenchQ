@@ -318,7 +318,7 @@ describe("keeping a typed answer (07 Q58)", () => {
     return onSave;
   };
 
-  it("lists what the BDE typed first, each with its button and Only this job", async () => {
+  it("lists what the BDE typed first, each with its button and Only this résumé", async () => {
     const typedRow = holding("Why us?", false, "Payments.", "same", { saveOffer: offer });
     const onSave = renderWith([row("Email", true), typedRow]);
     expect(titles()).toEqual(["Save for next time (1)", "Needs you (1)"]);

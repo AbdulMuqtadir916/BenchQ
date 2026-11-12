@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { addJob, BENCHQ_URL } from "../api";
-import AddJobCard, { jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
+import AddJobCard, { isSavedJob, jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
 import { missingAccess, requestAccess } from "./site-access";
 import { readJobPage } from "./tab-bridge";
 
@@ -190,5 +190,18 @@ describe("a site BenchQ may not read yet (#126)", () => {
     expect(looksLikeJobPage("https://acme.test/opportunities?gh_jid=8329677")).toBe(true);
     expect(looksLikeJobPage("https://mail.example.test/inbox/42")).toBe(false);
     expect(looksLikeJobPage("https://news.example.test/jobsearch-tips")).toBe(false);
+  });
+});
+
+describe("a job the candidate has, by its code (CodeRabbit #129)", () => {
+  const page = (url: string, company = "Acme") => ({ title: "QA Engineer", company, description: "", location: "Remote", url, isJobPage: true });
+  const known = (url: string, company = "Acme") => ({ title: "QA Engineer", company, location: "Remote", url });
+  const acme = "https://acme.wd5.myworkdayjobs.com/External/job/Remote/QA-Engineer_R123456";
+
+  it("needs the same employer for a shared requisition code, and tells two requisitions for one role apart", () => {
+    expect(isSavedJob(page("https://globex.wd1.myworkdayjobs.com/Careers/job/Remote/QA-Engineer_R123456", "Globex"), known(acme))).toBe(false);
+    expect(isSavedJob(page(`${acme}?source=LinkedIn`), known(acme))).toBe(true);
+    expect(isSavedJob(page("https://acme.wd5.myworkdayjobs.com/External/job/Remote/QA-Engineer_R654321"), known(acme))).toBe(false);
+    expect(isSavedJob(page("https://www.linkedin.com/jobs/view/3912345678"), known(acme))).toBe(true);
   });
 });

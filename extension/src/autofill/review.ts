@@ -168,7 +168,8 @@ const recordText = (value: unknown) => (typeof value === "string" ? value.trim()
 const FROM_RECORD: Partial<Record<string, [keyof HistoryRecords, (record: Record<string, unknown>) => string]>> = {
   "education-school": ["education", (record) => recordText(record.school)],
   "education-degree": ["education", (record) => recordText(record.degree)],
-  "graduation-year": ["education", (record) => recordText(record.graduation_date).match(/\b(19|20)\d{2}\b/)?.[0] ?? ""],
+  // The last year of a range ("2013 – 2017"), as the backend's graduation year reads it.
+  "graduation-year": ["education", (record) => recordText(record.graduation_date).match(/\b(?:19|20)\d{2}\b/g)?.at(-1) ?? ""],
   "current-company": ["work", (record) => recordText(record.company)],
   "current-title": ["work", (record) => recordText(record.title)],
 };
@@ -211,13 +212,20 @@ export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewR
     ordered.set(kind, next);
     return next;
   };
-  const seen = new Map<string, number>();
+  // Each field's block, by kind: a block ends where a question it already asked comes again (school, degree, school:
+  // the second school starts the next block), so a block that lacks a field never shifts the next one's record.
+  const blocks = new Map<keyof HistoryRecords, { index: number; asked: Set<string> }>();
   return rows.map((row) => {
     const type = typeOf(row.field);
     const from = type ? FROM_RECORD[type] : undefined;
     if (!type || !from) return row;
-    const index = seen.get(type) ?? 0;
-    seen.set(type, index + 1);
+    let block = blocks.get(from[0]);
+    if (!block || block.asked.has(type)) {
+      block = { index: (block?.index ?? -1) + 1, asked: new Set() };
+      blocks.set(from[0], block);
+    }
+    block.asked.add(type);
+    const index = block.index;
     if (!takesRecord(row)) return row;
     const base = { key: row.key, field: row.field, isUnsaved: row.isUnsaved };
     if (index === 0 && row.status !== "manual") {
@@ -307,7 +315,8 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   const type = fieldTypeFor(asked) ?? classifyField(asked);
   const blocked = neverFillReason(field) ?? (type && manualOnlyReason(type));
   if (blocked) return { ...scanned, status: "blocked", reason: blocked, isUnsaved: staysOutOfSavedForm(blocked) };
-  const base = type?.startsWith("eeo-") ? { ...scanned, isUnsaved: true } : scanned;
+  // Self-identification (the EEO questions, pronouns) is never kept in the form saved with an application (docs/02 §8.1).
+  const base = type?.startsWith("eeo-") || type === "pronouns" ? { ...scanned, isUnsaved: true } : scanned;
   const manual = (reason: string): ReviewRow => ({ ...base, status: "manual", reason });
   if (asksForSelfRating(asked.label)) return manual("This asks for a self-rating, so it's yours to answer.");
   if (field.kind === "custom") return manual("BenchQ can't fill this kind of control yet.");

@@ -51,6 +51,9 @@ export type ResumeAutofill = z.infer<typeof ResumeAutofillSchema>;
 export const AutofillChangeSchema = z.object({
   edit: z.record(z.string(), AutofillAnswerSchema),
   built: z.record(z.string(), AutofillAnswerSchema),
+  /** Each edited or reset key's answer the user was shown (their edit, else the built one): a save over one changed
+   * since is refused (409). */
+  answered: z.record(z.string(), AutofillAnswerSchema).optional(),
   reset: z.array(z.string()),
   add: z.record(z.string(), z.string()),
   remove: z.array(z.string()),

@@ -18,6 +18,7 @@ import { AutofillRail } from "./autofill-rail";
 import { AutofillSectionCard } from "./autofill-section";
 import { AutofillSkeleton } from "./autofill-skeleton";
 import { AutofillToolbar } from "./autofill-toolbar";
+import { useDraftRows } from "./use-unsaved-answers";
 
 /** The filter and the search, in the URL (CLAUDE.md): a stale or hand-typed value falls back to the open list. */
 const AutofillView = z.object({
@@ -96,7 +97,8 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
 
   const entries = autofillQuery.data?.entries;
   const summary = useMemo(() => summarize(entries ?? []), [entries]);
-  const sections = useMemo(() => autofillSections(entries ?? [], view.show, view.q), [entries, view.show, view.q]);
+  const drafts = useDraftRows();
+  const sections = useMemo(() => autofillSections(entries ?? [], view.show, view.q, drafts), [entries, view.show, view.q, drafts]);
 
   const onListKey = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target) || (event.key !== "j" && event.key !== "k")) return;

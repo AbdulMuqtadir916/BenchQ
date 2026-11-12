@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { editChange, isEditable, keepMineChange, removeChange, resetChange } from "@/lib/derive/autofill";
-import { ANSWER_SUGGESTIONS, builderSectionOf, displayAnswer, sourceOf, statusOf } from "@/lib/derive/autofill-view";
+import { ANSWER_SUGGESTIONS, builderSectionOf, displayAnswer, draftRowOf, sourceOf, statusOf } from "@/lib/derive/autofill-view";
 import type { AutofillAnswer, AutofillChange, AutofillEntry } from "@/lib/schemas/resume-autofill";
 import type { ResumeSectionKey } from "@/lib/schemas/resume-document";
 import { AnswerEditor } from "./answer-editor";
@@ -130,7 +130,7 @@ export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditI
         </div>
       </div>
       {isEditing ? (
-        <AnswerEditor question={entry.question} type={entry.type} initial={entry.answer} isSaving={isSaving}
+        <AnswerEditor question={entry.question} type={entry.type} initial={entry.answer} isSaving={isSaving} draftRow={draftRowOf(entry)}
           suggestions={entry.key ? ANSWER_SUGGESTIONS[entry.key] : undefined}
           isMultiline={entry.kind === "CUSTOM" || entry.key === "summary"} onSave={saveAnswer} onCancel={closeEditor} />
       ) : null}

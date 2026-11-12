@@ -49,15 +49,17 @@ export function parseDraft(draft: string, type: AutofillAnswerType | null): Pars
 
 const nothing = (onlyThis: boolean): AutofillChange => ({ edit: {}, built: {}, reset: [], add: {}, remove: [], onlyThis });
 
-/** The user's answer to one of BenchQ's questions, sent with the built answer they were shown (07 Q14). */
+/** The user's answer to one of BenchQ's questions, sent with the built answer and the answer they were shown (07 Q14):
+ * the route refuses a save over one changed since. */
 export function editChange(entry: AutofillEntry, answer: AutofillAnswer, onlyThis: boolean): AutofillChange {
   const key = entry.key ?? "";
   const shown = entry.kind === "EDITED" ? (entry.built ?? null) : entry.answer;
-  return { ...nothing(onlyThis), edit: { [key]: answer }, built: { [key]: shown } };
+  return { ...nothing(onlyThis), edit: { [key]: answer }, built: { [key]: shown }, answered: { [key]: entry.answer ?? null } };
 }
 
 /** Back to BenchQ's answer: the user's edit goes. Also "Use the new one" for an edit that stopped applying (07 Q15). */
-export const resetChange = (entry: AutofillEntry, onlyThis: boolean): AutofillChange => ({ ...nothing(onlyThis), reset: [entry.key ?? ""] });
+export const resetChange = (entry: AutofillEntry, onlyThis: boolean): AutofillChange =>
+  ({ ...nothing(onlyThis), reset: [entry.key ?? ""], answered: { [entry.key ?? ""]: entry.answer ?? null } });
 
 /** "Keep mine" (07 Q15): the user's earlier answer again, over the built answer that replaced it. */
 export const keepMineChange = (entry: AutofillEntry, onlyThis: boolean): AutofillChange => editChange(entry, entry.replaced ?? null, onlyThis);

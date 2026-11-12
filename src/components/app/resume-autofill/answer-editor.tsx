@@ -19,15 +19,17 @@ type AnswerEditorProps = {
   isSaving: boolean;
   onSave: (answer: AutofillAnswer) => void;
   onCancel: () => void;
+  /** The row the answer is on (`draftRowOf`): a filter or a search keeps it in view while it's being written. */
+  draftRow: string;
 };
 
 /** One answer being written, in the control its type takes. Enter saves a one-line answer, Esc cancels. */
-export function AnswerEditor({ question, type, initial, isMultiline, suggestions, isSaving, onSave, onCancel }: AnswerEditorProps) {
+export function AnswerEditor({ question, type, initial, isMultiline, suggestions, isSaving, onSave, onCancel, draftRow }: AnswerEditorProps) {
   const id = useId();
   const [draft, setDraft] = useState(() => draftOf(initial));
   const [error, setError] = useState<string | null>(null);
   const isBox = isMultiline || type === "texts";
-  useUnsavedAnswer(draft !== draftOf(initial));
+  useUnsavedAnswer(draft !== draftOf(initial), draftRow);
 
   const submit = () => {
     const parsed = parseDraft(draft, type);

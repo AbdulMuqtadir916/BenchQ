@@ -130,12 +130,18 @@ def _build_gmail_query(db) -> str:
     return " ".join(parts)
 
 
+def _matchable_applications(db) -> list:
+    """The applications this monitor may match a reply to: none. It reads the deployment's own Gmail, which is no
+    candidate's, and matched only applications without a candidate (the old pool's). Since migration 0027 every
+    application is a candidate's, matched from that candidate's own mailbox within their firm (`backend/inbox/`): no
+    scope ties one of them to this inbox."""
+    return []
+
+
 def _get_active_apps_for_llm(db) -> list:
     """Build numbered list of active applications for LLM prompt."""
-    active_statuses = ["applied", "interview"]
-    apps = db.query(Application).filter(Application.candidate_id.is_(None), Application.status.in_(active_statuses)).all()
     result = []
-    for i, app in enumerate(apps, 1):
+    for i, app in enumerate(_matchable_applications(db), 1):
         job = posting_job(app.posting)
         if not (job.company or job.title):
             continue
@@ -422,11 +428,13 @@ def _email_matches_company(company: str, from_header: str, subject: str,
 
 
 def _match_email_to_application(db, from_header: str, subject: str, body: str, sender_domain: str):
-    """Match an email to an active application anchored on the sender; a body-only company
-    match is used only as a fallback after every app is checked for a stronger sender match."""
-    active_statuses = ["applied", "interview"]
-    apps = db.query(Application).filter(Application.candidate_id.is_(None), Application.status.in_(active_statuses)).all()
+    """The application an email answers, among those this monitor may match (`_matchable_applications`)."""
+    return _best_match(_matchable_applications(db), from_header, subject, body, sender_domain)
 
+
+def _best_match(apps, from_header: str, subject: str, body: str, sender_domain: str):
+    """Match an email to one of `apps` anchored on the sender; a body-only company
+    match is used only as a fallback after every app is checked for a stronger sender match."""
     body_lower = (body or "").lower()
     body_fallback = None
     for app in apps:

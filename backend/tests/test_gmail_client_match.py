@@ -10,12 +10,6 @@ def _app(company, title, status="applied"):
     return app
 
 
-def _db_with(apps):
-    db = MagicMock()
-    db.query.return_value.filter.return_value.all.return_value = apps
-    return db
-
-
 # --- _email_matches_company (pure helper) ---
 
 def test_helper_matches_company_in_sender_domain():
@@ -75,10 +69,10 @@ def test_helper_short_token_no_substring_false_positive():
 
 def test_amazon_email_does_not_match_kpler_or_docusign_by_shared_title():
     """End to end through the matcher: an Amazon acknowledgment must not match Kpler/DocuSign applications sharing the title 'Product Manager'."""
-    from backend.email_monitor.gmail_client import _match_email_to_application
+    from backend.email_monitor.gmail_client import _best_match
     apps = [_app("Kpler", "Product Manager"), _app("DocuSign", "Product Manager")]
-    matched = _match_email_to_application(
-        _db_with(apps),
+    matched = _best_match(
+        apps,
         from_header="Amazon.jobs <no-reply@amazon.com>",
         subject="Thanks for applying to the Product Manager role",
         body="Thank you for applying to the Product Manager position at Amazon.",
@@ -88,13 +82,13 @@ def test_amazon_email_does_not_match_kpler_or_docusign_by_shared_title():
 
 
 def test_matcher_picks_the_correct_company():
-    from backend.email_monitor.gmail_client import _match_email_to_application
+    from backend.email_monitor.gmail_client import _best_match
     apps = [
         _app("Kpler", "Product Manager"),
         _app("Amazon", "Senior Product Manager - Tech, Prime Video Financial Systems"),
     ]
-    matched = _match_email_to_application(
-        _db_with(apps),
+    matched = _best_match(
+        apps,
         from_header="Amazon.jobs <no-reply@amazon.com>",
         subject="Your Amazon application",
         body="Thank you for applying.",
@@ -104,13 +98,22 @@ def test_matcher_picks_the_correct_company():
 
 
 def test_matcher_returns_none_when_no_company_matches_sender():
-    from backend.email_monitor.gmail_client import _match_email_to_application
+    from backend.email_monitor.gmail_client import _best_match
     apps = [_app("Kpler", "Product Manager")]
-    matched = _match_email_to_application(
-        _db_with(apps),
+    matched = _best_match(
+        apps,
         from_header="no-reply@greenhouse-mail.io",
         subject="Application update",
         body="Your application status has changed.",
         sender_domain="greenhouse-mail.io",
     )
     assert matched is None
+
+
+def test_the_monitor_matches_no_candidates_application():
+    """CodeRabbit #129: this inbox is no candidate's, and every application is a candidate's since migration 0027."""
+    from backend.email_monitor.gmail_client import _get_active_apps_for_llm, _match_email_to_application
+    db = MagicMock()
+    assert _match_email_to_application(db, "Amazon <no-reply@amazon.com>", "Your Amazon application", "",
+                                       "amazon.com") is None
+    assert _get_active_apps_for_llm(db) == [] and not db.query.called

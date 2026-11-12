@@ -542,6 +542,17 @@ describe("a school or job block that repeats (#132)", () => {
     expect(rows.map((row) => [row.status, row.proposed ?? null])).toEqual([["ready", "Osmania University"], ["ready", "JNTU"], ["manual", null]]);
   });
 
+  it("gives a block's fields that block's record when an earlier block lacks one, and a year range its last year", () => {
+    // CodeRabbit #129: the third school's degree was the second school's when the second block had no degree field.
+    const three = { education: [{ school: "Osmania University", degree: "MS", graduation_date: "2015 – 2017" },
+      { school: "JNTU", degree: "BTech", graduation_date: "2011 – 2015" }, { school: "IIT", degree: "PhD", graduation_date: "2018 – 2022" }], work: [] };
+    const fields = ["School", "Degree", "School", "School", "Degree", "Graduation year"].map((label, n) => field(label, { id: `f${n}` }));
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" },
+      { ...entry("What is your highest degree?", "MS"), key: "education-degree" }, { ...entry("What year did you graduate?", "2017"), key: "graduation-year" }];
+    expect(withHistory(buildReview(fields, bank), three).map((row) => row.proposed ?? null))
+      .toEqual(["Osmania University", "MS", "JNTU", "IIT", "PhD", "2022"]);
+  });
+
   it("starts from the school the first block already holds, and keeps a row the review held back for another reason", () => {
     const fields = [field("School", { id: "f0", current: "JNTU" }), field("School", { id: "f1" })];
     const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }];
@@ -583,5 +594,11 @@ describe("a school or job block that repeats (#132)", () => {
   it("leaves a form with one block as it was", () => {
     const rows = buildReview([field("School")], [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]);
     expect(withHistory(rows, history)).toEqual(rows);
+  });
+});
+
+describe("self-identification stays out of the saved form (CodeRabbit #129)", () => {
+  it("keeps pronouns out, like the EEO questions", () => {
+    expect(review(field("Pronouns")).isUnsaved).toBe(true);
   });
 });

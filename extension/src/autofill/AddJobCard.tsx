@@ -76,14 +76,41 @@ export function jobIdsOf(url: string | null | undefined): string[] {
     .filter((id) => id.length >= 4);
 }
 
+/** The part of a link one employer owns on a site many share: its host (Workday's acme.wd5.myworkdayjobs.com) and the
+ * first step of its path (boards.greenhouse.io/acme/…), as `backend/applications/saving.py` reads it. */
+function employerPartOf(url: string | null | undefined): string | null {
+  try {
+    const link = new URL(url ?? "");
+    return `${link.hostname.toLowerCase().replace(/^www\./, "")}/${link.pathname.replace(/^\/+/, "").split("/")[0]!.toLowerCase()}`;
+  } catch {
+    return null;
+  }
+}
+
 /** Whether the page shows a saved job by its code: a code in the page or its links that the saved job's link has too,
- * on the same site or at the same company (a requisition number is unique only inside one company). */
+ * from the same employer: the same company, or the same employer's part of one site. A requisition number is unique
+ * only inside one employer, so two employers on Workday with R123456 have two jobs. */
 function sharesJobId(found: PageJob, known: KnownJob): boolean {
   const saved = jobIdsOf(known.url);
   const seen = new Set([...(found.ids ?? []), ...[found.url, ...(found.links ?? [])].flatMap(jobIdsOf)]);
   if (!saved.some((id) => seen.has(id))) return false;
-  return jobKeyOf(found.url)?.site === jobKeyOf(known.url ?? "")?.site || sameCompany(found.company, known.company);
+  const part = employerPartOf(found.url);
+  return (part !== null && part === employerPartOf(known.url)) || sameCompany(found.company, known.company);
 }
+
+/** Two requisitions for one role on the same employer's site are two jobs: both links carry codes and share none.
+ * Codes from two sites say nothing, since each site numbers its own. */
+function isOtherRequisition(found: PageJob, known: KnownJob): boolean {
+  const [here, saved] = [jobIdsOf(found.url), jobIdsOf(known.url)];
+  const part = employerPartOf(found.url);
+  return here.length > 0 && saved.length > 0 && !here.some((id) => saved.includes(id)) && part !== null
+    && part === employerPartOf(known.url);
+}
+
+/** Whether the page's job is this saved job: the same listing, unless the links name two requisitions, or a job code
+ * they share from the same employer. */
+export const isSavedJob = (found: PageJob, known: KnownJob) =>
+  (sameListing(found, known) && !isOtherRequisition(found, known)) || sharesJobId(found, known);
 
 /** Whether the panel looks at the page at all: a web page that isn't BenchQ's own and isn't one of the candidate's jobs. */
 export const offersPage = (url: string | undefined, knownUrls: readonly string[]) =>
@@ -157,7 +184,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
 
   const isWebPage = Boolean(tab && /^https?:\/\//i.test(tab.url) && !tab.url.startsWith(BENCHQ_URL));
   const saved = (isWebPage && knownJobs.find((known) => known.url && isSameJob(tab!.url, known.url)))
-    || (job ? knownJobs.find((known) => sameListing(job, known) || sharesJobId(job, known)) : undefined);
+    || (job ? knownJobs.find((known) => isSavedJob(job, known)) : undefined);
   if (saved) {
     return onUseTab && (saved.status ?? "saved") === "saved" ? <section data-slot="use-tab" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="use-tab-title">
       <h2 id="use-tab-title" className="text-sm font-[550]">{candidateName}&apos;s job is on this page</h2>

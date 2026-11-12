@@ -694,6 +694,9 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=
             continue
         app = _scoped_application(db, firm_id, principal, app.id, write=True)
         if app.candidate_id is not None:
+            if undo:
+                # The status command has no Undo of its own (PATCH refuses `undo` too): a move back is a move.
+                raise HTTPException(400, "Undo isn't available for a candidate's application: move it back instead.")
             from backend.applications.tracking import accessible_application, move
             app = accessible_application(db, firm_id, principal, app.id, lock=True)
             revisions = body.get("expected_revisions", {})

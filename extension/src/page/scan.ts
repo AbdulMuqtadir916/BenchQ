@@ -3,7 +3,7 @@ import {
   ariaChecked, ariaLabelOf, cleanLabel, collapse, fieldClues, groupLabel, hasOptionalMark, hasRequiredMark, isAriaChoice, isChoiceVisible, isFileInput,
   isOn, isUploadShown, isVisible, optionLabel, PLACEHOLDER_OPTION, rawLabel, shownFileName, shownValue, textOf,
 } from "./labels";
-import { queryDeep } from "./shadow";
+import { hostOf, queryDeep } from "./shadow";
 
 /** One field of a scan: what the panel sees, and the elements a later fill writes to. */
 export type Entry = {
@@ -205,7 +205,17 @@ function ariaGroupEntry({ aria, kind }: AriaGroup, id: string): Entry {
  * that wraps a real input is that input's look, and the input stands for it. */
 function isAriaQuestion(element: HTMLElement): boolean {
   return isVisible(element) && element.getAttribute("aria-disabled") !== "true" && !element.querySelector("input, select, textarea")
-    && element.closest(FORM_AREA) !== null && element.closest(NOT_A_QUESTION) === null;
+    && closestThrough(element, FORM_AREA) !== null && closestThrough(element, NOT_A_QUESTION) === null;
+}
+
+/** `closest()` through the components an element sits in: a choice inside a component under a form is in that form,
+ * and one inside a component in a menu is in that menu. */
+function closestThrough(element: Element, selector: string): Element | null {
+  for (let at: Element | null = element; at; at = hostOf(at)) {
+    const found = at.closest(selector);
+    if (found) return found;
+  }
+  return null;
 }
 
 /** The group a styled choice answers with: its radio group, the toggle buttons beside it, or the checkboxes in its

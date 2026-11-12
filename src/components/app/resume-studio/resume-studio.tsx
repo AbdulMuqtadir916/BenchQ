@@ -75,6 +75,11 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
   // Closing with unsaved edits asks first: a save is explicit (no autosave), so closing would lose them.
   const close = useCallback(() => leaveAutofill(() => (useStudio.getState().isDirty && onSave ? setConfirmingClose(true) : onClose())),
     [leaveAutofill, onClose, onSave]);
+  // Saving moves the studio to the new version, which drops an answer being written on the Autofill tab: ask first, as
+  // Close does.
+  const saveDocument = useCallback(() => {
+    if (onSave) leaveAutofill(onSave);
+  }, [leaveAutofill, onSave]);
   const selectTab = useCallback((next: StudioTab) => {
     if (next === tab) return;
     if (next === "autofill") {
@@ -98,7 +103,7 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (canEdit && onSave && !hasInvalidLinks && !isSaving && useStudio.getState().isDirty) onSave();
+        if (canEdit && onSave && !hasInvalidLinks && !isSaving && useStudio.getState().isDirty) saveDocument();
         return;
       }
       // A dialog on top (discard, "Use this as the base?") answers its own Esc; the studio stays open.
@@ -115,7 +120,7 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, canEdit, onSave, hasInvalidLinks, isSaving, isAutofill]);
+  }, [close, canEdit, onSave, saveDocument, hasInvalidLinks, isSaving, isAutofill]);
 
   if (!doc) return null;
   const isEditable = canEdit && mode === "view";
@@ -138,7 +143,7 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
         canEdit={canEdit}
         canTailor={canTailor}
         isTailoring={tailor.isRunning}
-        onSave={onSave}
+        onSave={onSave && saveDocument}
         isSaving={isSaving}
         isSaveBlocked={hasInvalidLinks}
         onClose={close}
