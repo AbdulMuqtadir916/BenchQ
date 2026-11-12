@@ -93,3 +93,23 @@ describe("the résumé selection waits for its linked application", () => {
     expect(hook.resumes).toMatchObject({ status: "ready", picked: { id: "hidden-v1" } });
   });
 });
+
+describe("reading the list again", () => {
+  const settle = () => act(async () => { for (let tick = 0; tick < 10; tick += 1) await Promise.resolve(); });
+
+  it("keeps the list on show while it's read again and through a read that fails, then shows what's new", async () => {
+    await render({ ...options, applicationStatus: "ready", jobId: "job-1" });
+    expect(hook.resumes).toMatchObject({ status: "ready", picked: { id: "visible-v1" } });
+    expect(hook.source).toEqual({ resumeId: "visible-v1", baseId: "visible", label: "Base 1 · Active" });
+    vi.mocked(getResumeListing).mockRejectedValueOnce(Object.assign(new Error("BenchQ had a problem"), { status: 500 }));
+    act(() => hook.refresh());
+    await settle();
+    expect(hook.resumes.status).toBe("ready");
+    const version = { id: "t-v1", version: 1, name: "Base", title: null, category: "TAILORED", job_id: "job-1" };
+    vi.mocked(getResumeListing).mockResolvedValueOnce({ ...listing, tailored: [{ base_resume_id: "visible", job_id: "job-1", versions: [version] }] });
+    act(() => hook.refresh());
+    await settle();
+    expect(hook.resumes).toMatchObject({ status: "ready", choices: [{ id: "t-v1", isTailored: true }, { id: "visible-v1" }, { id: "visible-2-v1" }] });
+    expect(getResumeListing).toHaveBeenCalledTimes(3);
+  });
+});

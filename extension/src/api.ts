@@ -98,7 +98,7 @@ export const getCandidates = (firmId: string) =>
   request<Candidate[]>(`/api/firms/${encodeURIComponent(firmId)}/candidates`);
 
 /** One version in a candidate's résumé list: its details, never its content (backend/candidates/versions.py). */
-export type ResumeVersion = { id: string; version: number; name: string; title: string | null; category: string; job_id: string | null };
+export type ResumeVersion = { id: string; version: number; name: string; title: string | null; category: string; job_id: string | null; created_at?: string | null };
 export type ResumeBase = { id: string; number: number; is_active: boolean; archived_at: string | null; versions: ResumeVersion[] };
 export type TailoredResume = { base_resume_id: string; job_id: string; versions: ResumeVersion[] };
 export type ResumeListing = { bases: ResumeBase[]; tailored: TailoredResume[] };
@@ -132,6 +132,35 @@ export async function getResumeFile(firmId: string, candidateId: string, resumeI
     throw error;
   }
 }
+
+/** A tailoring of the candidate's résumé for one of their jobs, as BenchQ reports it (backend/resume_tailor/runs.py
+ * `run_json`): running with its step, completed with the new résumé, or failed with its reason's code. */
+export type TailoringRun = {
+  run_id: string;
+  status: "running" | "completed" | "failed";
+  step?: string | null;
+  resume_id: string | null;
+  error_code: string | null;
+  job_posting_id?: string | null;
+  started_at: string | null;
+};
+
+/** Starts tailoring the candidate's résumé for one of their jobs (backend/api/routes_resume_tailoring.py, as the
+ * website's Tailor button does): about a minute, in the background. `resumeId`: the base version it reads; none: the
+ * active base's v1. Its run id. */
+export const startTailoring = (firmId: string, candidateId: string, jobPostingId: string, resumeId: string | null) =>
+  request<{ run_id: string }>(`${candidatePath(firmId, candidateId)}/resumes/tailor`, {
+    method: "POST",
+    body: JSON.stringify({ job_posting_id: jobPostingId, ...(resumeId ? { resume_id: resumeId } : {}) }),
+  });
+
+/** One tailoring's status, read again while it runs. */
+export const getTailoring = (firmId: string, candidateId: string, runId: string) =>
+  request<TailoringRun>(`${candidatePath(firmId, candidateId)}/resumes/tailorings/${encodeURIComponent(runId)}`);
+
+/** The candidate's tailorings still running, newest first: one for this job started on the website shows here too. */
+export const getRunningTailorings = (firmId: string, candidateId: string) =>
+  request<TailoringRun[]>(`${candidatePath(firmId, candidateId)}/resumes/tailorings?running=true`);
 
 /** Keeps answers the BDE typed on a résumé version's autofill, for next time: phase 3's save route (docs/02 §8.4). */
 export const saveResumeAnswers = (firmId: string, candidateId: string, resumeId: string, change: object) =>

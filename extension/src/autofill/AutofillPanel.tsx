@@ -17,6 +17,8 @@ import type { AppliedForm, Connection, ReviewRow, ShortcutMessage } from "./type
 import { SiteAccessNotice } from "./SiteAccessNotice";
 import { useAutofill, type Outcome } from "./use-autofill";
 import { useResumes, type ApplicationContextStatus } from "./use-resumes";
+import TailorResume from "./TailorResume";
+import { useTailoring } from "./use-tailoring";
 
 type AutofillPanelProps = {
   connection: Connection;
@@ -66,7 +68,7 @@ type PendingFill = { context: string; resumeId: string | null };
  * it goes, the résumé and the cover letter, then the rest of the form. The form stays theirs to submit. */
 export default function AutofillPanel({ connection, firmId = null, firmSlug = null, details = null, applicationStatus = "ready", onRetryContext = () => {}, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
   const { tabId, job } = connection;
-  const { resumes, pick, retry } = useResumes({
+  const { resumes, pick, retry, refresh, source } = useResumes({
     firmId, candidateId: connection.candidateId, applicationId: connection.applicationId, applicationStatus,
     jobId: details?.job_id ?? null, namedId: details?.tailored_resume_id ?? null,
     onSessionExpired, onAccessLost,
@@ -102,6 +104,25 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     setPendingFill({ context, resumeId: id });
     pick(id);
   };
+  // Tailor for this job: the connected job as BenchQ holds it for the candidate, once its record is confirmed.
+  const jobPostingId = applicationStatus === "ready" ? details?.job_id ?? null : null;
+  const pickedId = picked?.id ?? null;
+  // A tailoring that finished: the list again, the résumé in use kept, so nothing changes under the BDE until they use
+  // the new one.
+  const onTailored = useCallback(() => {
+    if (pickedId) pick(pickedId);
+    refresh();
+  }, [pickedId, pick, refresh]);
+  const { tailoring, start: tailor, dismiss: dismissTailoring } = useTailoring({
+    firmId, candidateId: connection.candidateId, jobId: jobPostingId, onSessionExpired, onTailored,
+  });
+  const listed = resumes.status === "ready" ? resumes.choices : [];
+  const tailoredId = tailoring.status === "completed" ? tailoring.resumeId : null;
+  const tailorFooter = jobPostingId && listed.length > 0 ? <TailorResume tailoring={tailoring} from={source?.label ?? null}
+    isAgain={Boolean(source && listed.some(({ isTailored, baseId }) => isTailored && baseId === source.baseId))}
+    isReadyListed={Boolean(tailoredId && listed.some(({ id }) => id === tailoredId))} isInUse={Boolean(tailoredId && tailoredId === pickedId)}
+    studioUrl={tailoredId ? studioUrl(tailoredId) : null} isBusy={isWorking}
+    onStart={() => tailor(source?.resumeId ?? null)} onUse={() => { if (tailoredId) pickResume(tailoredId); }} onDismiss={dismissTailoring} /> : null;
   const { autofill } = state;
   // The pending fill already started, so each one starts once.
   const startedFill = useRef<PendingFill | null>(null);
@@ -183,7 +204,7 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
       </div>}
 
       <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl}
-        isBusy={isWorking || applicationStatus !== "ready"} onPick={pickResume} onRetry={retry} onRetryContext={onRetryContext} />
+        isBusy={isWorking || applicationStatus !== "ready"} onPick={pickResume} onRetry={retry} onRetryContext={onRetryContext} footer={tailorFooter} />
 
       {hasForm && <FormProgress rows={currentRows} isRestarting={pendingFill !== null} />}
 
