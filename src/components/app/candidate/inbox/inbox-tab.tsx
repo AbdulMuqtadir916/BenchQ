@@ -109,6 +109,9 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
         {ws.inbox?.connection?.status === "ERROR" ? <><p role="alert">Reconnect required: Google access expired.</p><Button variant="secondary" onClick={() => setConfirmDisconnect(true)}>Disconnect</Button></> : null}
         {ws.inbox?.connection?.lastSyncError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{ws.inbox.connection.lastSyncError}</p> : null}
         <InboxConnect candidate={candidate} />
+        {/* The Disconnect button above opens this; the main screen below is never reached here (Abdul's review on #127). */}
+        {confirmDisconnect ? <DisconnectMailboxDialog candidateId={candidate.id} candidateName={candidate.fullName}
+          onClose={() => setConfirmDisconnect(false)} /> : null}
       </>
     ) : (
       <EmptyState icon={Mail} title={ws.inbox?.connection?.status === "ERROR" ? "Reconnect required" : "Inbox not connected"} description="A recruiter on this candidate can connect their Google account." />

@@ -75,6 +75,9 @@ export function useCandidateInbox(candidateId: string) {
     if (lastSeen.current && classificationsFinished(lastSeen.current, next)) {
       void cache.invalidateQueries({queryKey: queryKeys.inbox.reviews(firm, candidateId)});
       void cache.invalidateQueries({queryKey: queryKeys.applications.all(firm)});
+      // The open email is read on its own and isn't polled: reload it too, or the reader stays on "Classifying…"
+      // without its result or the Review email button (Abdul's review on #127).
+      void cache.invalidateQueries({queryKey: queryKeys.inbox.body(firm, candidateId)});
     }
     lastSeen.current = next;
   }, [messages, cache, firm, candidateId]);

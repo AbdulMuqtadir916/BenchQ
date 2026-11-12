@@ -55,6 +55,21 @@ def _current(db, message):
             and message.source_address.strip().lower() == mailbox.address.strip().lower() else None)
 
 
+def _still_sendable(db, message_id, snapshot, token, fingerprint, cfg, probing):
+    """The claimed work is still the work to send: the firm isn't suspended, the same mailbox is still connected, the
+    email is neither deleted nor hidden nor changed, the switches and settings are as claimed, and no pause began.
+    Read fresh, so a change committed meanwhile by another request counts. Raises WORK_INVALIDATED otherwise."""
+    db.expire_all()
+    row = scoped(db, InboxMessage, snapshot.firm_id).filter_by(id=message_id).first()
+    box = _current(db, row) if row else None
+    if (not enabled() or not box or box.connected_at != snapshot.generation
+            or row.classification_token != token or row.content_revision != snapshot.content_revision
+            or config_identity(ai_config('email_classification', db=db)) != fingerprint
+            or (not probing and classifier_pause.active_pause(db, cfg) is not None)):
+        raise DeciderError('WORK_INVALIDATED')
+    return row, box
+
+
 def _add_review(db, message, app, result):
     query = scoped(db, ApplicationReview, message.firm_id).filter_by(
         inbox_message_id=message.id, candidate_id=message.candidate_id)
@@ -185,13 +200,7 @@ def process_one(message_id, *, provider=None, aliases=None):
     try:
         with SessionLocal() as db:
             # Immediate dispatch check after claim: no stale provider send after disconnect/erase/off.
-            row = scoped(db, InboxMessage, snapshot.firm_id).filter_by(id=message_id).first()
-            box = _current(db, row) if row else None
-            if (not enabled() or not box or box.connected_at != snapshot.generation
-                    or row.classification_token != token or row.content_revision != snapshot.content_revision
-                    or config_identity(ai_config('email_classification', db=db)) != fingerprint
-                    or (not probing and classifier_pause.active_pause(db, cfg) is not None)):
-                raise DeciderError('WORK_INVALIDATED')
+            row, box = _still_sendable(db, message_id, snapshot, token, fingerprint, cfg, probing)
             parts = email_parts(row)
             subject, body = parts.subject, parts.current
             known = _known_identity(db, row, box)
@@ -205,6 +214,9 @@ def process_one(message_id, *, provider=None, aliases=None):
                 except Exception:
                     raise DeciderError('MASKING_FAILED', retryable=True) from None
                 send = partial(classify, request=request)
+            # Checked again just before the dispatch is marked (Abdul's review on #127, P1): masking can take seconds,
+            # and a disconnect, an erasure or a switch turned off meanwhile must stop the send, not be found afterwards.
+            _still_sendable(db, message_id, snapshot, token, fingerprint, cfg, probing)
             # Committed before the request: "dispatch started; charge unknown" (DEBUG D-15). A crash after this
             # point is counted as possibly charged, never as free.
             started = scoped(db, JobRun, snapshot.firm_id).filter_by(id=snapshot.job_id).one()
@@ -333,8 +345,12 @@ def process_one(message_id, *, provider=None, aliases=None):
             # Shown in the Inbox as Irrelevant (decided 2026-11-07, replacing hide-and-encrypt); still erased after
             # 30 days once the purge switches are on (retention.purge_due).
             row.other_purge_after = utcnow() + timedelta(days=30)
-        elif not confident_other and reason not in ('SAME_STAGE', 'AUTO_APPLIED'):
-            _add_review(db, row, app, record)
+        else:
+            # No longer Irrelevant (a newer result went to review, applied, or was the same stage): an earlier purge
+            # date must not erase it later, e.g. once a BDE dismisses its review (Abdul's review on #127).
+            row.other_purge_after = None
+            if not confident_other and reason not in ('SAME_STAGE', 'AUTO_APPLIED'):
+                _add_review(db, row, app, record)
         row.classification_state = 'DONE'
         row.classification_version = snapshot.result_version
         row.classification_error = None

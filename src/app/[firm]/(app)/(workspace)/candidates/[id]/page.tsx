@@ -73,7 +73,8 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  // `?message=` opens one email, e.g. from an application's timeline (Abdul's review on #127).
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(() => searchParams.get("message"));
   const [toast, setToast] = useState<string | null>(null);
   // Each "Find jobs" press starts a matching run; the Jobs tab plays it until it reports done.
   const [matchRun, setMatchRun] = useState(0);

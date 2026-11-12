@@ -123,6 +123,14 @@ describe("applications DTO mapper", () => {
     expect(toApplication(row({ pending_reviews: [{ id: "r1" }, { id: "r2" }] }), "firm_1")?.pendingReviewCount).toBe(2);
   });
 
+  it("carries the résumé version that was sent, and none when none was recorded", () => {
+    const sent = toApplication(row({ status: "applied", resume_id: "44444444-4444-4444-8444-444444444444" }), "firm_1");
+    expect(ApplicationSchema.safeParse(sent).success).toBe(true);
+    expect(sent?.resumeVersionId).toBe("44444444-4444-4444-8444-444444444444");
+    expect(toApplication(row({ status: "applied", resume_id: null }), "firm_1")?.resumeVersionId).toBeNull();
+    expect(toApplication(row({ status: "applied" }), "firm_1")?.resumeVersionId).toBeNull();   // an older backend without the field
+  });
+
   it("converts statuses in both directions without guessing", () => {
     expect(toFrontendStatus("interview_schedule_request")).toBe("INTERVIEW_SCHEDULE_REQUEST");
     expect(toFrontendStatus("interview")).toBe("INTERVIEW");

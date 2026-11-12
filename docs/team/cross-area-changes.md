@@ -3,6 +3,25 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## For Arbaz: merging #129 after #127
+
+#127 (PR 4) is expected to merge first. When you bring main into #129, these won't all show as git conflicts: they are
+lines #129's changes break at runtime. Each needs the change listed.
+
+| # | Where | What to do | Why |
+|---|---|---|---|
+| 1 | `backend/migrations/versions/` (your first migration) | Number yours **0026** and **0027**, and point the first one's `down_revision` at `'0025'` (#127's AUTO_APPLIED migration, after Abdul's 0024). The team README already lists 0026–0027 as yours. | Otherwise Alembic finds two heads after 0024 and the backend won't start. |
+| 2 | `backend/applications/tracking.py`, `apply_email_decision` (the automatic status change, ≈ l.254–258) | Remove the `FavoriteJob` lookup and delete (a Saved application is the favourite in #129); make the ledger's `entity_label=app.job.title or 'Application'` read `posting_job(app.posting).title or 'Application'`. | `FavoriteJob` and `Application.job` no longer exist after #129. |
+| 3 | `backend/applications/tracking.py`, `undo_email_decision` (Undo of an automatic change, ≈ l.304–319) | Remove the "back to Saved restores the favourite" block (`if original.from_status == 'saved' and … FavoriteJob …`); make `entity_label=app.job.title or 'Application'` read `posting_job(app.posting).title or 'Application'`. | Same: the table and the relationship are gone. Tests that pin the restored favourite (from your `cff6830`/`689fbc0`) go with it. |
+| 4 | `src/lib/api/applications.ts`, `BackendUnsavedSchema` (≈ l.25) | `z.object({ favorite: z.literal(false) })` → `z.object({ favorite: z.boolean() })`. | #129's un-favourite answers `favorite: not untouched`, so `true` for a kept application; the current check rejects it and the heart shows "returned data the app doesn't understand". |
+| 5 | Check after merging | Heart on a job from a search saves it as Saved (#127's heart already sends the posting id); un-heart an untouched Saved job removes it; un-heart one with history keeps it, without an error. The backend suite's automatic-change and Undo tests pass. | Abdul's item 3 on #127 is fixed by #129's save route. |
+
+## Abdul's review on #127: the résumé sent with an application (`feat/inbox-masking-and-review`)
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad; the field is filled by Arbaz's extension flow) | `backend/api/routes_applications.py` (`_app_to_dict`), `backend/tests/test_candidate_application_status.py`, `docs/02-DATA-CONTRACTS.md` §9 | Every application response adds `resume_id`: the version already stored on the application, or `null`. Read-only; no schema change. | Abdul's review (P2): the "Résumé sent" panel said "Not submitted yet" for every live application, because the backend never sent the stored value and the mapper set it to `null`. |
+
 ## Main merged into PR 4 a third time — #135's job screens (`feat/inbox-masking-and-review`)
 
 Main brought Zuhair's #135: the job screens read `job_postings`, and the candidates, résumés and jobs mocks are gone.

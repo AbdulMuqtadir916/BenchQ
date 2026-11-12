@@ -117,8 +117,9 @@ checked masked.
 #128 (BUG-005) gave every screen one count of applications, written on the old stages. On this branch: active =
 submitted and not closed (every stage Applied to Offer), closed = Move On and the legacy closed values, a legacy Placed on
 its own, a saved job never active (`src/lib/derive/application-counts.ts`). The candidate's Active board keeps its Saved
-and Move On columns (no "All" view here); the line above it reads "N active · M closed · S saved". Abdul's decision on
-#128 ("Active excludes Saved and Placed; All shows them") is **not** followed on the board, by Uzair's choice; logged in
+and Move On columns (no "All" view here); the line above it reads "N active · M closed · S saved". No "All" tab: this
+is what Uzair agreed with Abdul Muqtadir (2026-11-12), although the #128 thread records "Active excludes Saved and Placed; All
+shows them". Arbaz's review fix `689fbc0` brought All back; it was removed again for that reason; logged in
 [cross-area-changes.md](../cross-area-changes.md).
 
 ## Merge with main: #135 (job screens on `job_postings`), 2026-11-12
@@ -134,6 +135,22 @@ Abdul's #120 added migration 0024 (drop `firms.bde_capacity`) after 0023, beside
 migration is now **0025**, after 0024 (`test_migration_0025.py`); Arbaz's #129 takes 0026–0027. Other conflicts: the
 migration table and `FIXTURE_VERSION`. Umamah's #126 (extension) merged without conflicts.
 
+
+## Abdul's review on #127 (2026-11-12)
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 (P1) | An email could still be sent after a disconnect or deletion during masking | `classification_worker._still_sendable` runs before masking and again just before the dispatch is marked; tests disconnect the mailbox and delete the email during masking (`test_pr4_classifier_gate.py`) |
+| 2 | A stale purge date could erase an email no longer Irrelevant | The worker clears `other_purge_after` whenever a newer result isn't Irrelevant; the purge also requires the latest outcome `OTHER` (`test_pr3_pipeline.py`) |
+| 3 | The heart sends a posting id the save route can't find | Open: the save route moves onto `job_postings` in Arbaz's #129 |
+| 4 | "Résumé sent" said "Not submitted yet" for every live application | The application data carries `resume_id`; the mapper reads it (docs/02 §9) |
+| 5 | The review tabs were hidden for a candidate with no applications | The empty state is inside the Active view; the tabs always show |
+| 6 | Timeline entries from an email didn't link to it | "Open the email" on each such entry; the candidate page opens `?tab=inbox&message=<id>` (`status-timeline.test.tsx`) |
+| 7 | Disconnect did nothing on an empty, expired inbox | The confirmation dialog renders on that screen too |
+| 8 | The open email stayed on "Classifying…" | The open email is reloaded when a classification finishes |
+| 9 | The Applications tab reset on Back | The tab is in the URL (`applications_tab`) |
+
+Also: the Gmail connect card's consent-style text (CodeRabbit) is a short line with an info tip (`src/components/app/info-tip.tsx`).
 
 ## Remaining limits
 

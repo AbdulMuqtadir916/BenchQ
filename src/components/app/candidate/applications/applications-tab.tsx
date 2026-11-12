@@ -1,6 +1,8 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { z } from "zod";
 import { Columns3, List, Send } from "lucide-react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { cn } from "@/lib/cn";
@@ -17,19 +19,26 @@ import { ApplicationList } from "./application-list";
 import { IrrelevantEmails, irrelevantEmails } from "./irrelevant-emails";
 
 type View = "board" | "list";
-type Scope = "active" | "all" | "review" | "irrelevant";
+/** The tab is in the URL (`applications_tab`), so Back from an email opened in BDE review returns to the queue. */
+const ScopeParam = z.enum(["active", "review", "irrelevant"]).catch("active");
+type Scope = z.infer<typeof ScopeParam>;
 
 /** Every submission for this candidate: a board to move stages, a list to scan fast. */
 export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; onMove: (id: string, to: ApplicationStatus) => void }) {
   const [view, setView] = useState<View>("board");
-  const [scope, setScope] = useState<Scope>("active");
+  const params = useSearchParams();
+  const scope = ScopeParam.parse(params.get("applications_tab") ?? "active");
   // Switching tabs changes the page height; keep the switch row where it was on screen instead of letting the
   // browser clamp the scroll position (which made the page jump up when a shorter tab opened).
   const switchRef = useRef<HTMLDivElement>(null);
   const switchTopBefore = useRef<number | null>(null);
   const chooseScope = (next: Scope) => {
     switchTopBefore.current = switchRef.current?.getBoundingClientRect().top ?? null;
-    setScope(next);
+    // Same pattern as the Inbox filter: this entry's URL changes, the candidate page's other keys stay.
+    const url = new URL(window.location.href);
+    if (next === "active") url.searchParams.delete("applications_tab");
+    else url.searchParams.set("applications_tab", next);
+    window.history.replaceState(null, "", url.pathname + url.search);
   };
   const spacerRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -52,16 +61,12 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
   const all = ws.applications;
   // One rule for the count line, the board and the list (BUG-005, PR #128): a saved job is never active; every row shown is
   // named in the line. Move On has its own column and counts as closed; the legacy closed values are left out.
-  // All adds the closed ones (Placed, Rejected, Withdrawn, Expired), which the count line names too.
-  const visible = applicationsInScope(all, scope === "all" ? "all" : "active");
+  const visible = applicationsInScope(all, "active");
   const [activePart = "", ...otherParts] = describeApplicationCounts(countApplications(all)).split(" · ");
   const irrelevantCount = irrelevantEmails(ws.messages).length;
 
   if (ws.applicationsQuery.error) return <ErrorState error={ws.applicationsQuery.error} onRetry={() => void ws.applicationsQuery.refetch()} />;
   if (ws.applicationsQuery.isLoading) return <SkeletonList rows={6} />;
-  if (all.length === 0) {
-    return <EmptyState icon={Send} title="No applications yet" description="Find matching jobs and submit — every application shows up here with its status." action={actions.findJobs ? <button type="button" onClick={actions.findJobs} className="text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:underline">Find jobs</button> : undefined} />;
-  }
 
   const toggle = "inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 text-sm";
   return (
@@ -72,13 +77,13 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
         </p>
         <div className="flex items-center gap-2">
           <div ref={switchRef} className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">
-            {(["active", "all", "review", "irrelevant"] as const).map((s) => (
+            {(["active", "review", "irrelevant"] as const).map((s) => (
               <button key={s} type="button" aria-pressed={scope === s} onClick={() => chooseScope(s)} className={cn(toggle, scope === s ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
-                {s === "active" ? "Active" : s === "all" ? "All" : s === "review" ? `BDE review ${ws.reviewTotal}` : `Irrelevant ${irrelevantCount}`}
+                {s === "active" ? "Active" : s === "review" ? `BDE review ${ws.reviewTotal}` : `Irrelevant ${irrelevantCount}`}
               </button>
             ))}
           </div>
-          {scope === "active" || scope === "all" ? <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="View">
+          {scope === "active" ? <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="View">
             {([["board", "Board", Columns3], ["list", "List", List]] as const).map(([id, label, Icon]) => (
               <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} className={cn(toggle, view === id ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
                 <Icon size={14} aria-hidden />{label}
@@ -106,8 +111,11 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
         <ReviewQueue ws={ws} actions={actions} />
       ) : scope === "irrelevant" ? (
         <IrrelevantEmails ws={ws} actions={actions} />
+      ) : all.length === 0 ? (
+        // No applications yet: the tabs stay, so an email waiting in BDE review or Irrelevant is still reachable.
+        <EmptyState icon={Send} title="No applications yet" description="Find matching jobs and submit — every application shows up here with its status." action={actions.findJobs ? <button type="button" onClick={actions.findJobs} className="text-sm font-[550] text-[var(--color-primary-subtle-fg)] hover:underline">Find jobs</button> : undefined} />
       ) : view === "board" ? (
-        <ApplicationBoard showReviewColumn={false} showClosed={scope === "all"} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} onOpen={actions.openApplication} />
+        <ApplicationBoard showReviewColumn={false} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} onOpen={actions.openApplication} />
       ) : (
         <ApplicationList apps={visible} onOpen={actions.openApplication} />
       )}

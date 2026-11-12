@@ -1755,7 +1755,9 @@ unchanged in this PR; their live DTO integration and display changes belong to l
 - `resume_id` on that move is the résumé version the form was sent with: the one the extension's answers came from.
   Only a move to `applied` may send it, and it must be one of the application's candidate's versions, not deleted;
   anything else returns 400 and changes nothing. It becomes the application's `resume_id`, the résumé the application
-  shows as sent. A move back to Saved leaves it.
+  shows as sent. A move back to Saved leaves it. Every application response carries it as `resume_id` (the version's
+  id, or `null` when none was recorded, e.g. a move to Applied by hand); the frontend maps it to
+  `Application.resumeVersionId` for the "Résumé sent" panel (added 2026-11-12, #127, Abdul's review).
 - `applications.form_data` (migration 0021, nullable JSONB) is what the employer's form held when the BDE marked the
   job applied from the extension: `{fields: [{label, value, required, source}]}`, `source` being `autofill` or `bde`.
   Only a move to `applied` may send it; at most 200 fields, labels up to 500 characters, values up to 4000; anything

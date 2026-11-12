@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Mail } from "lucide-react";
 import type { Application, ApplicationEvent } from "@/lib/schemas/application";
 import { cn } from "@/lib/cn";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
@@ -12,8 +14,15 @@ function sourceLabel(e: ApplicationEvent, actorName: (userId: string | null) => 
   return e.isAutomated ? "Automated" : null;
 }
 
-/** Every stage change for one application, oldest first, with who made it and why. */
-export function StatusTimeline({ application, actorName }: { application: Application; actorName: (userId: string | null) => string | null }) {
+/**
+ * Every stage change for one application, oldest first, with who made it and why. A change that came from an email
+ * links to that email when `emailHref` is given (Abdul's review on #127), so older changes can still be checked.
+ */
+export function StatusTimeline({ application, actorName, emailHref }: {
+  application: Application;
+  actorName: (userId: string | null) => string | null;
+  emailHref?: (emailId: string) => string;
+}) {
   const events = [...application.events].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
   return (
     <ol className="relative">
@@ -32,6 +41,11 @@ export function StatusTimeline({ application, actorName }: { application: Applic
               <p className="mt-0.5 text-caption text-[var(--color-text-3)]">
                 <DualTimestamp iso={e.createdAt} format="absolute" /> · {sourceLabel(e, actorName) ?? (actorName(e.actorUserId) ?? (e.toStatus === "APPLIED" ? actorName(application.submittedByUserId) : null) ?? "Team member")}
               </p>
+              {e.emailId && emailHref ? (
+                <Link href={emailHref(e.emailId)} className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-primary-subtle-fg)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]">
+                  <Mail size={12} aria-hidden />Open the email
+                </Link>
+              ) : null}
             </div>
           </li>
         );

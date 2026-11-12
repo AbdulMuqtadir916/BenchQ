@@ -46,7 +46,10 @@ def purge_due(*, limit=100):
             known_job = scoped(db, EmailClassification, message.firm_id).filter(
                 EmailClassification.inbox_message_id == message.id, EmailClassification.category != 'other').first()
             # A visible email can be linked to an application (by the matcher or a BDE): linked mail is never erased.
-            if (not latest or latest.category != 'other' or latest.confidence < CONFIDENCE_THRESHOLD or review or known_job
+            # The latest result must still be Irrelevant: an Other sent to review (forwarded, too little text,
+            # disagreeing scores) never is, even after its review is dismissed (Abdul's review on #127).
+            if (not latest or latest.outcome != 'OTHER'
+                    or latest.category != 'other' or latest.confidence < CONFIDENCE_THRESHOLD or review or known_job
                     or message.application_id is not None
                     or latest.prompt_version != config.CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID):
                 continue

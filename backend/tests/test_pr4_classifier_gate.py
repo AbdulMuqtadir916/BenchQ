@@ -142,6 +142,47 @@ def test_a_masking_failure_sends_nothing_costs_nothing_and_retries_later(test_db
     assert 'dispatch_started' not in job.meta and job.meta['error_code'] == 'MASKING_FAILED'
 
 
+def _masking_while(monkeypatch, change):
+    """Masking that takes long enough for someone else to `change` the email or its mailbox meanwhile."""
+    def slow(*args, **kwargs):
+        with worker.SessionLocal() as other:
+            change(other)
+            other.commit()
+        return {}
+    monkeypatch.setattr(worker, 'build_request', slow)
+
+
+def _assert_nothing_sent(test_db, message_id, sent, state):
+    row = _row(test_db, message_id)
+    assert sent == [], "the email was sent to the classifier after it stopped being sendable"
+    assert (row.classification_state, row.classification_attempts, row.classification_token) == (state, 0, None)
+    assert test_db.query(LlmCallLog).filter_by(purpose='email_classification').count() == 0
+    job = test_db.query(JobRun).filter_by(job_type='candidate_email_classification').one()
+    assert 'dispatch_started' not in job.meta and job.meta['error_code'] == 'WORK_INVALIDATED'
+
+
+def test_a_mailbox_disconnected_during_masking_stops_the_send(test_db, pipeline, monkeypatch):
+    """Abdul's review on #127 (P1): the email is checked again after masking, just before it is sent."""
+    from backend.models.candidates import CandidateMailbox
+    _, _, message_id = pipeline
+    mailbox_id = _row(test_db, message_id).mailbox_id
+    _masking_while(monkeypatch, lambda db: setattr(db.get(CandidateMailbox, mailbox_id), 'status', 'DISCONNECTED'))
+    sent = []
+    monkeypatch.setattr(worker, 'classify', lambda *args, **kwargs: sent.append(args) or decision())
+    assert not worker.process_one(message_id)
+    _assert_nothing_sent(test_db, message_id, sent, 'PENDING')
+
+
+def test_an_email_deleted_during_masking_is_never_sent(test_db, pipeline, monkeypatch):
+    """Abdul's review on #127 (P1). Only `deleted_at` changes here, so the check can't lean on the content revision."""
+    _, _, message_id = pipeline
+    _masking_while(monkeypatch, lambda db: setattr(db.get(InboxMessage, message_id), 'deleted_at', utcnow()))
+    sent = []
+    monkeypatch.setattr(worker, 'classify', lambda *args, **kwargs: sent.append(args) or decision())
+    assert not worker.process_one(message_id)
+    _assert_nothing_sent(test_db, message_id, sent, 'EXCLUDED')
+
+
 def test_a_masking_failure_during_a_probe_keeps_the_pause_and_the_attempt(test_db, pipeline, monkeypatch):
     _, _, message_id = pipeline
     with worker.SessionLocal() as db:

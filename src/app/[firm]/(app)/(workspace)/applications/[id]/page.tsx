@@ -106,7 +106,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
           <Card>
             <h2 className="mb-4 text-h3 text-[var(--color-text)]">Status history</h2>
             <div className="mb-4"><AutomaticChangeNotice application={app} canAct={can(principal, "application.move")} /></div>
-            <StatusTimeline application={app} actorName={actorName} />
+            <StatusTimeline application={app} actorName={actorName}
+              emailHref={candidate ? (emailId) => toHref("candidates.detail", { id: candidate.id }, { tab: "inbox", message: emailId }) : undefined} />
           </Card>
           <Card className="p-0">
             <h2 className="border-b border-[var(--color-border)] px-4 py-3 text-h3 text-[var(--color-text)]">Recruiter emails ({emails.length})</h2>

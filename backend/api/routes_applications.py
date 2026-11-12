@@ -1343,6 +1343,8 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
                             for r in a.reviews if r.state == "PENDING"],
         "applied_at": a.applied_at.isoformat() if a.applied_at else None,
         "cv_version_used": a.cv_version_used,
+        # The exact résumé version sent with the application (set when it moved to Applied with one, e.g. the extension).
+        "resume_id": str(a.resume_id) if a.resume_id else None,
         "notes": a.notes,
         "next_action": a.next_action,
         "next_action_date": a.next_action_date.isoformat() if a.next_action_date else None,

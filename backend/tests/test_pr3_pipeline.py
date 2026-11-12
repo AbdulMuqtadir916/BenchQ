@@ -289,6 +289,38 @@ def test_purge_waits_for_a_pending_review_but_not_for_a_dismissed_one(test_db, p
     assert not test_db.query(EmailClassification).first()
 
 
+def test_an_email_no_longer_irrelevant_keeps_no_purge_date_and_is_never_purged(test_db, pipeline, monkeypatch):
+    """Abdul's review on #127: marked Irrelevant (purge date set), then reclassified into review, then the review is
+    dismissed. The newer result clears the date, and the purge also requires the latest outcome to be Irrelevant."""
+    from backend.inbox.retention import purge_due
+    _, _, message_id = pipeline
+    assert worker.process_one(message_id, provider=lambda *a: decision('other'))
+    test_db.expire_all()
+    row = test_db.get(InboxMessage, message_id)
+    assert row.other_purge_after is not None
+    # Reclassified: still "other", but the provider's two numbers disagree, so policy sends it to a person.
+    disagreeing = decision('other', confidence=.95)
+    disagreeing.probabilities['other'] = .70
+    row.classification_state, row.classification_attempts = 'PENDING', 0
+    test_db.commit()
+    assert worker.process_one(message_id, provider=lambda *a: disagreeing)
+    test_db.expire_all()
+    row = test_db.get(InboxMessage, message_id)
+    latest = test_db.query(EmailClassification).filter_by(result_version=row.classification_version).one()
+    assert (latest.category, latest.outcome) == ('other', 'REVIEW')
+    assert row.other_purge_after is None, "the earlier Irrelevant result's purge date survived a review result"
+    # Even with a stale date left behind (rows from before this fix), the purge skips a latest result that isn't OTHER.
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_ENABLED', True)
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_EVALUATED', True)
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID', latest.prompt_version)
+    row.other_purge_after, row.application_id = utcnow() - timedelta(seconds=1), None
+    test_db.query(ApplicationReview).filter_by(inbox_message_id=row.id).update({ApplicationReview.state: 'RESOLVED'})
+    test_db.commit()
+    assert purge_due() == 0
+    test_db.expire_all()
+    assert test_db.get(InboxMessage, message_id).deleted_at is None
+
+
 def test_result_update_is_rejected(test_db, pipeline):
     _, _, message_id = pipeline
     assert worker.process_one(message_id, provider=lambda *a: decision())

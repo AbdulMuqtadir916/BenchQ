@@ -42,6 +42,8 @@ export const BackendApplicationSchema = z.object({
   title: z.string().nullable(),
   /** Booked interviews (the calendar picker). Only the date and state are read. */
   interviews: z.array(z.object({ when_at: z.string().nullable().optional(), status: z.string().nullable().optional() })).default([]),
+  /** The exact résumé version sent with the application; null when none was recorded (e.g. a move to Applied by hand). */
+  resume_id: z.string().nullable().optional(),
 });
 export type BackendApplication = z.infer<typeof BackendApplicationSchema>;
 
@@ -129,7 +131,7 @@ export function toApplication(dto: BackendApplication, firmId: string): Applicat
     firmId,
     candidateId: fromBackendId(dto.candidate_id),
     jobId: fromBackendId(dto.job_id),
-    resumeVersionId: null,
+    resumeVersionId: dto.resume_id ? fromBackendId(dto.resume_id) : null,
     submittedByUserId: dto.submitted_by_user_id ? fromBackendId(dto.submitted_by_user_id) : "",
     status,
     statusRevision: dto.status_revision,
