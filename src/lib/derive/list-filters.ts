@@ -3,7 +3,7 @@ import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { stageRank } from "@/components/app/applications/status-meta";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { ApplicationDate, ApplicationsSearchState, BenchBand, CandidatesSearchState, ListPeriod } from "@/lib/schemas/list-search";
-import { reachedStatuses } from "./funnel";
+import { effectiveEvents, reachedStatuses } from "./funnel";
 
 /**
  * The rules behind the Applications and Candidates filters. The dashboard counts with the same rules, so a number on
@@ -27,7 +27,7 @@ export const periodWindow = (period: ListPeriod, now: Date): TimeWindow =>
  */
 function firstReached(app: Application, stage: ApplicationStatus): string | null {
   const rank = stageRank(stage);
-  const times = app.events
+  const times = effectiveEvents(app)
     .filter((event) => (event.toStatus === "PLACED" ? stageRank("OFFER") : stageRank(event.toStatus)) >= rank)
     .map((event) => event.createdAt)
     .sort();

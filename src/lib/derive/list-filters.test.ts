@@ -4,7 +4,7 @@ import { countActivity, windowOf } from "@/features/dashboard/activity/activity-
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import { ApplicationsSearch, CandidatesSearch } from "@/lib/schemas/list-search";
-import { deriveFunnel } from "./funnel";
+import { deriveFunnel, reachedStatuses } from "./funnel";
 import { benchDays, filterApplications, filterCandidates, roleKey } from "./list-filters";
 
 const NOW = new Date("2026-11-10T12:00:00Z");
@@ -55,6 +55,17 @@ describe("the list filters agree with the dashboard", () => {
   it("keeps the submission date of a job moved back to Saved; a draft has none", () => {
     const saved = [app({ id: "6", status: "SAVED", appliedAt: daysAgo(3) }), app({ id: "7", status: "SAVED", appliedAt: null })];
     expect(filterApplications(saved, appsFilter({ period: "30d" }), candidates, NOW).map((a) => a.id)).toEqual(["6"]);
+  });
+
+  it("never counts an undone automatic move as a stage reached", () => {
+    const undone = app({ id: "8", events: [
+      { toStatus: "INTERVIEW_SCHEDULED", source: "email_classifier", revision: 2, createdAt: daysAgo(2) },
+      { toStatus: "APPLIED", source: "email_undo", revision: 3, createdAt: daysAgo(1) },
+    ] as Application["events"] });
+    expect(filterApplications([undone], appsFilter({ period: "30d", by: "interview" }), candidates, NOW)).toEqual([]);
+    expect(reachedStatuses(undone).has("INTERVIEW_SCHEDULED")).toBe(false);
+    const kept = app({ id: "9", events: [{ toStatus: "INTERVIEW_SCHEDULED", source: "email_classifier", revision: 2, createdAt: daysAgo(2) }] as Application["events"] });
+    expect(reachedStatuses(kept).has("INTERVIEW_SCHEDULED")).toBe(true);
   });
 
   it("falls back to no filter for a stale or hand-edited link", () => {

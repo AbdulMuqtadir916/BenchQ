@@ -43,6 +43,9 @@ def test_old_offer_in_a_quoted_reply_is_never_sent_as_current(test_db, matching_
     f'FYI\n---------- Forwarded message ---------\nFrom: Client\n{NAMES}: we would like to schedule an interview.',
     f'<html><body><p>FYI</p><div class="gmail_quote">---------- Forwarded message ---------<br>'
     f'{NAMES}: we would like to schedule an interview.</div></body></html>',
+    # Other mail programs (CodeRabbit #127): an HTML blockquote, and Outlook's From:/Sent: header in plain text.
+    f'<html><body><p>FYI</p><blockquote>{NAMES}: we would like to schedule an interview.</blockquote></body></html>',
+    f'FYI\nFrom: Client\nSent: Monday\nTo: Recruiter\nSubject: Interview\n{NAMES}: we would like to schedule an interview.',
 ])
 def test_forwarded_content_identifies_the_application(test_db, matching_case, body):
     _, _, app, box, row = matching_case

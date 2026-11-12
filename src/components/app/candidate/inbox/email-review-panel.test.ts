@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { FirmProvider } from "@/lib/tenancy/firm-context";
 import { firms } from "@/mocks/team";
 import type { EmailReview, InboxMessage } from "@/lib/schemas/inbox";
-import { EmailReviewPanel, STAGE_OPTIONS } from "./email-review-panel";
+import { EmailReviewPanel, STAGE_OPTIONS, reviewStages } from "./email-review-panel";
 
 const firm = firms.find((item) => item.id === "firm_hts")!;
 const message = (over: Partial<InboxMessage>): InboxMessage => ({
@@ -34,5 +34,14 @@ describe("email review panel: Irrelevant as a choice", () => {
     expect(html).toContain("Irrelevant (not about an application)"); // the selected stage, shown on the closed list
     expect(html).toContain("Confirm: Irrelevant");
     expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Confirm: Irrelevant/);
+  });
+});
+
+describe("email review panel: Incomplete (DEBUG D-10)", () => {
+  it("offers Incomplete only for an email classified Incomplete or an application already Incomplete", () => {
+    expect(reviewStages("assessment", "APPLIED")).not.toContain("INCOMPLETE_APPLICATION");
+    expect(reviewStages("incomplete_application", "APPLIED")).toContain("INCOMPLETE_APPLICATION");
+    expect(reviewStages("assessment", "INCOMPLETE_APPLICATION")).toContain("INCOMPLETE_APPLICATION");
+    expect(reviewStages("assessment", "APPLIED")).toContain("INTERVIEW_SCHEDULED");
   });
 });

@@ -114,6 +114,14 @@ def _gate(db, cfg):
     return 'probe' if classifier_pause.claim_probe(db, cfg) else None
 
 
+def _unclaimed(cfg, probing):
+    """No email was claimed: a probe lease this caller holds goes back unused, so the next sweep can test the key."""
+    if probing:
+        with SessionLocal() as db:
+            classifier_pause.release_probe(db, cfg)
+    return False
+
+
 def _known_identity(db, row, mailbox):
     """What the masking must remove for this email, read with the content it is sent with. Never stored or logged."""
     candidate = scoped(db, Candidate, row.firm_id).filter_by(id=row.candidate_id).first()
@@ -137,21 +145,21 @@ def process_one(message_id, *, provider=None, aliases=None):
     with SessionLocal() as db:
         message = db.query(InboxMessage).filter_by(id=message_id).with_for_update(skip_locked=True).first()
         if not message or not _current(db, message):
-            return False
+            return _unclaimed(cfg, probing)
         now = utcnow()
         if message.classification_state not in {'PENDING', 'PROCESSING'}:
-            return False
+            return _unclaimed(cfg, probing)
         if (message.classification_state == 'PROCESSING' and message.classification_lease_until
                 and message.classification_lease_until > now):
-            return False
+            return _unclaimed(cfg, probing)
         if message.classification_next_retry_at and message.classification_next_retry_at > now:
-            return False
+            return _unclaimed(cfg, probing)
         if message.classification_attempts >= MAX_ATTEMPTS:
             message.classification_state = 'ERROR'
             message.classification_error = 'RETRY_EXHAUSTED'
             db.commit()
             logger.warning("Email %s classification gave up after %d attempts", message.id, message.classification_attempts)
-            return False
+            return _unclaimed(cfg, probing)
         mailbox = _current(db, message)
         fingerprint = config_identity(cfg)
         token = uuid.uuid4()
@@ -373,7 +381,10 @@ def process_pending(*, limit=None):
             or_(InboxMessage.classification_next_retry_at.is_(None), InboxMessage.classification_next_retry_at <= utcnow()),
         ).join(CandidateMailbox, InboxMessage.mailbox_id == CandidateMailbox.id).filter(
             CandidateMailbox.status == 'CONNECTED', func.lower(func.trim(InboxMessage.source_address)) == func.lower(func.trim(CandidateMailbox.address)),
-        ).order_by(InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
+            # The rest of `_current` too, before the limit: a paused sweep's one probe must be an email it can claim.
+            CandidateMailbox.candidate_id == InboxMessage.candidate_id, CandidateMailbox.refresh_token_ciphertext.isnot(None),
+        ).join(Firm, Firm.id == InboxMessage.firm_id).filter(Firm.status != 'SUSPENDED').order_by(
+            InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
         aliases = company_aliases(db) if rows else {}
     done = classify_all([identity for (identity,) in rows], aliases, config.CANDIDATE_EMAIL_CLASSIFY_CONCURRENCY)
     if rows:

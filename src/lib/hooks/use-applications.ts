@@ -145,10 +145,11 @@ export function useToggleSavedJob() {
   return useMutation<void, Error, { save: SaveJob } | { unsave: { applicationId: string; jobId: string; candidateId: string } }>({
     mutationKey: queryKeys.applications.savedJobs(firmId),
     mutationFn: (vars) => ("save" in vars ? applicationsApi.saveJob(firmId, vars.save) : applicationsApi.unsaveJob(firmId, vars.unsave.applicationId)),
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.applications.all(firmId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
-    },
+    // Returned, so the save stays pending until the Saved state has reloaded: no gap for a second save of the job.
+    onSettled: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.applications.all(firmId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) }),
+    ]),
   });
 }
 

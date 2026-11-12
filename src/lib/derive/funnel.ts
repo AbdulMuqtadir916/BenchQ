@@ -12,8 +12,17 @@ import { round1 } from "./dates";
  */
 const STAGES = PIPELINE.slice(1);
 
+/**
+ * The moves that still count for stages: an automatic move that was undone, and the Undo that took it back, stay in the
+ * history but never mark a stage reached. An Undo is always of the change just before it (the backend refuses any other).
+ */
+export function effectiveEvents(app: Pick<Application, "events">): Application["events"] {
+  const undone = new Set(app.events.flatMap((e) => (e.source === "email_undo" && e.revision !== null ? [e.revision - 1] : [])));
+  return app.events.filter((e) => e.source !== "email_undo" && !(e.source === "email_classifier" && e.revision !== null && undone.has(e.revision)));
+}
+
 function furthestRank(app: Application): number {
-  const statuses: StoredApplicationStatus[] = [app.status, ...app.events.map((e) => e.toStatus)];
+  const statuses: StoredApplicationStatus[] = [app.status, ...effectiveEvents(app).map((e) => e.toStatus)];
   let furthest = app.appliedAt || app.status !== "SAVED" ? stageRank("APPLIED") : -1;
   for (const status of statuses) {
     const rank = status === "PLACED" ? stageRank("OFFER") : stageRank(status);

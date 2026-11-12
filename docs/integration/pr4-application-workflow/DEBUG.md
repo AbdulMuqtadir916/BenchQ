@@ -105,10 +105,10 @@ matching and the AI. A forward can become empty.
 - **Too little current text** (< 20 characters, non-forward): review, reason `INSUFFICIENT_CONTENT`. No fallback.
 - **Precedence over Other hiding (round 3):** the worker today decides confident Other before `review_reason`
   (`classification_worker.py:169–184`). New order: `FORWARDED_EMAIL`, `INSUFFICIENT_CONTENT` and
-  `CONFIDENCE_DISAGREEMENT` (D-01) are evaluated **first**; any of them ⇒ review, the email is not hidden. Only an
-  Other result with none of them is hidden.
+  `CONFIDENCE_DISAGREEMENT` (D-01) are evaluated **first**; any of them ⇒ review. Only an Other result with none of
+  them is Other: listed in the Inbox as Irrelevant since 2026-11-07 (#127); before that it was hidden.
 **Verify.** Regression tests: forwarded Other, short Other, disagreeing Other ⇒ review and visible; plain confident
-Other ⇒ hidden as today; forwarded mail with `From:` keeps content. **CONFIRM** (Samad decision 5).
+Other ⇒ Irrelevant (hidden before #127); forwarded mail with `From:` keeps content. **CONFIRM** (Samad decision 5).
 ### D-05 — Frontend cannot show the ten statuses · Blocker · T2.1 · **SIGN-OFF (Abdul, docs/02 §2.1)**
 **Selected.** Frontend `ApplicationStatus` = the ten target values exactly as docs/02 §2.1; a separate read-only legacy
 group (labelled, never selectable, never hidden); every list, column, progress, label, icon and tone from
@@ -337,6 +337,8 @@ fetches the last 3 days (`gmail_sync.py`, `newer_than:3d`, PR 2 design), so olde
 `hidden_count` (no content) and the Inbox says how many emails were hidden, that they are kept encrypted for 30 days and
 never deleted from Gmail, and that the first import covered the last 3 days. Widening the first-import window is a PR 2
 product decision: **Samad decided 2026-11-06 to keep 3 days.**
+**Superseded 2026-11-07 (#127).** New confident Other mail is no longer hidden: the Inbox lists it as Irrelevant, subject
+and sender in clear. `hidden_count` counts only mail hidden before #127, which stays hidden.
 **Verify.** Backend test: count matches, hidden content never in the response. Browser: the note shows "27 emails…".
 
 ---

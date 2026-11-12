@@ -208,6 +208,15 @@ def _presidio():
         return _engine
 
 
+def masking_ready() -> bool:
+    """Whether masking can run in this process: its analyzer loads (built once, then reused)."""
+    try:
+        _presidio()
+    except Exception:
+        return False
+    return True
+
+
 def layer3(text: str) -> list[tuple[int, int]]:
     engine = _presidio()
     with _lock:  # one analysis at a time: the scheduler and the wake-up thread can both run the worker

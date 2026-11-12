@@ -65,7 +65,7 @@ Branch `feat/inbox-masking-and-review` (#127, supersedes #116 on `codex/pr4-code
 - [x] T4.1 Migration + writer + replay cases (G6)
 - [x] T4.2 Pending review vs newer email
 - [x] T4.3 Undo endpoint + UI
-- [x] T4.4 Incomplete → Applied (G4)
+- [ ] T4.4 Incomplete → Applied (G4): built; waits for Abdul's G4 sign-off, else left out at activation (OPERATIONS.md)
 - [x] T4.5 Timeline source labels
 - [x] T4.6 Isolated live automation + Undo check
 
@@ -73,7 +73,7 @@ Branch `feat/inbox-masking-and-review` (#127, supersedes #116 on `codex/pr4-code
 - [x] T5.1 Inbox badges + "Email: Email"
 - [x] T5.2 Alias loading
 - [x] T5.3 Docs + per-file report
-- [x] T5.4 Full checks
+- [ ] T5.4 Full checks: backend and frontend passed (2026-11-06); the axe scan is still to run and be recorded
 - [ ] T5.5 PR (only on Samad's instruction)
 
 ## Phase 7 — Setup recovery, clearer states, older mail

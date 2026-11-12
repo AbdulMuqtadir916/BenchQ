@@ -165,7 +165,9 @@ export function JobExplorer({
 
   const selected = rows.find(({ job }) => job.id === selectedId) ?? rows[0] ?? null;
   const arrivedToday = rows.filter(({ job }) => job.postedAt && renderedAt - new Date(job.postedAt).getTime() < 86_400_000).length;
-  const saveError = toggleSavedJob.error
+  // A save error belongs to the candidate it was for: another candidate in context never shows it.
+  const failedFor = toggleSavedJob.variables && ("save" in toggleSavedJob.variables ? toggleSavedJob.variables.save.candidateId : toggleSavedJob.variables.unsave.candidateId);
+  const saveError = toggleSavedJob.error && failedFor === context?.id
     ? toggleSavedJob.error instanceof ApiError && toggleSavedJob.error.status === 404
       ? `This job is not in ${context?.fullName ?? "this candidate"}'s job list, so it can't be saved for them yet.`
       : toggleSavedJob.error.message

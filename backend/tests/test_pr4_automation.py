@@ -134,7 +134,9 @@ def test_undo_back_to_saved_brings_back_the_favorite(test_db, pipeline, automati
     app = test_db.get(Application, app_id)
     marker = app.submitted_by_user_id or test_db.get(Candidate, app.candidate_id).created_by_user_id
     app.status, app.submitted_by_user_id = 'saved', marker
-    test_db.add(FavoriteJob(firm_id=app.firm_id, candidate_id=app.candidate_id, job_id=app.job_id, marked_by_user_id=marker))
+    # A Saved application has its favorite; the fixture's may already have it (one per candidate and job).
+    if test_db.query(FavoriteJob).filter_by(candidate_id=app.candidate_id, job_id=app.job_id).first() is None:
+        test_db.add(FavoriteJob(firm_id=app.firm_id, candidate_id=app.candidate_id, job_id=app.job_id, marked_by_user_id=marker))
     test_db.commit()
     assert worker.process_one(message_id, provider=lambda *a: decision('screening_call', .95))
     app, events, _, _ = _state(test_db, app_id, message_id)

@@ -155,6 +155,34 @@ def test_a_masking_failure_during_a_probe_keeps_the_pause_and_the_attempt(test_d
     assert (row.classification_state, row.classification_attempts) == ('PENDING', 0)
 
 
+def test_a_probe_that_claims_no_email_gives_its_lease_back(test_db, pipeline):
+    """CodeRabbit #127: an email the probe cannot claim (here: waiting for its retry) leaves the probe free."""
+    _, _, message_id = pipeline
+    with worker.SessionLocal() as db:
+        classifier_pause.record_pause(db, CFG, 'PROVIDER_AUTH_REJECTED')
+    _make_probe_due(test_db)
+    row = _row(test_db, message_id)
+    row.classification_next_retry_at = utcnow() + timedelta(minutes=5)
+    test_db.commit()
+    assert not worker.process_one(message_id, provider=lambda *a: decision())
+    pause = _pause_meta(test_db)
+    assert pause.status == 'running' and pause.meta['probe_lease_until'] is None
+    with worker.SessionLocal() as db:
+        assert classifier_pause.claim_probe(db, CFG)  # still due: the next sweep can probe
+
+
+def test_a_paused_sweep_never_probes_with_a_suspended_firms_email(test_db, pipeline):
+    from backend.models.tenancy import Firm
+    _, _, message_id = pipeline
+    with worker.SessionLocal() as db:
+        classifier_pause.record_pause(db, CFG, 'PROVIDER_AUTH_REJECTED')
+    _make_probe_due(test_db)
+    test_db.get(Firm, _row(test_db, message_id).firm_id).status = 'SUSPENDED'
+    test_db.commit()
+    assert worker.process_pending() == 0
+    assert _pause_meta(test_db).meta['probe_lease_until'] is None
+
+
 def test_new_configuration_is_not_paused(test_db, pipeline):
     with worker.SessionLocal() as db:
         classifier_pause.record_pause(db, CFG, 'PROVIDER_AUTH_REJECTED')

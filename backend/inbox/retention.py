@@ -32,6 +32,8 @@ def purge_due(*, limit=100):
         rows = db.query(InboxMessage).filter(
             InboxMessage.deleted_at.is_(None), InboxMessage.other_purge_after.isnot(None),
             InboxMessage.other_purge_after <= now, InboxMessage.classification_state == 'DONE',
+            # Linked mail is never erased: left out here, before the limit, so it never holds up the rows behind it.
+            InboxMessage.application_id.is_(None),
         ).order_by(InboxMessage.other_purge_after).with_for_update(skip_locked=True).limit(min(limit, 500)).all()
         count = 0
         for message in rows:

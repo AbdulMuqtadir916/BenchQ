@@ -51,7 +51,11 @@ export function useOpenEmailReview(candidateId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (messageId: string) => inboxApi.openReview(firmId, candidateId, messageId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inbox.reviews(firmId, candidateId) }),
+    // A linked email's application gains a pending review: its badge reloads with the review list.
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.inbox.reviews(firmId, candidateId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.applications.all(firmId) }),
+    ]),
   });
 }
 
@@ -59,9 +63,14 @@ export function useOpenEmailReview(candidateId: string) {
 export function useRetryClassification(candidateId: string) {
   const firmId = useFirmId();
   const queryClient = useQueryClient();
+  // The same retry (same email and revisions) reuses its command id, so a retry after a lost response is recognised.
+  const last = useRef<{ payload: string; id: string } | null>(null);
   return useMutation({
-    mutationFn: ({ messageId, contentRevision, resultVersion }: { messageId: string; contentRevision: number; resultVersion: number }) =>
-      inboxApi.retryClassification(firmId, candidateId, messageId, { contentRevision, resultVersion }),
+    mutationFn: ({ messageId, contentRevision, resultVersion }: { messageId: string; contentRevision: number; resultVersion: number }) => {
+      const payload = JSON.stringify({ messageId, contentRevision, resultVersion });
+      if (last.current?.payload !== payload) last.current = { payload, id: newCommandId() };
+      return inboxApi.retryClassification(firmId, candidateId, messageId, { contentRevision, resultVersion }, last.current.id);
+    },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.inbox.byCandidate(firmId, candidateId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.inbox.body(firmId, candidateId) });

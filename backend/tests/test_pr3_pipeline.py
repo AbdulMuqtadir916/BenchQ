@@ -232,6 +232,37 @@ def test_purge_requires_both_flags_and_30_days(test_db, pipeline, monkeypatch):
     assert row.deleted_at and row.classification_state == 'EXCLUDED'
 
 
+def test_purge_reaches_unlinked_mail_behind_linked_mail(test_db, pipeline, monkeypatch):
+    """CodeRabbit #127: linked mail is left out before the batch limit, so it never holds up unlinked mail behind it."""
+    from backend.inbox.google_oauth import encrypt_content
+    from backend.inbox.retention import purge_due
+    from backend.tests.test_candidate_mailbox import email as make_email
+    _, mailbox_id, linked_id = pipeline
+    assert worker.process_one(linked_id, provider=lambda *a: decision('other'))  # the matcher links it
+    test_db.expire_all()
+    first = test_db.get(InboxMessage, linked_id)
+    other = make_email(test_db, test_db.get(CandidateMailbox, mailbox_id), key='unlinked-synthetic')
+    other.source_address, other.subject = first.source_address, 'Newsletter'
+    other.body, other.snippet = encrypt_content('A general market newsletter without names.'), ''
+    other.classification_state, other.sender_auth_result, other.receive_time_verified = 'PENDING', 'PASS', True
+    test_db.commit()
+    other_id = other.id
+    assert worker.process_one(other_id, provider=lambda *a: decision('other'))
+    test_db.expire_all()
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_ENABLED', True)
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_EVALUATED', True)
+    monkeypatch.setattr(config, 'CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID', test_db.query(EmailClassification).first().prompt_version)
+    linked, unlinked = test_db.get(InboxMessage, linked_id), test_db.get(InboxMessage, other_id)
+    assert linked.application_id is not None
+    unlinked.application_id = None
+    linked.other_purge_after, unlinked.other_purge_after = utcnow() - timedelta(minutes=2), utcnow() - timedelta(minutes=1)
+    test_db.commit()
+    assert purge_due(limit=1) == 1  # the older linked email is not the one batch row
+    test_db.expire_all()
+    assert test_db.get(InboxMessage, other_id).deleted_at is not None
+    assert test_db.get(InboxMessage, linked_id).deleted_at is None
+
+
 def test_purge_waits_for_a_pending_review_but_not_for_a_dismissed_one(test_db, pipeline, monkeypatch):
     """CodeRabbit #127: a review a BDE dismissed no longer keeps unlinked Other mail past its purge date."""
     from backend.inbox.retention import purge_due

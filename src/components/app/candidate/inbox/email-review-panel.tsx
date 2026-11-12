@@ -16,8 +16,14 @@ import { Tag } from "@/components/ui/tag";
 const REVIEW_STAGES: readonly ApplicationStatus[] = SELECTABLE.filter((s) => s !== "SAVED");
 /** Not a stage: confirming it dismisses the review as not about any application (DISMISS_NON_APPLICATION). */
 const IRRELEVANT = "IRRELEVANT";
-export const STAGE_OPTIONS = [{ value: "", label: "Choose a stage" }, ...REVIEW_STAGES.map((s) => ({ value: s, label: STATUS_LABEL[s] })),
-  { value: IRRELEVANT, label: "Irrelevant (not about an application)" }];
+/** The stages this review may confirm: Incomplete only for an email classified Incomplete or an application already
+ * Incomplete (DEBUG D-10; the backend refuses the rest). */
+export function reviewStages(category: InboxMessage["classificationCategory"], appStatus?: Application["status"]): ApplicationStatus[] {
+  return REVIEW_STAGES.filter((s) => s !== "INCOMPLETE_APPLICATION" || category === "incomplete_application" || appStatus === "INCOMPLETE_APPLICATION");
+}
+const stageOptions = (stages: readonly ApplicationStatus[]) => [{ value: "", label: "Choose a stage" },
+  ...stages.map((s) => ({ value: s, label: STATUS_LABEL[s] })), { value: IRRELEVANT, label: "Irrelevant (not about an application)" }];
+export const STAGE_OPTIONS = stageOptions(REVIEW_STAGES);
 
 function failure(error: Error): string {
   return error instanceof ApiError && error.status === 409
@@ -49,6 +55,8 @@ export function EmailReviewPanel({ message, review, applications, canAct, onHide
   // Same rule as the backend's match eligibility: a draft that never left Saved cannot receive an email.
   const choices = applications.filter((a) => a.status !== "SAVED" || a.id === lockedId);
   const canKeep = !!app && isSelectable(app.status) && app.status !== "SAVED";
+  const stages = reviewStages(message.classificationCategory, app?.status);
+  const stageAllowed = isIrrelevant || stages.includes(stage as ApplicationStatus);
   const busy = mutation.isPending;
   const ready = message.contentRevision !== undefined;
 
@@ -95,7 +103,7 @@ export function EmailReviewPanel({ message, review, applications, canAct, onHide
           </div>
           <div>
             <span className="block text-caption text-[var(--color-text-3)]">Confirm stage</span>
-            <Select aria-label="Confirm stage" className="mt-1" value={stage} options={STAGE_OPTIONS} onValueChange={setStage} disabled={busy} />
+            <Select aria-label="Confirm stage" className="mt-1" value={stage} options={stageOptions(stages)} onValueChange={setStage} disabled={busy} />
           </div>
           <label className="block text-caption text-[var(--color-text-3)]">Note (optional)
             <textarea className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text)]"
@@ -103,7 +111,7 @@ export function EmailReviewPanel({ message, review, applications, canAct, onHide
           </label>
           {app && !canKeep ? <p className="text-caption text-[var(--color-text-3)]">This application has an older status ({STATUS_LABEL[app.status]}); keeping it is not possible. Confirm a current stage, link only, or choose Irrelevant.</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" disabled={(!isIrrelevant && (!app || !stage)) || busy || !ready}
+            <Button size="sm" disabled={(!isIrrelevant && (!app || !stage)) || !stageAllowed || busy || !ready}
               onClick={() => decide(isIrrelevant ? "DISMISS_NON_APPLICATION" : "SET_STATUS")}>{isIrrelevant ? "Confirm: Irrelevant" : "Confirm stage"}</Button>
             <Button size="sm" variant="secondary" disabled={!canKeep || busy || !ready} onClick={() => decide("KEEP_CURRENT")}>{canKeep && app ? `Keep ${STATUS_LABEL[app.status]}` : "Keep current stage"}</Button>
             <Button size="sm" variant="secondary" disabled={!app || busy || !ready} onClick={() => decide("LINK_ONLY")}>Link only</Button>

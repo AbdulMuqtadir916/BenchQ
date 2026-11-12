@@ -89,3 +89,11 @@ def finish_probe(db, cfg, outcome: str) -> None:
         meta['probe_failures'] = int(meta.get('probe_failures') or 0) + (outcome == 'auth')
     row.meta = meta
     db.commit()
+
+
+def release_probe(db, cfg) -> None:
+    """Give an unused probe lease back (no email could be claimed): the next sweep may probe at once. Commits."""
+    row = db.query(JobRun).filter_by(id=pause_id(cfg), job_type=PAUSE_JOB_TYPE, status='running').with_for_update().first()
+    if row is not None:
+        row.meta = dict(row.meta or {}, probe_lease_until=None)
+    db.commit()

@@ -713,6 +713,13 @@ def review_candidate_email(candidate_id: uuid.UUID, message_id: uuid.UUID, body:
             raise HTTPException(409, 'Application changed. Reload before reviewing.')
         if body.action in {'LINK_ONLY', 'SET_STATUS', 'KEEP_CURRENT'} and app is None:
             raise HTTPException(400, 'Link a submitted application first.')
+        if body.action == 'SET_STATUS' and body.status == 'incomplete_application' and app.status != 'incomplete_application':
+            current = scoped(db, EmailClassification, firm_id).filter_by(
+                inbox_message_id=message.id, result_version=message.classification_version,
+                content_revision=message.content_revision).first()
+            if current is None or current.category != 'incomplete_application':
+                # DEBUG D-10: Incomplete only for an email classified Incomplete, or an application already Incomplete.
+                raise HTTPException(400, 'Incomplete is only for an email classified Incomplete or an application already Incomplete.')
         if review.application_id is None and app:
             duplicate = scoped(db, ApplicationReview, firm_id).filter_by(
                 application_id=app.id, inbox_message_id=message.id, state='PENDING').first()

@@ -16,6 +16,11 @@ function retryFailure(error: Error): string {
 
 /** What is happening with this email's classification, in words, with Retry where the role allows it (D-28). */
 export function ClassificationStatus({ message }: { message: InboxMessage }) {
+  // Always rendered: one polite region for every state, so a change (Classifying… → failed) is announced.
+  return <div role="status" aria-live="polite"><StatusBody message={message} /></div>;
+}
+
+function StatusBody({ message }: { message: InboxMessage }) {
   const canRetry = useCan("email.retry");
   const retry = useRetryClassification(message.candidateId);
   const state = message.classificationState;
@@ -26,7 +31,7 @@ export function ClassificationStatus({ message }: { message: InboxMessage }) {
     return <p className={`${box} text-[var(--color-text-3)]`}>Received before classification was switched on. It is classified when earlier emails are processed, and can then only suggest a change for review.</p>;
   }
   if (state === "PENDING" || state === "PROCESSING") {
-    return <p role="status" className={`${box} text-[var(--color-text-3)]`}>Classifying this email…</p>;
+    return <p className={`${box} text-[var(--color-text-3)]`}>Classifying this email…</p>;
   }
   const setup = !!message.classificationError && SETUP_ERRORS.includes(message.classificationError);
   const ready = message.contentRevision !== undefined && message.classificationVersion !== undefined;
@@ -40,7 +45,7 @@ export function ClassificationStatus({ message }: { message: InboxMessage }) {
           <RotateCw size={13} aria-hidden /> Retry classification
         </Button>
       ) : null}
-      {retry.isSuccess ? <p role="status">Queued again.</p> : null}
+      {retry.isSuccess ? <p>Queued again.</p> : null}
       {retry.error ? <p role="alert">{retryFailure(retry.error)}</p> : null}
     </div>
   );
