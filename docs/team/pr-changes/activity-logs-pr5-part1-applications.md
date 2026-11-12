@@ -3,6 +3,19 @@
 Branch: `activity-logs/pr5-part1-applications` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 Built on PR 4 (`activity-logs/pr4-activity-screen`), which holds PRs 1 to 3. Merge those first.
 
+## In plain words
+
+The log used to miss most of what people do with applications. This part adds it, so the Activity screen shows:
+
+- **Logging an application by hand** (no candidate), and **deleting** one or many at once: one entry for each.
+- **Interviews:** adding, editing (with before and after) and removing one, on the candidate.
+- **AI autofill answers:** an answer the AI wrote for a BDE shows as "AI agent (the BDE's name)", and counts towards that
+  BDE. A failed answer writes nothing.
+- **Status changes** on a hand-logged application now read "Moved <job>: <before> → <after>." like a candidate's.
+
+Notes and answer text are never written to the log. The Chrome extension's "mark applied" already logged (it goes through
+the candidate-status route); this part doesn't change it.
+
 ## An AI agent's person
 
 An agent's entry stores its person's role in `actor_role`, and the API returns the person's name as `on_behalf_of_name`,
