@@ -21,7 +21,7 @@ def test_auto_applied_is_allowed_and_the_revision_roundtrips(scratch_db):
     _ok(_alembic(name, 'downgrade', '0024'))
     _ok(_alembic(name, 'upgrade', 'head'))
     with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision() == '0025'
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision()
 
 
 def test_downgrade_refuses_while_automatic_evidence_exists(scratch_db):
@@ -29,7 +29,9 @@ def test_downgrade_refuses_while_automatic_evidence_exists(scratch_db):
     name, engine = scratch_db
     populated(scratch_db)
     _insert_result(engine, 'AUTO_APPLIED')
+    from backend.tests.migration_support import down_to_0026
+    down_to_0026(name, engine)  # #129's 0027 and its local move go first
     result = _alembic(name, 'downgrade', '0024')
     assert result.returncode != 0 and 'Refusing to discard automatic status evidence' in result.stderr
     with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0025'
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0026'

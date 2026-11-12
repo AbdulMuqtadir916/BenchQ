@@ -1326,7 +1326,12 @@ export const JobMarkSchema = z.object({
     day. A capture is its own batch (`scrape_jobs.kind = 'capture'`, finished at once) with one posting and a ledger
     entry (entity `job_posting`, restricted for a platform admin like a search's); the same job again (same hash) returns the posting the candidate has
     (200; the body's `created` is false, true on a 201, PR 3), even at the cap: only a capture that would create a posting counts against the 20 (Abdul's comment on PR
-    2). An `extension` description is read as HTML. Captures aren't search attempts and don't use the 100-new cap.
+    2). An `extension` description is read as HTML. A job the extension adds may also carry what its page states, each
+    only when stated and validated (decided 2026-11-12), flat in `content`: `work_mode` (`remote` | `hybrid` |
+    `onsite`), `employment_type` ("Full-time", "Part-time", "Contract", "Contract-to-hire", "Temporary", "Internship",
+    "Per diem", "Volunteer", "Seasonal"; several joined with ", "), `salary_min`, `salary_max` (numbers),
+    `salary_currency` (ISO 4217, only when named), `salary_period` (`hour` | `day` | `week` | `month` | `year`, only
+    when said), `posted_at` (YYYY-MM-DD) and `requisition_id`. Older rows without them read as before. Captures aren't search attempts and don't use the 100-new cap.
     A search that finds a captured job merges into that row (`source` and `content` become the provider's), and it
     still stays out of the 100: the cap counts `first_source`, which never changes (Abdul's comment on PR 2).
   - **A repeated search continues (job search PR 2):** a provider returns `next_cursor`; the same role (case and
@@ -1619,7 +1624,10 @@ candidate's route and on
   primary and target roles. Years of experience come from the version's own jobs, counted to today (the New candidate
   form's rule), else `years_experience`. A profile edit shows in every version at once; nothing is rewritten.
 - **The user's entries**, stored in `resumes.autofill` (`{}` by default) as
-  `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit to a fixed answer is kept by
+  `{"edited": {key: {"answer": …, "over": …}}, "custom": [{"question": …, "also": [wording…], "answer": …}]}`
+  (`custom` is a list since 07 Q40, so the questions keep the order they were added in; `also` holds other wordings of
+  the same question, Q41; nothing wrote the earlier `{question: answer}` map, which now reads as no entries). An edit to
+  a fixed answer is kept by
   its question's key, so rewording a question never loses it, with `over`: a copy of the built answer it replaced (for
   a list such as the work history, the whole list). An edit applies while `over` is still the built answer, compared
   as JSON (85.0 is 85, but `true` isn't 1): once the version's own text or the profile changes that answer, the new
@@ -1631,7 +1639,7 @@ candidate's route and on
   applies only where its built answer is still `over`; a new upload starts with none. Anything else stored (a value
   that isn't an object, or the first 0019's `{question: answer}` of built answers) reads as no entries.
 
-Each entry is `{question, answer, kind, key?, built?}`:
+Each entry is `{question, answer, kind, key?, built?, replaced?, also?, type?}`:
 
 | Field | What |
 |---|---|
@@ -1640,19 +1648,35 @@ Each entry is `{question, answer, kind, key?, built?}`:
 | `kind` | `FIXED` (built), `EDITED` (the user's entry for a fixed question), `CUSTOM` (a question the user added) |
 | `key` | On `FIXED` and `EDITED`: what the question asks, a fixed name that doesn't change with the wording, so a reader (the extension) matches by it. A new question gets a new key |
 | `built` | On `EDITED`: the built answer a reset gives back; `null` when the version and the profile don't answer it |
+| `replaced` | On `FIXED`: the answer of the user's edit that stopped applying when the built answer changed (07 Q15). The extension ignores it |
+| `also` | On `CUSTOM`, when there are any: the other wordings the answer is for (07 Q41), so a reader matches any of them. On `FIXED` and `EDITED` in the extension's read (not with `editor`): the other wordings forms use for a question with no field type of its own (`ALSO` in `backend/candidates/autofill.py`: visa transfer, work settings, employment types, industries, locations, field of study, GPA, languages, travel) |
+| `type` | With `&editor=true` only (§8.4), on `FIXED` and `EDITED`: `text`, `texts`, `number`, `boolean`, `date` or `entries` |
 
 The keys, in order: `full-name`, `email`, `phone`, `linkedin-url`, `github-url`, `address-city`, `address-region`,
 `address-country`, `professional-title`, `summary`, `work-auth-status`, `skills`, `current-company`, `current-title`,
-`work-history`, `education-degree`, `education-school`, `graduation-year`, `education-history`, `projects`, `awards`,
-`certifications`, `languages`, `work-auth-expiry`, `visa-sponsorship`, `visa-transfer`, `years-experience`,
+`work-history`, `education-degree`, `education-field`, `education-school`, `graduation-year`, `education-grade`,
+`education-history`, `projects`, `awards`, `certifications`, `languages`, `work-auth-expiry`, `visa-sponsorship`, `visa-transfer`, `years-experience`,
 `primary-role`, `target-roles`, `pay-rate`, `start-date`, `notice-period-days`, `relocation-willing`,
-`employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`. The fixed questions come first in
-that order, then the user's. A missing fact leaves its question out. Never in it: ids, `rate_min`, `contact_notes`,
-`deal_breakers`, `status`, `bench_start_date`. Not in the list, a save, or a read without `?autofill=true`. Writing the
-user's entries (a route) is planned: it takes `over` from its own build, never from the request, and the request
-carries the built answer the user was shown, so the route answers 409 when its own build differs (an edit is never
-saved over an answer the user didn't see). Its contract goes here first. The frontend doesn't map `autofill` (no screen
-shows it yet); the extension reads it (Arbaz).
+`employment-types`, `work-settings`, `preferred-locations`, `preferred-industries`, `preferred-name`, `middle-name`,
+`address-line1`, `address-line2`, `address-postal`, `portfolio-url`, `citizenship`, `nationality`, `current-pay`,
+`salary-expectation`, `floor-rate`, `onsite-work`, `willing-to-travel`, `commute`, `over-18`, `criminal-history`, `background-check`,
+`drug-test`, `security-clearance`, `non-compete`, `government-work`, `relative-at-company`, `former-employee`,
+`accommodations`, `essential-functions`, `gender`, `pronouns`, `race`, `hispanic-latino`, `veteran-status`,
+`disability-status`, `sexual-orientation`, `transgender`. The fixed questions come first in that order, then the
+user's. From `preferred-name` on (decided 2026-11-11) are the personal and screening questions forms ask: nothing holds
+them, so they're never built, except `citizenship` (true exactly when the profile's status is USC); `floor-rate` (a
+number, decided 2026-11-12) is the BDE's own answer, never the profile's `rate_min`, which stays the firm's own; the Autofill screen
+lists them to answer and the BDE adds the candidate's answer to that version, as an edit over no built answer. The last
+eight are voluntary self-identification: never logged, and the extension leaves them out of `form_data`. Never a date
+of birth, an ID number or a password: the extension never fills those. `education-field` is the subject the highest degree's line names after the degree, as
+printed ("B.Tech in Computer Science" → "Computer Science", "MS Data Science" → "Data Science"; "MBA" names none), and
+`education-grade` its grade as printed; each `education-history` record carries its own `field` the same way. A missing
+fact leaves its question out. Never in it: ids, `rate_min`, `contact_notes`,
+`deal_breakers`, `status`, `bench_start_date`. Not in the list, a save, or a read without `?autofill=true`. The user's
+entries are written by the Autofill screen's route (§8.4), which takes `over` from its own build, never from the
+request; the request carries the built answer the user was shown, so the route answers 409 when its own build differs
+(an edit is never saved over an answer the user didn't see). The extension reads `autofill` (Arbaz); the Autofill
+screen maps it (§8.4).
 
 ```ts
 // src/lib/schemas/resume.ts — new: the bases, for the base dropdown and the active-base marker
@@ -1766,6 +1790,64 @@ or the same version and job already running; 422 a job without a description; 42
 tailor not set up. `GET …/resumes/tailorings[/{run_id}]` reads the candidate's; `GET /firms/{firm}/tailorings` the
 signed-in user's own, running or finished in the last 30 minutes (their panel). Snake case is mapped in
 `src/lib/api/dto/tailoring.ts`.
+
+### 8.4 The Autofill screen — PROPOSED 2026-11-09 (07 Q6–Q8, Q13–Q15, Q30, Q34, Q40–Q45; for Abdul's sign-off), BUILT (phase 3)
+
+**The read.** `GET …/resumes/{id}?autofill=true&editor=true` (both routes of §8.1) is the §8.1 list for the screen: it
+also lists the fixed questions with no answer (`answer: null`, 07 Q34), and every `FIXED` and `EDITED` entry carries its
+`type` (`text`; `texts`, a list of short texts; `number`; `boolean`; `date`, `"YYYY-MM-DD"`; `entries`, a list of
+records such as the work history, shown but never edited here, 07 Q42).
+
+**The save.** `PATCH /api/firms/{firm}/candidates/{cid}/resumes/{rid}/autofill`, the same access as saving a version
+(`resume.edit` and `can_change_resume`), the candidate locked as a save locks it:
+
+```json
+{ "edit": {"pay-rate": 90}, "built": {"pay-rate": 85}, "answered": {"pay-rate": 85, "github-url": "github.com/ravi"},
+  "reset": ["github-url"], "add": {"Why do you want to work here?": "Payments."}, "remove": ["Shift?"], "only_this": false }
+```
+
+- `edit` by key: each answer as its `type` takes it (text up to 4000 characters, a list of up to 100 texts of up to
+  300, a number from 0, `true`/`false`, a real date). An edit equal to the built answer is no edit. `built` carries, for
+  each edited key, the built answer the user was shown; a missing one is 400 and a different one 409. `answered`
+  carries each edited or reset key's answer as the user was shown it (their edit, else the built one, null for none): a
+  missing one is 400 and a different one 409, so a save never replaces an answer saved after the page opened (another
+  tab, the extension). An added or removed question's answer the user was shown may go there too, by its words (null
+  for a new question), with the same 409.
+- `reset` keys drop their edits (the built answer shows again). `add` sets the user's questions: one that is already
+  there (compared without capitals, spacing or punctuation, its `also` too, 07 Q43) gets the new answer; a new one goes
+  last. A question in a fixed question's words is refused: its answer is edited instead. `remove` drops questions.
+- Refused (400): an unknown key, an `entries` question, an answer of the wrong type, a key both edited and reset,
+  nothing to save, over 200 questions of the user's own. Unknown fields: 422.
+- In place: no new version (07 Q7). Unless `only_this`, the change also goes to the newest version of the base and of
+  each tailored résumé made from it (07 Q30, Q44): a new answer where that version has no answer to the question yet or
+  still answers what the opened one did before the save; a reset or a removal only where it still answers the same. A
+  version that answers differently keeps its own. An edit's `over` there is that version's own built answer.
+- One activity entry per save on the opened version, naming the questions and how many other versions changed, never
+  the answers.
+- Answers `{"autofill": [...], "changed": n}`: the opened version's list as the screen reads it, and how many versions
+  changed (0 when nothing did).
+
+```ts
+// src/lib/schemas/resume-autofill.ts
+export const AutofillAnswerSchema = z.union([z.string(), z.number(), z.boolean(), z.array(z.string()),
+  z.array(z.record(z.string(), z.unknown())), z.null()]);
+export const AutofillEntrySchema = z.object({
+  question: z.string(), answer: AutofillAnswerSchema, kind: z.enum(['FIXED', 'EDITED', 'CUSTOM']),
+  key: z.string().nullable(), type: z.enum(['text', 'texts', 'number', 'boolean', 'date', 'entries']).nullable(),
+  built: AutofillAnswerSchema.optional(),   // EDITED only
+  replaced: AutofillAnswerSchema.optional(), // FIXED: the edit that stopped applying (Q15)
+  also: z.array(z.string()),                // CUSTOM: its other wordings; [] otherwise
+});
+export const ResumeAutofillSchema = z.object({ versionId: z.string(), candidateId: z.string(), entries: z.array(AutofillEntrySchema) });
+export const AutofillChangeSchema = z.object({
+  edit: z.record(z.string(), AutofillAnswerSchema), built: z.record(z.string(), AutofillAnswerSchema),
+  answered: z.record(z.string(), AutofillAnswerSchema).optional(),
+  reset: z.array(z.string()), add: z.record(z.string(), z.string()), remove: z.array(z.string()), onlyThis: z.boolean(),
+});
+// The save's result as the app reads it: the route answers `autofill` as the version's entries (a list), which the DTO
+// gives the version's and the candidate's ids.
+export const AutofillSaveResultSchema = z.object({ autofill: ResumeAutofillSchema, changed: z.number().int() });
+```
 
 ---
 

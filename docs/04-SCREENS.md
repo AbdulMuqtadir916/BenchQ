@@ -504,10 +504,16 @@ mode; **View** opens it in Viewer mode. The studio's URL names the version.
 **The studio — `/resumes/[id]`.** Opens full screen, outside the app shell: no sidebar, no top nav.
 A close button (and `Esc`) returns to wherever it was opened from. `?mode=view` opens in Viewer mode;
 `/resumes/new` starts a new resume from a candidate's record or blank, and
-`/resumes/new?upload=<file>` opens a parsed upload.
+`/resumes/new?upload=<file>` opens a parsed upload. Its tabs are **Builder**, **Viewer** and, on a saved version,
+**Autofill answers** (`/resumes/[id]/autofill`, below). A switch to or from Autofill answers replaces the URL, as a
+save does, so the history holds one entry for the studio: close goes back to the page that opened it, never to another
+tab. Opened directly (a new tab, a link from the extension, a reload), close goes to the Resumes library instead of
+leaving BenchQ. The bar's two sides share the room the tabs leave; the actions never shrink and the name gives way
+first, so nothing overlaps. Labels fold into their icons as the window narrows (Tailor below 1280px, Export below
+1024px, the tabs and Save on a phone). The Autofill tab keeps Save and drops Tailor and Export, which act on the page.
 
 ```
-┌ ✕ │ Base [Base]     [ Builder | Viewer ]    Unsaved changes [Save]  [Export PDF]                  ┐
+┌ ✕ │ Base [Base]   [ Builder | Viewer | Autofill answers ]   Unsaved changes [Save]  [Export PDF]                  ┐
 ├──────────────────────────────┬─────────────────────────────────────────────────────────────────┤
 │ ▸ Header                     │ Template ‹ Classic Serif ▾ ›   − Fit · 91% +   2 pages · Letter  │
 │ ▸ Summary                    │ ┌─────────────────────────────┐                                 │
@@ -542,6 +548,50 @@ A close button (and `Esc`) returns to wherever it was opened from. `?mode=view` 
 - **Export PDF** prints a clean copy of the page through the browser's print dialog.
 
 **Export.** Any résumé that is not deleted can be exported (no claim states, no export block).
+
+**The Autofill answers tab — `/resumes/[id]/autofill`** (07 Q6, Q13; docs/02 §8.4). The studio's third tab, with its
+access; also opened from **Autofill** on each version of the résumé tree. It shows what the extension fills on
+application forms from this version, every question once, by topic:
+
+```
+┌ ✕ │ Base [Base]   [ Builder | Viewer | Autofill answers ]                     Saved [Save] ┐
+│ Topics          │ Autofill answers                                                                            │
+│ ⚠ Needs a look 1│ What the extension fills on application forms from this resume version…                        │
+│ Contact  •    5 │ 31 of 37 questions answered ▓▓▓▓▓▓▓▓▓▓▓▓░░░                             6 not answered yet │
+│ Location      3 │ [All 37 | To answer 6 | Needs a look 1 | Yours 2]                     [🔍 Search questions  /] │
+│ …               │ ┌ Contact 5 · 1 to answer ───────────────────────────────────────────────────────────────┐ │
+│ Your questions 2│ │ What is your GitHub profile URL?                                [To answer] [+ Add answer] │ │
+│                 │ │ Not answered · The resume doesn't say. Forms that ask this are left to you…             │ │
+└─────────────────┴────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Topics**, in this order: **Needs a look** (an answer of the user's that the résumé or the profile replaced, 07 Q15:
+  "Your answer “Texas” was replaced when the resume changed it to “TX”", with **Keep mine** and **Use the new one**),
+  Contact, Location, Work authorization, Experience, Education, Skills and languages, Rate and preferences, Other
+  questions (a key added later), and **Your questions** (the user's own, oldest first, with their other wordings, **Add
+  a question**, **Edit** and **Delete**, which asks first). Each topic is a card with its count and how many are still to
+  answer; on a wide screen a side rail lists the topics and jumps to them.
+- **A row** is the question, then the answer as the extension writes it on a form (Yes/No, 12/01/2026, $85/hr, "14 days"
+  or "Immediately"; a list as tags, the first 12 then "Show all"; a list of records — the work history, education,
+  projects, awards — as two lines each, the first four then "Show all"), then where it comes from ("From the resume",
+  "From the candidate's profile", "Counted from the work history"). The user's answer shows **Yours**, BenchQ's answer
+  under it and **Reset**; an unanswered one shows **To answer** and **Add answer**; a list of records is changed in the
+  résumé itself (07 Q42): **Edit in Builder** opens its section on the Builder tab.
+- **The top:** how many questions are answered (counted from the answers, never stored), and the filters **All**,
+  **To answer**, **Needs a look**, **Yours** with their counts and a search over the questions,
+  their other wordings and the answers. The filter and the search are in the URL (`?show=`, `?q=`) and stay in view while
+  the list scrolls.
+
+Each answer is edited in the control its type takes: a line, a box (the summary, the user's own questions), one item per
+line for a list, a number, a date, Yes/No. A change is saved to this version only, never to the résumé's other
+versions (decided 2026-11-11; the save sends `only_this`). A save's outcome shows in the studio's status bar; a 409 (an answer changed meanwhile) shows a note with **Reload**. With unsaved résumé edits, a note says the
+answers come from the last saved version. Editing follows `canChangeResume`; a viewer and a support view read, with "You
+can view these answers. The candidate's BDE changes them." Keyboard: `J`/`K` move through the questions, `Enter` edits
+the focused one, `Enter` saves a one-line answer and `Ctrl+Enter` a box, `/` searches, `Esc` cancels an edit (focus goes
+back to its row) and, outside one, closes the studio. States: a skeleton in the tab's shape while it loads, an error with
+retry, not-found for a missing version or one outside the user's scope, an empty filter or search ("Every question has
+an answer.", "No question matches …" with **Show every question**), and "No questions of your own yet." for an empty
+**Your questions**.
 
 ---
 

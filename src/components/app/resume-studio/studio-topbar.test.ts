@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { newText } from "@/lib/resume-doc/build";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
+import type { StudioTab } from "./studio-store";
 import { StudioTopbar } from "./studio-topbar";
 
 /**
@@ -17,9 +18,10 @@ const doc: ResumeDocument = {
   summary: newText(), experience: [], skills: [], education: [], certifications: [], awards: [], projects: [],
 };
 
-function bar(canEdit: boolean): string {
+function bar(canEdit: boolean, tab: StudioTab = "build"): string {
   return renderToStaticMarkup(createElement(StudioTopbar, {
-    doc, name: "Base", subtitle: "", canEdit, onSave: () => undefined, onClose: () => undefined, onExport: () => undefined,
+    doc, name: "Base", subtitle: "", canEdit, onSave: () => undefined, onClose: () => undefined,
+    onExport: () => undefined, tab, onTab: () => undefined, hasAutofill: true,
   }));
 }
 
@@ -29,6 +31,16 @@ describe("the studio top bar", () => {
     expect(markup).toContain("Save");
     expect(markup).toContain("Export PDF");
     expect(markup).not.toContain("Tailor");
+  });
+
+  it("the candidate's own BDE can save", () => {
+    expect(bar(true)).toContain("Save");
+  });
+
+  it("on the Autofill tab the BDE keeps Save, and Export stays with the page tabs", () => {
+    const markup = bar(true, "autofill");
+    expect(markup).toContain("Save");
+    expect(markup).not.toContain("Export PDF");
   });
 
   it("someone who may only view gets no Save, and can still export", () => {
