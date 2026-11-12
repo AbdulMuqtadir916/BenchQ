@@ -198,4 +198,9 @@ the studio's tailor props, the agents mock's `tailorResume`.
 - Focus mode: on the last job, T waits for the answer, so a refused start keeps the job open with the reason; its
   "Tailored" counts the started runs that saved a résumé (and says how many are still tailoring).
 
+**Scale (2026-11-12):** the candidate's tailoring list and the panel's read filter by candidate or user in the
+database and read at most 50 (they read every tailoring of the firm and picked in Python). Still to do before scaling
+out, outside this PR: a job queue with a separate worker (deployment), `cleanup_stale_runs` per worker and a per-firm
+cap (Uzair), the OpenRouter rate limit and per-firm spend.
+
 **Later:** the ATS score of a tailored version against its job, and a PDF the server makes (extension, email).

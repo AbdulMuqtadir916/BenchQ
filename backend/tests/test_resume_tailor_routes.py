@@ -513,3 +513,25 @@ def test_the_bdes_lock_makes_a_second_start_wait(test_db):
     finally:
         holder.rollback()
         holder.close()
+
+
+def test_the_lists_are_filtered_and_cut_in_the_database(anonymous_client, test_db, world, launched, setup):
+    """The candidate's list reads only that candidate's tailorings, newest first, at most `limit`; the panel's read
+    only the user's own (2026-11-12: they read every tailoring of the firm, then picked in Python)."""
+    from backend.models.candidates import Candidate
+    me = world["people"]["adnan"].id
+    other = _candidate(anonymous_client, test_db, world, bde="adnan")
+    theirs = make_posting(test_db, world["firm"].id, uuid.UUID(other["id"]), me, n=7)
+    second = make_posting(test_db, world["firm"].id, uuid.UUID(setup["c"]["id"]), me, n=8)
+    test_db.commit()
+    mine = [_start(anonymous_client, world, setup).json()["run_id"],
+            _start(anonymous_client, world, setup, job_posting_id=str(second.id)).json()["run_id"]]
+    their_run = _start(anonymous_client, world, {**setup, "c": other, "posting": theirs}).json()["run_id"]
+
+    listed = anonymous_client.get(_url(world, setup["c"], "/tailorings"), headers=world["as"]["adnan"]).json()
+    assert {r["run_id"] for r in listed} == set(mine)
+    candidate = test_db.get(Candidate, uuid.UUID(setup["c"]["id"]))
+    assert [str(r.id) for r in runs.candidate_runs(test_db, candidate, limit=1)] == [mine[1]]     # the newest only
+    panel = anonymous_client.get(f"/api/firms/{world['firm'].id}/tailorings", headers=world["as"]["adnan"]).json()
+    assert {r["run_id"] for r in panel} == set(mine) | {their_run}
+    assert runs.my_runs(test_db, world["firm"].id, uuid.uuid4()) == []                        # nobody else's

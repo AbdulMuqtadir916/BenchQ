@@ -57,7 +57,8 @@ TAILORED_NAME = "Tailored"
 GONE, LOST, SETUP, INTERNAL, HIDDEN = "gone", "lost", "setup", "internal", "hidden"
 # What the screens show while it runs: the pipeline's five steps, then the save (decided 2026-11-12, part 3 R2-Q1).
 SAVE_STEP = "save"
-RECENT_FOR = timedelta(minutes=30)             # decided 2026-11-12 (R3-Q2): finished ones stay in the BDE's panel
+RECENT_FOR = timedelta(minutes=30)
+MOST_LISTED = 50                               # the most of a user's recent tailorings the panel reads             # decided 2026-11-12 (R3-Q2): finished ones stay in the BDE's panel
 
 
 def _now() -> datetime:
@@ -155,13 +156,14 @@ def run_json(row: JobRun) -> dict:
 
 
 def candidate_runs(db, candidate, *, running_only: bool = False, limit: int = 50) -> list:
-    """The candidate's tailorings, newest first (lost ones expired first)."""
+    """The candidate's tailorings, newest first, at most `limit` (lost ones expired first). Filtered and cut in the
+    database: the firm's tailorings grow every day, and only this candidate's newest are read (2026-11-12)."""
     expire_lost(db, candidate.firm_id)
-    query = scoped(db, JobRun, candidate.firm_id).filter(JobRun.job_type == JOB_TYPE)
+    query = scoped(db, JobRun, candidate.firm_id).filter(JobRun.job_type == JOB_TYPE,
+                                                         JobRun.meta["candidate_id"].as_string() == str(candidate.id))
     if running_only:
         query = query.filter(JobRun.status == "running")
-    rows = query.order_by(JobRun.started_at.desc()).all()
-    return [r for r in rows if (r.meta or {}).get("candidate_id") == str(candidate.id)][:limit]
+    return query.order_by(JobRun.started_at.desc()).limit(limit).all()
 
 
 def my_runs(db, firm_id, user_id) -> list:
@@ -169,10 +171,10 @@ def my_runs(db, firm_id, user_id) -> list:
     panel, decided 2026-11-12, part 3 R2-Q2 and R3-Q2). Lost ones are expired first."""
     expire_lost(db, firm_id)
     since = _now() - RECENT_FOR
-    rows = scoped(db, JobRun, firm_id).filter(JobRun.job_type == JOB_TYPE,
+    return scoped(db, JobRun, firm_id).filter(JobRun.job_type == JOB_TYPE,
+                                              JobRun.meta["user_id"].as_string() == str(user_id),
                                               (JobRun.status == "running") | (JobRun.finished_at >= since)) \
-        .order_by(JobRun.started_at.desc()).all()
-    return [r for r in rows if (r.meta or {}).get("user_id") == str(user_id)]
+        .order_by(JobRun.started_at.desc()).limit(MOST_LISTED).all()
 
 
 def candidate_run(db, candidate, run_id) -> JobRun:
