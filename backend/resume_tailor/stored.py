@@ -15,10 +15,11 @@ A version is stored as columns: the header fields, the summary and its id, and s
   there. A printed section the copy left out is left out (decided 2026-11-12, Q12); languages are never printed and
   autofill reads them, so they always stay (decided 2026-11-12, Zuhair).
 """
+import re
 from dataclasses import dataclass
 
 from backend.analyzer.prompt_fence import without_fake_markers
-from backend.candidates.base_resume import (_award_line, _clean_bullets, _squash, build_base_resume, canonicalize_tech,
+from backend.candidates.base_resume import (_award_line, _clean_bullets, build_base_resume, canonicalize_tech,
                                             split_skills)
 from backend.candidates.values import dicts, text
 from backend.candidates.versions import HEADER
@@ -104,11 +105,11 @@ def _kept_entries(chosen: list, entries: list, lines) -> list:
     (`lines(entry)` gives the ways an entry is printed). A line no entry prints is left out."""
     kept, used = [], set()
     for line in chosen:
-        key = _squash(line)
+        key = _identity(line)
         if len(key) < 3:
             continue
-        exact = [i for i, entry in enumerate(entries) if i not in used and key in {_squash(x) for x in lines(entry)}]
-        within = [i for i, entry in enumerate(entries) if i not in used and any(key in _squash(x) for x in lines(entry))]
+        exact = [i for i, entry in enumerate(entries) if i not in used and key in {_identity(x) for x in lines(entry)}]
+        within = [i for i, entry in enumerate(entries) if i not in used and any(key in _identity(x) for x in lines(entry))]
         found = (exact or within or [None])[0]
         if found is not None:
             used.add(found)
@@ -116,10 +117,18 @@ def _kept_entries(chosen: list, entries: list, lines) -> list:
     return kept
 
 
+def _identity(value) -> str:
+    """What a printed name, line or date is compared by: its letters and digits in any case, and the symbols that tell
+    names apart ("C++ Tracker" is not "C# Tracker"); dashes, spaces and other punctuation don't count ("2021 – 2022"
+    is "2021 - 2022"). Abdul's review of the tailoring PR, 2026-11-12: comparing letters and digits only made C++
+    and C# the same, and saved one project under the other's name."""
+    return re.sub(r"[^a-z0-9+#]", "", str(value or "").lower())
+
+
 def _facts(entry: dict) -> dict:
-    """An entry's fields but its bullets, as letters and digits only: the copy prints "2021 - 2022" where the version
-    says "2021 – 2022", and that is the same project (Abdul's review of the tailoring PR, 2026-11-12)."""
-    return {key: _squash(value) for key, value in entry.items() if key != "bullets"}
+    """An entry's fields but its bullets, compared as `_identity`: the copy prints "2021 - 2022" where the version
+    says "2021 – 2022", and that is the same project."""
+    return {key: _identity(value) for key, value in entry.items() if key != "bullets"}
 
 
 def _projects(copy: dict, content: dict, given: TailorInput) -> list:
@@ -156,7 +165,7 @@ def _skills(copy: dict, content: dict) -> list:
 def _printed_dates(copied: str, stored: str) -> str:
     """The copy's printed dates, unless they are the version's own written another way (the copy writes "-" where the
     version has "–"): then the version's, as the BDE wrote them (Abdul's review, 2026-11-12)."""
-    if not copied or _squash(copied) == _squash(stored):
+    if not copied or _identity(copied) == _identity(stored):
         return stored
     return copied
 

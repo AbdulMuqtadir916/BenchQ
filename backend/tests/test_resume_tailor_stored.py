@@ -159,3 +159,26 @@ def test_a_kept_project_with_dates_stays_whatever_dash_the_copy_prints(monkeypat
     content["projects"][0]["dates"] = "2021 – 2022"
     projects = _tailored(monkeypatch, content=content).content["projects"]
     assert [(p["id"], p["dates"]) for p in projects] == [("project-1", "2021 – 2022")]   # kept, the version's own text
+
+
+
+def test_a_project_named_with_a_symbol_is_never_saved_under_another(monkeypatch):
+    """Abdul's review (2026-11-12): with "C++ Tracker" and "C# Tracker" stored, keeping the second saved the first."""
+    content = copying.deepcopy(CONTENT)
+    first = content["projects"][0]
+    content["projects"] = [{**first, "id": "project-cpp", "name": "C++ Tracker", "dates": "2021 – 2022"},
+                           {**first, "id": "project-cs", "name": "C# Tracker", "dates": "2021 – 2022",
+                            "bullets": [{**b, "id": f"cs-{b['id']}"} for b in first["bullets"]]}]
+    keeps_the_second = {**KEEPING, "projects": [{"project_number": 2, "bullets": ["Built a tracker in Python."]}]}
+    projects = _tailored(monkeypatch, draft=keeps_the_second, content=content).content["projects"]
+    assert [(p["id"], p["name"], p["dates"]) for p in projects] == [("project-cs", "C# Tracker", "2021 – 2022")]
+
+
+def test_a_certification_named_with_a_symbol_is_never_kept_as_another():
+    """The same comparison for certifications and awards: "C# Developer" is not "C++ Developer"."""
+    from backend.resume_tailor.stored import _kept_entries
+    entries = [{"id": "c1", "name": "C++ Developer Certification"}, {"id": "c2", "name": "C# Developer Certification"}]
+    kept = _kept_entries(["C# Developer Certification"], entries, lambda c: (c["name"],))
+    assert [c["id"] for c in kept] == ["c2"]
+    assert [c["id"] for c in _kept_entries(["AWS – Developer"], [{"id": "a", "name": "AWS - Developer"}],
+                                           lambda c: (c["name"],))] == ["a"]           # a dash is still a dash

@@ -198,6 +198,23 @@ the studio's tailor props, the agents mock's `tailorResume`.
 - Focus mode: on the last job, T waits for the answer, so a refused start keeps the job open with the reason; its
   "Tailored" counts the started runs that saved a résumé (and says how many are still tailoring).
 
+**Abdul's second review (2026-11-12), fixed:** projects, certifications and awards are matched back by a key that
+keeps the symbols telling names apart (`stored._identity`: letters, digits, `+`, `#`), so "C# Tracker" is never saved
+as "C++ Tracker"; dashes, spaces and case still don't count, so a project dated "2021 – 2022" survives.
+
+**Known issues, follow-up (Abdul's second review and CodeRabbit, 2026-11-12).** None starts a second tailoring: the
+backend refuses the same source and job while one runs (409).
+1. Focus mode: switching candidates while the last job's start is pending lets the old answer mark the new
+   candidate's queue complete (each start should carry the Focus session it belongs to).
+2. The panel: an older running tailoring can drop out of the read behind 50 newer finished ones (`runs.MOST_LISTED`);
+   it still runs, but the panel stops checking it (read every running one, then the newest finished).
+3. Focus mode: the key handler doesn't see that the last job's start is pending, so a second T sends another start
+   (answered 409); guard with a ref shared by the key and the button.
+4. The panel: only the newest Try again counts as in progress, so an earlier row's button comes back early (keep a set
+   of rows retrying).
+5. The panel: two retries finishing together can bring back a row dismissed by the first (merge each dismissal into
+   the latest state).
+
 **Scale (2026-11-12):** the candidate's tailoring list and the panel's read filter by candidate or user in the
 database and read at most 50 (they read every tailoring of the firm and picked in Python). Still to do before scaling
 out, outside this PR: a job queue with a separate worker (deployment), `cleanup_stale_runs` per worker and a per-firm
