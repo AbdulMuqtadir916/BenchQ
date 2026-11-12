@@ -35,8 +35,11 @@ const CALLING_CODES: Record<string, string> = {
   "nz": "64", "nzl": "64", "new zealand": "64",
 };
 
-/** The longest national number (without the trunk 0) per calling code: longer digits must include the code. */
-const NATIONAL_MAX: Record<string, number> = { "91": 10, "44": 10, "61": 9, "49": 11, "353": 9, "65": 8, "971": 9, "92": 10, "880": 10, "64": 10 };
+/** National number lengths (without the trunk 0) per calling code, [shortest, longest]. */
+const NATIONAL_LENGTH: Record<string, readonly [number, number]> = {
+  "91": [10, 10], "44": [9, 10], "61": [9, 9], "49": [5, 11], "353": [7, 9], "65": [8, 8],
+  "971": [8, 9], "92": [10, 10], "880": [10, 10], "64": [8, 10],
+};
 
 /** The calling code for a country field, or null when it isn't one we know. */
 export function callingCode(country: string): string | null {
@@ -62,9 +65,15 @@ export function toE164(value: string, country: string): string | null {
     if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
     return digits.length === 10 ? `+1${digits}` : null;
   }
-  // "91 98765 43210" includes the code; "9123456789" (ten digits) is a national number that happens to start with 91.
-  if (digits.startsWith(code) && digits.length > (NATIONAL_MAX[code] ?? 10)) digits = digits.slice(code.length);
-  else if (digits.startsWith("0")) digits = digits.slice(1);
+  // Digits starting with the code: longer than any national number → the code is included ("91 98765 43210"); where
+  // national numbers have one fixed length, as long as one → national ("9123456789" in India). Otherwise ("49 30 227-0"
+  // in Germany) it could be either, so no link rather than a wrong one.
+  const [shortest, longest] = NATIONAL_LENGTH[code] ?? [6, 12];
+  if (digits.startsWith(code)) {
+    const rest = digits.length - code.length;
+    if (digits.length > longest) digits = digits.slice(code.length);
+    else if (shortest !== longest && rest >= shortest) return null;
+  } else if (digits.startsWith("0")) digits = digits.slice(1);
   const e164 = `${code}${digits}`;
   return digits.length >= 6 && e164.length <= 15 ? `+${e164}` : null;
 }

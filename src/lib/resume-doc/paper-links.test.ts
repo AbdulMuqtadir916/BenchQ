@@ -40,6 +40,13 @@ describe("résumé links", () => {
 
     it("keeps a ten-digit Indian number that starts with 91", () => {
       expect(toE164("9123456789", "India")).toBe("+919123456789");
+      expect(toE164("9198765432", "India")).toBe("+919198765432");
+    });
+
+    it("doesn't guess when a short number may already include its code", () => {
+      expect(toE164("49 30 227-0", "Germany")).toBeNull();
+      expect(toE164("+49 30 227-0", "Germany")).toBe("+49302270");
+      expect(toE164("030 227-0", "Germany")).toBe("+49302270");
     });
   });
 
