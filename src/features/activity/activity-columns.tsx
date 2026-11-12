@@ -5,6 +5,7 @@ import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { ActionTag, ActorTag } from "@/components/app/ledger-tags";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { actorDisplay } from "./actor";
+import { candidateLabel } from "./candidate-label";
 
 /** With dates picked, "When" shows the exact time; otherwise how long ago. */
 export function activityColumns(isExactTime: boolean): ColumnDef<LedgerEntry, unknown>[] {
@@ -40,10 +41,10 @@ export function activityColumns(isExactTime: boolean): ColumnDef<LedgerEntry, un
     },
     {
       id: "candidate",
-      accessorFn: (entry) => entry.candidateName ?? "",
+      accessorFn: (entry) => candidateLabel(entry),
       header: "Candidate",
       enableSorting: false,
-      cell: ({ row }) => <span className="whitespace-nowrap text-[var(--color-text-2)]">{row.original.candidateName ?? "—"}</span>,
+      cell: ({ row }) => <span className="whitespace-nowrap text-[var(--color-text-2)]">{candidateLabel(row.original)}</span>,
     },
     {
       id: "summary",

@@ -537,6 +537,63 @@ def test_the_days_with_activity_are_the_firms_days_and_the_readers_own(anonymous
     assert _read(anonymous_client, world, world.cara, month, "/days") == []
 
 
+def test_a_sorted_list_with_rows_at_the_same_moment_pages_by_offset_without_repeats(anonymous_client, test_db, world):
+    """Same actor and same microsecond for every row of a person: the order inside a group is still fixed (lowest id
+    first), so two pages never show a row twice or skip one."""
+    moment = datetime(2026, 3, 3, 12, 0, tzinfo=timezone.utc)
+    mine = {actor.name: [] for actor in (world.bea, world.ben)}
+    for number in range(3):
+        for actor in (world.bea, world.ben):
+            entry = ledger.record(test_db, actor=actor, action="UPDATE", entity_type="user", entity_id=actor.id,
+                                  entity_label=actor.name, summary=f"{actor.name} {number}", firm_id=world.id,
+                                  candidate_id=None, at=moment)
+            mine[actor.name].append(entry)
+    test_db.commit()
+    by_id = lambda entries: [entry.summary for entry in sorted(entries, key=lambda entry: entry.id)]
+    for direction, order in (("asc", ("Bea", "Ben")), ("desc", ("Ben", "Bea"))):
+        expected = [summary for name in order for summary in by_id(mine[name])]
+        query = f"?sort=actor&dir={direction}&limit=2"
+        pages = [_summaries(anonymous_client, world, world.owner, f"{query}&offset={offset}") for offset in (0, 2, 4)]
+        assert [summary for page in pages for summary in page] == expected
+        assert _summaries(anonymous_client, world, world.owner, f"?sort=actor&dir={direction}") == expected   # and whole
+
+
+@pytest.mark.parametrize("sorted_by", ["sort=actor", "sort=action", "sort=when&dir=asc", "dir=asc"])
+def test_a_page_marker_is_refused_under_any_order_but_newest_first(anonymous_client, test_db, world, sorted_by):
+    """A marker means "the rows after this one, newest first". Under another order the next page would skip and repeat
+    rows, so the server says so instead of answering with a plausible wrong page."""
+    for number in range(3):
+        _log(test_db, world.bea, str(number))
+    marker = _read(anonymous_client, world, world.owner, "?limit=1")[0]
+    for query in (f"?{sorted_by}&cursor={marker['cursor']}",
+                  f"?{sorted_by}&cursor_at={marker['created_at'].replace('+', '%2B')}&cursor_id={marker['id']}"):
+        response = anonymous_client.get(f"{world.url}{query}", headers=_as_session(world, world.owner))
+        assert response.status_code == 422, query
+    assert _read(anonymous_client, world, world.owner, f"?{sorted_by}&limit=2&offset=1")      # offset is fine
+    assert _read(anonymous_client, world, world.owner, f"?sort=when&dir=desc&cursor={marker['cursor']}")  # and so is newest first
+
+
+def test_the_calendar_dots_follow_midnight_and_a_day_when_the_clocks_change(anonymous_client, test_db, world):
+    """The same moments as the day filter: Kolkata's midnight is 18:30 UTC; New York's 8 March 2026 is 23 hours long."""
+    one = timedelta(microseconds=1)
+    midnight = datetime(2026, 3, 3, 18, 30, tzinfo=timezone.utc)
+    for name, moment in (("end of 3rd", midnight - one), ("start of 4th", midnight), ("start of 5th", midnight + timedelta(days=1))):
+        _at(test_db, world, name, moment)
+    month = "?from_date=2026-03-01&to_date=2026-03-31"
+    assert _read(anonymous_client, world, world.owner, month, "/days") == ["2026-03-03", "2026-03-04", "2026-03-05"]
+
+    test_db.get(Firm, world.id).primary_timezone = "America/New_York"
+    for name, moment in (("end of 7th", datetime(2026, 3, 8, 4, 59, 59, 999999, tzinfo=timezone.utc)),
+                         ("start of 8th", datetime(2026, 3, 8, 5, 0, tzinfo=timezone.utc)),
+                         ("end of 8th", datetime(2026, 3, 9, 3, 59, 59, 999999, tzinfo=timezone.utc)),
+                         ("start of 9th", datetime(2026, 3, 9, 4, 0, tzinfo=timezone.utc))):
+        _at(test_db, world, name, moment)
+    days = _read(anonymous_client, world, world.owner, "?from_date=2026-03-07&to_date=2026-03-09", "/days")
+    assert days == ["2026-03-07", "2026-03-08", "2026-03-09"]
+    assert _summaries(anonymous_client, world, world.owner, "?from_date=2026-03-08&to_date=2026-03-08") == [
+        "end of 8th", "start of 8th"]
+
+
 # ── The migration ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 
