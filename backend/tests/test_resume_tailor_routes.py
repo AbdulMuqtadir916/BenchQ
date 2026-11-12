@@ -474,3 +474,42 @@ def test_the_panel_reads_only_ones_own_recent_tailorings(anonymous_client, test_
     old.finished_at = utcnow() - runs.RECENT_FOR - timedelta(minutes=1)
     test_db.commit()
     assert [r["run_id"] for r in anonymous_client.get(url, headers=world["as"]["adnan"]).json()] == [running]
+
+
+# ── Abdul's review of the tailoring PR (2026-11-12) ─────────────────────────
+
+def test_a_start_takes_the_bdes_lock_before_it_counts(anonymous_client, world, launched, setup, monkeypatch):
+    """Two starts for different candidates of one BDE lock different candidate rows; the BDE's own lock, taken before
+    the running tailorings are counted, makes them count in turn, so only one takes the last slot."""
+    order = []
+    real_lock, real_expire = runs.lock_bde, runs.expire_lost
+    monkeypatch.setattr(runs, "lock_bde", lambda db, user_id: (order.append(("lock", str(user_id))), real_lock(db, user_id)))
+    monkeypatch.setattr(runs, "expire_lost", lambda db, firm_id: (order.append(("count", None)), real_expire(db, firm_id))[1])
+    assert _start(anonymous_client, world, setup).status_code == 202
+    assert order[:2] == [("lock", str(world["people"]["adnan"].id)), ("count", None)]
+
+
+def test_the_bdes_lock_makes_a_second_start_wait(test_db):
+    """While one transaction holds a BDE's tailoring lock, another taking it waits (here: gives up after 200 ms)."""
+    import pytest as _pytest
+    from sqlalchemy import text as sql_text
+    from sqlalchemy.exc import OperationalError
+    from backend.models.db import SessionLocal
+    me, someone_else = uuid.uuid4(), uuid.uuid4()
+    holder = SessionLocal()
+    try:
+        runs.lock_bde(holder, me)
+        waiter = SessionLocal()
+        try:
+            waiter.execute(sql_text("SET lock_timeout = '200ms'"))
+            with _pytest.raises(OperationalError):
+                runs.lock_bde(waiter, me)
+            waiter.rollback()
+            waiter.execute(sql_text("SET lock_timeout = '200ms'"))
+            runs.lock_bde(waiter, someone_else)                   # another BDE's lock is free
+        finally:
+            waiter.rollback()
+            waiter.close()
+    finally:
+        holder.rollback()
+        holder.close()

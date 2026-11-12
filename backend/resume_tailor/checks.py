@@ -40,6 +40,9 @@ _RUN = re.compile(r"[A-Za-z0-9+#.]+")
 _ENDINGS = ("ization", "isation", "ations", "ation", "izing", "ising", "ized", "ised", "ings", "ing", "ed", "es", "s")
 # A shorter stem matches too many words to be the same thing.
 SHORTEST_STEM = 5
+# Other endings a word of the same thing takes, checked after the stem (BenchQ): "automated" and "automation".
+_MORE_ENDINGS = ("ions", "ion", "ments", "ment", "ically", "ally", "ities", "ity", "ive", "ers", "er", "ors", "or", "al",
+                 "ic", "ly", "e")
 # Words that join the parts of a name and claim nothing of their own: "Containerization-based".
 _JOINING_WORDS = {"and", "as", "based", "for", "in", "of", "on", "the", "to", "with"}
 # Words that may follow a tool's name without making a narrower product of it: "Microservices Architecture", "ETL
@@ -176,7 +179,10 @@ def _is_stated_with_another_ending(word: str, text: str) -> bool:
     """Whether `text` states one word with another ending: "Containerization" where it says "containerized"."""
     if not word.isalpha() or len(_stem(word)) < SHORTEST_STEM:
         return False
-    return re.search(r"(?<![A-Za-z0-9])" + re.escape(_stem(word)), text or "", re.IGNORECASE) is not None
+    # The stem, then one of a word's own endings, and the word ends there: "Spring" is not in "Springfield" (BenchQ).
+    endings = "|".join(map(re.escape, _ENDINGS + _MORE_ENDINGS))
+    return re.search(r"(?<![A-Za-z0-9])" + re.escape(_stem(word)) + rf"(?:{endings})?(?![A-Za-z0-9])", text or "",
+                     re.IGNORECASE) is not None
 
 
 def _each_of_its_words_is_stated(name: str, text: str) -> bool:
@@ -255,11 +261,17 @@ def _is_a_stated_name_with_a_generic_word(name: str, text: str, other_names: dic
 
 
 def _is_stated(name: str, text: str) -> bool:
-    """Whether `text` states this name. A short name must stand as a word of its own ("Go" is inside "MongoDB")."""
+    """Whether `text` states this name as a whole: its letters and digits in any capitals, with or without spaces,
+    hyphens, dots or slashes between its parts ("Spring Boot" is "SpringBoot", "Node.js" is "NodeJS"), a plural ending
+    at most, and never inside a longer word: "Java" is not stated by "JavaScript", nor "Go" by "MongoDB" (BenchQ, Abdul's
+    review of the tailoring PR, 2026-11-12: the handoff matched a name anywhere inside the text with its spaces taken
+    out). Another name for the same tool is `_is_the_same_tool_named_another_way`'s."""
     key = rs._squash(name)
-    if len(key) > 3:
-        return key in rs._squash(text)
-    return _stands_as_a_word(name, text)
+    if len(key) <= 3:
+        return _stands_as_a_word(name, text)
+    parts = re.findall(r"[a-z0-9]+", name.lower())
+    pattern = r"(?<![a-z0-9])" + r"[^a-z0-9]{0,2}".join(map(re.escape, parts)) + r"(?:e?s)?(?![a-z0-9])"
+    return re.search(pattern, (text or "").lower()) is not None
 
 
 def _stands_as_a_word(name: str, text: str) -> bool:

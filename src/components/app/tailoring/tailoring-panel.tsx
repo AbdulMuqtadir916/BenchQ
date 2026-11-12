@@ -14,7 +14,7 @@ import { AgentRunPanel } from "@/components/app/ai";
 import { Button } from "@/components/ui/button";
 import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/cn";
-import { STEP_LABELS, runFailure } from "./messages";
+import { STEP_LABELS, runFailure, startRefusal } from "./messages";
 import { readStored, writeStored } from "./stored";
 
 const Dismissed = z.array(z.string()).catch([]);
@@ -48,6 +48,10 @@ function Panel() {
   const runsQuery = useMyTailorings();
   const candidatesQuery = useCandidates();
   const retry = useStartTailoring();
+  // Each failed row's own retry: in progress, or why it was refused (Abdul's review, 2026-11-12: the row kept the old
+  // reason when Try again was refused, e.g. with five running).
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryRefusals, setRetryRefusals] = useState<Record<string, string>>({});
   const [dismissed, setDismissed] = useState<string[]>(() => readStored(DISMISSED_KEY, Dismissed));
   const [isHidden, setHidden] = useState<boolean>(() => readStored(HIDDEN_KEY, Folded));
   const [openId, setOpenId] = useState<string | null>(null);
@@ -106,8 +110,16 @@ function Panel() {
                 <Row key={run.runId} run={run} name={names.get(run.candidateId) ?? null} now={now}
                   onOpenSteps={() => setOpenId(run.runId)}
                   openHref={run.resumeId ? toHref("resumes.studio", { id: run.resumeId }) : null}
-                  onRetry={() => retry.mutate({ candidateId: run.candidateId, jobId: run.jobId ?? "", resumeId: run.sourceResumeId ?? undefined }, { onSuccess: () => dismiss(run.runId) })}
-                  isRetrying={retry.isPending} onDismiss={() => dismiss(run.runId)} />
+                  onRetry={() => {
+                    setRetrying(run.runId);
+                    setRetryRefusals((all) => Object.fromEntries(Object.entries(all).filter(([id]) => id !== run.runId)));
+                    retry.mutateAsync({ candidateId: run.candidateId, jobId: run.jobId ?? "", resumeId: run.sourceResumeId ?? undefined }).then(
+                      () => dismiss(run.runId),
+                      (error: unknown) => setRetryRefusals((all) => ({ ...all, [run.runId]: startRefusal(error).message })),
+                    ).finally(() => setRetrying((current) => (current === run.runId ? null : current)));
+                  }}
+                  retryRefusal={retryRefusals[run.runId] ?? null}
+                  isRetrying={retrying === run.runId} onDismiss={() => dismiss(run.runId)} />
               ))}
             </ul> : null}
           </motion.section>
@@ -117,9 +129,10 @@ function Panel() {
   );
 }
 
-function Row({ run, name, now, openHref, onOpenSteps, onRetry, isRetrying, onDismiss }: {
+/** One tailoring in the panel (exported for its test). */
+export function Row({ run, name, now, openHref, onOpenSteps, onRetry, retryRefusal, isRetrying, onDismiss }: {
   run: TailoringRun; name: string | null; now: number; openHref: string | null; onOpenSteps: () => void;
-  onRetry: () => void; isRetrying: boolean; onDismiss: () => void;
+  onRetry: () => void; retryRefusal: string | null; isRetrying: boolean; onDismiss: () => void;
 }) {
   const failure = run.status === "failed" ? runFailure(run.errorCode) : null;
   const title = <span className="block truncate text-sm text-[var(--color-text)]">{run.jobTitle || "A job"}</span>;
@@ -138,6 +151,7 @@ function Row({ run, name, now, openHref, onOpenSteps, onRetry, isRetrying, onDis
             ? <>{run.step ? STEP_LABELS[run.step] : "Waiting to start"} · <span className="tabular">{clock(seconds(run.startedAt, now))}</span></>
             : failure ? failure.message : "Tailored résumé ready."}
         </span>
+        {retryRefusal ? <span role="alert" className="block text-caption text-[var(--color-danger-fg)]">{`Not started again: ${retryRefusal}`}</span> : null}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {openHref ? <Button asChild size="sm" variant="secondary"><Link href={openHref}>Open</Link></Button> : null}

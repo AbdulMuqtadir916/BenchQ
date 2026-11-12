@@ -20,9 +20,9 @@ KEEPING = {**DRAFT, "projects": [{"project_number": 1, "bullets": ["Built a trac
            "certifications": ["AWS Certified Developer"], "awards": [1]}
 
 
-def _tailored(monkeypatch, draft=KEEPING) -> run.Tailored:
+def _tailored(monkeypatch, draft=KEEPING, content=None) -> run.Tailored:
     _replies_from(monkeypatch, [ANALYSIS, draft, REVIEW, draft, VERIFY])
-    return asyncio.run(run.tailor_version(copying.deepcopy(CONTENT), POSTING, "Senior Python Engineer",
+    return asyncio.run(run.tailor_version(copying.deepcopy(content or CONTENT), POSTING, "Senior Python Engineer",
                                           setup=default_setup(api_key="test-key")))
 
 
@@ -81,7 +81,8 @@ def test_every_job_stays_with_its_facts_and_the_copys_bullets(monkeypatch):
     assert jobs[1] == CONTENT["experiences"][1]                              # no bullets: never tailored, kept
     assert {k: jobs[0][k] for k in ("job_title", "company", "location", "start", "current")} == \
         {k: CONTENT["experiences"][0][k] for k in ("job_title", "company", "location", "start", "current")}
-    assert jobs[0]["dates"] == "Jan 2021 - Present"                          # printed with a plain hyphen
+    # The copy prints "Jan 2021 - Present"; the same dates keep the version's own text (Abdul's review, 2026-11-12).
+    assert jobs[0]["dates"] == "Jan 2021 – Present"
     assert [b["text"] for b in jobs[2]["bullets"]] == ["Maintained a SQL reporting database for the reporting team."]
 
 
@@ -149,3 +150,12 @@ def test_a_failed_step_gives_no_content(monkeypatch, step_failing):
     _replies_from(monkeypatch, replies)
     with pytest.raises(pipeline.TailorFailed):
         asyncio.run(run.tailor_version(copying.deepcopy(CONTENT), POSTING, setup=default_setup(api_key="k")))
+
+
+
+def test_a_kept_project_with_dates_stays_whatever_dash_the_copy_prints(monkeypatch):
+    """Abdul's review (2026-11-12): a project dated "2021 – 2022" was lost because the copy prints "2021 - 2022"."""
+    content = copying.deepcopy(CONTENT)
+    content["projects"][0]["dates"] = "2021 – 2022"
+    projects = _tailored(monkeypatch, content=content).content["projects"]
+    assert [(p["id"], p["dates"]) for p in projects] == [("project-1", "2021 – 2022")]   # kept, the version's own text

@@ -9,8 +9,8 @@ import { useJobs } from "@/lib/hooks/use-jobs";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { canManageResume, scopeCandidates } from "@/lib/auth/permissions";
-import { useStartTailoring } from "@/lib/hooks/use-tailoring";
-import { startRefusal } from "@/components/app/tailoring/messages";
+import { useMyTailorings, useStartTailoring } from "@/lib/hooks/use-tailoring";
+import { startRefusal, startedOutcomes } from "@/components/app/tailoring/messages";
 import { rankJobsForCandidate } from "@/lib/derive";
 import { MatchScore } from "@/components/app/match-score";
 import { Tag } from "@/components/ui/tag";
@@ -47,10 +47,14 @@ export default function FocusModePage() {
 
   const [index, setIndex] = useState(0);
   const [applied, setApplied] = useState(0);
-  const [tailored, setTailored] = useState(0);
+  // The tailorings this run started; "Tailored" counts those that saved a résumé (Abdul's review, 2026-11-12).
+  const [startedRuns, setStartedRuns] = useState<string[]>([]);
+  const myTailorings = useMyTailorings();
+  const { tailored, running: stillTailoring } = startedOutcomes(myTailorings.data ?? [], startedRuns);
   // T starts the real tailoring from the active base and moves on at once; it runs in the panel (part 3 Q1, Q4).
   const startTailoring = useStartTailoring();
   const [refused, setRefused] = useState<string | null>(null);
+  const [isLastPending, setLastPending] = useState(false);
   const [reviewed, setReviewed] = useState(0);
   const [finished, setFinished] = useState(false);
   const startRef = useRef(Date.now());
@@ -80,12 +84,21 @@ export default function FocusModePage() {
   function tailor() {
     if (!candidate || !current || !canManageResume(principal, candidate)) return;
     const title = current.job.title;
+    // On the last job, wait for the answer: a refused start keeps the job open with the reason, so the BDE can see
+    // why and try again (Abdul's review, 2026-11-12). Elsewhere the queue moves on at once, the reason shown on the next.
+    const isLast = index + 1 >= queue.length;
+    if (isLast && isLastPending) return;
     setRefused(null);
-    startTailoring.mutate({ candidateId: candidate.id, jobId: current.job.id }, {
-      onSuccess: () => setTailored((n) => n + 1),
-      onError: (error) => setRefused(`${title}: ${startRefusal(error).message}`),
-    });
-    next();
+    if (isLast) setLastPending(true);
+    // mutateAsync: each press gets its own answer (mutate's callbacks fire only for the latest of quick presses).
+    startTailoring.mutateAsync({ candidateId: candidate.id, jobId: current.job.id }).then(
+      (runId) => {
+        setStartedRuns((runs) => [...runs, runId]);
+        if (isLast) next();
+      },
+      (error: unknown) => setRefused(`${isLast ? "" : `${title}: `}${startRefusal(error).message}`),
+    ).finally(() => { if (isLast) setLastPending(false); });
+    if (!isLast) next();
   }
 
   function next() {
@@ -102,7 +115,7 @@ export default function FocusModePage() {
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between">
         <div className="flex items-center gap-3 text-sm text-[var(--color-text-2)]">
           {candidate ? (
-            <select value={candidate.id} onChange={(e) => { setCandidateId(e.target.value); setIndex(0); setFinished(false); setApplied(0); setTailored(0); setReviewed(0); startRef.current = Date.now(); }} className="bq-input h-8 w-auto">
+            <select value={candidate.id} onChange={(e) => { setCandidateId(e.target.value); setIndex(0); setFinished(false); setApplied(0); setStartedRuns([]); setReviewed(0); startRef.current = Date.now(); }} className="bq-input h-8 w-auto">
               {myCandidates.map((c) => <option key={c.id} value={c.id}>{c.fullName}</option>)}
             </select>
           ) : <span>No candidate</span>}
@@ -134,6 +147,7 @@ export default function FocusModePage() {
                 </div>
               ))}
             </div>
+            {stillTailoring ? <p className="mt-3 text-caption text-[var(--color-text-3)]" aria-live="polite">{stillTailoring} still tailoring — the panel says when each is saved.</p> : null}
             <Button asChild className="mt-6 w-full"><Link href={toHref("dashboard")}>Back to dashboard</Link></Button>
           </motion.div>
         ) : (

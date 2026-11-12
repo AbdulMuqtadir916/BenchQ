@@ -185,4 +185,17 @@ failure code), `routes_resume_tailoring.py` (`resume_id`, `firm_router`), `versi
 `app/[firm]/layout.tsx`, the four entry points, the registry (Focus mode). Deleted: `tailor-run.tsx`, `schemas/agent.ts`,
 the studio's tailor props, the agents mock's `tailorResume`.
 
+**Abdul's review of the PR (2026-11-12), fixed:**
+- The checks state a name only **as a whole** (`checks._is_stated`): "Java" is no longer supported by "JavaScript",
+  nor a stem by a longer word ("Spring" by "Springfield"); the same name written together or with a plural still
+  matches ("SpringBoot", "NodeJS", "microservices"). A change to the handoff's checker, with Abdul's case as a test.
+- Projects are matched back by their fields compared as letters and digits (`stored._facts`), so a project dated
+  "2021 – 2022" isn't lost when the copy prints "2021 - 2022"; a job or project keeps the version's own date text
+  when only the punctuation differs (the dash finding of the live runs).
+- A start takes the BDE's own lock (`runs.lock_bde`, an advisory lock, as the job search's) before counting the
+  running tailorings: two starts for different candidates of one BDE can't both take the last of the 5 slots.
+- The panel's Try again shows its own refusal on the row ("Not started again: …").
+- Focus mode: on the last job, T waits for the answer, so a refused start keeps the job open with the reason; its
+  "Tailored" counts the started runs that saved a résumé (and says how many are still tailoring).
+
 **Later:** the ATS score of a tailored version against its job, and a PDF the server makes (extension, email).

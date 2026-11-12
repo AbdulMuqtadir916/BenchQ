@@ -1,5 +1,5 @@
 import { ApiError } from "@/lib/api/client";
-import type { TailoringStep } from "@/lib/schemas/tailoring";
+import type { TailoringRun, TailoringStep } from "@/lib/schemas/tailoring";
 
 /** What each step is called while it runs (part 3 R2-Q1: the run's real step, never a guess). */
 export const STEP_LABELS: Record<TailoringStep, string> = {
@@ -35,4 +35,11 @@ export function startRefusal(error: unknown): { message: string; needsBase: bool
   if (status === 404) return { message: "This job or résumé isn't this candidate's.", needsBase: false };
   if (status === 409) return { message: said || "This résumé can't be tailored now.", needsBase: /no active base/i.test(said) };
   return { message: "Tailoring didn't start. Try again.", needsBase: false };
+}
+
+/** Of the tailorings a Focus run started: how many saved a résumé, and how many still run (Abdul's review, 2026-11-12:
+ * "Tailored" counted starts, which may still fail). */
+export function startedOutcomes(runs: readonly TailoringRun[], started: readonly string[]): { tailored: number; running: number } {
+  const mine = runs.filter((run) => started.includes(run.runId));
+  return { tailored: mine.filter((run) => run.status === "completed").length, running: mine.filter((run) => run.status === "running").length };
 }

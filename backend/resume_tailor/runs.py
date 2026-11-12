@@ -247,6 +247,16 @@ def posting_text(posting: JobPosting) -> tuple[str, str]:
     return text(fields.description), text(fields.title)
 
 
+def lock_bde(db, user_id) -> None:
+    """Hold the BDE's tailoring admission lock until the transaction ends (a Postgres advisory lock on their id)."""
+    db.execute(sql("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(user_id)})
+
+
+def _lock_key(user_id) -> int:
+    """A signed 64-bit key from the user's id, in its own namespace (the top bits say "tailoring BDE")."""
+    return ((0x5452 << 48) | (uuid.UUID(str(user_id)).int & 0xFFFFFFFFFFFF)) - (1 << 63)
+
+
 def admit(db, candidate, actor: User, job_posting_id, resume_id=None) -> dict:
     """The checks before a tailoring starts, the candidate row locked by the caller; the run's meta. Raises the
     route's answer: 404, 409 (no usable source; the same source and job running), 422 (no description), 429 (the BDE
@@ -256,6 +266,10 @@ def admit(db, candidate, actor: User, job_posting_id, resume_id=None) -> dict:
     description, title = posting_text(posting)
     if not description:
         raise HTTPException(status_code=422, detail="This job has no description to tailor the résumé to.")
+    # The BDE's own lock, after the candidate's: two of one BDE's starts for different candidates count in turn, so
+    # only one takes the last of the MOST_RUNNING_PER_BDE slots (Abdul's review of the tailoring PR, 2026-11-12; the
+    # job search's `limits.lock_bde`). Held until the route commits, after the launch writes the run's row.
+    lock_bde(db, actor.id)
     expire_lost(db, candidate.firm_id)
     running = [row.meta or {} for row in _running(db, candidate.firm_id)]
     if any(m.get("source_resume_id") == str(source.id) and m.get("job_posting_id") == str(posting.id) for m in running):

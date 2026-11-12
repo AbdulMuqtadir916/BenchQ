@@ -116,15 +116,22 @@ def _kept_entries(chosen: list, entries: list, lines) -> list:
     return kept
 
 
+def _facts(entry: dict) -> dict:
+    """An entry's fields but its bullets, as letters and digits only: the copy prints "2021 - 2022" where the version
+    says "2021 – 2022", and that is the same project (Abdul's review of the tailoring PR, 2026-11-12)."""
+    return {key: _squash(value) for key, value in entry.items() if key != "bullets"}
+
+
 def _projects(copy: dict, content: dict, given: TailorInput) -> list:
     """The version's projects the copy kept, with the copy's bullets. The copy's project is the base's own with new
-    bullets, in the base's order, so it is found by its other fields."""
+    bullets, in the base's order, so it is found by its other fields (compared as `_facts`). Its printed fields stay
+    the version's own."""
     stored, base_projects = dicts(content.get("projects")), dicts(given.base.get("projects"))
     out, start = [], 0
     for project in dicts(copy.get("projects")):
-        facts = {key: value for key, value in project.items() if key != "bullets"}
+        facts = _facts(project)
         for number in range(start, len(base_projects)):
-            if {key: value for key, value in base_projects[number].items() if key != "bullets"} == facts:
+            if _facts(base_projects[number]) == facts:
                 item = stored[given.project_index[number]]
                 out.append({**item, "bullets": _bullets(list(project.get("bullets") or []), item.get("bullets"))})
                 start = number + 1
@@ -146,6 +153,14 @@ def _skills(copy: dict, content: dict) -> list:
     return out
 
 
+def _printed_dates(copied: str, stored: str) -> str:
+    """The copy's printed dates, unless they are the version's own written another way (the copy writes "-" where the
+    version has "–"): then the version's, as the BDE wrote them (Abdul's review, 2026-11-12)."""
+    if not copied or _squash(copied) == _squash(stored):
+        return stored
+    return copied
+
+
 def version_content(copy: dict, content: dict, given: TailorInput) -> dict:
     """The tailored copy as a version's content, ready for `versions._with_ids(content, ...)`."""
     head = copy.get("header") or {}
@@ -157,7 +172,7 @@ def version_content(copy: dict, content: dict, given: TailorInput) -> dict:
         if role is None:            # an entry with no bullets never reached the tailor: it stays as stored
             experiences.append(job)
             continue
-        experiences.append({**job, "dates": text(role.get("date")) or text(job.get("dates")),
+        experiences.append({**job, "dates": _printed_dates(text(role.get("date")), text(job.get("dates"))),
                             "bullets": _bullets(list(role.get("bullets") or []), job.get("bullets"))})
     certifications = dicts(content.get("certifications"))
     awards = dicts(content.get("awards"))

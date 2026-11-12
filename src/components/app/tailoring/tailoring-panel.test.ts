@@ -14,7 +14,8 @@ import { signInAs, signInAsSupportView, signOutForTest } from "@/mocks/sign-in-a
 import { useSession } from "@/lib/stores/session-store";
 import { queryKeys } from "@/lib/query/keys";
 import type { TailoringRun } from "@/lib/schemas/tailoring";
-import { TailoringPanel } from "./tailoring-panel";
+import { Row, TailoringPanel } from "./tailoring-panel";
+import { startedOutcomes } from "./messages";
 
 /** The BDE's panel (decided 2026-11-12, part 3 R2-Q1–Q3, R3-Q2), rendered from the runs its read returned. */
 const FIRM = "firm_hts";
@@ -66,5 +67,23 @@ describe("the tailoring panel", () => {
     useSession.getState().setSession(await signInAsSupportView("padm_sana", FIRM));
     expect(render([run({ runId: "a" })])).toBe("");
     useSession.getState().setSession(await signInAs("user_adnan"));
+  });
+});
+
+
+describe("Abdul's review (2026-11-12)", () => {
+  it("a refused Try again shows the new reason on its row", () => {
+    const html = renderToString(createElement(Row, {
+      run: run({ runId: "d", status: "failed", errorCode: "provider_failed", jobTitle: "Platform Engineer" }), name: null, now,
+      openHref: null, onOpenSteps: () => undefined, onRetry: () => undefined, isRetrying: false, onDismiss: () => undefined,
+      retryRefusal: "You have 5 tailorings running. Wait for one to finish.",
+    }));
+    expect(html).toContain("Tailoring failed.");
+    expect(html).toContain("Not started again: You have 5 tailorings running. Wait for one to finish.");
+  });
+
+  it("Focus mode's Tailored counts the started runs that saved a résumé, not the starts", () => {
+    const runs = [run({ runId: "a", status: "completed" }), run({ runId: "b" }), run({ runId: "c", status: "failed" }), run({ runId: "z", status: "completed" })];
+    expect(startedOutcomes(runs, ["a", "b", "c"])).toEqual({ tailored: 1, running: 1 });   // z: not this run's
   });
 });

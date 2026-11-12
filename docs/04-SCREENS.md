@@ -618,7 +618,9 @@ candidate's jobs). While they load it shows a skeleton; a failed read shows the 
 unapplied jobs shows "No jobs to work".
 
 **The BDE's only** (07 Q64). **T** starts a real tailoring of the active base for this job and moves on at once; it
-runs in the tailoring panel. A refused start says why under the actions.
+runs in the tailoring panel. A refused start says why under the actions. On the last job T waits for the answer, so
+a refused start keeps that job open with the reason. The summary's "Tailored" counts the run's tailorings that saved a
+résumé, and says how many are still tailoring.
 
 Single keystroke per decision, auto-advance, progress across the top. `Esc` exits and returns to
 the dashboard with a session summary: jobs reviewed, applications logged, time spent.

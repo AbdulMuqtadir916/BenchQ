@@ -1,5 +1,7 @@
 """The résumé tailor's code gate: every bullet checked against its own role's lines, not the skills list or other roles
 (docs/team/tailoring.md). Ported from JobNavigator's tests/test_mads_fact_gate.py."""
+import pytest
+
 from backend.resume_tailor import fact_gate
 from backend.tests.resume_tailor_samples import BASE
 
@@ -44,3 +46,21 @@ def test_a_bullet_whose_resume_bullet_is_already_in_the_copy_is_dropped():
                                "Provisioned AWS EKS environments with CloudFormation templates for the platform team."])
     assert bullets == [["Provisioned AWS environments with CloudFormation templates."]]
     assert changes[0]["action"] == fact_gate.DROPPED
+
+
+
+# ── Abdul's review of the tailoring PR (2026-11-12): a name is stated only as a whole ─────────────────────────────────
+
+@pytest.mark.parametrize("sentence, text, unsupported", [
+    ("Built Java services", "Built JavaScript services", ["Java"]),       # Java is not inside JavaScript
+    ("Used Spring", "Lived in Springfield", ["Spring"]),                     # nor a stem inside a longer word
+    ("Built JavaScript services", "Built JavaScript services", []),
+    ("Used Spring Boot", "Used SpringBoot", []),                             # the same name written together
+    ("Used Node.js", "Used NodeJS", []),
+    ("Built microservices", "Built a microservice", []),                     # a plural ending
+    ("Ran Kubernetes clusters", "Kubernetes-based platform", []),
+    ("Automated releases", "release automation", []),                        # another ending of the same word
+])
+def test_a_name_is_stated_only_as_a_whole(sentence, text, unsupported):
+    from backend.resume_tailor import checks
+    assert checks.unsupported_in(sentence, text, set(), {}) == unsupported
