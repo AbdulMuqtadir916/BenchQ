@@ -17,8 +17,8 @@ from backend.auth import ledger
 from backend.logging_setup import request_id
 from backend.models.candidates import Candidate
 from backend.models.tenancy import ActivityEntry, Firm, User
-from backend.tests.resume_support import make_version
 from backend.tests.auth_support import make_firm, make_plan, make_user
+from backend.tests.resume_support import make_version
 from backend.tests.scratch_db import _admin_engine, _url_for
 
 
@@ -57,8 +57,8 @@ def firm(test_db, accounts):
     asha, ravi = person("Asha", mira, bea), person("Ravi", zed, cara)
     test_db.add_all([asha, ravi])
     test_db.flush()
-    for candidate, name in ((asha, "Asha"), (ravi, "Ravi")):     # the name lives on the résumé (07 Q57)
-        make_version(test_db, acme.id, candidate=candidate, candidate_name=name)
+    for candidate, name in ((asha, "Asha"), (ravi, "Ravi")):
+        make_version(test_db, acme.id, candidate=candidate, candidate_name=name)    # the name is the résumé's (07 Q57)
     test_db.commit()
     return type("World", (), dict(id=acme.id, owner=owner, mira=mira, zed=zed, bea=bea, ben=ben, cara=cara, viewer=viewer,
                                   asha=asha, ravi=ravi, url=f"/api/firms/{acme.id}/ledger"))
