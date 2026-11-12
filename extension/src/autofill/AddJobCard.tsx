@@ -120,6 +120,8 @@ function isOtherRequisition(found: PageJob, known: KnownJob): boolean {
 export const isSavedJob = (found: PageJob, known: KnownJob) =>
   (sameListing(found, known) && !isOtherRequisition(found, known)) || sharesJobId(found, known);
 
+/** How much a reading of a page holds: its stated fields. */
+const fieldsOf = (job: PageJob) => Object.values(job).filter((value) => value !== undefined && value !== null && value !== "").length;
 const MODE_LABEL = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" } as const;
 const PER = { hour: "an hour", day: "a day", week: "a week", month: "a month", year: "a year" } as const;
 const amount = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -164,10 +166,11 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
     if (tabId === null) return;
     let timers: ReturnType<typeof setTimeout>[] = [];
     let isLive = true;
+    // Looks for the whole schedule: a page that adds its JobPosting data after it shows (Oracle's) gives more on a later
+    // look, and the card takes that fuller reading of the same job.
     const look = () => void readJobPage(tabId).then((found) => {
       if (!isLive || !found?.isJobPage || !found.title || !found.company || !found.description) return;
-      timers.forEach(clearTimeout);
-      setJob(found);
+      setJob((shown) => (!shown || (shown.title === found.title && fieldsOf(found) > fieldsOf(shown)) ? found : shown));
     }, () => undefined);
     const read = () => {
       look();

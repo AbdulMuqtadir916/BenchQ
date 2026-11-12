@@ -47,9 +47,9 @@ const CODES = "USD|CAD|EUR|GBP|INR|AUD|NZD|SGD|CHF|JPY|MXN";
 const SIGNS: Record<string, string> = { "US$": "USD", "C$": "CAD", "CA$": "CAD", "A$": "AUD", "AU$": "AUD", "€": "EUR", "£": "GBP", "₹": "INR" };
 const MONEY = new RegExp(String.raw`(US\$|CA?\$|AU?\$|[$€£₹]|\b(?:${CODES})\b)?\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s?([kK]\b)?(?:\s?\b(${CODES})\b)?`, "g");
 const PERIODS: [RegExp, NonNullable<Pay["salaryPeriod"]>][] = [
-  [/\b(?:per|an?|\/)\s*(?:hour|hr)\b|\bhourly\b|\/\s*h\b/i, "hour"], [/\b(?:per|a|\/)\s*day\b|\bdaily\b/i, "day"],
-  [/\b(?:per|a|\/)\s*(?:week|wk)\b|\bweekly\b/i, "week"], [/\b(?:per|a|\/)\s*(?:month|mo)\b|\bmonthly\b/i, "month"],
-  [/\b(?:per|an?|\/)\s*(?:year|yr|annum)\b|\bannual(?:ly)?\b|\byearly\b/i, "year"],
+  [/(?:\b(?:per|an?)|\/)\s*(?:hour|hr)\b|\bhourly\b|\/\s*h\b/i, "hour"], [/(?:\b(?:per|a)|\/)\s*day\b|\bdaily\b/i, "day"],
+  [/(?:\b(?:per|a)|\/)\s*(?:week|wk)\b|\bweekly\b/i, "week"], [/(?:\b(?:per|a)|\/)\s*(?:month|mo)\b|\bmonthly\b/i, "month"],
+  [/(?:\b(?:per|an?)|\/)\s*(?:year|yr|annum)\b|\bannual(?:ly)?\b|\byearly\b/i, "year"],
 ];
 const UNITS: Record<string, NonNullable<Pay["salaryPeriod"]>> = { HOUR: "hour", DAY: "day", WEEK: "week", MONTH: "month", YEAR: "year" };
 const PAY_WORDS = /\b(?:salary|salaries|pay|compensation|wage|wages|rate|base|range|hourly|annual|ote)\b/i;
@@ -70,8 +70,10 @@ export function payIn(text: string): Pay | undefined {
     const between = next ? text.slice(first.index! + first[0].length, next.index) : "";
     const isRange = Boolean(next) && /^\s*(?:-|–|—|to)\s*$/i.test(between);
     const end = isRange ? next!.index! + next![0].length : first.index! + first[0].length;
-    const around = text.slice(Math.max(0, first.index! - 30), end + 30);
-    const period = PERIODS.find(([pattern]) => pattern.test(around))?.[1];
+    // The period the amount goes with: the one after it ("… per year"), else the one just before ("Hourly: $60-70"),
+    // never another figure's ("40 hours/week, … $143,700 - $194,400 per year").
+    const periodIn = (part: string) => PERIODS.find(([pattern]) => pattern.test(part))?.[1];
+    const period = periodIn(text.slice(end, end + 30)) ?? periodIn(text.slice(Math.max(0, first.index! - 30), first.index));
     if (!isRange && !period) continue;
     const min = amountOf(first[2]!, first[3] ?? (isRange ? next![3] : undefined));
     const max = isRange ? amountOf(next![2]!, next![3]) : min;
@@ -87,7 +89,7 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 
 /** "2026-11-10" from a date a page writes out (ISO, "Nov 10, 2026", "10 November 2026", or a day/month order only one
  * reading of fits); never from "3 days ago" or a date that isn't real or is still to come. */
-export function dateOf(value: string): string | undefined {
+export function dateOf(value: string, monthFirst = false): string | undefined {
   let found: [number, number, number] | undefined;
   let match: RegExpExecArray | null;
   if ((match = /\b(\d{4})-(\d{2})-(\d{2})/.exec(value))) found = [+match[1]!, +match[2]!, +match[3]!];
@@ -96,7 +98,7 @@ export function dateOf(value: string): string | undefined {
   else if ((match = /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/.exec(value))) {
     const [a, b, year] = [+match[1]!, +match[2]!, +match[3]!];
     if (a > 12 && b <= 12) found = [year, b, a];
-    else if (b > 12 || a === b) found = [year, a, b];
+    else if (b > 12 || a === b || monthFirst) found = [year, a, b];
   }
   if (!found) return undefined;
   const [year, month, day] = found;
@@ -165,28 +167,53 @@ const HEADING = /^(?:job |related )?(?:categories|category|teams?|details|descri
 const LOCATION_LABEL = /^(?:job |work |primary |office )?(?:locations?|offices?)$/i;
 const MODE_LABEL = /^(?:workplace(?: type)?|work(?:place)? (?:type|setting|arrangement|model|mode|style)|location type|remote(?: type| status| option)?)$/i;
 const TYPE_LABEL = /^(?:(?:employment|job|position|contract|role|work|engagement) ?type|employment|commitment|schedule|time type|job schedule)$/i;
-const PAY_LABEL = /^(?:salary|pay|compensation|wage|rate|base pay|base salary|pay range|salary range|pay rate|hourly rate|annual salary|salary\/rate|compensation range)$/i;
+const PAY_LABEL = /^(?:(?:base|annual(?:ized)?|hourly|target|starting|expected|estimated|total|cash)\s+)*(?:pay|salary|compensation|wage|rate)(?:\s*(?:\/|&|and|or)\s*(?:pay|salary|compensation|wage|rate))?(?:\s+(?:range|rate|band))?$/i;
 const POSTED_LABEL = /^(?:posted|date posted|posted on|posting date|published|date published|posted date|job posted)$/i;
-const ID_LABEL = /^(?:job|req|requisition|posting|reference|ref|vacancy)\.? ?(?:id|number|no\.?|#|code)$/i;
+const ID_LABEL = /^(?:job\s+)?(?:job|req|requisition|posting|reference|ref|vacancy)\.? ?(?:id|identification|number|no\.?|#|code)$/i;
 
 const BLOCKS = new Set(["P", "LI", "DT", "DD", "DIV", "TD", "TH", "H1", "H2", "H3", "H4", "H5", "H6", "SECTION", "ARTICLE",
   "MAIN", "ASIDE", "FORM", "UL", "OL", "TABLE", "TR", "BODY", "BLOCKQUOTE", "PRE", "LABEL", "BUTTON", "FIGCAPTION"]);
 const SKIPPED = "script, style, noscript, template, svg, nav, header, footer, select";
+/** Site chrome a page marks by name rather than by element: `div.footer`, a navbar, a menu. */
+const CHROME = /^(?:site-?|global-?|page-?)?(?:footer|navbar|nav|menu)$|[-_]footer$|^footer[-_]/i;
 
-/** The page's text as its lines, as it reads: one per block, its inline pieces joined ("$200,000 - $225,000 USD" from
- * three spans), leaving out the site's navigation, header and footer and anything that doesn't show. */
-function linesOf(root: Element): string[] {
+/** The page's text as its lines, as it shows: one per block as the page lays it out (a label styled as its own line is
+ * one), a line break where it breaks one, its inline pieces joined ("$200,000 - $225,000 USD" from three spans);
+ * leaving out the site's navigation, header and footer and anything hidden. */
+export function linesOf(root: Element): string[] {
+  const view = root.ownerDocument.defaultView;
+  const known = new Map<Element, { isBlock: boolean; isOut: boolean }>();
+  const factsOf = (element: Element) => {
+    let facts = known.get(element);
+    if (!facts) {
+      const display = view?.getComputedStyle?.(element).display ?? "";
+      facts = { isBlock: display ? display !== "inline" && display !== "contents" : BLOCKS.has(element.tagName),
+        isOut: display === "none" || element.matches(SKIPPED) || [...element.classList, element.id].some((token) => CHROME.test(token)) };
+      known.set(element, facts);
+    }
+    return facts;
+  };
   const lines: string[] = [];
   let block: Element | null = null;
-  const walker = root.ownerDocument.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+  let breaks = true;
+  const walker = root.ownerDocument.createTreeWalker(root, 5 /* NodeFilter.SHOW_ELEMENT | SHOW_TEXT */);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const parent = node.parentElement;
-    if (!parent || parent.closest(SKIPPED) || !node.textContent?.trim()) continue;
-    let owner: Element | null = parent;
-    while (owner && !BLOCKS.has(owner.tagName)) owner = owner.parentElement;
-    if (owner !== block || !lines.length) lines.push("");
+    if (node.nodeType === 1) {
+      if ((node as Element).tagName === "BR") breaks = true;
+      continue;
+    }
+    if (!node.parentElement || !node.textContent?.trim()) continue;
+    let owner: Element | null = null;
+    let isOut = false;
+    for (let at: Element | null = node.parentElement; at && !isOut; at = at === root ? null : at.parentElement) {
+      const facts = factsOf(at);
+      isOut = facts.isOut;
+      if (!owner && facts.isBlock) owner = at;
+    }
+    if (isOut) continue;
+    if (owner !== block || breaks || !lines.length) lines.push("");
     lines[lines.length - 1] += ` ${node.textContent}`;
-    block = owner;
+    [block, breaks] = [owner, false];
     if (lines.length > 3000) break;
   }
   return lines.map(collapse).filter(Boolean);
@@ -200,7 +227,13 @@ const classed = (root: Element, name: RegExp) => Array.from(root.querySelectorAl
 const iconed = (root: Element, name: string) => {
   const icon = Array.from(root.querySelectorAll("[aria-label], [title]")).find((element) => !element.closest(SKIPPED)
     && !collapse(element.textContent ?? "") && (element.getAttribute("aria-label") ?? element.getAttribute("title") ?? "").toLowerCase() === name);
-  const text = collapse(icon?.parentElement?.textContent ?? "");
+  const seen = new Set<string>();
+  const places = icon?.parentElement ? linesOf(icon.parentElement).filter((line) => !seen.has(line.toLowerCase()) && seen.add(line.toLowerCase())) : [];
+  return places.join("; ") || undefined;
+};
+/** A place as a page lists it, without "and 1 more" (the link to its other places), which is never a place. */
+const placeOf = (value: string) => {
+  const text = value.replace(/\s*(?:and|\+)\s*\d+\s*more\b.*$/i, "").trim();
   return text.length >= 2 && text.length <= 120 ? text : undefined;
 };
 /** Lines that are only a chip: "Hybrid", "Full-time", "Remote (US)". */
@@ -238,8 +271,10 @@ export function pageDetails(doc: Document, title: string): JobDetails {
   if (!root) return {};
   const lines = linesOf(root);
   // An icon the page names "location" says it outright, before lines a menu of places may imitate.
-  const location = iconed(root, "location") ?? firstOf(valuesOf(lines, LOCATION_LABEL), (value) => (value.length <= 120 ? value : undefined))
-    ?? classed(root, /(?:^|__|-|_)(?:locations?|offices?)$/i)[0];
+  const location = firstOf([iconed(root, "location") ?? "", ...valuesOf(lines, LOCATION_LABEL),
+    ...classed(root, /(?:^|__|-|_)(?:locations?|offices?)$/i)], placeOf);
+  // A page in US English writes 11/12/2026 month first; any other leaves an order that both readings fit unread.
+  const monthFirst = /^en(?:-us)?$/i.test(doc.documentElement.getAttribute("lang") ?? "");
   const payLines = lines.filter((line, n) => line.length <= 400 && /\d/.test(line)
     && PAY_WORDS.test([lines[n - 2] ?? "", lines[n - 1] ?? "", line].join(" ")));
   const idLine = firstOf(lines, (line) => /^(?:job|req|requisition)\.? ?(?:id|#|number)\s*#?\s+(\S+)$/i.exec(line)?.[1]);
@@ -250,7 +285,7 @@ export function pageDetails(doc: Document, title: string): JobDetails {
     employmentType: firstOf(valuesOf(lines, TYPE_LABEL), employmentOf)
       ?? firstOf(chips(lines), (line) => (CHIP_TYPE.test(line) ? employmentOf(line) : undefined)),
     ...(firstOf(valuesOf(lines, PAY_LABEL), payIn) ?? firstOf(payLines, payIn) ?? {}),
-    postedAt: firstOf(valuesOf(lines, POSTED_LABEL), dateOf),
+    postedAt: firstOf(valuesOf(lines, POSTED_LABEL), (value) => dateOf(value, monthFirst)),
     requisitionId: firstOf(valuesOf(lines, ID_LABEL), (value) => idOf(value.split(/[\s|,;]+/)[0])) ?? (idLine ? idOf(idLine) : undefined),
   });
 }

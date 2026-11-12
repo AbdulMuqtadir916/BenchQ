@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { dateOf, employmentOf, microdataDetails, pageDetails, payIn, postingDetails } from "./job-details";
-import { readJob } from "./job";
+import { companyOf, readJob } from "./job";
 
 const page = (body: string, head = "") => new DOMParser().parseFromString(`<html><head>${head}</head><body>${body}</body></html>`, "text/html");
 
@@ -17,9 +17,10 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
   });
 
   it("reads a date written out, never a relative or ambiguous one, nor one still to come", () => {
-    expect(["2026-11-10T09:00:00Z", "Nov 10, 2026", "10 November 2026", "13/06/2026"].map(dateOf))
+    expect(["2026-11-10T09:00:00Z", "Nov 10, 2026", "10 November 2026", "13/06/2026"].map((text) => dateOf(text)))
       .toEqual(["2026-11-10", "2026-11-10", "2026-11-10", "2026-06-13"]);
     for (const text of ["05/06/2026", "3 days ago", "2099-01-01", "Feb 30, 2026"]) expect(dateOf(text), text).toBeUndefined();
+    expect(dateOf("11/12/2026, 06:21 PM", true)).toBe("2026-11-12");   // a US English page writes month first
   });
 
   it("names employment types, and only ones it knows", () => {
@@ -47,6 +48,19 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
       salaryMin: 139200, salaryMax: 235200, salaryCurrency: "USD", postedAt: "2026-11-10", requisitionId: "R998877" });
   });
 
+  it("reads a page with no JobPosting data, main or footer element as it shows: lines a <br> breaks, no site footer", () => {
+    const doc = page(`<a href="#main">Skip to main content</a><div class="jobs-header">Amazon Jobs home page</div>
+      <h1>Software Dev Eng II</h1><p>Job ID: 10600216 | Amazon Advertising LLC</p><a id="apply-button" href="#">Apply now</a>
+      <div class="association location-icon"><span aria-label="location" role="img"></span><ul><li>USA, WA, Seattle</li><li>USA, WA, SEATTLE</li></ul></div>
+      <div class="section"><p>Design and build services.<br/><br/>40 hours/week, Salary Range $143,700 - $194,400 per year. #0000<br/></p></div>
+      <div class="footer"><span>JOIN US ON</span><p>© 1996-2026, Amazon.com, Inc.</p></div>`, '<meta property="og:site_name" content="Amazon.jobs">');
+    const job = readJob(doc, "https://www.amazon.jobs/en/jobs/10600216/software-dev-eng-ii");
+    expect(job).toMatchObject({ title: "Software Dev Eng II", company: "Amazon", location: "USA, WA, Seattle", requisitionId: "10600216",
+      salaryMin: 143700, salaryMax: 194400, salaryPeriod: "year" });
+    expect(job.description.startsWith("Software Dev Eng II")).toBe(true);
+    expect(job.description).not.toMatch(/Skip to main|JOIN US|©/);
+  });
+
   it("reads schema.org microdata", () => {
     const doc = page(`<div itemscope itemtype="http://schema.org/JobPosting"><li itemprop="employmentType">Part-time</li>
       <meta itemprop="datePosted" content="2026-11-12T18:38:26Z"><span itemprop="addressLocality">Itasca</span>
@@ -58,5 +72,12 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
     const doc = page(`<main><h1>QA Engineer</h1><div>Hybrid</div><p>Test it all, every day, with care and a steady hand.</p></main>`,
       `<script type="application/ld+json">{"@type":"JobPosting","title":"QA Engineer","hiringOrganization":"Acme","jobLocationType":"TELECOMMUTE","description":"<p>Test.</p>"}</script>`);
     expect(readJob(doc, "https://acme.com/careers/qa-engineer")).toMatchObject({ isJobPage: true, workMode: "hybrid", location: "Remote" });
+  });
+});
+
+describe("a company as a site names itself", () => {
+  it("drops the site's own words", () => {
+    expect(["Amazon.jobs", "JPMC Candidate Experience page", "Careers at Acme", "Globex Careers", "Initech"].map(companyOf))
+      .toEqual(["Amazon", "JPMC", "Acme", "Globex", "Initech"]);
   });
 });

@@ -1,5 +1,5 @@
 import type { PageJob } from "../autofill/types";
-import { DETAIL_KEYS, microdataDetails, modeIn, pageDetails, postingDetails, type JobDetails } from "./job-details";
+import { DETAIL_KEYS, linesOf, microdataDetails, modeIn, pageDetails, postingDetails, type JobDetails } from "./job-details";
 import { collapse, textOf } from "./labels";
 
 /** The job a page shows, for adding it to a candidate's jobs (the add-job plan, decided 2026-11-11): the page's own
@@ -169,7 +169,7 @@ function fromPosting(posting: JsonRecord): Omit<PageJob, "url" | "isJobPage"> {
   const organisation = posting.hiringOrganization;
   return {
     title: text(posting.title),
-    company: typeof organisation === "string" ? collapse(organisation) : text((organisation as JsonRecord | undefined)?.name),
+    company: companyOf(typeof organisation === "string" ? collapse(organisation) : text((organisation as JsonRecord | undefined)?.name)),
     description: typeof posting.description === "string" ? posting.description.trim() : "",
     location: placeOf(posting) || null,
     ids: identifiersOf(posting),
@@ -192,6 +192,13 @@ function companyFromTitle(pageTitle: string, jobTitle: string): string {
     .find((part) => part && part.length <= MAX_COMPANY && !/^(careers?|jobs?|job board)$/i.test(part) && !JOB_SITES.test(part)) ?? "";
 }
 
+/** A company as a site names itself: "Amazon.jobs" is Amazon, "JPMC Candidate Experience page" JPMC, "Careers at Acme"
+ * Acme. */
+export function companyOf(name: string): string {
+  return name.replace(/\.(?:jobs|careers|com|io|co)$/i, "").replace(/^(?:careers|jobs)\s+(?:at|with)\s+/i, "")
+    .replace(/\s*[-–|:·]?\s*(?:candidate experience(?:\s+(?:page|site))?|career(?:s)?(?:\s+(?:site|page|portal|home|center))?|job(?:s)?(?:\s+(?:site|board|page|portal))?|talent\s+(?:community|network))\s*$/i, "").trim();
+}
+
 /** The company a page's own logo names: "Discord Logo" gives "Discord". */
 function logoCompany(doc: Document): string {
   for (const image of Array.from(doc.querySelectorAll("img[alt]"))) {
@@ -199,6 +206,13 @@ function logoCompany(doc: Document): string {
     if (name && !JOB_SITES.test(name)) return name;
   }
   return "";
+}
+
+/** The page's text from the job's own title on (the site's chrome comes before it) to its copyright line, if any. */
+function descriptionOf(lines: string[], title: string): string {
+  const start = Math.max(0, lines.findIndex((line) => line === title));
+  const end = lines.findIndex((line, n) => n > start && /^(?:©|copyright\b)/i.test(line));
+  return lines.slice(start, end > start ? end : undefined).join("\n");
 }
 
 function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"> {
@@ -209,9 +223,9 @@ function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"
   const siteName = meta("og:site_name");
   return {
     title,
-    company: (JOB_SITES.test(siteName) ? "" : siteName) || companyFromTitle(collapse(doc.title), title) || logoCompany(doc)
+    company: (JOB_SITES.test(siteName) ? "" : companyOf(siteName)) || companyFromTitle(collapse(doc.title), title) || logoCompany(doc)
       || new URL(url).hostname.replace(/^www\./, ""),
-    description: main ? (main as HTMLElement).innerText?.trim() ?? collapse(textOf(main)) : "",
+    description: descriptionOf(main ? linesOf(main) : [], title),
     location: null,
   };
 }
