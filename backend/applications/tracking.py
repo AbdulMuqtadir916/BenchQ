@@ -1,7 +1,7 @@
 """Transactional status and review commands. Callers commit only after the whole command succeeds."""
 import uuid
 from fastapi import HTTPException
-from backend.auth.ledger import record
+from backend.auth.ledger import diff, record
 from backend.auth.policy import can
 from backend.auth.scoping import scoped
 from backend.models.db import Application, ApplicationStatusEvent, ApplicationReview, utcnow
@@ -157,7 +157,8 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
     record(db, actor=actor, action='UPDATE', entity_type='application', entity_id=app.id,
            entity_label=app.job.title or 'Application',
            summary=f"{'Reviewed' if review else 'Moved'} {app.job.title or 'application'}: {old_status} → {status}.",
-           firm_id=app.firm_id, candidate_id=app.candidate_id, at=now)
+           firm_id=app.firm_id, candidate_id=app.candidate_id, at=now,
+           changes=diff({'status': old_status}, {'status': status}))
     db.flush()
     return app
 
@@ -182,6 +183,11 @@ def request_review(db, app, message, *, reason):
                                reason=reason, application_revision=app.status_revision)
     db.add(review)
     db.flush()
+    from backend.auth.ledger import record_automated
+    record_automated(db, actor_type='AGENT', actor_name='Email classifier', action='CREATE',
+                     entity_type='application_review', entity_id=review.id, entity_label=app.job.title or 'Application',
+                     summary=f"Email sent to BDE review ({reason.replace('_', ' ').lower()}) for {app.job.title or 'an application'}.",
+                     firm_id=app.firm_id, candidate_id=app.candidate_id)
     return review
 
 
@@ -257,7 +263,8 @@ def apply_email_decision(db, app, message, classification_id, *, target: str) ->
             record_automated(db, actor_type='AGENT', actor_name='Email classifier', action='STATE_CHANGE',
                              entity_type='application', entity_id=app.id, entity_label=app.job.title or 'Application',
                              summary=f'Automatic status change from email: {old_status} → {target}. Source email {message.id}.',
-                             firm_id=app.firm_id, candidate_id=app.candidate_id, at=now)
+                             firm_id=app.firm_id, candidate_id=app.candidate_id, at=now,
+                             changes=diff({'status': old_status}, {'status': target}))
             db.flush()
     except IntegrityError:
         db.refresh(app)
@@ -318,6 +325,7 @@ def undo_email_decision(db, app, principal, *, event_id, expected_revision, comm
     record(db, actor=actor, action='UPDATE', entity_type='application', entity_id=app.id,
            entity_label=app.job.title or 'Application',
            summary=f'Undid automatic change {original.id}: {old_status} → {original.from_status}.',
-           firm_id=app.firm_id, candidate_id=app.candidate_id, at=now)
+           firm_id=app.firm_id, candidate_id=app.candidate_id, at=now,
+           changes=diff({'status': old_status}, {'status': original.from_status}))
     db.flush()
     return app
