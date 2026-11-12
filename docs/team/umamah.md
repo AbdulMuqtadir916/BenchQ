@@ -14,11 +14,12 @@ PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part o
 Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
 Next: PR 2, the ledger rules as tests.
 
-**Activity logs, ready to raise (2026-11-12):** PRs 1–7 brought up to date with `main` (up to #120) by merging, not
-rebasing, and stacked one on the next: PR 1, PR 2, PR 3, PR 4, PR 5 parts 1–3 (three PRs), PR 6, PR 7. The
+**Activity logs, ready to raise (2026-11-12):** PRs 1–7 brought up to date with `main` (up to #136) by merging, not
+rebasing, and stacked one on the next: PR 1, PR 2, PR 3, PR 4, PR 5 parts 1–2 (two PRs), PR 6, PR 7. PR 5 part 3
+(cover letters) is dropped: cover letters are being removed from BenchQ. The
 manager-ledger decision is Q64 (`main` took Q56 and Q59). The migrations are 0028 (`activity_logs`), 0029 (sign-in
 events) and 0030 (old tables removed): `main` has 0024, #127 holds 0025 and #129 0026–0027, so 0028 follows `main`'s
-0024 until those merge. Not pushed: each goes up in order once agreed.
+0024 until those merge. PR 1 and PR 2 are pushed to #113 and #115; the rest go up in order once agreed.
 
 Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/password-reset-approval`), PR #105 to
 `main` (open, awaiting Abdul's review; backend suite 3705 passed). Change document: [pr-changes/feat-password-reset-notifications.md](./pr-changes/feat-password-reset-notifications.md).
@@ -102,15 +103,16 @@ screen: people list, searchable actor and candidate dropdowns, dates, and the si
 **Activity Log PR 5 part 2, added 2026-11-07:** background work (scrapes, scoring, Gmail, Telegram, scheduled runs and AI
 calls) writes to `activity_logs` with no firm, so only the Super Admin sees it.
 
-**Activity Log PR 6 (2026-11-07):** `activity-logs/pr6-signin-events-and-super-admin`, built on PR 5 part 3, not pushed
+**Activity Log PR 6 (2026-11-07):** `activity-logs/pr6-signin-events-and-super-admin`, built on PR 5 part 2, not pushed
 yet. Sign-out, failed sign-ins and lockouts are logged (migration 0029), and the Super Admin has the full Activity page,
 with a Failed sign-ins view only they can see. Details in
 [pr-changes/activity-logs-pr6-signin-events-and-super-admin.md](./pr-changes/activity-logs-pr6-signin-events-and-super-admin.md).
 
-**Activity Log PR 5 (2026-11-06), three parts, each built on the last, none pushed:**
-`activity-logs/pr5-part1-applications` (applications, interviews, autofill), `activity-logs/pr5-part2-jobs-and-analysis`,
-`activity-logs/pr5-part3-cover-letters`. Together they log every firm route that wrote nothing. Whether they go up as
-three PRs, one on the next (decided 2026-11-12). Change documents in [pr-changes](./pr-changes/).
+**Activity Log PR 5 (2026-11-06), two parts, the second built on the first, none pushed:**
+`activity-logs/pr5-part1-applications` (applications, interviews, autofill) and `activity-logs/pr5-part2-jobs-and-analysis`
+(background work: scrapes, scheduled runs, AI calls, Gmail and Telegram, for the Super Admin). Two PRs, one on the next
+(decided 2026-11-12). Part 3 (cover letters) is dropped, as cover letters are being removed, and the old job feed's
+logging left part 2 when main retired those routes. Change documents in [pr-changes](./pr-changes/).
 
 ## 1. Notifications inbox
 
