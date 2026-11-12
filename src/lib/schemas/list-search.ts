@@ -10,12 +10,12 @@ import { ApplicationStatus, CandidateStatus } from "./enums";
 export const LIST_PERIODS = ["1d", "7d", "30d", "90d"] as const;
 export type ListPeriod = (typeof LIST_PERIODS)[number];
 
-/** Which date the period is about: submitted, first reply, interview, offer, or placed (closed as placed). */
-export const APPLICATION_DATES = ["applied", "response", "interview", "offer", "placed"] as const;
+/** Which date the period is about: submitted, first reply, interview, or offer. Offer is the last stage. */
+export const APPLICATION_DATES = ["applied", "response", "interview", "offer"] as const;
 export type ApplicationDate = (typeof APPLICATION_DATES)[number];
 
-/** Stages an application can have reached, in order (the funnel's stages). */
-export const REACHED_STAGES = ["APPLIED", "RESPONSE", "SCREENING", "INTERVIEW", "OFFER", "PLACED"] as const;
+/** Stages an application can have reached, in order: the funnel's stages (status-meta PIPELINE without Saved). */
+export const REACHED_STAGES = ["APPLIED", "SCREENING_CALL", "SHORTLISTED", "INTERVIEW_SCHEDULE_REQUEST", "INTERVIEW_SCHEDULED", "ASSESSMENT", "OFFER"] as const;
 export type ReachedStage = (typeof REACHED_STAGES)[number];
 
 export const ApplicationsSearch = z.object({

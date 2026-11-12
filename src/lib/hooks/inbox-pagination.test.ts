@@ -35,6 +35,31 @@ describe("Inbox infinite pagination", () => {
     expect(requests).toEqual([null]);
     unsubscribe(); client.clear();
   });
+
+  it("refreshes every loaded page while an email past the newest page is still being classified", async () => {
+    const client = new QueryClient({defaultOptions:{queries:{retry:false, gcTime:0}}});
+    const cycles = new WeakMap<AbortSignal, boolean>();
+    const key = queryKeys.inbox.byCandidate("firm", "candidate");
+    const classified = (ids: string[], next: string | null, state: string) => CandidateInboxSchema.parse({firmId:"firm", connection:null,
+      messages:ids.map(id => ({...message(id), classificationState:state})), nextCursor:next});
+    let olderState = "PENDING";
+    const requests: (string | null)[] = [];
+    const observer = new InfiniteQueryObserver(client, {queryKey:key, initialPageParam:null as string | null,
+      queryFn: ({pageParam, signal}) => loadInboxPage(pageParam, client.getQueryData<InboxPages>(key), async cursor => {
+        requests.push(cursor);
+        return cursor ? classified(["older"], null, olderState) : classified(["recent"], "older-cursor", "DONE");
+      }, {signal, cycles}),
+      getNextPageParam: value => value.nextCursor ?? undefined, select:flattenInbox});
+    const unsubscribe = observer.subscribe(() => {});
+    await observer.refetch();
+    await observer.fetchNextPage();
+    requests.length = 0;
+    olderState = "DONE";
+    await observer.refetch();
+    expect(requests).toEqual([null, "older-cursor"]);
+    expect(observer.getCurrentResult().data?.messages.map(m => [m.id, m.classificationState])).toEqual([["recent","DONE"], ["older","DONE"]]);
+    unsubscribe(); client.clear();
+  });
 });
 
 

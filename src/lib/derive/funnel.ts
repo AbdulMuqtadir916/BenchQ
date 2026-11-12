@@ -1,43 +1,52 @@
 import type { Application } from "@/lib/schemas/application";
-import type { ApplicationStatus } from "@/lib/schemas/enums";
+import type { ApplicationStatus, StoredApplicationStatus } from "@/lib/schemas/enums";
 import type { FunnelStage } from "@/lib/schemas/analytics";
+import { PIPELINE, STATUS_LABEL, stageRank } from "@/components/app/applications/status-meta";
 import { round1 } from "./dates";
 
 /**
- * The funnel counts every application that REACHED each stage, not just those
- * sitting in it now — an app now at INTERVIEW also passed through APPLIED and
- * RESPONSE. We read each application's event chain to know what it reached.
+ * The funnel counts every application that REACHED each stage, not just those sitting in it now. Stages come
+ * from the one pipeline in status-meta (Applied → Offer). A move may skip stages (D1), so an application counts
+ * as having reached every stage up to the furthest one in its history. Legacy values: a legacy placement counts
+ * as reaching Offer (D6); other legacy values reach nothing beyond Applied.
  */
-const STAGE_ORDER: Array<{ status: ApplicationStatus; label: string }> = [
-  { status: "APPLIED", label: "Applied" },
-  { status: "RESPONSE", label: "Response" },
-  { status: "SCREENING", label: "Screening" },
-  { status: "INTERVIEW", label: "Interview" },
-  { status: "OFFER", label: "Offer" },
-  { status: "PLACED", label: "Placed" },
-];
+const STAGES = PIPELINE.slice(1);
 
+/**
+ * The moves that still count for stages: an automatic move that was undone, and the Undo that took it back, stay in the
+ * history but never mark a stage reached. An Undo is always of the change just before it (the backend refuses any other).
+ */
+export function effectiveEvents(app: Pick<Application, "events">): Application["events"] {
+  const undone = new Set(app.events.flatMap((e) => (e.source === "email_undo" && e.revision !== null ? [e.revision - 1] : [])));
+  return app.events.filter((e) => e.source !== "email_undo" && !(e.source === "email_classifier" && e.revision !== null && undone.has(e.revision)));
+}
+
+function furthestRank(app: Application): number {
+  const statuses: StoredApplicationStatus[] = [app.status, ...effectiveEvents(app).map((e) => e.toStatus)];
+  let furthest = app.appliedAt || app.status !== "SAVED" ? stageRank("APPLIED") : -1;
+  for (const status of statuses) {
+    const rank = status === "PLACED" ? stageRank("OFFER") : stageRank(status);
+    if (rank > furthest) furthest = rank;
+  }
+  return furthest;
+}
+
+/**
+ * Every pipeline stage this application has reached, by the same rule as the funnel: a skipped stage counts (D1), and
+ * a legacy placement counts as reaching Offer (D6). Saved drafts reach nothing.
+ */
 export function reachedStatuses(app: Application): Set<ApplicationStatus> {
-  const reached = new Set<ApplicationStatus>();
-  for (const e of app.events) reached.add(e.toStatus);
-  reached.add(app.status);
-  return reached;
+  const furthest = furthestRank(app);
+  return new Set(STAGES.filter((status) => stageRank(status) <= furthest));
 }
 
 export function deriveFunnel(applications: Application[]): FunnelStage[] {
-  const reachedList = applications.map(reachedStatuses);
-
+  const reached = applications.map(furthestRank);
   let previousCount: number | null = null;
-  return STAGE_ORDER.map(({ status, label }) => {
-    const count = reachedList.filter((r) => r.has(status)).length;
-    const conversion =
-      previousCount && previousCount > 0 ? round1((100 * count) / previousCount) : null;
+  return STAGES.map((status: ApplicationStatus) => {
+    const count = reached.filter((rank) => rank >= stageRank(status)).length;
+    const conversion = previousCount && previousCount > 0 ? round1((100 * count) / previousCount) : null;
     previousCount = count;
-    return {
-      status,
-      label,
-      count,
-      conversionFromPreviousPct: conversion,
-    };
+    return { status, label: STATUS_LABEL[status], count, conversionFromPreviousPct: conversion };
   });
 }
