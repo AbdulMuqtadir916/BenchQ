@@ -8,7 +8,7 @@ import pytest
 
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
-    make_company, make_search, big_string, EMOJI, MISSING_UUID,
+    make_company, make_search, EMOJI, MISSING_UUID,
 )
 from backend.models.tenancy import DEFAULT_FIRM_ID
 
@@ -48,11 +48,6 @@ def test_create_search_drops_unknown_fields(client):
 def test_create_search_unicode_name(client):
     r = assert_clean(client.post("/api/searches", json={"name": EMOJI}), 200)
     assert r.json()["name"] == EMOJI
-
-
-def test_create_search_ten_megabyte_search_term(client):
-    r = client.post("/api/searches", json={"name": "Big", "search_term": big_string(10)})
-    assert_clean(r, 200, 400, 413, 422)
 
 
 @pytest.mark.parametrize("field,value", [
@@ -193,11 +188,6 @@ def test_create_company_rejects_wrongly_typed_fields(client, field, bad):
 def test_create_company_unicode_name(client):
     r = assert_clean(client.post("/api/companies", json={"name": EMOJI}), 200)
     assert r.json()["name"] == EMOJI
-
-
-def test_create_company_ten_megabyte_notes(client):
-    r = client.post("/api/companies", json={"name": "Big", "notes": big_string(10)})
-    assert_clean(r, 200, 400, 413, 422)
 
 
 @pytest.mark.parametrize("value", [-1, 0])

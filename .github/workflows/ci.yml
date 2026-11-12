@@ -15,7 +15,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.paths.outputs.frontend }}
+      extension: ${{ steps.paths.outputs.extension }}
+      backend: ${{ steps.paths.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: paths
+        shell: bash
+        run: |
+          frontend=false
+          extension=false
+          backend=false
+
+          # The first parent of the PR merge commit is the base that this CI run tests against.
+          # Disable rename detection so both the old and new paths are considered.
+          git rev-parse --verify HEAD^2 > /dev/null
+          git diff --name-only --no-renames -z HEAD^1 HEAD > "$RUNNER_TEMP/benchq-changed-paths"
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              backend/auth/policy_table.json|src/mocks/data/*|src/lib/api/dto/demo-ids.json)
+                frontend=true
+                backend=true
+                ;;
+              backend/*|pytest.ini|Dockerfile.backend|docker-compose.yml|.dockerignore)
+                backend=true
+                ;;
+              extension/*|.nvmrc)
+                # Root ESLint and TypeScript also cover extension sources.
+                frontend=true
+                extension=true
+                ;;
+              src/*|public/*|scripts/qa/candidate-gmail/*|.env.example|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|next.config.ts|tsconfig.json|vitest.config.ts|eslint.config.mjs|postcss.config.mjs|components.json)
+                frontend=true
+                ;;
+              docs/*|README.md|CONTRIBUTING.md|AGENTS.md|CLAUDE.md|product.md|design.md|design-qa.md|.github/pull_request_template.md)
+                ;;
+              *)
+                # Workflow changes and any unrecognized inputs run every suite.
+                frontend=true
+                extension=true
+                backend=true
+                break
+                ;;
+            esac
+          done < "$RUNNER_TEMP/benchq-changed-paths"
+          printf 'frontend=%s\nextension=%s\nbackend=%s\n' "$frontend" "$extension" "$backend" >> "$GITHUB_OUTPUT"
+
   frontend:
+    needs: changes
+    # Run the suite if change detection failed, including while the existing checks are still required.
+    if: ${{ always() && !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.frontend != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,6 +90,8 @@ jobs:
 
   # The Chrome extension has its own package and tests (vitest, jsdom); its build runs tsc -b first.
   extension:
+    needs: changes
+    if: ${{ always() && !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.extension != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -50,6 +108,8 @@ jobs:
       - run: npm --prefix extension run build:store
 
   backend:
+    needs: changes
+    if: ${{ always() && !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.backend != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     services:
@@ -80,3 +140,32 @@ jobs:
       - run: pip install -r backend/requirements.txt
       # "live" tests hit a running stack over HTTP; there is none here.
       - run: python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider
+
+  required:
+    name: CI required
+    needs: [changes, frontend, extension, backend]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check CI results
+        shell: bash
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          FRONTEND: ${{ needs.frontend.result }}
+          EXTENSION: ${{ needs.extension.result }}
+          BACKEND: ${{ needs.backend.result }}
+          EXPECTED_FRONTEND: ${{ needs.changes.outputs.frontend == 'false' && 'skipped' || 'success' }}
+          EXPECTED_EXTENSION: ${{ needs.changes.outputs.extension == 'false' && 'skipped' || 'success' }}
+          EXPECTED_BACKEND: ${{ needs.changes.outputs.backend == 'false' && 'skipped' || 'success' }}
+        run: |
+          check() {
+            if [[ "$2" != "$3" ]]; then
+              printf '::error::%s finished with %s, expected %s\n' "$1" "$2" "$3"
+              return 1
+            fi
+          }
+          check changes "$CHANGES" success
+          check frontend "$FRONTEND" "$EXPECTED_FRONTEND"
+          check extension "$EXTENSION" "$EXPECTED_EXTENSION"
+          check backend "$BACKEND" "$EXPECTED_BACKEND"
