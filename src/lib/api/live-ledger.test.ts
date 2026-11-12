@@ -71,6 +71,12 @@ describe("the ledger on the live backend", () => {
     expect(urls).toEqual([`/api/firms/${HTS}/ledger/candidates`, `/api/firms/${HTS}/ledger/days?from_date=2026-11-01&to_date=2026-11-30`]);
   });
 
+  it("a candidate with no name on their résumé is listed as unnamed, never blank", async () => {
+    answer = { status: 200, body: [{ id: "6f1c0000-0000-4000-8000-000000000011", name: "" }, { id: "6f1c0000-0000-4000-8000-000000000012", name: "Asha Rao" }] };
+    const candidates = await ledgerApi.candidates("firm_hts");
+    expect(candidates.map((candidate) => candidate.name)).toEqual(["Unnamed candidate", "Asha Rao"]);
+  });
+
   it("an empty ledger is an empty list, for the page's empty state", async () => {
     await expect(ledgerApi.list("firm_hts")).resolves.toEqual([]);
   });

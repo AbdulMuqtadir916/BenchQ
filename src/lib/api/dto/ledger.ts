@@ -38,6 +38,9 @@ export function toLedgerPeople(dto: z.infer<typeof LedgerPeopleDto>): LedgerPeop
   });
 }
 
+/** What a candidate with no name on their résumé is called, so a blank never shows in a table or a list. */
+export const UNNAMED_CANDIDATE = "Unnamed candidate";
+
 export function toLedgerCandidate(dto: z.infer<typeof LedgerCandidateDto>): LedgerCandidate {
-  return LedgerCandidateSchema.parse({ id: fromBackendId(dto.id), name: dto.name });
+  return LedgerCandidateSchema.parse({ id: fromBackendId(dto.id), name: dto.name.trim() || UNNAMED_CANDIDATE });
 }

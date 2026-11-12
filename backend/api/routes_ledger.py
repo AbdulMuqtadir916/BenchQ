@@ -137,6 +137,10 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
         raise HTTPException(status_code=404, detail="Not found.")
     if (cursor_at is None) != (cursor_id is None) or (cursor_at is not None and cursor_at.utcoffset() is None):
         raise HTTPException(status_code=422, detail="Supply both cursor fields, with a timezone.")
+    if (cursor is not None or cursor_at is not None) and (sort != "when" or direction != "desc"):
+        # A marker says "the rows after this one, newest first". Under another order the next page would skip and
+        # repeat rows, so page a sorted list by `offset`.
+        raise HTTPException(status_code=422, detail="A page marker only works newest first; page a sorted list by offset.")
     support.settle_expired(db)      # a support view that ran out shows its end here, dated at its expiry
     db.commit()
     entries = _visible(db, principal, my_firm, filters)
