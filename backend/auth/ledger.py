@@ -9,6 +9,7 @@ import json
 import uuid
 
 from fastapi.encoders import jsonable_encoder
+from sqlalchemy import text
 from sqlalchemy.orm import Session as DbSession
 
 from backend.logging_setup import request_id
@@ -114,6 +115,11 @@ def _sign_in_entry(db: DbSession, *, account: User | PlatformUser | None, email:
 def record_sign_in_failure(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str,
                            reason: str) -> ActivityEntry:
     """Tries on one account from one IP within `SAME_ATTEMPT_WINDOW` of the first share a row, which counts them."""
+    # Two tries at the same instant would both find no row and both insert one. A lock on this account and IP, held until
+    # the first request commits, makes the second one find the row and count itself on it. Tries on no account share a row
+    # by IP alone, whatever email was typed, so they share a lock the same way.
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+               {"key": f"sign-in-failure:{account.id if account else 'unknown'}:{ip}"})
     same_account = ActivityEntry.actor_user_id == account.id if account else ActivityEntry.actor_type == "UNKNOWN"
     row = db.query(ActivityEntry).filter(ActivityEntry.action == "SIGN_IN_FAILED", ActivityEntry.ip_address == ip,
                                          same_account, ActivityEntry.created_at >= utcnow() - SAME_ATTEMPT_WINDOW) \

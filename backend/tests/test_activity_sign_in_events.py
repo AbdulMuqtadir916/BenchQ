@@ -91,6 +91,60 @@ def test_a_try_after_ten_seconds_starts_a_new_row(anonymous_client, test_db, peo
     assert sorted(row.attempt_count for row in _failed(test_db)) == [1, 1]
 
 
+def test_two_failed_tries_at_the_same_instant_share_one_row(test_db, people):
+    """The second try waits for the first and counts itself on its row, instead of both finding no row and adding one."""
+    import threading
+    from backend.auth import ledger
+    from backend.models.db import SessionLocal
+
+    _, bde, _ = people
+    first, second, done = SessionLocal(), SessionLocal(), threading.Event()
+    try:
+        ledger.record_sign_in_failure(first, account=bde, email=bde.email, ip="203.0.113.9", reason="Wrong password.")
+        first.flush()                                        # its row is written but not yet committed
+
+        def other():
+            ledger.record_sign_in_failure(second, account=bde, email=bde.email, ip="203.0.113.9", reason="Wrong password.")
+            second.commit()
+            done.set()
+        worker = threading.Thread(target=other)
+        worker.start()
+        assert not done.wait(0.5), "the second try went ahead without waiting for the first"
+        first.commit()
+        assert done.wait(10)
+        worker.join()
+    finally:
+        first.close()
+        second.close()
+    assert [row.attempt_count for row in _failed(test_db)] == [2]
+
+
+def test_two_tries_at_once_on_unknown_emails_from_one_ip_share_one_row(test_db, people):
+    import threading
+    from backend.auth import ledger
+    from backend.models.db import SessionLocal
+
+    first, second, done = SessionLocal(), SessionLocal(), threading.Event()
+    try:
+        ledger.record_sign_in_failure(first, account=None, email="Nobody@Example.test", ip="203.0.113.9", reason="Wrong password.")
+        first.flush()
+
+        def other():
+            ledger.record_sign_in_failure(second, account=None, email="someone.else@example.test", ip="203.0.113.9", reason="Wrong password.")
+            second.commit()
+            done.set()
+        worker = threading.Thread(target=other)
+        worker.start()
+        assert not done.wait(0.5)
+        first.commit()
+        assert done.wait(10)
+        worker.join()
+    finally:
+        first.close()
+        second.close()
+    assert [row.attempt_count for row in _failed(test_db)] == [2]
+
+
 def test_another_account_or_ip_gets_its_own_row(anonymous_client, test_db, people, monkeypatch):
     _, bde, _ = people
     _sign_in(anonymous_client, bde.email)

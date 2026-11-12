@@ -3,6 +3,13 @@
 Branch: `activity-logs/pr6-signin-events-and-super-admin`, built on `activity-logs/pr5-part2-jobs-and-analysis` (PR 5 part 3, cover letters, is dropped).
 Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 
+## In plain words
+
+Until now the log held what people did, but not when someone signed out, mistyped a password or got locked out. This PR
+logs all three, and gives the Super Admin (BenchQ staff) a full Activity page across every firm, with a **Failed
+sign-ins** view that only they can see. Firms never see failed sign-ins, not even the Owner or a support view. The
+address a try came from (IP) is kept but is never in a list; the Super Admin opens it one row at a time.
+
 ## Scope
 
 - Logs sign-out for everyone, and failed sign-ins and lockouts. Nothing stored failed sign-ins before: only an in-memory
@@ -33,7 +40,7 @@ proxy's address. Locally every row shows Docker's address.
 
 | File | Changes and reason |
 |---|---|
-| `backend/migrations/versions/0017_activity_sign_in_events.py` | New actions, the UNKNOWN actor, `ip_address`, `attempt_count`. The append-only trigger now allows one UPDATE: adding 1 to a failed sign-in's count, with every other column unchanged. Downgrading removes these rows, which have no place in the older log. |
+| `backend/migrations/versions/0029_activity_sign_in_events.py` | New actions, the UNKNOWN actor, `ip_address`, `attempt_count`. The append-only trigger now allows one UPDATE: adding 1 to a failed sign-in's count, with every other column unchanged. Downgrading removes these rows, which have no place in the older log. |
 | `backend/models/tenancy.py` | The columns and action lists. `ledger_entries` keeps its own list. |
 | `backend/auth/ledger.py`, `backend/auth/throttle.py`, `backend/api/routes_auth.py` | Writing the entries. `record_failure` says when a limit is used up. |
 | `backend/api/routes_ledger.py` | `_visible` leaves out failed sign-ins for every firm reader. `people_in_view` and the `Filters` time zone are shared with the Super Admin's routes. |
@@ -48,3 +55,15 @@ proxy's address. Locally every row shows Docker's address.
 - Unknown-account tries from one IP share a row for 10 seconds, whichever email was typed, and the row shows the first.
   The IP limit of 10 tries a minute is what stops a flood, so one IP can write at most 6 such rows a minute.
 - On the Whole platform view, Show IP can need a sideways scroll. The Failed sign-ins view has room for it.
+
+## Edge cases and fixes (2026-11-12)
+
+- **Two failed tries at the same instant.** The "tries from one IP within 10 seconds share a row" rule locked an existing
+  row, but two tries arriving together found no row and both added one. A database lock per account and IP (per IP for
+  unknown accounts, as they share a row by IP) makes the second try wait for the first and count on its row. Two tests
+  use two real sessions and fail without the lock.
+- **Candidate names** in the Super Admin's log and its candidate list come from each candidate's résumé, one firm at a
+  time (07 Q57), since main moved names off `candidates`.
+- **Same moment and day edges** behave as in the firm's log (newest first, then lowest id), but the Super Admin's days are
+  cut in IST.
+- **A candidate with no name** shows "Unnamed candidate", as on the firm's screen.
