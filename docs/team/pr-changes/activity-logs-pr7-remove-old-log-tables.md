@@ -3,6 +3,12 @@
 Branch: `activity-logs/pr7-remove-old-log-tables`, built on `activity-logs/pr6-signin-events-and-super-admin`.
 Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)). Removing the tables was agreed with Abdul.
 
+## In plain words
+
+After PRs 3 to 6, `activity_logs` holds everything: what people do, what the platform does by itself, and sign-ins. Two
+older tables are left that nothing uses. This PR removes them, **after copying any row not yet in `activity_logs`**, and it
+stops, changing nothing, if a row is missing, so no history is lost. Every screen shows exactly what it showed before.
+
 ## Scope
 
 `activity_logs` is now the only log. No table named `activity_log_v2` or `ledger_entries` remains.
