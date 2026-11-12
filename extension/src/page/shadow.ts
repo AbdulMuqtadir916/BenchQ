@@ -15,8 +15,9 @@ export function shadowOf(element: Element): ShadowRoot | null {
   }
 }
 
-/** Every element matching `selector` in page order, a component's own elements right after the component. */
-export function queryDeep<T extends Element>(root: Document | ShadowRoot, selector: string): T[] {
+/** Every element matching `selector` in page order, a component's own elements right after the component. `root` may be
+ * an element too (a form): what's inside it, never the element itself. */
+export function queryDeep<T extends Element>(root: Document | ShadowRoot | Element, selector: string): T[] {
   const all = Array.from(root.querySelectorAll("*"));
   if (!all.some((element) => shadowOf(element))) return Array.from(root.querySelectorAll<T>(selector));
   return all.flatMap((element) => {

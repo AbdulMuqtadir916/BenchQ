@@ -340,11 +340,13 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   if (asksForSelfRating(asked.label)) return manual("This asks for a self-rating, so it's yours to answer.");
   if (field.kind === "custom") return manual("BenchQ can't fill this kind of control yet.");
   if (!field.label && !type) return manual("This field has no label.");
-  // Forms often ask a self-ID question twice, in their own survey and the EEO section. The answer is the same.
-  if (repeated && !type?.startsWith("eeo-")) return manual("This question appears more than once on the form.");
+  // Whose answer it is comes before a repeat: two "Company" fields under References are the references' employers,
+  // and a repeat's reason would let `withHistory` give them the candidate's (the PR 129 review, finding 1).
   const section = normalize(field.clues.sectionHeading);
   if (type && PERSON_KINDS.has(type) && SOMEONE_ELSES_SECTION.test(section)) return manual("This section asks about someone else, so it's yours to fill.");
   if (type === "start-date" && HISTORY_SECTION.test(section)) return manual("This date belongs to an entry in the candidate's history.");
+  // Forms often ask a self-ID question twice, in their own survey and the EEO section. The answer is the same.
+  if (repeated && !type?.startsWith("eeo-")) return manual("This question appears more than once on the form.");
   // The job applied for is the linked job, whatever the bank says.
   if (type === "job-applied") return job?.title ? rowFor(base, job.title) : manual(NO_ANSWER);
 

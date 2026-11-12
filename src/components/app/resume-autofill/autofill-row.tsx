@@ -59,10 +59,6 @@ export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditI
     requestAnimationFrame(() => rowRef.current?.focus());
   };
   const save = (build: (onlyThis: boolean) => AutofillChange) => void onSave(build).then((saved) => { if (saved) closeEditor(); });
-  const saveAnswer = (answer: AutofillAnswer) =>
-    save((onlyThis) => (entry.kind === "CUSTOM"
-      ? { edit: {}, built: {}, reset: [], add: { [entry.question]: String(answer) }, remove: [], onlyThis }
-      : editChange(entry, answer, onlyThis)));
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>) => {
     if (event.target === event.currentTarget && event.key === "Enter" && mayEdit && !isEditing && status !== "review") {
       event.preventDefault();
@@ -129,16 +125,37 @@ export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditI
           ) : null}
         </div>
       </div>
-      {isEditing ? (
-        <AnswerEditor question={entry.question} type={entry.type} initial={entry.answer} isSaving={isSaving} draftRow={draftRowOf(entry)}
-          suggestions={entry.key ? ANSWER_SUGGESTIONS[entry.key] : undefined}
-          isMultiline={entry.kind === "CUSTOM" || entry.key === "summary"} onSave={saveAnswer} onCancel={closeEditor} />
-      ) : null}
+      {isEditing ? <RowEditor entry={entry} isSaving={isSaving} onSave={save} onCancel={closeEditor} /> : null}
       <ConfirmDialog open={isConfirmingDelete} title="Delete this question?" confirmLabel="Delete" tone="danger" cancelLabel="Keep it" isBusy={isSaving}
         onCancel={() => setIsConfirmingDelete(false)}
         onConfirm={() => { setIsConfirmingDelete(false); save((onlyThis) => removeChange(entry, onlyThis)); }}>
         <p>“{entry.question}” and its answer go, and the extension stops filling it.</p>
       </ConfirmDialog>
     </li>
+  );
+}
+
+type RowEditorProps = {
+  entry: AutofillEntry;
+  isSaving: boolean;
+  onSave: (build: (onlyThis: boolean) => AutofillChange) => void;
+  onCancel: () => void;
+};
+
+/**
+ * A row's editor, which keeps the answer as it stood when it opened: a save sends that as the answer the user was
+ * shown, so one changed meanwhile (another tab, the extension) is refused (409), not saved over, even after another
+ * row's save read the whole list again (the PR 129 review, finding 3). Exported for its test.
+ */
+export function RowEditor({ entry, isSaving, onSave, onCancel }: RowEditorProps) {
+  const [shown] = useState(entry);
+  const saveAnswer = (answer: AutofillAnswer) =>
+    onSave((onlyThis) => (shown.kind === "CUSTOM"
+      ? { edit: {}, built: {}, reset: [], add: { [shown.question]: String(answer) }, remove: [], onlyThis }
+      : editChange(shown, answer, onlyThis)));
+  return (
+    <AnswerEditor question={shown.question} type={shown.type} initial={shown.answer} isSaving={isSaving} draftRow={draftRowOf(shown)}
+      suggestions={shown.key ? ANSWER_SUGGESTIONS[shown.key] : undefined}
+      isMultiline={shown.kind === "CUSTOM" || shown.key === "summary"} onSave={saveAnswer} onCancel={onCancel} />
   );
 }

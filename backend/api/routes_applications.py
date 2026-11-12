@@ -385,6 +385,7 @@ def create_application(
     from backend.api.routes_candidates import _candidate
     from backend.applications.saving import add_job, ensure_saved
     from backend.auth.policy import can, can_add_job
+    from backend.job_search import limits
     from backend.models.job_search import JobPosting
     from backend.models.tenancy import User
 
@@ -397,8 +398,19 @@ def create_application(
         if not can_add_job(principal, candidate):
             raise HTTPException(status_code=403, detail="Only the candidate's BDE adds jobs for them.")
         actor = db.get(User, principal.user_id)
+        # An added job is a capture (its own `kind = 'capture'` batch): the capture route's lock and its 20 a day,
+        # shared, so a BDE at the cap can't keep adding here (the PR 129 review, finding 5). The same job again is
+        # returned even at the cap: `add_job` admits only a new posting.
+        limits.lock_bde(db, principal.user_id)
+        now = utcnow()
+
+        def under_the_cap():
+            if limits.captures_today(db, firm_id, principal.user_id, now) >= limits.CAPTURES_PER_BDE_PER_DAY:
+                resets = f"{limits.next_reset(now).astimezone(limits.IST):%I:%M %p}".lstrip("0")
+                raise HTTPException(status_code=429, detail=f"You've added {limits.CAPTURES_PER_BDE_PER_DAY} jobs "
+                                                            f"today, the most for one day. It resets at {resets} IST.")
         posting, job_created = add_job(db, firm_id=firm_id, actor=actor, candidate=candidate, source=data.job.source,
-                                       job=data.job.model_dump(exclude={"source"}))
+                                       job=data.job.model_dump(exclude={"source"}), admit=under_the_cap)
         app, application_created = ensure_saved(db, firm_id=firm_id, actor=actor, candidate=candidate, posting=posting)
         db.commit()
         response.status_code = 201 if job_created else 200

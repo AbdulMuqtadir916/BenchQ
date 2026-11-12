@@ -92,8 +92,14 @@ function kindOf(element: HTMLElement): FieldKind {
   return isInput(element) ? INPUT_KINDS[element.type] ?? "custom" : "custom";
 }
 
+/** A sign-in or sign-up form, whose email is the BDE's account, never the candidate's: a form the field sits in, out
+ * through the components around it, that holds a password field anywhere, a component's own too (the PR 129 review,
+ * finding 2: `closest` and `querySelector` stop at a component's edge). */
 function accountForm(element: HTMLElement): boolean {
-  return Boolean(element.closest("form")?.querySelector("input[type='password']"));
+  for (let node: Element | null = element; node; node = node.parentElement ?? hostOf(node)) {
+    if (node.tagName === "FORM" && queryDeep(node, "input[type='password']").length > 0) return true;
+  }
+  return false;
 }
 
 /** What the BDE reads on the form comes first: a label saying "(optional)" beats whatever its markup says. */
