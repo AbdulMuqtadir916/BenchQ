@@ -73,7 +73,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreItem[] })
             ) : (
               <button key={item.label} type="button" role="menuitem" tabIndex={-1}
                 className={cn(itemClass, item.tone === "danger" && "text-[var(--color-danger-fg)] hover:text-[var(--color-danger-fg)]")}
-                onClick={() => { close(false); item.onSelect(); }}>
+                onClick={() => { close(); item.onSelect(); }}>
                 {item.label}
               </button>
             ),

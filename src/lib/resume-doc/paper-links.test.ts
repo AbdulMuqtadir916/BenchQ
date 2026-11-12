@@ -7,6 +7,9 @@ describe("résumé links", () => {
     expect(emailLink("not an email")).toBeNull();
     expect(emailLink("a@b.co?bcc=x@evil.test")).toBeNull();
     expect(emailLink("a@b.co,x@evil.test")).toBeNull();
+    // One literal @: the old pattern let these through as mailto options.
+    expect(emailLink("a@b.co?bcc=spy%40evil.test")).toBeNull();
+    expect(emailLink("a@b.co&cc=spy%40evil.test")).toBeNull();
   });
 
   describe("phone numbers in E.164", () => {

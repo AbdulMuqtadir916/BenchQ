@@ -92,7 +92,7 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
             </div>
           </div>
         </div>
-        <div className="flex w-full flex-wrap items-start justify-end gap-2 md:ml-auto md:w-auto md:shrink-0 md:flex-nowrap">
+        <div className="flex w-full flex-wrap items-start justify-end gap-2 md:ml-auto md:w-auto">
           <Can action="candidate.assign"><ReassignAction candidate={candidate} /></Can>
           {search ? <FindJobs candidate={candidate} resumeHref={resumeHref} search={search} /> : null}
           {canAct ? (

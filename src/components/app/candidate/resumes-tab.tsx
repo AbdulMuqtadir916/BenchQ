@@ -1,15 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useId, useMemo, useState } from "react";
-import { FilePlus2, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { ResumeShelf } from "@/lib/schemas/resume";
 import { buildResumeTree } from "@/lib/derive/resume-tree";
-import { useHref } from "@/lib/routes/use-href";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTreeLabels } from "@/components/app/resumes/use-tree-labels";
 import { UploadResume } from "@/components/app/resumes/upload-resume";
@@ -32,7 +29,6 @@ export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct
   /** "Make a copy for a job": job copies are made from a job, on the Jobs tab. */
   onMakeJobCopy?: () => void;
 }) {
-  const toHref = useHref();
   const candidates = useMemo(() => [candidate], [candidate]);
   const labels = useTreeLabels(candidates);
   const tree = useMemo(() => (shelf ? buildResumeTree(shelf, [candidate.id])[0] : undefined), [shelf, candidate.id]);
@@ -42,8 +38,7 @@ export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct
   const [isHiddenOpen, setHiddenOpen] = useState(false);
   const hiddenId = useId();
   const canUpload = canAct && actions.canManage;
-  const canCreate = canAct && actions.canChange;
-  const createHref = toHref("resumes.studio", { id: "new" }, { candidate: candidate.id });
+  // "Create new résumé" waits until the new-résumé screen can save (it can only download today).
 
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
   if (isLoading) {
@@ -57,13 +52,8 @@ export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct
   if (!cards.length && !(canUpload && hiddenCards.length)) {
     return (
       <EmptyState icon={FileText} title="No résumé yet"
-        description={canUpload && canCreate ? "Upload the candidate's résumé file, or build one from scratch." : canUpload ? "Upload the candidate's résumé file." : canCreate ? "Build the candidate's résumé from scratch." : "The candidate's recruiter adds their first résumé."}
-        action={canUpload || canCreate ? (
-          <div className="flex flex-wrap justify-center gap-2">
-            {canUpload ? <UploadResume candidateId={candidate.id} label="Upload a file" /> : null}
-            {canCreate ? <Button asChild size="sm"><Link href={createHref}><FilePlus2 size={14} aria-hidden />Create one</Link></Button> : null}
-          </div>
-        ) : undefined} />
+        description={canUpload ? "Upload the candidate's résumé file." : "The candidate's recruiter adds their first résumé."}
+        action={canUpload ? <UploadResume candidateId={candidate.id} label="Upload a file" /> : undefined} />
     );
   }
 
@@ -75,12 +65,7 @@ export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct
           <h2 id="resumes-heading" className="text-h3 text-[var(--color-text)]">Résumés ({cards.length})</h2>
           <p className="mt-0.5 text-sm text-[var(--color-text-2)]">The main résumé is the one we send to jobs by default.</p>
         </div>
-        {canUpload || canCreate ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {canUpload ? <UploadResume candidateId={candidate.id} /> : null}
-            {canCreate ? <Button asChild size="sm"><Link href={createHref}><FilePlus2 size={14} aria-hidden />Create new résumé</Link></Button> : null}
-          </div>
-        ) : null}
+        {canUpload ? <UploadResume candidateId={candidate.id} /> : null}
       </div>
 
       <ul className="space-y-3">

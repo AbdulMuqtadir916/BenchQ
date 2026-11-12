@@ -19,10 +19,9 @@ Frontend only. No backend change, migration, new dependency, schema or contract 
    8pt, line height 1.25, margin 0.45in) and says "Can't fit on one page — trim about N lines" when the floors aren't
    enough. Preview, page count and Export use it. It is held for the open résumé like the template choice and is
    **not saved per résumé**: that needs a stored field (a contract and backend change, open).
-4. **Candidate Résumés tab redesign** (plain words, no internal terms). Header row with Upload résumé / Create new
-   résumé (Upload moved off the tab bar); one closed card per résumé titled by its role, main résumé first with a
+4. **Candidate Résumés tab redesign** (plain words, no internal terms). Header row with Upload résumé (moved off the tab bar); one closed card per résumé titled by its role, main résumé first with a
    "Main résumé" badge; "Updated … by … · N versions"; View, Download PDF, "Make main résumé", a ⋯ menu (Edit, Make
-   main, Make a copy for a job → Jobs tab, Delete); older versions and job copies behind links; plain-English dialogs;
+   main, Delete); older versions and job copies behind links; plain-English dialogs;
    empty state. The firm-wide Resume Builder page is unchanged. The résumé editor (Builder/Viewer) UI is unchanged.
 5. **Candidate header.** Find jobs / Build resume stay top-right, level with the name, from `md` (768px) up, and stack
    right-aligned below it.
@@ -69,8 +68,9 @@ Frontend only. No backend change, migration, new dependency, schema or contract 
 ## Remaining limits
 
 - Fit to one page is not saved per résumé (needs a stored field — product/backend decision).
-- "Make a copy for a job" opens the Jobs tab; nothing creates a job copy yet ("Tailor & apply" isn't wired).
-- "Create new résumé" opens the existing new-résumé screen, which can't save yet.
+- "Make a copy for a job" and "Create new résumé" are hidden (review): nothing creates a job copy yet, and the
+  new-résumé screen can't save. `ResumesTab` keeps an `onMakeJobCopy` prop for when copies can be made.
+- The Two Column template's side column (contact, skills) sits on page 1 only and isn't paginated.
 - No "Upload new version" (an upload always adds a new résumé). No delete on job copies (the backend refuses it).
 - axe isn't installed in the repo, so no automated accessibility run.
 - Opening one résumé version took ~20s on the local backend (pre-existing; affects the editor too).

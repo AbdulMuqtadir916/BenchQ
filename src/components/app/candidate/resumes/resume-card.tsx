@@ -36,11 +36,13 @@ export function ResumeCard({ card, labels, candidateName, actions, onMakeJobCopy
   const isHidden = !!node.base.archivedAt;
   const canChange = !!actions?.canChange && !isHidden;
   const canManage = !!actions?.canManage;
+  // Making a résumé main uses its first version; one with no versions left can't be made main.
+  const canMakeMain = canChange && !isMain && node.versions.some((v) => v.number === 1);
   const toggle = (part: "versions" | "copies") => setOpenPart(openPart === part ? null : part);
 
   const more: MoreItem[] = [];
   if (latest && canChange) more.push({ label: "Edit résumé", href: toHref("resumes.studio", { id: latest.id }) });
-  if (canChange && !isMain) more.push({ label: "Make main résumé", onSelect: () => actions!.makeMain(node, title) });
+  if (canMakeMain) more.push({ label: "Make main résumé", onSelect: () => actions!.makeMain(node, title) });
   if (canManage && !isHidden && onMakeJobCopy) more.push({ label: "Make a copy for a job", onSelect: onMakeJobCopy });
   if (canManage && isHidden) more.push({ label: "Show on the list again", onSelect: () => actions!.showAgain(node, title) });
   if (canManage && !isMain && !isHidden && !node.base.madeByLead) more.push({ label: "Delete", tone: "danger", onSelect: () => actions!.deleteResume(node, title) });
@@ -60,7 +62,7 @@ export function ResumeCard({ card, labels, candidateName, actions, onMakeJobCopy
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {canChange && !isMain ? <Button variant="ghost" size="sm" onClick={() => actions!.makeMain(node, title)} aria-label={`Make ${title} the main résumé`}>Make main résumé</Button> : null}
+          {canMakeMain ? <Button variant="ghost" size="sm" onClick={() => actions!.makeMain(node, title)} aria-label={`Make ${title} the main résumé`}>Make main résumé</Button> : null}
           {latest ? (
             <>
               <Button asChild variant="secondary" size="sm"><Link href={toHref("resumes.studio", { id: latest.id }, { mode: "view" })} aria-label={`View ${title}`}>View</Link></Button>

@@ -19,7 +19,8 @@ export interface PaperMeasure {
  */
 export function measurePaper(flow: HTMLElement): PaperMeasure | null {
   const sheet = flow.closest<HTMLElement>(".rt");
-  if (!sheet) return null;
+  // No layout boxes (the print stylesheet hides the copy): measuring now would read every block as 0px tall.
+  if (!sheet || !flow.getClientRects().length) return null;
   const paperHeight = parseFloat(getComputedStyle(sheet).getPropertyValue("--paper-height"));
   if (!paperHeight) return null;
 

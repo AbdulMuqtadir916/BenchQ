@@ -23,7 +23,9 @@ export function markFocus(root: HTMLElement | null): FocusMark | null {
       const before = document.createRange();
       before.selectNodeContents(active);
       before.setEnd(range.endContainer, range.endOffset);
-      caret = before.toString().length;
+      // A <br> counts as one position, so a caret just after a line break comes back after it, not before.
+      const head = before.cloneContents();
+      caret = (head.textContent?.length ?? 0) + head.querySelectorAll("br").length;
     }
   }
   return { index, caret };
@@ -38,15 +40,27 @@ export function restoreFocus(root: HTMLElement | null, mark: FocusMark): void {
   if (!selection) return;
   const range = document.createRange();
   let left = mark.caret ?? Number.POSITIVE_INFINITY;
-  const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT);
+  const place = (set: () => void) => {
+    set();
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+  const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.nodeName !== "BR") continue;
+      const br = node;
+      if (left === 0) return place(() => range.setStartBefore(br));
+      left -= 1;
+      if (left === 0) return place(() => range.setStartAfter(br));
+      continue;
+    }
     const length = node.textContent?.length ?? 0;
     if (left <= length) {
-      range.setStart(node, left);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return;
+      const text = node;
+      const at = left;
+      return place(() => range.setStart(text, at));
     }
     left -= length;
   }

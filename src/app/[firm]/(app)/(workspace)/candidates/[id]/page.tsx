@@ -211,7 +211,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
               onMatchDone={finishMatch}
             />
           ) : null}
-          {tab === "resumes" ? <ResumesTab candidate={candidate} shelf={ws.shelfQuery.data} isLoading={ws.shelfQuery.isLoading} error={ws.shelfQuery.error} onRetry={() => void ws.shelfQuery.refetch()} canAct={canAct} onMakeJobCopy={() => setTab("jobs")} /> : null}
+          {tab === "resumes" ? <ResumesTab candidate={candidate} shelf={ws.shelfQuery.data} isLoading={ws.shelfQuery.isLoading} error={ws.shelfQuery.error} onRetry={() => void ws.shelfQuery.refetch()} canAct={canAct} /> : null}
           {tab === "documents" ? <DocumentsTab ws={ws} canAct={canAct} onNotify={setToast} /> : null}
           {tab === "activity" ? <ActivityTab applications={ws.applications} messages={ws.messages} teamName={ws.teamName} onOpenApplication={setOpenApplicationId} /> : null}
         </motion.div>
