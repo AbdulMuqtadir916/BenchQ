@@ -14,6 +14,12 @@ PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part o
 Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
 Next: PR 2, the ledger rules as tests.
 
+**Activity logs, ready to raise (2026-11-12):** PRs 1–7 brought up to date with `main` (up to #120) by merging, not
+rebasing, and stacked one on the next: PR 1, PR 2, PR 3, PR 4, PR 5 parts 1–3 (three PRs), PR 6, PR 7. The
+manager-ledger decision is Q64 (`main` took Q56 and Q59). The migrations are 0028 (`activity_logs`), 0029 (sign-in
+events) and 0030 (old tables removed): `main` has 0024, #127 holds 0025 and #129 0026–0027, so 0028 follows `main`'s
+0024 until those merge. Not pushed: each goes up in order once agreed.
+
 Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/password-reset-approval`), PR #105 to
 `main` (open, awaiting Abdul's review; backend suite 3705 passed). Change document: [pr-changes/feat-password-reset-notifications.md](./pr-changes/feat-password-reset-notifications.md).
 
@@ -104,7 +110,7 @@ with a Failed sign-ins view only they can see. Details in
 **Activity Log PR 5 (2026-11-06), three parts, each built on the last, none pushed:**
 `activity-logs/pr5-part1-applications` (applications, interviews, autofill), `activity-logs/pr5-part2-jobs-and-analysis`,
 `activity-logs/pr5-part3-cover-letters`. Together they log every firm route that wrote nothing. Whether they go up as
-three PRs or one is for Abdul. Change documents in [pr-changes](./pr-changes/).
+three PRs, one on the next (decided 2026-11-12). Change documents in [pr-changes](./pr-changes/).
 
 ## 1. Notifications inbox
 
