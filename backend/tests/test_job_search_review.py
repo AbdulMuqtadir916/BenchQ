@@ -193,7 +193,7 @@ def test_a_lost_search_keeps_its_error_code_and_gets_its_ledger_entry(anonymous_
                                                                       test_db):
     """P3: before and after it is written, the history says `error` / `internal`; one ledger entry, credited to the
     BDE who started it."""
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     lost = _open(world, adnans)
     _lose(test_db, lost)
 
@@ -205,8 +205,8 @@ def test_a_lost_search_keeps_its_error_code_and_gets_its_ledger_entry(anonymous_
     assert _post(anonymous_client, world, adnans).status_code == 202          # writes it
     assert shown() == ("error", "internal")
     test_db.expire_all()
-    (entry,) = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "job_search",
-                                                 LedgerEntry.entity_id == str(lost)).all()
+    (entry,) = test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "job_search",
+                                                 ActivityEntry.entity_id == str(lost)).all()
     assert entry.actor_user_id == world["people"]["adnan"].id and "failed (internal)" in entry.summary
     assert entry.candidate_id == uuid.UUID(adnans["id"])
 
