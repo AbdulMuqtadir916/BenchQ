@@ -3,6 +3,26 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Activity logs (Umamah; PRs 3 to 7)
+
+The ledger moves to a new table, `activity_logs`, that can only be added to (07 Q64; migrations 0028 to 0030). Each row
+names the PR that makes the change. Rows are added to this table by each PR.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Job search tests (Zuhair), PR 3 | `backend/tests/test_job_search_api.py`, `test_job_search_capture.py`, `test_job_search_review.py` | They read the entry from `ActivityEntry` (`activity_logs`) instead of `LedgerEntry`. The hand-off-note test builds an `ActivityEntry`. | `ledger.record` writes to the new table from PR 3. No expectation changed. | **Pending: Zuhair** |
+| Résumé version tests (Zuhair), PR 3 | `backend/tests/test_resume_versions.py` | Reads the entries from `ActivityEntry`. | The same. | **Pending: Zuhair** |
+| Ledger tests (Samad), PR 3 | `backend/tests/test_ledger.py` | His manager-scope test stamps its entries after it sets the teams (`_stamp_from_today`). | What a role reads now follows the stamps on each entry (who was responsible at the time), not today's teams. | **Pending: Samad** |
+| Candidates and team routes (Abdul), PR 3 | `backend/api/routes_candidates.py`, `routes_team.py` | They pass before/after values to the log. The BDE-capacity route is gone with main's Q63. | The log keeps what changed on a candidate edit, an assignment and a manager change. | **Pending: Abdul** |
+| Platform admin reads, passwords, scripts, demo seed (Abdul), PR 3 | `backend/api/routes_admin.py`, `backend/auth/password_reset.py`, `backend/scripts/*`, `backend/scripts/seed_demo.py` | They write and read `activity_logs`. The demo reset names itself to the trigger that refuses deletes. | The old `ledger_entries` is no longer written. | **Pending: Abdul** |
+| Table component (shared), PR 4 | `src/components/app/data-table.tsx` | A table can page on the server: `page.count` (it also leaves sorting to the server) and `countLabel`. Main's one-column URL sort, page keys and page reset are kept. | The Activity screen sorts, searches and pages on the server. | **Pending: Samad** |
+| Old Ledger page helpers (Samad), PR 4 | `src/lib/api/analytics.ts` (`listAll`), `src/lib/hooks/use-ledger.ts` (`useLedgerAll`), `src/lib/query/keys.ts`, `ledger-cap-notice`, `ledger-actors`, `ledger-list-query`, `src/lib/api/paging.ts` and their tests | Removed. | Only the old Ledger page used them (the BUG-002, BUG-003 and BUG-022 fixes). The Activity screen replaces that page. | **Pending: Samad** |
+| Routes (Abdul), PR 4 | `src/lib/routes/registry.ts`, `docs/04-SCREENS.md` | The `/[firm]/ledger` route is titled "Activity logs" and the sidebar says "Activity". The address is unchanged. | The screen's name. | **Pending: Abdul** |
+| Applications (Samad), PR 5 part 1 | `backend/api/routes_applications.py`, `backend/api/routes_autofill.py`, `backend/auth/ledger.py` | A hand-logged application, its status change, deletes and interviews each write an entry; an AI autofill answer writes one as `AI agent (person)`. `ledger.record_agent` is new. Notes and answer text are never logged. | These routes wrote nothing. The route-rules test (PR 2) lists what is still not logged. | **Pending: Samad** |
+| Gmail check (Samad), PR 5 part 2 | `backend/email_monitor/gmail_client.py`, `backend/tests/test_r4_failure_injection.py` | `check_emails()` returns the number of replies it read (0 when it can't run) instead of nothing, for the run summary. Two failure-injection tests expect `0` instead of `None`. | The run summary used to count rows in `activity_log_v2`, which PR 7 removes. Nothing else read the old return value. | **Pending: Samad** |
+| Scheduler, monitor, Telegram (Uzair), PR 5 part 2 | `backend/scheduler.py`, `backend/job_monitor.py`, `backend/notifier/telegram.py`, `backend/analyzer/llm_logger.py`, `backend/analyzer/cv_scorer.py` | A scheduled run that did something or failed writes one system row ("Scheduler"); each AI call writes an AI agent row with its cost; a check that handled nothing writes nothing. `llm_call_log`, `scrape_log` and `job_runs` keep their rows. | Background work is logged for the Super Admin, with no firm. | **Pending: Uzair** |
+| Scrapers (Zuhair), PR 5 part 2 | `backend/scraper/orchestrator.py`, `backend/scraper/sources/*.py` (company_pages, freehire, jobright, jobspy, levelsfyi, linkedin_personal), `backend/activity.py` | Their `log_activity` calls say when a scrape found nothing (`is_empty`), so an empty scrape writes no row. The message text is unchanged. | Keeps the Super Admin's log readable. | **Pending: Zuhair** |
+
 ## Job screens on the backend (`integrate/jobs`, Zuhair; job search PR 3)
 
 Decided 2026-11-11 (grilling rounds 1–3). In progress; rows are added as the work lands. Opened as a PR only after
