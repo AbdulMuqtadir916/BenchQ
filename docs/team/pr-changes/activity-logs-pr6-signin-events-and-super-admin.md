@@ -72,6 +72,16 @@ the Telegram and LinkedIn controls. These 30 routes now each write one entry (no
 - **Checked by CI:** the route rules from PR 2 now accept this form, so a new Super Admin route that logs nothing fails
   the build, as any other write route does.
 
+## Proof that every change is in Activity (added 2026-11-12)
+
+`test_ledger_rules.py` (PR 2) proves a write route *can* log, because its code reaches the log's writer. The new
+`test_every_change_is_in_activity.py` proves it *does*: it calls every write route with the sweep's request (a database
+with a row in every table), as the person each route needs, and when the route goes through the log must have a new row.
+A route that goes through and writes nothing fails the build, unless it is listed with why it changed nothing. Six are,
+each a real no-op (no support view open, an edit that changes no field, an unknown email on a password reset, an email
+that already has a review, a base that is already shown or already active), and each has a test of the case that does
+log. 51 routes pass; 30 can't be reached with the generic request and have their own tests.
+
 ## Edge cases and fixes (2026-11-12)
 
 - **Two failed tries at the same instant.** The "tries from one IP within 10 seconds share a row" rule locked an existing
