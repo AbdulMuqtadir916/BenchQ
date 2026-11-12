@@ -92,3 +92,8 @@ that page with the Activity screen, which pages, sorts and searches on the serve
 - **Sorted lists with rows at the same moment:** the order inside a group of equal rows is fixed (newest first, then lowest
   id), so offset pages never repeat or skip a row, ascending or descending.
 - **The calendar's dots** follow the firm's midnight to the microsecond, and a 23-hour day when the clocks change.
+- **Activity refreshes after any change.** A status move refreshed the Applications data only, so the Activity screen showed
+  the log from its cache (kept 30 seconds) until the page was reloaded. The app's query client now marks Activity stale
+  after **any** change succeeds (`src/lib/query/client.ts`): the screen that is open reads the server at once, and one
+  opened later does too. This covers every action a person can take, not just status moves. A change that fails writes no
+  entry, so it leaves Activity alone. Both the firm's Activity and the Super Admin's are covered, with tests.
