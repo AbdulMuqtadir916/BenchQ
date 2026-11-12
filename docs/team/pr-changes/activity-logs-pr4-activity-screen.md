@@ -1,5 +1,12 @@
 # Activity Log PR 4: the activity screen
 
+## In plain words
+
+PR 3 taught the server to filter and page the log. This PR is the screen that uses it: a people list on the left (who did
+what, by manager and BDE), and a table on the right with **When, Actor, Action, Candidate and Summary**. You can search,
+pick a person, a candidate or a date range, sort by actor or action, and page. Each row names the candidate it is about
+and who did it, with their role. Every number is counted by the server, so it matches the rows you can see.
+
 Branch: `activity-logs/pr4-activity-screen` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 Built on PR 3 (`activity-log/pr3-new-table-and-endpoints`), which holds PR 1 and PR 2. Merge those first.
 
@@ -74,3 +81,14 @@ that page with the Activity screen, which pages, sorts and searches on the serve
   the old page's URL schema (`ledger-list-query`) and the page-by-page reader it used (`paging.ts`, `loadAllPages`),
   with their tests.
 - **Candidate names** in the log come from the résumé (`profile.prime`, 07 Q57), since main moved them off `candidates`.
+
+## Edge cases (2026-11-12)
+
+- **A page marker with a sort order.** The marker means "after this row, newest first", so sending it with `sort=actor`,
+  `sort=action` or `dir=asc` would skip and repeat rows. The server now refuses it (422). The screen pages a sorted list
+  by `offset`, so nothing on screen changes.
+- **A candidate with no name on their résumé** (main's demo data has several) showed a blank cell and a blank dropdown row.
+  The table and the candidate list now say "Unnamed candidate". An entry about no candidate still shows a dash.
+- **Sorted lists with rows at the same moment:** the order inside a group of equal rows is fixed (newest first, then lowest
+  id), so offset pages never repeat or skip a row, ascending or descending.
+- **The calendar's dots** follow the firm's midnight to the microsecond, and a 23-hour day when the clocks change.
