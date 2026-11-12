@@ -223,7 +223,7 @@ illustration and a "capture jobs" action.
 ### 3.2 MANAGER view — "the floor"
 
 Same shell, different content. Team throughput today versus the trailing seven-day average, a
-per-BDE strip (applications, responses, interviews, placements), candidates with no
+per-BDE strip (applications, responses, interviews, offers), candidates with no
 applications in 48 hours flagged in amber, and the pipeline funnel. Every per-BDE row clicks
 through to that BDE's filtered application tracker.
 
@@ -232,7 +232,7 @@ behind, and on which candidate" in under five seconds of looking at this screen.
 
 ### 3.3 OWNER view — "the business"
 
-Manager content plus placements this quarter, time-to-placement trend, cost per placement, and
+Manager content plus offers this quarter, time to an offer, and
 seat / usage against plan. Read-only rollups; the owner drills into the manager views for detail.
 The usage card is **"Seats used x / seatLimit"** with the breakdown "N users + M pending": a seat is an
 active user or a pending, unexpired invite (A1). It comes from `deriveFirmUsage` on the firm's users,
@@ -250,7 +250,7 @@ The OWNER and a VIEWER have two tabs, kept in the URL (`?view=finance|activity`)
 level), with a period of 24 hours, 7, 30 or 90 days (`?period=`). The OWNER and a VIEWER start at the firm; a MANAGER
 starts and stays at their own team, with no way up.
 
-- **Firm:** what needs attention (chips); applications, interviews and placements with their shape and change against
+- **Firm:** what needs attention (chips); applications, interviews and offers with their shape and change against
   the period before; bench placed as a meter; the pipeline funnel with the share that made each step; managers ranked;
   bench aging in three bands with the longest waits; open jobs by role against the bench; time between stages; job
   sources (from Analytics); every BDE in one table.
@@ -260,7 +260,7 @@ starts and stays at their own team, with no way up.
   furthest stage, today's count and a quiet flag; the funnel and bench aging.
 
 **Every count opens its records**: a tile, funnel stage or stage count opens `/applications` filtered (`status`,
-`reached`, `period` with `by`, `manager`, `bde`, `candidate`); a bench band, a role or a queue opens `/candidates`
+`reached` (Applied to Offer), `period` with `by` (submitted, heard back, interview, offer), `manager`, `bde`, `candidate`); a bench band, a role or a queue opens `/candidates`
 filtered (`status`, `bench`, `manager`, `bde`, `role`, `assignment`). The lists show the filters as removable chips with
 **Clear all**, and use the dashboard's own counting rules (`src/lib/derive/list-filters.ts`), so the list always shows the
 number that was clicked. People open their own level of the dashboard; candidates open their profile. Two cards do not
@@ -269,19 +269,19 @@ link: **job sources** (the lists have no source filter) and **time between stage
 ### 3.5b A manager's dashboard (07 Q62)
 
 A MANAGER's dashboard is the Activity dashboard only: no floor, no tab buttons. Next to the BDE cards is a bar chart of
-how far each BDE's applications of the period got (applied, shortlisted, interview, placed, counted like the pipeline:
-each is the applications that reached that stage). Opening a card or a bar goes to that BDE's dashboard.
+how far each BDE's applications of the period got (applied, shortlisted, interview scheduled, offer, counted like the
+pipeline: each is the applications that reached that stage, a skipped stage included). Opening a card or a bar goes to that BDE's dashboard.
 
 ### 3.6b `/bdes` — MANAGER (07 Q62)
 
-The manager's own BDEs as a table (workload, candidates, applications, responses, interviews, placements for the
+The manager's own BDEs as a table (workload, candidates, applications, responses, interviews, offers for the
 period), with a name search (`?q=`) and the period (`?period=`). A row opens that BDE on the dashboard. Skeleton, empty
 (none yet / no match) and error states.
 
 ### 3.6 `/managers` — OWNER (07 Q60)
 
 Search by name (`?q=`), and **Table** or **Cards** (`?view=`). Each manager: active or not, BDEs, candidates, the queue
-waiting for a BDE, and their team's applications, interviews and placements in the last 30 days. Opening one goes to
+waiting for a BDE, and their team's applications, interviews and offers in the last 30 days. Opening one goes to
 the dashboard's Activity tab at that manager's level. Skeleton, empty (none yet / no match) and error states.
 
 ---

@@ -423,7 +423,7 @@ class EmailClassification(Base):
         CheckConstraint("category IN ('applied','screening_call','shortlisted','interview_schedule_request','interview_scheduled','assessment','offer','move_on','incomplete_application','other')", name="ck_email_category"),
         CheckConstraint("confidence >= 0 AND confidence <= 1 AND confidence != 'NaN'::float", name="ck_email_confidence"),
         CheckConstraint("sender_auth_result IN ('PASS','FAIL','UNKNOWN')", name="ck_email_sender_auth"),
-        CheckConstraint("outcome IN ('REVIEW','OTHER','NO_CHANGE')", name="ck_email_outcome"),
+        CheckConstraint("outcome IN ('REVIEW','OTHER','NO_CHANGE','AUTO_APPLIED')", name="ck_email_outcome"),
         Index("ix_email_results_scope", "firm_id", "candidate_id", "created_at"),
     )
 

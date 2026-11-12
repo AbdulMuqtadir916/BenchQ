@@ -71,6 +71,9 @@ recent three-day window; subsequent imports use the established incremental-sync
   Inbox instead of deleting it on classification; keep it encrypted. Hidden Other mail is retained encrypted for
   **30 days**, then becomes eligible for purge only when the purge gate below is passed and purge is enabled.
   Keep the approved minimal scoped exclusion marker afterward to prevent reimport; Gmail originals are untouched.
+  **Changed by #127 (decided 2026-11-07):** a confident Other is shown in the Inbox as **Irrelevant**, subject and
+  sender in clear, and a BDE can open a review for it (`…/review/open`). The 30-day purge rule and its gate are
+  unchanged (OFF); mail linked to an application is never purged. Mail hidden before #127 stays hidden.
 - **Purge remains OFF** until evaluation demonstrates zero job-related would-remove decisions. Never interpret
   the superseded 0.6 status threshold as permission for immediate deletion. Respect explicit deletion controls and
   minimal history/dedup requirements; content cleanup must cover derivatives, not just the visible message body.

@@ -33,7 +33,15 @@ export const queryKeys = {
     /** One of a candidate's own jobs (the job page opened for that candidate): under the job's detail key. */
     candidateDetail: (firmId: string, candidateId: string, id: string) => [firmId, "jobs", "detail", id, candidateId] as const,
   },
-  applications: resource("applications"),
+  applications: {
+    ...resource("applications"),
+    /** Server counts per status; under `all` so a move invalidates them with the lists. */
+    counts: (firmId: string, candidateId?: string | null) => [firmId, "applications", "counts", candidateId ?? null] as const,
+    /** Mutation key for saving / unsaving a feed job (the heart), so pending saves can be read back. */
+    savedJobs: (firmId: string) => [firmId, "applications", "savedJobs"] as const,
+    /** Mutation key of status moves (the pending-move overlay reads it). */
+    moves: (firmId: string) => [firmId, "applications", "move"] as const,
+  },
   /** The signed-in user's own tailorings (their panel, docs/02 §8.3). */
   tailorings: { mine: (firmId: string) => [firmId, "tailorings", "mine"] as const },
   resumes: {
@@ -42,7 +50,7 @@ export const queryKeys = {
   },
   records: { byCandidate: (firmId: string, candidateId: string) => [firmId, "records", "byCandidate", candidateId] as const },
   documents: { byCandidate: (firmId: string, candidateId: string) => [firmId, "documents", "byCandidate", candidateId] as const },
-  inbox: { confirmation: (firm: string, candidate: string, attempt: string | null) => [firm, "mailbox-confirmation", candidate, attempt] as const, body: (firm: string, candidate: string, message?: string | null) => message === undefined ? [firm, "inbox-body", candidate] as const : [firm, "inbox-body", candidate, message] as const, byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const },
+  inbox: { confirmation: (firm: string, candidate: string, attempt: string | null) => [firm, "mailbox-confirmation", candidate, attempt] as const, body: (firm: string, candidate: string, message?: string | null) => message === undefined ? [firm, "inbox-body", candidate] as const : [firm, "inbox-body", candidate, message] as const, byCandidate: (firmId: string, candidateId: string) => [firmId, "inbox", "byCandidate", candidateId] as const, reviews: (firmId: string, candidateId: string) => [firmId, "inbox", "reviews", candidateId] as const },
   ledger: { all: (firmId: string) => [firmId, "ledger"] as const, list: (firmId: string, params?: Params) => [firmId, "ledger", "list", params ?? {}] as const, whole: (firmId: string, params?: Params) => [firmId, "ledger", "whole", params ?? {}] as const },
   team: {
     all: (firmId: string) => [firmId, "team"] as const,

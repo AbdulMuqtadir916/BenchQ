@@ -27,6 +27,8 @@ const FIRM = "firm_hts";
 /** Arguments that would make each write succeed for a member who may act (so a refusal can only be the policy). */
 const ARGS: Record<string, unknown[]> = {
   "applications.updateStatus": ["app_001", { status: "WITHDRAWN", note: null }],
+  "applications.saveJob": [{ candidateId: "cand_01", jobId: "job_001", title: "QA", company: "Example" }],
+  "applications.unsaveJob": ["app_001"],
   "documents.upload": ["cand_01", { kind: "OTHER", title: "Note", fileName: "note.pdf", sizeBytes: 1000, expiresAt: null }],
   "documents.remove": ["doc_none"],
   "inbox.connect": ["cand_01"],
@@ -56,7 +58,7 @@ describe("the write inventory", () => {
       }
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
-      "applications.updateStatus", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark",
+      "applications.saveJob", "applications.unsaveJob", "applications.updateStatus", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark",
     ]);
   });
 

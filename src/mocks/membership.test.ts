@@ -44,7 +44,9 @@ type Ids = ReturnType<typeof idsOf>;
 const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) => Promise<unknown>, boolean]> = [
   ["applications", "list", (f) => applicationsApi.list(f), false],
   ["applications", "byId", (f, i) => applicationsApi.byId(f, i.application), false],
-  ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "WITHDRAWN", note: null }), true],
+  ["applications", "updateStatus", (f, i) => applicationsApi.updateStatus(f, i.application, { status: "MOVE_ON", note: null }), true],
+  ["applications", "saveJob", (f, i) => applicationsApi.saveJob(f, { candidateId: i.candidate, jobId: i.job, title: "QA", company: "Example", url: "" }), true],
+  ["applications", "unsaveJob", (f, i) => applicationsApi.unsaveJob(f, i.application), true],
   ["records", "byCandidate", (f, i) => recordsApi.byCandidate(f, i.candidate), false],
   ["documents", "byCandidate", (f, i) => documentsApi.byCandidate(f, i.candidate), false],
   ["documents", "upload", (f, i) => documentsApi.upload(f, i.candidate, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null } as never), true],
