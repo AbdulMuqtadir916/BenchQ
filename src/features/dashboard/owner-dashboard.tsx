@@ -1,11 +1,14 @@
 "use client";
 
+import { reachedOffer } from "@/components/app/applications/status-meta";
+
 import { isBde } from "@/lib/auth/roles";
 import { useMemo } from "react";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useMemberInvites, useTeam } from "@/lib/hooks/use-team";
 import { daysBetween, deriveFirmUsage } from "@/lib/derive";
+import { applicationDate } from "@/lib/derive/list-filters";
 import { StatCard } from "@/components/app/stat-card";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { ErrorState } from "@/components/app/error-state";
@@ -19,7 +22,7 @@ const EMPTY: never[] = [];
 
 export function OwnerDashboard() {
   return (
-    <DashboardTabs overview={{ label: "Finance dashboard", title: "The business", subtitle: "Placements, throughput, and plan usage at a glance." }}
+    <DashboardTabs overview={{ label: "Finance dashboard", title: "The business", subtitle: "Offers, throughput, and plan usage at a glance." }}
       activity={{ title: "Firm activity", subtitle: "Follow activity from the firm to managers, BDEs, and their candidates." }}>
       <FinanceDashboardContent />
     </DashboardTabs>
@@ -40,23 +43,26 @@ function FinanceDashboardContent() {
   const team = teamQuery.data ?? EMPTY;
   const invites = invitesQuery.data ?? EMPTY;
 
-  const placements = useMemo(
-    () => applications.filter((a) => a.status === "PLACED"),
+  // Offer is the last stage. D6: selected = reached Offer, or a legacy placement. Dated by when it got there.
+  const offers = useMemo(
+    () => applications.filter(reachedOffer).flatMap((app) => {
+      const offeredAt = applicationDate(app, "offer");
+      return offeredAt ? [{ app, offeredAt }] : [];
+    }),
     [applications],
   );
 
-  const placedThisQuarter = useMemo(
-    () => placements.filter((a) => a.closedAt && daysBetween(a.closedAt, new Date()) <= 90).length,
-    [placements],
+  const offersThisQuarter = useMemo(
+    () => offers.filter(({ offeredAt }) => daysBetween(offeredAt, new Date()) <= 90).length,
+    [offers],
   );
 
-  const avgTimeToPlace = useMemo(() => {
-    const spans = placements
-      .filter((a) => a.appliedAt && a.closedAt)
-      .map((a) => daysBetween(a.appliedAt!, a.closedAt!));
+  const avgTimeToOffer = useMemo(() => {
+    const spans = offers.flatMap(({ app, offeredAt }) =>
+      (app.appliedAt && Date.parse(app.appliedAt) <= Date.parse(offeredAt) ? [daysBetween(app.appliedAt, offeredAt)] : []));
     if (spans.length === 0) return 0;
     return Math.round(spans.reduce((s, d) => s + d, 0) / spans.length);
-  }, [placements]);
+  }, [offers]);
 
   // Limits come from the firm (copied from its plan, A3). A seat is an active user or a pending invite (A1);
   // active candidates are ON_BENCH / INTERVIEWING / OFFER (A2). deriveFirmUsage is the function /admin
@@ -79,8 +85,8 @@ function FinanceDashboardContent() {
           <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
         ) : (
           <>
-            <StatCard label="Placements" value={`${placedThisQuarter}`} delta="this quarter" trend="up" window="closed won" />
-            <StatCard label="Time to place" value={`${avgTimeToPlace}d`} trend="neutral" window="apply → placed avg" />
+            <StatCard label="Offers" value={`${offersThisQuarter}`} delta="this quarter" trend="up" window="reached offer" />
+            <StatCard label="Time to offer" value={`${avgTimeToOffer}d`} trend="neutral" window="apply → offer avg" />
             <StatCard label="BDE seats used" value={`${usage.seatsUsed} / ${usage.seatLimit}`} window={seatDetail} />
             <StatCard label="Assigned candidates" value={`${usage.assignedCandidates} / ${usage.candidateLimit}`} window="of plan" />
           </>

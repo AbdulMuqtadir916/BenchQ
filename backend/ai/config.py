@@ -23,11 +23,15 @@ class AiModule:
     `prompts` maps each prompt the module uses to the setting that holds it today."""
     feature: str
     prompts: dict[str, str] = field(default_factory=dict)
+    # False: the module runs only on its own `<feature>_llm_*` settings and never borrows the primary model's
+    # provider/model/key (candidate email classification is OpenRouter Decisions only, OPERATIONS.md).
+    fallback: bool = True
 
 
 # The AI modules that get presets first (08 Q3). Email classification and autofill join when their tracks are live.
 AI_MODULES: dict[str, AiModule] = {
-    "email_classification": AiModule("candidate_email", {"instructions": "candidate_email_instructions"}),
+    "email_classification": AiModule("candidate_email", {"instructions": "candidate_email_instructions"},
+                                     fallback=False),
     "scoring": AiModule("scoring", {"rubric": "scoring_rubric"}),
     "tailoring": AiModule("cv_tailor", {"tailor": "cv_tailor_prompt", "persona_tailor": "persona_tailor_prompt"}),
     # Résumé building: JobNavigator's PDF -> résumé parser, removed in résumé versioning PR 6. Nothing calls it; the
@@ -61,6 +65,11 @@ class AiConfig:
         return text
 
 
+def _setting(db, key: str) -> str:
+    row = db.query(Setting).filter(Setting.key == key).first()
+    return row.value if row and row.value else ""
+
+
 def ai_config(module: str, db=None) -> AiConfig:
     """The setup `module` runs with now. An unknown module is a bug, so it raises."""
     if module not in AI_MODULES:
@@ -70,7 +79,10 @@ def ai_config(module: str, db=None) -> AiConfig:
     if own_db:
         db = SessionLocal()
     try:
-        llm = resolve_llm_config(spec.feature, db=db)
+        if spec.fallback:
+            llm = resolve_llm_config(spec.feature, db=db)
+        else:
+            llm = {name: _setting(db, f"{spec.feature}_llm_{name}") for name in ("provider", "model", "api_key", "effort")}
         prompts = {}
         for name, key in spec.prompts.items():
             row = db.query(Setting).filter(Setting.key == key).first()

@@ -69,19 +69,46 @@ export const ClientType = z.enum([
 ]);
 export type ClientType = z.infer<typeof ClientType>;
 
+/**
+ * The ten selectable candidate application statuses (docs/02 §2.1, D3). The only values a new command may write.
+ * Spelling is the backend value in upper case.
+ */
 export const ApplicationStatus = z.enum([
   "SAVED",
   "APPLIED",
+  "SCREENING_CALL",
+  "SHORTLISTED",
+  "INTERVIEW_SCHEDULE_REQUEST",
+  "INTERVIEW_SCHEDULED",
+  "ASSESSMENT",
+  "OFFER",
+  "MOVE_ON",
+  "INCOMPLETE_APPLICATION",
+]);
+export type ApplicationStatus = z.infer<typeof ApplicationStatus>;
+
+/**
+ * Older stored values (docs/02 §2.1 legacy table). Read and shown with a legacy label, never selectable, never
+ * guessed into a target stage. UNKNOWN stands for a blank or unrecognised stored value.
+ */
+export const LegacyApplicationStatus = z.enum([
   "RESPONSE",
   "SCREENING",
   "INTERVIEW",
-  "OFFER",
   "PLACED",
   "REJECTED",
   "WITHDRAWN",
   "EXPIRED",
+  "OTHER",
+  "PHONE_SCREEN",
+  "FINAL_ROUND",
+  "UNKNOWN",
 ]);
-export type ApplicationStatus = z.infer<typeof ApplicationStatus>;
+export type LegacyApplicationStatus = z.infer<typeof LegacyApplicationStatus>;
+
+/** What an application or a history event may hold: a selectable status or a preserved legacy one. */
+export const StoredApplicationStatus = z.union([ApplicationStatus, LegacyApplicationStatus]);
+export type StoredApplicationStatus = z.infer<typeof StoredApplicationStatus>;
 
 export const OutreachChannel = z.enum([
   "EMAIL",
