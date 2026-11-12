@@ -1,7 +1,8 @@
 # Activity logs PR 2: the ledger's rules, as tests
 
 Branch: `activity/pr2-ledger-rules-as-tests` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
-Base: `origin/main` at `3f8be61`. Does not depend on PR 1 (#113).
+Base: PR 1 (`activity/pr1-role-access-on-server`, #113) since 2026-11-12, so the diff shows only this PR's changes. It
+doesn't need PR 1's code to work; merge #113 first and GitHub moves this PR's base to `main`.
 
 ## Scope and dependencies
 
