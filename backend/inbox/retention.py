@@ -32,13 +32,17 @@ def purge_due(*, limit=100):
         rows = db.query(InboxMessage).filter(
             InboxMessage.deleted_at.is_(None), InboxMessage.other_purge_after.isnot(None),
             InboxMessage.other_purge_after <= now, InboxMessage.classification_state == 'DONE',
+            # Linked mail is never erased: left out here, before the limit, so it never holds up the rows behind it.
+            InboxMessage.application_id.is_(None),
         ).order_by(InboxMessage.other_purge_after).with_for_update(skip_locked=True).limit(min(limit, 500)).all()
         count = 0
         for message in rows:
             latest = scoped(db, EmailClassification, message.firm_id).filter_by(
                 inbox_message_id=message.id, result_version=message.classification_version,
                 content_revision=message.content_revision).first()
-            review = scoped(db, ApplicationReview, message.firm_id).filter_by(inbox_message_id=message.id).first()
+            # Only a pending review keeps the email: one a BDE dismissed is erased on schedule like any Other mail.
+            review = scoped(db, ApplicationReview, message.firm_id).filter_by(
+                inbox_message_id=message.id, state='PENDING').first()
             known_job = scoped(db, EmailClassification, message.firm_id).filter(
                 EmailClassification.inbox_message_id == message.id, EmailClassification.category != 'other').first()
             # A visible email can be linked to an application (by the matcher or a BDE): linked mail is never erased.

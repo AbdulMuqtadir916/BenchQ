@@ -713,6 +713,13 @@ def review_candidate_email(candidate_id: uuid.UUID, message_id: uuid.UUID, body:
             raise HTTPException(409, 'Application changed. Reload before reviewing.')
         if body.action in {'LINK_ONLY', 'SET_STATUS', 'KEEP_CURRENT'} and app is None:
             raise HTTPException(400, 'Link a submitted application first.')
+        if body.action == 'SET_STATUS' and body.status == 'incomplete_application' and app.status != 'incomplete_application':
+            current = scoped(db, EmailClassification, firm_id).filter_by(
+                inbox_message_id=message.id, result_version=message.classification_version,
+                content_revision=message.content_revision).first()
+            if current is None or current.category != 'incomplete_application':
+                # DEBUG D-10: Incomplete only for an email classified Incomplete, or an application already Incomplete.
+                raise HTTPException(400, 'Incomplete is only for an email classified Incomplete or an application already Incomplete.')
         if review.application_id is None and app:
             duplicate = scoped(db, ApplicationReview, firm_id).filter_by(
                 application_id=app.id, inbox_message_id=message.id, state='PENDING').first()
@@ -726,6 +733,11 @@ def review_candidate_email(candidate_id: uuid.UUID, message_id: uuid.UUID, body:
             move(db, app, principal, status=status, expected_revision=body.expected_application_revision,
                  command_id=body.command_id, note=body.note, review=review)
         else:
+            # Link only: the email is about this application and its status stays as it is. Resolved like Dismiss.
+            review.state = 'RESOLVED'
+            review.resolved_at = utcnow()
+            review.resolved_by_user_id = principal.user_id
+            review.note = body.note
             review.revision += 1
             _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=review.id,
                    summary='Reviewed candidate email linkage/disposition; no automatic status change.')

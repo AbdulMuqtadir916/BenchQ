@@ -17,7 +17,7 @@ import { ApplicationList } from "./application-list";
 import { IrrelevantEmails, irrelevantEmails } from "./irrelevant-emails";
 
 type View = "board" | "list";
-type Scope = "active" | "review" | "irrelevant";
+type Scope = "active" | "all" | "review" | "irrelevant";
 
 /** Every submission for this candidate: a board to move stages, a list to scan fast. */
 export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; onMove: (id: string, to: ApplicationStatus) => void }) {
@@ -52,7 +52,8 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
   const all = ws.applications;
   // One rule for the count line, the board and the list (BUG-005, PR #128): a saved job is never active; every row shown is
   // named in the line. Move On has its own column and counts as closed; the legacy closed values are left out.
-  const visible = applicationsInScope(all, "active");
+  // All adds the closed ones (Placed, Rejected, Withdrawn, Expired), which the count line names too.
+  const visible = applicationsInScope(all, scope === "all" ? "all" : "active");
   const [activePart = "", ...otherParts] = describeApplicationCounts(countApplications(all)).split(" · ");
   const irrelevantCount = irrelevantEmails(ws.messages).length;
 
@@ -71,13 +72,13 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
         </p>
         <div className="flex items-center gap-2">
           <div ref={switchRef} className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="Which applications">
-            {(["active", "review", "irrelevant"] as const).map((s) => (
+            {(["active", "all", "review", "irrelevant"] as const).map((s) => (
               <button key={s} type="button" aria-pressed={scope === s} onClick={() => chooseScope(s)} className={cn(toggle, scope === s ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
-                {s === "active" ? "Active" : s === "review" ? `BDE review ${ws.reviewTotal}` : `Irrelevant ${irrelevantCount}`}
+                {s === "active" ? "Active" : s === "all" ? "All" : s === "review" ? `BDE review ${ws.reviewTotal}` : `Irrelevant ${irrelevantCount}`}
               </button>
             ))}
           </div>
-          {scope === "active" ? <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="View">
+          {scope === "active" || scope === "all" ? <div className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-0.5" role="group" aria-label="View">
             {([["board", "Board", Columns3], ["list", "List", List]] as const).map(([id, label, Icon]) => (
               <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} className={cn(toggle, view === id ? "bg-[var(--color-surface)] font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]")}>
                 <Icon size={14} aria-hidden />{label}
@@ -106,7 +107,7 @@ export function ApplicationsTab({ ws, actions, canAct, onMove }: { ws: Candidate
       ) : scope === "irrelevant" ? (
         <IrrelevantEmails ws={ws} actions={actions} />
       ) : view === "board" ? (
-        <ApplicationBoard showReviewColumn={false} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} onOpen={actions.openApplication} />
+        <ApplicationBoard showReviewColumn={false} showClosed={scope === "all"} apps={visible} saving={ws.saving} onMove={onMove} canAct={canAct} onOpen={actions.openApplication} />
       ) : (
         <ApplicationList apps={visible} onOpen={actions.openApplication} />
       )}

@@ -48,6 +48,7 @@ export const applicationsMock = firmScoped("applications", {
     });
     application.statusRevision += 1;
     application.status = update.status;
+    if (update.status === "APPLIED" && !application.appliedAt) application.appliedAt = now;
     if (update.status === "SCREENING_CALL" && !application.firstResponseAt) application.firstResponseAt = now;
     if (update.status === "INTERVIEW_SCHEDULED" && !application.interviewAt) application.interviewAt = now;
     if (update.status === "OFFER") application.offerAt = now;

@@ -19,7 +19,9 @@ CFG = SimpleNamespace(provider='openrouter', model='synthetic-test-only', api_ke
 @pytest.fixture
 def fake_provider(monkeypatch):
     calls = []
-    monkeypatch.setattr(worker, 'classify', lambda subject, body, cfg, known=None: calls.append(subject) or decision('screening_call', .95))
+    monkeypatch.setattr(worker, 'build_request', lambda *args, **kwargs: {})
+    monkeypatch.setattr(backfill, 'masking_ready', lambda: True)
+    monkeypatch.setattr(worker, 'classify', lambda subject, body, cfg, known=None, **_: calls.append(subject) or decision('screening_call', .95))
     return calls
 
 
@@ -65,7 +67,7 @@ def test_a_repeated_setup_failure_is_not_recovered_again(test_db, pipeline, fake
     assert _summaries(test_db, 'not set up') == 1
 
 
-@pytest.mark.parametrize('blocker', ['switch_off', 'disconnected', 'paused', 'other_error'])
+@pytest.mark.parametrize('blocker', ['switch_off', 'disconnected', 'paused', 'other_error', 'masking_unavailable'])
 def test_recovery_is_skipped_when_it_must_not_run(test_db, pipeline, fake_provider, monkeypatch, blocker):
     _, mailbox_id, message_id = pipeline
     _set(test_db, message_id, classification_state='ERROR', classification_attempts=1,
@@ -77,9 +79,19 @@ def test_recovery_is_skipped_when_it_must_not_run(test_db, pipeline, fake_provid
     if blocker == 'paused':
         with worker.SessionLocal() as db:
             classifier_pause.record_pause(db, CFG, 'PROVIDER_AUTH_REJECTED')
+    if blocker == 'masking_unavailable':  # CodeRabbit #127: no recovery is spent while masking cannot run
+        monkeypatch.setattr(backfill, 'masking_ready', lambda: False)
     worker.process_pending()
     assert _row(test_db, message_id).classification_state == 'ERROR'
     assert fake_provider == [] and test_db.get(JobRun, backfill.marker_id(backfill.RECOVERY, message_id)) is None
+
+
+def test_the_counts_command_runs_and_counts_by_candidate(test_db, pipeline):
+    """CodeRabbit #127: `full_name` is read off the résumé, not a column; the command failed before printing."""
+    _, _, message_id = pipeline
+    _set(test_db, message_id, classification_state='ERROR', classification_error='CLASSIFIER_NOT_CONFIGURED')
+    lines = backfill.report(test_db)
+    assert lines[0].startswith('setup_recovery: 1 ') and lines[-1] == f'batch per sweep: {backfill.BATCH}'
 
 
 # ── historical classification ──────────────────────────────────────────────────────────────────────────────────

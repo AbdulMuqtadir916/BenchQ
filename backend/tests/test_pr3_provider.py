@@ -109,6 +109,17 @@ def test_foreign_arc_hop_is_unknown():
     assert sender_authentication(_gmail_arc(headers(), foreign=True)) == 'UNKNOWN'
 
 
+def test_an_arc_seal_or_signature_without_its_own_results_is_a_forwarder():
+    """CodeRabbit #127: every ARC instance needs Gmail's results header; a seal or signature alone stays UNKNOWN."""
+    for name in ('ARC-Seal', 'ARC-Message-Signature'):
+        payload = _gmail_arc(headers())
+        payload['headers'].insert(0, {'name': name, 'value': 'i=3; a=rsa-sha256; d=forwarder.example'})
+        assert sender_authentication(payload) == 'UNKNOWN', name
+    payload = _gmail_arc(headers())
+    payload['headers'].append({'name': 'ARC-Message-Signature', 'value': 'i=1; a=rsa-sha256; d=google.com'})
+    assert sender_authentication(payload) == 'PASS'
+
+
 # ---------------- masking before the provider (backend/inbox/masking.py), synthetic values only ----------------
 
 KNOWN = KnownIdentity(candidate_name='Priyanka Venkatesh Rao',
@@ -137,7 +148,7 @@ def test_phone_and_bank_details_are_masked_for_india_and_the_us():
     aadhaar = _valid_aadhaar()
     values = ['+91 98480 22338', '098480-22338', '(614) 555-0182', '614.555.0182', '50100234567891', '5010 0234 5678 91',
               'HDFC0001234', 'priyanka.rao@okhdfcbank', '021000021', 'A/c No: 123456', aadhaar,
-              aadhaar[:4] + ' ' + aadhaar[4:8] + ' ' + aadhaar[8:], 'ABCPV1234K', '123-45-6789']
+              aadhaar[:4] + ' ' + aadhaar[4:8] + ' ' + aadhaar[8:], 'ABCPV1234K', 'abcpv1234k', '123-45-6789']
     text = 'Please confirm your details.\n' + '\n'.join(f'Detail {i}: {v}' for i, v in enumerate(values))
     masked = mask_for_classifier(text, KnownIdentity())
     for value in values:

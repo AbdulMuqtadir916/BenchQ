@@ -4,6 +4,7 @@ One HTTP attempt per lease; no session/row lock is held across provider I/O.
 PENDING rows are the queue, so import/enqueue crashes are recovered by the sweep.
 """
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import time
 from datetime import timedelta
 import logging
@@ -20,8 +21,8 @@ from backend.analyzer.llm_logger import log_llm_call
 from backend.auth.scoping import scoped
 from backend.inbox.application_matching import (ai_input, company_aliases, email_parts, has_too_little_text,
                                                 matching_application_id, submitted_applications)
-from backend.inbox.decider import (DeciderError, classify, config_identity, decision_value, is_configured,
-                                  values_disagree)
+from backend.inbox.decider import (DeciderError, build_request, classify, config_identity, decision_value,
+                                  is_configured, values_disagree)
 from backend.inbox import backfill, classifier_pause
 from backend.inbox.decider_categories import CATEGORY_VERSION, CONFIDENCE_THRESHOLD
 from backend.inbox.policy import review_reason
@@ -113,6 +114,14 @@ def _gate(db, cfg):
     return 'probe' if classifier_pause.claim_probe(db, cfg) else None
 
 
+def _unclaimed(cfg, probing):
+    """No email was claimed: a probe lease this caller holds goes back unused, so the next sweep can test the key."""
+    if probing:
+        with SessionLocal() as db:
+            classifier_pause.release_probe(db, cfg)
+    return False
+
+
 def _known_identity(db, row, mailbox):
     """What the masking must remove for this email, read with the content it is sent with. Never stored or logged."""
     candidate = scoped(db, Candidate, row.firm_id).filter_by(id=row.candidate_id).first()
@@ -136,21 +145,21 @@ def process_one(message_id, *, provider=None, aliases=None):
     with SessionLocal() as db:
         message = db.query(InboxMessage).filter_by(id=message_id).with_for_update(skip_locked=True).first()
         if not message or not _current(db, message):
-            return False
+            return _unclaimed(cfg, probing)
         now = utcnow()
         if message.classification_state not in {'PENDING', 'PROCESSING'}:
-            return False
+            return _unclaimed(cfg, probing)
         if (message.classification_state == 'PROCESSING' and message.classification_lease_until
                 and message.classification_lease_until > now):
-            return False
+            return _unclaimed(cfg, probing)
         if message.classification_next_retry_at and message.classification_next_retry_at > now:
-            return False
+            return _unclaimed(cfg, probing)
         if message.classification_attempts >= MAX_ATTEMPTS:
             message.classification_state = 'ERROR'
             message.classification_error = 'RETRY_EXHAUSTED'
             db.commit()
             logger.warning("Email %s classification gave up after %d attempts", message.id, message.classification_attempts)
-            return False
+            return _unclaimed(cfg, probing)
         mailbox = _current(db, message)
         fingerprint = config_identity(cfg)
         token = uuid.uuid4()
@@ -186,6 +195,16 @@ def process_one(message_id, *, provider=None, aliases=None):
             parts = email_parts(row)
             subject, body = parts.subject, parts.current
             known = _known_identity(db, row, box)
+            text = ai_input(parts)
+            send = provider
+            if send is None:
+                # Masked before the dispatch is marked: a masking failure sends nothing, so it is never counted as a
+                # possible charge and never settles a probe. It retries with backoff; setup recovery requeues it.
+                try:
+                    request = build_request(subject, text, cfg, known)
+                except Exception:
+                    raise DeciderError('MASKING_FAILED', retryable=True) from None
+                send = partial(classify, request=request)
             # Committed before the request: "dispatch started; charge unknown" (DEBUG D-15). A crash after this
             # point is counted as possibly charged, never as free.
             started = scoped(db, JobRun, snapshot.firm_id).filter_by(id=snapshot.job_id).one()
@@ -193,7 +212,7 @@ def process_one(message_id, *, provider=None, aliases=None):
             db.commit()
         sent_at = time.monotonic()
         try:
-            result = (provider or classify)(subject, ai_input(parts), cfg, known)
+            result = send(subject, text, cfg, known)
         finally:
             duration_ms = int((time.monotonic() - sent_at) * 1000)
     except DeciderError as exc:
@@ -362,7 +381,10 @@ def process_pending(*, limit=None):
             or_(InboxMessage.classification_next_retry_at.is_(None), InboxMessage.classification_next_retry_at <= utcnow()),
         ).join(CandidateMailbox, InboxMessage.mailbox_id == CandidateMailbox.id).filter(
             CandidateMailbox.status == 'CONNECTED', func.lower(func.trim(InboxMessage.source_address)) == func.lower(func.trim(CandidateMailbox.address)),
-        ).order_by(InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
+            # The rest of `_current` too, before the limit: a paused sweep's one probe must be an email it can claim.
+            CandidateMailbox.candidate_id == InboxMessage.candidate_id, CandidateMailbox.refresh_token_ciphertext.isnot(None),
+        ).join(Firm, Firm.id == InboxMessage.firm_id).filter(Firm.status != 'SUSPENDED').order_by(
+            InboxMessage.received_at, InboxMessage.id).limit(min(limit, 100)).all()
         aliases = company_aliases(db) if rows else {}
     done = classify_all([identity for (identity,) in rows], aliases, config.CANDIDATE_EMAIL_CLASSIFY_CONCURRENCY)
     if rows:

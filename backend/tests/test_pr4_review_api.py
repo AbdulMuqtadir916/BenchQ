@@ -68,6 +68,43 @@ def test_dismiss_never_links_and_ignores_application_revision(test_db, pipeline,
     assert test_db.get(Application, app_id).status == 'applied'
 
 
+def test_link_only_links_the_email_and_resolves_its_review(test_db, pipeline, api_client):
+    """CodeRabbit #127: Link only is a decision: the email is linked, the status stays, the review leaves the queue."""
+    app_id, _, _ = pipeline
+    row, review = _unmatched_review(test_db, pipeline)
+    revision = test_db.get(Application, app_id).status_revision
+    result = api_client.patch(_base(row) + f'/inbox-messages/{row.id}/review', json=_command(
+        test_db, row, review, action='LINK_ONLY', application_id=str(app_id), expected_application_revision=revision))
+    assert result.status_code == 200, result.text
+    test_db.expire_all()
+    review = test_db.get(ApplicationReview, review.id)
+    assert (review.state, review.resolved_status) == ('RESOLVED', None) and review.resolved_by_user_id is not None
+    assert test_db.get(InboxMessage, row.id).application_id == app_id
+    assert test_db.get(Application, app_id).status == 'applied'
+    assert api_client.get(_base(row) + '/email-reviews').json()['total_count'] == 0
+
+
+def test_a_review_sets_incomplete_only_for_an_incomplete_email_or_application(test_db, pipeline, api_client):
+    """DEBUG D-10 (CodeRabbit #127): Incomplete needs an email classified Incomplete or an application already Incomplete."""
+    app_id, _, _ = pipeline
+    row, review = _unmatched_review(test_db, pipeline)  # classified Assessment
+    revision = test_db.get(Application, app_id).status_revision
+
+    def set_incomplete():
+        return api_client.patch(_base(row) + f'/inbox-messages/{row.id}/review', json=_command(
+            test_db, row, review, action='SET_STATUS', status='incomplete_application', application_id=str(app_id),
+            expected_application_revision=revision))
+
+    refused = set_incomplete()
+    assert refused.status_code == 400, refused.text
+    test_db.expire_all()
+    assert test_db.get(ApplicationReview, review.id).state == 'PENDING'
+    test_db.get(Application, app_id).status = 'incomplete_application'
+    test_db.commit()
+    allowed = set_incomplete()
+    assert allowed.status_code == 200, allowed.text
+
+
 def test_review_cannot_set_saved(test_db, pipeline, api_client):
     app_id, _, message_id = pipeline
     assert worker.process_one(message_id, provider=lambda *a: decision('assessment', .9))

@@ -25,7 +25,7 @@ Gmail ─► import (PR 2) ─► PENDING (only if classification ON; else NOT_Q
       ─► versioned classification row (+ cost row or unpriced marker, same transaction)
       ─► decide (in this order):
            forwarded / too little text / numbers disagree ...... review
-           Other (min value ≥ 0.8) ......................... hide 30 days, no status change
+           Other (min value ≥ 0.8) ......................... Irrelevant, no status change; gated purge after 30 days
            5 forward targets, ≥ 0.8, sender PASS, unique,
            fresh, revisions current, automation ON .......... AUTOMATIC change (savepoint: status + event + ledger)
            anything else (incl. Offer, Move On) ............ BDE review with the specific reason
@@ -49,7 +49,7 @@ Turned on locally only for isolated tests (D-25); switched on in production only
 | Classification | Works live (T1.6): configured, tolerant confidence check, config guard and pause, spend counted |
 | Matching | Works; one eligibility rule (D-07); reply/forward rules (D-04) |
 | Reviews | Backend list/command fixed (T3.1–T3.3); review panel and BDE review column live (T3.4–T3.6) |
-| Automatic status updates and Undo | Built (migration 0016); live automatic move and Undo verified (T4.6) |
+| Automatic status updates and Undo | Built (migration 0025); live automatic move and Undo verified (T4.6) |
 | Frontend ten statuses | Built (T2.1); legacy values shown read-only |
 | Setup recovery, older mail | Built (Phase 7); recovery run on 25 emails; historical switch off (0 eligible) |
 | Checks | Full backend 3852 passed / 0 failed; frontend 613 tests, typecheck, lint, build passed; axe not run |

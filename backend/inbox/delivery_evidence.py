@@ -20,12 +20,27 @@ def _domain(value):
 
 
 _GMAIL_ARC = re.compile(r'^\s*i=\d+\s*;\s*mx\.google\.com\s*;', re.I)
+_ARC_HEADERS = ('arc-seal', 'arc-message-signature', 'arc-authentication-results')
+_ARC_INSTANCE = re.compile(r'^\s*i\s*=\s*(\d+)\s*;', re.I)
 
 
 def _only_gmail_arc(names):
-    """Gmail seals ordinary incoming mail with its own ARC set (authserv mx.google.com, DEBUG D-26). Only an ARC
-    result written by any other server means the message passed through a forwarder: that stays UNKNOWN."""
-    return all(_GMAIL_ARC.match(value) for key, value in names if key == 'arc-authentication-results')
+    """Gmail seals ordinary incoming mail with its own ARC set (authserv mx.google.com, DEBUG D-26). Every ARC instance
+    must carry exactly one results header, written by Gmail. A result from any other server, or a seal or signature
+    whose instance has no results header, means the message passed through a forwarder: that stays UNKNOWN."""
+    instances, gmail = set(), set()
+    for key, value in names:
+        if key not in _ARC_HEADERS:
+            continue
+        match = _ARC_INSTANCE.match(value)
+        if not match:
+            return False
+        instances.add(match.group(1))
+        if key == 'arc-authentication-results':
+            if match.group(1) in gmail or not _GMAIL_ARC.match(value):
+                return False
+            gmail.add(match.group(1))
+    return instances == gmail
 
 
 def sender_authentication(payload):

@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Columns3, Calendar, SearchX, Table2, type LucideIcon } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { useApplications, useUpdateApplicationStatus, useWithPendingMoves } from "@/lib/hooks/use-applications";
+import { moveFailure, useApplications, useUpdateApplicationStatus, useWithPendingMoves } from "@/lib/hooks/use-applications";
 import { can, scopeApplications, scopeTeam } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useCandidates } from "@/lib/hooks/use-candidates";
@@ -24,6 +25,7 @@ import { FilterChips, type FilterChip } from "@/components/app/filter-chips";
 import { filterApplications } from "@/lib/derive/list-filters";
 import { useNow } from "@/lib/hooks/use-now";
 import { useTeam } from "@/lib/hooks/use-team";
+import { useHref } from "@/lib/routes/use-href";
 import { useUrlState } from "@/lib/routes/use-url-state";
 import { ApplicationsSearch, type ApplicationDate, type ApplicationsSearchState } from "@/lib/schemas/list-search";
 
@@ -64,6 +66,10 @@ function ApplicationsList() {
   const setView = (next: View) => setSearch({ view: next });
   // A move on the board is a real status change (it persists, docs/03 §3.3), shown at once (optimistic).
   const updateStatus = useUpdateApplicationStatus();
+  // A failed move snaps back, so the page says which one and why, one line per application, until it moves.
+  const [moveErrors, setMoveErrors] = useState<Record<string, string>>({});
+  const router = useRouter();
+  const toHref = useHref();
 
   const candidateName = useMemo(() => {
     const map = new Map((candidatesQuery.data ?? []).map((c) => [c.id, c.fullName]));
@@ -93,7 +99,11 @@ function ApplicationsList() {
   const { applications: shown, saving } = useWithPendingMoves(apps);
 
   function moveTo(id: string, to: ApplicationStatus) {
-    return updateStatus.mutate({ id, status: to, note: null });
+    const name = apps.find((a) => a.id === id)?.companyNameAtApply || "This application";
+    return updateStatus.mutate({ id, status: to, note: null }, {
+      onSuccess: () => setMoveErrors((errors) => withoutKey(errors, id)),
+      onError: (error) => setMoveErrors((errors) => ({ ...errors, [id]: `${name} didn't move to ${STATUS_LABEL[to]}: ${moveFailure(error)}` })),
+    });
   }
 
   return (
@@ -113,7 +123,13 @@ function ApplicationsList() {
         <EmptyState variant="filtered" icon={SearchX} title="No applications match these filters" description="Remove a filter above, or clear them all to see every application."
           action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>} />
       ) : view === "kanban" ? (
-        <ApplicationBoard apps={shown} saving={saving} candidateName={candidateName} onMove={moveTo} canAct={can(principal, "application.move")} />
+        <>
+          {Object.entries(moveErrors).map(([id, text]) => (
+            <p key={id} role="alert" className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-danger-bg)] px-3 py-2 text-caption text-[var(--color-danger-fg)]">{text}</p>
+          ))}
+          <ApplicationBoard apps={shown} saving={saving} candidateName={candidateName} onMove={moveTo} canAct={can(principal, "application.move")}
+            onOpen={(id) => router.push(toHref("applications.detail", { id }))} />
+        </>
       ) : view === "table" ? (
         <TableView apps={apps} candidateName={candidateName} />
       ) : (
@@ -121,6 +137,12 @@ function ApplicationsList() {
       )}
     </div>
   );
+}
+
+function withoutKey(errors: Record<string, string>, id: string): Record<string, string> {
+  const next = { ...errors };
+  delete next[id];
+  return next;
 }
 
 function TableView({ apps, candidateName }: { apps: Application[]; candidateName: (id: string) => string }) {

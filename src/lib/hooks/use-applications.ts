@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import { applicationsApi, type SaveJob } from "@/lib/api/applications";
+import { ApiError } from "@/lib/api/client";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { queryKeys } from "@/lib/query/keys";
@@ -26,19 +27,26 @@ export function useApplication(id: string) {
 }
 
 export type MoveVariables = { id: string; status: ApplicationStatus; note: string | null };
+/** What one move reports when it settles, for that move only: concurrent moves never share or lose a message. */
+export type MoveHandlers = { onSuccess?: (saved: Application) => void; onError?: (error: Error) => void };
+
+/** Why a move failed, in words. A 409 is a stale revision: someone changed the application first. */
+export function moveFailure(error: Error): string {
+  if (error instanceof ApiError && error.status === 409) return "it changed since it was loaded. The latest status is shown; move it again if needed.";
+  return error.message;
+}
 
 /** Applications with a move in flight, as `firmId:applicationId`. Module-level: every screen shares it (DEBUG D-06). */
 const movesInFlight = new Set<string>();
 
-/** Every cached copy of one application (lists and detail), or undefined. */
+/** The newest cached copy of one application (lists and detail): the highest status revision, or undefined. */
 function cachedApplication(queryClient: ReturnType<typeof useQueryClient>, firmId: string, id: string): Application | undefined {
-  const detail = queryClient.getQueryData<Application>(queryKeys.applications.detail(firmId, id));
-  if (detail) return detail;
+  let newest = queryClient.getQueryData<Application>(queryKeys.applications.detail(firmId, id));
   for (const [, list] of queryClient.getQueriesData<Application[]>({ queryKey: queryKeys.applications.lists(firmId) })) {
     const found = list?.find((a) => a.id === id);
-    if (found) return found;
+    if (found && (!newest || found.statusRevision > newest.statusRevision)) newest = found;
   }
-  return undefined;
+  return newest;
 }
 
 /**
@@ -46,7 +54,8 @@ function cachedApplication(queryClient: ReturnType<typeof useQueryClient>, firmI
  * - One move per application at a time: a second move is refused (returns false) until the first settles.
  * - The cache only ever holds server data: the move's target is shown from the pending mutation (`usePendingMoves`),
  *   so there is nothing to roll back and no refetch can overwrite a pending change.
- * - The revision sent is the server-confirmed one in the cache when the request starts.
+ * - The revision sent is the newest server-confirmed one in the cache when the request starts.
+ * - `handlers` report this move's own success or failure (the page says which move failed and why).
  */
 export function useUpdateApplicationStatus() {
   const firmId = useFirmId();
@@ -65,12 +74,13 @@ export function useUpdateApplicationStatus() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.applications.all(firmId) });
     },
   });
-  const move = useCallback((variables: MoveVariables): boolean => {
+  const move = useCallback((variables: MoveVariables, handlers?: MoveHandlers): boolean => {
     const key = `${firmId}:${variables.id}`;
     if (movesInFlight.has(key)) return false;
     movesInFlight.add(key);
     try {
-      mutation.mutate(variables);
+      // mutateAsync settles once per call (the callbacks given to mutate fire only for the latest call).
+      void mutation.mutateAsync(variables).then((saved) => handlers?.onSuccess?.(saved), (error: Error) => handlers?.onError?.(error));
     } catch (error) {
       movesInFlight.delete(key);
       throw error;
@@ -135,10 +145,11 @@ export function useToggleSavedJob() {
   return useMutation<void, Error, { save: SaveJob } | { unsave: { applicationId: string; jobId: string; candidateId: string } }>({
     mutationKey: queryKeys.applications.savedJobs(firmId),
     mutationFn: (vars) => ("save" in vars ? applicationsApi.saveJob(firmId, vars.save) : applicationsApi.unsaveJob(firmId, vars.unsave.applicationId)),
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.applications.all(firmId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
-    },
+    // Returned, so the save stays pending until the Saved state has reloaded: no gap for a second save of the job.
+    onSettled: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.applications.all(firmId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) }),
+    ]),
   });
 }
 

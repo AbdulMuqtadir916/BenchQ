@@ -34,6 +34,21 @@ export function inboxRefetchInterval(data: Pages | undefined): number | false {
 }
 const initialPages = (inbox: CandidateInbox): Pages => ({pages: [inbox], pageParams: [null]});
 
+/** The inbox's classifications at one moment: how many wait, each email's state and result, the newest arrival. */
+export type ClassificationSnapshot = {classifying: number; newest: number; states: Map<string, {key: string; done: boolean; at: number}>};
+export function classificationSnapshot(messages: CandidateInbox["messages"]): ClassificationSnapshot {
+  const states = new Map(messages.map(message => [message.id, {key: `${message.classificationState ?? ""}:${message.classificationVersion ?? ""}`,
+    done: message.classificationState === "DONE", at: Date.parse(message.receivedAt) || 0}]));
+  return {states, newest: Math.max(0, ...[...states.values()].map(state => state.at)),
+    classifying: messages.filter(message => ["PENDING", "PROCESSING"].includes(message.classificationState ?? "")).length};
+}
+/** Some classification finished since `previous`: an email seen unfinished (or with an older result) is DONE now, newer
+ * mail arrived already DONE, or fewer emails wait (one gave up). Older mail loaded by "Load more" is not a change. */
+export function classificationsFinished(previous: ClassificationSnapshot, next: ClassificationSnapshot): boolean {
+  return next.classifying < previous.classifying || [...next.states].some(([id, state]) => state.done
+    && (previous.states.has(id) ? previous.states.get(id)!.key !== state.key : state.at > previous.newest));
+}
+
 export function useCandidateInbox(candidateId: string) {
   const firm = useFirmId();
   const cache = useQueryClient();
@@ -52,16 +67,17 @@ export function useCandidateInbox(candidateId: string) {
     refetchInterval: query => inboxRefetchInterval(query.state.data)});
   // When emails finish classifying, a review (and possibly an automatic status change) was created on the server:
   // reload the review list and the applications at that moment, not only on the next page load.
-  const classifying = query.data?.messages.filter(message => ["PENDING", "PROCESSING"].includes(message.classificationState ?? "")).length ?? null;
-  const lastClassifying = useRef<number | null>(null);
+  const messages = query.data?.messages;
+  const lastSeen = useRef<ClassificationSnapshot | null>(null);
   useEffect(() => {
-    if (classifying === null) return;
-    if (lastClassifying.current !== null && classifying < lastClassifying.current) {
+    if (!messages) return;
+    const next = classificationSnapshot(messages);
+    if (lastSeen.current && classificationsFinished(lastSeen.current, next)) {
       void cache.invalidateQueries({queryKey: queryKeys.inbox.reviews(firm, candidateId)});
       void cache.invalidateQueries({queryKey: queryKeys.applications.all(firm)});
     }
-    lastClassifying.current = classifying;
-  }, [classifying, cache, firm, candidateId]);
+    lastSeen.current = next;
+  }, [messages, cache, firm, candidateId]);
   const forbidden = query.error && "status" in query.error && [403, 404].includes(Number(query.error.status));
   useEffect(() => {
     if (forbidden) cache.removeQueries({queryKey: queryKeys.inbox.body(firm, candidateId)});

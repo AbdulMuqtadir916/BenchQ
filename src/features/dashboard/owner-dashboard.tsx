@@ -58,7 +58,8 @@ function FinanceDashboardContent() {
   );
 
   const avgTimeToOffer = useMemo(() => {
-    const spans = offers.flatMap(({ app, offeredAt }) => (app.appliedAt ? [daysBetween(app.appliedAt, offeredAt)] : []));
+    const spans = offers.flatMap(({ app, offeredAt }) =>
+      (app.appliedAt && Date.parse(app.appliedAt) <= Date.parse(offeredAt) ? [daysBetween(app.appliedAt, offeredAt)] : []));
     if (spans.length === 0) return 0;
     return Math.round(spans.reduce((s, d) => s + d, 0) / spans.length);
   }, [offers]);

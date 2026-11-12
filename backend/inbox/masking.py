@@ -129,7 +129,7 @@ LAYER2_PATTERNS = [p for p, _ in TODAY_PATTERNS] + [
     re.compile(r'(?i)\b(?:user\s?name|user\s?id|login(?:\s?id)?)[ \t]*[:=][ \t]*(?!\[)\S+'),             # login
     re.compile(r'(?i)\b(?:password|passwd|passcode|pin|otp|access token|api key|client secret|secret key)'
                r'[ \t]*[:=][ \t]*(?!\[)\S+'),                                                             # credential
-    re.compile(r'\b[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z]\b'),                                             # PAN
+    re.compile(r'\b[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z]\b', re.I),                                        # PAN
     # bank details
     re.compile(r'(?<![\w.])\d{9,18}(?![\w]|[.,]\d)'),                                                   # 9-18 digits
     re.compile(r'(?<![\w.])(?:\d{4}[ -]){2,3}\d{1,6}(?![\w]|[.,]\d)'),                                  # grouped digits
@@ -206,6 +206,15 @@ def _presidio():
             _entities = [e for e in engine.get_supported_entities('en') if e != 'DATE_TIME']
             _engine = engine
         return _engine
+
+
+def masking_ready() -> bool:
+    """Whether masking can run in this process: its analyzer loads (built once, then reused)."""
+    try:
+        _presidio()
+    except Exception:
+        return False
+    return True
 
 
 def layer3(text: str) -> list[tuple[int, int]]:

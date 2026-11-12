@@ -18,11 +18,13 @@ from sqlalchemy import String, cast, exists, func
 from sqlalchemy.dialects.postgresql import insert
 
 from backend import config
+from backend.inbox.masking import masking_ready
 from backend.models.candidates import CandidateMailbox, InboxMessage
 from backend.models.db import JobRun, utcnow
 from backend.models.tenancy import Firm
 
-SETUP_ERRORS = ('CLASSIFIER_NOT_CONFIGURED', 'PROVIDER_AUTH_REJECTED')
+# MASKING_FAILED: the request could not be masked, so nothing was sent (the email is not at fault).
+SETUP_ERRORS = ('CLASSIFIER_NOT_CONFIGURED', 'PROVIDER_AUTH_REJECTED', 'MASKING_FAILED')
 RECOVERY = 'candidate_email_setup_recovery'
 HISTORICAL = 'candidate_email_historical'
 BATCH = 20
@@ -107,7 +109,11 @@ def recover_setup_failures(db, *, limit=BATCH) -> int:
     """Return setup-only failures to PENDING, once each. Caller has checked the classifier is configured and unpaused."""
     if not getattr(config, 'CANDIDATE_EMAIL_SETUP_RECOVERY_ENABLED', False):
         return 0
-    return _run(db, _recovery_query(db), RECOVERY, lambda m: {'previous_error': m.classification_error},
+    query = _recovery_query(db)
+    # Masking must work first: an email recovered while it cannot would spend its one recovery and fail again.
+    if query.first() is None or not masking_ready():
+        return 0
+    return _run(db, query, RECOVERY, lambda m: {'previous_error': m.classification_error},
                 'Requeued {count} emails that failed only because the classifier was not set up.', limit)
 
 
@@ -130,13 +136,21 @@ def eligible_counts(db) -> dict:
             'excluded_disconnected': by_candidate(excluded), 'batch_per_sweep': BATCH}
 
 
+def report(db) -> list[str]:
+    """The counts command's lines, per candidate by name."""
+    from backend.models.candidates import Candidate
+    counts = eligible_counts(db)
+    keys = ('setup_recovery', 'historical', 'excluded_disconnected')
+    ids = {candidate_id for key in keys for candidate_id in counts[key]}
+    # `full_name` is read off the résumé (a property, not a column), so the candidates themselves are loaded.
+    names = {c.id: c.full_name for c in db.query(Candidate).filter(Candidate.id.in_(ids))} if ids else {}
+    lines = [f'{key}: {sum(counts[key].values())} {({names.get(c) or str(c): n for c, n in counts[key].items()})}'
+             for key in keys]
+    return [*lines, f"batch per sweep: {counts['batch_per_sweep']}"]
+
+
 if __name__ == '__main__':
     from backend.models.db import SessionLocal
-    from backend.models.candidates import Candidate
     with SessionLocal() as session:
-        counts = eligible_counts(session)
-        names = dict(session.query(Candidate.id, Candidate.full_name).all())
-        for key in ('setup_recovery', 'historical', 'excluded_disconnected'):
-            rows = counts[key]
-            print(f'{key}: {sum(rows.values())}', {names.get(c, str(c)): n for c, n in rows.items()})
-        print('batch per sweep:', counts['batch_per_sweep'])
+        for line in report(session):
+            print(line)

@@ -183,8 +183,11 @@ def _strip_sign_off(lines):
 
 
 def _split(value, subject):
-    """(current, forwarded, is_forward) — separate rules for replies and forwards (DEBUG D-04)."""
+    """(current, forwarded, is_forward) — separate rules for replies and forwards (DEBUG D-04). With a forward subject
+    ("Fwd:", "FW:"), quoted history is forwarded history: other mail programs quote a forward like a reply (an HTML
+    blockquote, or Outlook's From:/Sent: header), and it may hold the only evidence of the application."""
     forwarded = ''
+    forward_subject = bool(_FORWARD_SUBJECT.match(subject or ''))
     if re.search(r'<(?:html|body|div|p|br)\b', value, re.IGNORECASE):
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(value, 'html.parser')
@@ -192,6 +195,10 @@ def _split(value, subject):
             if 'forwarded message' in quote.get_text(' ').lower() and not forwarded:
                 forwarded = quote.get_text('\n')
                 quote.decompose()
+        quote = soup.select_one('blockquote') if forward_subject and not forwarded else None
+        if quote is not None:
+            forwarded = quote.get_text('\n')
+            quote.decompose()
         for quoted in soup.select('blockquote, .gmail_quote, .gmail_signature, script, style'):
             quoted.decompose()
         value = soup.get_text('\n')
@@ -202,11 +209,13 @@ def _split(value, subject):
         forwarded = '\n'.join(lines[forward + 1:]) or forwarded
         lines = lines[:forward]
     elif reply is not None:
+        if forward_subject and not forwarded:
+            forwarded = '\n'.join(lines[reply:])
         lines = lines[:reply]
     lines = _strip_sign_off([line for line in lines if not line.lstrip().startswith('>')])
     current = '\n'.join(lines).strip()
     forwarded = '\n'.join(line for line in forwarded.splitlines() if not line.lstrip().startswith('>')).strip()
-    is_forward = bool(forwarded) or bool(_FORWARD_SUBJECT.match(subject or ''))
+    is_forward = bool(forwarded) or forward_subject
     return current, forwarded, is_forward
 
 
