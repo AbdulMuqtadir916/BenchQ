@@ -141,3 +141,21 @@ def test_a_failure_saves_nothing(anonymous_client, test_db, world, monkeypatch):
     assert test_db.query(BaseResume).count() == 0
     kept = test_db.get(ResumeParse, upload.id)
     assert kept.candidate_id is None and kept.expires_at is not None          # still waiting for a create
+
+
+def test_create_rejects_an_invalid_profile_link(anonymous_client, world):
+    response = _create(anonymous_client, world, linkedin_url="aghajrgng;knga")
+    assert response.status_code == 422
+    assert any(error["loc"][-1] == "linkedin_url" for error in response.json()["detail"])
+
+
+@pytest.mark.parametrize("link", ["LinkedIn", "bare-handle", "ftp://linkedin.com/in/qa"])
+def test_first_base_drops_invalid_parser_links(link):
+    import uuid
+    from types import SimpleNamespace
+    from backend.candidates.first_base import first_base
+
+    upload = SimpleNamespace(id=uuid.uuid4(), parse={"header": {"linkedin": link, "github": link}})
+    candidate = SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), full_name="Candidate")
+    _, version = first_base(upload, candidate, None, uuid.uuid4())
+    assert version.linkedin is None and version.github is None

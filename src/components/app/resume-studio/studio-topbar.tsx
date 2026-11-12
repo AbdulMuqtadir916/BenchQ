@@ -12,9 +12,13 @@ interface StudioTopbarProps {
   /** The résumé's name by the convention (src/lib/derive/resume-name.ts). */
   name: string;
   subtitle: string;
+  /** May edit and save (07 Q55 `canChangeResume`): the BDE once assigned; before that the OWNER and the candidate's MANAGER. */
   canEdit: boolean;
+  /** May tailor (07 Q55 `canManageResume`): only the candidate's assigned BDE, never the owner or manager. */
+  canTailor: boolean;
   isTailoring: boolean;
   /** Saving makes the next version (§4.3). Absent where there is nothing to save to (a new, unsaved draft). */
+  isSaveBlocked?: boolean;
   onSave?: () => void;
   isSaving?: boolean;
   onClose: () => void;
@@ -22,7 +26,7 @@ interface StudioTopbarProps {
   onExport: () => void;
 }
 
-export function StudioTopbar({ doc, name, subtitle, canEdit, isTailoring, onSave, isSaving = false, onClose, onTailor, onExport }: StudioTopbarProps) {
+export function StudioTopbar({ doc, name, subtitle, canEdit, canTailor, isTailoring, onSave, isSaving = false, isSaveBlocked = false, onClose, onTailor, onExport }: StudioTopbarProps) {
   const Icon = doc.isMaster ? FileUser : FileCheck2;
 
   return (
@@ -53,8 +57,8 @@ export function StudioTopbar({ doc, name, subtitle, canEdit, isTailoring, onSave
       <ModeSwitch />
 
       <div className="flex min-w-0 items-center justify-end gap-2">
-        {canEdit && onSave ? <SaveControl onSave={onSave} isSaving={isSaving} /> : null}
-        {canEdit ? (
+        {canEdit && onSave ? <SaveControl onSave={onSave} isSaving={isSaving} isSaveBlocked={isSaveBlocked} /> : null}
+        {canTailor ? (
           <Button variant="secondary" size="sm" onClick={onTailor} disabled={isTailoring} className="hidden md:inline-flex">
             {isTailoring ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
             Tailor with AI
@@ -70,7 +74,7 @@ export function StudioTopbar({ doc, name, subtitle, canEdit, isTailoring, onSave
 }
 
 /** Save: each save is the résumé's next version (no autosave); the state beside it says whether anything is unsaved. */
-function SaveControl({ onSave, isSaving }: { onSave: () => void; isSaving: boolean }) {
+function SaveControl({ onSave, isSaving, isSaveBlocked }: { onSave: () => void; isSaving: boolean; isSaveBlocked: boolean }) {
   const isDirty = useStudio((s) => s.isDirty);
   return (
     <>
@@ -78,7 +82,7 @@ function SaveControl({ onSave, isSaving }: { onSave: () => void; isSaving: boole
         {isSaving ? <LoaderCircle size={13} className="animate-spin" aria-hidden /> : isDirty ? <CircleDot size={13} aria-hidden className="text-[var(--color-warning-fg)]" /> : <CloudCheck size={14} aria-hidden />}
         {isSaving ? "Saving…" : isDirty ? "Unsaved changes" : "Saved"}
       </span>
-      <Button variant="secondary" size="sm" onClick={onSave} disabled={!isDirty || isSaving} title="Save as the next version  ⌘S">
+      <Button variant="secondary" size="sm" onClick={onSave} disabled={!isDirty || isSaving || isSaveBlocked} title="Save as the next version  ⌘S">
         <Save size={14} aria-hidden />
         <span className="hidden sm:inline">Save</span>
       </Button>

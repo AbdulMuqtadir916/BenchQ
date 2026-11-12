@@ -1,16 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { can } from "@/lib/auth/policy";
 import { agentsMock } from "./agents";
-import { applicationsMock, followupsMock } from "./applications";
-import { candidatesMock } from "./candidates";
-import { createCandidateBody } from "./create-candidate-body";
+import { applicationsMock } from "./applications";
+import { stubCandidateReads } from "./fixture-backend";
 import { documentsMock } from "./documents";
 import { inboxMock } from "./inbox";
-import { jobsMock } from "./jobs";
 import { jobMarksMock } from "./job-marks";
 import { FIRM_SCOPED_RESOURCES, WRITE_ACTIONS, isReadMethod } from "./membership";
 import { recordsMock } from "./records";
-import { resumesMock } from "./resumes";
 import { signInAs, signInAsSupportView, signOutForTest } from "./sign-in-as";
 
 /**
@@ -22,25 +19,14 @@ import { signInAs, signInAsSupportView, signOutForTest } from "./sign-in-as";
 
 type AnyMethod = (firmId: string, ...args: unknown[]) => Promise<unknown>;
 const MOCKS: Record<string, Record<string, AnyMethod>> = {
-  candidates: candidatesMock, jobs: jobsMock, applications: applicationsMock, followups: followupsMock, resumes: resumesMock, records: recordsMock,
+  applications: applicationsMock, records: recordsMock,
   documents: documentsMock, inbox: inboxMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
 } as unknown as Record<string, Record<string, AnyMethod>>;
 
 const FIRM = "firm_hts";
-const RESUME_DOC = {
-  resumeId: "rv_cand_02_3", candidateId: "cand_02", name: "Master Resume", isMaster: true, templateId: "template_modern", fullName: "Policy Check", title: "QA",
-  header: { city: "", state: "", country: "US", email: "policy@example.com", phone: "", linkedin: "", github: "", workAuthorization: "" },
-  summary: { id: "s", html: "Summary" }, experience: [], skills: [], education: [], certifications: [], awards: [], projects: [],
-};
 /** Arguments that would make each write succeed for a member who may act (so a refusal can only be the policy). */
 const ARGS: Record<string, unknown[]> = {
   "applications.updateStatus": ["app_001", { status: "WITHDRAWN", note: null }],
-  "candidates.update": ["cand_01", { headline: "Senior Java Developer" }],
-  "candidates.create": [createCandidateBody({ fullName: "Policy Check", primaryRole: "QA", workAuth: "USC" })],
-  "candidates.followBde": ["user_adnan", "user_fatima"],
-  "candidates.reassign": ["cand_01", { managerId: "user_priya", bdeId: "user_vikram", note: null }],
-  "candidates.parseResume": [{ fileName: "Ravi_Teja_Java_FullStack.pdf", sizeBytes: 1000, mimeType: "application/pdf" }],
-  "jobs.capture": [{ sourceUrl: "https://example.com/jobs/policy-check", title: "QA", companyName: "Example", location: "", remoteMode: "REMOTE", employmentType: null, payPeriod: "HOUR", payMin: null, payMax: null, sponsorsVisa: false, excludesC2C: false, experience: "", skills: [], description: "Policy check" }],
   "documents.upload": ["cand_01", { kind: "OTHER", title: "Note", fileName: "note.pdf", sizeBytes: 1000, expiresAt: null }],
   "documents.remove": ["doc_none"],
   "inbox.connect": ["cand_01"],
@@ -49,22 +35,14 @@ const ARGS: Record<string, unknown[]> = {
   "jobMarks.mark": ["job_001", "SAVED"],
   "jobMarks.unmark": ["job_001", "SAVED"],
   "agents.tailorResume": [{ resumeVersionId: "rv", jobId: "job" }],
-  // Résumé writes (07 Q55): cand_02 has no BDE (cand_01 gets one above), so its OWNER may save and pick; cand_03 is its BDE's to manage.
-  "resumes.save": ["rv_cand_02_3", RESUME_DOC],
-  "resumes.useAsBase": ["cand_02", "rv_cand_02_1"],
-  "resumes.upload": ["cand_03", "later.pdf"],
-  "resumes.deleteBase": ["cand_03", "base_none", false],
-  "resumes.deleteVersion": ["cand_03", "rv_none"],
-  "resumes.showBase": ["cand_03", "base_none"],
 };
-/** Only the candidate's BDE does these (07 Q55): the OWNER's control is refused them by that rule, not the policy. */
-const BDE_ONLY = new Set(["resumes.upload", "resumes.deleteBase", "resumes.deleteVersion", "resumes.showBase"]);
 
 const writes = Object.entries(WRITE_ACTIONS).flatMap(([resource, methods]) => Object.entries(methods).map(([name, action]) => ({ resource, name, action })));
 const call = (resource: string, name: string) => MOCKS[resource]![name]!(FIRM, ...(ARGS[`${resource}.${name}`] ?? []));
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_MOCK_DELAY_MS = "0";
+  stubCandidateReads(); // candidates are the backend's: the mocks that check one read the test fixture
 });
 afterAll(async () => {
   signOutForTest();
@@ -79,15 +57,11 @@ describe("the write inventory", () => {
       }
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
-      "agents.tailorResume", "applications.updateStatus", "candidates.create", "candidates.followBde", "candidates.parseResume", "candidates.reassign", "candidates.update", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark", "jobs.capture",
-      "resumes.deleteBase", "resumes.deleteVersion", "resumes.save", "resumes.showBase", "resumes.upload", "resumes.useAsBase",
+      "agents.tailorResume", "applications.updateStatus", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark",
     ]);
   });
 
   it("the Phase B writes name their own actions (fix PRs 1, 2)", () => {
-    expect(WRITE_ACTIONS.candidates?.create).toBe("candidate.create");
-    expect(WRITE_ACTIONS.candidates?.parseResume).toBe("candidate.create"); // reading a résumé is part of adding one
-    expect(WRITE_ACTIONS.jobs?.capture).toBe("job.capture");
     expect(WRITE_ACTIONS.jobMarks).toEqual({ mark: "job.apply", unmark: "job.apply" });
   });
 });
@@ -107,7 +81,7 @@ describe("a VIEWER is refused every write (403), with the UI's table", () => {
   });
 
   it("still reads (the refusal is about writing, not membership)", async () => {
-    expect((await candidatesMock.list(FIRM)).length).toBeGreaterThan(0);
+    expect((await applicationsMock.list(FIRM)).length).toBeGreaterThan(0);
   });
 });
 
@@ -133,25 +107,11 @@ describe("control: an OWNER is not refused by the policy", () => {
     await signInAs("user_imran");
   });
 
-  it.each(writes.filter((w) => !BDE_ONLY.has(`${w.resource}.${w.name}`)))("$resource · $name", async ({ resource, name }) => {
+  it.each(writes)("$resource · $name", async ({ resource, name }) => {
     // It may fail for its own reasons (an id that doesn't exist: 404), never with 403.
     const outcome = await call(resource, name).then(() => "ok", (error: { status?: number }) => error.status);
     expect(outcome).not.toBe(403);
   });
 });
 
-describe("control: the candidate's BDE is not refused what only they do (07 Q55)", () => {
-  beforeAll(async () => {
-    await signInAs("user_adnan");
-  });
-
-  it.each(writes.filter((w) => BDE_ONLY.has(`${w.resource}.${w.name}`)))("$resource · $name", async ({ resource, name }) => {
-    const outcome = await call(resource, name).then(() => "ok", (error: { status?: number }) => error.status);
-    expect(outcome).not.toBe(403);
-  });
-
-  it("but the OWNER is, by that rule", async () => {
-    await signInAs("user_imran");
-    await expect(call("resumes", "upload")).rejects.toMatchObject({ status: 403 });
-  });
-});
+// The BDE-only résumé writes (07 Q55) are the backend's now (no résumé mock): backend/tests/test_resume_*.

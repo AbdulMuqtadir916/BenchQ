@@ -51,8 +51,6 @@ export type FirmDashboard = z.infer<typeof FirmDashboardSchema>;
 
 export const BdeDashboardSchema = z.object({
   queueCount: z.number().int(),
-  followUpsDueToday: z.number().int(),
-  followUpsOverdue: z.number().int(),
   applicationsThisWeek: z.number().int(),
   responsesThisWeek: z.number().int(),
   interviewsScheduled: z.number().int(),
@@ -164,7 +162,7 @@ export type LedgerCandidate = z.infer<typeof LedgerCandidateSchema>;
 /** Merged activity stream for a candidate. */
 export const TimelineEventSchema = z.object({
   id: z.string(),
-  kind: z.enum(["STATUS", "APPLICATION", "RESUME", "OUTREACH", "FOLLOWUP", "NOTE", "RECORD"]),
+  kind: z.enum(["STATUS", "APPLICATION", "RESUME", "OUTREACH", "NOTE", "RECORD"]),
   occurredAt: z.string().datetime(),
   actorName: z.string().nullable(),
   title: z.string(),

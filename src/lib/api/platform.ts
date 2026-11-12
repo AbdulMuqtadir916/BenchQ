@@ -5,15 +5,15 @@ import type { Firm, User } from "@/lib/schemas/session";
 import type { Invite, Plan, PlatformUser } from "@/lib/schemas/tenancy";
 import { filterQuery, type LedgerFilters, type LedgerQuery } from "./analytics";
 import { arrayOf, notLiveYet } from "./client";
-import { toBackendId } from "./dto/demo-ids";
+import { fromBackendId, toBackendId } from "./dto/demo-ids";
 import { LedgerCandidateDto, LedgerPeopleDto, PlatformActivityOverviewDto, toLedgerCandidate, toLedgerPeople, toPlatformActivityOverview } from "./dto/ledger";
+import { CandidateStatus } from "@/lib/schemas/enums";
 import {
-  CreatedFirmDto, FirmDto, InviteDto, InviteWithTokenDto, LedgerEntryDto, PlanDto, PlatformUserDto, UserDto,
+  CandidateUsageDto, CreatedFirmDto, FirmDto, InviteDto, InviteWithTokenDto, LedgerEntryDto, PlanDto, PlatformUserDto, UserDto,
   toFirm, toInvite, toLedgerEntry, toPlan, toPlatformUser, toUser,
 } from "./dto/session";
 import { http } from "./http";
 
-const usageMock = () => import("@/mocks/usage").then((m) => m.candidateUsageMock);
 
 /** Which part of the Super Admin's log is on show: one firm, or only the failed sign-ins. */
 export interface ActivityView {
@@ -158,7 +158,10 @@ export const platformApi = {
     deactivate: unavailable<[string], PlatformUser>(),
   },
   candidates: {
-    /** Firm, status and BDE of every candidate, for usage counts (07 Q45). Candidates are still mocks, read under the real signed-in principal. */
-    usage: async (): Promise<CandidateUsageRow[]> => (await usageMock()).usage(),
+    /** Firm, status and BDE of every candidate, for usage counts (07 Q45): `GET /api/admin/candidate-usage`, counts only. */
+    usage: async (): Promise<CandidateUsageRow[]> =>
+      (await http.get("/api/admin/candidate-usage", arrayOf(CandidateUsageDto))).map((row) => ({
+        firmId: fromBackendId(row.firm_id), status: CandidateStatus.parse(row.status), bdeId: row.bde_id ? fromBackendId(row.bde_id) : null,
+      })),
   },
 };

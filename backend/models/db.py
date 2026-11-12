@@ -345,6 +345,10 @@ class Application(Base):
     last_email_received = Column(DateTime(timezone=True), nullable=True)
     last_email_snippet = Column(Text, nullable=True)
     status_transitions = Column(JSON, default=[])  # [{from, to, at, source}]
+    # What the employer's form held when the BDE marked the job applied from the extension (docs/02 §9). Null while
+    # Saved. It is the candidate's answers, so no response carries it and nothing logs it. Deferred so a list never
+    # loads it; `none_as_null` so None is SQL NULL, not a JSON null. Owner: Samad.
+    form_data = deferred(Column(JSONB(none_as_null=True), nullable=True))
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     __table_args__ = (
@@ -538,7 +542,7 @@ class JobRun(Base):
     error = Column(Text, nullable=True)
     meta = Column(JSON, nullable=True)
     # Optional: for per-job operations (tailor_resume, analyze_job, backfill_description)
-    target_job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
+    target_job_id = Column(UUID(as_uuid=True), ForeignKey("job_postings.id", ondelete="SET NULL"), nullable=True)  # 0023
 
 
 # ── LLM Call Log (observability for prompt caching / cost tracking) ─────────
@@ -555,7 +559,7 @@ class LlmCallLog(Base):
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     purpose = Column(String, nullable=False)  # score_light, score_full, tailor, email, pdf
     provider = Column(String, nullable=False, default="")  # claude_api, claude_code, codex_cli, antigravity_cli, openai, ollama
-    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
+    job_id = Column(UUID(as_uuid=True), ForeignKey("job_postings.id", ondelete="SET NULL"), nullable=True)  # 0023
     model = Column(String, nullable=False, default="")
     input_tokens = Column(Integer, default=0, nullable=False)
     output_tokens = Column(Integer, default=0, nullable=False)
@@ -588,9 +592,9 @@ class Resume(Base):
     # The candidate core (07 Q53e, migration 0007): whose résumé. Required from 0013 (PR 6). Owner: Zuhair.
     candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id", ondelete="RESTRICT"), nullable=False,
                           index=True)
-    # Deleting a job deletes the résumés tailored for it (Abdul, 2026-11-01): a tailored résumé always has its job.
-    # An application still blocks deleting a job it names, so a résumé that was sent stays.
-    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=True)
+    # The job a tailored résumé is for: one of its candidate's `job_postings` (migration 0023, job search PR 2; the
+    # composite key below). Deleting the job deletes the résumés tailored for it (Abdul, 2026-11-01).
+    job_id = Column(UUID(as_uuid=True), nullable=True)
     # The studio's design id (src/components/app/resume-studio/templates.ts); the backend's own designs went in PR 6.
     template = Column(String, nullable=True)
     page_format = Column(String, default="letter")
@@ -637,12 +641,13 @@ class Resume(Base):
                         name="ck_resumes_category_job"),
         ForeignKeyConstraint(["base_resume_id", "candidate_id"], ["base_resumes.id", "base_resumes.candidate_id"],
                              name="fk_resumes_base_candidate", ondelete="RESTRICT"),
+        # The candidate's own job, in the same firm (0023). A base's job_id is NULL, so this doesn't apply to it.
+        ForeignKeyConstraint(["firm_id", "candidate_id", "job_id"],
+                             ["job_postings.firm_id", "job_postings.candidate_id", "job_postings.id"],
+                             name="fk_resumes_job_posting", ondelete="CASCADE"),
         Index("uq_resumes_version", "base_resume_id", "category", "job_id", "version", unique=True,
               postgresql_nulls_not_distinct=True),
     )
-
-    # passive_deletes: let the database cascade; otherwise the ORM would null job_id on the children first.
-    job = relationship("Job", backref=backref("resumes", passive_deletes=True))
 
 
 # ── Cover Letter ──────────────────────────────────────────────────────────────
@@ -654,7 +659,7 @@ class CoverLetter(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = firm_id_column()
     name = Column(String, nullable=False)
-    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
+    job_id = Column(UUID(as_uuid=True), ForeignKey("job_postings.id", ondelete="SET NULL"), nullable=True)   # 0023
     resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("cover_letters.id", ondelete="SET NULL"), nullable=True)
     # garamond_alt (not garamond) — the garamond template dir is gitignored
@@ -676,7 +681,6 @@ class CoverLetter(Base):
     # loading + null-ing related cover letters (matches the FK ondelete above).
     parent = relationship("CoverLetter", remote_side=[id],
                           backref=backref("revisions", passive_deletes=True))
-    job = relationship("Job", backref=backref("cover_letters", passive_deletes=True))
     resume = relationship("Resume", backref=backref("cover_letters", passive_deletes=True))
 
 

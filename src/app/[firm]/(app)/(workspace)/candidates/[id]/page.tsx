@@ -4,7 +4,9 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { can, canManageResume } from "@/lib/auth/permissions";
+import { can, canManageResume, canSearchJobs } from "@/lib/auth/permissions";
+import { useJobSearches, useStartJobSearch } from "@/lib/hooks/use-jobs";
+import { blockedReason, searchRole, type FindJobsSearch } from "@/components/app/candidate/find-jobs";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { EASE_OUT } from "@/lib/motion";
@@ -29,7 +31,11 @@ import { ResumesTab } from "@/components/app/candidate/resumes-tab";
 import { UploadResume } from "@/components/app/resumes/upload-resume";
 import { ActivityTab } from "@/components/app/candidate/activity-tab";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
+import { safeReturnTo } from "@/lib/routes/landing";
 import { useHref } from "@/lib/routes/use-href";
+import { BACK_SHORTCUT } from "@/lib/list-shortcuts";
+import { usePageShortcuts } from "@/lib/hooks/use-page-shortcuts";
+import { useEscapeBack } from "@/lib/hooks/use-escape-back";
 
 export default function CandidateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const toHref = useHref();
@@ -37,7 +43,11 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const principal = useSignedInPrincipal();
   const router = useRouter();
   const pathname = usePathname();
-  const tabParam = useSearchParams().get("tab");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const listHref = toHref("candidates");
+  const requestedReturn = safeReturnTo(searchParams.get("returnTo"));
+  const returnTo = requestedReturn?.split(/[?#]/)[0] === listHref ? requestedReturn : null;
   const tab: CandidateTabId = isCandidateTab(tabParam) ? tabParam : "overview";
   const reduce = useReducedMotion() ?? false;
   const ws = useCandidateWorkspace(id);
@@ -45,6 +55,21 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const updateStatus = useUpdateApplicationStatus();
   const canAct = can(principal, "candidate.edit");
   const canEditProfile = can(principal, "candidate.editProfile");
+  // "Find jobs" is the candidate's BDE's (docs/02 §6.z); while their search runs, the matching sequence waits for it.
+  const canSearch = ws.candidate ? canSearchJobs(principal, ws.candidate) : false;
+  const searchesQuery = useJobSearches(id, canSearch);
+  const isSearching = Boolean(searchesQuery.data?.running);
+  const startSearch = useStartJobSearch(id);
+  const role = ws.candidate ? searchRole(ws.candidate) : null;
+  const searchBlocked = ws.candidate ? blockedReason(ws.candidate, searchesQuery.data) : null;
+
+  // Esc goes back (docs/04 §1.3, BUG-004): to where the person came from, which keeps the list's page, search and sort in its
+  // URL, or to the candidates list when this page was opened directly. A drawer, dialog or field keeps its own Esc.
+  const leave = useCallback(() => {
+    router.replace(returnTo ?? listHref);
+  }, [router, returnTo, listHref]);
+  useEscapeBack(leave);
+  usePageShortcuts(BACK_SHORTCUT);
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
@@ -63,13 +88,16 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   // The tab lives in the URL, so back/forward and shared links land on the same view.
   const setTab = useCallback(
     (next: CandidateTabId) => {
-      router.replace(next === "overview" ? pathname : `${pathname}?tab=${next}`, { scroll: false });
+      const query = new URLSearchParams();
+      if (next !== "overview") query.set("tab", next);
+      if (returnTo) query.set("returnTo", returnTo);
+      router.replace(query.size ? `${pathname}?${query}` : pathname, { scroll: false });
       requestAnimationFrame(() => {
         const bar = tabsRef.current;
         if (bar && bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
       });
     },
-    [router, pathname, reduce],
+    [router, pathname, reduce, returnTo],
   );
 
   const moveApplication = useCallback(
@@ -81,6 +109,21 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     [ws.applications, updateStatus],
   );
 
+  // Every "Find jobs" on this page starts the candidate's search (their BDE only), then shows the Jobs tab. When it
+  // can't start (no role, no country, today's limit, one running), the tab opens and the header says why.
+  const { mutate: startMutate, isPending: isStartPending } = startSearch;
+  const findJobs = useCallback(() => {
+    // The matching sequence plays only for a search that starts, and stops if the backend refuses it; otherwise the
+    // Jobs tab just opens and the header says why (CodeRabbit on #135).
+    if (role && !searchBlocked && !isSearching && !isStartPending) {
+      let run = 0;
+      setMatchRun((n) => (run = n + 1));
+      startMutate(role, { onError: () => setMatchDone((done) => Math.max(done, run)) });
+    }
+    setTab("jobs");
+    requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
+  }, [role, searchBlocked, isSearching, isStartPending, startMutate, setTab, reduce]);
+
   const actions = useMemo<CandidateActions>(() => ({
     openTab: setTab,
     openApplication: setOpenApplicationId,
@@ -90,12 +133,11 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
       setTab("inbox");
     },
     applySuggestion: (s: Suggestion) => moveApplication(s.applicationId, s.to, `From recruiter email: ${s.message.subject}`),
-    findJobs: () => {
-      setMatchRun((n) => n + 1);
-      setTab("jobs");
-      requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
-    },
-  }), [setTab, moveApplication, reduce]);
+    findJobs: canSearch ? findJobs : undefined,
+  }), [setTab, moveApplication, canSearch, findJobs]);
+  const search: FindJobsSearch | undefined = canSearch
+    ? { run: findJobs, isStarting: startSearch.isPending, refusal: startSearch.error instanceof Error ? startSearch.error.message : null }
+    : undefined;
 
   const closeDrawer = useCallback(() => setOpenApplicationId(null), []);
   const finishMatch = useCallback(() => setMatchDone(matchRun), [matchRun]);
@@ -121,7 +163,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         showOwner={can(principal, "team.view")}
         canAct={canAct}
         resumeHref={ws.base ? toHref("resumes.studio", { id: ws.base.version.id }) : null}
-        onFindJobs={actions.findJobs}
+        search={search}
         onOpenTab={setTab}
       />
 
@@ -156,7 +198,10 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
               jobs={ws.jobsQuery.data ?? []}
               applications={ws.applications}
               isLoading={ws.jobsQuery.isLoading || ws.applicationsQuery.isLoading}
+              error={ws.jobsQuery.error}
+              onRetry={() => void ws.jobsQuery.refetch()}
               isMatching={matchRun > matchDone}
+              isSearching={isSearching}
               hasMatched={matchRun > 0}
               onMatchDone={finishMatch}
             />

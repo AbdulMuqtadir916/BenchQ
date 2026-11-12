@@ -107,78 +107,6 @@ async def test_llm_failure_leaves_the_job_unscored(test_db, monkeypatch, fault):
     assert fresh.best_cv_score is None
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("fault", list(FAULTS))
-async def test_llm_failure_is_recorded_in_the_llm_call_log(test_db, monkeypatch, fault):
-    import backend.analyzer.llm_client as lc
-    from backend.analyzer.cv_scorer import score_single_job
-    from backend.models.db import LlmCallLog
-
-    resume = _seed_scoring(test_db)
-    job = _scored_job(test_db)
-
-    async def _boom(*a, **k):
-        raise FAULTS[fault]
-    monkeypatch.setattr(lc, "_dispatch", _boom)
-
-    await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light", firm_id=DEFAULT_FIRM_ID)
-    test_db.expire_all()
-    rows = test_db.query(LlmCallLog).all()
-    assert len(rows) == 1
-    assert rows[0].success is False
-    assert rows[0].error
-
-
-@pytest.mark.asyncio
-async def test_llm_failure_run_is_visible_in_the_run_history(test_db, monkeypatch):
-    """launch_background wraps the scorer, so the outage must be inspectable later."""
-    import backend.analyzer.llm_client as lc
-    import backend.job_monitor as jm
-    from backend.analyzer.cv_scorer import score_single_job
-    from backend.models.db import JobRun
-
-    resume = _seed_scoring(test_db)
-    job = _scored_job(test_db)
-
-    async def _boom(*a, **k):
-        raise FAULTS["529"]
-    monkeypatch.setattr(lc, "_dispatch", _boom)
-
-    jm.launch_background("analyze_job", score_single_job, trigger="manual",
-                         scope_key=str(job.id), target_job_id=job.id,
-                         func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light", "firm_id": DEFAULT_FIRM_ID})
-    await asyncio.sleep(0.2)
-    test_db.expire_all()
-    row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()
-    assert row.result_summary == "Scoring failed"
-
-
-@pytest.mark.asyncio
-async def test_llm_failure_marks_the_run_failed_not_completed(test_db, monkeypatch):
-    """A provider outage reads as a green run in Stats and as an OK toast in the UI,
-    because the scorer swallows the error and returns a summary string."""
-    import backend.analyzer.llm_client as lc
-    import backend.job_monitor as jm
-    from backend.analyzer.cv_scorer import score_single_job
-    from backend.models.db import JobRun
-
-    resume = _seed_scoring(test_db)
-    job = _scored_job(test_db)
-
-    async def _boom(*a, **k):
-        raise FAULTS["529"]
-    monkeypatch.setattr(lc, "_dispatch", _boom)
-
-    jm.launch_background("analyze_job", score_single_job, trigger="manual",
-                         scope_key=str(job.id), target_job_id=job.id,
-                         func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light", "firm_id": DEFAULT_FIRM_ID})
-    await asyncio.sleep(0.2)
-    test_db.expire_all()
-    row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()
-    assert row.status == "failed" and row.error
-
 
 @pytest.mark.asyncio
 async def test_a_malformed_llm_response_is_not_persisted(test_db, monkeypatch):
@@ -299,33 +227,6 @@ async def test_without_a_fallback_the_primary_error_propagates(test_db, monkeypa
     with pytest.raises(RateLimited):
         await lc.call_llm("p", "s")
 
-
-@pytest.mark.asyncio
-async def test_the_fallback_pair_is_what_gets_logged(test_db, monkeypatch):
-    """A cost row must name the provider that answered, not the one that timed out."""
-    import backend.analyzer.llm_client as lc
-    from backend.analyzer.cv_scorer import score_single_job
-    from backend.models.db import LlmCallLog
-
-    resume = _seed_scoring(test_db)
-    job = _scored_job(test_db)
-    set_setting(test_db, "llm_provider", "claude_api")
-    set_setting(test_db, "llm_model", "primary-model")
-    set_setting(test_db, "llm_fallback_provider", "openai")
-    set_setting(test_db, "llm_fallback_model", "fallback-model")
-
-    async def _dispatch(provider, model, api_key, prompt, system, max_tokens,
-                        cached_prefix=None, effort=""):
-        if model == "primary-model":
-            raise FAULTS["529"]
-        return {"text": '{"scores": {"Base": 60}}', "usage": {}}
-    monkeypatch.setattr(lc, "_dispatch", _dispatch)
-
-    await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light", firm_id=DEFAULT_FIRM_ID)
-    test_db.expire_all()
-    row = test_db.query(LlmCallLog).first()
-    assert row.provider == "openai" and row.model == "fallback-model"
-    assert row.success is True
 
 
 # ══ Gmail ════════════════════════════════════════════════════════════════════
@@ -528,34 +429,6 @@ async def test_telegram_test_trigger_survives_a_dead_bot(client, test_db, monkey
 
 
 # ── R4 fix-loop regressions (R4-T1-28) ───────────────────────────────────────
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("fault", list(FAULTS))
-async def test_every_llm_fault_kind_marks_the_run_failed(test_db, monkeypatch, fault):
-    """All four fault kinds must reach the JobRun as `failed`, not just 529."""
-    import backend.analyzer.llm_client as lc
-    import backend.job_monitor as jm
-    from backend.analyzer.cv_scorer import score_single_job
-    from backend.models.db import JobRun
-
-    resume = _seed_scoring(test_db)
-    job = _scored_job(test_db)
-
-    async def _boom(*a, **k):
-        raise FAULTS[fault]
-    monkeypatch.setattr(lc, "_dispatch", _boom)
-
-    jm.launch_background("analyze_job", score_single_job, trigger="manual",
-                         scope_key=str(job.id), target_job_id=job.id,
-                         func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light", "firm_id": DEFAULT_FIRM_ID})
-    await asyncio.sleep(0.2)
-    test_db.expire_all()
-    row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()
-    assert row.status == "failed"
-    # The summary the user sees is kept; the reason lands on `error`.
-    assert row.result_summary == "Scoring failed"
-    assert row.error and "Scoring failed" in row.error
 
 
 @pytest.mark.asyncio

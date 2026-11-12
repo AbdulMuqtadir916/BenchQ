@@ -9,19 +9,19 @@ Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)). Removing the tabl
 
 What each table held:
 
-- `ledger_entries`: the old activity ledger. Migration 0020 copied it, and nothing has read or written it since.
+- `ledger_entries`: the old activity ledger. Migration 0026 copied it, and nothing has read or written it since.
 - `activity_log_v2`: short event lines from background jobs, with no firm or person. Scores and jobs were never in it:
   they live in `jobs` and `candidate_jobs`. Since the PR 5 part 2 addition, those events are system rows.
 
 Owner, Manager, BDE and Viewer see exactly what they saw before. Every new row has no firm, and those readers only read
 their own firm's rows.
 
-## Migration 0022
+## Migration 0028
 
 1. Copies each `activity_log_v2` row into `activity_logs` as a system row with no firm. It keeps the id, date and message.
    The actor is named by type (Scraper, H-1B refresh, Résumé scoring, Email monitor, Telegram digest), the company becomes
    the label and the details the note.
-2. Copies any `ledger_entries` row not already there, the same way 0019 did. There were none on the development database.
+2. Copies any `ledger_entries` row not already there, the same way 0026 did. There were none on the development database.
 3. Stops with an error if any row of either table is missing from `activity_logs`.
 4. Drops both tables.
 

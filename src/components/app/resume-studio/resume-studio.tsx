@@ -15,6 +15,7 @@ import { usePrintExport } from "./print-export";
 import { stepTemplate } from "./templates";
 import { useStudio } from "./studio-store";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { normalizeProfileLink } from "@/lib/resume-doc/profile-link";
 import { resumeFileName } from "@/lib/derive/resume-name";
 
 /** True when a key press belongs to a text field rather than to the studio. */
@@ -28,7 +29,7 @@ function isTyping(target: EventTarget | null): boolean {
  * gets all the room. Builder mode: section forms left, live page right.
  * Viewer mode: the page itself, editable in place.
  */
-export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false }: { name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
+export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSave, isSaving = false }: { name: string; subtitle: string; canEdit: boolean; canTailor: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
   const doc = useStudio((s) => s.doc);
   const mode = useStudio((s) => s.mode);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -39,11 +40,13 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
   // Closing with unsaved edits asks first: a save is explicit (no autosave), so closing would lose them.
   const close = useCallback(() => (useStudio.getState().isDirty && onSave ? setConfirmingClose(true) : onClose()), [onClose, onSave]);
 
+  const hasInvalidLinks = !!doc && [doc.header.linkedin, doc.header.github].some((value) => normalizeProfileLink(value) === null);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (canEdit && onSave && useStudio.getState().isDirty) onSave();
+        if (canEdit && onSave && !hasInvalidLinks && !isSaving && useStudio.getState().isDirty) onSave();
         return;
       }
       // A dialog on top (discard, "Use this as the base?") answers its own Esc; the studio stays open.
@@ -60,7 +63,7 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, canEdit, onSave]);
+  }, [close, canEdit, onSave, hasInvalidLinks, isSaving]);
 
   if (!doc) return null;
   const isEditable = canEdit && mode === "view";
@@ -81,9 +84,11 @@ export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSavin
         name={name}
         subtitle={subtitle}
         canEdit={canEdit}
+        canTailor={canTailor}
         isTailoring={tailor.isRunning}
         onSave={onSave}
         isSaving={isSaving}
+        isSaveBlocked={hasInvalidLinks}
         onClose={close}
         onTailor={tailor.start}
         onExport={exporter.print}

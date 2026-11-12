@@ -93,7 +93,6 @@ src/mocks/fixtures/
 ├── resumes.ts         ~40 resumes, ~90 versions
 ├── applications.ts    ~320 applications with full event history
 ├── outreach.ts        contacts + touches
-├── followups.ts       derived from applications
 ├── ledger.ts          generated from all mutations above
 └── empty.ts           the empty-state variant of every collection
 ```
@@ -312,6 +311,9 @@ Rejection reasons must be real and varied: `NO_FUNCTIONING_WEBSITE`,
 
 ### 4.4 Jobs — 400
 
+> **Removed 2026-11-11 (job search PR 3):** jobs come only from the backend (`job_postings`, docs/02 §6.z). The
+> fixture below no longer exists; it is kept here as the record of what it held.
+
 | Field | Spread |
 |---|---|
 | `provenance.sourceType` | 180 CONNECTOR · 90 AGGREGATOR · 95 USER_SUBMITTED · 35 MANUAL |
@@ -358,16 +360,7 @@ checks — semantic headings, tables detected, font count, image text, contact b
 Two versions should carry a `tracer` with non-zero `openCount`, so the "recruiter opened your
 submission" signal has something to render.
 
-### 4.7 Follow-ups
-
-Derived from applications in `APPLIED` or later:
-
-- **7 overdue** — drives the red section on the dashboard
-- **11 due today**
-- **26 upcoming**
-- 4 snoozed, 3 cancelled
-
-Split across the three BDEs so the role switcher shows different queues.
+### 4.7 Follow-ups — removed, 07 Q61
 
 ---
 
@@ -443,7 +436,7 @@ A parallel set in `fixtures/empty.ts`, reachable via `?state=empty` on any route
 Empty states are half the screens in a new firm's first week and they are routinely shipped broken.
 
 Cover: no candidates · no jobs · no applications · candidate with no Record · candidate with no
-resumes · no follow-ups due · analytics with no data in the period · ledger with no entries.
+resumes · analytics with no data in the period · ledger with no entries.
 
 ---
 

@@ -66,6 +66,14 @@ duplicate adapter, the reset pages on hooks, and one token-based count badge. Ne
 **Known local issue:** `src/mocks/db.test.ts` (fixture fingerprint) fails on this Windows checkout only, because Git
 checks the fixture JSON out with CRLF. CI (Linux) is unaffected; `.gitattributes` would fix it for Windows.
 
+**PR 8 (2026-11-10):** `pr8-dashboards-managers-bdes-remove-analytics-followups`, built on main, not pushed yet. The dashboard's Activity tab goes from the
+whole firm to a manager's team to one BDE, now drawn as charts (funnel, ranked bars, bench aging, demand against the
+bench, stage speeds, job sources, BDE workload, a today ring), and every number opens the Applications or Candidates
+list filtered to the same records. Managers and viewers have the tab too (a manager sees only their team). New
+Owner-only Managers page; Analytics removed, its numbers moved to the tab (07 Q60). Follow-ups removed, agreed with
+Abdul (07 Q61). A manager now has only the Activity dashboard, with a per-BDE stage chart, and a BDEs page (07 Q62). Details in
+[pr-changes/pr8-owner-dashboard.md](./pr-changes/pr8-owner-dashboard.md).
+
 **Activity logs PR 2 (2026-11-05):** `activity/pr2-ledger-rules-as-tests`. CI now fails a route that changes data and
 writes no ledger entry (unless listed in `NOT_LOGGED` with a reason), a ledger write without `candidate_id`, and a ledger
 read outside the role-limited routes. No behaviour change. Change document:
@@ -81,7 +89,7 @@ screen: people list, searchable actor and candidate dropdowns, dates, and the si
 [pr-changes/activity-logs-pr4-activity-screen.md](./pr-changes/activity-logs-pr4-activity-screen.md).
 
 **Activity Log PR 7 (2026-11-07):** `activity-logs/pr7-remove-old-log-tables`, built on PR 6, not pushed yet. Removing
-`activity_log_v2` and `ledger_entries` is my responsibility, agreed with Abdul. Migration 0022 copies any row not yet in
+`activity_log_v2` and `ledger_entries` is my responsibility, agreed with Abdul. Migration 0028 copies any row not yet in
 `activity_logs`, stops if one is missing, then drops both tables. Details in
 [pr-changes/activity-logs-pr7-remove-old-log-tables.md](./pr-changes/activity-logs-pr7-remove-old-log-tables.md).
 
@@ -89,7 +97,7 @@ screen: people list, searchable actor and candidate dropdowns, dates, and the si
 calls) writes to `activity_logs` with no firm, so only the Super Admin sees it.
 
 **Activity Log PR 6 (2026-11-07):** `activity-logs/pr6-signin-events-and-super-admin`, built on PR 5 part 3, not pushed
-yet. Sign-out, failed sign-ins and lockouts are logged (migration 0021), and the Super Admin has the full Activity page,
+yet. Sign-out, failed sign-ins and lockouts are logged (migration 0027), and the Super Admin has the full Activity page,
 with a Failed sign-ins view only they can see. Details in
 [pr-changes/activity-logs-pr6-signin-events-and-super-admin.md](./pr-changes/activity-logs-pr6-signin-events-and-super-admin.md).
 

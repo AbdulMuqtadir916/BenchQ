@@ -521,3 +521,23 @@ def test_two_uploads_of_one_file_at_once_make_one_base(anonymous_client, test_db
     assert out["response"].status_code == 409
     assert out["response"].json()["detail"]["message"] == "This résumé is already Base 2."
     assert len(_listing(anonymous_client, world, c)["bases"]) == 2
+
+
+@pytest.mark.parametrize("field,value", [("linkedin", "aghajrgng;knga"), ("github", "ftp://github.com/qa")])
+def test_save_rejects_invalid_profile_links(anonymous_client, test_db, world, field, value):
+    candidate = _candidate(anonymous_client, test_db, world, bde="adnan")
+    version = _v(anonymous_client, world, candidate, who="adnan")
+    response = _save(anonymous_client, world, candidate, version, who="adnan", **{field: value})
+    assert response.status_code == 422
+    assert any(error["loc"][-1] == field for error in response.json()["detail"])
+
+
+def test_save_normalizes_bare_profile_links(anonymous_client, test_db, world):
+    candidate = _candidate(anonymous_client, test_db, world, bde="adnan")
+    version = _v(anonymous_client, world, candidate, who="adnan")
+    response = _save(anonymous_client, world, candidate, version, who="adnan",
+                     linkedin="linkedin.com/in/qa-test", github="github.com/qa-test")
+    assert response.status_code == 201
+    saved = _v(anonymous_client, world, candidate, version=2, who="adnan")
+    assert saved["linkedin"] == "https://linkedin.com/in/qa-test"
+    assert saved["github"] == "https://github.com/qa-test"

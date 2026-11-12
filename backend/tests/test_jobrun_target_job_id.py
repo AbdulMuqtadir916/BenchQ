@@ -5,7 +5,8 @@ import pytest
 from datetime import timezone
 from sqlalchemy import event
 from backend.models.db import JobRun
-from backend.tests.r4_support import make_job
+from backend.tests.r4_support import make_job  # noqa: F401
+from backend.tests.resume_support import make_target_posting
 
 pytestmark = pytest.mark.usefixtures("jobs_in_default_firm")
 
@@ -36,7 +37,7 @@ def test_target_job_id_column_nullable(test_db):
 
 def test_target_job_id_stores_uuid(test_db):
     job_uuid = uuid.uuid4()
-    make_job(test_db, id=job_uuid)  # job_runs.target_job_id is a real foreign key on Postgres
+    make_target_posting(test_db, id=job_uuid)  # job_runs.target_job_id names a job posting (0023)
     row = JobRun(
         job_type="tailor_resume",
         trigger="manual",
@@ -52,8 +53,8 @@ def test_target_job_id_stores_uuid(test_db):
 def test_target_job_id_indexed_for_filter(test_db):
     """Filter by target_job_id returns only matching rows."""
     job_a, job_b = uuid.uuid4(), uuid.uuid4()
-    make_job(test_db, id=job_a)
-    make_job(test_db, id=job_b)
+    make_target_posting(test_db, id=job_a)
+    make_target_posting(test_db, id=job_b)
     test_db.add_all([
         JobRun(job_type="tailor_resume", trigger="manual", status="running", target_job_id=job_a),
         JobRun(job_type="analyze_job",  trigger="manual", status="running", target_job_id=job_a),
@@ -73,7 +74,7 @@ async def test_launch_background_persists_target_job_id(test_db, monkeypatch):
     monkeypatch.setattr(mon, "_running", {})
 
     job_uuid = uuid.uuid4()
-    make_job(test_db, id=job_uuid)  # job_runs.target_job_id is a real foreign key on Postgres
+    make_target_posting(test_db, id=job_uuid)  # job_runs.target_job_id names a job posting (0023)
 
     async def noop():
         pass
@@ -100,7 +101,7 @@ async def test_tracked_run_persists_target_job_id(test_db, monkeypatch):
     monkeypatch.setattr(mon, "_running", {})
 
     job_uuid = uuid.uuid4()
-    make_job(test_db, id=job_uuid)  # job_runs.target_job_id is a real foreign key on Postgres
+    make_target_posting(test_db, id=job_uuid)  # job_runs.target_job_id names a job posting (0023)
 
     from backend.job_monitor import tracked_run
     async with tracked_run("analyze_job", trigger="scheduler", target_job_id=job_uuid):

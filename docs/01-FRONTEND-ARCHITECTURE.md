@@ -127,7 +127,6 @@ benchq-frontend/
 │   │   │   │   ├── page.tsx         kanban | table | calendar
 │   │   │   │   └── [id]/page.tsx
 │   │   │   ├── outreach/page.tsx
-│   │   │   ├── followups/page.tsx
 │   │   │   ├── analytics/page.tsx   MANAGER+
 │   │   │   ├── ledger/page.tsx
 │   │   │   └── settings/
@@ -151,7 +150,6 @@ benchq-frontend/
 │   │   │   ├── matches.ts
 │   │   │   ├── applications.ts
 │   │   │   ├── outreach.ts
-│   │   │   ├── followups.ts
 │   │   │   ├── analytics.ts
 │   │   │   └── ledger.ts
 │   │   ├── hooks/                   TanStack Query hooks, one per adapter
@@ -249,7 +247,7 @@ Everyone signs in on `/sign-in` with email + password against the backend; there
 - **Modules still on mocks** read the signed-in principal through `liveSession()` (`src/lib/api/live-session.ts`);
   tests sign in with `src/mocks/sign-in-as.ts`.
 
-This is how you verify that a BDE never sees `/analytics`, that a VIEWER has no mutating controls in the DOM at
+This is how you verify that a BDE never sees `/managers`, that a VIEWER has no mutating controls in the DOM at
 all, and that a BDE sees only their assigned candidates: sign in as each seeded account. The client guards are
 UX; enforcement is the backend (`backend/auth/access.py`).
 

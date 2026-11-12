@@ -1,13 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { candidatesApi } from "@/lib/api/candidates";
-import { jobsApi } from "@/lib/api/jobs";
-import { applicationsApi, followupsApi } from "@/lib/api/applications";
-import { resumesApi } from "@/lib/api/resumes";
+import { applicationsApi } from "@/lib/api/applications";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
 import { inboxApi } from "@/lib/api/inbox";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
+import { stubCandidateReads } from "@/mocks/fixture-backend";
+import { fixtureCandidates } from "@/test/fixtures/candidates";
 
 /**
  * Firm isolation at the adapter boundary (docs/07 T5): what a firm asks for is all it gets, and a
@@ -30,42 +29,37 @@ const is404 = async (promise: Promise<unknown>) => {
   return error instanceof ApiError && error.status === 404;
 };
 
+// Candidates, résumés and jobs are the backend's only (no mocks, decided 2026-11-11): their isolation is
+// backend/tests/test_isolation.py. The mocks below read candidates from the test fixture.
+beforeAll(() => {
+  stubCandidateReads();
+});
+const candidateOf = (firmId: string) => fixtureCandidates.find((candidate) => candidate.firmId === firmId)!;
+
 describe.each([[A, B], [B, A]])("firm %s never sees firm %s", (mine, other) => {
-  it("lists: candidates, jobs, applications, follow-ups, resumes", async () => {
+  it("lists: applications", async () => {
     await as(mine);
-    expect(onlyFirm(await candidatesApi.list(mine), mine)).toBe(true);
-    expect(onlyFirm(await jobsApi.list(mine, { limit: 1000 }), mine)).toBe(true);
     expect(onlyFirm(await applicationsApi.list(mine), mine)).toBe(true);
-    expect(onlyFirm(await followupsApi.list(mine), mine)).toBe(true);
-    const shelf = await resumesApi.shelf(mine);
-    expect(onlyFirm(shelf.resumes, mine) && onlyFirm(shelf.bases, mine)).toBe(true);
   });
 
   it("reads by id or candidate: the other firm's records are 404", async () => {
     await as(other);
-    const theirCandidate = (await candidatesApi.list(other))[0]!;
-    const theirJob = (await jobsApi.list(other))[0]!;
+    const theirCandidate = candidateOf(other);
     const theirApplication = (await applicationsApi.list(other))[0]!;
-    const theirResume = (await resumesApi.shelf(other)).resumes[0]!;
     await as(mine);
-    expect(await is404(candidatesApi.byId(mine, theirCandidate.id))).toBe(true);
-    expect(await is404(jobsApi.byId(mine, theirJob.id))).toBe(true);
     expect(await is404(applicationsApi.byId(mine, theirApplication.id))).toBe(true);
-    expect(await is404(resumesApi.open(mine, theirResume.latestVersionId))).toBe(true);
     expect(await is404(recordsApi.byCandidate(mine, theirCandidate.id))).toBe(true);
     expect(await is404(inboxApi.byCandidate(mine, theirCandidate.id))).toBe(true);
-    expect(await resumesApi.shelfByCandidate(mine, theirCandidate.id)).toEqual({ bases: [], resumes: [] });
     expect(await documentsApi.byCandidate(mine, theirCandidate.id)).toEqual([]);
     expect((await applicationsApi.list(mine, { candidateId: theirCandidate.id }))).toEqual([]);
   });
 
   it("writes: the other firm's records can't be changed through mine", async () => {
     await as(other);
-    const theirCandidate = (await candidatesApi.list(other))[0]!;
+    const theirCandidate = candidateOf(other);
     const theirApplication = (await applicationsApi.list(other))[0]!;
     const theirDocuments = await documentsApi.byCandidate(other, theirCandidate.id);
     await as(mine);
-    expect(await is404(candidatesApi.update(mine, theirCandidate.id, { notes: "x" } as never))).toBe(true);
     expect(await is404(applicationsApi.updateStatus(mine, theirApplication.id, { status: "WITHDRAWN", note: null }))).toBe(true);
     expect(await is404(documentsApi.upload(mine, theirCandidate.id, { kind: "OTHER", title: "x", fileName: "x.pdf", mimeType: "application/pdf", sizeKb: 1, expiresAt: null } as never))).toBe(true);
     expect(await is404(inboxApi.connect(mine, theirCandidate.id))).toBe(true);

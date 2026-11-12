@@ -42,7 +42,47 @@ def _clean_auth_throttle():
     throttle.reset()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _real_jobspy_model():
+    """Import the real `jobspy.model` once, before any test can stand in a fake `jobspy` module.
+
+    Several tests fake `jobspy` by putting a bare module (with `scrape_jobs` only) into `sys.modules`.
+    `backend/countries.py` does `from jobspy.model import Country`, which a bare module cannot satisfy, so those
+    tests (20 of them, in three files) failed when run on their own or first (KI-001) and passed in a full run
+    only because an earlier test had already imported the real submodule. With it already in `sys.modules`
+    the result no longer depends on test order."""
+    try:
+        import jobspy.model  # noqa: F401
+    except ImportError:
+        pass  # jobspy is not installed: the tests that need it will say so
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _restore_jobspy_module():
+    """Put `sys.modules["jobspy"]` back after each test: the fakes assign it directly, and used to leave
+    the stand-in behind for every test that ran after them."""
+    import sys
+
+    before = sys.modules.get("jobspy")
+    yield
+    if before is None:
+        sys.modules.pop("jobspy", None)
+    else:
+        sys.modules["jobspy"] = before
+
+
 # ── Anthropic mock fixtures ───────────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+def _no_job_search_network(monkeypatch):
+    """No test reaches a real job source (job search PR 1, Q31): the outbound call answers with no jobs unless a test
+    sets its own transport (backend/job_search/http.py). A live check is run by hand, never here."""
+    import httpx
+    from backend.job_search import http as job_search_http
+    monkeypatch.setattr(job_search_http, "transport",
+                        httpx.MockTransport(lambda request: httpx.Response(200, json={"data": [], "meta": {}})))
+
 
 @pytest.fixture
 def mock_anthropic_response():

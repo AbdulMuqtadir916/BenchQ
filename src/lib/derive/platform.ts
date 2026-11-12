@@ -1,5 +1,5 @@
 import type { Candidate } from "@/lib/schemas/candidate";
-import { isOwner } from "@/lib/auth/roles";
+import { isManager, isOwner } from "@/lib/auth/roles";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import type { Firm, User } from "@/lib/schemas/session";
 import { RESERVED_SLUGS, SUPPORT_VIEW_MINUTES, type FirmStatus, type Invite } from "@/lib/schemas/tenancy";
@@ -45,6 +45,14 @@ export function assignBlockReason(usage: Pick<FirmUsage, "assignedCandidates" | 
 
 /** 07 Q40: every BDE reports to a manager, so a firm without one can't invite BDEs or add candidates. The backend's NO_MANAGER_REASON. */
 export const NO_MANAGER_REASON = "Invite a manager first. Every BDE reports to a manager.";
+
+/**
+ * Why "New candidate" is off, or null: the team has loaded and has no active manager (07 Q40). One rule for the button and its
+ * `n` shortcut (BUG-017). The plan's candidate limit never blocks adding a candidate, only assigning a BDE (07 Q45).
+ */
+export function newCandidateBlockReason(team: readonly (Parameters<typeof isManager>[0] & { isActive: boolean })[] | undefined): string | null {
+  return team !== undefined && !team.some((user) => user.isActive && isManager(user)) ? NO_MANAGER_REASON : null;
+}
 
 export type OwnerStatus =
   | { kind: "active"; name: string; email: string; userId: string; isActive: boolean }

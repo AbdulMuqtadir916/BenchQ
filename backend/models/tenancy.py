@@ -263,7 +263,7 @@ ACTIVITY_ACTOR_ROLES = (*FIRM_ROLES, "PLATFORM_ADMIN")
 
 class ActivityEntry(Base):
     """The activity log: who did what, and who was responsible at that moment. A database trigger refuses UPDATE and
-    DELETE (migration 0016), so no code path can rewrite history. `firm_id` is null only for platform-only events
+    DELETE (migration 0026), so no code path can rewrite history. `firm_id` is null only for platform-only events
     (A13). No foreign key but the firm: the log outlives what it describes, and an actor may be a firm user, a platform
     user or nobody (SYSTEM, AGENT). Names and stamps are kept as they were at the time."""
     __tablename__ = "activity_logs"

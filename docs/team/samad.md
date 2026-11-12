@@ -8,6 +8,9 @@ These decisions supersede the earlier five-PR split, blanket human-acceptance ru
 immediate Other-content removal and manual sender-approval proposals. This file is the reviewer’s current module
 plan. Historical proposals in local working documents are not approval to implement conflicting behavior.
 
+> **Update 2026-11-11 (Zuhair):** the `applications.job_id` → `job_postings` repoint, first given to you on 2026-11-10,
+> is now **Arbaz's** (§2 item 5 points to it). `applications` stays your table: Arbaz confirms his change with you.
+
 ## PR raise rules
 
 1. **Check the latest main before every PR.** Fetch origin/main, start each branch from updated main and integrate
@@ -170,9 +173,15 @@ proposed access log. These are future scope, not hidden dependencies for PR 3.
    values; `status_transitions` → a proper history the frontend's `ApplicationEvent` reads.
 2. **Routes:** list (by candidate, in scope: a MANAGER's team, a BDE's own), create (candidate + job + **tailored
    résumé** `resume_id`; one per candidate per job), move status, notes. `submitted_by_user_id` is the signed-in user.
-3. **Follow-ups** (D5) as that doc says.
+3. ~~**Follow-ups** (D5)~~: dropped, the feature is removed (07 Q61, 2026-11-10, agreed with Abdul).
 4. **Frontend live** behind `applications`: the board, the candidate's Applications tab, the dashboards' numbers
    (they are derived from applications: never store a count).
+
+5. **Moved to Arbaz (decided 2026-11-11 by Zuhair):** repointing `applications.job_id` from the old `jobs` pool onto
+   `job_postings` is Arbaz's PR, not yours: [arbaz.md](./arbaz.md), "Repoint `applications.job_id` onto
+   `job_postings`". `applications` stays your table; that PR changes it, so Arbaz confirms the change with you first. **Still
+   yours:** `favorite_jobs` also points at the old `jobs` pool: repoint it onto `job_postings` or retire it in favour of
+   a Saved application, your call.
 
 ## 3. The Extension (capture + autofill)
 

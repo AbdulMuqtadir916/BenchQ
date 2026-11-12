@@ -3,7 +3,7 @@ import sample from "@/lib/api/dto/__samples__/resumes.json";
 import { ResumeShelfDto, toResumeShelf } from "@/lib/api/dto/resumes";
 import { arrayOf } from "@/lib/api/client";
 import { ResumeSchema } from "@/lib/schemas/resume";
-import resumesSeed from "@/mocks/data/resumes.json";
+import resumesSeed from "@/test/fixtures/resumes.json";
 import { baseSummary, buildResumeTree } from "./resume-tree";
 
 const shelf = toResumeShelf(ResumeShelfDto.parse(sample.listing), "firm_hts");

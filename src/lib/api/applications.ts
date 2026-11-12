@@ -1,4 +1,4 @@
-import type { Application, FollowUpTask } from "@/lib/schemas/application";
+import type { Application } from "@/lib/schemas/application";
 import type { UpdateApplicationStatus } from "@/lib/schemas/inbox";
 
 const mock = () => import("@/mocks/applications");
@@ -12,8 +12,4 @@ export const applicationsApi = {
 
   updateStatus: async (firmId: string, id: string, body: UpdateApplicationStatus): Promise<Application> =>
     (await mock()).applicationsMock.updateStatus(firmId, id, body),
-};
-
-export const followupsApi = {
-  list: async (firmId: string, params?: { userId?: string }): Promise<FollowUpTask[]> => (await mock()).followupsMock.list(firmId, params),
 };

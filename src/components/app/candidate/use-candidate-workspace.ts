@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import type { InboxMessage } from "@/lib/schemas/inbox";
 import { useCandidate } from "@/lib/hooks/use-candidates";
-import { useApplications, useFollowups } from "@/lib/hooks/use-applications";
+import { useApplications } from "@/lib/hooks/use-applications";
 import { useRecord } from "@/lib/hooks/use-records";
 import { useResumeShelf } from "@/lib/hooks/use-resumes";
 import { useJobs } from "@/lib/hooks/use-jobs";
@@ -31,10 +31,9 @@ export function useCandidateWorkspace(candidateId: string) {
   const applicationsQuery = useApplications(candidateId);
   const recordQuery = useRecord(candidateId);
   const shelfQuery = useResumeShelf(candidateId);
-  const jobsQuery = useJobs({ limit: 300 });
+  const jobsQuery = useJobs({ limit: 400, candidateId }); // the candidate's own jobs (docs/02 §6.z)
   const inboxQuery = useCandidateInbox(candidateId);
   const documentsQuery = useCandidateDocuments(candidateId);
-  const followupsQuery = useFollowups();
   const teamQuery = useTeam();
 
   const candidate = candidateQuery.data;
@@ -50,10 +49,6 @@ export function useCandidateWorkspace(candidateId: string) {
       const existing = byApp.get(message.applicationId);
       if (to && (!existing || message.receivedAt > existing.message.receivedAt)) byApp.set(message.applicationId, { message, applicationId: message.applicationId, to });
     }
-    const appIds = new Set(applications.map((a) => a.id));
-    const followups = (followupsQuery.data ?? [])
-      .filter((f) => appIds.has(f.applicationId) && (f.state === "PENDING" || f.state === "SNOOZED"))
-      .sort((a, b) => ((a.snoozedUntil ?? a.dueAt) < (b.snoozedUntil ?? b.dueAt) ? -1 : 1));
     const upcoming = messages
       .filter((m) => m.scheduledFor && new Date(m.scheduledFor).getTime() > now && (m.signal === "INTERVIEW_SCHEDULED" || m.signal === "CALL_REQUEST"))
       .filter((m) => !m.applicationId || !isClosed(statusById.get(m.applicationId) ?? "APPLIED"))
@@ -61,12 +56,11 @@ export function useCandidateWorkspace(candidateId: string) {
     return {
       statusById,
       suggestions: [...byApp.values()],
-      followups,
       upcoming,
       signals: latestSignalByApplication(messages),
       unread: messages.filter((m) => !m.isRead && m.signal !== "CONFIRMATION").length,
     };
-  }, [applications, messages, followupsQuery.data, now]);
+  }, [applications, messages, now]);
 
   const stats = useMemo(() => (candidate ? deriveCandidateStats(candidate, applications) : null), [candidate, applications]);
 

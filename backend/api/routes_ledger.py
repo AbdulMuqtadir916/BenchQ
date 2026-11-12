@@ -16,6 +16,7 @@ never repeats or skips one.
 from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import DateTime, String, and_, cast, func, literal, or_
@@ -127,15 +128,23 @@ SORTS = {"when": ActivityEntry.created_at, "actor": ActivityEntry.actor_name, "a
 def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
                 cursor: str | None = Query(None, max_length=128), sort: str = Query("when", pattern="^(when|actor|action)$"),
                 direction: str = Query("desc", alias="dir", pattern="^(asc|desc)$"), filters: Filters = Depends(),
+                cursor_at: datetime | None = None, cursor_id: uuid.UUID | None = None,
                 principal: Principal = Depends(current_principal), my_firm: uuid.UUID = Depends(reader_firm_id),
                 db: DbSession = Depends(get_db)):
     if firm_id != my_firm:
         raise HTTPException(status_code=404, detail="Not found.")
+    if (cursor_at is None) != (cursor_id is None) or (cursor_at is not None and cursor_at.utcoffset() is None):
+        raise HTTPException(status_code=422, detail="Supply both cursor fields, with a timezone.")
     support.settle_expired(db)      # a support view that ran out shows its end here, dated at its expiry
     db.commit()
     entries = _visible(db, principal, my_firm, filters)
     if cursor is not None:
         entries = _after_cursor(entries, cursor)
+    if cursor_at is not None:
+        # The same marker as two fields (the whole-ledger paging on main, BUG-022): the rows after that one, in
+        # this order. Both or neither, with a timezone (checked above).
+        entries = entries.filter(or_(ActivityEntry.created_at < cursor_at,
+                                     and_(ActivityEntry.created_at == cursor_at, ActivityEntry.id < cursor_id)))
     column = SORTS[sort]
     entries = entries.order_by(column.asc() if direction == "asc" else column.desc(), ActivityEntry.created_at.desc(),
                                ActivityEntry.id.desc()).offset(offset).limit(limit).all()

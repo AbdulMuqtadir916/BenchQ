@@ -21,7 +21,7 @@ deleted, so nothing cascades from a candidate.
 | Applications | `applications` | Job + status, no candidate | `candidate_id`, `resume_id`, `submitted_by_user_id` |
 | Inbox | `candidate_mailboxes`, `inbox_messages` | Nothing | New tables |
 | ~~Record (Truth Guard)~~ | ~~`claims`, `evidence`~~ | Created in 0007, **dropped in 0015** (2026-11-05: BenchQ has no claim states) | — |
-| Activity | `ledger_entries` (now `activity_logs`, migrations 0020 and 0021) | Firm ledger; candidate only in `entity_id` | `candidate_id` |
+| Activity | `ledger_entries` (now `activity_logs`, migrations 0026 and 0028) | Firm ledger; candidate only in `entity_id` | `candidate_id` |
 
 ## 2. The tables
 
@@ -132,7 +132,7 @@ so one application can have many (acknowledgement, screening, interview…).
 index (`firm_id`, `candidate_id`, `created_at`). Backfilled from entries whose `entity_type` is `candidate`.
 `ledger.record` sets it itself for an entry whose entity is a candidate; **every other write about a candidate passes
 `candidate_id=`** (an application, a résumé, an email). `GET /ledger?candidate_id=` is the candidate's activity. The old `activity_log_v2`
-was removed by migration 0022.
+was removed by migration 0028.
 
 ## 3. Not in 0007, on purpose
 

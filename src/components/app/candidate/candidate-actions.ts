@@ -7,5 +7,6 @@ export interface CandidateActions {
   openApplication: (applicationId: string) => void;
   openMessage: (messageId: string) => void;
   applySuggestion: (suggestion: Suggestion) => void;
-  findJobs: () => void;
+  /** "Find jobs": starts a real search (docs/02 §6.z). Only for the candidate's BDE: absent for anyone else, so no link offers it. */
+  findJobs?: () => void;
 }
