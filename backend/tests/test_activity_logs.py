@@ -628,13 +628,10 @@ def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0015)
         manager = make_user(db, firm, email="m@copied.test", role="MANAGER", name="Mira")
         bde = make_user(db, firm, email="b@copied.test", role="BDE", name="Bea")
         bde.manager_id = manager.id
-        # At 0015 the name is still a column the model no longer has (main's 0017 moved it to the résumé).
-        db.execute(text("ALTER TABLE candidates ALTER COLUMN full_name SET DEFAULT 'Asha'"))
         candidate = Candidate(firm_id=firm.id, manager_id=manager.id, bde_id=bde.id, created_by_user_id=manager.id,
                               work_auth="H1B")
         db.add(candidate)
         db.flush()
-        db.execute(text("ALTER TABLE candidates ALTER COLUMN full_name DROP DEFAULT"))
         when = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
         entry_id, firm_id, manager_id, bde_id, candidate_id = uuid.uuid4(), firm.id, manager.id, bde.id, candidate.id
         db.commit()
