@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { sessionApi } from "@/lib/api/session";
 import { teamApi, type InviteMemberInput } from "@/lib/api/team";
 import { useCan } from "@/lib/auth/permissions";
 import { queryKeys } from "@/lib/query/keys";
@@ -56,19 +55,6 @@ export function useChangeManager() {
       for (const key of [queryKeys.team.all(firmId), queryKeys.candidates.all(firmId), queryKeys.ledger.all(firmId)]) {
         void queryClient.invalidateQueries({ queryKey: key });
       }
-    },
-  });
-}
-
-/** OWNER only (`firmSettings.edit`, 07 Q46): the firm's BDE capacity. Refreshes the firm the URL resolved. */
-export function useUpdateFirmSettings() {
-  const firmId = useFirmId();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (settings: { bdeCapacity: number }) => sessionApi.updateFirmSettings(firmId, settings),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.session.all() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
     },
   });
 }

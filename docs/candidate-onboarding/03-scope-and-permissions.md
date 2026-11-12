@@ -1,5 +1,7 @@
 # 03 — Scope and permissions
 
+> **Superseded in part (2026-11-11, 07 Q63):** BDE capacity (Q46) was removed: no `bdeCapacity`, no `firmSettings.edit`, no capacity form, no "At capacity" figure, no `deriveBdeLoad`. Read the capacity parts below as history.
+
 **Owner:** — · **Depends on:** 01 · **Branch:** `feat/onboarding-03-scope-permissions`
 
 > **Built 2026-10-27.** As specified, with three notes:

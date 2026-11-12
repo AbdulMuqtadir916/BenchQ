@@ -19,11 +19,11 @@ from backend.auth.invites import (bad_request, check_email_free, check_seat, con
                                   normal_email, resend_invite, revoke_invite, send_invite)
 from backend.auth.policy import require
 from backend.auth.scoping import scoped
-from backend.auth.serialize import firm_json, user_json
+from backend.auth.serialize import user_json
 from backend.auth.sessions import Principal
 from backend.models.candidates import Candidate
 from backend.models.db import get_db, utcnow
-from backend.models.tenancy import Firm, Invite, User
+from backend.models.tenancy import Invite, User
 
 router = APIRouter(prefix="/firms/{firm_id}", tags=["team"])
 
@@ -62,10 +62,6 @@ class InviteMemberBody(BaseModel):
 
 class ChangeManagerBody(BaseModel):
     manager_id: uuid.UUID
-
-
-class FirmSettingsBody(BaseModel):
-    bde_capacity: int = Field(ge=1, le=50)
 
 
 def _active_manager(db: DbSession, firm_id: uuid.UUID, manager_id: uuid.UUID) -> User:
@@ -184,21 +180,3 @@ def change_manager(firm_id: uuid.UUID, user_id: uuid.UUID, body: ChangeManagerBo
                   changes=ledger.diff({"manager_id": previous.id if previous else None}, {"manager_id": manager.id}))
     db.commit()
     return user_json(bde)
-
-
-@router.patch("/settings", summary="The firm's own settings: the BDE capacity")
-def update_settings(firm_id: uuid.UUID, body: FirmSettingsBody,
-                    principal: Principal = Depends(require("firmSettings.edit")), db: DbSession = Depends(get_db)):
-    """OWNER only (07 Q46). The capacity is a warning when assigning, never a block."""
-    _member_of(firm_id, principal)
-    firm = lock_firm(db, firm_id)
-    if firm is None:
-        raise _not_found()
-    if firm.bde_capacity != body.bde_capacity:
-        before, firm.bde_capacity = firm.bde_capacity, body.bde_capacity
-        ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="firm",
-                      entity_id=firm.id, entity_label=firm.name, firm_id=firm.id,
-                      summary=f"BDE capacity {before} → {body.bde_capacity}", candidate_id=None,
-                      changes=ledger.diff({"bde_capacity": before}, {"bde_capacity": body.bde_capacity}))
-        db.commit()
-    return firm_json(db.get(Firm, firm_id))
