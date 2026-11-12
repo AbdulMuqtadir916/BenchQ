@@ -38,3 +38,16 @@ or a Super Admin operation.
 
 The check is static: it proves a route can reach a ledger write, not that every path through it does. `sign_out` counts
 as logging because it ends a support view, though a plain sign-out writes nothing yet (a later Activity logs PR).
+
+## Review fixes (CodeAnt, 2026-11-12)
+
+CodeAnt found six ways a change could get past the checks. None is in the code today, and the scan finds the same
+routes and writes as before (97 write routes, 98 logging functions, 30 ledger writes). Each now has a test that feeds the
+check a small file doing it:
+
+- `import backend.auth.ledger as ledger` (or by its full path) is read like `from backend.auth import ledger`.
+- A helper defined inside a route but never called no longer counts as the route logging.
+- A route added with `api_route(..., methods=[...])` or `add_api_route(...)` counts as a write route.
+- `LedgerEntry` imported under another name, or reached as `module.LedgerEntry`, is still seen when built or read.
+- The isolation setup's candidate entry names the real candidate: `record` fills a missing `candidate_id` from
+  `entity_id`, so the random id it had pointed at a candidate that doesn't exist.
