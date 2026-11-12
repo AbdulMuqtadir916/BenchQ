@@ -114,7 +114,7 @@ export function BdeCards({ rows, onSelectBde, columns = "sm:grid-cols-2 xl:grid-
               <span className="mt-3 grid grid-cols-3 gap-2 text-caption text-[var(--color-text-3)]">
                 <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.applications}</span>applied</span>
                 <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.interviews}</span>interviews</span>
-                <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.placements}</span>placed</span>
+                <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.offers}</span>offers</span>
               </span>
             </button>
           </li>
@@ -152,11 +152,11 @@ export function QueueCard({ waiting, now, links, canAssign }: { waiting: Candida
 const STAGES = [
   { key: "applied", label: "Applied", fill: "bg-[var(--color-chart-1)]" },
   { key: "shortlisted", label: "Shortlisted", fill: "bg-[var(--color-chart-2)]" },
-  { key: "interview", label: "Interview", fill: "bg-[var(--color-chart-3)]" },
-  { key: "placed", label: "Placed", fill: "bg-[var(--color-chart-4)]" },
+  { key: "interview", label: "Interview scheduled", fill: "bg-[var(--color-chart-3)]" },
+  { key: "offer", label: "Offer", fill: "bg-[var(--color-chart-4)]" },
 ] as const;
 
-/** Each BDE's applications of the period and how many reached shortlisted, interview and placed. Each BDE opens their dashboard. */
+/** Each BDE's applications of the period and how many reached Shortlisted, Interview scheduled and Offer. Each BDE opens their dashboard. */
 export function BdeStageBars({ rows, onSelectBde }: { rows: BdeStageRow[]; onSelectBde: (bdeId: string) => void }) {
   const max = Math.max(1, ...rows.map((row) => row.applied));
   return (
@@ -170,7 +170,7 @@ export function BdeStageBars({ rows, onSelectBde }: { rows: BdeStageRow[]; onSel
           {rows.map((row) => (
             <li key={row.id}>
               <button type="button" onClick={() => onSelectBde(row.id)} className={cn("block w-full px-2 py-1.5 text-left", linkSurface)}
-                aria-label={`${row.name}: ${row.applied} applied, ${row.shortlisted} shortlisted, ${row.interview} interview, ${row.placed} placed. Open their dashboard`}>
+                aria-label={`${row.name}: ${row.applied} applied, ${row.shortlisted} shortlisted, ${row.interview} interview scheduled, ${row.offer} offer. Open their dashboard`}>
                 <span className="block truncate text-sm text-[var(--color-text)]">{row.name}</span>
                 {STAGES.map((stage) => (
                   <span key={stage.key} className="mt-0.5 grid grid-cols-[1fr_2rem] items-center gap-2" aria-hidden>
