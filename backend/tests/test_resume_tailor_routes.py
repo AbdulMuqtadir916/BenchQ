@@ -15,7 +15,7 @@ from backend.tests.resume_support import make_posting
 from backend.tests.resume_tailor_samples import ANALYSIS, DRAFT, REVIEW, VERIFY
 from backend.tests.test_candidates_api import _assign, world  # noqa: F401  (the fixture)
 from backend.tests.test_resume_tailor_pipeline import _replies_from
-from backend.tests.test_resume_versions import _candidate, _listing
+from backend.tests.test_resume_versions import _candidate, _listing, _save, _v
 
 
 @pytest.fixture
@@ -190,13 +190,13 @@ def test_anyone_who_sees_the_candidate_reads_its_tailorings(anonymous_client, wo
 
 # ── Refusals ─────────────────────────────────────────────────────────────────
 
-def test_another_candidates_posting_or_base_is_not_found(anonymous_client, test_db, world, launched, setup):
+def test_another_candidates_posting_or_version_is_not_found(anonymous_client, test_db, world, launched, setup):
     other = _candidate(anonymous_client, test_db, world, bde="adnan")
     theirs = make_posting(test_db, world["firm"].id, uuid.UUID(other["id"]), world["people"]["adnan"].id, n=1)
     test_db.commit()
     assert _start(anonymous_client, world, setup, job_posting_id=str(theirs.id)).status_code == 404
-    their_base = _listing(anonymous_client, world, other)["bases"][0]["id"]
-    assert _start(anonymous_client, world, setup, base_resume_id=their_base).status_code == 404
+    their_v1 = _listing(anonymous_client, world, other)["bases"][0]["versions"][0]["id"]
+    assert _start(anonymous_client, world, setup, resume_id=their_v1).status_code == 404
     assert launched == []
 
 
@@ -232,7 +232,7 @@ def test_a_hidden_base_or_no_active_base_is_refused(anonymous_client, test_db, w
     base = test_db.get(BaseResume, uuid.UUID(setup["base"]["id"]))
     base.archived_at = utcnow()
     test_db.commit()
-    r = _start(anonymous_client, world, setup, base_resume_id=setup["base"]["id"])
+    r = _start(anonymous_client, world, setup, resume_id=setup["base"]["versions"][0]["id"])
     assert r.status_code == 409 and "hidden" in r.json()["detail"]
     base.archived_at, base.is_active = None, False
     test_db.commit()
@@ -240,7 +240,7 @@ def test_a_hidden_base_or_no_active_base_is_refused(anonymous_client, test_db, w
     assert r.status_code == 409 and "no active base" in r.json()["detail"]
 
 
-def test_the_same_base_and_job_running_is_refused(anonymous_client, world, launched, setup):
+def test_the_same_source_and_job_running_is_refused(anonymous_client, world, launched, setup):
     assert _start(anonymous_client, world, setup).status_code == 202
     r = _start(anonymous_client, world, setup)
     assert r.status_code == 409 and "already being tailored" in r.json()["detail"]
@@ -338,3 +338,139 @@ def test_a_run_logs_no_resume_or_posting_text(anonymous_client, test_db, world, 
                  "text the draft never had"):
         assert text not in written
     assert test_db.get(JobRun, uuid.UUID(run_id)).status == "completed"
+
+
+
+# ── From a version (decided 2026-11-12, part 3 R3-Q1, Q3, Q4) ───────────────
+
+def _v2(client, test_db, world, s):
+    """Base 1 v2: the BDE's saved edit."""
+    v1 = _v(client, world, s["c"], who="adnan")
+    r = _save(client, world, s["c"], v1, who="adnan", summary="An edited summary for the tailoring")
+    assert r.status_code in (200, 201), r.text
+    return _v(client, world, s["c"], version=2, who="adnan")
+
+
+def test_a_later_version_gets_its_own_base_not_active_when_the_tailoring_succeeds(
+        anonymous_client, test_db, world, launched, setup, monkeypatch):
+    from backend.models.candidates import BaseResume
+    from backend.models.tenancy import LedgerEntry
+    v2 = _v2(anonymous_client, test_db, world, setup)
+    r = _start(anonymous_client, world, setup, resume_id=v2["id"])
+    assert r.status_code == 202, r.text
+    run_id = r.json()["run_id"]
+    status = _status(anonymous_client, world, setup, run_id).json()
+    assert status["source_resume_id"] == v2["id"] and status["base_resume_id"] is None      # no base yet
+    assert len(_listing(anonymous_client, world, setup["c"])["bases"]) == 1
+
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    status = _status(anonymous_client, world, setup, run_id).json()
+    assert status["status"] == "completed"
+    bases = _listing(anonymous_client, world, setup["c"])["bases"]
+    assert len(bases) == 2 and status["base_resume_id"] == bases[1]["id"]
+    made = test_db.get(BaseResume, uuid.UUID(bases[1]["id"]))
+    assert (made.source, made.is_active, str(made.promoted_from_resume_id)) == ("PROMOTED", False, v2["id"])
+    assert test_db.get(BaseResume, uuid.UUID(setup["base"]["id"])).is_active               # the one in use stays
+    row = test_db.get(Resume, uuid.UUID(status["resume_id"]))
+    assert (row.category, str(row.base_resume_id)) == ("TAILORED", bases[1]["id"])
+    summaries = [e.summary for e in test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "resume")
+                 .order_by(LedgerEntry.created_at).all()]
+    assert "Made Base 2 from Base 1 v2 (for tailoring)" in summaries and "Tailored Base 2 for Dev 0" in summaries
+
+    # The same version again, for another job: the same base, no third one.
+    other = make_posting(test_db, world["firm"].id, uuid.UUID(setup["c"]["id"]), world["people"]["adnan"].id, n=1)
+    test_db.commit()
+    assert _start(anonymous_client, world, setup, resume_id=v2["id"], job_posting_id=str(other.id)).status_code == 202
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    assert len(_listing(anonymous_client, world, setup["c"])["bases"]) == 2
+
+
+def test_a_failed_tailoring_from_a_version_leaves_no_base(anonymous_client, test_db, world, launched, setup,
+                                                         monkeypatch):
+    v2 = _v2(anonymous_client, test_db, world, setup)
+    run_id = _start(anonymous_client, world, setup, resume_id=v2["id"]).json()["run_id"]
+    _drive(test_db, launched, ["not json", "still not json"], monkeypatch)
+    assert _status(anonymous_client, world, setup, run_id).json()["status"] == "failed"
+    assert len(_listing(anonymous_client, world, setup["c"])["bases"]) == 1
+
+
+def test_a_tailored_version_is_not_a_source(anonymous_client, test_db, world, launched, setup, monkeypatch):
+    run_id = _start(anonymous_client, world, setup).json()["run_id"]
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    tailored = _status(anonymous_client, world, setup, run_id).json()["resume_id"]
+    r = _start(anonymous_client, world, setup, resume_id=tailored)
+    assert r.status_code == 409 and "can't be tailored again" in r.json()["detail"]
+
+
+def test_a_hidden_base_made_from_the_version_is_refused_and_a_deleted_one_comes_back(
+        anonymous_client, test_db, world, launched, setup, monkeypatch):
+    from backend.models.candidates import BaseResume
+    from backend.models.tenancy import LedgerEntry
+    v2 = _v2(anonymous_client, test_db, world, setup)
+    _start(anonymous_client, world, setup, resume_id=v2["id"])
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    made = test_db.query(BaseResume).filter(BaseResume.promoted_from_resume_id == uuid.UUID(v2["id"])).one()
+    made.archived_at = utcnow()
+    test_db.commit()
+    r = _start(anonymous_client, world, setup, resume_id=v2["id"])
+    assert r.status_code == 409 and "made from this version, is hidden" in r.json()["detail"]
+
+    made.archived_at, made.deleted_at = None, utcnow()
+    test_db.commit()
+    other = make_posting(test_db, world["firm"].id, uuid.UUID(setup["c"]["id"]), world["people"]["adnan"].id, n=2)
+    test_db.commit()
+    run_id = _start(anonymous_client, world, setup, resume_id=v2["id"], job_posting_id=str(other.id)).json()["run_id"]
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    assert _status(anonymous_client, world, setup, run_id).json()["status"] == "completed"
+    test_db.refresh(made)
+    assert made.deleted_at is None and not made.is_active
+    assert test_db.query(LedgerEntry).filter(
+        LedgerEntry.summary == "Restored Base 2 (its v1) by using Base 1 v2 again (for tailoring)").count() == 1
+
+
+def test_use_as_base_still_makes_the_base_the_one_in_use(anonymous_client, test_db, world, launched, setup):
+    from backend.models.candidates import BaseResume
+    v2 = _v2(anonymous_client, test_db, world, setup)
+    r = anonymous_client.post(_url(world, setup["c"], f"/{v2['id']}/use-as-base"), headers=world["as"]["adnan"])
+    assert r.status_code == 200, r.text
+    made = test_db.query(BaseResume).filter(BaseResume.promoted_from_resume_id == uuid.UUID(v2["id"])).one()
+    assert made.is_active
+
+
+# ── The steps and the BDE's panel (part 3 R2-Q1, R2-Q2, R3-Q2) ──────────────
+
+def test_each_step_is_recorded_as_it_starts(anonymous_client, test_db, world, launched, setup, monkeypatch):
+    seen = []
+    monkeypatch.setattr(runs, "_record_step", lambda run_id, step: seen.append(step))
+    run_id = _start(anonymous_client, world, setup).json()["run_id"]
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    assert seen == ["analyse", "draft", "review", "revise", "verify", "save"]
+    assert _status(anonymous_client, world, setup, run_id).json()["step"] is None          # finished: no step
+
+
+def test_a_running_tailoring_shows_its_step(anonymous_client, test_db, world, launched, setup):
+    run_id = _start(anonymous_client, world, setup).json()["run_id"]
+    runs._record_step(uuid.UUID(run_id), "review")
+    assert _status(anonymous_client, world, setup, run_id).json()["step"] == "review"
+
+
+def test_the_panel_reads_only_ones_own_recent_tailorings(anonymous_client, test_db, world, launched, setup,
+                                                         monkeypatch):
+    from datetime import timedelta
+    url = f"/api/firms/{world['firm'].id}/tailorings"
+    running = _start(anonymous_client, world, setup).json()["run_id"]
+    other = make_posting(test_db, world["firm"].id, uuid.UUID(setup["c"]["id"]), world["people"]["adnan"].id, n=1)
+    test_db.commit()
+    done = _start(anonymous_client, world, setup, job_posting_id=str(other.id)).json()["run_id"]
+    launched.reverse()                                     # drive the second one; the first stays running
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    mine = anonymous_client.get(url, headers=world["as"]["adnan"]).json()
+    assert {r["run_id"]: r["status"] for r in mine} == {running: "running", done: "completed"}
+    assert all(r["job_title"].startswith("Dev") and r["candidate_id"] == setup["c"]["id"] for r in mine)
+    for who in ("owner", "fatima"):                        # their own only: none
+        assert anonymous_client.get(url, headers=world["as"][who]).json() == []
+
+    old = test_db.get(JobRun, uuid.UUID(done))
+    old.finished_at = utcnow() - runs.RECENT_FOR - timedelta(minutes=1)
+    test_db.commit()
+    assert [r["run_id"] for r in anonymous_client.get(url, headers=world["as"]["adnan"]).json()] == [running]

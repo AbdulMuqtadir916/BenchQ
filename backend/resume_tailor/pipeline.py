@@ -38,16 +38,20 @@ REPORT_KEY = cb.REPORT_KEY
 PURPOSE = "resume_tailor"
 
 
-async def tailor(base: dict, jd_text: str, title_of_the_job: str = "", *, setup: Setup, firm_id=None) -> dict:
+async def tailor(base: dict, jd_text: str, title_of_the_job: str = "", *, setup: Setup, firm_id=None,
+                 on_step=None) -> dict:
     """The tailored copy (our résumé JSON) with the workflow's record kept in its report: each step's result,
     seconds and token usage. `base` is `build_base_resume` of the stored résumé; `jd_text` the posting without fake
-    markers, cut to its first 20,000 characters (`stored.prepared_posting`)."""
+    markers, cut to its first 20,000 characters (`stored.prepared_posting`). `on_step(name)`, if given, is awaited as
+    each step starts (BenchQ: the run records the step the screens show, decided 2026-11-12, part 3 R2-Q1)."""
     base = base or {}
     resume = with_the_skills_list_labelled(cb._resume_as_numbered_text(base))
     posting = fence(jd_text, "JOB POSTING")
     steps, seconds, usage = {}, {}, {}
 
     async def step(name: str, prompt: str, system_name: str = "system") -> dict:
+        if on_step is not None:
+            await on_step(name)
         started = time.monotonic()
         reply, response = await _ask(setup, prompt, setup.prompts[system_name], name, firm_id)
         seconds[name] = round(time.monotonic() - started, 1)

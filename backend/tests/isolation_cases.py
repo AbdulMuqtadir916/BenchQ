@@ -115,6 +115,8 @@ CASES: dict[str, Case] = {
         as_bde=True, body=lambda i: {"job_posting_id": str(i["posting"])}, body_ids=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings": Case(),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings/{run_id}": Case(),
+    # The signed-in user's own tailorings (their panel): another firm's URL is the same 404 as a missing one.
+    "GET /api/firms/{firm_id}/tailorings": Case(),
     # Job search (job search PR 1): a search is the candidate's BDE's, with the résumé country it searches in.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(
         as_bde=True, body=lambda i: {"query": "Java Developer"}, prepare=_resume_country_us),

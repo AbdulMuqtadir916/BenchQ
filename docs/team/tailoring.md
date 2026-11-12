@@ -22,8 +22,8 @@ not started. Committed, not pushed.
 | # | Decision |
 |---|---|
 | Split | One PR (`feat/resume-tailoring`) in three commits, each tested on its own: **part 1** the backend package and its tests, with no routes; **part 2** the route, the background run and storing the version; **part 3** the frontend. The ATS score and a PDF the server makes are later PRs. |
-| Q1 | A tailoring starts from the candidate's **active base** by default; the BDE may pick any of the candidate's other bases that isn't hidden. It reads that base's **version 1** (resume-versioning.md §4, "the workflow always uses version 1"). A tailored résumé stays identified by base + job. |
-| Q2 | Tailoring the same base for the same job again adds the **next version** of that tailored résumé; earlier versions, edited ones included, stay in its history. part 3 asks before it does. A version an application was sent with is never changed. |
+| Q1 | A tailoring starts from the candidate's **active base** by default; the BDE may pick any of the candidate's other bases that isn't hidden. It reads that base's **version 1** (resume-versioning.md §4, "the workflow always uses version 1"). A tailored résumé stays identified by base + job. **Changed in part 3 (R3-Q1, §8):** the source may be any of a visible base's versions; a later version becomes a base of its own, not active, when the tailoring succeeds. |
+| Q2 | Tailoring the same base for the same job again adds the **next version** of that tailored résumé; earlier versions, edited ones included, stay in its history. Part 3 asks nothing: the button reads "Tailor again" (§8, Q5). A version an application was sent with is never changed. |
 | Q3, Q3c | Tracking: the **ledger** (who, when, the candidate, the résumé, model and prompt version), **`job_runs`** (every run: status, times, failure reason, the job, the firm), **`llm_call_log`** (each of the five calls: tokens, cost, under the firm) and **counts only** of the tailor's report in `job_runs.meta` (§5). No new table, no migration. |
 | Q4b | The BDE sees only the tailored résumé. The gaps and stretch flags the workflow writes are not shown and not kept. |
 | Q5 | The skills dictionary and its matcher come from JobNavigator unchanged (`backend/analyzer/keyword_match.py`, `data/skills_dictionary.json`, `known_skills.py`, and `clean_job_text` in `job_requirements.py`). |
@@ -156,9 +156,33 @@ Jobs page's "All candidates", the owner's dashboard, ⌘K) read more.
   `providers.reader_for(source).read()`), so a freehire.me or extension description's HTML reaches the model as plain
   text, a typed one as typed; "no description" (422) is checked on that text. It read `content["description"]` raw.
 
-**Part 3, the frontend:**
-- the studio's tailoring (`tailor-run.tsx`, `useAgentRun`) and the job pane run the real thing;
-- a base picker and the re-tailor confirmation;
-- skeleton, empty, error and 409 states.
+**Part 3, the screens (grilled and built 2026-11-12, Zuhair).**
+
+| # | Decision |
+|---|---|
+| Q1 | A BDE starts a tailoring from the job pane (the button reads **"Tailor"**, was "Tailor & apply"), the job page opened for a candidate, the dashboard queue's sparkle, and Focus mode's **T**. **Focus mode is the BDE's only** (07 Q64, replaces Q3). |
+| Q2 | The studio's "Tailor with AI" is removed: a tailoring starts from a job. |
+| Q3 | The BDE stays where they are: the button dims while that tailoring runs; the panel says when it's done, with **Open**. The existing staged panel (`AgentRunPanel`) is reused. |
+| Q4, R2-Q5 | The **Tailor** button and a picker beside it, on the job pane, the job page and the dashboard queue: the click uses the picked source, by default the active base's v1. Focus mode's T always uses the active base. |
+| Q5 | No confirmation: once a copy exists for that base and job the button reads **"Tailor again"** (its next version), with **Open tailored** beside it. |
+| Q6 | A job's id is the candidate's own posting: screens about a candidate read only their jobs (step 1 above). |
+| Q7 | The `TailoringRun` contract (docs/02 §8.3), signed off by Zuhair; the old mock (`agentsApi.tailorResume`, `AgentDraft`) is deleted. |
+| Q8 | One plain sentence per failure; **Try again** for `provider_failed`, `unreadable_reply`, `lost`, `internal`; none for `gone`, `hidden`, `setup`. |
+| R2-Q1 | **Real steps:** the run records its step as it starts each (analyse, draft, review, revise, verify), then `save`; the panel shows exactly that. |
+| R2-Q2, R3-Q2 | **One panel on every firm page** (the studio and Focus mode included): the BDE's tailorings that are running or finished in the last 30 minutes (`GET /firms/{firm}/tailorings`, their own only). A finished row has **Open**, a failed one its reason and Try again; **×** dismisses a finished row (remembered in that browser). |
+| R2-Q3 | **Hide** folds the panel into a pill ("2 tailoring · 1 ready"); a tailoring can't be cancelled (later). |
+| R2-Q4 | The panel and buttons read the runs again **every 3 s while one runs**, not at all otherwise. |
+| R2-Q6 | The job page opened for no candidate (⌘K, "All candidates") has no Tailor: "Open this job from a candidate to tailor their résumé." |
+| R3-Q1 | **The source is a version** (changes Q1): the picker lists each visible base's own versions. A v1 is its base. **Any other version gets a base of its own when the tailoring succeeds, not made active** (`versions.base_for_tailoring`; "Use as base" makes it active, as before). The active base, the profile and the job search don't change; a failed run leaves no base. |
+| R3-Q3 | Only a base's versions: a tailored version can't be tailored again (409). |
+| R3-Q4 | As "Use as base": the version's base made before comes back if deleted (ledger "Restored Base N (its v1) by using Base M vK again (for tailoring)"); if hidden, 409 "Show it again first", and the picker shows the version unavailable with the reason. A new one is logged "Made Base N from Base M vK (for tailoring)". |
+
+**Files.** Backend: `runs.py` (`tailoring_source`, the step recorder, `_finish` makes the base, `my_runs`, a `hidden`
+failure code), `routes_resume_tailoring.py` (`resume_id`, `firm_router`), `versions.py` (`_base_from` shared by
+`use_as_base` and `base_for_tailoring`; `restore_base(activate=)`), `pipeline.py`/`run.py` (`on_step`), `access.py`,
+`main.py`. Frontend: `schemas/tailoring.ts`, `api/tailoring.ts`, `api/dto/tailoring.ts`, `hooks/use-tailoring.ts`,
+`components/app/tailoring/` (`tailor-button.tsx`, `tailoring-panel.tsx`, `messages.ts`, `stored.ts`), the panel in
+`app/[firm]/layout.tsx`, the four entry points, the registry (Focus mode). Deleted: `tailor-run.tsx`, `schemas/agent.ts`,
+the studio's tailor props, the agents mock's `tailorResume`.
 
 **Later:** the ATS score of a tailored version against its job, and a PDF the server makes (extension, email).

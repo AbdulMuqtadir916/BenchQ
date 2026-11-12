@@ -8,7 +8,7 @@ import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useRecord } from "@/lib/hooks/use-records";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { can, canManageResume, scopeCandidates } from "@/lib/auth/permissions";
+import { can, scopeCandidates } from "@/lib/auth/permissions";
 import { buildResumeDocument, newText, newId } from "@/lib/resume-doc/build";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -61,7 +61,7 @@ export function NewResume({ initialMode, upload }: { initialMode: StudioMode; up
   }, [start, candidate, recordQuery.data, loadedId, draftId, templateId, upload, initialMode, load]);
 
   if (loadedId === draftId) {
-    return <ResumeStudio name={[candidate?.fullName, "New résumé"].filter(Boolean).join(" · ")} subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")} canEdit={can(principal, "resume.edit")} canTailor={!!candidate && canManageResume(principal, candidate)} onClose={close} />;
+    return <ResumeStudio name={[candidate?.fullName, "New résumé"].filter(Boolean).join(" · ")} subtitle={[candidate?.fullName, candidate?.primaryRole].filter(Boolean).join(" · ")} canEdit={can(principal, "resume.edit")} onClose={close} />;
   }
 
   // No Record (a candidate from the backend): the buttons open again, so "Start blank" still works.

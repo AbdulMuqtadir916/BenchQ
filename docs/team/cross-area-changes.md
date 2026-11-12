@@ -3,6 +3,21 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé tailoring, part 3: the screens (`feat/resume-tailoring`, Zuhair)
+
+Grilled and built 2026-11-12 ([tailoring.md](./tailoring.md) §8). These rows wait for their owners.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Route registry and 07 (Abdul) | `src/lib/routes/registry.ts`, `registry.test.ts`, `docs/07-ROUTES-AND-RBAC.md` (Q3, Q64, §2.2) | Focus mode is the BDE's only: OWNER and MANAGER `none` (Forbidden in place), out of their palette and shortcuts. | Decided by Zuhair 2026-11-12 (Q64, replaces Q3): its actions are the BDE's own work. | **Pending: Abdul** |
+| Firm layout (shared) | `src/app/[firm]/layout.tsx` | The tailoring panel mounted beside every firm page (inside `FirmGate`). | R2-Q2: the BDE's tailorings follow them across pages. | **Pending** |
+| BDE dashboard (candidate/dashboard owners) | `src/features/dashboard/bde-dashboard.tsx` | The queue's sparkle is the Tailor control (the picker beside it); it no longer links to the job page. | R2-Q5. | **Pending** |
+| Focus mode (shared) | `src/app/[firm]/focus/page.tsx` | T starts a real tailoring (the active base) and moves on; a refusal is said under the actions. | Q1, Q4. | **Pending** |
+| Mock tests (shared) | `src/mocks/agents.ts`, `membership.ts` (`FIRM_SCOPED_RESOURCES` without `agents`), `membership.test.ts`, `write-authorization.test.ts`; `src/components/dev/stage-one-showcase.tsx` | The agents mock's `tailorResume` and its rows deleted; `agents` keeps only `rewrite` (no firm). The dev showcase plays the staged panel without a call. | Q7: the theatre goes; tailoring is the backend's. | **Pending** |
+| Access table (Abdul) | `backend/auth/access.py` | `GET /api/firms/{firm_id}/tailorings` (FIRM; the caller's own runs, a support view gets none). | `test_access.py` refuses an unclassified route. | **Pending: Abdul** |
+| Isolation sweep (Uzair) | `backend/tests/isolation_cases.py` | The new route's case. | Every route stays classified and checked. | **Pending: Uzair** |
+| App wiring | `backend/main.py` | The tailoring `firm_router` included. | The new route. | Informational |
+
 ## Résumé tailoring, part 3 step 1: only that candidate's jobs (`feat/resume-tailoring`, Zuhair)
 
 Zuhair's rule (2026-11-12): a screen about one candidate reads only that candidate's jobs ([tailoring.md](./tailoring.md)

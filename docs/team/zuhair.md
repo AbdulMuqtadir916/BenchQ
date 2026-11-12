@@ -72,9 +72,10 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
 ## 3. Résumé tailoring (+ ATS score) — design and plan in [tailoring.md](./tailoring.md)
 
 1. Designed (grilling, 2026-11-11 and 2026-11-12): one PR, `feat/resume-tailoring`, in three commits (the backend
-   package, the wiring, the frontend), decisions in [tailoring.md](./tailoring.md) §1 and §7. Parts 1 and 2 built
-   2026-11-12; part 3 (the frontend) next.
-2. **Tailored résumés** from a base's version 1 for one job (`category = 'TAILORED'`, `base_resume_id`,
+   package, the wiring, the frontend), decisions in [tailoring.md](./tailoring.md) §1, §7 and §8. All three parts
+   built 2026-11-12 (part 3 after a commit that makes a candidate's screens read only their own jobs).
+2. **Tailored résumés** from a version of a visible base (default the active base's v1; a later version becomes a
+   base of its own, not active, part 3 R3-Q1) for one job (`category = 'TAILORED'`, `base_resume_id`,
    `job_id`; [resume-versioning.md](./resume-versioning.md) §4), many per candidate.
    Tailoring creates them; editing one is résumé versioning PR 5's save (the next version), and only the
    candidate's BDE tailors (07 Q55, `can_manage_resume`). The active base by default; the BDE may pick another
@@ -88,7 +89,8 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
    workflow (tailoring.md), and tailoring's part 2 deletes the old pipeline (`backend/analyzer/legacy_tailoring.py`).
    A PDF the server makes itself (extension, email, tracer links) is also a later PR, built from the studio's designs
    (resume-versioning.md §8).
-6. Frontend live behind `resumes`.
+6. Frontend live: the Tailor control (job pane, job page for a candidate, dashboard queue, Focus mode's T) and the
+   tailoring panel on every firm page (tailoring.md §8).
 
 ## Rules for you
 

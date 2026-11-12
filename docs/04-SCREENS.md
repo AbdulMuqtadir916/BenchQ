@@ -442,6 +442,15 @@ Virtualise past 100 rows. 500 rows must scroll at 60fps.
 **Empty:** no jobs captured → a card explaining the two capture paths with a link to `/jobs/capture`.
 Filtered to nothing → clear-filters state.
 
+**Tailoring (tailoring part 3, docs/02 §8.3).** With a candidate picked, their BDE gets **Tailor** in the job pane
+(the same control on the job page opened for that candidate, and as the sparkle in the dashboard queue): a picker
+beside it lists the candidate's visible bases' versions (default the active base's v1; a version whose base is hidden
+is shown unavailable with the reason). "Tailor again" plus **Open tailored** once a copy exists for that base and job;
+dimmed while that tailoring runs; a refused start says why in one line. **The tailoring panel**, on every firm page
+(the studio and Focus mode included), lists the BDE's tailorings running or finished in the last 30 minutes: the open
+one with its real step and timer, the rest as rows (step and timer, or **Open**, or the reason and **Try again**);
+**Hide** folds it to a pill, **×** dismisses a finished row. Nothing shows for someone with no tailorings.
+
 ### 5.2 `/jobs/capture`
 
 > **Since job search PR 3 (docs/02 §6.z):** one form, the candidate's BDE's only: the candidate (one of theirs), the
@@ -498,7 +507,7 @@ A close button (and `Esc`) returns to wherever it was opened from. `?mode=view` 
 `/resumes/new?upload=<file>` opens a parsed upload.
 
 ```
-┌ ✕ │ Base [Base]     [ Builder | Viewer ]    Unsaved changes [Save]  [Tailor with AI] [Export PDF] ┐
+┌ ✕ │ Base [Base]     [ Builder | Viewer ]    Unsaved changes [Save]  [Export PDF]                  ┐
 ├──────────────────────────────┬─────────────────────────────────────────────────────────────────┤
 │ ▸ Header                     │ Template ‹ Classic Serif ▾ ›   − Fit · 91% +   2 pages · Letter  │
 │ ▸ Summary                    │ ┌─────────────────────────────┐                                 │
@@ -528,7 +537,8 @@ A close button (and `Esc`) returns to wherever it was opened from. `?mode=view` 
 - **Templates** — six styles (Classic Serif, Modern, Minimal, Executive, Compact, Two Column). The
   ‹ › arrows (or `[` `]`) step through them; the name opens a strip of live thumbnails rendered from
   this resume's own content. The page is always white in both themes — it is the printed document.
-- **AI output** — a rewrite from the selection toolbar or a **Tailor with AI** run flashes the text it changed.
+- **AI output** — a rewrite from the selection toolbar flashes the text it changed. The studio doesn't tailor: a
+  tailoring starts from a job (§5, tailoring part 3 Q2).
 - **Export PDF** prints a clean copy of the page through the browser's print dialog.
 
 **Export.** Any résumé that is not deleted can be exported (no claim states, no export block).
@@ -606,6 +616,9 @@ against the selected candidate:
 The queue is the selected candidate's own jobs, read again when the candidate changes (2026-11-12: only that
 candidate's jobs). While they load it shows a skeleton; a failed read shows the error with Retry; a candidate with no
 unapplied jobs shows "No jobs to work".
+
+**The BDE's only** (07 Q64). **T** starts a real tailoring of the active base for this job and moves on at once; it
+runs in the tailoring panel. A refused start says why under the actions.
 
 Single keystroke per decision, auto-advance, progress across the top. `Esc` exits and returns to
 the dashboard with a session summary: jobs reviewed, applications logged, time spent.

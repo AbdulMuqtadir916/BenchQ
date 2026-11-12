@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDot, CloudCheck, Download, FileCheck2, FileUser, LoaderCircle, Save, Sparkles, X } from "lucide-react";
+import { CircleDot, CloudCheck, Download, FileCheck2, FileUser, LoaderCircle, Save, X } from "lucide-react";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
@@ -14,19 +14,15 @@ interface StudioTopbarProps {
   subtitle: string;
   /** May edit and save (07 Q55 `canChangeResume`): the BDE once assigned; before that the OWNER and the candidate's MANAGER. */
   canEdit: boolean;
-  /** May tailor (07 Q55 `canManageResume`): only the candidate's assigned BDE, never the owner or manager. */
-  canTailor: boolean;
-  isTailoring: boolean;
   /** Saving makes the next version (§4.3). Absent where there is nothing to save to (a new, unsaved draft). */
   isSaveBlocked?: boolean;
   onSave?: () => void;
   isSaving?: boolean;
   onClose: () => void;
-  onTailor: () => void;
   onExport: () => void;
 }
 
-export function StudioTopbar({ doc, name, subtitle, canEdit, canTailor, isTailoring, onSave, isSaving = false, isSaveBlocked = false, onClose, onTailor, onExport }: StudioTopbarProps) {
+export function StudioTopbar({ doc, name, subtitle, canEdit, onSave, isSaving = false, isSaveBlocked = false, onClose, onExport }: StudioTopbarProps) {
   const Icon = doc.isMaster ? FileUser : FileCheck2;
 
   return (
@@ -58,12 +54,6 @@ export function StudioTopbar({ doc, name, subtitle, canEdit, canTailor, isTailor
 
       <div className="flex min-w-0 items-center justify-end gap-2">
         {canEdit && onSave ? <SaveControl onSave={onSave} isSaving={isSaving} isSaveBlocked={isSaveBlocked} /> : null}
-        {canTailor ? (
-          <Button variant="secondary" size="sm" onClick={onTailor} disabled={isTailoring} className="hidden md:inline-flex">
-            {isTailoring ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
-            Tailor with AI
-          </Button>
-        ) : null}
         <Button size="sm" onClick={onExport} title="Download as PDF">
           <Download size={14} aria-hidden />
           <span className="hidden sm:inline">Export PDF</span>

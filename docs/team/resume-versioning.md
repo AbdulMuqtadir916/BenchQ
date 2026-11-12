@@ -284,7 +284,10 @@ Re-tailoring the same base for the same job is the next version of that résumé
 > **The workflow (tailoring, job search) always uses version 1 of the active base.**
 
 Every version a person selects becomes the first version of a new base, so the active base's v1 is always the
-résumé in use. Versions 2, 3… of any base are saved edits nobody selected. The workflow résumé is:
+résumé in use. Versions 2, 3… of any base are saved edits nobody selected. **Tailoring may also start from any of a
+visible base's versions** (decided 2026-11-12, tailoring part 3 R3-Q1): a later version then becomes v1 of a base of
+its own when the tailoring succeeds, **not made active**, so the résumé in use is unchanged (`base_for_tailoring`,
+[tailoring.md](./tailoring.md) §8). The workflow résumé is:
 
 ```sql
 SELECT r.* FROM resumes r

@@ -34,6 +34,8 @@ export const queryKeys = {
     candidateDetail: (firmId: string, candidateId: string, id: string) => [firmId, "jobs", "detail", id, candidateId] as const,
   },
   applications: resource("applications"),
+  /** The signed-in user's own tailorings (their panel, docs/02 §8.3). */
+  tailorings: { mine: (firmId: string) => [firmId, "tailorings", "mine"] as const },
   resumes: {
     ...resource("resumes"),
     byCandidate: (firmId: string, candidateId: string) => [firmId, "resumes", "byCandidate", candidateId] as const,

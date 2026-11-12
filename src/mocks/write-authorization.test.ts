@@ -20,7 +20,7 @@ import { signInAs, signInAsSupportView, signOutForTest } from "./sign-in-as";
 type AnyMethod = (firmId: string, ...args: unknown[]) => Promise<unknown>;
 const MOCKS: Record<string, Record<string, AnyMethod>> = {
   applications: applicationsMock, records: recordsMock,
-  documents: documentsMock, inbox: inboxMock, agents: { tailorResume: agentsMock.tailorResume } as Record<string, AnyMethod>, jobMarks: jobMarksMock,
+  documents: documentsMock, inbox: inboxMock, jobMarks: jobMarksMock,
 } as unknown as Record<string, Record<string, AnyMethod>>;
 
 const FIRM = "firm_hts";
@@ -34,7 +34,6 @@ const ARGS: Record<string, unknown[]> = {
   "inbox.markRead": ["msg_none"],
   "jobMarks.mark": ["job_001", "SAVED"],
   "jobMarks.unmark": ["job_001", "SAVED"],
-  "agents.tailorResume": [{ resumeVersionId: "rv", jobId: "job" }],
 };
 
 const writes = Object.entries(WRITE_ACTIONS).flatMap(([resource, methods]) => Object.entries(methods).map(([name, action]) => ({ resource, name, action })));
@@ -57,7 +56,7 @@ describe("the write inventory", () => {
       }
     }
     expect(writes.map((w) => `${w.resource}.${w.name}`).sort()).toEqual([
-      "agents.tailorResume", "applications.updateStatus", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark",
+      "applications.updateStatus", "documents.remove", "documents.upload", "inbox.connect", "inbox.disconnect", "inbox.markRead", "jobMarks.mark", "jobMarks.unmark",
     ]);
   });
 

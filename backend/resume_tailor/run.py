@@ -24,10 +24,13 @@ class Tailored:
     counts: dict           # report_counts: what is kept of the report (job_runs.meta)
 
 
-async def tailor_version(content: dict, posting: str, job_title: str = "", *, setup: Setup, firm_id=None) -> Tailored:
-    """Tailor one version for one posting. Raises pipeline.TailorFailed when a step fails: no partial copy."""
+async def tailor_version(content: dict, posting: str, job_title: str = "", *, setup: Setup, firm_id=None,
+                         on_step=None) -> Tailored:
+    """Tailor one version for one posting. Raises pipeline.TailorFailed when a step fails: no partial copy.
+    `on_step(name)` is awaited as each model step starts."""
     given = tailor_input(content)
-    copy = await pipeline.tailor(given.base, prepared_posting(posting), job_title, setup=setup, firm_id=firm_id)
+    copy = await pipeline.tailor(given.base, prepared_posting(posting), job_title, setup=setup, firm_id=firm_id,
+                                 on_step=on_step)
     return Tailored(content=version_content(copy, content, given),
                     counts=report_counts(copy.get(pipeline.REPORT_KEY) or {}))
 

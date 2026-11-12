@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { Play, Sparkles, Send, Mail, ArrowRight, CalendarDays, MailCheck } from "lucide-react";
+import { Play, Send, Mail, ArrowRight, CalendarDays, MailCheck } from "lucide-react";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { scopeApplications, scopeCandidates } from "@/lib/auth/permissions";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useJobs } from "@/lib/hooks/use-jobs";
+import { TailorButton } from "@/components/app/tailoring/tailor-button";
 import { deriveCandidateStats, deriveBdeDashboard, rankJobsForCandidate } from "@/lib/derive";
 import { StatCard } from "@/components/app/stat-card";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -181,9 +182,7 @@ export function BdeDashboard() {
                   </div>
                   <MatchScore score={score} className="hidden sm:flex" />
                   <div className="flex shrink-0 items-center gap-1">
-                    <Button asChild variant="ghost" size="icon" aria-label="Tailor resume">
-                      <Link href={toHref("jobs.detail", { id: job.id }, { candidate: topCandidate?.id })}><Sparkles size={15} aria-hidden /></Link>
-                    </Button>
+                    {topCandidate ? <TailorButton candidate={topCandidate} job={job} variant="icon" /> : null}
                     <Button asChild variant="ghost" size="icon" aria-label="Mark applied">
                       <Link href={toHref("jobs.detail", { id: job.id }, { candidate: topCandidate?.id })}><Send size={15} aria-hidden /></Link>
                     </Button>

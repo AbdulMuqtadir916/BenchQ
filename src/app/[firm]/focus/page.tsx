@@ -8,7 +8,9 @@ import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { scopeCandidates } from "@/lib/auth/permissions";
+import { canManageResume, scopeCandidates } from "@/lib/auth/permissions";
+import { useStartTailoring } from "@/lib/hooks/use-tailoring";
+import { startRefusal } from "@/components/app/tailoring/messages";
 import { rankJobsForCandidate } from "@/lib/derive";
 import { MatchScore } from "@/components/app/match-score";
 import { Tag } from "@/components/ui/tag";
@@ -46,6 +48,9 @@ export default function FocusModePage() {
   const [index, setIndex] = useState(0);
   const [applied, setApplied] = useState(0);
   const [tailored, setTailored] = useState(0);
+  // T starts the real tailoring from the active base and moves on at once; it runs in the panel (part 3 Q1, Q4).
+  const startTailoring = useStartTailoring();
+  const [refused, setRefused] = useState<string | null>(null);
   const [reviewed, setReviewed] = useState(0);
   const [finished, setFinished] = useState(false);
   const startRef = useRef(Date.now());
@@ -62,7 +67,7 @@ export default function FocusModePage() {
     function onKey(e: KeyboardEvent) {
       if (finished || !current) return;
       const k = e.key.toLowerCase();
-      if (k === "t") { setTailored((n) => n + 1); next(); }
+      if (k === "t") { tailor(); }
       else if (k === "a") { setApplied((n) => n + 1); next(); }
       else if (k === "o") { next(); }
       else if (k === "s") { next(); }
@@ -71,6 +76,17 @@ export default function FocusModePage() {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, finished, index]);
+
+  function tailor() {
+    if (!candidate || !current || !canManageResume(principal, candidate)) return;
+    const title = current.job.title;
+    setRefused(null);
+    startTailoring.mutate({ candidateId: candidate.id, jobId: current.job.id }, {
+      onSuccess: () => setTailored((n) => n + 1),
+      onError: (error) => setRefused(`${title}: ${startRefusal(error).message}`),
+    });
+    next();
+  }
 
   function next() {
     setReviewed((n) => n + 1);
@@ -146,12 +162,13 @@ export default function FocusModePage() {
               </div>
 
               <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <FocusAction k="T" label="Tailor" Icon={Sparkles} onClick={() => { setTailored((n) => n + 1); next(); }} primary />
+                <FocusAction k="T" label="Tailor" Icon={Sparkles} onClick={tailor} primary />
                 <FocusAction k="A" label="Applied" Icon={Send} onClick={() => { setApplied((n) => n + 1); next(); }} />
                 <FocusAction k="O" label="Outreach" Icon={Mail} onClick={next} />
                 <FocusAction k="S" label="Skip" Icon={SkipForward} onClick={next} />
               </div>
               <p className="mt-4 text-center text-caption text-[var(--color-text-3)]">One keystroke per job — T tailor · A applied · O outreach · S skip</p>
+              {refused ? <p role="alert" className="mt-2 text-center text-caption text-[var(--color-danger-fg)]">Not tailored — {refused}</p> : null}
             </motion.div>
           </AnimatePresence>
         )}

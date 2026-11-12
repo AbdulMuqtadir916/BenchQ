@@ -100,6 +100,8 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailor": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings/{run_id}": F,
+    # The signed-in user's own tailorings, for their panel (part 3); a support view gets an empty list.
+    "GET /api/firms/{firm_id}/tailorings": F,
     # Job search (job search PR 1): a search, the candidate's BDE (job.search + can_search_jobs); reads, in scope.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": F,

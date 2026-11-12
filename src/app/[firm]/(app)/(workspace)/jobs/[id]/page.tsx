@@ -7,7 +7,8 @@ import { useJob } from "@/lib/hooks/use-jobs";
 import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { can, scopeCandidates } from "@/lib/auth/permissions";
+import { can, canManageResume, scopeCandidates } from "@/lib/auth/permissions";
+import { TailorButton } from "@/components/app/tailoring/tailor-button";
 import { deriveMatchScore } from "@/lib/derive";
 import type { Job, JobRequirement } from "@/lib/schemas/job";
 import type { Candidate } from "@/lib/schemas/candidate";
@@ -191,9 +192,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
           </Card>
 
+          {linkedId && context && canManageResume(principal, context) ? (
+            <Card><TailorButton candidate={context} job={job} className="items-stretch" /></Card>
+          ) : !linkedId && canAct ? (
+            // Opened for no candidate (⌘K, "All candidates"): which candidate's résumé is unknown (part 3 R2-Q6).
+            <p className="text-caption text-[var(--color-text-3)]">Open this job from a candidate to tailor their résumé.</p>
+          ) : null}
           {canAct ? (
             <div className="grid grid-cols-2 gap-2">
-              <Button asChild><Link href={toHref("resumes.studio", { id: "new" })}><Sparkles size={14} aria-hidden />Tailor</Link></Button>
               <Button variant="secondary"><Send size={14} aria-hidden />Mark applied</Button>
               <Button asChild variant="secondary"><Link href={toHref("outreach")}><Mail size={14} aria-hidden />Outreach</Link></Button>
               <Button variant="ghost" aria-pressed={savedIds.has(job.id)} onClick={() => toggleMark.mutate({ jobId: job.id, kind: "SAVED", on: !savedIds.has(job.id) })}>

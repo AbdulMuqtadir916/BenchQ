@@ -38,7 +38,7 @@ from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
 from backend.api.routes_candidates import router as candidates_router
 from backend.api.routes_candidate_resumes import router as candidate_resumes_router
-from backend.api.routes_resume_tailoring import router as resume_tailoring_router
+from backend.api.routes_resume_tailoring import firm_router as resume_tailoring_firm_router, router as resume_tailoring_router
 from backend.api.routes_job_search import router as job_search_router
 from backend.api.routes_firm_resumes import router as firm_resumes_router
 from backend.api.routes_ledger import router as ledger_router
@@ -204,6 +204,7 @@ app.include_router(team_router, prefix="/api")
 app.include_router(candidates_router, prefix="/api")
 # Before the résumé routes: `…/resumes/tailorings` must not be read as a résumé id.
 app.include_router(resume_tailoring_router, prefix="/api")
+app.include_router(resume_tailoring_firm_router, prefix="/api")
 app.include_router(candidate_resumes_router, prefix="/api")
 app.include_router(job_search_router, prefix="/api")
 app.include_router(firm_resumes_router, prefix="/api")
