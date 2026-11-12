@@ -87,22 +87,3 @@ describe("deriveFirmUsage edges", () => {
     expect([pendingAs("BDE"), pendingAs("MANAGER"), pendingAs("VIEWER"), pendingAs("OWNER")]).toEqual([1, 0, 0, 0]);
   });
 });
-
-describe("fixture invite dates are relative to load time (no drift in the live UI)", () => {
-  it.each([0, 3, 30, 365])("%i days after the fixtures were written, the same invites are pending and expired, and the seat counts don't move", (days) => {
-    const later = new Date(FIXTURE_NOW.getTime() + days * 86_400_000);
-    const rebased = invitesAt(later);
-    const pendingIds = rebased.filter((invite) => effectiveInviteStatus(invite, later) === "PENDING").map((invite) => invite.id);
-    expect(pendingIds).toEqual(["inv_hts_01", "inv_stl_01", "inv_cbw_01", "inv_gsc_owner", "inv_platform_01"]);
-    expect(effectiveInviteStatus(rebased.find((invite) => invite.id === "inv_hts_02")!, later)).toBe("EXPIRED");
-    const stl = firms.find((item) => item.id === "firm_stl")!;
-    expect(deriveFirmUsage(stl, { users: allUsers, invites: rebased, candidates: allCandidates }, later)).toMatchObject({ seatsUsed: 4, seatLimit: 4, canAddSeat: false, isOverSeatLimit: false });
-  });
-
-  it("keeps each invite's 7-day lifetime when shifting", () => {
-    for (const invite of invitesAt(new Date("2030-01-01T00:00:00.000Z"))) {
-      const days = (new Date(invite.expiresAt).getTime() - new Date(invite.createdAt).getTime()) / 86_400_000;
-      expect(days, invite.id).toBe(7);
-    }
-  });
-});

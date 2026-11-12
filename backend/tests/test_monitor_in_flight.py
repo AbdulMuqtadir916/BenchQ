@@ -23,7 +23,9 @@ def _install_fake_running(monkeypatch, entries):
 
 
 def test_in_flight_returns_per_job_map(api_client, test_db, monkeypatch):
-    """Multiple active ops → grouped by target_job_id."""
+    """The default response groups job-type strings by target, even with run metadata."""
+    import backend.job_monitor as mon
+
     job_a, job_b = uuid.uuid4(), uuid.uuid4()
     _install_fake_running(monkeypatch, [
         (f"tailor_resume:{job_a}", "tailor_resume", job_a),
@@ -31,6 +33,7 @@ def test_in_flight_returns_per_job_map(api_client, test_db, monkeypatch):
         (f"tailor_resume:{job_b}", "tailor_resume", job_b),
         ("scrape_all", "scrape_all", None),  # scheduler op, not per-job — ignored
     ])
+    mon._running[f"analyze_job:{job_a}"].meta = {"resume_names": ["PM"], "depth": "light"}
     resp = api_client.get("/api/monitor/in-flight")
     assert resp.status_code == 200
     data = resp.json()
