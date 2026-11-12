@@ -248,7 +248,7 @@ def test_a_ledger_entry_is_built_only_by_the_writer():
 
 
 def test_the_old_ledger_table_is_only_cleared_by_the_demo_reset():
-    """`activity_logs` replaced `ledger_entries` (migration 0026); an entry written there would never be seen."""
+    """`activity_logs` replaced `ledger_entries` (migration 0028); an entry written there would never be seen."""
     used = _enclosing_calls(lambda call: any(isinstance(node, ast.Name) and node.id == "LedgerEntry"
                                              for node in ast.walk(call)))
     assert used <= {("scripts/seed_demo.py", "reset")}, f"Use ActivityEntry instead: {sorted(used)}"

@@ -6,13 +6,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { hasTeamScope } from "@/lib/auth/policy";
 import { isBde, isManager } from "@/lib/auth/roles";
 import { queueByManager } from "@/lib/derive/assignment";
-import { deriveBdeLoad, isWorkingCandidate } from "@/lib/derive/tenancy";
+import { isWorkingCandidate } from "@/lib/derive/tenancy";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useTeam } from "@/lib/hooks/use-team";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { User } from "@/lib/schemas/session";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { useFirm } from "@/lib/tenancy/firm-context";
 import { AssignOption, onRadioJK } from "./assign-option";
 
 /** "works 2 similar profiles" (A4): the BDE's working candidates marketed as the same title, ignoring case. */
@@ -49,7 +48,6 @@ export function AssignPicker({
   errors?: { managerId?: string; bdeId?: string };
 }) {
   const principal = useSignedInPrincipal();
-  const firm = useFirm();
   const team = useTeam();
   const candidates = useCandidates();
   const [query, setQuery] = useState("");
@@ -83,13 +81,13 @@ export function AssignPicker({
   const shown = needle ? bdes.filter((user) => `${user.name} ${user.email}`.toLowerCase().includes(needle)) : bdes;
 
   const bdeRow = (user: User) => {
-    const load = deriveBdeLoad(user.id, list, firm.bdeCapacity);
+    const working = list.filter((candidate) => candidate.bdeId === user.id && isWorkingCandidate(candidate)).length;
     const similar = similarCount(user.id, primaryRole, list);
     return (
       <AssignOption key={user.id} name={user.name} avatarKey={user.id} group={`${idPrefix}-bde`} value={user.id} checked={value.bdeId === user.id} disabled={blockReason !== null}
-        title={user.name} onChange={() => onChange({ managerId: value.managerId, bdeId: user.id })} isWarning={load.isAtCapacity}
+        title={user.name} onChange={() => onChange({ managerId: value.managerId, bdeId: user.id })}
         detail={<>{user.email}{similar > 0 ? ` · works ${similar} similar ${similar === 1 ? "profile" : "profiles"}` : ""}</>}
-        figure={<>{load.load} / {load.capacity}{load.isAtCapacity ? <span> · At capacity</span> : null}</>} />
+        figure={<>{working} working</>} />
     );
   };
 
@@ -121,7 +119,6 @@ export function AssignPicker({
         <section className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-h3 text-[var(--color-text)]">BDE{isTeamScoped ? <span className="sr-only"> (required)</span> : null}</h3>
-            <span className="text-caption text-[var(--color-text-3)]">Capacity {firm.bdeCapacity} per BDE</span>
           </div>
           {blockReason ? (
             <p role="status" className="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-warning-bg)] p-3 text-sm text-[var(--color-warning-fg)]">

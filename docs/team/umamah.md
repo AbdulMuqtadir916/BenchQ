@@ -10,7 +10,7 @@ contract changes and the migration number with Abdul.
 ## Status
 
 **Activity logs (from 2026-11-05):** the ledger plan, agreed with Abdul, runs as one branch per PR named `activity/…`.
-PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q59).
+PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q64).
 Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
 Next: PR 2, the ledger rules as tests.
 

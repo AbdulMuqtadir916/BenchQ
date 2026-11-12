@@ -1,5 +1,7 @@
 # 02 — Hierarchy and seats
 
+> **Superseded in part (2026-11-11, 07 Q63):** BDE capacity (Q46) was removed: no `bdeCapacity`, no `firmSettings.edit`, no capacity form, no "At capacity" figure, no `deriveBdeLoad`. Read the capacity parts below as history.
+
 **Owner:** — · **Depends on:** 01; §1–§2 can start then. §4–§6 also need 03's new actions **and** 06 PR 2's endpoints ·
 **Branch:** `feat/onboarding-02-hierarchy-seats`
 
