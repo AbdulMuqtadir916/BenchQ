@@ -56,6 +56,22 @@ proxy's address. Locally every row shows Docker's address.
   The IP limit of 10 tries a minute is what stops a flood, so one IP can write at most 6 such rows a minute.
 - On the Whole platform view, Show IP can need a sideways scroll. The Failed sign-ins view has room for it.
 
+## The Super Admin's own operations (added 2026-11-12)
+
+The Super Admin's Activity page is the record of everything on the platform, but their own operations were not in it:
+changing settings, creating, changing and deleting searches and companies, running scrapes, backups and cleanups, and
+the Telegram and LinkedIn controls. These 30 routes now each write one entry (no firm, the Super Admin as the actor,
+`PLATFORM_ADMIN`) **after the route succeeds**. A route that fails writes nothing.
+
+- **How:** a small dependency on each route, `logs_platform_action(...)` in `backend/auth/platform_actions.py`. The route
+  bodies are untouched.
+- **What an entry says:** what was done, the id from the path, and for a change the *names* of the fields in the request
+  ("Changed settings: scrape_interval_minutes."). Never the values (a setting can hold a key or a token) and never the body.
+- **Actions:** `CREATE`, `UPDATE` and `DELETE` for records; `STATE_CHANGE` for starting or running something.
+- **Not logged:** Telegram's inbound webhook (Telegram calling in with its own secret: no signed-in person).
+- **Checked by CI:** the route rules from PR 2 now accept this form, so a new Super Admin route that logs nothing fails
+  the build, as any other write route does.
+
 ## Edge cases and fixes (2026-11-12)
 
 - **Two failed tries at the same instant.** The "tries from one IP within 10 seconds share a row" rule locked an existing

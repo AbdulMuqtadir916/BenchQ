@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, Query, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.auth.platform_actions import logs_platform_action
 from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun, engine
 from backend import statement_timeout
@@ -373,7 +374,7 @@ async def tracer_redirect_param(request: Request):
 
 
 # ── Trigger endpoints (non-blocking, return 202) ────────────────────────────
-@app.post("/api/scrape/run-all", tags=["triggers"], summary="Run all scrapes", status_code=202)
+@app.post("/api/scrape/run-all", tags=["triggers"], summary="Run all scrapes", status_code=202, dependencies=[Depends(logs_platform_action("Started every scrape", entity_type="platform_job"))])
 async def trigger_all_scrapes():
     """Run all active JobSpy keyword searches + all active Playwright career page scrapes.
     Returns immediately with a run_id. Check progress via /api/monitor/active.
@@ -409,7 +410,7 @@ async def trigger_all_scrapes():
         )
 
 
-@app.post("/api/email/check-now", tags=["triggers"], summary="Check Gmail now", status_code=202)
+@app.post("/api/email/check-now", tags=["triggers"], summary="Check Gmail now", status_code=202, dependencies=[Depends(logs_platform_action("Ran an email check", entity_type="platform_job"))])
 async def trigger_email_check():
     """Poll Gmail for new emails. Returns immediately with a run_id."""
     async def _do():
@@ -431,7 +432,7 @@ async def trigger_email_check():
         )
 
 
-@app.post("/api/h1b/refresh", tags=["triggers"], summary="Refresh H-1B data", status_code=202)
+@app.post("/api/h1b/refresh", tags=["triggers"], summary="Refresh H-1B data", status_code=202, dependencies=[Depends(logs_platform_action("Started an H-1B refresh", entity_type="platform_job"))])
 async def trigger_h1b_refresh():
     """Scrape MyVisaJobs.com for all active companies. Returns immediately with a run_id."""
     async def _do():
@@ -513,7 +514,7 @@ async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, 
         )
 
 
-@app.post("/api/db/cleanup", tags=["triggers"], summary="Database cleanup", status_code=202)
+@app.post("/api/db/cleanup", tags=["triggers"], summary="Database cleanup", status_code=202, dependencies=[Depends(logs_platform_action("Ran database cleanup", entity_type="platform_job"))])
 async def trigger_job_cleanup():
     """Delete old skipped/ignored jobs. Returns immediately with a run_id."""
     async def _do():
@@ -549,7 +550,7 @@ async def trigger_job_cleanup():
         )
 
 
-@app.post("/api/auto-reject/run", tags=["triggers"], summary="Run auto-reject now", status_code=202)
+@app.post("/api/auto-reject/run", tags=["triggers"], summary="Run auto-reject now", status_code=202, dependencies=[Depends(logs_platform_action("Ran auto-reject", entity_type="platform_job"))])
 async def trigger_auto_reject():
     """Run auto-reject on stale applications. Returns immediately with a run_id."""
     async def _do():
@@ -590,7 +591,7 @@ async def trigger_auto_reject():
         )
 
 
-@app.post("/api/jobs/backfill-descriptions", tags=["triggers"], summary="Fetch descriptions for jobs missing them", status_code=202)
+@app.post("/api/jobs/backfill-descriptions", tags=["triggers"], summary="Fetch descriptions for jobs missing them", status_code=202, dependencies=[Depends(logs_platform_action("Started a job-description backfill", entity_type="platform_job"))])
 async def trigger_backfill_descriptions():
     """Fetch job descriptions for new/saved/applied jobs that have a URL but no description."""
     retired()  # job search PR 2: the old pool's write routes answer 410
@@ -641,7 +642,7 @@ async def trigger_backfill_descriptions():
         )
 
 
-@app.post("/api/db/backup", tags=["triggers"], summary="Run database backup", status_code=202)
+@app.post("/api/db/backup", tags=["triggers"], summary="Run database backup", status_code=202, dependencies=[Depends(logs_platform_action("Ran a database backup", entity_type="platform_job"))])
 async def trigger_db_backup():
     """Run a database backup immediately. Returns immediately with a run_id."""
     async def _do():
@@ -689,7 +690,7 @@ async def trigger_db_backup():
         )
 
 
-@app.post("/api/telegram/digest", tags=["triggers"], summary="Send Telegram digest", status_code=202)
+@app.post("/api/telegram/digest", tags=["triggers"], summary="Send Telegram digest", status_code=202, dependencies=[Depends(logs_platform_action("Sent the Telegram digest", entity_type="platform_job"))])
 async def trigger_digest():
     """Send the daily Telegram digest immediately. Returns immediately with a run_id."""
     async def _do():
@@ -711,7 +712,7 @@ async def trigger_digest():
         )
 
 
-@app.post("/api/scrape/company/{company_id}", tags=["triggers"], summary="Scrape a single company", status_code=202)
+@app.post("/api/scrape/company/{company_id}", tags=["triggers"], summary="Scrape a single company", status_code=202, dependencies=[Depends(logs_platform_action("Started a scrape of a company", entity_type="platform_job", id_param="company_id"))])
 async def trigger_company_scrape(company_id: str, auto_score: bool = None):
     """Run Playwright career page scrape for one company. Returns immediately with a run_id.
     auto_score: True/False override, null=use company.auto_scoring_depth setting.
@@ -805,7 +806,7 @@ async def telegram_webhook(update: dict, request: Request):
     return {"ok": True}
 
 
-@app.post("/api/telegram/register-webhook", tags=["telegram"], summary="Register Telegram webhook")
+@app.post("/api/telegram/register-webhook", tags=["telegram"], summary="Register Telegram webhook", dependencies=[Depends(logs_platform_action("Registered the Telegram webhook", entity_type="telegram", action="UPDATE"))])
 async def telegram_register_webhook(body: dict):
     """Register {public_url}/api/telegram/webhook with Telegram, signed with telegram_webhook_secret; public_url must be HTTPS."""
     from backend.notifier.telegram import register_webhook
@@ -817,7 +818,7 @@ async def telegram_register_webhook(body: dict):
     return result
 
 
-@app.post("/api/telegram/rotate-webhook-secret", tags=["telegram"], summary="Rotate Telegram webhook secret")
+@app.post("/api/telegram/rotate-webhook-secret", tags=["telegram"], summary="Rotate Telegram webhook secret", dependencies=[Depends(logs_platform_action("Rotated the Telegram webhook secret", entity_type="telegram", action="UPDATE"))])
 async def telegram_rotate_webhook_secret():
     """Regenerate `telegram_webhook_secret` and return the new value. After
     rotating, call POST /api/telegram/register-webhook to re-register with
@@ -828,7 +829,7 @@ async def telegram_rotate_webhook_secret():
     return {"ok": True, "webhook_secret": new_value}
 
 
-@app.post("/api/telegram/test", tags=["telegram"], summary="Send test message", status_code=202)
+@app.post("/api/telegram/test", tags=["telegram"], summary="Send test message", status_code=202, dependencies=[Depends(logs_platform_action("Sent a Telegram test message", entity_type="telegram"))])
 async def telegram_test():
     """Send a test message to the configured Telegram chat. Returns immediately with a run_id."""
     async def _do():
