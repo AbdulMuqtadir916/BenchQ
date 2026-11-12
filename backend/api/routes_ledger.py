@@ -2,7 +2,7 @@
 
 The worked example of a firm-scoped read: the path names the firm, `reader_firm_id` says which firm the caller
 may read, `scoped()` adds the filter, and `_limit_to_reader` narrows it by role: a BDE sees the entries they made
-(`own_scope`, 07 §2.2) and a MANAGER the entries they and the BDEs who report to them made (`team_scope`, 07 Q59),
+(`own_scope`, 07 §2.2) and a MANAGER the entries they and the BDEs who report to them made (`team_scope`, 07 Q64),
 each plus the assignment entries about their candidates (07 Q52: "New assignments" and the handoff note). The OWNER,
 a VIEWER and a support view see the firm. Another firm's ledger is 404, the same as a missing firm (principle 4).
 Platform-only events (`firm_id` null) are the Super Admin's, in `/api/admin/audit`.
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/firms/{firm_id}", tags=["ledger"])
 
 
 def _limit_to_reader(entries, db: DbSession, principal: Principal, firm_id: uuid.UUID):
-    """What a principal's role lets them read of `entries`, the firm's rows (07 Q52, Q59). Every filter a request adds
+    """What a principal's role lets them read of `entries`, the firm's rows (07 Q52, Q64). Every filter a request adds
     goes on top of this, so no filter can widen it. Pairs with `scoped()`, never instead of it."""
     bde, manager = own_scope(principal), team_scope(principal)
     if bde is not None:
