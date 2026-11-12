@@ -841,12 +841,12 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const saveAnswer = useCallback(async (row: ReviewRow, isOnlyThisResume: boolean): Promise<boolean> => {
     if (!row.saveOffer || row.saveOffer === "saved" || !firmId || !resumeId || busy.current) return false;
     const picked = resume.current;
-    // The field may have changed since the last look: look again, and save what it holds now (or nothing).
-    await scan();
-    const fresh = (shownRows.current ?? []).find((shown) => memoKeyOf(shown) === memoKeyOf(row));
-    const offer = fresh?.saveOffer;
+    // The field may have changed since the last look: read the form again, and save what it holds now (or nothing).
+    await watchForm();
+    const fresh = (shownRows.current ?? []).find((shown) => memoKeyOf(shown) === memoKeyOf(row)) ?? row;
+    const offer = fresh.saveOffer;
     if (resume.current !== picked || !offer || offer === "saved") return false;
-    const value = fresh!.field.current.trim();
+    const value = fresh.field.current.trim();
     try {
       await saveResumeAnswers(firmId, candidateId, resumeId, { ...offer.change, only_this: isOnlyThisResume });
     } catch (e) {
@@ -865,7 +865,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     memory.current.saved.set(memoKeyOf(row), { resumeId, value });
     await scan();
     return true;
-  }, [candidateId, firmId, onSessionExpired, resumeId, scan]);
+  }, [candidateId, firmId, onSessionExpired, resumeId, scan, watchForm]);
 
   /** The form as it stands, for Mark applied. A page that has gone leaves what BenchQ last saw on it, and one stuck on an
    * alert() never answers, which mustn't hold up the job. */

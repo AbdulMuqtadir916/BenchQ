@@ -63,8 +63,13 @@ function isSameJob(page: string, known: string): boolean {
   if (!here || !saved || here.site !== saved.site) return false;
   const under = (inner: string, outer: string) => inner === outer || (outer.length > 1 && inner.startsWith(`${outer}/`));
   if (!under(here.path, saved.path) && !under(saved.path, here.path)) return false;
-  // The same job ids on both, or none on either: an id on one side only can be another job's.
-  return [...new Set([...here.ids.keys(), ...saved.ids.keys()])].every((key) => here.ids.get(key) === saved.ids.get(key));
+  // The same job ids on both, or one side's id written in the other's path (Greenhouse's gh_jid=8329677 on
+  // /jobs/8329677): an id the other side has nowhere can be another job's.
+  return [...new Set([...here.ids.keys(), ...saved.ids.keys()])].every((key) => {
+    const [mine, theirs] = [here.ids.get(key), saved.ids.get(key)];
+    if (mine !== undefined && theirs !== undefined) return mine === theirs;
+    return (mine === undefined ? here.path : saved.path).includes((mine ?? theirs ?? "").toLowerCase());
+  });
 }
 
 /** Codes that name one job in a link: a UUID (Lever, Ashby), a long number (Greenhouse, LinkedIn, SmartRecruiters), a

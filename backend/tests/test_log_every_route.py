@@ -85,6 +85,8 @@ NOT_REACHED.update({route: "410: the old job pool is retired" for route in (
     "POST /api/cover-letters/generate", "POST /api/jobs/bulk-update")})
 # A letter's job is a job posting since 0023; the sweep's `job_id` names the old pool's seeded job, so this is 404.
 NOT_REACHED["PATCH /api/cover-letters/{cl_id}"] = "404: Job not found"
+# Only the candidate's BDE adds a job for them (backend/auth/policy.py can_add_job), and the sweep signs in as the OWNER.
+NOT_REACHED["POST /api/applications"] = "403: only the candidate's BDE adds a job"
 
 # "METHOD path" -> the state a seeded row needs for the route to do its work, set just before its request.
 ROUTE_STATE = {

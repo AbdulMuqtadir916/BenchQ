@@ -328,10 +328,9 @@ describe("keeping a typed answer (07 Q58)", () => {
     expect(onSave).toHaveBeenCalledWith(typedRow, true);
   });
 
-  it("says once it's saved, under the filled fields", () => {
+  it("keeps a saved answer in sight, saying so (CodeRabbit #129)", () => {
     renderWith([holding("Why us?", false, "Payments.", "same", { saveOffer: "saved" })]);
-    expect(titles()).toEqual([]);
-    act(() => { host.querySelector<HTMLButtonElement>("[data-slot='review-filled-toggle']")!.click(); });
+    expect(titles()).toEqual(["Save for next time (1)"]);
     expect(host.querySelector("[data-slot='review-saved-note']")!.textContent).toBe("Saved for next time");
     expect(host.querySelector("[data-slot='review-save']")).toBeNull();
   });
