@@ -129,7 +129,7 @@ export function FloorContent() {
                     <th className="px-4 py-2 font-medium tabular">Apps</th>
                     <th className="px-4 py-2 font-medium tabular">Responses</th>
                     <th className="px-4 py-2 font-medium tabular">Interviews</th>
-                    <th className="px-4 py-2 font-medium tabular">Placements</th>
+                    <th className="px-4 py-2 font-medium tabular">Offers</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)]">
