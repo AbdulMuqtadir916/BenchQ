@@ -4,6 +4,7 @@ Entries a firm reader never gets are here too: failed sign-ins and lockouts. Ema
 An IP address is never in a list: it comes one row at a time, from `/{entry_id}/ip`. Days are IST (docs/04 §14).
 """
 import uuid
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -13,8 +14,8 @@ from backend.api.routes_auth import current_principal
 from backend.api.routes_ledger import SORTS, Filters, candidate_options, people_in_view
 from backend.auth import support
 from backend.auth.serialize import ledger_entry_json
-from backend.candidates import profile
 from backend.auth.sessions import Principal
+from backend.candidates import profile
 from backend.models.candidates import Candidate
 from backend.models.db import get_db
 from backend.models.tenancy import (ACTIVITY_ACTOR_TYPES, SUPER_ADMIN_ONLY_ACTIONS, ActivityEntry, Firm, PlatformUser,
@@ -41,14 +42,6 @@ def _rows(db: DbSession, view: View, filters: Filters, *, person: bool = True, c
     return filters.apply(entries, ZONE, hide_email=True, person=person, candidate=candidate)
 
 
-def _named(db: DbSession, query) -> list:
-    """The candidates with their names read in one query per firm: the name is the résumé's (07 Q57)."""
-    rows = query.all()
-    for firm_id in {candidate.firm_id for candidate in rows}:
-        profile.prime(db, firm_id, [candidate for candidate in rows if candidate.firm_id == firm_id])
-    return rows
-
-
 @router.get("", summary="Every entry on the platform, newest first")
 def list_activity(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
                   sort: str = Query("when", pattern="^(when|actor|action)$"),
@@ -58,10 +51,9 @@ def list_activity(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, g
     db.commit()
     column = SORTS[sort]
     entries = _rows(db, view, filters).order_by(column.asc() if direction == "asc" else column.desc(),
-                                                ActivityEntry.created_at.desc(), ActivityEntry.id.desc()) \
+                                                ActivityEntry.created_at.desc(), ActivityEntry.id) \
         .offset(offset).limit(limit).all()
-    candidates = {candidate.id: candidate.full_name for candidate in
-                  _named(db, db.query(Candidate).filter(Candidate.id.in_({e.candidate_id for e in entries if e.candidate_id})))}
+    candidates = {c.id: c.full_name for c in _named(db, {e.candidate_id for e in entries if e.candidate_id})}
     firms = dict(db.query(Firm.id, Firm.name).filter(Firm.id.in_({e.firm_id for e in entries if e.firm_id})).all())
     return [{**ledger_entry_json(e, hide_email=True, candidate_name=candidates.get(e.candidate_id)),
              "firm_name": firms.get(e.firm_id)} for e in entries]
@@ -108,7 +100,18 @@ def days(view: View = Depends(), filters: Filters = Depends(), db: DbSession = D
 def candidates(view: View = Depends(), filters: Filters = Depends(), db: DbSession = Depends(get_db)):
     entries = _rows(db, view, filters, candidate=False)
     ids = entries.filter(ActivityEntry.candidate_id.isnot(None)).with_entities(ActivityEntry.candidate_id).distinct()
-    return candidate_options(_named(db, db.query(Candidate).filter(Candidate.id.in_(ids.scalar_subquery()))))
+    return candidate_options(_named(db, ids.scalar_subquery()))
+
+
+def _named(db: DbSession, ids) -> list[Candidate]:
+    """The candidates with these ids, from any firm, each named from their résumé (07 Q57), read one firm at a time."""
+    rows = db.query(Candidate).filter(Candidate.id.in_(ids)).all()
+    by_firm = defaultdict(list)
+    for candidate in rows:
+        by_firm[candidate.firm_id].append(candidate)
+    for firm_id, group in by_firm.items():
+        profile.prime(db, firm_id, group)
+    return rows
 
 
 @router.get("/{entry_id}/ip", summary="The IP address behind a failed sign-in or lockout")

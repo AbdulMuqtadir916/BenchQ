@@ -8,7 +8,8 @@ from sqlalchemy.exc import DBAPIError
 from backend.auth import throttle
 from backend.auth.passwords import hash_password
 from backend.models.tenancy import ActivityEntry, Firm, PlatformUser, User
-from backend.tests.auth_support import TEST_PASSWORD, make_user
+from backend.tests.auth_support import TEST_PASSWORD, make_firm, make_plan, make_user
+from backend.tests.resume_support import make_version
 
 PASSWORD = "A-long-test-password-2026"
 
@@ -168,6 +169,25 @@ def test_the_super_admin_reads_every_firm_and_the_platform(anonymous_client, tes
     assert all("ip_address" not in r for r in rows)
     in_firm = client.get("/api/admin/activity", params={"firm_id": str(firm.id)}).json()
     assert in_firm and {r["firm_id"] for r in in_firm} == {str(firm.id)}
+
+
+def test_candidates_are_named_from_their_resumes_in_every_firm(anonymous_client, test_db, people):
+    """07 Q57: the name is the résumé's, read per firm, in the log and in the list to pick one from."""
+    firm, bde, _ = people
+    other = make_firm(test_db, make_plan(test_db, name="Other plan"), slug="globex")
+    asha = make_version(test_db, firm.id, candidate_name="Asha Rao").candidate_id
+    ravi = make_version(test_db, other.id, candidate_name="Ravi Teja").candidate_id
+    for firm_id, candidate_id in ((firm.id, asha), (other.id, ravi)):
+        test_db.add(ActivityEntry(firm_id=firm_id, actor_type="SYSTEM", actor_name="test", entity_type="candidate",
+                                  entity_id=str(candidate_id), entity_label="A candidate", action="UPDATE",
+                                  summary="Edited.", candidate_id=candidate_id))
+    test_db.commit()
+    client = _as_admin(anonymous_client)
+    rows = client.get("/api/admin/activity").json()
+    assert {r["candidate_id"]: r["candidate_name"] for r in rows if r["candidate_id"]} == {
+        str(asha): "Asha Rao", str(ravi): "Ravi Teja"}
+    assert client.get("/api/admin/activity/candidates").json() == [
+        {"id": str(asha), "name": "Asha Rao"}, {"id": str(ravi), "name": "Ravi Teja"}]
 
 
 def test_the_failed_view_holds_only_failures(anonymous_client, test_db, people):
