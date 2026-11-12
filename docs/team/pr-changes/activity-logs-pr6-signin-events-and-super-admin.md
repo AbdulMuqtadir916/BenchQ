@@ -1,6 +1,6 @@
 # Activity Log PR 6: sign-in events and the Super Admin's Activity page
 
-Branch: `activity-logs/pr6-signin-events-and-super-admin`, built on `activity-logs/pr5-part3-cover-letters`.
+Branch: `activity-logs/pr6-signin-events-and-super-admin`, built on `activity-logs/pr5-part2-jobs-and-analysis` (PR 5 part 3, cover letters, is dropped).
 Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 
 ## Scope
