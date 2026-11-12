@@ -26,6 +26,7 @@ from backend.auth import support
 from backend.auth.scoping import own_scope, reader_firm_id, scoped, team_scope
 from backend.auth.serialize import EPOCH, ledger_entry_json
 from backend.auth.sessions import Principal
+from backend.candidates import profile
 from backend.models.candidates import Candidate
 from backend.models.db import get_db
 from backend.models.tenancy import LEDGER_ACTOR_TYPES, ActivityEntry, Firm, User
@@ -112,13 +113,14 @@ def _visible(db: DbSession, principal: Principal, firm_id: uuid.UUID, filters: F
 
 
 def _after_cursor(entries, cursor: str):
-    """The rows older than the one `cursor` names: `<microseconds since 1970>_<id>`, as each row carries it."""
+    """The rows after the one `cursor` names (`<microseconds since 1970>_<id>`, as each row carries it), in the
+    list's order: older first, and among rows at the same moment, the higher id."""
     try:
         micros, row_id = cursor.split("_", 1)
         at, row_id = EPOCH + timedelta(microseconds=int(micros)), uuid.UUID(row_id)
     except (ValueError, OverflowError):
         raise HTTPException(status_code=400, detail="That page marker isn't valid.")
-    return entries.filter(or_(ActivityEntry.created_at < at, and_(ActivityEntry.created_at == at, ActivityEntry.id < row_id)))
+    return entries.filter(or_(ActivityEntry.created_at < at, and_(ActivityEntry.created_at == at, ActivityEntry.id > row_id)))
 
 
 @router.get("/ledger", summary="The firm's activity log, newest first, limited by role")
@@ -140,8 +142,9 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
         # The same marker as two fields (the whole-ledger paging on main, BUG-022): the rows after that one, in
         # this order. Both or neither, with a timezone (checked above).
         entries = entries.filter(or_(ActivityEntry.created_at < cursor_at,
-                                     and_(ActivityEntry.created_at == cursor_at, ActivityEntry.id < cursor_id)))
-    entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id.desc()).offset(offset).limit(limit)
+                                     and_(ActivityEntry.created_at == cursor_at, ActivityEntry.id > cursor_id)))
+    # Newest first; rows at the same moment by id, lowest first, as on main (the page markers depend on it).
+    entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id).offset(offset).limit(limit)
     return [ledger_entry_json(e, hide_email=principal.support_view_id is not None) for e in entries]
 
 
@@ -182,6 +185,12 @@ def ledger_candidates(firm_id: uuid.UUID, filters: Filters = Depends(),
         raise HTTPException(status_code=404, detail="Not found.")
     entries = _visible(db, principal, my_firm, filters, candidate=False)
     ids = entries.filter(ActivityEntry.candidate_id.isnot(None)).with_entities(ActivityEntry.candidate_id).distinct()
-    rows = scoped(db, Candidate, my_firm, Candidate.id, Candidate.full_name) \
-        .filter(Candidate.id.in_(ids.scalar_subquery())).order_by(Candidate.full_name, Candidate.id)
-    return [{"id": str(row.id), "name": row.full_name} for row in rows]
+    rows = scoped(db, Candidate, my_firm).filter(Candidate.id.in_(ids.scalar_subquery())).all()
+    profile.prime(db, my_firm, rows)
+    return candidate_options(rows)
+
+
+def candidate_options(candidates) -> list[dict]:
+    """Candidates by name: the name is the résumé's (07 Q57), so it is sorted here, not in the query."""
+    named = sorted(((candidate.full_name, str(candidate.id)) for candidate in candidates), key=lambda row: (row[0].lower(), row[1]))
+    return [{"id": candidate_id, "name": name} for name, candidate_id in named]

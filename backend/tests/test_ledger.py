@@ -168,6 +168,8 @@ def test_manager_scope_excludes_non_assignment_events_on_managed_candidates(anon
     edit = _entry(firm.id, owner, "Owner edited Ravi", 1)
     edit.entity_id, edit.candidate_id = str(candidate.id), candidate.id
     test_db.add_all([assignment, edit])
+    test_db.flush()
+    _stamp_from_today(test_db)         # the teams are set after the fixture's entries; scope follows the stamps
     test_db.commit()
 
     def entries(manager, query=""):

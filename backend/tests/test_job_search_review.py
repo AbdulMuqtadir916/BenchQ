@@ -319,13 +319,13 @@ def test_a_search_refreshing_a_job_keeps_its_whole_posting(world, adnans, fake, 
 
 def test_a_hand_off_note_is_not_shown_to_a_platform_admin():
     """CodeAnt on #135 (Abdul's file, at his request): the firm's note on an ASSIGN entry stays in the firm."""
-    import types
     from backend.auth.serialize import ledger_entry_json
-    entry = types.SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), candidate_id=uuid.uuid4(), actor_user_id=None,
-                                  actor_type="USER", actor_name="Manager", entity_type="candidate", entity_id="c1",
-                                  entity_label="A candidate", action="ASSIGN", summary="Assigned to a BDE.",
-                                  note="Over to you: they prefer remote roles.", model_id=None, prompt_version=None,
-                                  created_at=None)
+    from backend.models.tenancy import ActivityEntry
+    entry = ActivityEntry(id=uuid.uuid4(), firm_id=uuid.uuid4(), candidate_id=uuid.uuid4(), actor_user_id=None,
+                          actor_type="USER", actor_name="Manager", entity_type="candidate", entity_id="c1",
+                          entity_label="A candidate", action="ASSIGN", summary="Assigned to a BDE.",
+                          note="Over to you: they prefer remote roles.", model_id=None, prompt_version=None,
+                          created_at=None)
     assert ledger_entry_json(entry, hide_email=True)["note"] is None
     assert ledger_entry_json(entry, hide_email=True)["summary"] == "Assigned to a BDE."
     assert ledger_entry_json(entry)["note"] == "Over to you: they prefer remote roles."

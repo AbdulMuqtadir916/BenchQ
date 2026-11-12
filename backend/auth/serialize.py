@@ -49,8 +49,10 @@ def support_view_json(view: SupportView) -> dict:
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
-def _cursor(entry: ActivityEntry) -> str:
-    """The page marker for reading on after this row (routes_ledger `cursor`)."""
+def _cursor(entry: ActivityEntry) -> str | None:
+    """The page marker for reading on after this row (routes_ledger `cursor`); none for a row not yet saved."""
+    if entry.created_at is None:
+        return None
     return f"{(entry.created_at - EPOCH) // timedelta(microseconds=1)}_{entry.id}"
 
 
