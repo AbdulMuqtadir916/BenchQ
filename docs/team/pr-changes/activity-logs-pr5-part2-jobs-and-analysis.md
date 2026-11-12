@@ -3,6 +3,13 @@
 Branch: `activity-logs/pr5-part2-jobs-and-analysis` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 Built on part 1 (`activity-logs/pr5-part1-applications`). Merge that first.
 
+## In plain words
+
+Besides what people do, the platform does things by itself: scrapes for jobs, scoring, checking Gmail, Telegram messages,
+scheduled runs and AI calls. This part writes a line in the log for each of those, with **no firm**, so only the Super
+Admin sees them (firm users never do). It keeps the log readable: a scrape that found nothing, or a check that handled
+nothing, writes nothing, and a scheduled run writes one row, not one per step. Each AI call says what it did and its cost.
+
 ## Scope and dependencies
 
 No table, route or response changes.
