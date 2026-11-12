@@ -17,7 +17,6 @@ from backend.body_limit import BodySizeLimit
 from backend.logging_setup import configure_logging
 from backend.request_log import HEADER as REQUEST_ID_HEADER, NO_ROUTE, RequestLog
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
-from backend.auth.sessions import Principal
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
 
@@ -31,7 +30,7 @@ from backend.api.routes_cover_letters import router as cover_letters_router
 from backend.api.routes_linkedin import router as linkedin_router
 from backend.api.routes_autofill import router as autofill_router
 from backend.api.routes_llm import router as llm_router
-from backend.api.routes_auth import current_principal, router as auth_router
+from backend.api.routes_auth import router as auth_router
 from backend.api.routes_admin import router as admin_router
 from backend.api.routes_firms import router as firms_router
 from backend.api.routes_invites import router as invites_router
@@ -457,25 +456,8 @@ async def trigger_h1b_refresh():
         )
 
 
-def _log_analysis(principal: Principal, job_id) -> None:
-    """A person asked an AI agent to score a job: the entry says so, whatever the scoring finds later."""
-    from backend.auth import ledger
-    from backend.models.db import Job as _Job
-    from backend.models.tenancy import User
-    db = SessionLocal()
-    try:
-        job = db.get(_Job, job_id)
-        ledger.record_agent(db, person=db.get(User, principal.user_id), action="AI_GENERATE", entity_type="job",
-                            entity_id=job.id, entity_label=f"{job.title or 'Job'} · {job.company or 'unknown company'}",
-                            summary=f"AI agent scored {job.title or 'a job'} against the résumés", candidate_id=None)
-        db.commit()
-    finally:
-        db.close()
-
-
 @app.post("/api/analyze/{job_id}", tags=["triggers"], summary="Analyze a single job", status_code=202)
-async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, firm_id=Depends(reader_firm_id),
-                           principal: Principal = Depends(current_principal)):
+async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, firm_id=Depends(reader_firm_id)):
     """Re-run resume scoring for a specific job. depth: 'light' or 'full' (default)."""
     retired()  # job search PR 2: the old pool's write routes answer 410
     import uuid as _uuid
@@ -520,7 +502,6 @@ async def trigger_analysis(job_id: str, depth: str = "full", body: dict = None, 
             target_job_id=target_job_uuid,
             meta={"resume_names": resume_names, "depth": depth},
         )
-        _log_analysis(principal, target_job_uuid)
         return {"run_id": run_id, "status": "running", "job_id": job_id}
     except JobAlreadyRunningError as e:
         logger.info("Duplicate trigger rejected for job_type=%s", e.job_type)

@@ -689,42 +689,6 @@ def job_facets(
     }
 
 
-def _job_label(job: Job) -> str:
-    return f"{job.title or 'Job'} · {job.company or 'unknown company'}"
-
-
-def _audit_job(db: Session, firm_id, principal: Principal, job: Job, action: str, summary: str, changes: dict | None = None) -> None:
-    """Jobs are the firm's feed, so an entry here is about no candidate."""
-    from backend.auth import ledger
-    from backend.models.tenancy import User
-    actor = scoped(db, User, firm_id).filter_by(id=principal.user_id).one()
-    ledger.record(db, actor=actor, action=action, entity_type="job", entity_id=job.id, entity_label=_job_label(job),
-                  summary=summary, firm_id=firm_id, candidate_id=None, changes=changes)
-
-
-def _job_state(job: Job) -> dict:
-    """What an entry records about a job. `seen` isn't in it: opening a job is a read, and reads aren't logged."""
-    return {"status": job.status, "saved": job.saved}
-
-
-def _audit_job_change(db: Session, firm_id, principal: Principal, job: Job, before: dict) -> None:
-    from backend.auth.ledger import diff
-    changes = diff(before, _job_state(job))
-    if changes:
-        said = ", ".join(f"{field} {change['before']} → {change['after']}" for field, change in changes.items())
-        _audit_job(db, firm_id, principal, job, "UPDATE", f"Updated {job.title or 'a job'}: {said}.", changes)
-
-
-def _audit_captured(db: Session, firm_id, principal: Principal, job: Job, *, is_new_to_firm: bool) -> None:
-    """Capturing a posting the firm already sees changes nothing, so it writes nothing."""
-    if is_new_to_firm:
-        _audit_job(db, firm_id, principal, job, "CREATE", f"Added {job.title or 'a job'} at {job.company or 'a company'} to the feed.")
-
-
-def _firm_sees(db: Session, firm_id, job: Job) -> bool:
-    return scoped_jobs(db, firm_id).filter(Job.id == job.id).first() is not None
-
-
 @router.post("/save-from-extension")
 async def save_from_extension(body: dict, db: Session = Depends(get_db), firm_id=Depends(writer_firm_id),
                               principal: Principal = Depends(current_principal)):
@@ -766,9 +730,7 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db), firm_id
             apply_salary_to_job(existing, (_hd or {}).get("median_salary"))
             apply_arrangement_to_job(existing)
             apply_location_to_job(existing)
-        is_new_to_firm = not _firm_sees(db, firm_id, existing)
         link_job_to_firm(db, firm_id, existing.id, "CAPTURED", captured_by_user_id=principal.user_id)
-        _audit_captured(db, firm_id, principal, existing, is_new_to_firm=is_new_to_firm)
         db.commit()
         # `saved` is the field the extension reads — a row sitting at `ignored` never
         # reaches the feed, and re-saving it will not change that.
@@ -845,7 +807,6 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db), firm_id
     db.add(job)
     db.flush()
     link_job_to_firm(db, firm_id, job.id, "CAPTURED", search_id=job.search_id, captured_by_user_id=principal.user_id)
-    _audit_captured(db, firm_id, principal, job, is_new_to_firm=True)
     db.commit()
     db.refresh(job)
 
@@ -921,9 +882,7 @@ def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session
     if existing:
         # Report the row, change nothing: an `applied` or `ignored` posting must
         # not fall back to `new` because the user pasted its URL a second time. The firm does see it now.
-        is_new_to_firm = not _firm_sees(db, firm_id, existing)
         link_job_to_firm(db, firm_id, existing.id, "CAPTURED", captured_by_user_id=principal.user_id)
-        _audit_captured(db, firm_id, principal, existing, is_new_to_firm=is_new_to_firm)
         db.commit()
         return {"id": str(existing.id), "created": False, "status": existing.status}
 
@@ -948,7 +907,6 @@ def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session
     db.add(job)
     db.flush()
     link_job_to_firm(db, firm_id, job.id, "CAPTURED", captured_by_user_id=principal.user_id)
-    _audit_captured(db, firm_id, principal, job, is_new_to_firm=True)
     db.commit()
     db.refresh(job)
 
@@ -986,8 +944,7 @@ def _validate_job_updates(updates: dict, allowed: set) -> None:
 
 
 @router.post("/bulk-update")
-def bulk_update_jobs(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
-                     principal: Principal = Depends(current_principal)):
+def bulk_update_jobs(body: dict, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
     """Bulk update multiple jobs at once (status, seen, saved); returns {"updated": count, "not_found": [<ids>]} so the frontend can reconcile stale client-side selections."""
     retired()  # job search PR 2 (bot review on #135): it still wrote the old pool's rows, which no list shows
     import uuid as _uuid
@@ -1012,11 +969,9 @@ def bulk_update_jobs(body: dict, db: Session = Depends(get_db), firm_id=Depends(
             continue
         job = scoped_jobs(db, firm_id).filter(Job.id == parsed).first()
         if job:
-            before = _job_state(job)
             for k, v in updates.items():
                 if k in allowed:
                     setattr(job, k, v)
-            _audit_job_change(db, firm_id, principal, job, before)
             count += 1
         else:
             not_found.append(str(job_id))
@@ -1045,7 +1000,7 @@ def get_job(job_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_f
 
 @router.patch("/{job_id}")
 async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db),
-                     firm_id=Depends(writer_firm_id), principal: Principal = Depends(current_principal)):
+                     firm_id=Depends(writer_firm_id)):
     # Must be async — launch_background() uses asyncio.create_task(), which needs a running
     # event loop; a sync endpoint's threadpool has none, so the task would silently never start.
     retired()  # job search PR 2: the old pool's write routes answer 410
@@ -1055,11 +1010,9 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
 
     allowed = {"seen", "saved", "status"}
     _validate_job_updates(updates, allowed)
-    before = _job_state(job)
     for key, value in updates.items():
         if key in allowed:
             setattr(job, key, value)
-    _audit_job_change(db, firm_id, principal, job, before)
     db.commit()
 
     # Trigger CV scoring when job is saved (respects on_save_action); launched as a tracked
@@ -1102,9 +1055,6 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
             app = Application(firm_id=firm_id, job_id=job.id, status="applied",
                               status_transitions=[{"from": None, "to": "applied", "at": datetime.now(timezone.utc).isoformat(), "source": "ui"}])
             db.add(app)
-            db.flush()
-            from backend.api.routes_applications import _audit_application_edit
-            _audit_application_edit(db, app, principal, f"Marked {job.title or 'a job'} as applied.", action="CREATE")
             db.commit()
             created_application_id = str(app.id)
 
