@@ -22,9 +22,10 @@ WRITERS = {("auth/ledger.py", "record"), ("auth/ledger.py", "record_automated")}
 # logged, so reaching one doesn't count as a route writing its entry.
 BACKGROUND_LOGGING = {("activity.py", "log_activity"), ("analyzer/llm_logger.py", "_log_work"), ("job_monitor.py", "_log_run")}
 
-# Why a route that changes something writes no entry. Firm work marked TO_LOG leaves this list as its Activity logs PR
-# lands; every other reason is a decision. A new route doesn't belong here unless a reason below is true of it.
-TO_LOG = "firm work with no entry yet: the Activity logs PR that logs this area removes it from this list"
+# Why a route that changes something writes no entry. Each reason is a decision. A new route doesn't belong here unless
+# a reason below is true of it.
+RETIRED = "the old job pool's write route: it answers 410 (job search PR 2) and goes with the pool in the clean-up PR"
+COVER_LETTERS_REMOVED = "cover letters are being removed from BenchQ (decided 2026-11-12), so nothing logs them"
 NOT_FIRM_ACTIVITY = "a Super Admin operation, not a firm's activity"
 PERSONA_REMOVED = "the Persona table is being removed; its fields live on the candidate, whose edits routes_candidates logs"
 REFERENCE_DATA = "global reference data, not a firm's record (07 tenancy: Company is global)"
@@ -32,10 +33,16 @@ NO_READ_ENTRIES = "no ledger entry for reads and manual sync (Abdul, 2026-11-03)
 NOTHING_SAVED = "saves nothing about a firm's records"
 
 NOT_LOGGED: dict[tuple[str, str], str] = {
-    ("api/routes_cover_letters.py", "create_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "update_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "delete_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "generate_cover_letter"): TO_LOG,
+    ("api/routes_cover_letters.py", "create_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "update_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "delete_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "generate_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_jobs.py", "linkedin_import"): RETIRED,
+    ("api/routes_jobs.py", "save_from_extension"): RETIRED,
+    ("api/routes_jobs.py", "create_manual_job"): RETIRED,
+    ("api/routes_jobs.py", "bulk_update_jobs"): RETIRED,
+    ("api/routes_jobs.py", "update_job"): RETIRED,
+    ("main.py", "trigger_analysis"): RETIRED,
     ("api/routes_persona.py", "update_persona"): PERSONA_REMOVED,
     ("api/routes_persona.py", "append_qa_bank"): PERSONA_REMOVED,
 
@@ -60,7 +67,6 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_companies.py", "backfill_h1b_jobs"): REFERENCE_DATA,
     ("api/routes_companies.py", "test_scrape_company"): REFERENCE_DATA,
 
-    ("api/routes_jobs.py", "linkedin_import"): NOT_FIRM_ACTIVITY,
     ("api/routes_linkedin.py", "session_refresh"): NOT_FIRM_ACTIVITY,
     ("api/routes_linkedin.py", "session_pin"): NOT_FIRM_ACTIVITY,
     ("api/routes_searches.py", "create_search"): NOT_FIRM_ACTIVITY,

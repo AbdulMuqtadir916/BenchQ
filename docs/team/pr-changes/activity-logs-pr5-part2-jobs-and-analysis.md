@@ -1,20 +1,19 @@
-# Activity Log PR 5 part 2: jobs and analysis
+# Activity Log PR 5 part 2: background work
 
 Branch: `activity-logs/pr5-part2-jobs-and-analysis` → `main`. Owner: Mohammed Abdul Ahad Umamah ([umamah.md](../umamah.md)).
 Built on part 1 (`activity-logs/pr5-part1-applications`). Merge that first.
 
 ## Scope and dependencies
 
-Logs the firm's job feed. No table, route or response changes. Job entries are about no candidate.
+No table, route or response changes.
 
-- Adding a job by hand or from the extension writes `CREATE`. A posting the firm already sees writes nothing.
-- A change to a job's `status` or `saved` writes `UPDATE` with before/after, one entry a job in a bulk update. Setting
-  `seen` writes nothing, because opening a job is a read (Abdul, 2026-11-03). A change to the same value writes nothing.
-- Marking a job applied from the feed also creates an application, and now logs that too.
-- Asking for a job to be analysed writes `AI_GENERATE` as `AI agent (<person>)`, when the run starts.
-
-`POST /api/jobs/linkedin-import` moves to `NOT_FIRM_ACTIVITY` in the rules test: only a Super Admin can reach it, like
-searches and settings, so it isn't a firm's activity.
+**Changed 2026-11-12, after main's job search:** this part first also logged the old job feed (adding a job by hand or
+from the extension, a job's status, bulk updates, asking for an analysis). Main's job search PR 2 retired those routes
+(they answer 410 and go with the old pool in Zuhair's clean-up PR), so that logging could never run and is taken out. Jobs
+now come from a candidate's search or capture (`job_postings`), which main already logs (`job_search`, `job_posting`) and
+which this stack writes to `activity_logs`. In the rules test the six old-pool routes are `RETIRED`, and the four cover
+letter routes `COVER_LETTERS_REMOVED`: cover letters are being removed from BenchQ, so the part that logged them (part 3)
+is dropped. No route is left marked to log later.
 
 ## Background work, for the Super Admin only
 
@@ -35,7 +34,4 @@ has no firm, so a firm reader never gets one.
 
 | File | Changes and reason |
 |---|---|
-| `backend/api/routes_jobs.py` | The entries above, through `_audit_job` and `_audit_job_change`. |
-| `backend/main.py` | `POST /api/analyze/{job_id}` knows who asked, and logs when the run starts. |
-| `backend/tests/test_activity_jobs.py` | New: each entry, and the cases that must write nothing. |
-| `backend/tests/test_ledger_rules.py` | Six routes leave the to-log list. |
+| `backend/tests/test_ledger_rules.py` | Background work's own rows don't count as a route's entry; the old pool's routes are `RETIRED` and the cover letter routes `COVER_LETTERS_REMOVED`. |
