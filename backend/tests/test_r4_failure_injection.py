@@ -262,7 +262,7 @@ async def test_gmail_token_expiry_returns_no_token_and_does_not_raise(test_db, m
     _fake_httpx(monkeypatch, gc, status=400,
                 payload={"error": "invalid_grant", "error_description": "Token expired"})
     assert await gc._get_access_token() == ""
-    assert await gc.check_emails() is None
+    assert await gc.check_emails() == 0          # no replies read; it returns the count for the run summary
 
 
 @pytest.mark.asyncio
@@ -318,7 +318,7 @@ async def test_gmail_list_error_response_is_swallowed(test_db, monkeypatch):
     c.__aexit__ = AsyncMock(return_value=False)
     monkeypatch.setattr(gc.httpx, "AsyncClient", lambda **kw: c)
 
-    assert await gc.check_emails() is None
+    assert await gc.check_emails() == 0          # no replies read; it returns the count for the run summary
 
 
 # ══ Telegram ═════════════════════════════════════════════════════════════════
