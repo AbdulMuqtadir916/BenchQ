@@ -146,7 +146,7 @@ sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 
 ## Acceptance criteria
 
-- [x] `GET /api/firms/{firm_id}/ledger`: the firm's entries, newest first; a MANAGER's team only (07 Q59); a BDE's own only; another firm 404
+- [x] `GET /api/firms/{firm_id}/ledger`: the firm's entries, newest first; a MANAGER's team only (07 Q64); a BDE's own only; another firm 404
 - [x] `ledger_entries` covered by the scoping lint
 - [x] Adapter live, mapping and paging tested
 - [ ] Clicked through as OWNER and BDE on the live backend (the PR's test plan)

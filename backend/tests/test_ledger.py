@@ -1,5 +1,5 @@
 """A firm's ledger (backend/api/routes_ledger.py; docs/integration/01-ledger.md): the firm's own entries, newest
-first; a MANAGER's team only (07 Q59); a BDE's own entries only; another firm's ledger and a Super Admin get no
+first; a MANAGER's team only (07 Q64); a BDE's own entries only; another firm's ledger and a Super Admin get no
 answer."""
 from datetime import timedelta
 
@@ -264,7 +264,7 @@ def test_filters_by_candidate_their_whole_activity(api_client, accounts, ledger,
         ["Applied for Asha", "Mira edited Asha", "Assigned Asha to Bea"]
 
 
-# 07 Q59: a MANAGER reads their own team, not the firm.
+# 07 Q64: a MANAGER reads their own team, not the firm.
 
 @pytest.fixture
 def teams(test_db, accounts, ledger, assignments):

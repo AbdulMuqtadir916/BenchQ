@@ -86,9 +86,3 @@ export function candidateCapacity(
   const assignedCandidates = candidates.filter((candidate) => candidate.firmId === firm.id && countsTowardLimit(candidate)).length;
   return { assignedCandidates, candidateLimit: firm.candidateLimit, canAssignCandidate: assignedCandidates < firm.candidateLimit };
 }
-
-/** A BDE's load against the firm's capacity (07 Q46): their candidates in a working status. At capacity is a warning, never a block. */
-export function deriveBdeLoad(bdeId: string, candidates: readonly Pick<Candidate, "status" | "bdeId">[], bdeCapacity: number): { load: number; capacity: number; isAtCapacity: boolean } {
-  const load = candidates.filter((candidate) => candidate.bdeId === bdeId && isWorkingCandidate(candidate)).length;
-  return { load, capacity: bdeCapacity, isAtCapacity: load >= bdeCapacity };
-}
