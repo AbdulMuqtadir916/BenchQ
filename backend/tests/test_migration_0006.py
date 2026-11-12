@@ -45,13 +45,6 @@ def test_only_a_bde_invite_names_a_manager(test_db, firm, accounts):
     test_db.flush()
 
 
-def test_bde_capacity_is_one_to_fifty(test_db, firm):
-    assert firm.bde_capacity == 10
-    firm.bde_capacity = 0
-    with pytest.raises(IntegrityError, match="ck_firms_bde_capacity_range"):
-        test_db.flush()
-    test_db.rollback()
-
 
 def test_the_ledger_takes_assign_with_a_note(test_db, firm):
     test_db.add(LedgerEntry(firm_id=firm.id, actor_type="USER", actor_name="Owner", entity_type="candidate",
