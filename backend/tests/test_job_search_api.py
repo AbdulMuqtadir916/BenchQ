@@ -244,7 +244,7 @@ def _rows(test_db, candidate):
 
 
 def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, adnans, fake, test_db):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     fake.jobs = [_job(1), _job(2), _job(3, closed=True), {"t": "No company"}, _job(1)]
     assert _run(world, adnans) == "2 new, 0 seen again"
     assert fake.calls == [("Java Developer", "us", 100)]
@@ -257,7 +257,7 @@ def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, a
     assert batch.meta["meta"] == {"total": 5}
     assert sorted(p.content["t"] for p in postings) == ["Java Developer 1", "Java Developer 2"]
     assert {p.batch_id for p in postings} == {batch.batch_id} and {p.source for p in postings} == {"fake"}
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "job_search").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "job_search").one()
     assert (entry.candidate_id, entry.actor_user_id) == (uuid.UUID(adnans["id"]), world["people"]["adnan"].id)
     assert entry.summary == "Searched jobs for 'Java Developer': 2 new, 0 seen again (US)"
 
