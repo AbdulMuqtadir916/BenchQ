@@ -4,14 +4,14 @@
 - `ip_address` is kept on failed sign-ins. `attempt_count` lets repeat tries share a row.
 - The append-only trigger now allows one thing: adding 1 to a failed sign-in's `attempt_count`.
 
-Revision ID: 0027
-Revises: 0026
+Revision ID: 0029
+Revises: 0028
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0027'
-down_revision = '0026'
+revision = '0029'
+down_revision = '0028'
 branch_labels = None
 depends_on = None
 

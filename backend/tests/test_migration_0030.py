@@ -1,4 +1,4 @@
-"""Migration 0028: nothing is lost, and the two old log tables are gone."""
+"""Migration 0030: nothing is lost, and the two old log tables are gone."""
 import uuid
 from datetime import datetime, timezone
 
@@ -11,7 +11,7 @@ WHEN = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
 
 
 def _at_0027(url):
-    _alembic(url, "upgrade", "0027")
+    _alembic(url, "upgrade", "0029")
 
 
 def test_every_old_row_is_copied_before_the_tables_go(at_0015):
@@ -45,7 +45,7 @@ def test_every_old_row_is_copied_before_the_tables_go(at_0015):
 def test_the_downgrade_brings_both_tables_back_empty(at_0015):
     url, engine = at_0015
     _alembic(url, "upgrade", "head")
-    _alembic(url, "downgrade", "0027")
+    _alembic(url, "downgrade", "0029")
     tables = set(inspect(engine).get_table_names())
     assert {"activity_log_v2", "ledger_entries"} <= tables
     _alembic(url, "upgrade", "head")

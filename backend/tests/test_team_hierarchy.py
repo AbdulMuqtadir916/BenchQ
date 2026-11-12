@@ -131,20 +131,3 @@ def test_only_the_owner_moves_a_bde(anonymous_client, test_db, firm, people):
     for who in ("fatima", "adnan"):
         cookie = _session_for(test_db, people[who])
         assert _move(anonymous_client, firm, cookie, people["adnan"], people["priya"]).status_code == 403, who
-
-
-# ── BDE capacity ─────────────────────────────────────────────────────────────
-
-def test_the_owner_sets_the_bde_capacity(anonymous_client, test_db, firm, owner, people):
-    from backend.models.tenancy import ActivityEntry
-    r = anonymous_client.patch(f"/api/firms/{firm.id}/settings", json={"bde_capacity": 8}, headers=owner)
-    assert r.status_code == 200
-    assert r.json()["bde_capacity"] == 8
-    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "firm", ActivityEntry.action == "UPDATE").one()
-    assert entry.summary == "BDE capacity 10 → 8"
-    for bad in (0, 51):
-        assert anonymous_client.patch(f"/api/firms/{firm.id}/settings", json={"bde_capacity": bad},
-                                      headers=owner).status_code == 422
-    manager = _session_for(test_db, people["fatima"])
-    assert anonymous_client.patch(f"/api/firms/{firm.id}/settings", json={"bde_capacity": 5},
-                                  headers=manager).status_code == 403

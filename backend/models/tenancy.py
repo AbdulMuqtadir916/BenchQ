@@ -106,14 +106,11 @@ class Firm(Base):
     primary_timezone = Column(String, nullable=False, server_default=text("'Asia/Kolkata'"))
     client_timezone = Column(String, nullable=False, server_default=text("'America/New_York'"))
     application_expiry_days = Column(Integer, nullable=False, server_default=text("30"))
-    # 07 Q46: a BDE's comfortable load. A warning when assigning, never a block; the OWNER edits it.
-    bde_capacity = Column(Integer, nullable=False, server_default=text("10"))
     created_at = _created_at()
     updated_at = _updated_at()
 
     __table_args__ = (
         CheckConstraint(f"slug ~ '{SLUG_PATTERN}'", name="ck_firms_slug_format"),
-        CheckConstraint("bde_capacity BETWEEN 1 AND 50", name="ck_firms_bde_capacity_range"),
         CheckConstraint(_in("status", FIRM_STATUSES), name="ck_firms_status"),
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_firms_limits_not_negative"),
         CheckConstraint("application_expiry_days > 0", name="ck_firms_application_expiry_days_positive"),
@@ -263,7 +260,7 @@ ACTIVITY_ACTOR_ROLES = (*FIRM_ROLES, "PLATFORM_ADMIN")
 
 class ActivityEntry(Base):
     """The activity log: who did what, and who was responsible at that moment. A database trigger refuses UPDATE and
-    DELETE (migration 0026), so no code path can rewrite history. `firm_id` is null only for platform-only events
+    DELETE (migration 0028), so no code path can rewrite history. `firm_id` is null only for platform-only events
     (A13). No foreign key but the firm: the log outlives what it describes, and an actor may be a firm user, a platform
     user or nobody (SYSTEM, AGENT). Names and stamps are kept as they were at the time."""
     __tablename__ = "activity_logs"

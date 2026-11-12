@@ -19,7 +19,6 @@ import type { Candidate } from "@/lib/schemas/candidate";
 import { DashboardSearch } from "@/lib/schemas/dashboard-search";
 import type { User } from "@/lib/schemas/session";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { useFirm } from "@/lib/tenancy/firm-context";
 import { cn } from "@/lib/cn";
 import { PERIODS, periodLabel, windowOf, type Period } from "./activity/activity-numbers";
 import { BdeView, FirmView, ManagerView, type JobsData } from "./owner-activity-views";
@@ -60,7 +59,6 @@ export function OwnerActivityDashboard() {
   const applicationsQuery = useApplications();
   // Jobs only feed demand and sources: their failure stays in those cards, not the whole page.
   const jobsQuery = useJobs({ limit: JOBS_LIMIT });
-  const firm = useFirm();
   const group = queryGroup(teamQuery, candidatesQuery, applicationsQuery);
   const allUsers = teamQuery.data ?? EMPTY_USERS;
   const allCandidates = candidatesQuery.data ?? EMPTY_CANDIDATES;
@@ -129,10 +127,10 @@ export function OwnerActivityDashboard() {
         <BdeView user={bde} manager={manager} candidates={bdeCandidates} applications={applicationsOf(bdeCandidates)} period={query.period} window={window} now={now} />
       ) : manager ? (
         <ManagerView user={manager} bdes={teamBdes} candidates={teamCandidates} applications={applicationsOf(teamCandidates)} period={query.period} window={window}
-          now={now} capacity={firm.bdeCapacity} jobs={jobs} canAssign={can(principal, "candidate.assign")} onSelectBde={(bdeId) => setQuery({ bde: bdeId }, "push")} />
+          now={now} jobs={jobs} canAssign={can(principal, "candidate.assign")} onSelectBde={(bdeId) => setQuery({ bde: bdeId }, "push")} />
       ) : (
         <FirmView managers={managers} users={users} candidates={candidates} applications={applications} period={query.period} window={window}
-          now={now} jobs={jobs} capacity={firm.bdeCapacity} onSelectManager={(managerId) => setQuery({ manager: managerId, bde: "" }, "push")} onSelectBde={openBde} />
+          now={now} jobs={jobs} onSelectManager={(managerId) => setQuery({ manager: managerId, bde: "" }, "push")} onSelectBde={openBde} />
       )}
     </div>
   );

@@ -5,7 +5,7 @@ import { FIXTURE_NOW, invitesAt } from "@/mocks/tenancy";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { User } from "@/lib/schemas/session";
 import type { Invite } from "@/lib/schemas/tenancy";
-import { countsTowardLimit, deriveBdeLoad, deriveFirmUsage, effectiveInviteStatus, isWorkingCandidate } from "./tenancy";
+import { countsTowardLimit, deriveFirmUsage, effectiveInviteStatus, isWorkingCandidate } from "./tenancy";
 
 /** Tests use a fixed clock: the instant the fixture invite dates were written against. */
 const NOW = FIXTURE_NOW;
@@ -69,13 +69,6 @@ describe("deriveFirmUsage edges", () => {
     expect([usage.assignedCandidates, usage.canAssignCandidate, usage.isOverCandidateLimit]).toEqual([3, false, false]);
     expect(countsTowardLimit({ status: "ON_BENCH", bdeId: null })).toBe(false);
     expect(countsTowardLimit({ status: "PAUSED", bdeId: "bde" })).toBe(false);
-  });
-
-  it("a BDE's load is their working candidates against the capacity: at it is a warning (07 Q46)", () => {
-    const of = (status: Candidate["status"], bdeId: string | null) => ({ status, bdeId });
-    const rows = [of("ON_BENCH", "b"), of("OFFER", "b"), of("PLACED", "b"), of("ON_BENCH", "other"), of("ON_BENCH", null)];
-    expect(deriveBdeLoad("b", rows, 3)).toEqual({ load: 2, capacity: 3, isAtCapacity: false });
-    expect(deriveBdeLoad("b", rows, 2)).toEqual({ load: 2, capacity: 2, isAtCapacity: true });
   });
 
   it("treats a PENDING invite past expiresAt as EXPIRED, and only PENDING ones reserve seats (A9)", () => {

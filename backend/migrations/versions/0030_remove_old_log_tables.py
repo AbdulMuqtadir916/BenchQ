@@ -2,19 +2,19 @@
 
 - Every `activity_log_v2` row is copied in as a system row with no firm, so only the Super Admin reads it. Each keeps its
   id, date and message; its company becomes the label and its details the note.
-- Any `ledger_entries` row not already copied by 0026 comes in the same way 0026 did it.
+- Any `ledger_entries` row not already copied by 0028 comes in the same way 0028 did it.
 - The upgrade stops if a row is missing, before anything is dropped.
 
 The downgrade brings both tables back empty. What was copied stays in `activity_logs`.
 
-Revision ID: 0028
-Revises: 0027
+Revision ID: 0030
+Revises: 0029
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0028'
-down_revision = '0027'
+revision = '0030'
+down_revision = '0029'
 branch_labels = None
 depends_on = None
 
