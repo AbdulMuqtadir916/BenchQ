@@ -159,8 +159,10 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     named = scoped(db, Candidate, my_firm).filter(Candidate.id.in_(ids)).all()
     profile.prime(db, my_firm, named)
     names = {candidate.id: candidate.full_name for candidate in named}
-    return [ledger_entry_json(e, hide_email=principal.support_view_id is not None,
-                              candidate_name=names.get(e.candidate_id)) for e in entries]
+    people = dict(db.query(User.id, User.name).filter(
+        User.id.in_({e.on_behalf_of_user_id for e in entries if e.on_behalf_of_user_id is not None})).all())
+    return [ledger_entry_json(e, hide_email=principal.support_view_id is not None, candidate_name=names.get(e.candidate_id),
+                              person_name=people.get(e.on_behalf_of_user_id)) for e in entries]
 
 
 @router.get("/ledger/people", summary="Who the reader can see in the log, with each person's action count")

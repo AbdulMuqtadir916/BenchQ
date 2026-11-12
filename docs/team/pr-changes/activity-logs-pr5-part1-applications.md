@@ -16,6 +16,29 @@ The log used to miss most of what people do with applications. This part adds it
 Notes and answer text are never written to the log. The Chrome extension's "mark applied" already logged (it goes through
 the candidate-status route); this part doesn't change it.
 
+## Application status, every path (added 2026-11-12, after main's #127)
+
+Main's #127 (Uzair) changed the statuses: a candidate's application now has **ten** (Saved, Applied, Screening call,
+Shortlisted, Interview schedule request, Interview scheduled, Assessment, Offer, Move on, Incomplete application), and it
+added automatic changes from email. Every way a status changes is an entry, with the candidate, who did it and the before
+and after (`changes`). The notes people type and the email's own words are never written to the log.
+
+| What happens | Entry | Who |
+|---|---|---|
+| A person moves an application to any of the ten | "Moved <job>: a → b." | The person, with their role |
+| A BDE settles a review the AI raised | "Reviewed <job>: a → b." | The BDE |
+| A person undoes an automatic change | "Undid automatic change …: a → b." | The person |
+| The AI changes a status from an email | "Automatic status change from email: a → b." | AI agent, **for the candidate's BDE** |
+| The AI sends an email to BDE review | "Email sent to BDE review (<reason>) for <job>." | AI agent, **for the candidate's BDE** |
+| An unsupported or old status, a stale view, the same status again | Refused (400, 409) or no change: nothing is written | |
+
+An AI agent working on a candidate works for that candidate's BDE, so these entries are the BDE's, and their manager's, as
+the entries from autofill already were. Before this, a BDE could not see an automatic status change on their own
+candidate unless they picked the candidate. The Actor column shows the BDE with the AI tag. Other teams' BDEs never see it.
+
+Hand-logged applications (no candidate) still use the older four statuses (applied, interview, offer, rejected), and their
+moves keep before and after too.
+
 ## An AI agent's person
 
 An agent's entry stores its person's role in `actor_role`, and the API returns the person's name as `on_behalf_of_name`,
