@@ -3,19 +3,23 @@
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
+import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/cn";
 import { Card } from "@/components/ui/card";
-import { CLOSED, STATUS_COLOR, STATUS_ICON, STATUS_LABEL } from "@/components/app/applications/status-meta";
+import { CLOSED, PIPELINE, STATUS_COLOR, STATUS_ICON, STATUS_LABEL } from "@/components/app/applications/status-meta";
 
-const STAGES = ["APPLIED", "RESPONSE", "SCREENING", "INTERVIEW", "OFFER", "PLACED"] as const;
-const BAR: Record<(typeof STAGES)[number], string> = {
+/** Applied → Offer, plus Incomplete, from the one pipeline in status-meta (PR 4). */
+const STAGES: ApplicationStatus[] = [...PIPELINE.slice(1), "INCOMPLETE_APPLICATION"];
+const BAR: Record<string, string> = {
   APPLIED: "bg-[var(--color-info-fg)]",
-  RESPONSE: "bg-[var(--color-violet-fg)]",
-  SCREENING: "bg-[var(--color-violet-fg)]",
-  INTERVIEW: "bg-[var(--color-warning-fg)]",
+  SCREENING_CALL: "bg-[var(--color-violet-fg)]",
+  SHORTLISTED: "bg-[var(--color-violet-fg)]",
+  INTERVIEW_SCHEDULE_REQUEST: "bg-[var(--color-warning-fg)]",
+  INTERVIEW_SCHEDULED: "bg-[var(--color-warning-fg)]",
+  ASSESSMENT: "bg-[var(--color-warning-fg)]",
   OFFER: "bg-[var(--color-success-fg)]",
-  PLACED: "bg-[var(--color-teal-fg)]",
+  INCOMPLETE_APPLICATION: "bg-[var(--color-warning-fg)]",
 };
 
 /** Where every submission stands right now. Each row opens the board. */

@@ -97,7 +97,7 @@ export function ManagersList() {
                     <span className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--color-border)] pt-3 text-caption text-[var(--color-text-3)]">
                       <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.applications}</span>applied</span>
                       <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.interviews}</span>interviews</span>
-                      <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.placements}</span>placed</span>
+                      <span><span className="block text-h3 tabular text-[var(--color-text)]">{row.counts.offers}</span>offers</span>
                     </span>
                     <span className="mt-2 block text-caption text-[var(--color-text-3)]">Last {periodLabel(period)}</span>
                   </Link>
