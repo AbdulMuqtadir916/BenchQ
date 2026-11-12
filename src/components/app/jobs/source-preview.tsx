@@ -15,7 +15,7 @@ import { JobDescription } from "@/components/app/jobs/job-description";
  * The selected job as its source shows it. The list leaves descriptions out (a list of up to 400 jobs stays small,
  * docs/02 §6.z), so the description comes from the one job's read, the same the job page makes (decided 2026-11-11).
  */
-export function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) {
+export function SourcePreview({ job, portal, onOpenSource = null }: { job: Job; portal: PortalKey; onOpenSource?: ((job: Job) => void) | null }) {
   const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl;
   return (
     <div className="flex-1 bg-[var(--color-surface-2)] p-4">
@@ -25,7 +25,7 @@ export function SourcePreview({ job, portal }: { job: Job; portal: PortalKey }) 
             <PortalLogo portal={portal} domain={job.company.domain} size={32} />
             <div className="min-w-0"><div className="text-body-strong text-[var(--color-text)]">Source preview · {PORTALS[portal].label}</div><div className="truncate text-caption text-[var(--color-text-3)]">{sourceUrl ?? job.company.websiteUrl ?? "Source URL unavailable"}</div></div>
           </div>
-          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">Open original<ArrowUpRight size={13} /></a> : null}
+          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)} className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">Open original<ArrowUpRight size={13} /></a> : null}
         </header>
         <div className="p-5">
           <div className="mb-5 flex items-start gap-3">
