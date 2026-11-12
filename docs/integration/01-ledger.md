@@ -49,11 +49,12 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     entries = scoped(db, ActivityEntry, my_firm)                         # firm_id = :firm, always
     if (actor := own_scope(principal)) is not None:                    # a BDE: only their own rows
         entries = entries.filter(ActivityEntry.actor_user_id == actor)
-    entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id.desc()).offset(offset).limit(limit)
+    entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id).offset(offset).limit(limit)
     return [ledger_entry_json(e) for e in entries]
 ```
 
-It limits the rows by role (`_limit_to_reader`: a BDE's own and their candidates' assignments, a MANAGER's team, 07 Q52 and Q64) and orders them by `created_at`, then `id`, both descending. To read on, pass the last row's `cursor`, or the same marker as two fields, `cursor_at` and `cursor_id` (both, and a timestamp with a timezone; what the whole-ledger paging on the frontend sends). An `offset` with a cursor skips that many rows after it. See [the route](../../backend/api/routes_ledger.py) for the filters.
+It limits the rows by role (`_limit_to_reader`: a BDE's own and their candidates' assignments, a MANAGER's team, 07 Q52 and Q64) and orders them newest first (`created_at` descending), then by lowest `id` for rows at exactly the same moment, so the order is
+the same on every read. To read on, pass the last row's `cursor`, or the same marker as two fields, `cursor_at` and `cursor_id` (both, and a timestamp with a timezone; what the whole-ledger paging on the frontend sends). An `offset` with a cursor skips that many rows after it. See [the route](../../backend/api/routes_ledger.py) for the filters.
 
 The rules it follows, which every track follows:
 
