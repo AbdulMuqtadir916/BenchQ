@@ -193,7 +193,7 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["resumes", "full", "team", "assigned", "read"],
   ["resumes.studio", "full", "team", "assigned", "read"],
   ["outreach", "full", "team", "own", "read"],
-  ["focus", "full", "full", "full", "none"],
+  ["focus", "none", "none", "full", "none"], // BDE only (07 Q64)
   ["ledger", "full", "team", "own", "read"],
   ["settings", "full", "full", "full", "full"], // index: redirects to the first allowed section
   ["settings.firm", "full", "none", "none", "none"],
@@ -461,9 +461,9 @@ describe("⌘K navigation by area (P5, docs/04 §14.1)", () => {
     for (const id of pages) expect(accessFor(routeById(id), inSupport), id).toBe("read");
   });
 
-  it("offers Focus mode only to firm users who can open it", () => {
+  it("offers Focus mode only to BDEs (07 Q64)", () => {
     for (const role of ROLES) {
-      expect(ids(asRole(role), "firm").includes("focus"), role).toBe(role !== "VIEWER");
+      expect(ids(asRole(role), "firm").includes("focus"), role).toBe(role === "BDE");
     }
     expect(ids(inSupport, "firm")).not.toContain("focus");
   });

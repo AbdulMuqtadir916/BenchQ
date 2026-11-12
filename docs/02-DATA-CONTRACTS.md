@@ -680,7 +680,7 @@ export const ScraperRunSchema = z.object({
 
 ```ts
 export const AiPurpose = z.enum([
-  'RESUME_TAILOR',      // the tailoring agent (AgentDraft.runId)
+  'RESUME_TAILOR',      // the tailoring agent (a tailoring's `job_runs` row, §8.3)
   'JOB_SCORE_FULL',     // backend purpose "score_full"
   'JOB_SCORE_LIGHT',    // "score_light"
   'EMAIL_CLASSIFY',     // "email"
@@ -707,7 +707,7 @@ export const AiUsageSchema = z.object({
    * backend prices each call at call time from the provider's price list; the frontend never prices.
    */
   costMicroUsd: z.number().int().nonnegative(),
-  /** The run this call belongs to (AgentDraft.runId), if any. */
+  /** The run this call belongs to (a tailoring's `job_runs` id, §8.3), if any. */
   runId: z.string().nullable(),
   jobId: z.string().nullable(),
   durationMs: z.number().int().nonnegative(),
@@ -1579,6 +1579,7 @@ export const ResumeSchema = z.object({
   name: z.string(),
   isMaster: z.boolean(),
   targetJobId: z.string().nullable(),
+  targetJob: z.object({ title: z.string(), company: z.string() }).nullable(), // §8.1, 2026-11-12
   templateId: z.string(),
   versions: z.array(ResumeVersionSchema),
   latestVersionId: z.string(),
@@ -1599,6 +1600,9 @@ every edit as a new row; the frontend keeps its `Resume.versions[]` model, fille
 rows. `isMaster` ← `category = 'BASE'`, `targetJobId` ← `job_id`, `templateId` ← `template`, `name` ← `name`,
 `versions[]` / `versionNumber` ← the group's rows / `version`, `latestVersionId` ← the highest `version`, and
 `ResumeVersion.parentVersionId` ← the previous version in the group (derived; there is no column).
+`targetJob` ← the listing's `job` on a tailored group: `{title, company}` of its own job posting, read by the backend
+(null on a base, or from a backend that doesn't send it). Added 2026-11-12 (tailoring part 3, Zuhair): a list names a
+tailored copy without the screen loading any jobs (only a candidate's own jobs are read, docs/04 §5.3).
 
 **`autofill` (backend only, migration 0019; decided by Zuhair 2026-11-07, Abdul and Samad OK; this contract signed off
 by Abdul 2026-11-08 in issue 119, the `key` added with his OK):** `GET …/resumes/{id}?autofill=true`, on the
@@ -1724,6 +1728,44 @@ name, `Cache-Control: no-store`). Only an uploaded base's version 1 has one: tha
 version, a tailored one or a promoted base's answers 404 ("This version has no uploaded file."), as does a version out
 of the principal's scope. The read follows the version's own access (§8.1). The extension attaches it to a form's
 résumé upload (07 Q50–Q52); a file for every version (rendered by the backend) is asked of Zuhair (Q25).
+
+### 8.3 Tailoring a résumé — APPROVED 2026-11-12 (Zuhair, tailoring part 3 Q7), BUILT (tailoring part 3)
+
+A tailoring is a background run (`docs/team/tailoring.md`): the BDE starts it for one of the candidate's own jobs, from
+a version of one of the candidate's visible bases (default: the active base's v1). It writes a TAILORED version; a
+source that isn't a v1 gets a base of its own when it succeeds, not made active. The run's `job_runs` row is the record.
+
+```ts
+export const TAILORING_STEPS = ["analyse", "draft", "review", "revise", "verify", "save"] as const;
+
+export const StartTailoringSchema = z.object({
+  candidateId: z.string(),
+  jobId: z.string(),                       // the candidate's own posting (docs/04 §5.3)
+  resumeId: z.string().optional(),         // a base's version; absent: the active base's v1
+});
+
+export const TailoringRunSchema = z.object({
+  runId: z.string(),
+  status: z.enum(["running", "completed", "failed"]),
+  step: z.enum(TAILORING_STEPS).nullable(),           // while running only
+  resumeId: z.string().nullable(),                    // the TAILORED version, once completed
+  errorCode: z.string().nullable(),                   // provider_failed, unreadable_reply, gone, lost, hidden, setup, internal
+  candidateId: z.string(),
+  sourceResumeId: z.string().nullable(),
+  baseResumeId: z.string().nullable(),                // known at the start for a v1, else once completed
+  jobId: z.string().nullable(),
+  jobTitle: z.string(),
+  startedAt: z.string().datetime().nullable(),
+  finishedAt: z.string().datetime().nullable(),
+});
+```
+
+`POST …/candidates/{cid}/resumes/tailor` `{job_posting_id, resume_id?}` → 202 `{run_id}`; 404 a job or version that
+isn't the candidate's; 409 a tailored version, a hidden base (or a hidden base made from the version), no active base,
+or the same version and job already running; 422 a job without a description; 429 five running for the BDE; 500 the
+tailor not set up. `GET …/resumes/tailorings[/{run_id}]` reads the candidate's; `GET /firms/{firm}/tailorings` the
+signed-in user's own, running or finished in the last 30 minutes (their panel). Snake case is mapped in
+`src/lib/api/dto/tailoring.ts`.
 
 ---
 

@@ -4,7 +4,6 @@ import { applicationsApi } from "@/lib/api/applications";
 import { recordsApi } from "@/lib/api/records";
 import { documentsApi } from "@/lib/api/documents";
 import { inboxApi } from "@/lib/api/inbox";
-import { agentsApi } from "@/lib/api/agents";
 import { stubCandidateReads } from "./fixture-backend";
 import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import { allJobMarks, jobMarksMock } from "./job-marks";
@@ -13,7 +12,6 @@ import { allApplications, applicationsMock } from "./applications";
 import { recordsMock } from "./records";
 import { allDocuments, documentsMock } from "./documents";
 import { allMessages, inboxMock } from "./inbox";
-import { agentsMock } from "./agents";
 import { FIRM_SCOPED_RESOURCES } from "./membership";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
 
@@ -34,9 +32,8 @@ const idsOf = (firmId: string) => {
   const candidate = of(allCandidates, firmId);
   return {
     candidate: candidate.id,
-    job: "job_001", // jobs are the backend's (no jobs mock): marks and tailoring take any id
+    job: "job_001", // jobs are the backend's (no jobs mock): marks take any id
     application: of(allApplications, firmId).id,
-    resumeVersion: "rv_001", // résumés are the backend's (no résumé mock): tailoring takes any id
     document: of(allDocuments, firmId).id,
     message: of(allMessages, firmId).id,
   };
@@ -61,15 +58,12 @@ const CALLS: ReadonlyArray<readonly [string, string, (firmId: string, ids: Ids) 
   ["jobMarks", "list", (f) => jobMarksApi.list(f), false],
   ["jobMarks", "mark", (f, i) => jobMarksApi.mark(f, i.job, "SAVED"), true],
   ["jobMarks", "unmark", (f, i) => jobMarksApi.unmark(f, i.job, "SAVED"), true],
-  ["agents", "tailorResume", (f, i) => agentsApi.tailorResume(f, { resumeVersionId: i.resumeVersion, jobId: i.job }), true],
 ];
 
 const MOCKS: Record<(typeof FIRM_SCOPED_RESOURCES)[number], object> = {
   applications: applicationsMock,
-  records: recordsMock, documents: documentsMock, inbox: inboxMock, agents: agentsMock, jobMarks: jobMarksMock,
+  records: recordsMock, documents: documentsMock, inbox: inboxMock, jobMarks: jobMarksMock,
 };
-/** Mock methods that take no firm (they work on text alone). */
-const UNSCOPED = new Set(["agents.rewrite"]);
 
 const status = (promise: Promise<unknown>) => promise.then(() => 200, (error: unknown) => (error instanceof ApiError ? error.status : -1));
 
@@ -84,7 +78,7 @@ afterEach(() => {
 
 describe("membership: a firm-A principal can't reach firm B through any adapter a hook calls (docs/07 T8)", () => {
   it("covers every method of every firm-scoped mock", () => {
-    const methods = Object.entries(MOCKS).flatMap(([resource, mock]) => Object.keys(mock).map((name) => `${resource}.${name}`)).filter((key) => !UNSCOPED.has(key));
+    const methods = Object.entries(MOCKS).flatMap(([resource, mock]) => Object.keys(mock).map((name) => `${resource}.${name}`));
     expect(CALLS.map(([resource, name]) => `${resource}.${name}`).sort()).toEqual(methods.sort());
   });
 

@@ -57,6 +57,11 @@ NOT_REACHED: dict[str, str] = {
     # logging (ids, codes, counts; never the query) is checked in test_job_search_api.py.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": "403: Only this candidate's BDE searches jobs for them",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": "403: Only this candidate's BDE adds jobs for them",
+    # Only the candidate's BDE tailors (07 Q55) and the sweep signs in as the OWNER; its seeded job_runs row is no
+    # firm's tailoring. The tailor's own logging (ids, codes, counts; never a résumé or a posting) is checked in
+    # test_resume_tailor_routes.py.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailor": "403: This candidate's BDE changes their résumés",
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings/{run_id}": "404: Not found",
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}":
         "409: Base 1 holds what an owner or manager added, so it can't be deleted",
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}":

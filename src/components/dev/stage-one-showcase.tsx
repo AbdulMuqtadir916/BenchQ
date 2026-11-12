@@ -6,7 +6,6 @@ import { Play, Square } from "lucide-react";
 import { AgentRunPanel, TypewriterText } from "@/components/app/ai";
 import { DataTable } from "@/components/app/data-table";
 import { Button } from "@/components/ui/button";
-import { useTailorResume } from "@/lib/hooks/use-agents";
 import type { AgentRunStatus } from "@/components/app/ai";
 
 interface DemoRow {
@@ -56,7 +55,6 @@ export function StageOneShowcase() {
   const [activeStage, setActiveStage] = React.useState(0);
   const [elapsedMs, setElapsedMs] = React.useState(0);
   const [draft, setDraft] = React.useState("");
-  const tailorMutation = useTailorResume();
   const abortRef = React.useRef<AbortController | null>(null);
   const timersRef = React.useRef<number[]>([]);
 
@@ -87,14 +85,15 @@ export function StageOneShowcase() {
     );
 
     try {
-      const result = await tailorMutation.mutateAsync({
-        input: { resumeVersionId: "resume-version-demo", jobId: "job-demo" },
-        signal: controller.signal,
+      // A static demo of the staged panel: no agent is called (the real tailoring runs on the backend, docs/02 §8.3).
+      await new Promise<void>((resolve, reject) => {
+        const timer = window.setTimeout(resolve, 2_000);
+        controller.signal.addEventListener("abort", () => { window.clearTimeout(timer); reject(new Error("Stopped.")); });
       });
       clearTimers();
       setStatus("complete");
       setActiveStage(AGENT_STAGES.length);
-      setDraft(result.lines[0]?.text ?? "Draft ready for review.");
+      setDraft("Draft ready for review.");
     } catch (error) {
       clearTimers();
       if (controller.signal.aborted) {

@@ -10,7 +10,6 @@ import { StudioTopbar } from "./studio-topbar";
 import { StatusBar } from "./status-bar";
 import { ViewerOutline } from "./viewer-outline";
 import { SelectionToolbar } from "./selection-toolbar";
-import { useTailorRun } from "./tailor-run";
 import { usePrintExport } from "./print-export";
 import { stepTemplate } from "./templates";
 import { useStudio } from "./studio-store";
@@ -29,12 +28,11 @@ function isTyping(target: EventTarget | null): boolean {
  * gets all the room. Builder mode: section forms left, live page right.
  * Viewer mode: the page itself, editable in place.
  */
-export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSave, isSaving = false }: { name: string; subtitle: string; canEdit: boolean; canTailor: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
+export function ResumeStudio({ name, subtitle, canEdit, onClose, onSave, isSaving = false }: { name: string; subtitle: string; canEdit: boolean; onClose: () => void; onSave?: () => void; isSaving?: boolean }) {
   const doc = useStudio((s) => s.doc);
   const mode = useStudio((s) => s.mode);
   const rootRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion() ?? false;
-  const tailor = useTailorRun();
   const exporter = usePrintExport(doc, resumeFileName(name));
   const [isConfirmingClose, setConfirmingClose] = useState(false);
   // Closing with unsaved edits asks first: a save is explicit (no autosave), so closing would lose them.
@@ -84,13 +82,10 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
         name={name}
         subtitle={subtitle}
         canEdit={canEdit}
-        canTailor={canTailor}
-        isTailoring={tailor.isRunning}
         onSave={onSave}
         isSaving={isSaving}
         isSaveBlocked={hasInvalidLinks}
         onClose={close}
-        onTailor={tailor.start}
         onExport={exporter.print}
       />
 
@@ -114,7 +109,6 @@ export function ResumeStudio({ name, subtitle, canEdit, canTailor, onClose, onSa
 
       <StatusBar doc={doc} />
       {isEditable || (canEdit && mode === "build") ? <SelectionToolbar scopeRef={rootRef} /> : null}
-      {tailor.panel}
       {exporter.portal}
       <ConfirmDialog open={isConfirmingClose} title="Discard unsaved changes?" confirmLabel="Discard" tone="danger" cancelLabel="Keep editing"
         onCancel={() => setConfirmingClose(false)} onConfirm={() => { setConfirmingClose(false); onClose(); }}>
