@@ -28,10 +28,11 @@ export function readKeyInput(event: KeyboardEvent): Omit<ListKeyInput, "insideTa
     defaultPrevented: event.defaultPrevented,
     isTyping,
     // Every overlay in the app is a native open <dialog> or `role="dialog" aria-modal="true"` (the palette, the shortcut sheet, the
-    // application drawer, the résumé studio), and a menu or list that has the keyboard is a listbox or menu.
+    // application drawer, the résumé studio), and a menu or list that has the keyboard is a listbox or menu. An open tooltip
+    // (InfoTip, `data-open`) counts too: its Esc closes it, it never leaves the page (Abdul's review on #127).
     overlayOpen:
       ui.commandPaletteOpen || ui.hintSheetOpen
-      || Boolean(document.querySelector("dialog[open], [role='dialog'][aria-modal='true'], [role='alertdialog']"))
+      || Boolean(document.querySelector("dialog[open], [role='dialog'][aria-modal='true'], [role='alertdialog'], [role='tooltip'][data-open]"))
       || (target instanceof Element && Boolean(target.closest("[role='listbox'], [role='menu'], details[data-column-chooser][open]"))),
     afterG,
   };

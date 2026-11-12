@@ -62,6 +62,14 @@ def test_a_persons_ai_call_is_one_row_with_what_it_did(test_db):
     assert row.summary.startswith("AI agent drafted 1 answer: 1,000 tokens in, 50 out, $")
 
 
+def test_an_ai_call_made_inside_the_callers_session_is_a_row_too(test_db):
+    """The email classifier (PR 4 on main) logs its call into its own transaction, which is never committed here. The
+    Super Admin's row is written on its own, so it is there whichever way the call was logged."""
+    log_llm_call("autofill", "openrouter", "model-x", USAGE, db=test_db)
+    row = _rows(test_db, entity_type="llm_call")[0]
+    assert (row.actor_type, row.firm_id, row.model_id) == ("AGENT", None, "model-x")
+
+
 def test_a_scheduled_batch_is_one_row_with_the_totals(test_db):
     with one_row_per_run():
         for _ in range(80):
