@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { addJob, BENCHQ_URL, type Application } from "../api";
-import { isJobLink } from "../page/job";
 import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CHECK, SPINNER_ICON } from "./icons";
 import { sameCompany, sameListing } from "./job-check";
 import { missingAccess, requestAccess, type SiteAccess } from "./site-access";
+import { isJobLink } from "./job-link";
 import { readJobPage } from "./tab-bridge";
 import type { PageJob } from "./types";
 
