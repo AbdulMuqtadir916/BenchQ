@@ -142,6 +142,8 @@ export type TailoringRun = {
   resume_id: string | null;
   error_code: string | null;
   job_posting_id?: string | null;
+  /** The base version it reads: a start refused because this one already runs follows only a run of the same source. */
+  source_resume_id?: string | null;
   started_at: string | null;
 };
 

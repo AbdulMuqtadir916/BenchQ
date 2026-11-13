@@ -70,10 +70,14 @@ export function payIn(text: string): Pay | undefined {
     const between = next ? text.slice(first.index! + first[0].length, next.index) : "";
     const isRange = Boolean(next) && /^\s*(?:-|–|—|to)\s*$/i.test(between);
     const end = isRange ? next!.index! + next![0].length : first.index! + first[0].length;
-    // The period the amount goes with: the one after it ("… per year"), else the one just before ("Hourly: $60-70"),
-    // never another figure's ("40 hours/week, … $143,700 - $194,400 per year").
+    // The period the amount goes with: the one right after it ("… per year"), up to the next figure or the end of the
+    // sentence, else the one just before it in its own clause ("Hourly: $60-70"). Never another figure's: not the
+    // annual sum after an hourly rate ("Hourly: $60 ($124,800 annually)"), nor a schedule's ("40 hours/week, Salary
+    // $143,700 - $194,400 per year"; "Salary $50,000. 40 hours per week"). PR #140's review.
     const periodIn = (part: string) => PERIODS.find(([pattern]) => pattern.test(part))?.[1];
-    const period = periodIn(text.slice(end, end + 30)) ?? periodIn(text.slice(Math.max(0, first.index! - 30), first.index));
+    const after = text.slice(end, end + 30).split(/\d|[.;!?](?:\s|$)/)[0]!;
+    const before = text.slice(Math.max(0, first.index! - 30), first.index).split(/\d|[,;.!?]/).at(-1)!;
+    const period = periodIn(after) ?? periodIn(before);
     if (!isRange && !period) continue;
     const min = amountOf(first[2]!, first[3] ?? (isRange ? next![3] : undefined));
     const max = isRange ? amountOf(next![2]!, next![3]) : min;
@@ -187,7 +191,9 @@ export function linesOf(root: Element): string[] {
     let facts = known.get(element);
     if (!facts) {
       const display = view?.getComputedStyle?.(element).display ?? "";
-      facts = { isBlock: display ? display !== "inline" && display !== "contents" : BLOCKS.has(element.tagName),
+      // Inline-level boxes (inline-block, inline-flex, inline-grid…) stay on the line: a range whose amounts are such
+      // spans is one line, or its pay is lost (PR #140's review).
+      facts = { isBlock: display ? !display.startsWith("inline") && display !== "contents" : BLOCKS.has(element.tagName),
         isOut: display === "none" || element.matches(SKIPPED) || [...element.classList, element.id].some((token) => CHROME.test(token)) };
       known.set(element, facts);
     }
@@ -274,7 +280,9 @@ export function pageDetails(doc: Document, title: string): JobDetails {
   const location = firstOf([iconed(root, "location") ?? "", ...valuesOf(lines, LOCATION_LABEL),
     ...classed(root, /(?:^|__|-|_)(?:locations?|offices?)$/i)], placeOf);
   // A page in US English writes 11/12/2026 month first; any other leaves an order that both readings fit unread.
-  const monthFirst = /^en(?:-us)?$/i.test(doc.documentElement.getAttribute("lang") ?? "");
+  // Month first only on a page that says it's US English: a bare "en" is a UK page too, where 05/06/2026 is 5 June, so
+  // such a date stays unread (PR #140's review).
+  const monthFirst = /^en-us$/i.test(doc.documentElement.getAttribute("lang") ?? "");
   const payLines = lines.filter((line, n) => line.length <= 400 && /\d/.test(line)
     && PAY_WORDS.test([lines[n - 2] ?? "", lines[n - 1] ?? "", line].join(" ")));
   const idLine = firstOf(lines, (line) => /^(?:job|req|requisition)\.? ?(?:id|#|number)\s*#?\s+(\S+)$/i.exec(line)?.[1]);

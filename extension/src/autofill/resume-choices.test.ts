@@ -63,7 +63,8 @@ describe("the résumés the picker offers", () => {
     expect(resumeChoices(listing, "job-1", "t1v1").map(({ id }) => id)).toEqual(["t1v2", "t1v1", "b1v2", "b2v1"]);
     // A hidden base is offered only when the application names its exact version, not another job's tailoring.
     expect(resumeChoices(listing, "job-1", "b3v1").map(({ id }) => id)).toEqual(["t1v2", "t1v1", "b1v2", "b2v1", "b3v1"]);
-    expect(resumeChoices(listing, "job-1", "t2v1").map(({ id }) => id)).toEqual(["t1v2", "t1v1", "b1v2", "b2v1"]);
+    // Another job's tailoring only as the application's own (its test below).
+    expect(resumeChoices(listing, "job-1", "t2v1").map(({ id }) => id)).toEqual(["t1v2", "t1v1", "b1v2", "b2v1", "t2v1"]);
   });
 
   it("offers only the exact hidden-base version named by the application", () => {
@@ -77,6 +78,14 @@ describe("the résumés the picker offers", () => {
     ]);
     expect(defaultResume(choices, "b3v1")).toBe("b3v1");
     expect(resumeChoices(listing, "job-1", null).some(({ id }) => id === "b3v1")).toBe(false);
+  });
+
+  it("offers the résumé the application was sent with when it was tailored for another job, and starts on it (PR #140 review)", () => {
+    const choices = resumeChoices(listing, "job-1", "t2v1");
+    expect(choices.at(-1)).toMatchObject({ id: "t2v1", label: "Tailored for another job · from Base 1 · v1", meta: "For another job · from Base 1 · v1", isTailored: true, isOtherJob: true });
+    expect(defaultResume(choices, "t2v1")).toBe("t2v1");
+    // Without it named, another job's tailoring stays out.
+    expect(resumeChoices(listing, "job-1").some(({ id }) => id === "t2v1")).toBe(false);
   });
 
   it("tags only the newest version of the base in use as active", () => {
@@ -118,11 +127,11 @@ describe("what Tailor reads", () => {
   });
 
   it("a tailored résumé's own base, so Tailor again makes its next version", () => {
-    expect(tailorSource(listing, choice("t1v1"))).toEqual({ resumeId: "b2v1", baseId: "b2", label: "Base 2 · Active" });
+    expect(tailorSource(listing, choice("t1v1"))).toEqual({ resumeId: "b2v1", baseId: "b2", label: "Base 2 (Active)" });
   });
 
   it("else the active base, as the website's Tailor does; never a hidden one", () => {
-    expect(tailorSource(listing, null)).toEqual({ resumeId: "b2v1", baseId: "b2", label: "Base 2 · Active" });
+    expect(tailorSource(listing, null)).toEqual({ resumeId: "b2v1", baseId: "b2", label: "Base 2 (Active)" });
     expect(tailorSource(listing, choice("b3v1"))?.baseId).toBe("b2");
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { addJob, BENCHQ_URL, type Application } from "../api";
 import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CHECK, SPINNER_ICON } from "./icons";
@@ -126,14 +126,22 @@ const MODE_LABEL = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" } as 
 const PER = { hour: "an hour", day: "a day", week: "a week", month: "a month", year: "a year" } as const;
 const amount = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
-/** What the page stated besides its title, company and place, as the card shows it before the BDE adds the job:
- * "Remote · Full-time · USD 120,000–150,000 a year · Posted 2026-11-10 · Req R123456". */
-export function detailsOf(job: PageJob): string {
+/** A posted date as anyone reads it, day first and the month in words: "10 Nov 2026", never an ambiguous 11/10. */
+const dateWords = (iso: string) => {
+  const date = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};
+
+/** What the page stated besides its title, company and place, each with its name, as the card shows it before the BDE
+ * adds the job, so anyone can check it at a glance: [["Work mode", "Remote"], ["Pay", "USD 120,000–150,000 a year"],
+ * ["Type", "Full-time"], ["Posted", "10 Nov 2026"], ["Job ID", "R123456"]]. Only what the page stated. */
+export function detailsOf(job: PageJob): Array<[string, string]> {
   const pay = job.salaryMin === undefined ? "" : [job.salaryCurrency, job.salaryMax !== undefined && job.salaryMax !== job.salaryMin
     ? `${amount(job.salaryMin)}–${amount(job.salaryMax)}` : amount(job.salaryMin), job.salaryPeriod ? PER[job.salaryPeriod] : ""]
     .filter(Boolean).join(" ");
-  return [job.workMode ? MODE_LABEL[job.workMode] : "", job.employmentType ?? "", pay, job.postedAt ? `Posted ${job.postedAt}` : "",
-    job.requisitionId ? `Req ${job.requisitionId}` : ""].filter(Boolean).join(" · ");
+  const facts: Array<[string, string]> = [["Work mode", job.workMode ? MODE_LABEL[job.workMode] : ""], ["Pay", pay],
+    ["Type", job.employmentType ?? ""], ["Posted", job.postedAt ? dateWords(job.postedAt) : ""], ["Job ID", job.requisitionId ?? ""]];
+  return facts.filter(([, value]) => value);
 }
 
 /** Whether the panel looks at the page at all: a web page that isn't BenchQ's own and isn't one of the candidate's jobs. */
@@ -170,7 +178,9 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
     // look, and the card takes that fuller reading of the same job.
     const look = () => void readJobPage(tabId).then((found) => {
       if (!isLive || !found?.isJobPage || !found.title || !found.company || !found.description) return;
-      setJob((shown) => (!shown || (shown.title === found.title && fieldsOf(found) > fieldsOf(shown)) ? found : shown));
+      // The same page (or the same title) read more fully: its JobPosting may also name the job better than the page's
+      // heading did, so the title may change (PR #140's review). Another page's reading never replaces this one.
+      setJob((shown) => (!shown || ((shown.url === found.url || shown.title === found.title) && fieldsOf(found) > fieldsOf(shown)) ? found : shown));
     }, () => undefined);
     const read = () => {
       look();
@@ -216,7 +226,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
       <h2 id="add-job-access-title" className="text-sm font-[550]">A job on this page?</h2>
       <p className={SOFT_TEXT}>
         To add it to {candidateName}&apos;s Saved jobs, BenchQ needs to read <strong className="font-[550]">{access.host}</strong>.
-        Chrome asks once for this site, and you can take it back any time in chrome://extensions.
+        Chrome asks you once for this site. You can turn it off later in Chrome&apos;s settings for extensions.
       </p>
       {isDenied && <p role="alert" className={ALERT}>Not allowed. BenchQ can&apos;t read {access.host}, so it can&apos;t add this job from here.</p>}
       <button type="button" data-slot="add-job-allow" className={button("primary")} disabled={isAsking} onClick={() => void allow()}>
@@ -226,6 +236,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   }
   if (tabId === null || !job) return null;
 
+  const details = detailsOf(job);
   const cancel = () => setState({ status: "idle" });
   const add = async () => {
     setState({ status: "adding" });
@@ -241,7 +252,12 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   return <section data-slot="add-job" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-title">
     <h2 id="add-job-title" className="text-sm font-[550]">A job on this page</h2>
     <p className={SOFT_TEXT}>{[job.title, job.company, job.location].filter(Boolean).join(" · ")}</p>
-    {detailsOf(job) ? <p data-slot="add-job-details" className={MUTED_TEXT}>{detailsOf(job)}</p> : null}
+    {details.length > 0 && <dl data-slot="add-job-details" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
+      {details.map(([name, value]) => <Fragment key={name}>
+        <dt className="text-[var(--color-text-3)]">{name}</dt>
+        <dd className="min-w-0 text-[var(--color-text-2)] wrap-anywhere">{value}</dd>
+      </Fragment>)}
+    </dl>}
     {state.status === "confirming"
       ? <div role="group" aria-labelledby="add-job-ask" className="grid gap-2"
         onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); cancel(); } }}>

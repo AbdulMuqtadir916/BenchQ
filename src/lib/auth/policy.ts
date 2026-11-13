@@ -212,7 +212,7 @@ export function scopeCandidates<T extends { managerId: string; bdeId: string | n
  * submitter (saving isn't a submission, docs/02 §9), so without that a BDE's Saved column was always empty (found
  * testing, 2026-11-13). `candidates` is the firm's.
  */
-export function scopeApplications<T extends { submittedByUserId: string; candidateId: string }>(
+export function scopeApplications<T extends { submittedByUserId: string; candidateId: string; status: string }>(
   principal: Principal,
   applications: readonly T[],
   candidates: readonly { id: string; managerId: string; bdeId: string | null }[],
@@ -223,9 +223,10 @@ export function scopeApplications<T extends { submittedByUserId: string; candida
     return applications.filter((application) => mine.has(application.candidateId));
   }
   if (scope.kind === "own") {
+    // Saved drafts only: one with no submitter in another status (moved on from Saved) stays out (PR #140's review).
     const theirs = new Set(scopeCandidates(principal, candidates).map((candidate) => candidate.id));
     return applications.filter((application) => application.submittedByUserId === scope.userId
-      || (!application.submittedByUserId && theirs.has(application.candidateId)));
+      || (!application.submittedByUserId && application.status === "SAVED" && theirs.has(application.candidateId)));
   }
   return [...applications];
 }

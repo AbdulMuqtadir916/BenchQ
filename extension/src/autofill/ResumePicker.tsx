@@ -40,11 +40,12 @@ const GROUP = `px-2 pt-1.5 pb-0.5 ${EYEBROW}`;
 
 const resumesCount = (count: number) => `${count} resume${count === 1 ? "" : "s"}`;
 
-/** The section, titled with how many résumés the candidate has once they're known (07 Q5): "Answers from · 3 resumes". */
+/** The section, titled with how many résumés the candidate has once they're known (07 Q5): "Resume to use · 3 resumes":
+ * the résumé whose answers fill the form, in plain words. */
 function Section({ count, children }: { count?: number; children: ReactNode }) {
   return <section data-slot="resume-picker" className={SECTION} aria-labelledby="resume-picker-title">
     <h3 id="resume-picker-title" className={TITLE}>
-      {RESUME_ICON}Answers from
+      {RESUME_ICON}Resume to use
       {count ? <span data-slot="resume-count" className="font-normal text-[var(--color-text-3)]">· {resumesCount(count)}</span> : null}
     </h3>
     {children}
@@ -161,8 +162,8 @@ export default function ResumePicker({ resumes, candidateName, resumesUrl, studi
   };
   // This job's tailored résumés, then the bases: each group named when there are both.
   const groups = [
-    { key: "tailored", title: "Tailored for this job", choices: choices.filter(({ isTailored }) => isTailored) },
-    { key: "bases", title: "Base resumes", choices: choices.filter(({ isTailored }) => !isTailored) },
+    { key: "tailored", title: "Tailored for this job", choices: choices.filter(({ isTailored, isOtherJob }) => isTailored && !isOtherJob) },
+    { key: "bases", title: "Base resumes", choices: choices.filter(({ isTailored, isOtherJob }) => !isTailored || isOtherJob) },
   ].filter((group) => group.choices.length > 0);
   const isGrouped = groups.length > 1;
   // The one in use only closes the list: picking it again would fill the form again.

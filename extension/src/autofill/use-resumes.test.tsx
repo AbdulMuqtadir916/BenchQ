@@ -100,7 +100,7 @@ describe("reading the list again", () => {
   it("keeps the list on show while it's read again and through a read that fails, then shows what's new", async () => {
     await render({ ...options, applicationStatus: "ready", jobId: "job-1" });
     expect(hook.resumes).toMatchObject({ status: "ready", picked: { id: "visible-v1" } });
-    expect(hook.source).toEqual({ resumeId: "visible-v1", baseId: "visible", label: "Base 1 · Active" });
+    expect(hook.source).toEqual({ resumeId: "visible-v1", baseId: "visible", label: "Base 1 (Active)" });
     vi.mocked(getResumeListing).mockRejectedValueOnce(Object.assign(new Error("BenchQ had a problem"), { status: 500 }));
     act(() => hook.refresh());
     await settle();
@@ -111,5 +111,31 @@ describe("reading the list again", () => {
     await settle();
     expect(hook.resumes).toMatchObject({ status: "ready", choices: [{ id: "t-v1", isTailored: true }, { id: "visible-v1" }, { id: "visible-2-v1" }] });
     expect(getResumeListing).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("the résumé in use across a refresh (PR #140 review)", () => {
+  const settle = () => act(async () => { for (let tick = 0; tick < 10; tick += 1) await Promise.resolve(); });
+  const version = { id: "t-v1", version: 1, name: "Base", title: null, category: "TAILORED", job_id: "job-1" };
+
+  it("stays the one in use when a refresh brings a newer tailoring, which shows in the list", async () => {
+    await render({ ...options, applicationStatus: "ready", jobId: "job-1" });
+    expect(hook.resumes).toMatchObject({ status: "ready", picked: { id: "visible-v1" } });
+    vi.mocked(getResumeListing).mockResolvedValueOnce({ ...listing, tailored: [{ base_resume_id: "visible", job_id: "job-1", versions: [version] }] });
+    act(() => hook.refresh());
+    await settle();
+    expect(hook.resumes).toMatchObject({ status: "ready", picked: { id: "visible-v1" }, choices: [{ id: "t-v1" }, { id: "visible-v1" }, { id: "visible-2-v1" }] });
+  });
+
+  it("says a refresh failed, and that the next one worked", async () => {
+    await render({ ...options, applicationStatus: "ready", jobId: "job-1" });
+    expect(hook.refreshFailed).toBe(false);
+    vi.mocked(getResumeListing).mockRejectedValueOnce(Object.assign(new Error("BenchQ had a problem"), { status: 500 }));
+    act(() => hook.refresh());
+    await settle();
+    expect([hook.resumes.status, hook.refreshFailed]).toEqual(["ready", true]);
+    act(() => hook.refresh());
+    await settle();
+    expect(hook.refreshFailed).toBe(false);
   });
 });

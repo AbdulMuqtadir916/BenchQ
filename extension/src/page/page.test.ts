@@ -1150,6 +1150,13 @@ describe("fields inside components (shadow DOM)", () => {
     expect(fieldsNow().filter(({ label }) => label === "Email").map(({ inAccountForm }) => inAccountForm)).toEqual([true, false]);
   });
 
+  it("looks for a form's password once a scan, and sees one the form gained since the last scan (PR #140 review)", () => {
+    document.body.innerHTML = `<form><label>Email <input type="email"></label><label>Phone <input type="tel"></label></form>`;
+    expect(fieldsNow().map(({ inAccountForm }) => inAccountForm)).toEqual([false, false]);
+    document.querySelector("form")!.insertAdjacentHTML("beforeend", `<label>Password <input type="password"></label>`);
+    expect(fieldsNow().filter(({ label }) => label !== "Password").map(({ inAccountForm }) => inAccountForm)).toEqual([true, true]);
+  });
+
   it("reads a question that sits on the component: its aria-label, an element naming it, its label, the text before it", () => {
     document.body.innerHTML = `<email-box aria-label="Email"></email-box><ui5-label for="z">Zip code</ui5-label><zip-box id="z"></zip-box>`
       + `<city-box label="City"></city-box><div>Country</div><country-box></country-box>`;

@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { addJob, BENCHQ_URL } from "../api";
-import AddJobCard, { isSavedJob, jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
+import AddJobCard, { detailsOf, isSavedJob, jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
 import { missingAccess, requestAccess } from "./site-access";
 import { readJobPage } from "./tab-bridge";
 
@@ -204,5 +204,44 @@ describe("a job the candidate has, by its code (CodeRabbit #129)", () => {
     expect(isSavedJob(page(`${acme}?source=LinkedIn`), known(acme))).toBe(true);
     expect(isSavedJob(page("https://acme.wd5.myworkdayjobs.com/External/job/Remote/QA-Engineer_R654321"), known(acme))).toBe(false);
     expect(isSavedJob(page("https://www.linkedin.com/jobs/view/3912345678"), known(acme))).toBe(true);
+  });
+});
+
+describe("a fuller reading of the same page (PR #140 review)", () => {
+  it("replaces the first, even when its JobPosting names the job better; another page's never does", async () => {
+    vi.mocked(missingAccess).mockResolvedValue(null);
+    vi.useFakeTimers();
+    try {
+      const fuller = { ...page, title: "Senior QA Engineer II", salaryMin: 120000, salaryMax: 150000, salaryPeriod: "year" as const };
+      vi.mocked(readJobPage).mockResolvedValueOnce(page).mockResolvedValueOnce(fuller)
+        .mockResolvedValue({ ...fuller, url: "https://boards.example.test/acme/jobs/999", title: "Data Engineer", employmentType: "Full-time", location: "Remote" });
+      await show();
+      expect(host.textContent).toContain("Senior QA Engineer · Acme Bank");
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(host.textContent).toContain("Senior QA Engineer II");
+      await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+      expect(host.textContent).toContain("Senior QA Engineer II");
+      expect(host.textContent).not.toContain("Data Engineer");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("what the card says the page stated, before the BDE adds the job", () => {
+  it("names each detail, the posted date in words, and only what the page stated", () => {
+    expect(detailsOf({ ...page, workMode: "remote", employmentType: "Full-time", salaryMin: 120000, salaryMax: 150000, salaryCurrency: "USD",
+      salaryPeriod: "year", postedAt: "2026-11-10", requisitionId: "R123456" })).toEqual([
+      ["Work mode", "Remote"], ["Pay", "USD 120,000–150,000 a year"], ["Type", "Full-time"], ["Posted", "10 Nov 2026"], ["Job ID", "R123456"],
+    ]);
+    expect(detailsOf(page)).toEqual([]);
+  });
+
+  it("shows them as named rows on the card", async () => {
+    vi.mocked(missingAccess).mockResolvedValue(null);
+    vi.mocked(readJobPage).mockResolvedValue({ ...page, employmentType: "Contract", salaryMin: 60, salaryPeriod: "hour", salaryCurrency: "USD" });
+    await show();
+    const rows = [...host.querySelectorAll("[data-slot='add-job-details'] dt")].map((name) => [name.textContent, name.nextElementSibling!.textContent]);
+    expect(rows).toEqual([["Pay", "USD 60 an hour"], ["Type", "Contract"]]);
   });
 });

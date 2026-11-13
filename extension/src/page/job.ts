@@ -209,8 +209,23 @@ function logoCompany(doc: Document): string {
 }
 
 /** The page's text from the job's own title on (the site's chrome comes before it) to its copyright line, if any. */
+/** The words of a line or title, to compare them: case and spacing aside. */
+const wordsOf = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
+
+/** The line the job's title heads, else the line a title like "QA Engineer | Acme Careers" begins with: the description
+ * starts there, after the site's breadcrumbs. With neither, the whole page (PR #140's review). */
+function titleLine(lines: string[], title: string): number {
+  const wanted = wordsOf(title);
+  const exact = lines.findIndex((line) => wordsOf(line) === wanted);
+  if (exact >= 0 || !wanted) return exact;
+  return lines.findIndex((line) => {
+    const words = wordsOf(line);
+    return words.length >= 4 && wanted.startsWith(words) && /^\s*(?:[|:,(–—-]|at\s)/.test(wanted.slice(words.length));
+  });
+}
+
 function descriptionOf(lines: string[], title: string): string {
-  const start = Math.max(0, lines.findIndex((line) => line === title));
+  const start = Math.max(0, titleLine(lines, title));
   const end = lines.findIndex((line, n) => n > start && /^(?:©|copyright\b)/i.test(line));
   return lines.slice(start, end > start ? end : undefined).join("\n");
 }

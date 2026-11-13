@@ -64,7 +64,8 @@ export const applicationsMock = firmScoped("applications", {
     const now = new Date().toISOString();
     const application = ApplicationSchema.parse({
       id: `app_saved_${body.candidateId}_${body.jobId}`, firmId, candidateId: body.candidateId, jobId: body.jobId,
-      resumeVersionId: null, submittedByUserId: currentUser().id, status: "SAVED", statusRevision: 0, pendingReviewCount: 0,
+      // No submitter, as the backend's: a Saved draft isn't a submission (docs/02 §9), so no one shows on its card.
+      resumeVersionId: null, submittedByUserId: "", status: "SAVED", statusRevision: 0, pendingReviewCount: 0,
       companyNameAtApply: body.company, jobTitleAtApply: body.title, appliedAt: null, firstResponseAt: null, interviewAt: null,
       offerAt: null, closedAt: null, expiresAt: null, coverLetterText: null, notes: null, events: [], createdAt: now,
     });

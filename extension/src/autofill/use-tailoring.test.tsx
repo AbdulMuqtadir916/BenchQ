@@ -3,7 +3,7 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getRunningTailorings, getTailoring, startTailoring, type TailoringRun } from "../api";
-import { runFailure, startRefusal, TAILORING_POLL_MS, useTailoring } from "./use-tailoring";
+import { LOOK_AGAIN_AT_MOST_MS, runFailure, startRefusal, TAILORING_POLL_MS, useTailoring } from "./use-tailoring";
 
 vi.mock("../api", async (actual) => ({
   ...await actual<typeof import("../api")>(), getRunningTailorings: vi.fn(), getTailoring: vi.fn(), startTailoring: vi.fn(),
@@ -89,14 +89,56 @@ describe("tailoring the résumé for the connected job", () => {
     expect(runFailure("provider_failed")).toEqual({ message: "Tailoring didn't finish. Try again.", canRetry: true });
   });
 
-  it("follows the run that's already tailoring the same résumé for this job when a start is refused for it", async () => {
+  it("follows the run that's already tailoring the same résumé for this job when a start is refused for it, and only that one", async () => {
     vi.mocked(startTailoring).mockRejectedValue(refused(409, "This résumé is already being tailored for this job."));
     await render();
-    vi.mocked(getRunningTailorings).mockResolvedValue([run({ step: "verify" })]);
-    act(() => hook.start(null));
+    // PR #140's review: another base's run for the same job is never taken for this résumé's.
+    vi.mocked(getRunningTailorings).mockResolvedValue([run({ run_id: "other-base", source_resume_id: "base2-v1" }), run({ step: "verify", source_resume_id: "base-v1" })]);
+    act(() => hook.start("base-v1"));
     await settle();
     await settle();
     expect(hook.tailoring).toMatchObject({ status: "running", runId: "run-1", step: "verify" });
+  });
+
+  it("keeps a 409 for another reason as said, following no run (PR #140 review)", async () => {
+    vi.mocked(startTailoring).mockRejectedValue(refused(409, "This candidate has no active base résumé to tailor from."));
+    await render();
+    vi.mocked(getRunningTailorings).mockResolvedValue([run({ source_resume_id: "base-v1" })]);
+    act(() => hook.start("base-v1"));
+    await settle();
+    await settle();
+    expect(hook.tailoring).toEqual({ status: "failed", message: "This candidate has no active base résumé to tailor from.", canRetry: false });
+    expect(getRunningTailorings).toHaveBeenCalledTimes(1);
+  });
+
+  it("never follows again a run that finished here, when a lookup answers late (PR #140 review)", async () => {
+    let answer: (runs: TailoringRun[]) => void = () => {};
+    vi.mocked(getRunningTailorings).mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    vi.mocked(startTailoring).mockResolvedValue({ run_id: "run-1" });
+    vi.mocked(getTailoring).mockResolvedValue(run({ status: "completed", resume_id: "res-new" }));
+    await render();
+    act(() => hook.start("base-v1"));
+    await settle();
+    await act(async () => { await vi.advanceTimersByTimeAsync(TAILORING_POLL_MS); });
+    await settle();
+    expect(hook.tailoring).toEqual({ status: "completed", resumeId: "res-new" });
+    answer([run()]);
+    await settle();
+    expect(hook.tailoring).toEqual({ status: "completed", resumeId: "res-new" });
+    expect(onTailored).toHaveBeenCalledTimes(1);
+  });
+
+  it("finds a run started on the website when the BDE comes back to the panel (PR #140 review)", async () => {
+    await render();
+    expect(hook.tailoring).toEqual({ status: "idle" });
+    vi.mocked(getRunningTailorings).mockResolvedValue([run({ step: "draft" })]);
+    act(() => { window.dispatchEvent(new Event("focus")); });
+    await settle();
+    expect(hook.tailoring).toEqual({ status: "idle" });                 // too soon after the last look
+    await act(async () => { await vi.advanceTimersByTimeAsync(LOOK_AGAIN_AT_MOST_MS); });
+    act(() => { window.dispatchEvent(new Event("focus")); });
+    await settle();
+    expect(hook.tailoring).toMatchObject({ status: "running", runId: "run-1", step: "draft" });
   });
 
   it("hands an ended session over, and starts nothing without the job", async () => {

@@ -149,9 +149,12 @@ type RowEditorProps = {
  */
 export function RowEditor({ entry, isSaving, onSave, onCancel }: RowEditorProps) {
   const [shown] = useState(entry);
+  // A question of the user's own sends the answer it had when the editor opened too, so the route refuses a save over
+  // an answer changed meanwhile, as it does for BenchQ's questions (PR #140's review; backend/candidates/autofill.py
+  // `unseen`).
   const saveAnswer = (answer: AutofillAnswer) =>
     onSave((onlyThis) => (shown.kind === "CUSTOM"
-      ? { edit: {}, built: {}, reset: [], add: { [shown.question]: String(answer) }, remove: [], onlyThis }
+      ? { edit: {}, built: {}, reset: [], add: { [shown.question]: String(answer) }, remove: [], answered: { [shown.question]: shown.answer ?? null }, onlyThis }
       : editChange(shown, answer, onlyThis)));
   return (
     <AnswerEditor question={shown.question} type={shown.type} initial={shown.answer} isSaving={isSaving} draftRow={draftRowOf(shown)}

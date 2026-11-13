@@ -402,8 +402,15 @@ function handBackRepeats(rows: ReviewRow[]): ReviewRow[] {
  * `job` is the linked job, which answers "Position applied for" and names the company a question is about. */
 export function buildReview(fields: TabField[], bank: BankEntry[], job: Job | null = null): ReviewRow[] {
   const review: Review = { bank, byType: indexBankByType(bank), job };
+  // A question about someone else (a reference's "Company") is that person's: it doesn't make the candidate's own
+  // "Company" a repeat, whose saved answer would then be held back (PR #140's review).
+  const isSomeoneElses = (field: TabField) => {
+    const type = typeOf(field);
+    return Boolean(type && PERSON_KINDS.has(type)) && SOMEONE_ELSES_SECTION.test(normalize(field.clues.sectionHeading));
+  };
   const counts = new Map<string, number>();
   for (const field of fields) {
+    if (isSomeoneElses(field)) continue;
     const label = normalize(field.label);
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }

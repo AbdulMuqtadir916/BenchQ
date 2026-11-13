@@ -21,6 +21,13 @@ export const stepIndex = (step: string | null) => Math.max(0, TAILORING_STEPS.in
 
 /** How often a running tailoring is read again: the website's 3 s (decided 2026-11-12, part 3 R2-Q4). */
 export const TAILORING_POLL_MS = 3000;
+/** Back in the panel, runs of the job are looked for again at most this often. */
+export const LOOK_AGAIN_AT_MOST_MS = 15_000;
+
+/** The start route's 409 for the same résumé and job already tailoring (backend/resume_tailor/runs.py `admit`), as
+ * opposed to its 409s for no usable base. */
+const isAlreadyTailoring = (error: unknown) =>
+  (error as { status?: number }).status === 409 && /already being tailored/i.test(error instanceof Error ? error.message : "");
 
 export type Tailoring =
   | { status: "idle" }
@@ -66,26 +73,47 @@ type Options = {
 export function useTailoring({ firmId, candidateId, jobId, onSessionExpired, onTailored }: Options) {
   const context = firmId && jobId ? `${firmId}:${candidateId}:${jobId}` : null;
   const [state, setState] = useState<{ context: string | null; tailoring: Tailoring }>({ context: null, tailoring: IDLE });
-  // Looks for a run of this job again: on opening, and when a start is refused because one already runs.
-  const [lookups, setLookups] = useState(0);
+  // Looks for a run of this job again: on opening, when the BDE comes back to the panel, and when a start is refused
+  // because the same résumé already tailors (`source`: then only that résumé's run is followed).
+  const [lookup, setLookup] = useState<{ count: number; source?: string }>({ count: 0 });
   const tailoring = state.context === context ? state.tailoring : IDLE;
   const latest = useRef({ onTailored, onSessionExpired });
   useEffect(() => { latest.current = { onTailored, onSessionExpired }; });
+  // Runs that finished while followed here: a lookup that answers late, listing one as still running, never follows it
+  // again, so its résumé isn't handed over twice (PR #140's review).
+  const finished = useRef(new Set<string>());
 
-  // One already running for this job (started on the website, or before the panel opened) is followed here.
+  // One already running for this job (started on the website, or before the panel opened) is followed here, while the
+  // panel follows none: never in place of a run it shows, a résumé ready to use, or a refusal not about that run.
   useEffect(() => {
     if (!firmId || !jobId || !context) return;
     let isCurrent = true;
+    const wanted = lookup.source;
     getRunningTailorings(firmId, candidateId).then((runs) => {
-      const run = runs.find((one) => one.job_posting_id === jobId && one.status === "running");
+      const run = runs.find((one) => one.job_posting_id === jobId && one.status === "running" && !finished.current.has(one.run_id)
+        && (wanted === undefined || one.source_resume_id === wanted));
       if (!isCurrent || !run) return;
-      setState((now) => (now.context === context && (now.tailoring.status === "running" || now.tailoring.status === "starting")
-        ? now : { context, tailoring: runningFrom(run) }));
+      setState((now) => {
+        const shown = now.context === context ? now.tailoring.status : "idle";
+        return shown === "idle" || (wanted !== undefined && shown === "failed") ? { context, tailoring: runningFrom(run) } : now;
+      });
     }, (error: unknown) => {
       if (isCurrent && isSessionExpired(error)) latest.current.onSessionExpired();
     });
     return () => { isCurrent = false; };
-  }, [firmId, candidateId, jobId, context, lookups]);
+  }, [firmId, candidateId, jobId, context, lookup]);
+
+  // Back in the panel: a run started on the website meanwhile shows here, at most once every LOOK_AGAIN_AT_MOST_MS.
+  useEffect(() => {
+    let last = Date.now();
+    const onFocus = () => {
+      if (Date.now() - last < LOOK_AGAIN_AT_MOST_MS) return;
+      last = Date.now();
+      setLookup((now) => ({ count: now.count + 1 }));
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   // A running one is read again every TAILORING_POLL_MS until it finishes. A read that fails is tried again.
   const runId = tailoring.status === "running" ? tailoring.runId : null;
@@ -98,13 +126,17 @@ export function useTailoring({ firmId, candidateId, jobId, onSessionExpired, onT
       getTailoring(firmId, candidateId, runId).then((run) => {
         if (!isCurrent) return;
         if (run.status === "completed" && run.resume_id) {
+          finished.current.add(runId);
           settle({ status: "completed", resumeId: run.resume_id });
           latest.current.onTailored(run.resume_id);
         } else if (run.status === "running") {
           setState((now) => (now.context === context && now.tailoring.status === "running" && now.tailoring.runId === runId
             ? { context, tailoring: { ...now.tailoring, step: run.step ?? null } } : now));
           timer = setTimeout(read, TAILORING_POLL_MS);
-        } else settle({ status: "failed", ...runFailure(run.error_code) });
+        } else {
+          finished.current.add(runId);
+          settle({ status: "failed", ...runFailure(run.error_code) });
+        }
       }, (error: unknown) => {
         if (!isCurrent) return;
         if (isSessionExpired(error)) latest.current.onSessionExpired();
@@ -133,8 +165,9 @@ export function useTailoring({ firmId, candidateId, jobId, onSessionExpired, onT
         return;
       }
       setState((now) => (now.context === context ? { context, tailoring: { status: "failed", ...startRefusal(error) } } : now));
-      // The same résumé and job are tailoring already (409): follow that one instead.
-      if ((error as { status?: number }).status === 409) setLookups((count) => count + 1);
+      // The same résumé and job are tailoring already: follow that run instead. Only for that 409, and only that
+      // résumé's run: a 409 for no active base or a hidden one stays as said (PR #140's review).
+      if (resumeId && isAlreadyTailoring(error)) setLookup((now) => ({ count: now.count + 1, source: resumeId }));
     });
   }, [firmId, candidateId, jobId, context]);
 

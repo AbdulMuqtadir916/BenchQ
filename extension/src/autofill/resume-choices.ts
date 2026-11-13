@@ -7,6 +7,8 @@ import type { ResumeBase, ResumeListing, ResumeVersion } from "../api";
  * the website does. `baseId`: that base. */
 export type ResumeChoice = {
   id: string; label: string; meta: string; isTailored: boolean; isActive: boolean; title: string | null; baseId: string;
+  /** Tailored for another job: offered only as the résumé this application was sent with. */
+  isOtherJob?: boolean;
 };
 
 const newest = (versions: ResumeVersion[]) =>
@@ -55,7 +57,17 @@ export function resumeChoices(listing: ResumeListing, jobId: string | null, name
     const meta = `Base ${base.number} · hidden · v${version.version}`;
     return [{ id: version.id, label: meta, meta, isTailored: false, isActive: false, title: title || null, baseId: base.id }];
   });
-  return [...tailored, ...bases, ...namedHidden];
+  // The résumé this application was sent with, when it was tailored for another job: offered for it alone, so the picker
+  // starts on it instead of calling it missing (PR #140's review). Another job's tailoring is never offered otherwise.
+  const namedOtherJob = listing.tailored.filter((shelf) => shelf.job_id !== jobId).flatMap((shelf) => {
+    const version = shelf.versions.find(({ id }) => id === namedId);
+    if (!version) return [];
+    const base = numbers.get(shelf.base_resume_id);
+    const from = `${base ? ` · from Base ${base}` : ""} · v${version.version}`;
+    return [{ id: version.id, label: `Tailored for another job${from}`, meta: `For another job${from}`, isTailored: true,
+      isActive: false, title: version.title?.trim() || null, baseId: shelf.base_resume_id, isOtherJob: true }];
+  });
+  return [...tailored, ...bases, ...namedHidden, ...namedOtherJob];
 }
 
 /** Where the picker starts: the résumé the application names (sent with it, or tailored for its job) when it's on
@@ -77,5 +89,5 @@ export function tailorSource(listing: ResumeListing, picked: ResumeChoice | null
   const base = [listing.bases.find(({ id }) => id === picked?.baseId), listing.bases.find(({ is_active }) => is_active)]
     .find((one) => firstOf(one));
   const first = firstOf(base);
-  return base && first ? { resumeId: first.id, baseId: base.id, label: `Base ${base.number}${base.is_active ? " · Active" : ""}` } : null;
+  return base && first ? { resumeId: first.id, baseId: base.id, label: `Base ${base.number}${base.is_active ? " (Active)" : ""}` } : null;
 }

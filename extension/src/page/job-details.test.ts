@@ -16,6 +16,28 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
     }
   });
 
+  it("takes an amount's own period, never another figure's or a schedule's (PR #140 review)", () => {
+    expect(payIn("Hourly: $60 ($124,800 annually)")).toEqual({ salaryMin: 60, salaryMax: 60, salaryPeriod: "hour" });
+    expect(payIn("Salary $50,000. 40 hours per week")).toBeUndefined();
+    expect(payIn("40 hours/week, Salary $143,700")).toBeUndefined();
+    expect(payIn("40 hours/week, Salary Range $143,700 - $194,400 per year. #0000")).toMatchObject({ salaryMin: 143700, salaryMax: 194400, salaryPeriod: "year" });
+    expect(payIn("$25 per hour, 40 hours per week")).toMatchObject({ salaryMin: 25, salaryPeriod: "hour" });
+  });
+
+  it("keeps inline-level boxes on their line, so a range in such spans is one pay (PR #140 review)", () => {
+    const doc = page(`<main><h1>QA Engineer</h1><p>Salary: <span style="display:inline-flex">$100,000</span> - <span style="display:inline-block">$120,000</span> a year</p></main>`);
+    expect(pageDetails(doc, "QA Engineer")).toMatchObject({ salaryMin: 100000, salaryMax: 120000, salaryPeriod: "year" });
+  });
+
+  it("reads 05/06/2026 month first only on a page in US English, and leaves it unread on a bare \"en\" one (PR #140 review)", () => {
+    const posted = (lang: string) => {
+      const doc = page(`<main><h1>QA Engineer</h1><dl><dt>Date posted</dt><dd>05/06/2026</dd></dl></main>`);
+      doc.documentElement.setAttribute("lang", lang);
+      return pageDetails(doc, "QA Engineer").postedAt;
+    };
+    expect([posted("en-US"), posted("en"), posted("en-GB")]).toEqual(["2026-05-06", undefined, undefined]);
+  });
+
   it("reads a date written out, never a relative or ambiguous one, nor one still to come", () => {
     expect(["2026-11-10T09:00:00Z", "Nov 10, 2026", "10 November 2026", "13/06/2026"].map((text) => dateOf(text)))
       .toEqual(["2026-11-10", "2026-11-10", "2026-11-10", "2026-06-13"]);
@@ -72,6 +94,17 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
     const doc = page(`<main><h1>QA Engineer</h1><div>Hybrid</div><p>Test it all, every day, with care and a steady hand.</p></main>`,
       `<script type="application/ld+json">{"@type":"JobPosting","title":"QA Engineer","hiringOrganization":"Acme","jobLocationType":"TELECOMMUTE","description":"<p>Test.</p>"}</script>`);
     expect(readJob(doc, "https://acme.com/careers/qa-engineer")).toMatchObject({ isJobPage: true, workMode: "hybrid", location: "Remote" });
+  });
+});
+
+describe("where a job's description starts", () => {
+  it("at the line its title begins with, after the site's breadcrumbs, when the title is the tab's (PR #140 review)", () => {
+    const doc = page(`<main><p>Home</p><p>Careers</p><p>QA Engineer</p><p>Test the payments API every day, with care.</p>
+      <a id="apply-button" href="#">Apply now</a></main>`);
+    doc.title = "QA Engineer | Acme Careers";
+    const job = readJob(doc, "https://careers.acme.com/jobs/12345");
+    expect(job.description.startsWith("QA Engineer")).toBe(true);
+    expect(job.description).not.toMatch(/Home|Careers\n/);
   });
 });
 

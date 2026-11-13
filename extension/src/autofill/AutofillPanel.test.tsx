@@ -43,10 +43,11 @@ const pick = vi.fn();
 const retry = vi.fn();
 const refresh = vi.fn();
 /** What Tailor reads: Base 1's version 1. */
-const source = { resumeId: "res-1", baseId: "base-1", label: "Base 1 · Active" };
+const source = { resumeId: "res-1", baseId: "base-1", label: "Base 1 (Active)" };
 const tailorStart = vi.fn();
 const tailorDismiss = vi.fn();
 let tailoring: Tailoring = { status: "idle" };
+let refreshFailed = false;
 const oneResume: Resumes = { status: "ready", choices: [base], picked: base };
 
 let root: Root | null = null;
@@ -63,7 +64,7 @@ type State = {
 };
 
 function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null } = {}, resumes: Resumes = oneResume) {
-  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry, refresh, source });
+  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry, refresh, refreshFailed, source });
   vi.mocked(useTailoring).mockReturnValue({ tailoring, start: tailorStart, dismiss: tailorDismiss });
   const applicationStatus = panel.applicationStatus ?? "ready";
   vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (applicationStatus === "ready" && resumes.status === "ready" ? { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
@@ -78,7 +79,7 @@ function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: str
 
 /** The panel again with what the hooks now say, as after the BDE's pick. */
 function update(state: State, resumes: Resumes) {
-  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry, refresh, source });
+  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry, refresh, refreshFailed, source });
   vi.mocked(useTailoring).mockReturnValue({ tailoring, start: tailorStart, dismiss: tailorDismiss });
   const appConnection = element.props.connection;
   vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (resumes.status === "ready" ? { applicationId: appConnection.applicationId, candidateId: appConnection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
@@ -97,6 +98,7 @@ afterEach(() => {
   root = null;
   host.remove();
   tailoring = { status: "idle" };
+  refreshFailed = false;
   vi.clearAllMocks();
 });
 
@@ -180,7 +182,7 @@ describe("the résumé the answers come from", () => {
     expect(autofill).not.toHaveBeenCalled();
 
     vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows, fillCount: 1, reviewedFor: { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id } } as unknown as ReturnType<typeof useAutofill>);
-    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [base], picked: base }, pick, retry, refresh, source });
+    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [base], picked: base }, pick, retry, refresh, refreshFailed, source });
     element = cloneElement(element, { connection: { ...connection, applicationId: "app-2" } });
     await act(async () => { root!.render(element); });
 
@@ -204,7 +206,7 @@ describe("the résumé the answers come from", () => {
     expect(pick).toHaveBeenCalledWith(tailored.id);
     // The new résumé's review can't happen on a site BenchQ may not read: access is asked for, nothing is scanned.
     vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows: null, needsAccess: access, isAccessDenied: true, reviewedFor: null } as unknown as ReturnType<typeof useAutofill>);
-    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [tailored, base], picked: tailored }, pick, retry, refresh, source });
+    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [tailored, base], picked: tailored }, pick, retry, refresh, refreshFailed, source });
     element = cloneElement(element);
     await act(async () => { root!.render(element); });
     expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
@@ -722,8 +724,8 @@ describe("Tailor for this job", () => {
   it("sits at the foot of the résumés, says which base it reads, and starts from that base's version 1", async () => {
     show({ fillCount: 1 }, { details: job });
     expect(host.querySelector("[data-slot='resume-picker']")!.contains(tailor())).toBe(true);
-    expect(tailor()!.querySelector("[data-slot='tailor-from']")!.textContent).toBe("From Base 1 · Active · about a minute");
-    await click("Tailor for this job");
+    expect(tailor()!.querySelector("[data-slot='tailor-from']")!.textContent).toBe("Rewrites Base 1 (Active) to fit this job · about a minute");
+    await click("Tailor resume for this job");
     expect(tailorStart).toHaveBeenCalledWith("res-1");
     expect(vi.mocked(useTailoring).mock.lastCall?.[0]).toMatchObject({ firmId: "firm-1", candidateId: "cand-1", jobId: "posting-1" });
   });
@@ -760,22 +762,32 @@ describe("Tailor for this job", () => {
     tailoring = { status: "completed", resumeId: "res-9" };
     show({ fillCount: 1 }, { details: job }, twoResumes);
     expect(tailor()!.textContent).toContain("Tailored resume ready");
-    await click("Use it");
+    await click("Use this resume");
     expect(pick).toHaveBeenCalledWith("res-9");
     expect(tailor()!.querySelector("a")!.getAttribute("href")).toContain("/resumes/res-9");
     act(() => { root?.unmount(); });
     host.remove();
     tailoring = { status: "completed", resumeId: "res-new" };
     show({ fillCount: 1 }, { details: job }, twoResumes);
-    expect(named("Use it").disabled).toBe(true);
+    expect(named("Use this resume").disabled).toBe(true);
     expect(tailor()!.textContent).toContain("Adding it to the list");
+  });
+
+  it("says when the list couldn't be read again once it finished, and reads it again on Reload resumes (PR #140 review)", async () => {
+    tailoring = { status: "completed", resumeId: "res-new" };
+    refreshFailed = true;
+    show({ fillCount: 1 }, { details: job }, twoResumes);
+    expect(tailor()!.querySelector("[data-slot='tailor-reload']")!.textContent).toContain("couldn't add the new resume to the list");
+    expect(tailor()!.textContent).not.toContain("Adding it to the list");
+    await click("Reload resumes");
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("says when the finished résumé is the one in use", () => {
     tailoring = { status: "completed", resumeId: "res-9" };
     show({ fillCount: 1 }, { details: job }, { ...twoResumes, picked: tailored });
     expect(tailor()!.textContent).toContain("Tailored resume in use");
-    expect(named("Use it")).toBeUndefined();
+    expect(named("Use this resume")).toBeUndefined();
   });
 
   it("says why it failed, with Try again when that can help", async () => {
@@ -786,5 +798,26 @@ describe("Tailor for this job", () => {
     expect(tailorStart).toHaveBeenCalledWith("res-1");
     await click("Close");
     expect(tailorDismiss).toHaveBeenCalled();
+  });
+});
+
+describe("the job's steps, for a BDE new to the panel", () => {
+  const steps = () => [...host.querySelectorAll("[data-slot='next-step']")]
+    .map((step) => [step.lastElementChild!.firstChild!.textContent, step.getAttribute("data-state")]);
+
+  it("say what's done and what to do now, from the resume to Mark applied", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() });
+    expect(steps()).toEqual([["Resume", "done"], ["Autofill", "now"], ["Submit on site", "later"], ["Mark applied", "later"]]);
+    expect(host.querySelector("[aria-current='step']")!.textContent).toContain("Autofill");
+  });
+
+  it("move on to submitting once nothing is left to fill, and are all done once the job is applied", () => {
+    show({ fillCount: 0, rows: [row("Email", true, "priya@example.test")], outcome: { filled: 1, handedBack: 0, stopped: false } }, { onApply: vi.fn() });
+    expect(steps().map(([, state]) => state)).toEqual(["done", "done", "now", "later"]);
+    act(() => { root?.unmount(); });
+    host.remove();
+    show({ fillCount: 0, rows: [row("Email", true, "priya@example.test")] }, { isApplied: true });
+    expect(steps().map(([, state]) => state)).toEqual(["done", "done", "done", "done"]);
+    expect(host.querySelector("[aria-current='step']")).toBeNull();
   });
 });

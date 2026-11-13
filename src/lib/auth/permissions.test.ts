@@ -52,9 +52,9 @@ describe("scope helpers (07 §2.2, Q47)", () => {
   ];
   const context = { users, candidates };
   const applications = [
-    { id: "a1", submittedByUserId: "u_BDE", candidateId: "c1" },
-    { id: "a2", submittedByUserId: "b2", candidateId: "c2" },
-    { id: "a3", submittedByUserId: "b2", candidateId: "c1" }, // c1 moved from b2's team: its history moves with it (Q43)
+    { id: "a1", submittedByUserId: "u_BDE", candidateId: "c1", status: "APPLIED" },
+    { id: "a2", submittedByUserId: "b2", candidateId: "c2", status: "APPLIED" },
+    { id: "a3", submittedByUserId: "b2", candidateId: "c1", status: "APPLIED" }, // c1 moved from b2's team: its history moves with it (Q43)
   ];
   const ledger = [
     { id: "l1", actorUserId: "u_BDE", entityType: "application", entityId: "a1", action: "UPDATE" },
@@ -66,9 +66,11 @@ describe("scope helpers (07 §2.2, Q47)", () => {
 
   it("a BDE also sees the Saved drafts of the candidates they work, which have no submitter, and no other BDE's", () => {
     // Found testing (2026-11-13): a BDE's Saved column was empty, since a Saved draft (#129) has no submitter.
-    const drafts = [...applications, { id: "d1", submittedByUserId: "", candidateId: "c1" }, { id: "d2", submittedByUserId: "", candidateId: "c2" }];
+    // PR #140's review: Saved drafts only; one with no submitter that moved on from Saved stays out.
+    const drafts = [...applications, { id: "d1", submittedByUserId: "", candidateId: "c1", status: "SAVED" },
+      { id: "d2", submittedByUserId: "", candidateId: "c2", status: "SAVED" }, { id: "d3", submittedByUserId: "", candidateId: "c1", status: "SCREENING_CALL" }];
     expect(ids(scopeApplications(firmUser("BDE"), drafts, candidates))).toEqual(["a1", "d1"]);
-    expect(ids(scopeApplications(firmUser("MANAGER"), drafts, candidates))).toEqual(["a1", "a3", "d1"]);
+    expect(ids(scopeApplications(firmUser("MANAGER"), drafts, candidates))).toEqual(["a1", "a3", "d1", "d3"]);
   });
 
   it("a BDE sees their own", () => {

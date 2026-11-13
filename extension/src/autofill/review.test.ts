@@ -572,6 +572,14 @@ describe("a school or job block that repeats (#132)", () => {
     ]);
   });
 
+  it("keeps the candidate's own Company answer when a reference's Company is on the form too (PR #140 review)", () => {
+    const references = { name: "", id: "", placeholder: "", ariaLabel: "", nearbyText: "", sectionHeading: "References", className: "", dataAttrs: "" };
+    const fields = [field("Company", { id: "own" }), field("Company", { id: "ref", clues: references })];
+    const rows = withHistory(buildReview(fields, [{ ...entry("Current company", "Acme"), key: "current-company" }]), { education: [], work: [] });
+    expect(rows.map((row) => [row.status, row.proposed ?? null])).toEqual([["ready", "Acme"], ["manual", null]]);
+    expect(rows[1]!.reason).toBe("This section asks about someone else, so it's yours to fill.");
+  });
+
   it("starts from the school the first block already holds, and keeps a row the review held back for another reason", () => {
     const fields = [field("School", { id: "f0", current: "JNTU" }), field("School", { id: "f1" })];
     const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }];

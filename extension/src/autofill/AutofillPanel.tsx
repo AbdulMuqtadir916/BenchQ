@@ -9,6 +9,7 @@ import FormProgress from "./FormProgress";
 import { CHECK, SPARKLES_ICON, SPINNER_ICON } from "./icons";
 import JobCard from "./JobCard";
 import MarkApplied from "./MarkApplied";
+import NextSteps from "./NextSteps";
 import OutcomeNote from "./OutcomeNote";
 import ResumePicker from "./ResumePicker";
 import ReviewList from "./ReviewList";
@@ -68,7 +69,7 @@ type PendingFill = { context: string; resumeId: string | null };
  * it goes, the résumé and the cover letter, then the rest of the form. The form stays theirs to submit. */
 export default function AutofillPanel({ connection, firmId = null, firmSlug = null, details = null, applicationStatus = "ready", onRetryContext = () => {}, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
   const { tabId, job } = connection;
-  const { resumes, pick, retry, refresh, source } = useResumes({
+  const { resumes, pick, retry, refresh, refreshFailed, source } = useResumes({
     firmId, candidateId: connection.candidateId, applicationId: connection.applicationId, applicationStatus,
     jobId: details?.job_id ?? null, namedId: details?.tailored_resume_id ?? null,
     onSessionExpired, onAccessLost,
@@ -107,12 +108,9 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   // Tailor for this job: the connected job as BenchQ holds it for the candidate, once its record is confirmed.
   const jobPostingId = applicationStatus === "ready" ? details?.job_id ?? null : null;
   const pickedId = picked?.id ?? null;
-  // A tailoring that finished: the list again, the résumé in use kept, so nothing changes under the BDE until they use
-  // the new one.
-  const onTailored = useCallback(() => {
-    if (pickedId) pick(pickedId);
-    refresh();
-  }, [pickedId, pick, refresh]);
+  // A tailoring that finished: the list again, the résumé in use kept (refresh pins it), so nothing changes under the
+  // BDE until they use the new one.
+  const onTailored = useCallback(() => refresh(), [refresh]);
   const { tailoring, start: tailor, dismiss: dismissTailoring } = useTailoring({
     firmId, candidateId: connection.candidateId, jobId: jobPostingId, onSessionExpired, onTailored,
   });
@@ -121,8 +119,9 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
   const tailorFooter = jobPostingId && listed.length > 0 ? <TailorResume tailoring={tailoring} from={source?.label ?? null}
     isAgain={Boolean(source && listed.some(({ isTailored, baseId }) => isTailored && baseId === source.baseId))}
     isReadyListed={Boolean(tailoredId && listed.some(({ id }) => id === tailoredId))} isInUse={Boolean(tailoredId && tailoredId === pickedId)}
-    studioUrl={tailoredId ? studioUrl(tailoredId) : null} isBusy={isWorking}
-    onStart={() => tailor(source?.resumeId ?? null)} onUse={() => { if (tailoredId) pickResume(tailoredId); }} onDismiss={dismissTailoring} /> : null;
+    studioUrl={tailoredId ? studioUrl(tailoredId) : null} isBusy={isWorking} refreshFailed={refreshFailed}
+    onStart={() => tailor(source?.resumeId ?? null)} onUse={() => { if (tailoredId) pickResume(tailoredId); }} onDismiss={dismissTailoring}
+    onReload={refresh} /> : null;
   const { autofill } = state;
   // The pending fill already started, so each one starts once.
   const startedFill = useRef<PendingFill | null>(null);
@@ -194,6 +193,12 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     <JobCard job={job} details={details} candidateName={candidateName} onDisconnect={onDisconnect} />
 
     <div data-slot="autofill-body" className="grid grid-cols-[minmax(0,1fr)] gap-3 p-3 empty:hidden">
+      <NextSteps steps={[
+        { key: "resume", label: "Resume", isDone: resumes.status === "ready" && Boolean(picked) },
+        { key: "fill", label: "Autofill", isDone: hasForm && !hasFillsLeft },
+        { key: "submit", label: "Submit on site", isDone: isApplied },
+        { key: "applied", label: "Mark applied", isDone: isApplied },
+      ]} />
       {needsConfirmation && <div className={WARNING} role="alert">
         <strong>This page may be a different job.</strong>
         <p className="mt-0.5 mb-2 wrap-anywhere">Saved: {job.title || "Untitled role"}{job.company ? ` at ${job.company}` : ""}.{state.check.detected ? ` This page: ${state.check.detected}.` : ""}</p>
