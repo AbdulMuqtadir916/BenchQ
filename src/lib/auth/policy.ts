@@ -208,7 +208,9 @@ export function scopeCandidates<T extends { managerId: string; bdeId: string | n
 
 /**
  * Applications in scope: a MANAGER's are the ones for the candidates they manage, so a candidate's history moves with
- * it (Q43); a BDE's are the ones they submitted. `candidates` is the firm's (only read for a MANAGER).
+ * it (Q43); a BDE's are the ones they submitted, and the Saved drafts of the candidates they work. A Saved draft has no
+ * submitter (saving isn't a submission, docs/02 §9), so without that a BDE's Saved column was always empty (found
+ * testing, 2026-11-13). `candidates` is the firm's.
  */
 export function scopeApplications<T extends { submittedByUserId: string; candidateId: string }>(
   principal: Principal,
@@ -220,7 +222,11 @@ export function scopeApplications<T extends { submittedByUserId: string; candida
     const mine = new Set(scopeCandidates(principal, candidates).map((candidate) => candidate.id));
     return applications.filter((application) => mine.has(application.candidateId));
   }
-  if (scope.kind === "own") return applications.filter((application) => application.submittedByUserId === scope.userId);
+  if (scope.kind === "own") {
+    const theirs = new Set(scopeCandidates(principal, candidates).map((candidate) => candidate.id));
+    return applications.filter((application) => application.submittedByUserId === scope.userId
+      || (!application.submittedByUserId && theirs.has(application.candidateId)));
+  }
   return [...applications];
 }
 

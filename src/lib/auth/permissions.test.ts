@@ -64,6 +64,13 @@ describe("scope helpers (07 §2.2, Q47)", () => {
   ];
   const ids = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
 
+  it("a BDE also sees the Saved drafts of the candidates they work, which have no submitter, and no other BDE's", () => {
+    // Found testing (2026-11-13): a BDE's Saved column was empty, since a Saved draft (#129) has no submitter.
+    const drafts = [...applications, { id: "d1", submittedByUserId: "", candidateId: "c1" }, { id: "d2", submittedByUserId: "", candidateId: "c2" }];
+    expect(ids(scopeApplications(firmUser("BDE"), drafts, candidates))).toEqual(["a1", "d1"]);
+    expect(ids(scopeApplications(firmUser("MANAGER"), drafts, candidates))).toEqual(["a1", "a3", "d1"]);
+  });
+
   it("a BDE sees their own", () => {
     const bde = firmUser("BDE");
     expect(scopeOf(bde)).toEqual({ kind: "own", userId: "u_BDE" });

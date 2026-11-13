@@ -10,7 +10,8 @@ export interface CardFaceProps {
   app: Application;
   /** Candidate name — shown on the firm-wide board, omitted on a candidate's own page. */
   candidateName?: string;
-  owner: string;
+  /** Who submitted it; null for a Saved draft, which nobody has submitted yet (docs/02 §9), so it shows no one. */
+  owner: string | null;
   /** A move for this card is in flight: shown as "Saving…" until the server confirms it. */
   isSaving?: boolean;
   /** Off inside the BDE review column, where every card is waiting for review anyway. */
@@ -43,7 +44,7 @@ export function ApplicationCardFace({ app, candidateName, owner, isSaving = fals
           <Clock3 size={12} aria-hidden />
           {days === 0 ? "Today" : `${days}d in stage`}
         </span>
-        <AvatarStack people={[{ name: owner }]} />
+        {owner ? <AvatarStack people={[{ name: owner }]} /> : null}
       </div>
     </>
   );
