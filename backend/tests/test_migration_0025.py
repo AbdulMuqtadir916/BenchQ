@@ -1,4 +1,6 @@
-"""0025 (renumbered from 0016, 0022, 0026; follows main's 0024) adds the AUTO_APPLIED outcome; downgrade refuses to discard automatic status evidence."""
+"""0025 (renumbered from 0016, 0022, 0026; follows main's 0024) adds the AUTO_APPLIED outcome; downgrade refuses to discard automatic status evidence.
+
+The Activity logs migrations (0028 and later) sit on top of it, so "the newest migration" is `head_revision()`, not 0025."""
 from sqlalchemy import text
 from backend.db_schema import head_revision
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401 (fixture)
@@ -21,7 +23,7 @@ def test_auto_applied_is_allowed_and_the_revision_roundtrips(scratch_db):
     _ok(_alembic(name, 'downgrade', '0024'))
     _ok(_alembic(name, 'upgrade', 'head'))
     with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision() == '0025'
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision()
 
 
 def test_downgrade_refuses_while_automatic_evidence_exists(scratch_db):
@@ -31,5 +33,5 @@ def test_downgrade_refuses_while_automatic_evidence_exists(scratch_db):
     _insert_result(engine, 'AUTO_APPLIED')
     result = _alembic(name, 'downgrade', '0024')
     assert result.returncode != 0 and 'Refusing to discard automatic status evidence' in result.stderr
-    with engine.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0025'
+    with engine.connect() as conn:       # the refused downgrade leaves the database where it was (one transaction)
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision()
