@@ -1,4 +1,4 @@
-import type { AppliedForm } from "./autofill/types";
+import type { AppliedForm, PageJob } from "./autofill/types";
 
 export const BENCHQ_URL = __BENCHQ_URL__.replace(/\/$/, "");
 
@@ -44,9 +44,27 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${BENCHQ_URL}${path}`, {
     ...init, credentials: "include", cache: "no-store",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  }).catch(() => {
+    throw Object.assign(new Error("BenchQ can't be reached. Check your connection, or that BenchQ is running, and try again."), { status: 0 });
   });
-  if (!response.ok) throw Object.assign(new Error(response.status === 401 ? "SESSION_EXPIRED" : `Request failed (${response.status})`), { status: response.status });
+  if (!response.ok) throw Object.assign(new Error(response.status === 401 ? "SESSION_EXPIRED" : await failureOf(response)), { status: response.status });
   return response;
+}
+
+/** What went wrong, in words the BDE can act on: BenchQ's own reason when it gives one for a refused request, else what
+ * the answer means. Never a bare status code. */
+async function failureOf(response: Response): Promise<string> {
+  const detail = response.status < 500
+    ? await response.json().then((body: { detail?: unknown }) => (typeof body?.detail === "string" ? body.detail : ""), () => "")
+    : "";
+  if (detail) return detail;
+  if (response.status === 403) return "You don't have access to this. Ask your manager if you should.";
+  if (response.status === 404) return "BenchQ couldn't find this any more. Refresh and try again.";
+  if (response.status === 409) return "This changed in BenchQ meanwhile. Refresh and try again.";
+  if (response.status === 413) return "That's too large for BenchQ to take.";
+  if (response.status === 429) return "Too many requests just now. Wait a moment and try again.";
+  if (response.status >= 500) return "BenchQ had a problem on its side. Try again in a moment.";
+  return "BenchQ couldn't take this as it was sent. Refresh the page and try again.";
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -115,6 +133,10 @@ export async function getResumeFile(firmId: string, candidateId: string, resumeI
   }
 }
 
+/** Keeps answers the BDE typed on a résumé version's autofill, for next time: phase 3's save route (docs/02 §8.4). */
+export const saveResumeAnswers = (firmId: string, candidateId: string, resumeId: string, change: object) =>
+  request<unknown>(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}/autofill`, { method: "PATCH", body: JSON.stringify(change) });
+
 export const getSavedApplications = async (candidateId: string) => {
   const candidate = `&candidate_id=${encodeURIComponent(candidateId)}`;
   const [saved, applied] = await Promise.all([
@@ -131,6 +153,22 @@ export const getSavedApplications = async (candidateId: string) => {
 };
 /** Marks the job applied with the form as it stood and, when known, the résumé version its answers came from: the one
  * sent (docs/02 §9). */
+/** A job added for a candidate from the page it's on (the add-job plan, 2026-11-11): it becomes one of their jobs and a
+ * Saved application at once, or the application they already have for it. */
+export const addJob = (candidateId: string, job: PageJob) => request<Application & { job_created: boolean; application_created: boolean }>(
+  "/api/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      candidate_id: candidateId,
+      job: {
+        source: "extension", title: job.title, company: job.company, description: job.description, url: job.url, location: job.location,
+        // What the page stated besides; a detail it didn't state is left out (JSON drops undefined).
+        work_mode: job.workMode, employment_type: job.employmentType, salary_min: job.salaryMin, salary_max: job.salaryMax,
+        salary_currency: job.salaryCurrency, salary_period: job.salaryPeriod, posted_at: job.postedAt, requisition_id: job.requisitionId,
+      },
+    }),
+  });
+
 export const markApplied = (application: Application, form: AppliedForm, resumeId: string | null = null) => request<Application>(`/api/applications/${encodeURIComponent(application.id)}/candidate-status`, {
   method: "PATCH",
   body: JSON.stringify({

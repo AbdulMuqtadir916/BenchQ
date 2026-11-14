@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from backend.analyzer.llm_client import resolve_llm_config
 from backend.models.db import SessionLocal, Setting
+from backend.resume_tailor import settings as tailor_settings
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,6 @@ AI_MODULES: dict[str, AiModule] = {
     "email_classification": AiModule("candidate_email", {"instructions": "candidate_email_instructions"},
                                      fallback=False),
     "scoring": AiModule("scoring", {"rubric": "scoring_rubric"}),
-    "tailoring": AiModule("cv_tailor", {"tailor": "cv_tailor_prompt", "persona_tailor": "persona_tailor_prompt"}),
     # Résumé building: JobNavigator's PDF -> résumé parser, removed in résumé versioning PR 6. Nothing calls it; the
     # résumé parser is `resume_parse` below. Kept so the AI presets' module list doesn't change.
     "resume_building": AiModule(""),
@@ -42,6 +42,11 @@ AI_MODULES: dict[str, AiModule] = {
     # primary's; candidates/parse.py checks them), its two prompts and its strict response format.
     "resume_parse": AiModule("resume_parse", {"system": "resume_parse_system_prompt", "parse": "resume_parse_prompt",
                                               "response_format": "resume_parse_response_format"}),
+    # The résumé tailor (docs/team/tailoring.md): its own model (resume_tailor_llm_*, never the primary's;
+    # resume_tailor/settings.py read_setup checks them), nine prompts and four strict response formats.
+    "resume_tailor": AiModule("resume_tailor", {**tailor_settings.PROMPT_ROWS,
+                                                **{f"{step}_format": row
+                                                   for step, row in tailor_settings.FORMAT_ROWS.items()}}),
 }
 
 

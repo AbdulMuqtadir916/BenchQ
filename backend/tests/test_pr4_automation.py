@@ -127,24 +127,20 @@ def test_undo_restores_the_status_once_and_blocks_reapplying(test_db, pipeline, 
     assert [r.reason for r in reviews if r.state == 'PENDING'] == ['AUTOMATIC_CHANGE_UNDONE']
 
 
-def test_undo_back_to_saved_brings_back_the_favorite(test_db, pipeline, automation, api_client):
-    """CodeRabbit #127: a submitted application moved back to Saved is still matched; Undo restores its favorite."""
-    from backend.models.candidates import Candidate, FavoriteJob
+def test_undo_back_to_saved_makes_it_the_favourite_again(test_db, pipeline, automation, api_client):
+    """CodeRabbit #127, on #129's model: a Saved application is the favourite, so Undo back to Saved is all it takes."""
+    from backend.models.candidates import Candidate
     app_id, _, message_id = pipeline
     app = test_db.get(Application, app_id)
     marker = app.submitted_by_user_id or test_db.get(Candidate, app.candidate_id).created_by_user_id
     app.status, app.submitted_by_user_id = 'saved', marker
-    # A Saved application has its favorite; the fixture's may already have it (one per candidate and job).
-    if test_db.query(FavoriteJob).filter_by(candidate_id=app.candidate_id, job_id=app.job_id).first() is None:
-        test_db.add(FavoriteJob(firm_id=app.firm_id, candidate_id=app.candidate_id, job_id=app.job_id, marked_by_user_id=marker))
     test_db.commit()
     assert worker.process_one(message_id, provider=lambda *a: decision('screening_call', .95))
     app, events, _, _ = _state(test_db, app_id, message_id)
-    favorites = test_db.query(FavoriteJob).filter_by(candidate_id=app.candidate_id, job_id=app.job_id)
-    assert (app.status, events[-1].from_status, favorites.count()) == ('screening_call', 'saved', 0)
+    assert (app.status, events[-1].from_status) == ('screening_call', 'saved')
     assert _undo(api_client, app, events[-1].id, app.status_revision).status_code == 200
     app, _, _, _ = _state(test_db, app_id, message_id)
-    assert (app.status, favorites.count()) == ('saved', 1)
+    assert app.status == 'saved'
 
 
 def test_undo_after_a_later_decision_is_refused(test_db, pipeline, automation, api_client):

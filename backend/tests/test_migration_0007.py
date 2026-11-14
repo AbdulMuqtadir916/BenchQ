@@ -43,17 +43,16 @@ def _ids(world):
 
 
 def test_one_application_per_candidate_per_job_with_the_tailored_resume(test_db, world):
-    # The tailored résumé names the candidate's job posting (0023); the application still the old pool's job.
+    # The tailored résumé names the candidate's job posting (0023), and so does the application (0027).
     posting = make_posting(test_db, world["firm"].id, world["candidate"].id, world["bde"].id)
     tailored = make_version(test_db, world["firm"].id, candidate=world["candidate"], category="TAILORED",
                             job_id=posting.id, name="Tailored")
-    app = dict(firm_id=world["firm"].id, job_id=world["job"].id, candidate_id=world["candidate"].id)
+    app = dict(firm_id=world["firm"].id, job_id=posting.id, candidate_id=world["candidate"].id)
     test_db.add(Application(**app, resume_id=tailored.id, submitted_by_user_id=world["bde"].id))
     test_db.flush()
     _refused(test_db, Application(**app), "uq_applications_candidate_job")
-    # Rows from before 0007 have no candidate and aren't held to it.
-    test_db.add_all([Application(firm_id=world["firm"].id, job_id=world["job"].id) for _ in range(2)])
-    test_db.flush()
+    # Since 0027 every application has a candidate; old rows are handled by the migration, not written at head.
+    _refused(test_db, Application(firm_id=world["firm"].id, job_id=posting.id), "candidate_id")
 
 
 def test_jobs_found_and_favorites_are_per_candidate(test_db, world):

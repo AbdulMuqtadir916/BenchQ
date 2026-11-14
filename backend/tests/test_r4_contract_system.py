@@ -245,8 +245,12 @@ def test_score_distribution_ignores_malformed_cv_scores(client, test_db):
 
 def test_sankey_tolerates_malformed_transition_rows(client, test_db):
     from backend.models.db import Application
-    job = make_job(test_db)
-    test_db.add(Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status="applied", status_transitions=[
+    from backend.tests.posting_support import posting_for
+    from backend.tests.r4_support import make_resume
+    candidate_id = make_resume(test_db, name="Sankey candidate").candidate_id
+    posting = posting_for(test_db, DEFAULT_FIRM_ID, candidate_id)
+    test_db.add(Application(firm_id=DEFAULT_FIRM_ID, candidate_id=candidate_id, job_id=posting.id, status="applied",
+                            status_transitions=[
         {"to": "applied"}, {"from": "applied"}, {}, {"from": "applied", "to": "offer"},
     ]))
     test_db.commit()

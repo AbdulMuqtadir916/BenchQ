@@ -5,7 +5,7 @@ import { normalize } from "./text";
 
 type Unit = "hourly" | "yearly";
 
-const PAY = new Set<EngineFieldType>(["salary-expectation", "current-pay", "pay-rate"]);
+const PAY = new Set<EngineFieldType>(["salary-expectation", "current-pay", "pay-rate", "floor-rate"]);
 const HOURLY = /\b(per hour|hourly|an hour|hr|hrs|ph|p h)\b/;
 const YEARLY = /\b(per year|per annum|annual|annually|yearly|yr|pa|p a|lpa|ctc|package)\b/;
 const AMOUNT = /(\d[\d,]*(?:\.\d+)?)\s*(k)?\b/i;
@@ -31,7 +31,7 @@ function fieldUnit(type: EngineFieldType, label: string, statedOnly: boolean): U
   const words = normalize(label);
   const said = unitIn(words);
   if (said || statedOnly) return said;
-  if (type === "pay-rate") return "hourly";
+  if (type === "pay-rate" || type === "floor-rate") return "hourly";
   return /\b(salary|ctc|package)\b/.test(words) ? "yearly" : null;
 }
 
