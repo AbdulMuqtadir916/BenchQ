@@ -27,6 +27,15 @@ describe("the résumé listing", () => {
     expect(tailored!.latestVersionId).toBe("6c1e9b1f-0005-4d2b-8b62-000000000005");
   });
 
+  it("carries a tailored copy's job name from the listing, so no screen loads jobs to name it", () => {
+    const named = structuredClone(sample.listing) as { tailored: Array<Record<string, unknown>> };
+    named.tailored[0]!.job = { title: "Java Developer", company: "Acme" };
+    const [tailored] = toResumeShelf(ResumeShelfDto.parse(named), FIRM).resumes.filter((r) => !r.isMaster);
+    expect(tailored!.targetJob).toEqual({ title: "Java Developer", company: "Acme" });
+    // An older backend sends no name: none is made up; a base has none.
+    expect(shelf.resumes.map((r) => r.targetJob)).toEqual(shelf.resumes.map(() => null));
+  });
+
   it("a base with no versions left lists no résumé; a version with no design opens in Modern", () => {
     expect(shelf.resumes.some((r) => r.baseResumeId === "5b0d8a0e-3333-4c1a-9a51-000000000003")).toBe(false);
     expect(shelf.resumes[0]!.versions[0]!.templateId).toBe("template_modern");

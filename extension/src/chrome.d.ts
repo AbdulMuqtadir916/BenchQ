@@ -64,6 +64,7 @@ declare const chrome: {
     onCommitted: ChromeEvent<(details: FrameDetails & { url: string; transitionType: string }) => void>;
     onCompleted: ChromeEvent<(details: FrameDetails) => void>;
     onHistoryStateUpdated: ChromeEvent<(details: FrameDetails) => void>;
+    onReferenceFragmentUpdated: ChromeEvent<(details: FrameDetails) => void>;
   };
 };
 declare const __BENCHQ_URL__: string;

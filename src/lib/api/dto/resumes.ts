@@ -50,6 +50,8 @@ const TailoredDto = z.object({
   candidate_id: z.string(),
   base_resume_id: z.string(),
   job_id: z.string(),
+  /** The job's title and company, so a list names the copy without loading jobs. Older backends don't send it. */
+  job: z.object({ title: z.string(), company: z.string() }).nullable().optional(),
   versions: z.array(VersionDto),
 });
 
@@ -92,14 +94,14 @@ function toVersions(rows: VersionDto[], resumeId: string): ResumeVersion[] {
   }));
 }
 
-function toResume(firmId: string, rows: VersionDto[], baseId: string, jobId: string | null): Resume {
+function toResume(firmId: string, rows: VersionDto[], baseId: string, jobId: string | null, job: Resume["targetJob"] = null): Resume {
   const id = groupId(fromBackendId(baseId), jobId ? fromBackendId(jobId) : null);
   const versions = toVersions(rows, id);
   const latest = [...rows].sort((a, b) => b.version - a.version)[0];
   return {
     id, firmId, candidateId: fromBackendId(rows[0]?.candidate_id ?? ""), baseResumeId: fromBackendId(baseId),
     // The backend names every row "Base"; the newest version's headline is the role the résumé is named by.
-    name: latest?.title?.trim() || latest?.name || "Base", isMaster: !jobId, targetJobId: jobId ? fromBackendId(jobId) : null,
+    name: latest?.title?.trim() || latest?.name || "Base", isMaster: !jobId, targetJobId: jobId ? fromBackendId(jobId) : null, targetJob: job,
     templateId: latest?.template ?? DEFAULT_TEMPLATE, versions, latestVersionId: versions.at(-1)?.id ?? "",
   };
 }
@@ -114,7 +116,7 @@ export function toResumeShelf(dto: ResumeShelfDto, firmId: string): ResumeShelf 
   }));
   const resumes = [
     ...dto.bases.filter((b) => b.versions.length).map((b) => toResume(firmId, b.versions, b.id, null)),
-    ...dto.tailored.filter((t) => t.versions.length).map((t) => toResume(firmId, t.versions, t.base_resume_id, t.job_id)),
+    ...dto.tailored.filter((t) => t.versions.length).map((t) => toResume(firmId, t.versions, t.base_resume_id, t.job_id, t.job ?? null)),
   ];
   return ResumeShelfSchema.parse({ bases, resumes });
 }

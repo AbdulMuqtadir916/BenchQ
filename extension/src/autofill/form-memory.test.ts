@@ -33,6 +33,12 @@ describe("what counts as filled", () => {
 });
 
 describe("remembering a form", () => {
+  it("never keeps a Social Security or card number, whatever the field is called", () => {
+    const form = formOf("app-1");
+    rememberRows(form, [row("ID number", "123-45-6789"), row("Notes", "Card 4111 1111 1111 1111"), row("City", "Dallas")], none);
+    expect(Array.from(form.values()).map(({ value }) => value)).toEqual(["Dallas"]);
+  });
+
   it("keeps each job's form apart", () => {
     rememberRows(formOf("app-1"), [row("a", "One")], none);
     rememberRows(formOf("app-2"), [row("a", "Two")], none);
