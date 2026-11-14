@@ -14,7 +14,9 @@ from sqlalchemy import or_
 from backend.auth.scoping import scoped
 from backend.models.candidates import InboxMessage
 from backend.inbox.google_oauth import decrypt_content
-from backend.models.db import Application, Company, Job
+from backend.applications.postings import posting_job
+from backend.models.db import Application, Company
+from backend.models.job_search import JobPosting
 
 _TOKEN = re.compile(r"\w+(?:\+\+|#)?", re.UNICODE)
 _BOUNDARY = re.compile(r"[\n\r:;|()\[\]!?.,\u2013\u2014]|\s-\s")
@@ -127,8 +129,11 @@ def matching_application_id(db, mailbox, message, *, allow_thread=False, aliases
     segments = [_segment(parts.subject), _segment(parts.current)]
     if parts.is_forward and parts.forwarded:
         segments.append(_segment(parts.forwarded))
-    applications = submitted_applications(db, mailbox.firm_id, mailbox.candidate_id).join(
-        Job, Application.job_id == Job.id).with_entities(Application.id, Job.company, Job.title).all()
+    # The job is the application's posting (2026-11-11), read the one way: its company and title.
+    applications = [(app_id, job.company, job.title) for app_id, job in (
+        (app_id, posting_job(posting)) for app_id, posting in submitted_applications(
+            db, mailbox.firm_id, mailbox.candidate_id).join(JobPosting, Application.job_id == JobPosting.id)
+        .with_entities(Application.id, JobPosting).all())]
     if aliases is None:
         aliases = company_aliases(db)  # a single email outside a sweep
     matches = set()

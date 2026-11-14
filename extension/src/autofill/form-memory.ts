@@ -1,3 +1,4 @@
+import { holdsSensitiveNumber } from "./never-fill";
 import type { AppliedField, AppliedForm, ReviewRow, TabField } from "./types";
 
 // backend/applications/tracking.py refuses more than this.
@@ -29,11 +30,12 @@ export const fieldLabel = ({ label }: Pick<TabField, "label">) => label || "Unla
 export const filledValue = ({ field, status, proposed }: ReviewRow) =>
   field.current || (status === "same" ? proposed ?? "" : "");
 
-/** Takes in the fields on the page now. A field on another page keeps what it last held. */
+/** Takes in the fields on the page now. A field on another page keeps what it last held. A Social Security or card
+ * number is never kept, whatever its field is called. */
 export function rememberRows(form: FormMemory, rows: ReviewRow[], autofilled: ReadonlyMap<string, string>) {
   for (const row of rows) {
     const value = filledValue(row);
-    if (!value || row.isUnsaved) form.delete(row.key);
+    if (!value || row.isUnsaved || holdsSensitiveNumber(value)) form.delete(row.key);
     else if (form.get(row.key)?.value !== value) {
       const { field, key } = row;
       form.set(key, {

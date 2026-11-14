@@ -17,7 +17,6 @@ _cache = {}  # provider -> {"at": float, "models": list}
 _KEY_SLOTS = [
     ("llm_provider", "llm_api_key"),
     ("llm_fallback_provider", "llm_fallback_api_key"),
-    ("cv_tailor_llm_provider", "cv_tailor_llm_api_key"),
     ("cover_letter_llm_provider", "cover_letter_llm_api_key"),
     ("autofill_llm_provider", "autofill_llm_api_key"),
     ("email_llm_provider", "email_llm_api_key"),
