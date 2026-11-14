@@ -9,9 +9,10 @@ import { ConfirmDialog } from "@/components/app/confirm-dialog";
 
 /**
  * The BDE's later résumé (resume-versioning.md §4.6): the file is read and becomes a new base, the one in use. The
- * same file again is refused, naming the base it already is; a hidden one is offered back; a deleted one comes back.
+ * same file again is refused; a hidden one is offered back; a deleted one comes back. Shown only on the candidate's
+ * Résumés tab, so its words are the tab's: "résumé" and "main résumé", never "base".
  */
-export function UploadResume({ candidateId }: { candidateId: string }) {
+export function UploadResume({ candidateId, label = "Upload résumé" }: { candidateId: string; label?: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const upload = useUploadResume();
   const showBase = useShowBase();
@@ -21,9 +22,10 @@ export function UploadResume({ candidateId }: { candidateId: string }) {
   function onFile(file: File | undefined) {
     if (!file) return;
     upload.mutate({ candidateId, file }, {
-      onSuccess: ({ restored, fileName }) => toast(restored ? `${fileName} was a deleted base: it's back (its first version) and now the base in use.` : `${fileName} is a new base, now the one in use.`),
+      onSuccess: ({ restored, fileName }) => toast(restored ? `${fileName} was deleted before. It's back, and it's now the main résumé.` : `${fileName} was added, and it's now the main résumé.`),
       onError: (error) => {
-        if (error instanceof DuplicateUploadError && error.isHidden) setHidden({ message: error.message, baseId: error.baseId });
+        if (error instanceof DuplicateUploadError && error.isHidden) setHidden({ message: "You uploaded this file before, and it's on the hidden list. Show it again?", baseId: error.baseId });
+        else if (error instanceof DuplicateUploadError) toast("This file is already one of the candidate's résumés.");
         else toast(error instanceof Error ? error.message : "The upload didn't go through. Try again.");
       },
     });
@@ -35,12 +37,12 @@ export function UploadResume({ candidateId }: { candidateId: string }) {
         onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
       <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
         {upload.isPending ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Upload size={14} aria-hidden />}
-        {upload.isPending ? "Reading the résumé…" : "Upload résumé"}
+        {upload.isPending ? "Reading the résumé…" : label}
       </Button>
-      <ConfirmDialog open={!!hidden} title="Show it again?" confirmLabel="Show again" isBusy={showBase.isPending}
+      <ConfirmDialog open={!!hidden} title="Show this résumé again?" confirmLabel="Show again" isBusy={showBase.isPending}
         onCancel={() => setHidden(null)}
         onConfirm={() => hidden && showBase.mutate({ candidateId, baseId: hidden.baseId }, {
-          onSuccess: () => { setHidden(null); toast("Shown again. It isn't the base in use until you pick it."); },
+          onSuccess: () => { setHidden(null); toast("It's back on the list. Make it main if you want to send it by default."); },
           onError: (e) => { setHidden(null); toast(e instanceof Error ? e.message : "That didn't go through. Try again."); },
         })}>
         <p>{hidden?.message}</p>

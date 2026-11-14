@@ -22,7 +22,8 @@ const BackendCountsSchema = z.object({ total: z.number().int(), by_status: z.rec
 /** What saving a feed job sends (`POST /api/applications` with status saved). */
 export type SaveJob = { candidateId: string; jobId: string; title: string; company: string; url: string };
 const BackendSavedSchema = z.object({ id: z.string() });
-const BackendUnsavedSchema = z.object({ favorite: z.literal(false) });
+// Un-heart: an untouched Saved draft goes (`false`); one with a history or notes stays Saved, the favourite still (`true`).
+const BackendUnsavedSchema = z.object({ favorite: z.boolean() });
 
 /** The backend takes the firm from the session, so the live calls need no firm in the path. */
 const live = {

@@ -57,7 +57,7 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
     capture.mutate(parsed.data, {
       onSuccess: (job) => {
         onClose?.();
-        router.push(toHref("jobs.detail", { id: job.id }));
+        router.push(toHref("jobs.detail", { id: job.id }, { candidate: parsed.data.candidateId }));
       },
       onError: (error) => {
         if (isDuplicateJob(error)) setProblem({ message: error.message, jobId: error.jobId });
@@ -127,7 +127,7 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
           {problem ? (
             <p role="alert" className="text-sm text-[var(--color-danger-fg)]">
               {problem.message}
-              {problem.jobId ? <> <Link className="underline" href={toHref("jobs.detail", { id: problem.jobId })} onClick={() => onClose?.()}>View job</Link></> : null}
+              {problem.jobId ? <> <Link className="underline" href={toHref("jobs.detail", { id: problem.jobId }, { candidate: chosen })} onClick={() => onClose?.()}>View job</Link></> : null}
             </p>
           ) : <span />}
           <div className="ml-auto flex gap-2">

@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { can, canManageResume, canSearchJobs } from "@/lib/auth/permissions";
+import { can, canSearchJobs } from "@/lib/auth/permissions";
 import { useJobSearches, useStartJobSearch } from "@/lib/hooks/use-jobs";
 import { blockedReason, searchRole, type FindJobsSearch } from "@/components/app/candidate/find-jobs";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
@@ -28,7 +28,6 @@ import { ApplicationsTab } from "@/components/app/candidate/applications/applica
 import { ApplicationDrawer } from "@/components/app/candidate/applications/application-drawer";
 import { InboxTab } from "@/components/app/candidate/inbox/inbox-tab";
 import { ResumesTab } from "@/components/app/candidate/resumes-tab";
-import { UploadResume } from "@/components/app/resumes/upload-resume";
 import { ActivityTab } from "@/components/app/candidate/activity-tab";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
 import { safeReturnTo } from "@/lib/routes/landing";
@@ -182,9 +181,6 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
         onChange={setTab}
         counts={{ applications: ws.stats?.applicationsSubmitted, resumes: ws.resumes.length, documents: ws.documentsQuery.data?.length }}
         alerts={{ overview: ws.suggestions.length + ws.upcoming.length > 0, inbox: ws.unread > 0, documents: ws.expiringDocuments.length > 0 }}
-        // Upload sits on the tab bar's line; with no résumé yet, the tab's empty state offers it instead.
-        trailing={tab === "resumes" && canAct && canManageResume(principal, candidate) && (ws.shelfQuery.data?.bases.length ?? 0) > 0
-          ? <UploadResume candidateId={candidate.id} /> : null}
       />
 
       <AnimatePresence mode="wait" initial={false}>

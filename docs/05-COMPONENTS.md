@@ -107,7 +107,7 @@ defaults as fallback. Collapses to two panes under 1280px.
 ```ts
 {
   tree: TreeCandidate[];          // buildResumeTree(shelf) in src/lib/derive/resume-tree.ts
-  labels: { jobLabel(jobId): string; userName(userId): string | null };   // useTreeLabels()
+  labels: { job(jobId): { company; title } | null; candidate(id); userName(userId): string | null };   // useTreeLabels(candidates, shelf): a copy's job from the listing's targetJob, no jobs read
   candidateHeading?: (candidateId) => { name; role } | null;              // Resume Builder only
   showTailored?: boolean;         // default true
   canSeeHidden?: (candidateId) => boolean;   // canManageResume: the assigned BDE
@@ -340,6 +340,19 @@ themes.
 ```
 Staged progress for simulated AI work. Shows the cancel action after 8 seconds. Per
 `03-MOCK-DATA.md §5`, the output is a draft to read over — the UI should say so while it runs.
+
+### `TailorButton` (`src/components/app/tailoring/`)
+```ts
+{ candidate: Candidate; job: { id: string; title: string }; variant?: "button" | "icon"; className?: string }
+```
+Tailor the candidate's résumé for this job (docs/02 §8.3): renders nothing unless `canManageResume` (07 Q55). The
+source picker (`tailorSources(shelf, candidateId)`) lists the visible bases' own versions; "Tailor again" and **Open
+tailored** once a copy exists; dimmed while that source and job run; a refusal in one line (`startRefusal`).
+
+### `TailoringPanel`
+No props; mounted once in `app/[firm]/layout.tsx`. The signed-in firm user's tailorings (`useMyTailorings`, read every
+3 s while one runs): the open run as `AgentRunPanel` with the real step, the rest as rows; Hide (a pill) and ×
+(dismissed rows) are kept in this browser (`stored.ts`). Nothing in a support view or with no tailorings.
 
 ### `ConfirmDialog`
 ```ts

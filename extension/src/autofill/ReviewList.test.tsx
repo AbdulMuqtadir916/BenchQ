@@ -307,3 +307,31 @@ describe("a long saved answer and a long dropdown (07 Q54)", () => {
     expect(host.querySelector("[data-slot='choice-all']")).toBeNull();
   });
 });
+
+describe("keeping a typed answer (07 Q58)", () => {
+  const offer = { label: "Save for next time", change: { add: { "Why us?": "Payments." } } };
+  const renderWith = (rows: ReviewRow[], onSave = vi.fn().mockResolvedValue(true)) => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => { root!.render(<ReviewList rows={rows} isFilling={false} onGoTo={onGoTo} onSave={onSave} />); });
+    return onSave;
+  };
+
+  it("lists what the BDE typed first, each with its button and Only this résumé", async () => {
+    const typedRow = holding("Why us?", false, "Payments.", "same", { saveOffer: offer });
+    const onSave = renderWith([row("Email", true), typedRow]);
+    expect(titles()).toEqual(["Save for next time (1)", "Needs you (1)"]);
+    const box = host.querySelector<HTMLInputElement>("[data-slot='review-save'] input")!;
+    act(() => { box.click(); });
+    await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='review-save'] button")!.click(); });
+    expect(onSave).toHaveBeenCalledWith(typedRow, true);
+  });
+
+  it("keeps a saved answer in sight, saying so (CodeRabbit #129)", () => {
+    renderWith([holding("Why us?", false, "Payments.", "same", { saveOffer: "saved" })]);
+    expect(titles()).toEqual(["Save for next time (1)"]);
+    expect(host.querySelector("[data-slot='review-saved-note']")!.textContent).toBe("Saved for next time");
+    expect(host.querySelector("[data-slot='review-save']")).toBeNull();
+  });
+});

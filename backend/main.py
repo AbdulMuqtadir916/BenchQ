@@ -1,4 +1,5 @@
 """FastAPI entry point for JobNavigator."""
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -39,6 +40,7 @@ from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
 from backend.api.routes_candidates import router as candidates_router
 from backend.api.routes_candidate_resumes import router as candidate_resumes_router
+from backend.api.routes_resume_tailoring import firm_router as resume_tailoring_firm_router, router as resume_tailoring_router
 from backend.api.routes_job_search import router as job_search_router
 from backend.api.routes_firm_resumes import router as firm_resumes_router
 from backend.api.routes_ledger import router as ledger_router
@@ -80,8 +82,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"OpenRouter price warmup failed: {e}")
 
+    # The résumé tailor's heartbeat: this worker stamps the tailorings it holds (backend/resume_tailor/runs.py).
+    from backend.resume_tailor.runs import keep_stamping
+    heartbeat = asyncio.create_task(keep_stamping())
+
     yield
 
+    heartbeat.cancel()
     scheduler.shutdown()
     logger.info("Shutting down JobNavigator backend...")
 
@@ -198,6 +205,9 @@ app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
 app.include_router(candidates_router, prefix="/api")
+# Before the résumé routes: `…/resumes/tailorings` must not be read as a résumé id.
+app.include_router(resume_tailoring_router, prefix="/api")
+app.include_router(resume_tailoring_firm_router, prefix="/api")
 app.include_router(candidate_resumes_router, prefix="/api")
 app.include_router(job_search_router, prefix="/api")
 app.include_router(firm_resumes_router, prefix="/api")
