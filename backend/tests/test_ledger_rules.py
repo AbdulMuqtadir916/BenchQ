@@ -477,8 +477,8 @@ def test_a_function_counts_only_when_a_call_hands_it_over_to_run():
 
 
 def test_a_ledger_read_passed_by_keyword_is_seen():
-    source = ("from backend.models.tenancy import LedgerEntry\n"
-              "def by_keyword(db, row_id):\n    return db.get(entity=LedgerEntry, ident=row_id)\n"
-              "def by_position(db, row_id):\n    return db.get(LedgerEntry, row_id)\n"
+    source = ("from backend.models.tenancy import ActivityEntry\n"
+              "def by_keyword(db, row_id):\n    return db.get(entity=ActivityEntry, ident=row_id)\n"
+              "def by_position(db, row_id):\n    return db.get(ActivityEntry, row_id)\n"
               "def elsewhere(db, row_id):\n    return db.get(Other, row_id)\n")
     assert {name for _, name in _enclosing_calls(_reads_the_ledger, _snippet(source))} == {"by_keyword", "by_position"}
