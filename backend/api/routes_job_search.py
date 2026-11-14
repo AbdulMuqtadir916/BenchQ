@@ -11,8 +11,10 @@ candidate's is the same 404 as a missing one.
 - GET  …/job-postings?page=&size=  the candidate's jobs, newest first, in the common fields
 - GET  …/job-postings/{posting_id} one job, with its description
 Firm level (job search PR 3, docs/02 §6.z), for the job screens:
-- GET  /firms/{firm_id}/job-postings?candidate_id=&limit=  the jobs of every candidate the principal sees, one item per
-                                   job (the content hash), newest first, each with the visible `candidate_ids`
+- GET  /firms/{firm_id}/job-postings?candidate_id=&sort=&min_score=&source=&remote=&q=&offset=&limit=
+                                   the jobs of every candidate the principal sees (or of one), one item per job (the
+                                   content hash), each with the visible `candidate_ids` and their `matches`; sorted and
+                                   filtered here, 100 at a time with the `total` (decided 2026-11-14, Q28, Q29, Q47)
 - GET  /firms/{firm_id}/job-postings/{posting_id}          one of those, with its description
 Who (decided 2026-11-10): a search, only the candidate's assigned BDE (`job.search` + `can_search_jobs`); reads,
 anyone who can see the candidate. A support view reads only (backend/auth/access.py). The country is the candidate's
@@ -20,13 +22,14 @@ résumé country (`Candidate.country`) and the role their target role, never req
 candidate's own (`backend/job_search/places.py`), never free text.
 """
 import asyncio
+import re
 import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import AfterValidator, BaseModel, StringConstraints
-from sqlalchemy import func
+from sqlalchemy import func, literal
 from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
@@ -40,7 +43,7 @@ from backend.job_search.country import search_country
 from backend.job_search.providers.base import ProviderError
 from backend.job_search.text import clean_json, safe_url, typed_text
 from backend.models.candidates import Candidate
-from backend.models.db import get_db, utcnow
+from backend.models.db import Application, get_db, utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
 
 # The firm in the prefix; a candidate's routes add CANDIDATE, the firm-level reads don't (job search PR 3).
@@ -49,7 +52,11 @@ CANDIDATE = "/candidates/{candidate_id}"
 
 HISTORY = 50
 PAGE_SIZE_MAX = 100
-FIRM_LIST_MAX = 400          # what the job screens ask for (docs/02 §6.z)
+FIRM_LIST_MAX = 400          # the most one read returns (the dashboards'); a job list asks for 100 (LIST_PAGE)
+LIST_PAGE = 100              # a job list's page (decided 2026-11-14, Q29)
+KNOWN_SOURCES = ("indeed", "freehire", "manual", "extension")
+_REMOTE = re.compile(r"\bremote\b", re.I)
+_HYBRID = re.compile(r"\bhybrid\b", re.I)
 
 
 class SearchBody(BaseModel):
@@ -233,6 +240,19 @@ def capture_job(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: CaptureBody, 
     return {**_posting_json(posting, with_description=True), "created": created}
 
 
+def remote_mode(fields) -> str:
+    """REMOTE, HYBRID or ONSITE, from what the source says (Indeed's labels) or the location's words."""
+    location = (fields.location or "") if fields else ""
+    if fields is not None and (fields.is_remote or _REMOTE.search(location)):
+        return "REMOTE"
+    return "HYBRID" if _HYBRID.search(location) else "ONSITE"
+
+
+def _match_json(row: JobPosting) -> dict:
+    """The posting's Match (decided 2026-11-14): its score, null until worked out, and why it is held at 40."""
+    return {"score": row.match_score, "note": row.match_note}
+
+
 def _posting_json(row: JobPosting, with_description: bool) -> dict:
     reader = providers.reader_for(row.source)
     fields = reader.read(row.content or {}) if reader else None
@@ -244,7 +264,8 @@ def _posting_json(row: JobPosting, with_description: bool) -> dict:
            "countries": list(fields.countries) if fields else [], "posted_at": fields.posted_at if fields else None,
            "employment_type": fields.employment_type if fields else None,
            "skills": list(fields.skills) if fields else [], "is_closed": fields.is_closed if fields else False,
-           "h1b_sponsor": fields.h1b_sponsor if fields else False}
+           "h1b_sponsor": fields.h1b_sponsor if fields else False, "remote_mode": remote_mode(fields),
+           "match": _match_json(row)}
     if with_description:
         out["description"] = fields.description if fields else ""
     return out
@@ -324,30 +345,87 @@ def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
     out = _posting_json(newest, with_description)
     out.pop("candidate_id")
     out.pop("batch_id")
+    out.pop("match")                      # a posting's, not the job's: each candidate's is in `matches`
     out["candidate_ids"] = sorted({str(row.candidate_id) for row in rows})
+    out["matches"] = {str(row.candidate_id): _match_json(row) for row in rows}
     return out
 
 
-@router.get("/job-postings", summary="The jobs of every candidate the principal sees, one per job, newest first")
+def _source_key(source: str) -> str:
+    return source if source in KNOWN_SOURCES else "other"
+
+
+@router.get("/job-postings", summary="The jobs of every candidate the principal sees (or one's), sorted and filtered, a page at a time")
 def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
-                   limit: int = Query(FIRM_LIST_MAX, ge=1, le=FIRM_LIST_MAX),
+                   limit: int = Query(LIST_PAGE, ge=1, le=FIRM_LIST_MAX), offset: int = Query(0, ge=0, le=1_000_000),
+                   sort: Literal["match", "newest", "company"] = "newest", min_score: int = Query(0, ge=0, le=100),
+                   source: Literal["indeed", "freehire", "manual", "extension", "other"] | None = None,
+                   remote: Literal["REMOTE", "HYBRID", "ONSITE"] | None = None,
+                   q: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None,
+                   exclude_applied: bool = False,
                    principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     """The owner and a viewer see the firm's, a manager their BDEs' candidates', a BDE their own (`_visible`, 07
     Q47); `candidate_id` narrows to one of those (another is 404). One item per `job_id`: a job found for two
-    candidates is one item with both in `candidate_ids`."""
+    candidates is one item with both in `candidate_ids`, and each one's Match in `matches`.
+
+    Sorted and filtered here, so a page is the next part of one list and `total` counts all of it (decided 2026-11-14,
+    Q47): `sort` (`match`, one candidate's best first, unscored last; `newest`; `company`), `min_score` (one
+    candidate's; above 0 leaves out unscored jobs), `source`, `remote` (the job's work mode), `q` (in the title,
+    company or location), `exclude_applied` (one candidate's jobs they have an application for past Saved). A closed
+    job is never listed. Every visible job is read once per call without its description (job search PR 3 reads
+    stay a candidate's or a team's: a few thousand rows)."""
     _member_of(firm_id, principal)
+    one = None
     if candidate_id is not None:
-        candidates = [_candidate(db, firm_id, principal, _id_or_404(candidate_id)).id]
+        one = _candidate(db, firm_id, principal, _id_or_404(candidate_id)).id
+        candidates = [one]
     else:
         candidates = _visible(db, firm_id, principal).with_entities(Candidate.id)
     postings = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id.in_(candidates))
-    newest = func.max(JobPosting.discovered_at)
-    keys = [key for key, _ in postings.with_entities(JobPosting.job_id, newest).group_by(JobPosting.job_id)
-            .order_by(newest.desc(), JobPosting.job_id).limit(limit).all()]
-    by_job: dict[str, list[JobPosting]] = {key: [] for key in keys}
-    for row in postings.filter(JobPosting.job_id.in_(keys)).all() if keys else []:
+    light = postings.with_entities(JobPosting.id, JobPosting.job_id, JobPosting.source, JobPosting.match_score,
+                                   JobPosting.discovered_at, JobPosting.last_seen_at,
+                                   JobPosting.content.op("-")(literal("description"))).all()
+    applied = set()
+    if one is not None and exclude_applied:
+        applied = {row[0] for row in scoped(db, Application, firm_id).filter(
+            Application.candidate_id == one, func.lower(Application.status) != "saved").with_entities(Application.job_id)}
+    groups: dict[str, list] = {}
+    for row in light:
+        groups.setdefault(row.job_id, []).append(row)
+    wanted = (q or "").lower()
+    kept = []
+    for key, rows in groups.items():
+        newest = max(rows, key=lambda row: (row.last_seen_at, str(row.id)))
+        reader = providers.reader_for(newest.source)
+        try:
+            fields = reader.read(newest[6] or {}) if reader else None
+        except Exception:
+            fields = None
+        if fields is None or fields.is_closed or any(row.id in applied for row in rows):
+            continue
+        if source is not None and _source_key(newest.source) != source:
+            continue
+        if remote is not None and remote_mode(fields) != remote:
+            continue
+        if wanted and wanted not in f"{fields.title} {fields.company} {fields.location or ''}".lower():
+            continue
+        score = rows[0].match_score if one is not None else None
+        if one is not None and min_score > 0 and (score is None or score < min_score):
+            continue
+        kept.append((key, score, max(row.discovered_at for row in rows), (fields.company or "").lower()))
+    if sort == "match" and one is not None:
+        kept.sort(key=lambda item: (item[1] is None, -(item[1] or 0), -item[2].timestamp(), item[0]))
+    elif sort == "company":
+        kept.sort(key=lambda item: (item[3], -item[2].timestamp(), item[0]))
+    else:
+        kept.sort(key=lambda item: (-item[2].timestamp(), item[0]))
+    page = [item[0] for item in kept[offset:offset + limit]]
+    by_job: dict[str, list[JobPosting]] = {key: [] for key in page}
+    for row in postings.filter(JobPosting.job_id.in_(page)).all() if page else []:
         by_job[row.job_id].append(row)
-    return {"items": [_job_json(by_job[key], with_description=False) for key in keys]}
+    following = offset + limit
+    return {"items": [_job_json(by_job[key], with_description=False) for key in page], "total": len(kept),
+            "next_offset": following if following < len(kept) else None}
 
 
 @router.get("/job-postings/{posting_id}", summary="One job a candidate the principal sees has, with its description")

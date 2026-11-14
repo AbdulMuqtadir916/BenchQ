@@ -49,7 +49,8 @@ export function BdeDashboard() {
     [myCandidates],
   );
   // The queue is one candidate's: only their jobs are read (Zuhair 2026-11-12), once the candidate is known.
-  const jobsQuery = useJobs({ limit: 300, candidateId: topCandidate?.id }, { isEnabled: Boolean(topCandidate) });
+  // The top candidate's best Match first (decided 2026-11-14): the first page holds the ones to queue.
+  const jobsQuery = useJobs({ limit: 100, candidateId: topCandidate?.id, sort: "match", excludeApplied: true }, { isEnabled: Boolean(topCandidate) });
   // With no candidate there is no jobs read to wait for (a disabled query stays pending).
   const jobReads = topCandidate ? [jobsQuery] : [];
   // docs/04 §13: one group per set of cards that read the same queries.
@@ -169,7 +170,7 @@ export function BdeDashboard() {
             <EmptyState icon={Users} title="Queue is clear" description="No unapplied matches for this candidate right now." variant="filtered" />
           ) : (
             <ul className="divide-y divide-[var(--color-border)]">
-              {queue.map(({ job, score }) => (
+              {queue.map(({ job, score, note }) => (
                 <li key={job.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]">
                   <div className="min-w-0 flex-1">
                     <Link href={toHref("jobs.detail", { id: job.id }, { candidate: topCandidate?.id })} className="text-body-strong truncate hover:underline block">
@@ -180,7 +181,7 @@ export function BdeDashboard() {
                       <Tag tone="neutral">{job.remoteMode}</Tag>
                     </div>
                   </div>
-                  <MatchScore score={score} className="hidden sm:flex" />
+                  {score !== null ? <MatchScore score={score} note={note} className="hidden sm:flex" /> : null}
                   <div className="flex shrink-0 items-center gap-1">
                     {topCandidate ? <TailorButton candidate={topCandidate} job={job} variant="icon" /> : null}
                     <Button asChild variant="ghost" size="icon" aria-label="Mark applied">

@@ -27,18 +27,27 @@ const posting = {
   is_closed: z.boolean(),
   /** The source marks the employer a known H-1B sponsor (freehire.me's `us-h1b-sponsor`). False: not known. */
   h1b_sponsor: z.boolean().optional().default(false),
+  /** The job's work mode as the backend reads it (the source's labels, else the location's words). */
+  remote_mode: z.enum(["REMOTE", "HYBRID", "ONSITE"]).optional(),
   description: z.string().optional(),
 };
 
+/** A candidate's Match for a job (decided 2026-11-14). */
+const MatchDto = z.object({ score: z.number().int().nullable(), note: z.string().nullable() });
+
 /** `GET /api/firms/{firm}/job-postings` items and `…/job-postings/{id}`: one job, with its visible candidates. */
-export const FirmJobDto = z.object({ ...posting, candidate_ids: z.array(z.string()) });
+export const FirmJobDto = z.object({ ...posting, candidate_ids: z.array(z.string()),
+  matches: z.record(z.string(), MatchDto).optional().default({}) });
 export type FirmJobDto = z.infer<typeof FirmJobDto>;
-export const FirmJobListDto = z.object({ items: z.array(FirmJobDto) });
+/** A page of the list (decided 2026-11-14, Q29, Q47): sorted and filtered by the backend, with the whole list's total. */
+export const FirmJobListDto = z.object({ items: z.array(FirmJobDto), total: z.number().int().optional(),
+  next_offset: z.number().int().nullable().optional() });
 
 /** `POST …/candidates/{id}/job-postings`: the candidate's posting, and whether this call created it. */
-export const CapturedPostingDto = z.object({ ...posting, candidate_id: z.string(), created: z.boolean() });
+export const CapturedPostingDto = z.object({ ...posting, candidate_id: z.string(), created: z.boolean(),
+  match: MatchDto.optional() });
 /** GET …/candidates/{id}/job-postings/{posting_id}: one of the candidate's own jobs. */
-export const CandidatePostingDto = z.object({ ...posting, candidate_id: z.string() });
+export const CandidatePostingDto = z.object({ ...posting, candidate_id: z.string(), match: MatchDto.optional() });
 export type CapturedPostingDto = z.infer<typeof CapturedPostingDto>;
 
 const normalise = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -87,7 +96,8 @@ function companyFrom(name: string, isKnownSponsor: boolean): Company {
 }
 
 /** One posting (or one job's newest posting) as a `Job` (docs/02 §6.z). */
-export function toJob(dto: z.infer<z.ZodObject<typeof posting>>, firmId: string, candidateIds: string[]): Job {
+export function toJob(dto: z.infer<z.ZodObject<typeof posting>>, firmId: string, candidateIds: string[],
+  matches: Record<string, { score: number | null; note: string | null }> = {}): Job {
   const company = companyFrom(dto.company, dto.h1b_sponsor);
   const applyUrl = urlOrNull(dto.apply_url);
   const source = SOURCE_TYPE[dto.source] ?? PROVIDER;
@@ -104,7 +114,7 @@ export function toJob(dto: z.infer<z.ZodObject<typeof posting>>, firmId: string,
     state: null,
     country: (dto.countries[0] ?? "US").toUpperCase(),
     // What the location says: remote, hybrid, else on-site (decided 2026-11-11; "hybrid" per the bot review on #135).
-    remoteMode: location && /\bremote\b/i.test(location) ? "REMOTE" : location && /\bhybrid\b/i.test(location) ? "HYBRID" : "ONSITE",
+    remoteMode: dto.remote_mode ?? (location && /\bremote\b/i.test(location) ? "REMOTE" : location && /\bhybrid\b/i.test(location) ? "HYBRID" : "ONSITE"),
     employmentType: (dto.employment_type && EMPLOYMENT[dto.employment_type.trim().toLowerCase()]) ?? null,
     rateMin: null,
     rateMax: null,
@@ -122,12 +132,17 @@ export function toJob(dto: z.infer<z.ZodObject<typeof posting>>, firmId: string,
     provenance: { sourceType: source.type, sourceId: dto.source, sourceUrl: applyUrl, legalBasis: source.basis, capturedByUserId: null, ingestedAt: toIso(dto.discovered_at) },
     isActive: !dto.is_closed,
     candidateIds,
+    matches,
   });
 }
 
-export const toFirmJob = (dto: FirmJobDto, firmId: string): Job => toJob(dto, firmId, dto.candidate_ids.map(fromBackendId));
-export const toCapturedJob = (dto: CapturedPostingDto, firmId: string): Job => toJob(dto, firmId, [fromBackendId(dto.candidate_id)]);
-export const toCandidateJob = (dto: z.infer<typeof CandidatePostingDto>, firmId: string): Job => toJob(dto, firmId, [fromBackendId(dto.candidate_id)]);
+const ownMatch = (dto: { candidate_id: string; match?: { score: number | null; note: string | null } }) =>
+  dto.match ? { [fromBackendId(dto.candidate_id)]: dto.match } : {};
+
+export const toFirmJob = (dto: FirmJobDto, firmId: string): Job => toJob(dto, firmId, dto.candidate_ids.map(fromBackendId),
+  Object.fromEntries(Object.entries(dto.matches).map(([id, match]) => [fromBackendId(id), match])));
+export const toCapturedJob = (dto: CapturedPostingDto, firmId: string): Job => toJob(dto, firmId, [fromBackendId(dto.candidate_id)], ownMatch(dto));
+export const toCandidateJob = (dto: z.infer<typeof CandidatePostingDto>, firmId: string): Job => toJob(dto, firmId, [fromBackendId(dto.candidate_id)], ownMatch(dto));
 
 /** What the capture form sends, as `CaptureBody` (backend/api/routes_job_search.py). */
 export function toBackendCapture(body: CaptureJob) {

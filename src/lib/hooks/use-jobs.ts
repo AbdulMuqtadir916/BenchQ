@@ -1,7 +1,7 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient, type Query, type QueryClient } from "@tanstack/react-query";
-import { jobsApi, type JobListParams } from "@/lib/api/jobs";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type Query, type QueryClient } from "@tanstack/react-query";
+import { JOBS_PAGE, jobsApi, type JobListParams } from "@/lib/api/jobs";
 import { queryKeys } from "@/lib/query/keys";
 import type { CaptureJob } from "@/lib/schemas/job";
 import type { JobSearches } from "@/lib/schemas/job-search";
@@ -21,6 +21,22 @@ export function useJobs(params?: JobListParams, { isEnabled = true }: { isEnable
   return useQuery({
     queryKey: queryKeys.jobs.list(firmId, params ? { ...params } : undefined),
     queryFn: () => jobsApi.list(firmId, params),
+    enabled: isEnabled,
+  });
+}
+
+/**
+ * A job list 100 at a time (decided 2026-11-14, Q28, Q29): every job the params' list holds, sorted and filtered by the
+ * backend, the next page on `fetchNextPage` ("Load more"). Under the jobs' list keys, so a capture or a search's end
+ * refreshes it like any list.
+ */
+export function useJobPages(params: Omit<JobListParams, "offset" | "limit">, { isEnabled = true }: { isEnabled?: boolean } = {}) {
+  const firmId = useFirmId();
+  return useInfiniteQuery({
+    queryKey: queryKeys.jobs.list(firmId, { ...params, paged: true }),
+    queryFn: ({ pageParam }) => jobsApi.page(firmId, { ...params, limit: JOBS_PAGE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.nextOffset ?? undefined,
     enabled: isEnabled,
   });
 }

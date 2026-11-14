@@ -9,7 +9,8 @@ import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { can, canManageResume, scopeCandidates } from "@/lib/auth/permissions";
 import { TailorButton } from "@/components/app/tailoring/tailor-button";
-import { deriveMatchScore } from "@/lib/derive";
+import { matchFor } from "@/lib/derive";
+import { PORTALS, portalForJob } from "@/components/app/jobs/portal-logo";
 import type { Job, JobRequirement } from "@/lib/schemas/job";
 import type { Candidate } from "@/lib/schemas/candidate";
 import { PageHeader } from "@/components/app/page-header";
@@ -81,7 +82,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const job: Job = jobQuery.data;
   // The candidates this job was found or captured for, among the ones this person sees (docs/02 §6.z).
   const foundFor = myCandidates.filter((candidate) => job.candidateIds.includes(candidate.id));
-  const score = context ? deriveMatchScore(context, job) : null;
+  // The stored Match of the candidate in context (decided 2026-11-14); only a candidate who has this job has one.
+  const match = context ? matchFor(job, context.id) : null;
+  const score = match?.score ?? null;
   const analysisReady = run.status === "complete";
 
   return (
@@ -98,7 +101,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <VerificationBadge verification={job.company.verification} />
         {job.company.h1b?.sponsorsH1b ? <Tag tone="green">H-1B sponsor</Tag> : null}
-        <SourceChip sourceType={job.provenance.sourceType} legalBasis={job.provenance.legalBasis} showBasis />
+        {/* A search's job says its source only, never a legal basis (decided 2026-11-14, Q50): Indeed's isn't a licence. */}
+        {job.provenance.sourceType === "AGGREGATOR"
+          ? <Tag tone="neutral">{PORTALS[portalForJob(job)].label}</Tag>
+          : <SourceChip sourceType={job.provenance.sourceType} legalBasis={job.provenance.legalBasis} showBasis />}
         {job.postedAt ? <span className="text-caption text-[var(--color-text-3)]">Posted <DualTimestamp iso={job.postedAt} format="relative" /></span> : null}
         <span className="text-caption text-[var(--color-text-3)]">· Captured <DualTimestamp iso={job.provenance.ingestedAt} format="relative" /></span>
       </div>
@@ -130,13 +136,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <Card>
-            <CardHeader><CardTitle>Match</CardTitle>{score !== null ? <MatchScore score={score} /> : null}</CardHeader>
+            <CardHeader><CardTitle>Match</CardTitle>{score !== null ? <MatchScore score={score} note={match?.note} /> : null}</CardHeader>
             {linkedId ? (
               <p className="mb-3 text-sm text-[var(--color-text-2)]">For <span className="font-[550] text-[var(--color-text)]">{context?.fullName ?? "this candidate"}</span></p>
             ) : (
               <select value={candidateId} onChange={(e) => { setCandidateId(e.target.value); run.reset(); }} className="bq-input mb-3" aria-label="Candidate to score">
                 <option value="">Pick a candidate to score</option>
-                {myCandidates.map((c) => <option key={c.id} value={c.id}>{c.fullName}</option>)}
+                {/* Only the candidates who have this job have its Match (decided 2026-11-14, Q48). */}
+                {foundFor.map((c) => <option key={c.id} value={c.id}>{c.fullName}</option>)}
               </select>
             )}
 

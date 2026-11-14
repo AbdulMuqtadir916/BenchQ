@@ -20,7 +20,10 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
-import { deriveMatchScore, isJobForCandidate, newestDate } from "@/lib/derive";
+import { matchFor } from "@/lib/derive";
+import { useJobPages } from "@/lib/hooks/use-jobs";
+import type { JobSort, JobSourceFilter } from "@/lib/api/jobs";
+import { ErrorState } from "@/components/app/error-state";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { EASE_OUT, POPOVER_TRANSITION } from "@/lib/motion";
@@ -59,6 +62,12 @@ const SOURCE_OPTIONS: SelectOption[] = [
   })),
 ];
 
+/** The source filter's backend names (backend/api/routes_job_search.py `list_firm_jobs`). */
+const SOURCE_FILTER: Record<string, JobSourceFilter> = {
+  INDEED: "indeed", FREEHIRE: "freehire", MANUAL: "manual", EXTENSION: "extension", OTHER_SOURCE: "other",
+};
+const SORT_PARAM: Record<string, JobSort> = { MATCH: "match", NEWEST: "newest", COMPANY: "company" };
+
 const SCORE_OPTIONS: SelectOption[] = [
   { value: "0", label: "Any score" },
   { value: "70", label: "Score 70+" },
@@ -73,7 +82,6 @@ const SORT_OPTIONS: SelectOption[] = [
 ];
 
 export function JobExplorer({
-  jobs,
   candidates = [],
   applications,
   loading = false,
@@ -85,9 +93,9 @@ export function JobExplorer({
   toolbarBordered = true,
   className,
 }: {
-  jobs: Job[];
   candidates?: Candidate[];
   applications: Application[];
+  /** The page's own reads (candidates, applications) are loading; the jobs are read here, 100 at a time. */
   loading?: boolean;
   lockedCandidate?: Candidate;
   /** Preselect a candidate context (e.g. arriving from "Find jobs" on a profile). */
@@ -108,7 +116,8 @@ export function JobExplorer({
   const deferredQuery = useDeferredValue(query);
   const [portal, setPortal] = useState("ALL");
   const [remote, setRemote] = useState("ALL");
-  const [scoreFloor, setScoreFloor] = useState(startingCandidateId ? "70" : "0");
+  // Every job a candidate has, best Match first (decided 2026-11-14, Q36): no score floor to start with.
+  const [scoreFloor, setScoreFloor] = useState("0");
   const [sort, setSort] = useState(startingCandidateId ? "MATCH" : "NEWEST");
   const [selectedId, setSelectedId] = useState("");
   // Hide is the person's own (docs/02 §6.x). Save is for a candidate: the job becomes a Saved application
@@ -141,28 +150,26 @@ export function JobExplorer({
     return pending ?? savedApplications.has(jobId);
   };
 
-  const rows = useMemo(() => {
-    const normalizedQuery = deferredQuery.trim().toLowerCase();
-    const minimum = Number(scoreFloor);
-    const list = jobs
-      .filter((job) => job.isActive && job.dedupe.duplicateOfJobId === null && (showHidden || !hiddenIds.has(job.id)))
-      .filter((job) => !context || (isJobForCandidate(job, context) && !appliedIds.has(job.id)))
-      .map((job) => ({ job, score: context ? deriveMatchScore(context, job) : null, portal: portalForJob(job) }))
-      .filter(({ job, score, portal: rowPortal }) => {
-        if (normalizedQuery && !`${job.title} ${job.company.name} ${job.city ?? ""} ${job.state ?? ""}`.toLowerCase().includes(normalizedQuery)) return false;
-        if (portal !== "ALL" && rowPortal !== portal) return false;
-        if (remote !== "ALL" && job.remoteMode !== remote) return false;
-        if (context && score !== null && score < minimum) return false;
-        return true;
-      });
-
-    list.sort((a, b) => {
-      if (sort === "MATCH" && a.score !== null && b.score !== null && a.score !== b.score) return b.score - a.score;
-      if (sort === "COMPANY") return a.job.company.name.localeCompare(b.job.company.name);
-      return newestDate(b.job).localeCompare(newestDate(a.job));
-    });
-    return list.slice(0, lockedCandidate ? 40 : 80);
-  }, [jobs, hiddenIds, showHidden, context, appliedIds, deferredQuery, portal, remote, scoreFloor, sort, lockedCandidate]);
+  // Every job, 100 at a time, sorted and filtered by the backend over the whole list (decided 2026-11-14, Q28, Q29,
+  // Q47): the filters are the request, so "Load more" brings the next part of the same list and the total is real.
+  const pages = useJobPages({
+    candidateId: context?.id,
+    sort: SORT_PARAM[sort === "MATCH" && !context ? "NEWEST" : sort],
+    minScore: context ? Number(scoreFloor) : 0,
+    source: portal === "ALL" ? undefined : SOURCE_FILTER[portal],
+    remote: remote === "ALL" ? undefined : (remote as "REMOTE" | "HYBRID" | "ONSITE"),
+    q: deferredQuery.trim() || undefined,
+    excludeApplied: Boolean(context),
+  });
+  const total = pages.data?.pages[0]?.total ?? 0;
+  const rows = useMemo(() => (pages.data?.pages.flatMap((page) => page.jobs) ?? [])
+    // Hidden is the person's own; an application made here since the page loaded leaves at once.
+    .filter((job) => (showHidden || !hiddenIds.has(job.id)) && (!context || !appliedIds.has(job.id)))
+    .map((job) => {
+      const match = matchFor(job, context?.id);
+      return { job, score: match?.score ?? null, note: match?.note ?? null, portal: portalForJob(job) };
+    }), [pages.data, hiddenIds, showHidden, context, appliedIds]);
+  const isListLoading = loading || pages.isLoading;
 
   const selected = rows.find(({ job }) => job.id === selectedId) ?? rows[0] ?? null;
   const arrivedToday = rows.filter(({ job }) => job.postedAt && renderedAt - new Date(job.postedAt).getTime() < 86_400_000).length;
@@ -220,11 +227,11 @@ export function JobExplorer({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-body-strong text-[var(--color-text)]">
-            {lockedCandidate ? "Profile-matched roles" : `${rows.length} open roles`}
+            {lockedCandidate ? "Profile-matched roles" : `${total} open roles`}
             {activeFilterCount ? <Tag tone="blue">{activeFilterCount} filters</Tag> : null}
           </div>
           <p className="mt-0.5 text-caption text-[var(--color-text-3)]">
-            {arrivedToday} arrived today · {context ? `scored for ${context.fullName}` : "select a candidate to score matches"}
+            {arrivedToday} arrived today · {context ? `Match for ${context.fullName}` : "select a candidate to see their Match"}
           </p>
         </div>
         <Select value={sort} options={SORT_OPTIONS} onValueChange={setSort} aria-label="Sort jobs" className="w-36" />
@@ -245,7 +252,7 @@ export function JobExplorer({
               <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-[var(--color-text-3)]" />
               <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, company, location…" className="pl-8" />
             </label>
-            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor(value ? "70" : "0"); setSort(value ? "MATCH" : "NEWEST"); }} aria-label="Candidate context" /> : <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" />}
+            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor("0"); setSort(value ? "MATCH" : "NEWEST"); }} aria-label="Candidate context" /> : <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" />}
             {!lockedCandidate ? <Select value={portal} options={SOURCE_OPTIONS} onValueChange={setPortal} aria-label="Job source" /> : null}
             <Select value={remote} options={REMOTE_OPTIONS} onValueChange={setRemote} aria-label="Work mode" />
             <Select value={scoreFloor} options={SCORE_OPTIONS} onValueChange={setScoreFloor} aria-label="Minimum match score" disabled={!context} />
@@ -259,7 +266,7 @@ export function JobExplorer({
         <div className="min-h-[360px] border-b border-[var(--color-border)] lg:min-h-0 lg:border-b-0 lg:border-r">
           <div className="flex h-9 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 text-caption text-[var(--color-text-3)]">
             <span className="flex items-center gap-2">
-              <span className="tabular">{rows.length} shown</span>
+              <span className="tabular">{rows.length} of {total} shown</span>
               {canMark && hiddenIds.size > 0 ? (
                 <button type="button" aria-pressed={showHidden} onClick={() => setShowHidden((value) => !value)} className="rounded-[var(--radius-sm)] text-[var(--color-primary-subtle-fg)] hover:underline">
                   {showHidden ? `Hide ${hiddenIds.size} hidden` : `Show ${hiddenIds.size} hidden`}
@@ -269,14 +276,16 @@ export function JobExplorer({
             <span className="inline-flex items-center gap-1 font-mono text-[10px]"><span aria-hidden>↑↓</span> move · Enter open <CircleHelp size={13} aria-hidden /></span>
           </div>
           <div className="h-[520px] overflow-y-auto lg:h-[calc(100%-36px)]">
-            {loading ? (
+            {isListLoading ? (
               <SkeletonList rows={8} />
+            ) : pages.error ? (
+              <div className="p-4"><ErrorState error={pages.error} onRetry={() => void pages.refetch()} /></div>
             ) : rows.length === 0 ? (
               <div className="p-4"><EmptyState icon={Search} title="No matching jobs" description="Try a wider search or lower the score filter." variant="filtered" /></div>
             ) : (
               <ul className="divide-y divide-[var(--color-border)]">
                 {rows.map((row, index) => {
-                  const { job, score, portal: rowPortal } = row;
+                  const { job, score, note, portal: rowPortal } = row;
                   const isSelected = selected?.job.id === job.id;
                   const isStaggered = animateRows && !reduceMotion && index < 12;
                   return (
@@ -298,7 +307,7 @@ export function JobExplorer({
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-3">
                               <h3 className="truncate text-body-strong text-[var(--color-text)]">{job.title}</h3>
-                              {score !== null ? <MatchScore score={score} variant="ring" /> : null}
+                              {score !== null ? <MatchScore score={score} note={note} variant="ring" /> : null}
                             </div>
                             <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-[var(--color-text-2)]">
                               <span className="truncate">{job.company.name}</span><span className="text-[var(--color-border-strong)]">·</span><span className="truncate">{jobLocation(job)}</span>
@@ -332,6 +341,13 @@ export function JobExplorer({
                     </motion.li>
                   );
                 })}
+                {pages.hasNextPage ? (
+                  <li className="p-3">
+                    <Button variant="secondary" size="sm" className="w-full" disabled={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>
+                      {pages.isFetchingNextPage ? "Loading…" : `Load more (${Math.max(0, total - (pages.data?.pages.reduce((sum, page) => sum + page.jobs.length, 0) ?? 0))} more)`}
+                    </Button>
+                  </li>
+                ) : null}
               </ul>
             )}
           </div>
@@ -345,6 +361,7 @@ export function JobExplorer({
               <JobDetailHeader
                 job={selected.job}
                 score={selected.score}
+                note={selected.note}
                 portal={selected.portal}
                 context={context}
                 menuOpen={menuOpen}
@@ -375,6 +392,7 @@ export function JobExplorer({
 function JobDetailHeader({
   job,
   score,
+  note,
   portal,
   context,
   menuOpen,
@@ -387,6 +405,8 @@ function JobDetailHeader({
 }: {
   job: Job;
   score: number | null;
+  /** Why the score is held at 40, shown on hover (Q37). */
+  note: string | null;
   portal: PortalKey;
   context: Candidate | null;
   menuOpen: boolean;
@@ -428,7 +448,7 @@ function JobDetailHeader({
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-2.5">
         <div className="flex items-center gap-3">
-          {score !== null ? <><MatchScore score={score} /><span className="text-sm text-[var(--color-text-2)]">Matched to {context?.fullName}</span></> : <span className="text-sm text-[var(--color-text-3)]">Select a candidate to calculate a match score.</span>}
+          {score !== null ? <><MatchScore score={score} note={note} /><span className="text-sm text-[var(--color-text-2)]">Match for {context?.fullName}</span></> : <span className="text-sm text-[var(--color-text-3)]">{context ? "The Match isn't worked out yet." : "Select a candidate to see their Match."}</span>}
         </div>
         <div className="flex items-center gap-2"><VerificationBadge verification={job.company.verification} />{job.company.h1b?.sponsorsH1b ? <Tag tone="green">H-1B sponsor</Tag> : null}</div>
       </div>

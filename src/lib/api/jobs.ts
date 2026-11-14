@@ -8,11 +8,34 @@ import { http } from "./http";
 
 /** The most jobs one list read returns (the backend's FIRM_LIST_MAX). */
 export const JOBS_LIST_MAX = 400;
+/** A job list's page (decided 2026-11-14, Q29): "Load more" reads the next one. */
+export const JOBS_PAGE = 100;
+
+export type JobSort = "match" | "newest" | "company";
+/** The backend's source names for the list's source filter (portal-logo.tsx `PortalKey`). */
+export type JobSourceFilter = "indeed" | "freehire" | "manual" | "extension" | "other";
 
 export interface JobListParams {
   limit?: number;
   /** One candidate's jobs only (docs/02 §6.z). */
   candidateId?: string;
+  /** Sorted and filtered by the backend, over the whole list (decided 2026-11-14, Q47). `match`: one candidate's. */
+  sort?: JobSort;
+  minScore?: number;
+  source?: JobSourceFilter;
+  remote?: "REMOTE" | "HYBRID" | "ONSITE";
+  q?: string;
+  /** One candidate's jobs they have an application for past Saved, left out. */
+  excludeApplied?: boolean;
+  offset?: number;
+}
+
+export interface JobPage {
+  jobs: Job[];
+  /** Every job the list holds with these filters, not only this page's. */
+  total: number;
+  /** Where the next page starts, or null at the end. */
+  nextOffset: number | null;
 }
 
 /** The capture found the job the candidate already has; `jobId` is that job, for "View job". */
@@ -24,11 +47,16 @@ export function duplicateJobError(jobId: string): ApiError & { jobId: string } {
 const firmPath = (firmId: string) => `/api/firms/${toBackendId(firmId)}`;
 const candidatePath = (firmId: string, candidateId: string) => `${firmPath(firmId)}/candidates/${toBackendId(candidateId)}`;
 const live = {
-  list: async (firmId: string, params?: JobListParams): Promise<Job[]> => {
+  page: async (firmId: string, params?: JobListParams): Promise<JobPage> => {
     // The backend answers at most 400 (routes_job_search.py FIRM_LIST_MAX): a larger ask is a 422, so it is capped here.
-    const query = { limit: Math.min(params?.limit ?? JOBS_LIST_MAX, JOBS_LIST_MAX), candidate_id: params?.candidateId ? toBackendId(params.candidateId) : undefined };
-    const { items } = await http.get(`${firmPath(firmId)}/job-postings`, FirmJobListDto, { query });
-    return items.map((item) => toFirmJob(item, firmId));
+    const query = {
+      limit: Math.min(params?.limit ?? JOBS_LIST_MAX, JOBS_LIST_MAX),
+      candidate_id: params?.candidateId ? toBackendId(params.candidateId) : undefined,
+      sort: params?.sort, min_score: params?.minScore || undefined, source: params?.source, remote: params?.remote,
+      q: params?.q?.trim() || undefined, exclude_applied: params?.excludeApplied || undefined, offset: params?.offset || undefined,
+    };
+    const { items, total, next_offset } = await http.get(`${firmPath(firmId)}/job-postings`, FirmJobListDto, { query });
+    return { jobs: items.map((item) => toFirmJob(item, firmId)), total: total ?? items.length, nextOffset: next_offset ?? null };
   },
   byId: async (firmId: string, id: string): Promise<Job> => toFirmJob(await http.get(`${firmPath(firmId)}/job-postings/${id}`, FirmJobDto), firmId),
   candidateJob: async (firmId: string, candidateId: string, id: string): Promise<Job> =>
@@ -50,7 +78,11 @@ const live = {
  * signed-in person sees. Jobs come only from the backend: there is no mock (decided 2026-11-11).
  */
 export const jobsApi = {
-  list: (firmId: string, params?: JobListParams): Promise<Job[]> => live.list(firmId, params),
+  /** One page's jobs (a dashboard's, ⌘K's): the first `limit` of the list these params make. */
+  list: async (firmId: string, params?: JobListParams): Promise<Job[]> => (await live.page(firmId, params)).jobs,
+
+  /** A page of the list, with the whole list's total and where the next page starts (the job lists' "Load more"). */
+  page: (firmId: string, params?: JobListParams): Promise<JobPage> => live.page(firmId, params),
 
   byId: (firmId: string, id: string): Promise<Job> => live.byId(firmId, id),
 

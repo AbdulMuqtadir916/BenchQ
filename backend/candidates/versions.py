@@ -157,7 +157,9 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
            "title": row.title,
            "template": row.template, "page_format": row.page_format,
            "created_by_user_id": str(row.created_by_user_id) if row.created_by_user_id else None,
-           "created_at": row.created_at.isoformat() if row.created_at else None}
+           "created_at": row.created_at.isoformat() if row.created_at else None,
+           # A tailored version's Match against its job (decided 2026-11-14, Q39); null for a base, or until worked out.
+           "match_score": row.match_score, "match_note": row.match_note}
     return {**out, **content_of(row)} if with_content else out
 
 

@@ -74,3 +74,18 @@ describe("a candidate's searches", () => {
     expect(searches.usage).toEqual({ jobsToday: 47, jobsCap: 100, searchesToday: 3, searchesCap: 20, capturesToday: 2, capturesCap: 20, resetsAt: "2026-11-12T13:00:00.000Z" });
   });
 });
+
+describe("a job's Match and work mode from the backend (decided 2026-11-14)", () => {
+  it("keeps each visible candidate's Match and the backend's work mode", () => {
+    const job = toFirmJob(FirmJobDto.parse({ ...posting, remote_mode: "HYBRID", candidate_ids: ["c1"],
+      matches: { c1: { score: 40, note: "no C2C or third-party candidates" } } }), "f");
+    expect(job.matches).toEqual({ c1: { score: 40, note: "no C2C or third-party candidates" } });
+    expect(job.remoteMode).toBe("HYBRID");
+    expect(toFirmJob(FirmJobDto.parse({ ...posting, candidate_ids: [] }), "f").matches).toEqual({});
+  });
+
+  it("a captured job carries its own candidate's Match", () => {
+    const job = toCapturedJob(CapturedPostingDto.parse({ ...posting, candidate_id: "c1", created: true, match: { score: 77, note: null } }), "f");
+    expect(job.matches).toEqual({ c1: { score: 77, note: null } });
+  });
+});
