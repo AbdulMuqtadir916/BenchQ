@@ -22,6 +22,10 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
     expect(payIn("40 hours/week, Salary $143,700")).toBeUndefined();
     expect(payIn("40 hours/week, Salary Range $143,700 - $194,400 per year. #0000")).toMatchObject({ salaryMin: 143700, salaryMax: 194400, salaryPeriod: "year" });
     expect(payIn("$25 per hour, 40 hours per week")).toMatchObject({ salaryMin: 25, salaryPeriod: "hour" });
+    // A number in the pay's own clause stays with it; only a schedule's period is dropped (PR #140, second review).
+    expect(payIn("Annual salary (2026): $120,000")).toEqual({ salaryMin: 120000, salaryMax: 120000, salaryPeriod: "year" });
+    expect(payIn("Hourly (W2): $60")).toEqual({ salaryMin: 60, salaryMax: 60, salaryPeriod: "hour" });
+    expect(payIn("40 hours per week Salary $50,000")).toBeUndefined();
   });
 
   it("keeps inline-level boxes on their line, so a range in such spans is one pay (PR #140 review)", () => {
@@ -112,5 +116,7 @@ describe("a company as a site names itself", () => {
   it("drops the site's own words", () => {
     expect(["Amazon.jobs", "JPMC Candidate Experience page", "Careers at Acme", "Globex Careers", "Initech"].map(companyOf))
       .toEqual(["Amazon", "JPMC", "Acme", "Globex", "Initech"]);
+    // Only after a space or a separator: a name that ends in a site word keeps it; one that is only those words is none.
+    expect(["AcmeJobs", "Acme Jobs", "Acme - Careers", "Careers", "Jobs board"].map(companyOf)).toEqual(["AcmeJobs", "Acme", "Acme", "", ""]);
   });
 });

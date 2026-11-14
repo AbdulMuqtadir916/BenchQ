@@ -51,9 +51,9 @@ const report = (state: ReturnType<typeof useAutofill>) => { hook = state; };
 /** A résumé id that stands for "the panel is still loading the résumés". */
 const LOADING = "loading";
 
-function Harness({ value, resumeId = "res-1" }: { value: Connection; resumeId?: string | null }) {
+function Harness({ value, resumeId = "res-1", isHeld = false }: { value: Connection; resumeId?: string | null; isHeld?: boolean }) {
   const state = useAutofill({
-    connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, fileName: "Priya Shah - Java Developer", onSessionExpired, onAccessLost,
+    connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, fileName: "Priya Shah - Java Developer", onSessionExpired, onAccessLost, isHeld,
   });
   useEffect(() => report(state));
   return null;
@@ -1305,5 +1305,20 @@ describe("a site BenchQ may not read yet", () => {
     await mount();
     expect(hook.needsAccess).toBeNull();
     expect(fake.permissions.contains).not.toHaveBeenCalled();
+  });
+});
+
+describe("while the panel asks whether the tab moved to another job (PR #140, second review)", () => {
+  it("fills nothing, and fills once the BDE keeps the tab", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")]));
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} isHeld />); });
+    await wait(5);
+    await run(() => hook.autofill());
+    expect(fillField).not.toHaveBeenCalled();
+    await act(async () => { root.render(<Harness value={connection} isHeld={false} />); });
+    await wait(5);
+    await run(() => hook.autofill());
+    expect(fillField).toHaveBeenCalled();
   });
 });

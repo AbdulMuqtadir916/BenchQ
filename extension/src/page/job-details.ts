@@ -51,7 +51,9 @@ const PERIODS: [RegExp, NonNullable<Pay["salaryPeriod"]>][] = [
   [/(?:\b(?:per|a)|\/)\s*(?:week|wk)\b|\bweekly\b/i, "week"], [/(?:\b(?:per|a)|\/)\s*(?:month|mo)\b|\bmonthly\b/i, "month"],
   [/(?:\b(?:per|an?)|\/)\s*(?:year|yr|annum)\b|\bannual(?:ly)?\b|\byearly\b/i, "year"],
 ];
-const UNITS: Record<string, NonNullable<Pay["salaryPeriod"]>> = { HOUR: "hour", DAY: "day", WEEK: "week", MONTH: "month", YEAR: "year" };
+/** A work schedule, whose period is the hours', never the pay's: "40 hours/week", "8 hrs a day", "5 days per week". */
+const SCHEDULE = /\b\d+(?:\.\d+)?\s*(?:-\s*\d+\s*)?(?:hours?|hrs?|days?|shifts?)\s*(?:\/|per|an?|each)\s*(?:week|wk|day|month|mo)\b/gi;
+const UNITS: Record<string, NonNullable<Pay["salaryPeriod"]>> ={ HOUR: "hour", DAY: "day", WEEK: "week", MONTH: "month", YEAR: "year" };
 const PAY_WORDS = /\b(?:salary|salaries|pay|compensation|wage|wages|rate|base|range|hourly|annual|ote)\b/i;
 
 const amountOf = (digits: string, thousands?: string) => {
@@ -76,7 +78,8 @@ export function payIn(text: string): Pay | undefined {
     // $143,700 - $194,400 per year"; "Salary $50,000. 40 hours per week"). PR #140's review.
     const periodIn = (part: string) => PERIODS.find(([pattern]) => pattern.test(part))?.[1];
     const after = text.slice(end, end + 30).split(/\d|[.;!?](?:\s|$)/)[0]!;
-    const before = text.slice(Math.max(0, first.index! - 30), first.index).split(/\d|[,;.!?]/).at(-1)!;
+    // The clause just before it, its own numbers kept ("Annual salary (2026):", "Hourly (W2):"), a schedule's dropped.
+    const before = text.slice(Math.max(0, first.index! - 40), first.index).split(/[,;.!?]/).at(-1)!.replace(SCHEDULE, " ");
     const period = periodIn(after) ?? periodIn(before);
     if (!isRange && !period) continue;
     const min = amountOf(first[2]!, first[3] ?? (isRange ? next![3] : undefined));

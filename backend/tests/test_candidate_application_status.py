@@ -384,3 +384,28 @@ def test_candidate_category_status_preserves_submission_and_records_actor(
     assert restored.json()['applied_at'] == applied.json()['applied_at']
     assert restored.json()['submitted_by_user_id'] == applied.json()['submitted_by_user_id']
     assert restored.json()["status"] == "saved"
+
+
+def test_a_saved_draft_moved_straight_to_a_later_stage_records_who_moved_it(
+    api_client, test_db, accounts, jobs_in_default_firm
+):
+    """PR #140's review: a submitter was recorded only on Saved -> Applied, so a draft moved straight to Screening call
+    had none, and the BDE's board (Saved drafts and their own submissions) lost it. The first move out of Saved records
+    whoever made it; a later move never overwrites it."""
+    from backend.models.db import Application
+
+    _, _, application, manager, headers, _ = _saved_candidate_application(
+        test_db, accounts, jobs_in_default_firm, "MANAGER"
+    )
+    path = f"/api/applications/{application.id}/candidate-status"
+    moved = api_client.patch(path, json={"status": "screening_call", "expected_revision": 0}, headers=headers)
+    assert moved.status_code == 200, moved.text
+    test_db.expire_all()
+    row = test_db.get(Application, application.id)
+    assert (row.status, row.submitted_by_user_id) == ("screening_call", manager.id)
+
+    owner = {"cookie": f"bq_session={accounts.firm_token}"}
+    again = api_client.patch(path, json={"status": "interview_scheduled", "expected_revision": 1}, headers=owner)
+    assert again.status_code == 200, again.text
+    test_db.expire_all()
+    assert test_db.get(Application, application.id).submitted_by_user_id == manager.id

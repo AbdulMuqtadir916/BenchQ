@@ -245,3 +245,29 @@ describe("what the card says the page stated, before the BDE adds the job", () =
     expect(rows).toEqual([["Pay", "USD 60 an hour"], ["Type", "Contract"]]);
   });
 });
+
+describe("a later reading of the page (PR #140, second review)", () => {
+  it("takes the whole description when only the description grew, and closes Add this job? when the card moves to another posting", async () => {
+    vi.mocked(missingAccess).mockResolvedValue(null);
+    vi.useFakeTimers();
+    try {
+      const teaser = { ...page, description: "<p>Test the API.</p>" };
+      const whole = { ...page, description: "<p>Test the API.</p><p>Own the payments test suite, end to end, every release.</p>" };
+      vi.mocked(readJobPage).mockResolvedValueOnce(teaser).mockResolvedValueOnce(whole)
+        .mockResolvedValue({ ...whole, url: "https://boards.example.test/acme/jobs/456", location: "Remote", employmentType: "Contract" });
+      await show();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      await click("add-job-run");
+      expect(host.querySelector("[data-slot='add-job-confirm']")).not.toBeNull();
+      // The same title on another posting, read more fully: the card shows it, and the question asked about the first closes.
+      await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+      expect(host.textContent).toContain("Remote");
+      expect(host.querySelector("[data-slot='add-job-confirm']")).toBeNull();
+      await click("add-job-run");
+      await click("add-job-confirm");
+      expect(addJob).toHaveBeenCalledWith("cand-1", expect.objectContaining({ url: "https://boards.example.test/acme/jobs/456" }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

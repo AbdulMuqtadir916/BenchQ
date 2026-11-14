@@ -80,6 +80,9 @@ type Options = {
   fileName?: string | null;
   onSessionExpired: () => void;
   onAccessLost: () => void;
+  /** The tab shows another job's page the BDE hasn't kept (the panel asks whether to disconnect): nothing fills, on its
+   * own (a next page) or from a click, until they answer (PR #140's review, Abdul's #1). */
+  isHeld?: boolean;
 };
 
 /** What a tab's review remembers while the panel is open. Switching tabs unmounts the review, so this lives outside it. */
@@ -214,7 +217,10 @@ function withSaveOfferIn(memory: TabMemory, built: ReadonlyMap<string, unknown>,
 /** One connected tab's review, held in memory: scan the page, match it against the picked résumé's answers, fill what
  * has an answer, verify it stuck, follow what happens on the form, and undo. Unmounting (another tab, sign-out) drops
  * the answers. */
-export function useAutofill({ connection, firmId, resumeId, fileName = null, onSessionExpired, onAccessLost }: Options) {
+export function useAutofill({ connection, firmId, resumeId, fileName = null, onSessionExpired, onAccessLost, isHeld = false }: Options) {
+  // Read when a fill is about to start, which can be well after the render that started its run (a next page settles).
+  const held = useRef(isHeld);
+  useEffect(() => { held.current = isHeld; });
   const { tabId, applicationId, candidateId, job, confirmedHosts } = connection;
   // The résumé and application context the review in hand answers from; selection changes wait for this exact scan.
   const [answeredFrom, setAnsweredFrom] = useState<string | null | undefined>(undefined);
@@ -581,7 +587,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
    * before the run. A field that was there keeps whatever the first pass left it. The résumé's file goes on before
    * anything else: what the site reads from it is then the site's, and the answers replace it (07 Q50). */
   const fillRows = useCallback(async (first: FillableRow[], passes: number) => {
-    if (busy.current || needsConfirmation || first.length === 0) return;
+    if (busy.current || needsConfirmation || held.current || first.length === 0) return;
     busy.current = true;
     setOutcome(null);
     setUndoNote("");
@@ -714,7 +720,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, [fillRows, scan, tabId]);
 
   const autofill = useCallback(async () => {
-    if (busy.current || needsConfirmation) return;
+    if (busy.current || needsConfirmation || held.current) return;
     memory.current.autoSteps = true;
     setIsFollowingSteps(true);
     try {
@@ -757,7 +763,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     const pageCheck = page === null ? null : checkJob(job, page);
     const isOtherJob = page !== null && pageCheck !== null && pageCheck.conflict
       && !confirmedHosts.includes(confirmationKey(page.url, pageCheck.detected));
-    if (isOtherJob) return;
+    // Another job, by its page or by the panel's own rule (another posting on the job's site, not kept): no fill.
+    if (isOtherJob || held.current) return;
     if (memory.current.autoSteps && !busy.current && (shownRows.current ?? []).some(isFillable)) await autofill();
   }, [autofill, confirmedHosts, job, scan, settle]);
   useEffect(() => {

@@ -72,6 +72,11 @@ type PendingFill = { context: string; resumeId: string | null };
  * it goes, the résumé and the cover letter, then the rest of the form. The form stays theirs to submit. */
 export default function AutofillPanel({ connection, tabUrl = null, firmId = null, firmSlug = null, details = null, applicationStatus = "ready", onRetryContext = () => {}, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
   const { tabId, job } = connection;
+  // The address the BDE said to keep this tab connected on, though it shows another job's page.
+  const [keptUrl, setKeptUrl] = useState<string | null>(null);
+  // The tab moved on to another job's page on the job's own site, and the BDE hasn't said to keep it connected there:
+  // the panel asks first, and nothing fills, on its own or queued, until they answer (PR #140's review).
+  const movedAway = Boolean(tabUrl && job.url && tabUrl !== keptUrl && isOtherJobOnSite(tabUrl, job.url));
   const { resumes, pick, retry, refresh, refreshFailed, source } = useResumes({
     firmId, candidateId: connection.candidateId, applicationId: connection.applicationId, applicationStatus,
     jobId: details?.job_id ?? null, namedId: details?.tailored_resume_id ?? null,
@@ -82,7 +87,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const canReview = applicationStatus === "ready" && !["loading", "unavailable", "missing"].includes(resumes.status);
   const resumeId = canReview ? picked?.id ?? null : undefined;
   const fileName = picked ? resumeFileName(candidateName, picked.title) : null;
-  const state = useAutofill({ connection, firmId, resumeId, fileName, onSessionExpired, onAccessLost });
+  const state = useAutofill({ connection, firmId, resumeId, fileName, onSessionExpired, onAccessLost, isHeld: movedAway });
   const { rows, scanning, error, filling, run, outcome, undoable, fillCount, staleCount, needsConfirmation, answeredFrom, reviewedFor, attachment, step } = state;
   const context = `${connection.candidateId}:${connection.applicationId}`;
   // A pick, or another application linked to this tab, waits for its own résumé's review, then fills the form so
@@ -131,12 +136,13 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   // A pick fills the form at once, once its answers are in, when the form is on the page and it's the right job.
   useEffect(() => {
     const wanted = pendingFill;
-    if (!wanted || startedFill.current === wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
+    // While the tab shows another job, the fill waits, queued: "Keep it connected" lets it run (PR #140's review).
+    if (!wanted || movedAway || startedFill.current === wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
     startedFill.current = wanted;
     // A new pick fills what it answers and takes back what the old one filled that it doesn't, so nothing stale stays.
     const fill = !needsConfirmation && rows?.length && (fillCount > 0 || staleCount > 0) ? autofill() : undefined;
     void Promise.resolve(fill).finally(() => setPendingFill((now) => (now === wanted ? null : now)));
-  }, [pendingFill, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
+  }, [pendingFill, movedAway, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
   // The keyboard shortcuts (background.ts), for this tab's job: each clicks its button, so it does nothing when the
   // button couldn't be clicked. Mark applied opens its dialog with Yes focused, so Enter confirms.
   useEffect(() => {
@@ -151,8 +157,6 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     return () => chrome.runtime.onMessage.removeListener(onShortcut);
   }, [tabId]);
   const [isCollecting, setIsCollecting] = useState(false);
-  // The address the BDE said to keep this tab connected on, though it shows another job's page.
-  const [keptUrl, setKeptUrl] = useState<string | null>(null);
   const card = useRef<HTMLElement>(null);
   const wasFilling = useRef(filling);
   // The note of a run that stopped, once the BDE closed it. A new run brings a new one.
@@ -195,8 +199,6 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   };
 
   const jobName = `${job.title || "Untitled role"}${job.company ? ` at ${job.company}` : ""}`;
-  // The tab moved on to another job's page on the job's own site, and the BDE hasn't said to keep it connected there.
-  const movedAway = Boolean(tabUrl && job.url && tabUrl !== keptUrl && isOtherJobOnSite(tabUrl, job.url));
   // The panel's own content shows once nothing is asked first: neither that, nor a site's permission (Mark applied stays).
   const isOpen = !movedAway && !state.needsAccess;
   return <section ref={card} data-slot="autofill" className={`mb-3 ${CARD}`} aria-labelledby="autofill-title">

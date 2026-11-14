@@ -874,3 +874,12 @@ describe("what the panel shows first", () => {
     show({ fillCount: 2, rows: [row("Email", true)] });
   });
 });
+
+describe("fills while the panel asks about another job (PR #140, second review)", () => {
+  it("are held, automatic ones included, until the BDE keeps the tab", async () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { tabUrl: "https://jobs.acme.test/jobs/98765" });
+    expect(vi.mocked(useAutofill).mock.lastCall?.[0].isHeld).toBe(true);
+    await click("Keep it connected");
+    expect(vi.mocked(useAutofill).mock.lastCall?.[0].isHeld).toBe(false);
+  });
+});

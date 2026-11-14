@@ -580,6 +580,14 @@ describe("a school or job block that repeats (#132)", () => {
     expect(rows[1]!.reason).toBe("This section asks about someone else, so it's yours to fill.");
   });
 
+  it("gives a reference's Company no slot, so the candidate's own Company keeps their first employer (PR #140, second review)", () => {
+    const references = { name: "", id: "", placeholder: "", ariaLabel: "", nearbyText: "", sectionHeading: "References", className: "", dataAttrs: "" };
+    const work = { education: [], work: [{ company: "Acme", title: "Engineer" }, { company: "Globex", title: "Developer" }] };
+    const fields = [field("Company", { id: "ref", clues: references }), field("Company", { id: "own" })];
+    const rows = withHistory(buildReview(fields, [{ ...entry("Current company", "Acme"), key: "current-company" }]), work);
+    expect(rows.map((row) => [row.status, row.proposed ?? null])).toEqual([["manual", null], ["ready", "Acme"]]);
+  });
+
   it("starts from the school the first block already holds, and keeps a row the review held back for another reason", () => {
     const fields = [field("School", { id: "f0", current: "JNTU" }), field("School", { id: "f1" })];
     const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }];

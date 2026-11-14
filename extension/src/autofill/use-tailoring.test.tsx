@@ -156,3 +156,17 @@ describe("tailoring the résumé for the connected job", () => {
     expect(getRunningTailorings).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("a refusal's filter (PR #140, second review)", () => {
+  it("follows any run of the next job, though a refusal for the last one filtered by its résumé", async () => {
+    vi.mocked(startTailoring).mockRejectedValue(refused(409, "This résumé is already being tailored for this job."));
+    await render("posting-1");
+    act(() => hook.start("base-v1"));
+    await settle();
+    await settle();
+    vi.mocked(getRunningTailorings).mockResolvedValue([run({ run_id: "run-2", job_posting_id: "posting-2", source_resume_id: "base2-v1", step: "draft" })]);
+    await act(async () => { root!.render(<Harness jobId="posting-2" />); });
+    await settle();
+    expect(hook.tailoring).toMatchObject({ status: "running", runId: "run-2", step: "draft" });
+  });
+});

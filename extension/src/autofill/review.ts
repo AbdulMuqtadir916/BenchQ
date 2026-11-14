@@ -30,6 +30,12 @@ const PERSON_KINDS = new Set<EngineFieldType>([
   "address-line1", "address-line2", "address-city", "address-region", "address-postal", "address-country", "city-state",
   "current-company", "current-title", "linkedin-url", "github-url", "portfolio-url", "website",
 ]);
+/** A question about someone else (a reference's "Company"): never the candidate's answer, never a repeat of the
+ * candidate's own question, and no slot among the candidate's schools or jobs (PR #140's review). */
+const isSomeoneElses = (field: TabField) => {
+  const type = typeOf(field);
+  return Boolean(type && PERSON_KINDS.has(type)) && SOMEONE_ELSES_SECTION.test(normalize(field.clues.sectionHeading));
+};
 /** A block of work or education history, where a start date is that entry's, not when the candidate can start. */
 const HISTORY_SECTION = /\b(experience|education|employment|work history)\b/;
 /** Words that mark one entry of a question asked again for another: "Employer 2", "Other phone", "Previous employer". */
@@ -215,7 +221,9 @@ export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewR
   // Each field's place among its kind's records. A form that asks block by block (school, degree, school, degree) starts
   // a block where a question it already asked comes again, so a block that lacks a field never shifts the next one's
   // record. A form that asks question by question (every school, then every degree) counts each question.
+  // A reference's "Company" takes no slot: before it, the candidate's own Company got their second employer.
   const asked = rows.map((row) => {
+    if (isSomeoneElses(row.field)) return null;
     const type = typeOf(row.field);
     const from = type ? FROM_RECORD[type] : undefined;
     return type && from ? { type, from } : null;
@@ -402,12 +410,8 @@ function handBackRepeats(rows: ReviewRow[]): ReviewRow[] {
  * `job` is the linked job, which answers "Position applied for" and names the company a question is about. */
 export function buildReview(fields: TabField[], bank: BankEntry[], job: Job | null = null): ReviewRow[] {
   const review: Review = { bank, byType: indexBankByType(bank), job };
-  // A question about someone else (a reference's "Company") is that person's: it doesn't make the candidate's own
-  // "Company" a repeat, whose saved answer would then be held back (PR #140's review).
-  const isSomeoneElses = (field: TabField) => {
-    const type = typeOf(field);
-    return Boolean(type && PERSON_KINDS.has(type)) && SOMEONE_ELSES_SECTION.test(normalize(field.clues.sectionHeading));
-  };
+  // A question about someone else is that person's: it doesn't make the candidate's own "Company" a repeat, whose saved
+  // answer would then be held back.
   const counts = new Map<string, number>();
   for (const field of fields) {
     if (isSomeoneElses(field)) continue;

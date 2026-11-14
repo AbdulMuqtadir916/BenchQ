@@ -192,11 +192,16 @@ function companyFromTitle(pageTitle: string, jobTitle: string): string {
     .find((part) => part && part.length <= MAX_COMPANY && !/^(careers?|jobs?|job board)$/i.test(part) && !JOB_SITES.test(part)) ?? "";
 }
 
+/** The words a site adds to its own name: "Careers", "Jobs site", "Candidate Experience page", "Talent Community". */
+const SITE_WORDS = String.raw`(?:candidate experience(?:\s+(?:page|site))?|career(?:s)?(?:\s+(?:site|page|portal|home|center))?|job(?:s)?(?:\s+(?:site|board|page|portal))?|talent\s+(?:community|network))`;
+
 /** A company as a site names itself: "Amazon.jobs" is Amazon, "JPMC Candidate Experience page" JPMC, "Careers at Acme"
- * Acme. */
+ * Acme. The site's words go only after a space or a separator, so a name that ends in one keeps it ("AcmeJobs"), and a
+ * name that is only those words is no company (PR #140's review). */
 export function companyOf(name: string): string {
-  return name.replace(/\.(?:jobs|careers|com|io|co)$/i, "").replace(/^(?:careers|jobs)\s+(?:at|with)\s+/i, "")
-    .replace(/\s*[-–|:·]?\s*(?:candidate experience(?:\s+(?:page|site))?|career(?:s)?(?:\s+(?:site|page|portal|home|center))?|job(?:s)?(?:\s+(?:site|board|page|portal))?|talent\s+(?:community|network))\s*$/i, "").trim();
+  const named = name.replace(/\.(?:jobs|careers|com|io|co)$/i, "").replace(/^(?:careers|jobs)\s+(?:at|with)\s+/i, "").trim();
+  if (new RegExp(`^${SITE_WORDS}$`, "i").test(named)) return "";
+  return named.replace(new RegExp(String.raw`(?:\s*[-–|:·]\s*|\s+)${SITE_WORDS}\s*$`, "i"), "").trim();
 }
 
 /** The company a page's own logo names: "Discord Logo" gives "Discord". */

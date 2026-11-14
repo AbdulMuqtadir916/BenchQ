@@ -75,7 +75,9 @@ export function useTailoring({ firmId, candidateId, jobId, onSessionExpired, onT
   const [state, setState] = useState<{ context: string | null; tailoring: Tailoring }>({ context: null, tailoring: IDLE });
   // Looks for a run of this job again: on opening, when the BDE comes back to the panel, and when a start is refused
   // because the same résumé already tailors (`source`: then only that résumé's run is followed).
-  const [lookup, setLookup] = useState<{ count: number; source?: string }>({ count: 0 });
+  // `source` and the job and candidate it was asked for (`context`): it filters only that job's lookup, so a refusal
+  // for one job never hides another job's run (PR #140's review).
+  const [lookup, setLookup] = useState<{ count: number; source?: string; context?: string }>({ count: 0 });
   const tailoring = state.context === context ? state.tailoring : IDLE;
   const latest = useRef({ onTailored, onSessionExpired });
   useEffect(() => { latest.current = { onTailored, onSessionExpired }; });
@@ -88,7 +90,7 @@ export function useTailoring({ firmId, candidateId, jobId, onSessionExpired, onT
   useEffect(() => {
     if (!firmId || !jobId || !context) return;
     let isCurrent = true;
-    const wanted = lookup.source;
+    const wanted = lookup.context === context ? lookup.source : undefined;
     getRunningTailorings(firmId, candidateId).then((runs) => {
       const run = runs.find((one) => one.job_posting_id === jobId && one.status === "running" && !finished.current.has(one.run_id)
         && (wanted === undefined || one.source_resume_id === wanted));
@@ -167,7 +169,7 @@ export function useTailoring({ firmId, candidateId, jobId, onSessionExpired, onT
       setState((now) => (now.context === context ? { context, tailoring: { status: "failed", ...startRefusal(error) } } : now));
       // The same résumé and job are tailoring already: follow that run instead. Only for that 409, and only that
       // résumé's run: a 409 for no active base or a hidden one stays as said (PR #140's review).
-      if (resumeId && isAlreadyTailoring(error)) setLookup((now) => ({ count: now.count + 1, source: resumeId }));
+      if (resumeId && isAlreadyTailoring(error)) setLookup((now) => ({ count: now.count + 1, source: resumeId, context }));
     });
   }, [firmId, candidateId, jobId, context]);
 

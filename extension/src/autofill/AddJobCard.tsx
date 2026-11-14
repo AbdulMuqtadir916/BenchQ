@@ -130,6 +130,11 @@ export const isSavedJob = (found: PageJob, known: KnownJob) =>
 
 /** How much a reading of a page holds: its stated fields. */
 const fieldsOf = (job: PageJob) => Object.values(job).filter((value) => value !== undefined && value !== null && value !== "").length;
+
+/** A later reading says more: more fields, or as many and a longer description (a page that shows a teaser first,
+ * then its whole job description: PR #140's review). */
+const isFuller = (found: PageJob, shown: PageJob) => fieldsOf(found) > fieldsOf(shown)
+  || (fieldsOf(found) === fieldsOf(shown) && found.description.length > shown.description.length);
 const MODE_LABEL = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" } as const;
 const PER = { hour: "an hour", day: "a day", week: "a week", month: "a month", year: "a year" } as const;
 const amount = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -177,6 +182,13 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   const [isDenied, setIsDenied] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [allowed, setAllowed] = useState(0);
+  // The posting "Yes, add it" was asked about: when the card moves on to another posting (the tab showed another one
+  // with the same title), the question closes, so a click never adds a posting the BDE didn't see (PR #140's review).
+  const [askedUrl, setAskedUrl] = useState<string | null>(null);
+  if (state.status === "confirming" && job && askedUrl !== null && job.url !== askedUrl) {
+    setAskedUrl(null);
+    setState({ status: "idle" });
+  }
 
   useEffect(() => {
     if (tabId === null) return;
@@ -187,8 +199,8 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
     const look = () => void readJobPage(tabId).then((found) => {
       if (!isLive || !found?.isJobPage || !found.title || !found.company || !found.description) return;
       // The same page (or the same title) read more fully: its JobPosting may also name the job better than the page's
-      // heading did, so the title may change (PR #140's review). Another page's reading never replaces this one.
-      setJob((shown) => (!shown || ((shown.url === found.url || shown.title === found.title) && fieldsOf(found) > fieldsOf(shown)) ? found : shown));
+      // heading did, so the title may change. Another page's reading never replaces this one (PR #140's review).
+      setJob((shown) => (!shown || ((shown.url === found.url || shown.title === found.title) && isFuller(found, shown)) ? found : shown));
     }, () => undefined);
     const read = () => {
       look();
@@ -275,7 +287,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
           <button type="button" data-slot="add-job-cancel" className={button("secondary")} onClick={cancel}>Cancel</button>
         </div>
       </div>
-      : <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding"} onClick={() => setState({ status: "confirming" })}>
+      : <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding"} onClick={() => { setAskedUrl(job.url); setState({ status: "confirming" }); }}>
         {state.status === "adding" ? <>{SPINNER_ICON}Adding…</> : `Add this job for ${candidateName}`}
       </button>}
     {state.status === "added" && <p role="status" className={`flex items-center gap-1 ${MUTED_TEXT} [&_svg]:size-[var(--icon-sm)]`}>{CHECK}{state.text}</p>}
