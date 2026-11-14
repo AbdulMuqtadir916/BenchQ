@@ -38,7 +38,7 @@ by content hash, with everything about the job itself (title, description, locat
 `scrape_jobs` (same migration), a log of finished batches (`success`/`empty`/`error`, the error detail only on
 `error`), not a queue. A successful batch's row and its postings are written in one transaction, batch row first
 (`job_postings.batch_id` references it). `job_postings` has no status: saved/applied live in `applications`.
-Live source right now: freehire.me. **Built so far:** both tables (0020), and the search pipeline
+Live source right now: **Indeed** (since 2026-11-14; freehire.me before, its saved jobs still read). **Built so far:** both tables (0020), and the search pipeline
 (`feat/job-search-pipeline`, migration 0022, docs/02 §6.y "The search pipeline"): `backend/job_search/` (providers
 behind one contract, freehire.me first; `content` is the provider's job as sent, read through its `read()`), the
 background search (`POST …/candidates/{id}/job-searches`, the candidate's BDE only; its `scrape_jobs` row is
@@ -50,6 +50,13 @@ scheduled scrape and write routes retired (410). **PR 3** (`integrate/jobs`, doc
 merge): the existing job screens on the backend through a mapper, two firm-level reads, "Find jobs" really searching
 (the BDE's), the capture form per candidate. **Not yet built:** Arbaz's `applications` repoint and the clean-up PR: delete the old pool (`jobs`,
 `job_locations`, `firm_jobs`, `candidate_jobs`, `companies` (no companies module, decided 2026-11-11), their routes and scrapers) once `applications` no longer points at it.
+**Indeed, places and the Match** (`feat/job-search-indeed-and-candidate-details`, decided 2026-11-14, docs/02 §6.w):
+Indeed through python-jobspy replaces freehire.me; a search asks for the candidate's target role (one) in one of their
+places (city and state, a preferred location, or Remote); it leaves out jobs over 14 days old, non-remote ones on a
+Remote search and ones whose text rules out the candidate's work authorization. Onboarding takes one target role and
+needs a place; the candidate's details have their own tab (07 Q65). The **Match** ([ats-score.md](./ats-score.md),
+migration 0028) replaces the title-only placeholder everywhere, and the job list shows every job, 100 at a time,
+sorted and filtered by the backend. The old pool's freehire scraper is removed.
 The flow described below (steps 1–5) is the old pool's: its scheduled scrape and write routes are retired (PR 2), its
 reads still answer until the clean-up.
 
@@ -84,7 +91,9 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
    `personas` row; what each read moves to the candidate and their résumé ([persona-to-candidates.md](./persona-to-candidates.md) §6–§7).
 4. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
    or re-tailoring inserts the next version.
-5. **ATS score** for a tailored résumé against its job: a later PR, after tailoring's. The old `score-check`
+5. **ATS score** for a tailored résumé against its job: **built 2026-11-14 as the Match** ([ats-score.md](./ats-score.md)):
+   a finished tailoring scores its version against the job (`resumes.match_score`), shown on the "Resume sent" tag.
+   Before that it was planned as a later PR, after tailoring's. The old `score-check`
    route and the old tailor route were removed in résumé versioning PR 6; the tailor is rebuilt on the handoff's
    workflow (tailoring.md), and tailoring's part 2 deletes the old pipeline (`backend/analyzer/legacy_tailoring.py`).
    A PDF the server makes itself (extension, email, tracer links) is also a later PR, built from the studio's designs

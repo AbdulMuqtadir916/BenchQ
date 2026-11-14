@@ -401,6 +401,10 @@ The profile-locked job explorer: the candidate's own jobs (job search PR 3). `Fi
 work authorization → score → rank) with real counts, then the ranked list staggers in. While the candidate's search
 runs, the last step holds on "Searching for new jobs…" until it ends; Skip opens the list and the search goes on.
 A job whose work authorization is unknown (a searched job's) is shown, never filtered out.
+**Since 2026-11-14 (docs/02 §6.w):** the list holds every job the candidate has, 100 at a time with **Load more**,
+sorted and filtered by the backend; it opens at "Any score", best Match first, and a score held at 40 says why on
+hover ("Held at 40: no C2C…"). Beside **Find jobs**, the BDE picks where to search: the résumé's city and state, a
+preferred location, or Remote.
 
 #### Resumes
 This candidate's résumés as a collapsible tree (the same component as the Resume Builder library): each **base**
@@ -449,6 +453,12 @@ Row: title, company + verification badge, location + remote mode, rate, posted a
 leaving the list — the BDE evaluates most jobs without ever navigating.
 
 Virtualise past 100 rows. 500 rows must scroll at 60fps.
+
+> **Built 2026-11-14 (docs/02 §6.w):** the toolbar's search, candidate, source, work mode and score filters and the
+> sort are the backend's request, so the list is every job they match, 100 at a time with **Load more**, and the
+> header counts all of them. With a candidate picked, each job shows their **Match** (docs/team/ats-score.md), best
+> first, starting at "Any score"; a score held at 40 says why on hover. The single job page's picker lists only the
+> candidates who have the job, and a search's job is labelled "Indeed".
 
 **Empty:** no jobs captured → a card explaining the two capture paths with a link to `/jobs/capture`.
 Filtered to nothing → clear-filters state.

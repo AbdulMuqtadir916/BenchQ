@@ -5,8 +5,9 @@ listed here: what changed, in whose area, and why. Newest PR first.
 
 ## Job search on Indeed, its inputs, and the candidate's details (`feat/job-search-indeed-and-candidate-details`, Zuhair)
 
-Grilled 2026-11-14 (Zuhair); not built yet. Built in parallel with Abdul's review: **the PR doesn't merge without
-Abdul's OK on the rows below** (Q22). No migration and no new column: every field already exists.
+Grilled and built 2026-11-14 (Zuhair), in parallel with Abdul's review: **the PR doesn't merge without Abdul's OK on
+the rows below** (Q22). The Match score's migration (0028) adds columns to `job_postings` and `resumes`, both Zuhair's
+tables, so it has no row here; the candidate fields below already exist.
 
 | Area (owner) | File | What changes | Why | Agreed |
 |---|---|---|---|---|

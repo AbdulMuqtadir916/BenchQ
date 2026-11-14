@@ -1297,12 +1297,13 @@ export const JobMarkSchema = z.object({
 - **The search pipeline (job search PR 1, decided 2026-11-10):**
   - **Who:** only the candidate's assigned BDE (`job.search`, BDE role, plus `bde_id` = the user: `can_search_jobs`);
     nobody while the candidate has no BDE. Reads: anyone who can see the candidate.
-  - **Input:** `query` (1–100 characters, one role per search, no control characters: NUL, tab or a line break
+  - **Input** (**superseded 2026-11-14 by §6.w**: the role and the place are the candidate's, the body only picks the
+    place): `query` (1–100 characters, one role per search, no control characters: NUL, tab or a line break
     inside it is 422 with nothing written; Abdul's second review, P2). The country is the candidate's résumé country
     (`Candidate.country`: the active base, newest version) mapped to `us` / `ca` / `in`; empty or anything else is
     422, never a default.
   - **Provider:** a registry by name; the active one is the global setting `job_search_provider` (default
-    `freehire`), a PLATFORM setting (`settings_scope.py`) that `PATCH /api/settings` takes only as a registered
+    `freehire`; **`indeed` since 2026-11-14, §6.w**), a PLATFORM setting (`settings_scope.py`) that `PATCH /api/settings` takes only as a registered
     provider. Every search asks for 100 jobs. One call: 20 s limit, one retry after 2 s on a timeout, a dropped
     connection, 5xx or 429; 5 MB cap; no redirects. Error codes: `timeout`, `provider_unavailable`,
     `provider_rejected`, `bad_response`, `too_large`, `internal`.
@@ -1360,7 +1361,8 @@ export const JobMarkSchema = z.object({
 > `jobs` switch are gone (decided 2026-11-11). A job's source shows as the backend says it (freehire.me, added by
 > hand, from the extension), never a guessed job board.
 
-**Reads (firm level, PR 3):** `GET /api/firms/{firm}/job-postings?candidate_id=&limit=` (limit 1–400, default 400)
+**Reads (firm level, PR 3):** `GET /api/firms/{firm}/job-postings?candidate_id=&limit=` (limit 1–400, default 400;
+**since 2026-11-14 default 100, sorted, filtered and paged by the backend: §6.w**)
 and `GET /api/firms/{firm}/job-postings/{id}`. Both read only the candidates the signed-in person may see (the owner
 and a viewer: the whole firm; a manager: their BDEs' candidates; a BDE: their own; a support view: read-only, like
 the firm's owner). The list has **one item per job** (`job_postings.job_id`, the content hash), newest first, with
@@ -1421,12 +1423,75 @@ export const JobSearchesSchema = z.object({
 });
 ```
 
-Only the candidate's BDE starts one (`canSearchJobs`), for the candidate's main role, else the first target role.
+Only the candidate's BDE starts one (`canSearchJobs`), for the candidate's target role in one of their places (§6.w;
+before 2026-11-14: the main role, else the first target role).
 The screen polls the searches every 3 s while one runs. A capture names its candidate (`CaptureJob.candidateId`) and
 sends only the link, title, company, location and description; the same job again is the job the candidate already
 has.
 
+### 6.w Job search on Indeed, the candidate's places, and the Match (decided 2026-11-14, Zuhair)
+
+**The source.** Indeed, through a small subclass of python-jobspy's Indeed scraper
+(`backend/job_search/providers/indeed.py`): at most 3 requests a search, Indeed's own next-page cursor, every failed
+reply a failed search, TLS checked, 60 s for the whole search, no retry. freehire.me no longer searches; its reader
+stays (`RETIRED`), so the jobs it saved still read. `job_search_provider` defaults to `indeed`, and a stored value
+that names a retired provider is set to the default when settings are seeded.
+
+**What a search asks.** The candidate's **target role** (one: onboarding takes one; a candidate from before keeps
+several and the first is searched) in **one of their places** (`backend/job_search/places.py`): the résumé's city and
+state together, then each preferred location, then "Remote" when their work settings include it. `POST
+…/job-searches {place?}` names one of them by its value (none: the first); anything else is 422, and a candidate with
+no role or no place is 422 with what to add. `GET …/job-searches` adds `role` and `places` (`{value, label, kind}`).
+50 miles around the place; jobs listed in the last 14 days. A search is continued per role + place + country.
+
+**What a search leaves out**, each counted in the batch's `counts` and said on the panel: a job posted over 14 days
+ago by its own date (`skipped_too_old`: Indeed's date filter means "listed on Indeed"), a job that isn't remote on a
+Remote search (`skipped_not_remote`), and a job whose text rules out the candidate's work authorization
+(`skipped_work_auth`: the Match calculator's rules, `backend/match/score.py` `ruled_out`).
+
+**Onboarding and the details.** The create takes exactly one target role and needs a place (§4); the candidate's
+details (every onboarding answer that isn't on the résumé) are edited on their "Additional candidate details" tab
+(§9.z, 07 Q65).
+
+**The Match** ([docs/team/ats-score.md](./team/ats-score.md)): a candidate's fit for a job, 0–100, worked out in
+plain code (`backend/match/`) against the active résumé's v1, and a tailored version's against its job. Stored on
+`job_postings` and `resumes` (migration 0028: `match_score`, `match_note`, `match_basis`), worked out when a job is
+saved, again when what it read changes, and for whatever has none when the backend starts.
+
+```ts
+// src/lib/schemas/job.ts
+export const JobMatchSchema = z.object({
+  score: z.number().int().min(0).max(100).nullable(),   // null: not worked out yet
+  note: z.string().nullable(),                           // the first reason it is held at 40
+});
+// Job gains:
+//   matches: Record<candidateId, JobMatch>              // each visible candidate's; read it with matchFor(job, id)
+//   remoteMode                                          // the backend's (Indeed's labels, else the location's words)
+// ResumeVersion.atsScore is a tailored version's Match against its job (the "Resume sent" tag says "Match").
+```
+
+**The list, 100 at a time** (Q28, Q29, Q36, Q47): `GET /api/firms/{firm}/job-postings` sorts and filters the whole
+list on the backend and answers `{items, total, next_offset}`:
+
+| Parameter | |
+|---|---|
+| `candidate_id` | one candidate's jobs (one the person sees; another is 404); none: every visible candidate's |
+| `limit`, `offset` | 1–400 (default 100) from `offset`; `next_offset` is null at the end |
+| `sort` | `match` (one candidate's best first, unscored last), `newest` (default), `company` |
+| `min_score` | one candidate's; above 0 leaves out unscored jobs |
+| `source` | `indeed`, `freehire`, `manual`, `extension`, `other` |
+| `remote` | `REMOTE`, `HYBRID`, `ONSITE` (the job's work mode) |
+| `q` | text in the title, company or location (case ignored) |
+| `exclude_applied` | one candidate's jobs with an application past Saved, left out |
+
+A closed job is never listed. Each item adds `matches` (`{candidate_id: {score, note}}` for its visible candidates) and
+`remote_mode`; a candidate's own posting (`…/candidates/{id}/job-postings/{id}`, a capture's answer) adds `match`.
+The job list reads it a page at a time with "Load more"; a candidate's list opens at "Any score", best Match first.
+⌘K asks it for the jobs matching what is typed (`q`, 20).
+
 ## 7. Matching & scoring
+
+> **2026-11-14:** the job screens' score is the Match (§6.w); the scoring records below are not built.
 
 ```ts
 // src/lib/schemas/match.ts
