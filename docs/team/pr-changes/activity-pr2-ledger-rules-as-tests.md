@@ -52,3 +52,9 @@ check a small file doing it:
 - `LedgerEntry` imported under another name, or reached as `module.LedgerEntry`, is still seen when built or read.
 - The isolation setup's candidate entry names the real candidate: `record` fills a missing `candidate_id` from
   `entity_id`, so the random id it had pointed at a candidate that doesn't exist.
+
+## Up to date with main (2026-11-14)
+
+Main added `start_tailoring` (`api/routes_resume_tailoring.py`), which changes data and writes no entry itself: it only
+starts a background run, and the run writes the entry once it has made the tailored version (`resume_tailor/runs.py`).
+It is in `NOT_LOGGED` with that reason (`RUN_LOGS`), so the check passes again.
