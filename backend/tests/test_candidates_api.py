@@ -42,6 +42,8 @@ def _body(world, manager="fatima", bde=None, **over):
     return {"full_name": "Ravi Teja", "primary_role": "Java Developer", "email": "Ravi@Example.com", "work_auth": "H1B",
             "phone": "+1 555 0100", "country": "US", "years_experience": 9, "needs_sponsorship": True,
             "needs_transfer": True, "target_roles": ["Java Developer"],
+            # A place for the job search (decided 2026-11-14: the résumé's city and state, or a preferred location).
+            "preferred_locations": ["Austin, TX"],
             "employment_types": ["C2C"], "manager_id": str(people[manager].id),
             "bde_id": str(people[bde].id) if bde else None, "skills": [{"name": "Java"}],
             "summary": "Nine years of Java.", **over}

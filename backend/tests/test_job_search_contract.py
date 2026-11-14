@@ -20,8 +20,8 @@ def _capture_body(**over):
 
 # ── contract: a malformed request is a 4xx ───────────────────────────────────
 
-@pytest.mark.parametrize("body", [{}, {"query": None}, {"query": 5}, {"query": ["Java"]}, {"query": {"q": 1}},
-                                  {"query": True}, {"q": "Java"}])
+@pytest.mark.parametrize("body", [{"place": 5}, {"place": ["Austin, TX"]}, {"place": {"q": 1}}, {"place": True},
+                                  {"place": ""}, {"place": "   "}, ["Austin, TX"], "Austin, TX"])
 def test_a_search_body_of_the_wrong_shape_is_422(anonymous_client, world, adnans, fake, launched, body):
     r = anonymous_client.post(_url(world, adnans, "job-searches"), json=body, headers=world["as"]["adnan"])
     assert r.status_code == 422 and launched == []

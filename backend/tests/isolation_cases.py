@@ -67,9 +67,13 @@ def _irrelevant_ready(db, ids):
 
 
 def _resume_country_us(db, ids):
-    """The candidate's résumés say US, so a job search has a country (backend/job_search/country.py)."""
+    """The candidate's résumés say US, so a job search has a country (backend/job_search/country.py), and the
+    candidate has a target role and a place, which a search needs since 2026-11-14 (backend/job_search/places.py)."""
+    from backend.models.candidates import Candidate
     from backend.models.db import Resume
     db.query(Resume).filter(Resume.candidate_id == ids["candidate"]).update({Resume.country: "US"})
+    db.query(Candidate).filter(Candidate.id == ids["candidate"]).update(
+        {Candidate.target_roles: ["Java Developer"], Candidate.preferred_locations: ["Austin, TX"]})
     db.commit()
 
 
@@ -139,7 +143,7 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/tailorings": Case(),
     # Job search (job search PR 1): a search is the candidate's BDE's, with the résumé country it searches in.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(
-        as_bde=True, body=lambda i: {"query": "Java Developer"}, prepare=_resume_country_us),
+        as_bde=True, body=lambda i: {"place": "Austin, TX"}, prepare=_resume_country_us),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": Case(

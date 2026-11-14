@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { LoaderCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { formatIst } from "@/lib/format/timezone";
 import { useJobSearches } from "@/lib/hooks/use-jobs";
 import type { Candidate } from "@/lib/schemas/candidate";
@@ -18,15 +19,24 @@ const FAILED: Record<JobSearchErrorCode, string> = {
   internal: "Something went wrong running the search. Try again.",
 };
 
-/** The role a search asks for: the candidate's main role, else their first target role (docs/02 §6.z). */
-export function searchRole(candidate: Pick<Candidate, "primaryRole" | "targetRoles">): string | null {
-  return candidate.primaryRole?.trim() || candidate.targetRoles.find((role) => role.trim())?.trim() || null;
+/** The role a search asks for: the candidate's target role, the first one (decided 2026-11-14; the backend's
+ * `places.search_role`). The primary role isn't searched. */
+export function searchRole(candidate: Pick<Candidate, "targetRoles">): string | null {
+  return candidate.targetRoles.map((role) => role.trim().replace(/\s+/g, " ")).find(Boolean) ?? null;
 }
 
-/** "12 new · 3 seen again · 5 over today's 100", "No new jobs for Java Developer", or why it failed. */
+/** How a search's place reads: "Austin, TX", "Remote", or nothing for a search from before places. */
+export function placeLabel(place: string | null): string | null {
+  return place === "remote" ? "Remote" : place;
+}
+
+/** "12 new · 3 seen again · 5 over today's 100", "No new jobs for Java Developer in Austin, TX", or why it failed. */
 export function searchOutcome(search: JobSearch, jobsCap: number): string {
   if (search.state === "ERROR") return FAILED[search.errorCode ?? "internal"];
-  if (search.state === "EMPTY") return `No new jobs for ${search.query ?? "this role"} right now.`;
+  if (search.state === "EMPTY") {
+    const where = placeLabel(search.place);
+    return `No new jobs for ${search.query ?? "this role"}${where ? ` in ${where}` : ""} right now.`;
+  }
   const parts = [`${search.newCount} new`];
   if (search.seenAgainCount) parts.push(`${search.seenAgainCount} seen again`);
   if (search.overLimitCount) parts.push(`${search.overLimitCount} over today's ${jobsCap}`);
@@ -46,9 +56,11 @@ export function usageLine({ usage }: JobSearches): string {
 }
 
 /** Why the button can't start a search now, or null when it can. */
-export function blockedReason(candidate: Pick<Candidate, "primaryRole" | "targetRoles" | "country">, searches: JobSearches | undefined): string | null {
+export function blockedReason(candidate: Pick<Candidate, "targetRoles" | "country">, searches: JobSearches | undefined): string | null {
   if (!searchRole(candidate)) return "Add a target role first";
   if (!candidate.country?.trim()) return "Add the candidate's country on their résumé";
+  // A search needs a place (decided 2026-11-14): the résumé's city and state, or a preferred location.
+  if (searches && searches.places.length === 0) return "Add a city and state on the résumé, or a preferred location";
   const usage = searches?.usage;
   if (usage && usage.searchesToday !== null && usage.searchesToday >= usage.searchesCap) {
     return `${usage.searchesToday}/${usage.searchesCap} searches today · resets ${resetTime(usage.resetsAt)}`;
@@ -60,8 +72,11 @@ export function blockedReason(candidate: Pick<Candidate, "primaryRole" | "target
 
 /** The search, owned by the candidate page: every "Find jobs" there starts the same one and shares its refusal. */
 export interface FindJobsSearch {
-  /** Starts the search for the candidate's role, opens the Jobs tab and plays the matching sequence. */
+  /** Starts the search for the candidate's role in `place`, opens the Jobs tab and plays the matching sequence. */
   run: () => void;
+  /** The place the next search uses (one of `JobSearches.places`), or null while none is known. */
+  place: string | null;
+  setPlace: (value: string) => void;
   isStarting: boolean;
   /** Why the backend refused the last start (409, 422, 429, 503), as it says it. */
   refusal: string | null;
@@ -69,14 +84,15 @@ export interface FindJobsSearch {
 
 interface FindJobsProps {
   candidate: Candidate;
-  /** The résumé to open when the country is missing (the header's "Build resume" target). */
+  /** The résumé to open when the country or a place is missing (the header's "Build resume" target). */
   resumeHref: string | null;
   search: FindJobsSearch;
 }
 
 /**
- * "Find jobs" for the candidate's BDE (docs/02 §6.z): starts a real search for the candidate's role, then shows its
- * outcome and today's usage under the button. Disabled, with the reason, when it can't start.
+ * "Find jobs" for the candidate's BDE (docs/02 §6.z): starts a real search for the candidate's target role in the place
+ * picked beside it, then shows its outcome and today's usage under the button. Disabled, with the reason, when it
+ * can't start.
  */
 export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   const searchesQuery = useJobSearches(candidate.id);
@@ -88,6 +104,10 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   const refusal = search.refusal;
   // Today's searches didn't load: whether one runs, and the day's usage, are unknown, so no start (CodeRabbit on #135).
   const isUnknown = !searches && Boolean(searchesQuery.error);
+  const places = searches?.places ?? [];
+  // The résumé fixes a missing country, city or state; a preferred location can't be edited here yet.
+  const linksToResume = Boolean(resumeHref && role && (!candidate.country?.trim() || (searches && places.length === 0)));
+  const running = searches?.running ?? null;
 
   function run() {
     if (!role || blocked || isSearching || isUnknown) return;
@@ -96,19 +116,25 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button variant="secondary" onClick={run} disabled={Boolean(blocked) || isSearching || isUnknown} aria-describedby={`find-jobs-${candidate.id}`}>
-        {isSearching ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
-        {isSearching ? "Searching…" : "Find jobs"}
-      </Button>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {places.length ? (
+          <Select value={search.place ?? places[0].value} options={places.map((p) => ({ value: p.value, label: p.label }))}
+            onValueChange={search.setPlace} disabled={isSearching} aria-label="Where to search" className="w-auto min-w-40" />
+        ) : null}
+        <Button variant="secondary" onClick={run} disabled={Boolean(blocked) || isSearching || isUnknown} aria-describedby={`find-jobs-${candidate.id}`}>
+          {isSearching ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
+          {isSearching ? "Searching…" : "Find jobs"}
+        </Button>
+      </div>
       <p id={`find-jobs-${candidate.id}`} className="max-w-xs text-right text-caption text-[var(--color-text-3)] sm:max-w-none" aria-live="polite">
         {isUnknown ? (
           <span className="inline-flex items-center gap-2">Today&apos;s searches didn&apos;t load.<button type="button" onClick={() => void searchesQuery.refetch()} className="underline">Retry</button></span>
         ) : blocked ? (
-          !candidate.country?.trim() && resumeHref && searchRole(candidate) ? <Link href={resumeHref} className="underline">{blocked}</Link> : blocked
+          linksToResume && resumeHref ? <Link href={resumeHref} className="underline">{blocked}</Link> : blocked
         ) : refusal ? (
           <span className="text-[var(--color-danger-fg)]">{refusal}</span>
         ) : isSearching ? (
-          `Searching ${searches?.running?.query ?? role}…`
+          `Searching ${running?.query ?? role}${placeLabel(running?.place ?? search.place) ? ` in ${placeLabel(running?.place ?? search.place)}` : ""}…`
         ) : last && searches ? (
           searchOutcome(last, searches.usage.jobsCap)
         ) : null}

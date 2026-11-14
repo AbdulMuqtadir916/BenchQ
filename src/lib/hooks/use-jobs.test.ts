@@ -21,15 +21,16 @@ import { jobSearchesQuery } from "./use-jobs";
 const FIRM = "firm_hts";
 const CANDIDATE = "cand_1";
 const RESET = "2026-11-11T13:00:00.000Z"; // 6:30 PM IST
-const candidate = { primaryRole: "Java Developer", targetRoles: [], country: "US" };
+const candidate = { targetRoles: ["Java Developer"], country: "US" };
 
 function search(id: string, state: JobSearch["state"]): JobSearch {
-  return { id, kind: "SEARCH", state, query: "Java Developer", newCount: state === "SUCCESS" ? 12 : 0, seenAgainCount: 0, overLimitCount: 0,
+  return { id, kind: "SEARCH", state, query: "Java Developer", place: "Austin, TX", newCount: state === "SUCCESS" ? 12 : 0, seenAgainCount: 0, overLimitCount: 0,
     errorCode: null, startedAt: "2026-11-11T12:00:00.000Z", finishedAt: state === "RUNNING" ? null : "2026-11-11T12:00:05.000Z" };
 }
 
 function searches(over: Partial<JobSearches> = {}, usage: Partial<JobSearches["usage"]> = {}): JobSearches {
-  return { running: null, searches: [], usage: { jobsToday: 0, jobsCap: 100, searchesToday: 1, searchesCap: 20, capturesToday: 0, capturesCap: 20, resetsAt: RESET, ...usage }, ...over };
+  return { running: null, searches: [], usage: { jobsToday: 0, jobsCap: 100, searchesToday: 1, searchesCap: 20, capturesToday: 0, capturesCap: 20, resetsAt: RESET, ...usage },
+    role: "Java Developer", places: [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }], ...over };
 }
 
 /** The page: a job list already loaded, then the searches query, each with a subscriber, as mounted screens have. */

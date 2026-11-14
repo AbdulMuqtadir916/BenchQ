@@ -11,6 +11,8 @@ export const JobSearchSchema = z.object({
   state: z.enum(["RUNNING", "SUCCESS", "EMPTY", "ERROR"]),
   /** The role searched; null for a capture. */
   query: z.string().nullable(),
+  /** Where it searched: "City, ST", "remote", or null (a capture, or a search from before places, 2026-11-14). */
+  place: z.string().nullable(),
   newCount: z.number().int(),
   seenAgainCount: z.number().int(),
   overLimitCount: z.number().int(),
@@ -32,10 +34,23 @@ export const JobSearchUsageSchema = z.object({
 });
 export type JobSearchUsage = z.infer<typeof JobSearchUsageSchema>;
 
+/** One of the candidate's places a search can use (backend/job_search/places.py): the résumé's city and state, a
+ * preferred location, or remote anywhere in the country. `value` is what a search sends. */
+export const JobSearchPlaceSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  kind: z.enum(["home", "preferred", "remote"]),
+});
+export type JobSearchPlace = z.infer<typeof JobSearchPlaceSchema>;
+
 export const JobSearchesSchema = z.object({
   running: JobSearchSchema.nullable(),
   /** Newest first, searches and captures. */
   searches: z.array(JobSearchSchema),
   usage: JobSearchUsageSchema,
+  /** The role a search asks for: the candidate's target role (decided 2026-11-14); null without one. */
+  role: z.string().nullable(),
+  /** The places the BDE picks from, in order; empty when the candidate has none (no search then). */
+  places: z.array(JobSearchPlaceSchema),
 });
 export type JobSearches = z.infer<typeof JobSearchesSchema>;

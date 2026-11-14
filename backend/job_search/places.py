@@ -1,0 +1,64 @@
+"""What a candidate's search asks for (decided 2026-11-14): the role, and the places the BDE picks from.
+
+- **The role** is the candidate's target role: the first one (onboarding takes one; a candidate created before that may
+  have several, and keeps them: Q1, Q10, Q11). The primary role ("Marketed as") isn't searched.
+- **The places**, in the picker's order (Q2, Q12, Q13): the résumé's city and state together ("Austin, TX"; a city
+  without its state is ambiguous and doesn't count), then each preferred location, then "Remote" when the candidate's
+  work settings include it (a preferred location that says "Remote" is that same place). The same place twice is one.
+  The city and state are the résumé's, read like the country (the active base's newest version, `Candidate.city`).
+
+A search sends one place, by its `value`: "City, ST" text, or `REMOTE`. The route accepts only one of the candidate's
+own places, never free text.
+"""
+import re
+
+from backend.job_search.providers.base import REMOTE
+
+COUNTRY_NAMES = {"us": "the US", "ca": "Canada", "in": "India"}
+_SPACES = re.compile(r"\s+")
+_REMOTE_WORDS = re.compile(r"^(remote|anywhere|work from home|wfh)\b", re.I)
+
+
+def _line(value) -> str:
+    return _SPACES.sub(" ", value).strip() if isinstance(value, str) else ""
+
+
+def search_role(candidate) -> str | None:
+    """The candidate's first target role, or None."""
+    return next((role for role in (_line(r) for r in candidate.target_roles or []) if role), None)
+
+
+def places(candidate, country: str | None) -> list[dict]:
+    """The candidate's places for the picker: `{value, label, kind}` with kind `home`, `preferred` or `remote`."""
+    out: list[dict] = []
+    seen: set[str] = set()
+
+    def add(value: str, label: str, kind: str) -> None:
+        key = value.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append({"value": value, "label": label, "kind": kind})
+
+    city, state = _line(candidate.city), _line(candidate.state)
+    if city and state:
+        add(f"{city}, {state}", f"{city}, {state}", "home")
+    wants_remote = "REMOTE" in (candidate.work_settings or [])
+    for preferred in (_line(p) for p in candidate.preferred_locations or []):
+        if _REMOTE_WORDS.match(preferred):
+            wants_remote = True
+        elif preferred:
+            add(preferred[:100], preferred[:100], "preferred")
+    if wants_remote:
+        add(REMOTE, f"Remote (anywhere in {COUNTRY_NAMES.get(country or '', 'the country')})", "remote")
+    return out
+
+
+def pick(candidate, country: str | None, value: str) -> dict | None:
+    """The candidate's place whose value is `value` (any letter case), or None when it isn't one of theirs."""
+    wanted = _line(value).lower()
+    return next((place for place in places(candidate, country) if place["value"].lower() == wanted), None)
+
+
+def label(place: str | None) -> str:
+    """How a stored place reads in the history and the Activity entry."""
+    return "Remote" if place == REMOTE else (place or "the whole country")

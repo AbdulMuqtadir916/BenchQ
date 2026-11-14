@@ -50,17 +50,22 @@ describe("a job from the backend (docs/02 §6.z): what a posting knows, nothing 
 });
 
 describe("a candidate's searches", () => {
-  it("maps the running search, the finished ones and today's usage", () => {
+  it("maps the running search, the finished ones, today's usage, the role and the places", () => {
     const searches = toJobSearches(JobSearchesDto.parse({
-      running: { batch_id: "b1", kind: "search", run_id: "r1", state: "running", error_code: null, query: "Java Developer", country: "us", provider: "freehire", counts: null, user_id: "u1", started_at: "2026-11-11T14:00:00+00:00", finished_at: null },
+      running: { batch_id: "b1", kind: "search", run_id: "r1", state: "running", error_code: null, query: "Java Developer", place: "remote", country: "us", provider: "indeed", counts: null, user_id: "u1", started_at: "2026-11-11T14:00:00+00:00", finished_at: null },
       searches: [
         { batch_id: "b0", kind: "search", state: "success", error_code: null, query: "Java Developer", counts: { found: 20, saved: 12, refreshed: 3, skipped_over_cap: 5 }, started_at: "2026-11-11T13:00:00+00:00", finished_at: "2026-11-11T13:00:09+00:00" },
         { batch_id: "bx", kind: "search", state: "error", error_code: "timeout", query: "QA", counts: null, started_at: "2026-11-11T12:00:00+00:00", finished_at: "2026-11-11T12:00:30+00:00" },
         { batch_id: "bc", kind: "capture", state: "success", error_code: null, query: null, counts: null, started_at: "2026-11-11T11:00:00+00:00", finished_at: "2026-11-11T11:00:00+00:00" },
       ],
       usage: { jobs_saved_today: 47, jobs_cap: 100, attempts_today: 3, attempts_cap: 20, captures_today: 2, captures_cap: 20, resets_at: "2026-11-12T13:00:00+00:00" },
+      role: "Java Developer",
+      places: [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }, { value: "remote", label: "Remote (anywhere in the US)", kind: "remote" }],
     }));
-    expect(searches.running).toMatchObject({ id: "b1", kind: "SEARCH", state: "RUNNING", newCount: 0, finishedAt: null });
+    expect(searches.running).toMatchObject({ id: "b1", kind: "SEARCH", state: "RUNNING", newCount: 0, finishedAt: null, place: "remote" });
+    expect(searches.searches[0].place).toBeNull();                    // a search from before places (2026-11-14)
+    expect(searches.role).toBe("Java Developer");
+    expect(searches.places.map((p) => p.value)).toEqual(["Austin, TX", "remote"]);
     expect(searches.searches.map((s) => [s.kind, s.state, s.newCount, s.seenAgainCount, s.overLimitCount, s.errorCode])).toEqual([
       ["SEARCH", "SUCCESS", 12, 3, 5, null], ["SEARCH", "ERROR", 0, 0, 0, "timeout"], ["CAPTURE", "SUCCESS", 0, 0, 0, null],
     ]);

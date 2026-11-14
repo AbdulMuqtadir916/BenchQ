@@ -61,6 +61,10 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const startSearch = useStartJobSearch(id);
   const role = ws.candidate ? searchRole(ws.candidate) : null;
   const searchBlocked = ws.candidate ? blockedReason(ws.candidate, searchesQuery.data) : null;
+  // Where the next search looks: the place picked beside "Find jobs", else the candidate's first (decided 2026-11-14).
+  const [pickedPlace, setPickedPlace] = useState<string | null>(null);
+  const places = searchesQuery.data?.places;
+  const place = places?.find((p) => p.value === pickedPlace)?.value ?? places?.[0]?.value ?? null;
 
   // Esc goes back (docs/04 §1.3, BUG-004): to where the person came from, which keeps the list's page, search and sort in its
   // URL, or to the candidates list when this page was opened directly. A drawer, dialog or field keeps its own Esc.
@@ -117,20 +121,21 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     [ws.applications, updateStatus],
   );
 
-  // Every "Find jobs" on this page starts the candidate's search (their BDE only), then shows the Jobs tab. When it
-  // can't start (no role, no country, today's limit, one running), the tab opens and the header says why.
+  // Every "Find jobs" on this page starts the candidate's search in the picked place (their BDE only), then shows the
+  // Jobs tab. When it can't start (no role, no country, no place, today's limit, one running), the tab opens and the
+  // header says why.
   const { mutate: startMutate, isPending: isStartPending } = startSearch;
   const findJobs = useCallback(() => {
     // The matching sequence plays only for a search that starts, and stops if the backend refuses it; otherwise the
     // Jobs tab just opens and the header says why (CodeRabbit on #135).
-    if (role && !searchBlocked && !isSearching && !isStartPending) {
+    if (role && place && !searchBlocked && !isSearching && !isStartPending) {
       let run = 0;
       setMatchRun((n) => (run = n + 1));
-      startMutate(role, { onError: () => setMatchDone((done) => Math.max(done, run)) });
+      startMutate(place, { onError: () => setMatchDone((done) => Math.max(done, run)) });
     }
     setTab("jobs");
     requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
-  }, [role, searchBlocked, isSearching, isStartPending, startMutate, setTab, reduce]);
+  }, [role, place, searchBlocked, isSearching, isStartPending, startMutate, setTab, reduce]);
 
   const actions = useMemo<CandidateActions>(() => ({
     openTab: setTab,
@@ -144,7 +149,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     findJobs: canSearch ? findJobs : undefined,
   }), [setTab, moveApplication, canSearch, findJobs]);
   const search: FindJobsSearch | undefined = canSearch
-    ? { run: findJobs, isStarting: startSearch.isPending, refusal: startSearch.error instanceof Error ? startSearch.error.message : null }
+    ? { run: findJobs, isStarting: startSearch.isPending, refusal: startSearch.error instanceof Error ? startSearch.error.message : null, place, setPlace: setPickedPlace }
     : undefined;
 
   const closeDrawer = useCallback(() => setOpenApplicationId(null), []);

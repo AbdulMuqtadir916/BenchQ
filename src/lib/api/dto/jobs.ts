@@ -142,6 +142,8 @@ const SearchDto = z.object({
   state: z.enum(["running", "success", "empty", "error"]),
   error_code: JobSearchErrorCode.nullable(),
   query: z.string().nullable(),
+  // Not on a search from before places (2026-11-14) nor on a capture.
+  place: z.string().nullable().optional(),
   counts: z.object({ saved: z.number().int(), refreshed: z.number().int(), skipped_over_cap: z.number().int() }).partial().nullable(),
   started_at: z.string(),
   finished_at: z.string().nullable(),
@@ -159,6 +161,8 @@ export const JobSearchesDto = z.object({
     captures_cap: z.number().int(),
     resets_at: z.string(),
   }),
+  role: z.string().nullable().optional(),
+  places: z.array(z.object({ value: z.string(), label: z.string(), kind: z.enum(["home", "preferred", "remote"]) })).optional(),
 });
 export type JobSearchesDto = z.infer<typeof JobSearchesDto>;
 
@@ -168,6 +172,7 @@ function toSearch(dto: z.infer<typeof SearchDto>): JobSearch {
     kind: dto.kind === "search" ? "SEARCH" : "CAPTURE",
     state: dto.state === "running" ? "RUNNING" : dto.state === "success" ? "SUCCESS" : dto.state === "empty" ? "EMPTY" : "ERROR",
     query: dto.query,
+    place: dto.place ?? null,
     newCount: dto.counts?.saved ?? 0,
     seenAgainCount: dto.counts?.refreshed ?? 0,
     overLimitCount: dto.counts?.skipped_over_cap ?? 0,
@@ -186,5 +191,7 @@ export function toJobSearches(dto: JobSearchesDto): JobSearches {
       jobsToday: u.jobs_saved_today, jobsCap: u.jobs_cap, searchesToday: u.attempts_today, searchesCap: u.attempts_cap,
       capturesToday: u.captures_today, capturesCap: u.captures_cap, resetsAt: toIso(u.resets_at),
     },
+    role: dto.role ?? null,
+    places: dto.places ?? [],
   };
 }

@@ -71,26 +71,28 @@ def _url(world, candidate, tail):
     return f"/api/firms/{world['firm'].id}/candidates/{candidate['id']}/{tail}"
 
 
-def _post(client, world, candidate, who="adnan", query="Java Developer"):
-    return client.post(_url(world, candidate, "job-searches"), json={"query": query}, headers=world["as"][who])
+def _post(client, world, candidate, who="adnan", place=None):
+    """"Find jobs": the candidate's target role in `place` (none: their first place)."""
+    return client.post(_url(world, candidate, "job-searches"), json={"place": place} if place else {},
+                       headers=world["as"][who])
 
 
-def _open(world, candidate, query="Java Developer", country="us", provider="fake"):
+def _open(world, candidate, query="Java Developer", country="us", provider="fake", place="Austin, TX"):
     """The `running` batch, as the POST writes it."""
     from backend.models.db import SessionLocal
     with SessionLocal() as db:
         batch = pipeline.open_batch(db, firm_id=world["firm"].id, candidate_id=uuid.UUID(candidate["id"]),
                                     user_id=world["people"]["adnan"].id, query=query, country=country,
-                                    provider=provider)
+                                    provider=provider, place=place)
         db.commit()
         return batch.batch_id
 
 
-def _run(world, candidate, query="Java Developer", country="us", provider="fake", batch_id=None):
-    batch_id = batch_id or _open(world, candidate, query, country, provider)
+def _run(world, candidate, query="Java Developer", country="us", provider="fake", batch_id=None, place="Austin, TX"):
+    batch_id = batch_id or _open(world, candidate, query, country, provider, place)
     return asyncio.run(pipeline.run_search(firm_id=world["firm"].id, candidate_id=uuid.UUID(candidate["id"]),
                                            user_id=world["people"]["adnan"].id, batch_id=batch_id, query=query,
-                                           country=country, provider_name=provider))
+                                           country=country, provider_name=provider, place=place))
 
 
 @pytest.fixture
@@ -106,11 +108,12 @@ def adnans(anonymous_client, world):
 def test_the_candidates_bde_starts_a_search_in_the_background(anonymous_client, world, adnans, fake, launched,
                                                               test_db):
     from backend.models.job_search import ScrapeJob
-    r = _post(anonymous_client, world, adnans, query="  Java Developer  ")
+    r = _post(anonymous_client, world, adnans)
     assert r.status_code == 202, r.text
     call = launched[0]
     assert call["job_type"] == "job_search" and call["meta"] is None      # the run names nothing of the firm's
     assert call["kwargs"]["query"] == "Java Developer" and call["kwargs"]["country"] == "us"
+    assert call["kwargs"]["place"] == "Austin, TX"                         # the first place: the picker's default
     assert call["kwargs"]["provider_name"] == "fake" and call["kwargs"]["user_id"] == world["people"]["adnan"].id
     batch_id = uuid.UUID(r.json()["batch_id"])
     assert call["kwargs"]["batch_id"] == batch_id and call["scope_key"] == str(batch_id)
@@ -141,13 +144,66 @@ def test_nobody_searches_for_a_candidate_without_a_bde(anonymous_client, world, 
 
 def test_another_firm_is_not_found(anonymous_client, world, adnans, fake, launched):
     r = anonymous_client.post(f"/api/firms/{uuid.uuid4()}/candidates/{adnans['id']}/job-searches",
-                              json={"query": "Java"}, headers=world["as"]["adnan"])
+                              json={}, headers=world["as"]["adnan"])
     assert r.status_code == 404
 
 
-@pytest.mark.parametrize("query", ["", "   ", "x" * 101])
-def test_the_query_is_1_to_100_characters(anonymous_client, world, adnans, fake, launched, query):
-    assert _post(anonymous_client, world, adnans, query=query).status_code == 422
+# ── the role and the place (decided 2026-11-14) ─────────────────────────────
+
+def test_the_role_is_the_target_role_never_the_primary_role_or_the_request(anonymous_client, world, fake, launched):
+    c = _create(anonymous_client, world, bde="adnan", primary_role="Backend Engineer",
+                target_roles=["  Data  Engineer ", "Analytics Engineer"]).json()
+    assert anonymous_client.post(_url(world, c, "job-searches"), json={"query": "Anything Else"},
+                                 headers=world["as"]["adnan"]).status_code == 202
+    assert launched[0]["kwargs"]["query"] == "Data Engineer"               # the first target role
+
+
+def test_the_bde_picks_one_of_the_candidates_places(anonymous_client, world, fake, launched, test_db):
+    c = _create(anonymous_client, world, bde="adnan", city="Plano", state="TX",
+                preferred_locations=["Austin, TX", "Remote"], work_settings=["HYBRID"]).json()
+    body = anonymous_client.get(_url(world, c, "job-searches"), headers=world["as"]["adnan"]).json()
+    assert body["role"] == "Java Developer"
+    assert [(p["value"], p["kind"]) for p in body["places"]] == [
+        ("Plano, TX", "home"), ("Austin, TX", "preferred"), ("remote", "remote")]
+    assert body["places"][2]["label"] == "Remote (anywhere in the US)"
+    assert _post(anonymous_client, world, c, place="austin, tx").status_code == 202
+    assert _post(anonymous_client, world, c, place="remote").status_code == 409      # one already runs
+    assert launched[0]["kwargs"]["place"] == "Austin, TX"
+
+
+@pytest.mark.parametrize("place", ["Seattle, WA", "x" * 201, ""])
+def test_a_place_that_isnt_the_candidates_is_refused(anonymous_client, world, adnans, fake, launched, place):
+    r = _post(anonymous_client, world, adnans, place=place) if place else anonymous_client.post(
+        _url(world, adnans, "job-searches"), json={"place": ""}, headers=world["as"]["adnan"])
+    assert r.status_code == 422 and launched == []
+
+
+def test_no_search_without_a_target_role_or_a_place(anonymous_client, world, fake, launched, test_db):
+    from backend.models.candidates import Candidate
+    c = _create(anonymous_client, world, bde="adnan", preferred_locations=[]).json()
+    r = _post(anonymous_client, world, c)
+    assert r.status_code == 422 and "city and state on their résumé, or a preferred location" in r.json()["detail"]
+    test_db.query(Candidate).filter(Candidate.id == uuid.UUID(c["id"])).update(
+        {Candidate.target_roles: [], Candidate.preferred_locations: ["Austin, TX"]})
+    test_db.commit()
+    r = _post(anonymous_client, world, c)
+    assert r.status_code == 422 and "target role" in r.json()["detail"] and launched == []
+
+
+def test_remote_is_a_place_when_the_work_settings_say_so(anonymous_client, world, fake, launched):
+    c = _create(anonymous_client, world, bde="adnan", work_settings=["REMOTE"]).json()
+    body = anonymous_client.get(_url(world, c, "job-searches"), headers=world["as"]["adnan"]).json()
+    assert [p["value"] for p in body["places"]] == ["Austin, TX", "remote"]
+
+
+def test_each_place_continues_from_its_own_last_search(world, adnans, fake):
+    """The next 100 of a role is per place: Dallas starts at the top after Austin's search went on."""
+    fake.next_cursor = "page-2"
+    _run(world, adnans)
+    _run(world, adnans, place="Dallas, TX")
+    _run(world, adnans)
+    assert fake.cursors == [None, None, "page-2"]
+    assert [a["place"] for a in fake.asks] == ["Austin, TX", "Dallas, TX", "Austin, TX"]
 
 
 # ── the country ──────────────────────────────────────────────────────────────
@@ -168,7 +224,7 @@ def test_no_search_without_a_us_canada_or_india_resume_country(anonymous_client,
 
 def test_a_second_search_while_one_runs_is_refused(anonymous_client, world, adnans, fake, launched):
     assert _post(anonymous_client, world, adnans).status_code == 202
-    r = _post(anonymous_client, world, adnans, query="Spring Developer")
+    r = _post(anonymous_client, world, adnans, place="Austin, TX")
     assert r.status_code == 409 and len(launched) == 1
 
 
@@ -250,19 +306,20 @@ def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, a
     fake.jobs = [_job(1), _job(2), _job(3, closed=True), {"t": "No company"}, _job(1)]
     assert _run(world, adnans) == "2 new, 0 seen again"
     assert fake.calls == [("Java Developer", "us", 100)]
-    assert fake.asks == [{"place": None, "posted_within_days": 14}]     # the last 14 days (2026-11-14, Q7)
+    assert fake.asks == [{"place": "Austin, TX", "posted_within_days": 14}]   # the last 14 days (2026-11-14, Q7)
     (batch,), postings = _rows(test_db, adnans)
     assert (batch.state, batch.error, batch.user_id) == ("success", None, world["people"]["adnan"].id)
     assert batch.meta["counts"] == {"found": 5, "saved": 2, "refreshed": 0, "skipped_closed": 1,
                                     "skipped_unreadable": 1, "skipped_duplicate": 1, "skipped_over_cap": 0}
-    assert batch.meta["request"] == {"query": "Java Developer", "country": "us", "provider": "fake", "limit": 100,
-                                     "cursor": None, "exhausted": False}
+    assert batch.meta["request"] == {"query": "Java Developer", "country": "us", "place": "Austin, TX",
+                                     "provider": "fake", "limit": 100, "posted_within_days": 14, "cursor": None,
+                                     "exhausted": False}
     assert batch.meta["meta"] == {"total": 5}
     assert sorted(p.content["t"] for p in postings) == ["Java Developer 1", "Java Developer 2"]
     assert {p.batch_id for p in postings} == {batch.batch_id} and {p.source for p in postings} == {"fake"}
     entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "job_search").one()
     assert (entry.candidate_id, entry.actor_user_id) == (uuid.UUID(adnans["id"]), world["people"]["adnan"].id)
-    assert entry.summary == "Searched jobs for 'Java Developer': 2 new, 0 seen again (US)"
+    assert entry.summary == "Searched jobs for 'Java Developer' in Austin, TX: 2 new, 0 seen again (US)"
 
 
 def test_a_job_seen_again_is_refreshed_not_duplicated(world, adnans, fake, test_db):
@@ -362,9 +419,10 @@ def test_the_history_shows_the_running_search_the_finished_ones_and_todays_usage
     _run(world, adnans)
     fake.error = "timeout"
     _run(world, adnans, query="Spring Developer")
-    assert _post(anonymous_client, world, adnans, query="Kotlin Developer").status_code == 202
+    assert _post(anonymous_client, world, adnans).status_code == 202
     body = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["fatima"]).json()
-    assert body["running"]["query"] == "Kotlin Developer" and body["running"]["state"] == "running"
+    assert body["running"]["query"] == "Java Developer" and body["running"]["state"] == "running"
+    assert body["running"]["place"] == "Austin, TX"
     assert body["running"]["finished_at"] is None and body["searches"][0]["finished_at"]
     assert [(s["query"], s["state"], s["error_code"]) for s in body["searches"]] == [
         ("Spring Developer", "error", "timeout"), ("Java Developer", "success", None)]

@@ -1,9 +1,11 @@
 """A candidate's job searches and the jobs they found (job search PR 1; docs/02 §6.y; docs/integration/02-jobs.md).
 Under the candidate's URL: another firm, a candidate outside the principal's scope, or a posting that isn't the
 candidate's is the same 404 as a missing one.
-- POST …/job-searches              start a search `{query}`: its batch is written `running`, the search runs in the
+- POST …/job-searches              start a search `{place?}`: the candidate's target role in one of their places
+                                   (none: the first); its batch is written `running`, the search runs in the
                                    background: 202 `{batch_id, run_id}`
-- GET  …/job-searches              the running search, the finished ones (newest first), today's usage and caps
+- GET  …/job-searches              the running search, the finished ones (newest first), today's usage and caps, the
+                                   role a search asks for and the candidate's places (decided 2026-11-14)
 - POST …/job-postings              capture one job `{source: manual | extension, title, company, description, url,
                                    location?}`: 201, or 200 with the job the candidate already has (job search PR 2)
 - GET  …/job-postings?page=&size=  the candidate's jobs, newest first, in the common fields
@@ -14,7 +16,8 @@ Firm level (job search PR 3, docs/02 §6.z), for the job screens:
 - GET  /firms/{firm_id}/job-postings/{posting_id}          one of those, with its description
 Who (decided 2026-11-10): a search, only the candidate's assigned BDE (`job.search` + `can_search_jobs`); reads,
 anyone who can see the candidate. A support view reads only (backend/auth/access.py). The country is the candidate's
-résumé country (`Candidate.country`), never a request field.
+résumé country (`Candidate.country`) and the role their target role, never request fields; the place is one of the
+candidate's own (`backend/job_search/places.py`), never free text.
 """
 import asyncio
 import uuid
@@ -32,7 +35,7 @@ from backend.auth.policy import can_search_jobs
 from backend.auth.scoping import scoped
 from backend.auth.sessions import Principal
 from backend.job_monitor import JobAlreadyRunningError, launch_background
-from backend.job_search import limits, pipeline, providers
+from backend.job_search import limits, pipeline, places, providers
 from backend.job_search.country import search_country
 from backend.job_search.providers.base import ProviderError
 from backend.job_search.text import clean_json, safe_url, typed_text
@@ -50,9 +53,11 @@ FIRM_LIST_MAX = 400          # what the job screens ask for (docs/02 §6.z)
 
 
 class SearchBody(BaseModel):
-    # One line of text: a control character (NUL, tab, a line break inside it) is a 422 before anything is written.
-    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
-                     AfterValidator(typed_text)]
+    # One of the candidate's places, by its value (`places.places`); none: the first one, the picker's default. One line
+    # of text: a control character (NUL, tab, a line break inside it) is a 422 before anything is written. The role
+    # isn't a request field (decided 2026-11-14: the candidate's target role).
+    place: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
+                     AfterValidator(typed_text)] | None = None
 
 
 def _http_url(value: str) -> str:
@@ -89,7 +94,7 @@ def _resets(now) -> str:
     return f"resets {limits.next_reset(now).astimezone(limits.IST):%I:%M %p} IST".replace("resets 0", "resets ")
 
 
-def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, query: str, principal: Principal) -> dict:
+def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: str | None, principal: Principal) -> dict:
     """The search's admission, in one transaction, committed: the checks, then its `running` batch row. Blocking (it
     waits for the candidate's row and the BDE's lock), so it runs in a worker thread, never on the event loop (Abdul's
     comment on PR 2: a wait there stalled every request on the worker until the lock's holder, whose release needs
@@ -102,6 +107,16 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, query: st
     if country is None:
         raise HTTPException(status_code=422, detail="Add the candidate's country (US, Canada or India) to their "
                                                     "résumé first.")
+    query = places.search_role(candidate)
+    if query is None:
+        raise HTTPException(status_code=422, detail="Add the candidate's target role first.")
+    options = places.places(candidate, country)
+    if not options:
+        raise HTTPException(status_code=422, detail="Add the candidate's city and state on their résumé, or a "
+                                                    "preferred location: the job search needs a place.")
+    chosen = places.pick(candidate, country, place) if place else options[0]
+    if chosen is None:
+        raise HTTPException(status_code=422, detail="Pick one of the candidate's places.")
     limits.lock_bde(db, principal.user_id)
     now = utcnow()
     pipeline.expire_lost(db, firm_id, candidate.id, now)
@@ -113,9 +128,10 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, query: st
         raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today; {_resets(now)}.")
     provider = providers.active(db)
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
-                                query=query, country=country, provider=provider.name)
+                                query=query, country=country, provider=provider.name, place=chosen["value"])
     task = {"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
-            "batch_id": batch.batch_id, "query": query, "country": country, "provider_name": provider.name}
+            "batch_id": batch.batch_id, "query": query, "country": country, "provider_name": provider.name,
+            "place": chosen["value"]}
     # Committed before the search is launched, so a launched search always has its row (Abdul's review, P2); the task
     # also checks it is still `running` before asking the source. A crash between the two leaves the row `running`,
     # and it becomes an `internal` error after 15 minutes, like a restart.
@@ -142,7 +158,7 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
     candidate take turns: the second sees the first one's `running` row and gets 409, on any worker. The BDE is locked
     too (a Postgres lock on their id, after the candidate's), so two searches of theirs for different candidates count
     their 20 attempts in turn (Abdul's review, P2)."""
-    task = await run_in_threadpool(_admit, db, firm_id, candidate_id, body.query, principal)
+    task = await run_in_threadpool(_admit, db, firm_id, candidate_id, body.place, principal)
     batch_id = task["batch_id"]
     try:
         # The run names nothing of the firm's (no meta; its scope is the opaque batch id): Super Admin's monitor lists
@@ -165,7 +181,8 @@ def _search_json(row: ScrapeJob, now=None) -> dict:
     lost = limits.is_lost(row, now)            # shown as the error it becomes; a read writes nothing
     return {"batch_id": str(row.batch_id), "kind": row.kind, "run_id": meta.get("run_id"),
             "state": "error" if lost else row.state,
-            "error_code": "internal" if lost else meta.get("error_code"), "query": request.get("query"), "country": request.get("country"),
+            "error_code": "internal" if lost else meta.get("error_code"), "query": request.get("query"),
+            "place": request.get("place"), "country": request.get("country"),
             "provider": request.get("provider"), "counts": meta.get("counts"), "user_id": str(row.user_id),
             "started_at": row.created_at.isoformat(),
             "finished_at": row.finished_at.isoformat() if row.finished_at else None}
@@ -184,7 +201,10 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
     rows = query.order_by(ScrapeJob.created_at.desc()).limit(HISTORY).all()     # searches and captures
     return {"running": _search_json(run, now) if run is not None else None,
             "searches": [_search_json(r, now) for r in rows],
-            "usage": limits.usage(db, firm_id, candidate.id, candidate.bde_id, now)}
+            "usage": limits.usage(db, firm_id, candidate.id, candidate.bde_id, now),
+            # What a search asks for (decided 2026-11-14): the target role, and the places the BDE picks from.
+            "role": places.search_role(candidate),
+            "places": places.places(candidate, search_country(candidate.country))}
 
 
 @router.post(CANDIDATE + "/job-postings", status_code=201, summary="Capture one job for a candidate (by hand or the extension)")

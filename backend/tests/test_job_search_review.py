@@ -38,10 +38,20 @@ def _poster(client, world, candidate, tail, body):
 
 # ── Abdul's review of PR 1 ───────────────────────────────────────────────────
 
-def test_a_platform_admin_sees_no_search_details_in_the_monitor(api_client, anonymous_client, world, adnans, fake):
+def _set(test_db, candidate, **values):
+    """Changes the candidate's own columns (the role and the places a search reads)."""
+    from backend.models.candidates import Candidate
+    test_db.query(Candidate).filter(Candidate.id == uuid.UUID(candidate["id"])).update(
+        {getattr(Candidate, k): v for k, v in values.items()})
+    test_db.commit()
+
+
+def test_a_platform_admin_sees_no_search_details_in_the_monitor(api_client, anonymous_client, world, adnans, fake,
+                                                                test_db):
     """P1: a search's run names nothing of the firm's; its details stay in the firm's `scrape_jobs` row."""
     from backend.models.db import JobRun, SessionLocal
-    r = _post(anonymous_client, world, adnans, query="Very Private Role")
+    _set(test_db, adnans, target_roles=["Very Private Role"])
+    r = _post(anonymous_client, world, adnans)
     run_id = r.json()["run_id"]
     import time
     deadline = time.monotonic() + 10
@@ -140,20 +150,25 @@ def test_the_platform_audit_shows_no_search_text_and_the_firms_ledger_does(api_c
     assert any("Very Private Role" in e["summary"] for e in own)
 
 
-@pytest.mark.parametrize("query", ["Java\x00Developer", "Java\nDeveloper", "Java\tDeveloper", "\x07Java", "Java\x7f",
-                                   "Java\u0085Developer"])
-def test_a_query_with_a_control_character_is_a_422_with_nothing_written(anonymous_client, world, adnans, fake,
-                                                                         launched, test_db, query):
-    """P2: NUL (which Postgres refuses in JSONB) and every other control character: 422, no batch, no launch."""
-    r = _post(anonymous_client, world, adnans, query=query)
+@pytest.mark.parametrize("place", ["Austin\x00, TX", "Austin,\nTX", "Austin,\tTX", "\x07Austin, TX", "Austin, TX\x7f",
+                                   "Austin\u0085, TX"])
+def test_a_place_with_a_control_character_is_a_422_with_nothing_written(anonymous_client, world, adnans, fake,
+                                                                         launched, test_db, place):
+    """P2: NUL (which Postgres refuses in JSONB) and every other control character: 422, no batch, no launch. (The
+    request's text is the place since 2026-11-14; the role is the candidate's.)"""
+    r = _post(anonymous_client, world, adnans, place=place)
     assert r.status_code == 422, r.text
     batches, _ = _rows(test_db, adnans)
     assert batches == [] and launched == []
 
 
-@pytest.mark.parametrize("query", ["Développeur Java", "Java/C++ (Senior) – Remote", "डेटा इंजीनियर"])
-def test_ordinary_text_in_any_script_still_searches(anonymous_client, world, adnans, fake, launched, query):
-    assert _post(anonymous_client, world, adnans, query=query).status_code == 202
+@pytest.mark.parametrize("role,place", [("Développeur Java", "Montréal, QC"), ("Java/C++ (Senior) – Remote", "São Paulo"),
+                                        ("डेटा इंजीनियर", "बेंगलुरु, कर्नाटक")])
+def test_ordinary_text_in_any_script_still_searches(anonymous_client, world, adnans, fake, launched, test_db, role,
+                                                    place):
+    _set(test_db, adnans, target_roles=[role], preferred_locations=[place])
+    assert _post(anonymous_client, world, adnans, place=place).status_code == 202
+    assert (launched[0]["kwargs"]["query"], launched[0]["kwargs"]["place"]) == (role, place)
 
 
 def test_the_search_is_committed_before_it_is_launched(anonymous_client, world, adnans, fake, monkeypatch):
