@@ -536,7 +536,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       const scanId = frames.current.scanIds.get(field.frameId);
       const request = { scanId: scanId ?? 0, fieldId: field.id, current: field.current };
       const fill = write.type === "choice"
-        ? fillChoice(tabId, field.frameId, { ...request, search: write.value.split(",")[0]!.trim() }, write.value, write.also)
+        ? fillChoice(tabId, field.frameId, { ...request, search: write.value.split(",")[0]!.trim() }, write.value, write.also, () => held.current)
         : fillField(tabId, field.frameId, { ...request, write });
       const result = scanId === undefined ? STALE : await fill.catch(() => STALE);
       if (result.status === "stale") {
@@ -713,7 +713,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     for (const [kind, type] of [["education", "education-school"], ["work", "current-company"]] as const) {
       const wanted = Math.min((bank.current?.history ?? NO_HISTORY)[kind].length, MAX_ENTRIES);
       let blocks = blocksOf(type);
-      while (blocks > 0 && blocks < wanted && !held.current && await addEntryIn(tabId, kind).catch(() => false)) {
+      while (blocks > 0 && blocks < wanted && !held.current && await addEntryIn(tabId, kind, () => held.current).catch(() => false)) {
         await new Promise((resolve) => setTimeout(resolve, ENTRY_MS));
         if (resume.current !== picked) return;
         await scan(undefined, true);
@@ -807,10 +807,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const choose = useCallback(async (row: ReviewRow, label: string) => {
     const { field } = row;
     const scanId = frames.current.scanIds.get(field.frameId);
-    if (busy.current || scanId === undefined) return;
+    if (busy.current || held.current || scanId === undefined) return;
     busy.current = true;
     const request = { scanId, fieldId: field.id, current: field.current, search: label };
-    const result = await chooseChoice(tabId, field.frameId, request, label).catch(() => STALE);
+    const result = await chooseChoice(tabId, field.frameId, request, label, () => held.current).catch(() => STALE);
     const key = memoKeyOf(row);
     if (result.status === "filled") {
       memory.current.handedBack.delete(key);

@@ -31,6 +31,23 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
     expect(payIn("Full time, 40 hours per week. Hourly rate of pay: $32")).toEqual({ salaryMin: 32, salaryMax: 32, salaryPeriod: "hour" });
   });
 
+  it("reads no period from a schedule written label first, on either side of the pay (PR #140, fourth review)", () => {
+    for (const text of [
+      "Weekly hours: 40 | Salary: $60,000", "Weekly hours: 40 Salary $60,000", "Weekly working hours: 37.5 | Salary: $60,000",
+      "Hours per week: 40 Salary $60,000", "Hours: 40 per week | Salary: $60,000", "Daily hours: 8 | Pay: $500",
+      "Salary: $60,000 | Weekly hours: 40", "Salary: $60,000 | Hours: 40 per week",
+    ]) {
+      expect(payIn(text), text).toBeUndefined();
+    }
+    // The pay's own period still counts, beside such a schedule or in a label with a figure of its own.
+    expect(payIn("Weekly hours: 40 | Hourly rate: $35")).toEqual({ salaryMin: 35, salaryMax: 35, salaryPeriod: "hour" });
+    expect(payIn("Weekly hours: 40 | Pay: $1,500 per week")).toEqual({ salaryMin: 1500, salaryMax: 1500, salaryPeriod: "week" });
+    expect(payIn("Weekly pay: $1,500")).toEqual({ salaryMin: 1500, salaryMax: 1500, salaryPeriod: "week" });
+    expect(payIn("Monthly salary (40 hours a week): $5,000")).toEqual({ salaryMin: 5000, salaryMax: 5000, salaryPeriod: "month" });
+    expect(payIn("Annual salary (2026): $120,000")).toEqual({ salaryMin: 120000, salaryMax: 120000, salaryPeriod: "year" });
+    expect(payIn("Weekly hours: 40 | Salary: $60,000 - $70,000 per year")).toMatchObject({ salaryMin: 60000, salaryMax: 70000, salaryPeriod: "year" });
+  });
+
   it("keeps inline-level boxes on their line, so a range in such spans is one pay (PR #140 review)", () => {
     const doc = page(`<main><h1>QA Engineer</h1><p>Salary: <span style="display:inline-flex">$100,000</span> - <span style="display:inline-block">$120,000</span> a year</p></main>`);
     expect(pageDetails(doc, "QA Engineer")).toMatchObject({ salaryMin: 100000, salaryMax: 120000, salaryPeriod: "year" });

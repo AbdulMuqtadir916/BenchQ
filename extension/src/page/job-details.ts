@@ -51,8 +51,14 @@ const PERIODS: [RegExp, NonNullable<Pay["salaryPeriod"]>][] = [
   [/(?:\b(?:per|a)|\/)\s*(?:week|wk)\b|\bweekly\b/i, "week"], [/(?:\b(?:per|a)|\/)\s*(?:month|mo)\b|\bmonthly\b/i, "month"],
   [/(?:\b(?:per|an?)|\/)\s*(?:year|yr|annum)\b|\bannual(?:ly)?\b|\byearly\b/i, "year"],
 ];
-/** A work schedule, whose period is the hours', never the pay's: "40 hours/week", "8 hrs a day", "5 days per week". */
-const SCHEDULE = /\b\d+(?:\.\d+)?\s*(?:-\s*\d+\s*)?(?:hours?|hrs?|days?|shifts?)\s*(?:\/|per|an?|each)\s*(?:week|wk|day|month|mo)\b/gi;
+/** A work schedule, whose period is the hours', never the pay's, its figure first or its label first: "40 hours/week",
+ * "8 hrs a day", "Hours per week: 40", "Hours: 40 per week", "Weekly hours: 40", "Daily working hours". A pay label's
+ * own figure isn't one: "Annual salary (2026)" keeps its period (PR #140's review). */
+const SCHEDULE = new RegExp([
+  String.raw`\b(?:\d+(?:\.\d+)?\s*(?:-\s*\d+\s*)?)?(?:hours?|hrs?|days?|shifts?)\s*(?:\/|per|an?|each)\s*(?:week|wk|day|month|mo)\b`,
+  String.raw`\b(?:hours?|hrs?|days?|shifts?)\s*[:\-–]?\s*\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?\s*(?:\/|per|an?|each)\s*(?:week|wk|day|month|mo)\b`,
+  String.raw`\b(?:weekly|daily|monthly|annual|yearly)\s+(?:[a-z]+\s+)?(?:hours?|hrs?|shifts?)\b`,
+].join("|"), "gi");
 const UNITS: Record<string, NonNullable<Pay["salaryPeriod"]>> ={ HOUR: "hour", DAY: "day", WEEK: "week", MONTH: "month", YEAR: "year" };
 const PAY_WORDS = /\b(?:salary|salaries|pay|compensation|wage|wages|rate|base|range|hourly|annual|ote)\b/i;
 
@@ -77,10 +83,10 @@ export function payIn(text: string): Pay | undefined {
     // annual sum after an hourly rate ("Hourly: $60 ($124,800 annually)"), nor a schedule's ("40 hours/week, Salary
     // $143,700 - $194,400 per year"; "Salary $50,000. 40 hours per week"). PR #140's review.
     const periodIn = (part: string) => PERIODS.find(([pattern]) => pattern.test(part))?.[1];
-    const after = text.slice(end, end + 30).split(/\d|[.;!?](?:\s|$)/)[0]!;
-    // The clause just before it, its own numbers kept ("Annual salary (2026):", "Hourly (W2):"). A schedule goes whole
-    // before the text is cut to its last 40 characters, so a cut can't leave "…rs per week" to read as the pay's period
-    // (PR #140's review).
+    // Either side, a schedule goes whole before the text is cut short, so a cut can't leave "…rs per week" to read as
+    // the pay's period, nor can "Weekly hours: 40 | Salary: $60,000" (PR #140's review).
+    const after = text.slice(end).replace(SCHEDULE, " ").slice(0, 30).split(/\d|[.;!?](?:\s|$)/)[0]!;
+    // The clause just before it, its own numbers kept ("Annual salary (2026):", "Hourly (W2):").
     const before = text.slice(0, first.index).replace(SCHEDULE, " ").slice(-40).split(/[,;.!?]/).at(-1)!;
     const period = periodIn(after) ?? periodIn(before);
     if (!isRange && !period) continue;

@@ -357,7 +357,7 @@ describe("autofill", () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Location (City)", "combobox")]));
     await mount();
     await run(() => hook.autofill());
-    expect(fillChoice).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", search: "Phoenix" }, "Phoenix, AZ", undefined);
+    expect(fillChoice).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", search: "Phoenix" }, "Phoenix, AZ", undefined, expect.any(Function));
     expect(fillField).not.toHaveBeenCalled();
   });
 
@@ -1340,5 +1340,29 @@ describe("while the panel asks whether the tab moved to another job (PR #140, se
     await wait(5);
     await run(() => hook.autofill());
     expect(fillField).toHaveBeenCalled();
+  });
+
+  it("hands a dropdown write the hold, which turns true when the tab moves on while its list opens (PR #140, fourth review)", async () => {
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("Current location", "Phoenix, AZ")]);
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Location (City)", "combobox")]));
+    let shouldStop: (() => boolean) | undefined;
+    let openList: (() => void) | undefined;
+    vi.mocked(fillChoice).mockImplementation(async (...args) => {
+      shouldStop = args[5];
+      await new Promise<void>((resolve) => { openList = resolve; });
+      return shouldStop?.() ? { status: "stale", current: "" } : { status: "filled", current: "Phoenix" };
+    });
+    await mount();
+    let running: Promise<void> | undefined;
+    await act(async () => { running = hook.autofill(); });
+    await wait(5);
+    expect(shouldStop?.()).toBe(false);
+    await act(async () => { root.render(<Harness value={connection} isHeld />); });
+    expect(shouldStop?.()).toBe(true);
+    await act(async () => {
+      openList?.();
+      await running;
+    });
+    expect(hook.outcome).toMatchObject({ filled: 0, stopped: true });
   });
 });
