@@ -181,8 +181,8 @@ def request_review(db, app, message, *, reason):
     db.flush()
     from backend.auth.ledger import record_automated
     record_automated(db, actor_type='AGENT', actor_name='Email classifier', action='CREATE',
-                     entity_type='application_review', entity_id=review.id, entity_label=app.job.title or 'Application',
-                     summary=f"Email sent to BDE review ({reason.replace('_', ' ').lower()}) for {app.job.title or 'an application'}.",
+                     entity_type='application_review', entity_id=review.id, entity_label=posting_job(app.posting).title or 'Application',
+                     summary=f"Email sent to BDE review ({reason.replace('_', ' ').lower()}) for {posting_job(app.posting).title or 'an application'}.",
                      firm_id=app.firm_id, candidate_id=app.candidate_id)
     return review
 
