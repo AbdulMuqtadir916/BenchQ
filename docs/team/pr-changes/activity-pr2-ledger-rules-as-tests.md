@@ -70,7 +70,8 @@ Three more ways a change could get past the checks, each now with a test that fe
 - **A function only named, never run.** `unused = write_audit` used to count as the route calling `write_audit`. Now a
   function passed by name counts only when it is handed to a call that runs it: `asyncio.to_thread`,
   `run_in_threadpool`, `run_in_executor`, `add_task`, `launch_background`, `submit`, `Thread`, `partial`,
-  `create_task`, `ensure_future`.
+  `create_task`, `ensure_future`, or FastAPI's `Depends`. A function a factory returns counts as well: the caller runs it
+  (a route's `Depends(factory(...))`).
 - **A ledger read passed by keyword.** `db.get(entity=LedgerEntry, ident=row_id)` is now seen as a read, like
   `db.get(LedgerEntry, row_id)`.
 
