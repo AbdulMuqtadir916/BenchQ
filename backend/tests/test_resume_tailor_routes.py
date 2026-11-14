@@ -86,7 +86,7 @@ def _status(client, world, s, run_id, who="adnan"):
 # ── The run ──────────────────────────────────────────────────────────────────
 
 def test_the_bde_tailors_and_a_tailored_v1_is_written(anonymous_client, test_db, world, launched, setup, monkeypatch):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     r = _start(anonymous_client, world, setup)
     assert r.status_code == 202, r.text
     run_id = r.json()["run_id"]
@@ -109,7 +109,7 @@ def test_the_bde_tailors_and_a_tailored_v1_is_written(anonymous_client, test_db,
     assert (run.status, run.firm_id, run.target_job_id) == ("completed", world["firm"].id, setup["posting"].id)
     assert run.meta["counts"]["review_edits_applied"] >= 0 and set(run.meta["counts"]["tokens"]) == set(
         ("analyse", "draft", "review", "revise", "verify"))
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == str(row.id)).one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == str(row.id)).one()
     assert (entry.action, entry.summary, entry.model_id) == ("CREATE", "Tailored Base 1 for Dev 0", "openai/gpt-6-luna")
     assert entry.actor_user_id == world["people"]["adnan"].id and str(entry.candidate_id) == setup["c"]["id"]
 
@@ -131,13 +131,13 @@ def test_a_retailor_is_the_next_version_and_carries_what_the_bde_typed(anonymous
 
 
 def test_a_step_that_fails_writes_no_version(anonymous_client, test_db, world, launched, setup, monkeypatch):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     run_id = _start(anonymous_client, world, setup).json()["run_id"]
     _drive(test_db, launched, [ANALYSIS, RuntimeError("provider down")], monkeypatch)
     status = _status(anonymous_client, world, setup, run_id).json()
     assert (status["status"], status["error_code"], status["resume_id"]) == ("failed", "provider_failed", None)
     assert test_db.query(Resume).filter(Resume.category == "TAILORED").count() == 0
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.summary.like("Tailored%")).count() == 0
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.summary.like("Tailored%")).count() == 0
 
 
 @pytest.mark.parametrize("change", ["posting_deleted", "base_hidden", "firm_suspended", "marked_lost"])
@@ -356,7 +356,7 @@ def _v2(client, test_db, world, s):
 def test_a_later_version_gets_its_own_base_not_active_when_the_tailoring_succeeds(
         anonymous_client, test_db, world, launched, setup, monkeypatch):
     from backend.models.candidates import BaseResume
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     v2 = _v2(anonymous_client, test_db, world, setup)
     r = _start(anonymous_client, world, setup, resume_id=v2["id"])
     assert r.status_code == 202, r.text
@@ -375,8 +375,8 @@ def test_a_later_version_gets_its_own_base_not_active_when_the_tailoring_succeed
     assert test_db.get(BaseResume, uuid.UUID(setup["base"]["id"])).is_active               # the one in use stays
     row = test_db.get(Resume, uuid.UUID(status["resume_id"]))
     assert (row.category, str(row.base_resume_id)) == ("TAILORED", bases[1]["id"])
-    summaries = [e.summary for e in test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "resume")
-                 .order_by(LedgerEntry.created_at).all()]
+    summaries = [e.summary for e in test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "resume")
+                 .order_by(ActivityEntry.created_at).all()]
     assert "Made Base 2 from Base 1 v2 (for tailoring)" in summaries and "Tailored Base 2 for Dev 0" in summaries
 
     # The same version again, for another job: the same base, no third one.
@@ -407,7 +407,7 @@ def test_a_tailored_version_is_not_a_source(anonymous_client, test_db, world, la
 def test_a_hidden_base_made_from_the_version_is_refused_and_a_deleted_one_comes_back(
         anonymous_client, test_db, world, launched, setup, monkeypatch):
     from backend.models.candidates import BaseResume
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     v2 = _v2(anonymous_client, test_db, world, setup)
     _start(anonymous_client, world, setup, resume_id=v2["id"])
     _drive(test_db, launched, list(REPLIES), monkeypatch)
@@ -426,8 +426,8 @@ def test_a_hidden_base_made_from_the_version_is_refused_and_a_deleted_one_comes_
     assert _status(anonymous_client, world, setup, run_id).json()["status"] == "completed"
     test_db.refresh(made)
     assert made.deleted_at is None and not made.is_active
-    assert test_db.query(LedgerEntry).filter(
-        LedgerEntry.summary == "Restored Base 2 (its v1) by using Base 1 v2 again (for tailoring)").count() == 1
+    assert test_db.query(ActivityEntry).filter(
+        ActivityEntry.summary == "Restored Base 2 (its v1) by using Base 1 v2 again (for tailoring)").count() == 1
 
 
 def test_use_as_base_still_makes_the_base_the_one_in_use(anonymous_client, test_db, world, launched, setup):
