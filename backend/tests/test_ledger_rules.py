@@ -122,10 +122,11 @@ def _functions(tree: ast.AST):
     return (node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)))
 
 
-# Calls that run the function they are handed (a thread, a background task, a launcher). A function passed to any other
-# call, or only assigned to a name, is not run by the route.
+# Calls that run the function they are handed (a thread, a background task, a launcher, a FastAPI dependency). A function
+# passed to any other call, or only assigned to a name, is not run by the route. A function a factory returns is run by
+# whoever called the factory (a route's `Depends(factory(...))`), so returning it counts too.
 DISPATCH_CALLS = {"to_thread", "run_in_threadpool", "run_in_executor", "add_task", "launch_background", "submit", "Thread",
-                  "partial", "create_task", "ensure_future"}
+                  "partial", "create_task", "ensure_future", "Depends"}
 
 
 def _scoped_functions(tree: ast.AST) -> list[tuple[tuple[str, ...], ast.AST]]:
@@ -289,6 +290,9 @@ def _logging_functions(trees=None) -> set[tuple[str, str]]:
                     for value in _dispatched(node):            # handed to a thread pool or a background launcher
                         if (target := resolve(value.id)) is not None:
                             calls.setdefault(key, set()).add((file, ".".join(target)))
+                elif isinstance(node, ast.Return) and isinstance(node.value, ast.Name):   # a factory hands it back
+                    if (target := resolve(node.value.id)) is not None:
+                        calls.setdefault(key, set()).add((file, ".".join(target)))
     grew = True
     while grew:
         found = {key for key, called in calls.items() if called & logging} - logging
@@ -453,9 +457,11 @@ def test_a_function_counts_only_when_a_call_hands_it_over_to_run():
               "def threaded(db):\n    return asyncio.to_thread(write_audit, db)\n"
               "def launched(db):\n    return launch_background('x', write_audit)\n"
               "def tasked(db, tasks):\n    tasks.add_task(write_audit, db)\n"
-              "def other_call(db):\n    return print(write_audit)\n")
+              "def other_call(db):\n    return print(write_audit)\n"
+              "def as_dependency(x=Depends(write_audit)):\n    return 1\n"
+              "def factory():\n    def inner(db):\n        write_audit(db)\n    return inner\n")
     logging = {name for _, name in _logging_functions(_snippet(source))}
-    assert {"threaded", "launched", "tasked"} <= logging
+    assert {"threaded", "launched", "tasked", "as_dependency", "factory"} <= logging
     assert not {"only_named", "only_listed", "other_call"} & logging
 
 
