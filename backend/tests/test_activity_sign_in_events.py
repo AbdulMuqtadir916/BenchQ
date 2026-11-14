@@ -164,6 +164,28 @@ def test_the_fifth_try_writes_one_lockout(anonymous_client, test_db, people):
     assert locked[0].actor_user_id == bde.id and locked[0].ip_address
 
 
+def test_an_address_that_runs_out_of_tries_names_no_account(anonymous_client, test_db, people):
+    _, bde, _ = people
+    for n in range(9):                                     # nine unknown emails from one address, then a real account
+        _sign_in(anonymous_client, f"nobody{n}@example.test")
+    _sign_in(anonymous_client, bde.email)                  # the tenth try from this address: the address is locked
+    test_db.expire_all()
+    (locked,) = test_db.query(ActivityEntry).filter(ActivityEntry.action == "LOCKED_OUT").all()
+    assert locked.actor_user_id is None and locked.firm_id is None      # not the BDE's lockout: they can sign in elsewhere
+    assert "sign-ins from this address locked for 1 minute after 10 tries" in locked.summary
+
+
+@pytest.mark.parametrize("typed,kept", [
+    ("nobody@example.test", "no***@example.test"),
+    ("P@ssw0rd2026", "***"),                               # a password typed into the email box: nothing of it is kept
+    ("ab@", "***"),
+    ("x@" + "a" * 120 + ".test", "***"),
+])
+def test_a_typed_email_keeps_its_domain_only_when_it_looks_like_one(typed, kept):
+    from backend.auth.ledger import mask_email
+    assert mask_email(typed.lower()) == kept
+
+
 def test_the_row_can_only_gain_a_try(test_db, anonymous_client, people):
     _, bde, _ = people
     _sign_in(anonymous_client, bde.email)
