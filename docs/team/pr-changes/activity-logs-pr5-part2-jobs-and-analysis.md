@@ -30,6 +30,11 @@ has no firm, so a firm reader never gets one.
 - `log_activity` writes a system row. Its 22 callers still say what happened. A scrape with no new jobs, nothing found and
   no error writes nothing, and neither does a scoring or email check that handled nothing.
 - A scheduled run that did something or failed writes one system row, named Scheduler. Manual runs and empty ones don't.
+- **The old pool's scrape is not BenchQ's.** The timed scrape of every search and company (`run_all_scrapes`) is no
+  longer scheduled (job search PR 2, 2026-11-10), and the Super Admin's manual scrapes only fill the old `jobs` pool,
+  which BenchQ doesn't use. So no extra logging is added for them. The scraping BenchQ uses is a BDE's job search and
+  job capture (`scrape_jobs`, `job_postings`): each is a firm row with the candidate, so the owner, the candidate's
+  manager and BDE see it.
 - Every LLM call writes an AI agent row saying what it did, such as "AI agent scored 80 jobs against the résumés", with
   tokens and cost. A scheduled run writes one row for each kind of work, with the totals. These rows sit beside the
   person's own AI agent row, which is unchanged.
