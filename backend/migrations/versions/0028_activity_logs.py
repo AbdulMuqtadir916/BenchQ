@@ -92,6 +92,11 @@ def upgrade():
         CREATE TRIGGER activity_logs_append_only BEFORE UPDATE OR DELETE ON activity_logs
         FOR EACH ROW EXECUTE FUNCTION activity_logs_append_only()
     """)
+    # TRUNCATE fires no row trigger, so it gets its own; the function refuses it (only a DELETE can be let through).
+    op.execute("""
+        CREATE TRIGGER activity_logs_no_truncate BEFORE TRUNCATE ON activity_logs
+        FOR EACH STATEMENT EXECUTE FUNCTION activity_logs_append_only()
+    """)
 
 
 def downgrade():
@@ -101,6 +106,7 @@ def downgrade():
         SELECT {SHARED} FROM activity_logs a
         WHERE NOT EXISTS (SELECT 1 FROM ledger_entries l WHERE l.id = a.id)
     """)
+    op.execute("DROP TRIGGER activity_logs_no_truncate ON activity_logs")
     op.execute("DROP TRIGGER activity_logs_append_only ON activity_logs")
     op.execute("DROP FUNCTION activity_logs_append_only()")
     op.drop_table('activity_logs')
