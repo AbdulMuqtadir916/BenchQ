@@ -528,6 +528,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     const filled: FillableRow[] = [];
     let stopped = false;
     for (const row of rows) {
+      // The tab moved on to another job mid-run: nothing more is written there (PR #140's review); the run ends as held.
+      if (held.current) break;
       const { field, write, key } = row;
       const label = fieldLabel(field);
       track({ key, label, status: "filling" });
@@ -621,11 +623,12 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       busy.current = false;
       await scan(new Set(filled.map(memoKeyOf).filter((key) => !memory.current.handedBack.has(key))));
       busy.current = true;
-      batch = (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !isAttachment(row as FillableRow));
+      // Held while the file settled (the tab moved on to another job): no answer goes on (PR #140's review).
+      batch = held.current ? [] : (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !isAttachment(row as FillableRow));
       const count = batch.length;
       setRun((current) => current && { ...current, total: files.length + count });
     }
-    for (let pass = 0; pass < passes && batch.length > 0; pass += 1) {
+    for (let pass = 0; pass < passes && batch.length > 0 && !held.current; pass += 1) {
       const count = batch.length;
       if (pass > 0) setRun((current) => current && { ...current, total: current.total + count });
       batch.forEach((row) => known.add(memoKeyOf(row)));
@@ -640,6 +643,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       if (stopped) break;
       batch = (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !known.has(memoKeyOf(row)));
     }
+    // A run the hold cut short ends as stopped, so the panel says it didn't finish.
+    if (held.current) total.stopped = true;
     busy.current = false;
     setFilling(false);
     setRun(null);
@@ -652,6 +657,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     busy.current = true;
     setStep(STEP_CLEARING);
     for (const row of stale) {
+      if (held.current) break;
       const scanId = frames.current.scanIds.get(row.field.frameId);
       const target = { scanId: scanId ?? 0, fieldId: row.field.id };
       const isBack = scanId !== undefined && await takeBackField(tabId, row.field.frameId, target).catch(() => false);
@@ -678,6 +684,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     setStep(STEP_REMOVING);
     let isRemoved = false;
     for (const [key, name] of old) {
+      if (held.current) break;
       if (!await removeFileOnPage(tabId, name).catch(() => false)) continue;
       memory.current.attached.delete(key);
       memory.current.settled.delete(key);
@@ -706,7 +713,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     for (const [kind, type] of [["education", "education-school"], ["work", "current-company"]] as const) {
       const wanted = Math.min((bank.current?.history ?? NO_HISTORY)[kind].length, MAX_ENTRIES);
       let blocks = blocksOf(type);
-      while (blocks > 0 && blocks < wanted && await addEntryIn(tabId, kind).catch(() => false)) {
+      while (blocks > 0 && blocks < wanted && !held.current && await addEntryIn(tabId, kind).catch(() => false)) {
         await new Promise((resolve) => setTimeout(resolve, ENTRY_MS));
         if (resume.current !== picked) return;
         await scan(undefined, true);
@@ -725,8 +732,11 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     setIsFollowingSteps(true);
     try {
       await removeOldFiles(bank.current?.file?.name ?? null);
+      // Each step checks the hold again: the tab can move on to another job while one runs (PR #140's review).
+      if (held.current) return;
       const stale = (shownRows.current ?? []).filter((row) => row.isStale);
       if (stale.length > 0) await takeBackStale(stale);
+      if (held.current) return;
       setStep(null);
       await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
       await addEntries();

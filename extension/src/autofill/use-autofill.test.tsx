@@ -1010,6 +1010,26 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     expect(hook.attachedFile).toBeNull();
   });
 
+  it("writes nothing more once the tab moves on to another job while the file settles (PR #140, third review)", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) =>
+      ({ status: "filled", current: write.type === "file" ? NAME : write.type === "text" ? write.value : "" }));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} />); });
+    await advance(1);
+    const running = hook.autofill();
+    await advance(500);
+    expect(vi.mocked(fillField).mock.calls.map(([, , { fieldId }]) => fieldId)).toEqual(["r"]);
+    // The file went on and the form is settling: the panel now asks whether the tab moved on to another job.
+    await act(async () => { root.render(<Harness value={connection} isHeld />); });
+    await advance(500 * 24);
+    await act(async () => { await running; });
+    expect(vi.mocked(fillField).mock.calls.map(([, , { fieldId }]) => fieldId)).toEqual(["r"]);
+    expect(hook.outcome).toMatchObject({ stopped: true });
+  });
+
   it("goes on with the answers when the page swapped its upload out, and leaves that upload to the BDE", async () => {
     vi.mocked(getResumeFile).mockResolvedValue(pdf);
     vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));

@@ -26,6 +26,9 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
     expect(payIn("Annual salary (2026): $120,000")).toEqual({ salaryMin: 120000, salaryMax: 120000, salaryPeriod: "year" });
     expect(payIn("Hourly (W2): $60")).toEqual({ salaryMin: 60, salaryMax: 60, salaryPeriod: "hour" });
     expect(payIn("40 hours per week Salary $50,000")).toBeUndefined();
+    // A schedule further back than the 40 characters looked at still goes whole, never read as "per week" (third review).
+    expect(payIn("40 hours per week with a starting salary of $50,000")).toBeUndefined();
+    expect(payIn("Full time, 40 hours per week. Hourly rate of pay: $32")).toEqual({ salaryMin: 32, salaryMax: 32, salaryPeriod: "hour" });
   });
 
   it("keeps inline-level boxes on their line, so a range in such spans is one pay (PR #140 review)", () => {

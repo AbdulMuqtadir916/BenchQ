@@ -78,8 +78,10 @@ export function payIn(text: string): Pay | undefined {
     // $143,700 - $194,400 per year"; "Salary $50,000. 40 hours per week"). PR #140's review.
     const periodIn = (part: string) => PERIODS.find(([pattern]) => pattern.test(part))?.[1];
     const after = text.slice(end, end + 30).split(/\d|[.;!?](?:\s|$)/)[0]!;
-    // The clause just before it, its own numbers kept ("Annual salary (2026):", "Hourly (W2):"), a schedule's dropped.
-    const before = text.slice(Math.max(0, first.index! - 40), first.index).split(/[,;.!?]/).at(-1)!.replace(SCHEDULE, " ");
+    // The clause just before it, its own numbers kept ("Annual salary (2026):", "Hourly (W2):"). A schedule goes whole
+    // before the text is cut to its last 40 characters, so a cut can't leave "…rs per week" to read as the pay's period
+    // (PR #140's review).
+    const before = text.slice(0, first.index).replace(SCHEDULE, " ").slice(-40).split(/[,;.!?]/).at(-1)!;
     const period = periodIn(after) ?? periodIn(before);
     if (!isRange && !period) continue;
     const min = amountOf(first[2]!, first[3] ?? (isRange ? next![3] : undefined));
