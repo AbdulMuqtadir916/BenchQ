@@ -43,3 +43,11 @@ candidate-based line is a separate change: `teamMemberIds` is shared with follow
 
 A MANAGER's candidate activity no longer shows the OWNER's edits or the AI and system rows on the candidates they
 manage. This is intended under Q64, and it is a visible change for MANAGERs on the live backend.
+
+## A test on main that failed this PR's CI (2026-11-14)
+
+`backend/tests/test_resume_tailor_routes.py::test_a_retailor_is_the_next_version_and_carries_what_the_bde_typed` (Zuhair's,
+from #137) failed the backend job here, and fails on `main` itself (8b670e3), so it is not caused by this PR. #137 wrote it
+with the older answer shape `{"Why this job?": "…"}`; #129's autofill code (`autofill.entries_of`) reads that shape as
+"no entry", so a re-tailor carries nothing. The test now types a custom answer in the shape the code keeps (a list of
+`{question, also, answer}`). Nothing outside that test changed. If `main` fixes it first, take main's version.
