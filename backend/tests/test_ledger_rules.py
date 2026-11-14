@@ -97,6 +97,39 @@ def _functions(tree: ast.AST):
     return (node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)))
 
 
+# Calls that run the function they are handed (a thread, a background task, a launcher). A function passed to any other
+# call, or only assigned to a name, is not run by the route.
+DISPATCH_CALLS = {"to_thread", "run_in_threadpool", "run_in_executor", "add_task", "launch_background", "submit", "Thread",
+                  "partial", "create_task", "ensure_future"}
+
+
+def _scoped_functions(tree: ast.AST) -> list[tuple[tuple[str, ...], ast.AST]]:
+    """Every function with its lexical path: `("route",)` at the top (a method counts as top level, its class is not a
+    scope), `("route", "_do")` for a `_do` defined inside `route`. Two handlers that each define a `_do` stay apart."""
+    found = []
+
+    def visit(node, path):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                found.append(((*path, child.name), child))
+                visit(child, (*path, child.name))
+            else:
+                visit(child, path)
+    visit(tree, ())
+    return found
+
+
+def _resolver(path: tuple[str, ...], defined: set[tuple[str, ...]]):
+    """Resolves a bare name used inside the function at `path` the way Python does: a function defined inside it, then one
+    defined beside it, then one level out, up to the top of the file. Returns that function's path, or None."""
+    def resolve(name: str):
+        for depth in range(len(path), -1, -1):
+            if (*path[:depth], name) in defined:
+                return (*path[:depth], name)
+        return None
+    return resolve
+
+
 def _relative(path: Path) -> str:
     return path.relative_to(BACKEND).as_posix()
 
@@ -144,12 +177,13 @@ def _dotted(node: ast.AST) -> str | None:
     return ".".join([node.id, *reversed(parts)])
 
 
-def _callee(call: ast.Call, file: str, defined: set[str], functions: dict, modules: dict) -> tuple[str, str] | None:
-    """The backend function a call reaches: a bare name or `module.name` (the module under whatever name it was
-    imported, or its full path), never a method like `db.commit`."""
+def _callee(call: ast.Call, file: str, resolve, functions: dict, modules: dict) -> tuple[str, str] | None:
+    """The backend function a call reaches: a bare name (`resolve` says which function in this file, if any) or
+    `module.name` (the module under whatever name it was imported, or its full path), never a method like `db.commit`."""
     func = call.func
     if isinstance(func, ast.Name):
-        return (file, func.id) if func.id in defined else functions.get(func.id)
+        target = resolve(func.id)
+        return (file, ".".join(target)) if target else functions.get(func.id)
     dotted = _dotted(func)
     if dotted is not None:
         module, _, name = dotted.rpartition(".")
@@ -194,30 +228,43 @@ def _ledger_writes(trees=None) -> list[tuple[str, ast.Call]]:
     for file, tree in _source_trees(SOURCE_FILES + TEST_FILES) if trees is None else trees:
         defined = {function.name for function in _functions(tree)}
         functions, modules = _imports(tree)
+        resolve = lambda name: (name,) if name in defined else None
         for node in ast.walk(tree):
             if (isinstance(node, ast.Call) and file != "auth/ledger.py"
-                    and _callee(node, file, defined, functions, modules) in WRITERS):
+                    and _callee(node, file, resolve, functions, modules) in WRITERS):
                 found.append((file, node))
     return found
 
 
+def _dispatched(call: ast.Call):
+    """The functions a call hands over to be run, when it is one of DISPATCH_CALLS: its name arguments, positional or
+    keyword (`target=`)."""
+    name = call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
+    if name not in DISPATCH_CALLS:
+        return []
+    return [value for value in (*call.args, *(keyword.value for keyword in call.keywords)) if isinstance(value, ast.Name)]
+
+
 def _logging_functions(trees=None) -> set[tuple[str, str]]:
-    """Every (file, function) that writes the ledger, directly or through another function it calls."""
+    """Every (file, function) that writes the ledger, directly or through another function it calls. A function is named
+    by its path (`route._do` for one defined inside `route`), so same-named helpers in two routes are two functions."""
     calls: dict[tuple[str, str], set] = {}
     logging = set(WRITERS)
     for file, tree in _source_trees(SOURCE_FILES) if trees is None else trees:
-        defined = {function.name for function in _functions(tree)}
+        scoped = _scoped_functions(tree)
+        defined = {path for path, _ in scoped}
         functions, modules = _imports(tree)
         names = _ledger_model_names(tree)
-        for function in _functions(tree):
-            key = (file, function.name)
+        for path, function in scoped:
+            key, resolve = (file, ".".join(path)), _resolver(path, defined)
             for node in _own_nodes(function):
                 if isinstance(node, ast.Call):
-                    calls.setdefault(key, set()).add(_callee(node, file, defined, functions, modules))
+                    calls.setdefault(key, set()).add(_callee(node, file, resolve, functions, modules))
                     if _is_ledger_model(node.func, names):
                         logging.add(key)
-                elif isinstance(node, ast.Name) and node.id in defined:   # passed by name, to a thread pool say
-                    calls.setdefault(key, set()).add((file, node.id))
+                    for value in _dispatched(node):            # handed to a thread pool or a background launcher
+                        if (target := resolve(value.id)) is not None:
+                            calls.setdefault(key, set()).add((file, ".".join(target)))
     grew = True
     while grew:
         found = {key for key, called in calls.items() if (called - BACKGROUND_LOGGING) & logging} - logging
@@ -244,10 +291,10 @@ def _route_methods(call: ast.Call) -> set[str]:
 def _write_routes(trees=None) -> list[tuple[str, str]]:
     routes = []
     for file, tree in _source_trees(ROUTE_FILES) if trees is None else trees:
-        for function in _functions(tree):
+        for path, function in _scoped_functions(tree):
             for decorator in function.decorator_list:
                 if isinstance(decorator, ast.Call) and _route_methods(decorator) & WRITE_METHODS:
-                    routes.append((file, function.name))
+                    routes.append((file, ".".join(path)))
         for node in ast.walk(tree):             # router.add_api_route("/x", handler, methods=["POST"])
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_api_route":
                 target = node.args[1] if len(node.args) > 1 else next(
@@ -319,7 +366,8 @@ def test_the_old_ledger_table_is_only_cleared_by_the_demo_reset():
 def _reads_the_ledger(call: ast.Call, names: set[str]) -> bool:
     name = call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
     return name in {"query", "scoped", "select", "get", "join", "outerjoin"} and any(
-        _is_ledger_model(node, names) for arg in call.args for node in ast.walk(arg))
+        _is_ledger_model(node, names)
+        for arg in (*call.args, *(keyword.value for keyword in call.keywords)) for node in ast.walk(arg))
 
 
 def test_only_the_listed_routes_read_the_ledger():
@@ -379,3 +427,35 @@ def test_a_renamed_ledger_model_is_still_seen_when_built_or_read():
     trees = _snippet(source)
     assert {name for _, name in _enclosing_calls(_builds_a_ledger_entry, trees)} == {"build", "build_by_module"}
     assert {name for _, name in _enclosing_calls(_reads_the_ledger, trees)} == {"read", "read_by_module"}
+
+
+def test_two_routes_that_each_define_a_helper_of_the_same_name_are_told_apart():
+    source = ("from backend.auth import ledger\n"
+              "@router.post('/a')\ndef a(db):\n    def _do():\n        ledger.record(db)\n    _do()\n"
+              "@router.post('/b')\ndef b(db):\n    def _do():\n        return 1\n    _do()\n")
+    trees = _snippet(source)
+    logging = _logging_functions(trees)
+    assert ("api/routes_example.py", "a") in logging and ("api/routes_example.py", "b") not in logging
+    assert sorted(name for _, name in _write_routes(trees)) == ["a", "b"]
+
+
+def test_a_function_counts_only_when_a_call_hands_it_over_to_run():
+    source = ("from backend.auth import ledger\n"
+              "def write_audit(db):\n    ledger.record(db)\n"
+              "def only_named(db):\n    unused = write_audit\n    return 1\n"
+              "def only_listed(db):\n    return [write_audit]\n"
+              "def threaded(db):\n    return asyncio.to_thread(write_audit, db)\n"
+              "def launched(db):\n    return launch_background('x', write_audit)\n"
+              "def tasked(db, tasks):\n    tasks.add_task(write_audit, db)\n"
+              "def other_call(db):\n    return print(write_audit)\n")
+    logging = {name for _, name in _logging_functions(_snippet(source))}
+    assert {"threaded", "launched", "tasked"} <= logging
+    assert not {"only_named", "only_listed", "other_call"} & logging
+
+
+def test_a_ledger_read_passed_by_keyword_is_seen():
+    source = ("from backend.models.tenancy import LedgerEntry\n"
+              "def by_keyword(db, row_id):\n    return db.get(entity=LedgerEntry, ident=row_id)\n"
+              "def by_position(db, row_id):\n    return db.get(LedgerEntry, row_id)\n"
+              "def elsewhere(db, row_id):\n    return db.get(Other, row_id)\n")
+    assert {name for _, name in _enclosing_calls(_reads_the_ledger, _snippet(source))} == {"by_keyword", "by_position"}
