@@ -36,4 +36,4 @@ def test_downgrade_refuses_while_automatic_evidence_exists(scratch_db):
     result = _alembic(name, 'downgrade', '0024')
     assert result.returncode != 0 and 'Refusing to discard automatic status evidence' in result.stderr
     with engine.connect() as conn:       # the refused downgrade leaves the database where it was (one transaction)
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == head_revision()
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0026'
