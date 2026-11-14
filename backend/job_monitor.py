@@ -82,6 +82,9 @@ _LIMIT_SOURCES: dict[str, tuple[Optional[str], int]] = {
     # A BDE's job search (backend/job_search/): one HTTP call to the source and a short write. Four at once per
     # worker; the rest queue here (decided 2026-11-10).
     "job_search": (None, 4),
+    # A résumé tailoring (backend/resume_tailor/): five model calls, about a minute, waiting on the model. It holds no
+    # database connection while it waits, so the limit is the model account's (decided 2026-11-12: 40 per worker).
+    "resume_tailor": ("resume_tailor_max_concurrent", 40),
 }
 
 # Which gate a launch_background job_type belongs to. Anything absent runs
@@ -89,10 +92,10 @@ _LIMIT_SOURCES: dict[str, tuple[Optional[str], int]] = {
 _JOB_TYPE_LIMITER: dict[str, str] = {
     "analyze_job": "scoring",
     "score_resume": "scoring",
-    "tailor_resume": "tailoring",
     "generate_cover_letter": "tailoring",
     "cache_job_page": "page_cache",
     "job_search": "job_search",
+    "resume_tailor": "resume_tailor",
 }
 
 _limiters: dict[str, TaskLimiter] = {}
@@ -268,6 +271,7 @@ def _insert_job_run(
     trigger: str,
     meta: Optional[dict],
     target_job_id: Optional[uuid.UUID] = None,
+    firm_id: Optional[uuid.UUID] = None,
 ) -> None:
     db = SessionLocal()
     try:
@@ -278,6 +282,7 @@ def _insert_job_run(
             status="running",
             meta=meta,
             target_job_id=target_job_id,
+            firm_id=firm_id,
         )
         db.add(run)
         db.commit()
@@ -416,8 +421,10 @@ def launch_background(
     func_kwargs: Optional[dict] = None,
     target_job_id: Optional[uuid.UUID] = None,
     company_id: Optional[str] = None,
+    firm_id: Optional[uuid.UUID] = None,
 ) -> str:
-    """Launch a coroutine as a background asyncio.Task with tracking; returns run_id immediately, raising JobAlreadyRunningError if already running."""
+    """Launch a coroutine as a background asyncio.Task with tracking; returns run_id immediately, raising JobAlreadyRunningError if already running.
+    `firm_id` is stored on the run's row for a run a firm started (a résumé tailoring), so the firm can read it."""
     key = _make_key(job_type, scope_key)
 
     existing = _running.get(key)
@@ -426,7 +433,7 @@ def launch_background(
         raise JobAlreadyRunningError(job_type, elapsed)
 
     run_id = uuid.uuid4()
-    _insert_job_run(run_id, job_type, trigger, meta, target_job_id=target_job_id)
+    _insert_job_run(run_id, job_type, trigger, meta, target_job_id=target_job_id, firm_id=firm_id)
 
     started_at = datetime.now(timezone.utc)
 

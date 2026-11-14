@@ -30,6 +30,8 @@ NOT_FIRM_ACTIVITY = "Telegram calling in, with its own secret: no signed-in pers
 PERSONA_REMOVED = "the Persona table is being removed; its fields live on the candidate, whose edits routes_candidates logs"
 NO_READ_ENTRIES = "no ledger entry for reads and manual sync (Abdul, 2026-11-03)"
 NOTHING_SAVED = "saves nothing about a firm's records"
+REFUSES_ALL = "refuses every application: each has a candidate (migration 0027) and is removed through Saved/favorite actions, which log"
+RUN_LOGS = "only starts a background run; the run writes the entry once it has made the version (resume_tailor/runs.py)"
 
 NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_cover_letters.py", "create_cover_letter"): COVER_LETTERS_REMOVED,
@@ -42,6 +44,9 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_jobs.py", "bulk_update_jobs"): RETIRED,
     ("api/routes_jobs.py", "update_job"): RETIRED,
     ("main.py", "trigger_analysis"): RETIRED,
+    ("api/routes_resume_tailoring.py", "start_tailoring"): RUN_LOGS,
+    ("api/routes_applications.py", "delete_application"): REFUSES_ALL,
+    ("api/routes_applications.py", "bulk_delete_applications"): REFUSES_ALL,
     ("api/routes_persona.py", "update_persona"): PERSONA_REMOVED,
     ("api/routes_persona.py", "append_qa_bank"): PERSONA_REMOVED,
 

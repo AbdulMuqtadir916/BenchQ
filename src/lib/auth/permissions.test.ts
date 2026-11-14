@@ -94,7 +94,7 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     expect(ids(scopeCandidates(manager, candidates))).toEqual(["c1", "c3"]);
     expect(ids(scopeApplications(manager, applications, candidates))).toEqual(["a1", "a3"]);
     expect(ids(scopeByCandidate(manager, [{ id: "r1", candidateId: "c1" }, { id: "r2", candidateId: "c2" }], candidates))).toEqual(["r1"]);
-    // 07 Q64: what their team did, plus who assigned the candidates they manage; never the firm's other work on them.
+    // 07 Q65: what their team did, plus who assigned the candidates they manage; never the firm's other work on them.
     const managed = [
       { id: "l8", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c3", action: "ASSIGN" },
       { id: "l9", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c2", action: "ASSIGN" },

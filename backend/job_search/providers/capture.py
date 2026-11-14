@@ -22,4 +22,7 @@ class Capture:
             description=text,
             apply_url=safe_url(content.get("url")),
             location=clean_str(content.get("location")),
+            # Stated on the page, when the extension read them (decided 2026-11-12).
+            posted_at=clean_str(content.get("posted_at")),
+            employment_type=clean_str(content.get("employment_type")),
         )

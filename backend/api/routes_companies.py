@@ -103,27 +103,24 @@ def list_companies(
         q = q.filter(Company.tier == tier)
     companies = q.order_by(Company.tier.asc().nullslast(), Company.name).all()
 
-    # Count applications: Application records + jobs with status='applied' (no double-counting)
-    # Uses UNION of job IDs from both sources, then groups by company name
-    from sqlalchemy import union, select
+    # Count applications: each names one of its candidate's postings (migration 0027) and counts under that posting's
+    # company; the old pool's Applied marks count too, but not a job an application already stands for (moved there).
+    from sqlalchemy import cast, select
+    from sqlalchemy.dialects.postgresql import UUID as PgUUID
+    from backend.models.job_search import JobPosting
     # Companies are global, but a firm user (or a support view) counts only the firm's applications; a Super Admin
     # with no view counts every firm's.
     firm_id = viewed_firm_id(principal)
-    app_job_ids = select(Application.job_id.label("jid")).distinct()
+    posting_company = JobPosting.content["company"].astext
+    by_posting = db.query(posting_company, func.count(Application.id)).join(JobPosting, JobPosting.id == Application.job_id)
+    moved = (select(cast(JobPosting.content["old_job_id"].astext, PgUUID))
+             .join(Application, Application.job_id == JobPosting.id).where(JobPosting.content.has_key("old_job_id")))
+    by_job = db.query(Job.company, func.count(Job.id)).filter(Job.status == "applied", Job.id.not_in(moved))
     if firm_id is not None:
-        app_job_ids = app_job_ids.where(Application.firm_id == firm_id)
-    applied_job_ids = select(Job.id.label("jid")).where(Job.status == "applied")
-    if firm_id is not None:
-        applied_job_ids = applied_job_ids.where(Job.id.in_(firm_job_ids(firm_id)))
-    all_applied = union(app_job_ids, applied_job_ids).subquery()
-    raw_counts = (
-        db.query(Job.company, func.count(all_applied.c.jid))
-        .join(all_applied, Job.id == all_applied.c.jid)
-        .group_by(Job.company)
-        .all()
-    )
+        by_posting = by_posting.filter(Application.firm_id == firm_id)
+        by_job = by_job.filter(Job.id.in_(firm_job_ids(firm_id)))
     app_counts = {}
-    for name, count in raw_counts:
+    for name, count in [*by_posting.group_by(posting_company).all(), *by_job.group_by(Job.company).all()]:
         key = (name or "").lower().replace(" ", "")
         app_counts[key] = app_counts.get(key, 0) + count
 

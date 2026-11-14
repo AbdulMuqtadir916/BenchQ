@@ -10,16 +10,16 @@ contract changes and the migration number with Abdul.
 ## Status
 
 **Activity logs (from 2026-11-05):** the ledger plan, agreed with Abdul, runs as one branch per PR named `activity/…`.
-PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q64).
+PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q65).
 Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
 Next: PR 2, the ledger rules as tests.
 
 **Activity logs, ready to raise (2026-11-12):** PRs 1–7 brought up to date with `main` (up to #136) by merging, not
 rebasing, and stacked one on the next: PR 1, PR 2, PR 3, PR 4, PR 5 parts 1–2 (two PRs), PR 6, PR 7. PR 5 part 3
 (cover letters) is dropped: cover letters are being removed from BenchQ. The
-manager-ledger decision is Q64 (`main` took Q56 and Q59). The migrations are 0028 (`activity_logs`), 0029 (sign-in
-events) and 0030 (old tables removed): `main` has 0025 (#127 merged) and #129 holds 0026–0027, so 0028 follows `main`'s
-0025 until #129 merges. PR 1 and PR 2 are pushed to #113 and #115; the rest go up in order once agreed.
+manager-ledger decision is Q65 (`main` took Q56 and Q59). The migrations are 0028 (`activity_logs`), 0029 (sign-in
+events) and 0030 (old tables removed): `main` has 0027 (#127 and #129 merged), so 0028 follows `main`'s
+0027; another PR that takes 0028 first moves ours up. PR 1 and PR 2 are pushed to #113 and #115; the rest go up in order once agreed.
 
 Updated 2026-11-02. Branch `feat/password-reset-notifications` (from `feat/password-reset-approval`), PR #105 to
 `main` (open, awaiting Abdul's review; backend suite 3705 passed). Change document: [pr-changes/feat-password-reset-notifications.md](./pr-changes/feat-password-reset-notifications.md).

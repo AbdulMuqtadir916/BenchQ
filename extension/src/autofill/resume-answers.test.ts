@@ -10,8 +10,9 @@ describe("a résumé's answers as the matcher reads them", () => {
     const entries = [
       fixed("visa-sponsorship", true), fixed("relocation-willing", false), fixed("start-date", "2026-12-01"),
       fixed("pay-rate", 85), fixed("notice-period-days", 14), fixed("years-experience", 8),
-      fixed("skills", ["Java", "Spring"]), fixed("preferred-locations", ["Dallas, TX", "Austin, TX"]),
+      fixed("skills", ["Java", "Spring"]), fixed("preferred-locations", ["Dallas, TX", "Austin, TX"]), fixed("floor-rate", 70),
     ];
+    expect(answerOf(entries, "floor-rate")).toBe("$70/hr");
     expect(answerOf(entries, "visa-sponsorship")).toBe("Yes");
     expect(answerOf(entries, "relocation-willing")).toBe("No");
     expect(answerOf(entries, "start-date")).toBe("12/01/2026");

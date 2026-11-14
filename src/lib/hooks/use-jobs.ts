@@ -10,19 +10,27 @@ import { useFirmId } from "@/lib/tenancy/firm-context";
 /** While a search runs, how often its candidate's searches are read again (docs/02 §6.z). */
 const SEARCH_POLL_MS = 3000;
 
-export function useJobs(params?: JobListParams) {
+/**
+ * A list of jobs. A screen about one candidate passes `candidateId` and reads only that candidate's jobs, each id that
+ * candidate's own posting (Zuhair 2026-11-12); `isEnabled: false` waits until the candidate is known, so the firm's
+ * list is never read in its place. Only screens that span candidates (the Jobs page's "All candidates", the owner's
+ * dashboard, ⌘K) read without one.
+ */
+export function useJobs(params?: JobListParams, { isEnabled = true }: { isEnabled?: boolean } = {}) {
   const firmId = useFirmId();
   return useQuery({
     queryKey: queryKeys.jobs.list(firmId, params ? { ...params } : undefined),
     queryFn: () => jobsApi.list(firmId, params),
+    enabled: isEnabled,
   });
 }
 
-export function useJob(id: string) {
+/** One job. With `candidateId`, read as that candidate's own job (not-found when it isn't theirs). */
+export function useJob(id: string, candidateId?: string) {
   const firmId = useFirmId();
   return useQuery({
-    queryKey: queryKeys.jobs.detail(firmId, id),
-    queryFn: () => jobsApi.byId(firmId, id),
+    queryKey: candidateId ? queryKeys.jobs.candidateDetail(firmId, candidateId, id) : queryKeys.jobs.detail(firmId, id),
+    queryFn: () => (candidateId ? jobsApi.candidateJob(firmId, candidateId, id) : jobsApi.byId(firmId, id)),
     enabled: !!id,
   });
 }
