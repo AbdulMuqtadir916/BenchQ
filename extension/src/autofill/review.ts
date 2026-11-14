@@ -30,6 +30,12 @@ const PERSON_KINDS = new Set<EngineFieldType>([
   "address-line1", "address-line2", "address-city", "address-region", "address-postal", "address-country", "city-state",
   "current-company", "current-title", "linkedin-url", "github-url", "portfolio-url", "website",
 ]);
+/** A question about someone else (a reference's "Company"): never the candidate's answer, never a repeat of the
+ * candidate's own question, and no slot among the candidate's schools or jobs (PR #140's review). */
+const isSomeoneElses = (field: TabField) => {
+  const type = typeOf(field);
+  return Boolean(type && PERSON_KINDS.has(type)) && SOMEONE_ELSES_SECTION.test(normalize(field.clues.sectionHeading));
+};
 /** A block of work or education history, where a start date is that entry's, not when the candidate can start. */
 const HISTORY_SECTION = /\b(experience|education|employment|work history)\b/;
 /** Words that mark one entry of a question asked again for another: "Employer 2", "Other phone", "Previous employer". */
@@ -215,7 +221,9 @@ export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewR
   // Each field's place among its kind's records. A form that asks block by block (school, degree, school, degree) starts
   // a block where a question it already asked comes again, so a block that lacks a field never shifts the next one's
   // record. A form that asks question by question (every school, then every degree) counts each question.
+  // A reference's "Company" takes no slot: before it, the candidate's own Company got their second employer.
   const asked = rows.map((row) => {
+    if (isSomeoneElses(row.field)) return null;
     const type = typeOf(row.field);
     const from = type ? FROM_RECORD[type] : undefined;
     return type && from ? { type, from } : null;
@@ -340,11 +348,13 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   if (asksForSelfRating(asked.label)) return manual("This asks for a self-rating, so it's yours to answer.");
   if (field.kind === "custom") return manual("BenchQ can't fill this kind of control yet.");
   if (!field.label && !type) return manual("This field has no label.");
-  // Forms often ask a self-ID question twice, in their own survey and the EEO section. The answer is the same.
-  if (repeated && !type?.startsWith("eeo-")) return manual("This question appears more than once on the form.");
+  // Whose answer it is comes before a repeat: two "Company" fields under References are the references' employers,
+  // and a repeat's reason would let `withHistory` give them the candidate's (the PR 129 review, finding 1).
   const section = normalize(field.clues.sectionHeading);
   if (type && PERSON_KINDS.has(type) && SOMEONE_ELSES_SECTION.test(section)) return manual("This section asks about someone else, so it's yours to fill.");
   if (type === "start-date" && HISTORY_SECTION.test(section)) return manual("This date belongs to an entry in the candidate's history.");
+  // Forms often ask a self-ID question twice, in their own survey and the EEO section. The answer is the same.
+  if (repeated && !type?.startsWith("eeo-")) return manual("This question appears more than once on the form.");
   // The job applied for is the linked job, whatever the bank says.
   if (type === "job-applied") return job?.title ? rowFor(base, job.title) : manual(NO_ANSWER);
 
@@ -400,8 +410,11 @@ function handBackRepeats(rows: ReviewRow[]): ReviewRow[] {
  * `job` is the linked job, which answers "Position applied for" and names the company a question is about. */
 export function buildReview(fields: TabField[], bank: BankEntry[], job: Job | null = null): ReviewRow[] {
   const review: Review = { bank, byType: indexBankByType(bank), job };
+  // A question about someone else is that person's: it doesn't make the candidate's own "Company" a repeat, whose saved
+  // answer would then be held back.
   const counts = new Map<string, number>();
   for (const field of fields) {
+    if (isSomeoneElses(field)) continue;
     const label = normalize(field.label);
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }

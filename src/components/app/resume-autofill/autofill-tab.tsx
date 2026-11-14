@@ -61,6 +61,8 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
     if (view.q !== written) setSearch(view.q);
   }
   const [isStale, setIsStale] = useState(false);
+  // Reloads finished after a refused save: an open editor re-bases on the answers each brought.
+  const [reloads, setReloads] = useState(0);
   // One of BenchQ's questions picked from Add a question: its row opens its editor (the list shows every question).
   const [openKey, setOpenKey] = useState<string | null>(null);
   const pickQuestion = useCallback((key: string) => {
@@ -128,7 +130,7 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
   }
   if (!autofillQuery.data) return <Scroll><AutofillSkeleton /></Scroll>;
 
-  const rowProps = { canEdit, isSaving: saving.isPending, onSave, onEditInBuilder, openKey, onOpened: () => setOpenKey(null), onPickQuestion: pickQuestion };
+  const rowProps = { canEdit, isSaving: saving.isPending, onSave, onEditInBuilder, openKey, onOpened: () => setOpenKey(null), onPickQuestion: pickQuestion, reloads };
   const isFiltered = view.show !== "all" || view.q.trim() !== "";
   return (
     <Scroll>
@@ -141,7 +143,11 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
             <Note tone="info">This resume has unsaved changes. These answers come from the last saved version: save to see your changes here.</Note>
           ) : null}
           {isStale ? (
-            <Note tone="danger" action={<Button size="sm" variant="secondary" onClick={() => { setIsStale(false); void autofillQuery.refetch(); }}>Reload</Button>}>
+            <Note tone="danger" action={<Button size="sm" variant="secondary" onClick={() => {
+              setIsStale(false);
+              // Once the answers now saved are in, an open editor re-bases on them (Abdul's review of #140, #2).
+              void autofillQuery.refetch().then(() => setReloads((count) => count + 1));
+            }}>Reload</Button>}>
               An answer changed since you opened this page. Reload to see the latest, then make your change again.
             </Note>
           ) : null}

@@ -25,6 +25,8 @@ type AutofillRowProps = {
   onEditInBuilder: (section: ResumeSectionKey) => void;
   /** Picked from Add a question: the row shows its editor until it's saved or cancelled. */
   isOpened?: boolean;
+  /** Reloads finished after a refused save: an open editor re-bases on the answer each brought. */
+  reloads?: number;
   onOpened?: () => void;
 };
 
@@ -43,7 +45,7 @@ const isOwnAnswer = (source: ReturnType<typeof sourceOf>): source is keyof typeo
  * (Add an answer); or a question of the user's own (Edit, Delete). A list of records is changed in the Builder (07 Q42).
  * `J` / `K` reach the row; Enter opens its editor.
  */
-export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditInBuilder, isOpened = false, onOpened }: AutofillRowProps) {
+export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditInBuilder, isOpened = false, onOpened, reloads = 0 }: AutofillRowProps) {
   const [isEditingHere, setIsEditing] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const rowRef = useRef<HTMLLIElement>(null);
@@ -59,10 +61,6 @@ export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditI
     requestAnimationFrame(() => rowRef.current?.focus());
   };
   const save = (build: (onlyThis: boolean) => AutofillChange) => void onSave(build).then((saved) => { if (saved) closeEditor(); });
-  const saveAnswer = (answer: AutofillAnswer) =>
-    save((onlyThis) => (entry.kind === "CUSTOM"
-      ? { edit: {}, built: {}, reset: [], add: { [entry.question]: String(answer) }, remove: [], onlyThis }
-      : editChange(entry, answer, onlyThis)));
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>) => {
     if (event.target === event.currentTarget && event.key === "Enter" && mayEdit && !isEditing && status !== "review") {
       event.preventDefault();
@@ -129,16 +127,46 @@ export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditI
           ) : null}
         </div>
       </div>
-      {isEditing ? (
-        <AnswerEditor question={entry.question} type={entry.type} initial={entry.answer} isSaving={isSaving} draftRow={draftRowOf(entry)}
-          suggestions={entry.key ? ANSWER_SUGGESTIONS[entry.key] : undefined}
-          isMultiline={entry.kind === "CUSTOM" || entry.key === "summary"} onSave={saveAnswer} onCancel={closeEditor} />
-      ) : null}
+      {isEditing ? <RowEditor entry={entry} reloads={reloads} isSaving={isSaving} onSave={save} onCancel={closeEditor} /> : null}
       <ConfirmDialog open={isConfirmingDelete} title="Delete this question?" confirmLabel="Delete" tone="danger" cancelLabel="Keep it" isBusy={isSaving}
         onCancel={() => setIsConfirmingDelete(false)}
         onConfirm={() => { setIsConfirmingDelete(false); save((onlyThis) => removeChange(entry, onlyThis)); }}>
         <p>“{entry.question}” and its answer go, and the extension stops filling it.</p>
       </ConfirmDialog>
     </li>
+  );
+}
+
+type RowEditorProps = {
+  entry: AutofillEntry;
+  /** Reloads finished after a refused save: each re-bases the editor on the answer it brought. */
+  reloads?: number;
+  isSaving: boolean;
+  onSave: (build: (onlyThis: boolean) => AutofillChange) => void;
+  onCancel: () => void;
+};
+
+/**
+ * A row's editor, which keeps the answer as it stood when it opened: a save sends that as the answer the user was
+ * shown, so one changed meanwhile (another tab, the extension) is refused (409), not saved over, even after another
+ * row's save read the whole list again (the PR 129 review, finding 3). An explicit Reload after that refusal re-bases it
+ * on the answer now saved, the answer typed kept, so the next save goes through; background reads never move it
+ * (Abdul's review of #140, #2). Exported for its test.
+ */
+export function RowEditor({ entry, reloads = 0, isSaving, onSave, onCancel }: RowEditorProps) {
+  const [opened, setOpened] = useState({ reloads, entry });
+  if (opened.reloads !== reloads) setOpened({ reloads, entry });
+  const shown = opened.reloads === reloads ? opened.entry : entry;
+  // A question of the user's own sends the answer it had when the editor opened too, so the route refuses a save over
+  // an answer changed meanwhile, as it does for BenchQ's questions (PR #140's review; backend/candidates/autofill.py
+  // `unseen`).
+  const saveAnswer = (answer: AutofillAnswer) =>
+    onSave((onlyThis) => (shown.kind === "CUSTOM"
+      ? { edit: {}, built: {}, reset: [], add: { [shown.question]: String(answer) }, remove: [], answered: { [shown.question]: shown.answer ?? null }, onlyThis }
+      : editChange(shown, answer, onlyThis)));
+  return (
+    <AnswerEditor question={shown.question} type={shown.type} initial={shown.answer} isSaving={isSaving} draftRow={draftRowOf(shown)}
+      suggestions={shown.key ? ANSWER_SUGGESTIONS[shown.key] : undefined}
+      isMultiline={shown.kind === "CUSTOM" || shown.key === "summary"} onSave={saveAnswer} onCancel={onCancel} />
   );
 }

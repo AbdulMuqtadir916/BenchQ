@@ -92,9 +92,27 @@ function kindOf(element: HTMLElement): FieldKind {
   return isInput(element) ? INPUT_KINDS[element.type] ?? "custom" : "custom";
 }
 
+/** A sign-in or sign-up form, whose email is the BDE's account, never the candidate's: a form the field sits in, out
+ * through the components around it, that holds a password field anywhere, a component's own too (the PR 129 review,
+ * finding 2: `closest` and `querySelector` stop at a component's edge). */
 function accountForm(element: HTMLElement): boolean {
-  return Boolean(element.closest("form")?.querySelector("input[type='password']"));
+  for (let node: Element | null = element; node; node = node.parentElement ?? hostOf(node)) {
+    if (node.tagName !== "FORM") continue;
+    // Each form is searched once a scan, not once per field: a large form was searched again for every field
+    // (PR #140's review).
+    let hasPassword = formsWithPassword.get(node);
+    if (hasPassword === undefined) {
+      hasPassword = queryDeep(node, "input[type='password']").length > 0;
+      formsWithPassword.set(node, hasPassword);
+    }
+    if (hasPassword) return true;
+  }
+  return false;
 }
+
+/** Whether each form holds a password field, for the scan running now: set anew by every scan, since a form can gain
+ * one later (a sign-up step). */
+let formsWithPassword = new WeakMap<Element, boolean>();
 
 /** What the BDE reads on the form comes first: a label saying "(optional)" beats whatever its markup says. */
 function isRequired(elements: HTMLElement[], label: string): boolean {
@@ -369,6 +387,7 @@ function pageSignals(doc: Document): PageSignals {
 }
 
 export function scanDocument(doc: Document, scanId: number, isTop: boolean): { registry: Registry; scan: FrameScan } {
+  formsWithPassword = new WeakMap();
   const entries = new Map<string, Entry>();
   const add = (build: (id: string) => Entry) => {
     const id = `f${entries.size}`;

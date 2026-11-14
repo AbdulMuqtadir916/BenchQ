@@ -5,6 +5,7 @@ had; the hand log with no candidate is retired."""
 import pytest
 
 from backend.applications.postings import job_hash, posting_job, read_content
+from backend.job_search import limits
 from backend.models.db import Application
 from backend.models.job_search import JobPosting, ScrapeJob
 from backend.tests.test_candidates_api import _create, world  # noqa: F401  (the fixture)
@@ -45,6 +46,19 @@ def test_a_posting_reads_the_one_way_whatever_wrote_it():
     assert job_hash("Acme", "QA Lead", "Text") != job_hash("Acme", "QA Lead", "Other text")
 
 
+def test_a_moved_job_reads_on_the_job_screens_and_for_tailoring():
+    """The PR 129 review, finding 6: the job screens and tailoring read a posting by `providers.reader_for`, which had
+    no reader for `legacy`, so a moved job read blank and tailoring refused it for having no description."""
+    from backend.job_search import providers
+    from backend.resume_tailor.runs import posting_text
+    content = {"title": "Java Developer", "company": "Acme", "description": "Build services.",
+               "url": "https://acme.example.test/jobs/1", "location": "Dallas, TX", "old_job_id": "x"}
+    fields = providers.reader_for("legacy").read(content)
+    assert (fields.title, fields.company, fields.description, fields.apply_url, fields.location) == (
+        "Java Developer", "Acme", "Build services.", "https://acme.example.test/jobs/1", "Dallas, TX")
+    assert posting_text(JobPosting(source="legacy", content=content)) == ("Build services.", "Java Developer")
+
+
 # ── Adding a job ────────────────────────────────────────────────────────────
 
 def test_an_added_job_is_a_posting_in_its_own_batch_and_a_saved_application(anonymous_client, test_db, world):
@@ -72,6 +86,19 @@ def test_the_same_job_again_is_the_one_the_candidate_has(anonymous_client, test_
     assert again.status_code == 200, again.text
     assert (again.json()["id"], again.json()["job_created"], again.json()["application_created"]) == (
         first["id"], False, False)
+    assert test_db.query(JobPosting).count() == 1 and test_db.query(ScrapeJob).count() == 1
+
+
+def test_an_added_job_counts_against_the_bdes_daily_captures_and_the_same_job_again_never_does(
+        anonymous_client, test_db, world, monkeypatch):
+    """The PR 129 review, finding 5: Add job skipped the capture route's daily cap, so a BDE at the cap kept adding."""
+    candidate = _candidate(anonymous_client, world)
+    first = _add(anonymous_client, world, candidate).json()
+    monkeypatch.setattr(limits, "CAPTURES_PER_BDE_PER_DAY", 1)
+    other = _add(anonymous_client, world, candidate, {**JOB, "title": "Data Engineer", "url": "https://boards.example.test/acme/456"})
+    assert other.status_code == 429 and "jobs today" in other.json()["detail"], other.text
+    again = _add(anonymous_client, world, candidate)
+    assert (again.status_code, again.json()["id"]) == (200, first["id"])
     assert test_db.query(JobPosting).count() == 1 and test_db.query(ScrapeJob).count() == 1
 
 

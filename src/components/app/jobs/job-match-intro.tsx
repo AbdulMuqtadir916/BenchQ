@@ -38,13 +38,20 @@ function useMatchStats(candidate: Candidate | null, jobs: Job[], applications: A
   }, [candidate, jobs, applications]);
 }
 
-function CountUp({ to, duration }: { to: number; duration: number }) {
+/**
+ * A count rising to `to`, which it always ends on. With reduced motion it is `to` at once: the value animation never
+ * updated it there, so the intro read "0 of 103 open roles accept this visa" and "0 strong matches (70+)" beside "Top
+ * match 98" (found testing on Windows with animations off, 2026-11-13). Exported for its test.
+ */
+export function CountUp({ to, duration }: { to: number; duration: number }) {
+  const reduce = useReducedMotion() ?? false;
   const [value, setValue] = useState(0);
   useEffect(() => {
-    const controls = animate(0, to, { duration, ease: EASE_OUT, onUpdate: (v) => setValue(Math.round(v)) });
+    if (reduce) return;
+    const controls = animate(0, to, { duration, ease: EASE_OUT, onUpdate: (v) => setValue(Math.round(v)), onComplete: () => setValue(to) });
     return () => controls.stop();
-  }, [to, duration]);
-  return <span className="tabular">{value}</span>;
+  }, [to, duration, reduce]);
+  return <span className="tabular">{reduce ? to : value}</span>;
 }
 
 /**

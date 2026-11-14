@@ -80,6 +80,9 @@ type Options = {
   fileName?: string | null;
   onSessionExpired: () => void;
   onAccessLost: () => void;
+  /** The tab shows another job's page the BDE hasn't kept (the panel asks whether to disconnect): nothing fills, on its
+   * own (a next page) or from a click, until they answer (PR #140's review, Abdul's #1). */
+  isHeld?: boolean;
 };
 
 /** What a tab's review remembers while the panel is open. Switching tabs unmounts the review, so this lives outside it. */
@@ -214,7 +217,12 @@ function withSaveOfferIn(memory: TabMemory, built: ReadonlyMap<string, unknown>,
 /** One connected tab's review, held in memory: scan the page, match it against the picked résumé's answers, fill what
  * has an answer, verify it stuck, follow what happens on the form, and undo. Unmounting (another tab, sign-out) drops
  * the answers. */
-export function useAutofill({ connection, firmId, resumeId, fileName = null, onSessionExpired, onAccessLost }: Options) {
+export function useAutofill({ connection, firmId, resumeId, fileName = null, onSessionExpired, onAccessLost, isHeld = false }: Options) {
+  // Read when a fill is about to start, which can be well after the render that started its run (a next page settles).
+  const held = useRef(isHeld);
+  useEffect(() => { held.current = isHeld; });
+  // Whether the rows on show came from a look begun or ended while held, which may have read another job's page.
+  const heldLook = useRef(false);
   const { tabId, applicationId, candidateId, job, confirmedHosts } = connection;
   // The résumé and application context the review in hand answers from; selection changes wait for this exact scan.
   const [answeredFrom, setAnsweredFrom] = useState<string | null | undefined>(undefined);
@@ -337,6 +345,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     const reviewed = withResumeFile(withHistory(buildReview(fields, answers, job), bank.current?.history ?? NO_HISTORY), bank.current?.file ?? null);
     const next = withMemory(reviewed, memory.current, resume.current, justFilled).map((row) => withSaveOffer(row, answers));
     showRows(next);
+    // While the panel asks whether the tab moved on to another job, the look goes on (it's how the job is checked), but
+    // that page's fields aren't this application's: none go into its form for Mark applied (PR #140's review).
+    if (held.current || heldLook.current) return;
     const { settled } = memory.current;
     const autofilled = new Map(next.flatMap((row) => {
       const value = settled.get(memoKeyOf(row));
@@ -348,13 +359,14 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const scan = useCallback(async (justFilled?: ReadonlySet<string>, reuseBank = false) => {
     // The résumés are still loading: there's nothing to answer from yet.
     if (busy.current || resumeId === undefined) return;
+    const isHeldAtStart = held.current;
     latestScan.current += 1;
     const run = latestScan.current;
     const isCurrent = () => run === latestScan.current && !busy.current;
     isScanRunning.current = true;
     setScanning(true);
-    const held = reuseBank && bank.current?.resumeId === resumeId ? bank.current : null;
-    const [answers, file] = held ? [held, held.file] : await Promise.all([loadAnswers(), loadFile()]);
+    const reused = reuseBank && bank.current?.resumeId === resumeId ? bank.current : null;
+    const [answers, file] = reused ? [reused, reused.file] : await Promise.all([loadAnswers(), loadFile()]);
     const page = answers ? await readPage(isCurrent) : null;
     if (answers && page && isCurrent()) {
       try {
@@ -366,6 +378,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
         }
         memory.current.lastScan = topScan;
         bank.current = { ...answers, resumeId, file };
+        heldLook.current = isHeldAtStart || held.current;
         review(page.fields, answers.entries, justFilled);
         setAttachment(file?.name ?? null);
         frames.current = page;
@@ -389,6 +402,18 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   // The scan for the current résumé, for a click that started before the résumé changed (Allow, while Chrome asks).
   const currentScan = useRef(scan);
   useEffect(() => { currentScan.current = scan; }, [scan]);
+
+  // The hold lifted: the BDE kept the tab connected on the page it moved to, or the tab went back to the job. Nothing
+  // went into this application's form while held, so a fresh look takes in the page the tab shows now; never the rows
+  // from while it was held, which can be the other job's (PR #140's review).
+  const wasHeld = useRef(isHeld);
+  useEffect(() => {
+    const isLifted = wasHeld.current && !isHeld;
+    wasHeld.current = isHeld;
+    if (!isLifted) return;
+    const look = window.setTimeout(() => void currentScan.current(), 0);
+    return () => window.clearTimeout(look);
+  }, [isHeld]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void scan(), 0);
@@ -522,13 +547,15 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     const filled: FillableRow[] = [];
     let stopped = false;
     for (const row of rows) {
+      // The tab moved on to another job mid-run: nothing more is written there (PR #140's review); the run ends as held.
+      if (held.current) break;
       const { field, write, key } = row;
       const label = fieldLabel(field);
       track({ key, label, status: "filling" });
       const scanId = frames.current.scanIds.get(field.frameId);
       const request = { scanId: scanId ?? 0, fieldId: field.id, current: field.current };
       const fill = write.type === "choice"
-        ? fillChoice(tabId, field.frameId, { ...request, search: write.value.split(",")[0]!.trim() }, write.value, write.also)
+        ? fillChoice(tabId, field.frameId, { ...request, search: write.value.split(",")[0]!.trim() }, write.value, write.also, () => held.current)
         : fillField(tabId, field.frameId, { ...request, write });
       const result = scanId === undefined ? STALE : await fill.catch(() => STALE);
       if (result.status === "stale") {
@@ -581,7 +608,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
    * before the run. A field that was there keeps whatever the first pass left it. The résumé's file goes on before
    * anything else: what the site reads from it is then the site's, and the answers replace it (07 Q50). */
   const fillRows = useCallback(async (first: FillableRow[], passes: number) => {
-    if (busy.current || needsConfirmation || first.length === 0) return;
+    if (busy.current || needsConfirmation || held.current || first.length === 0) return;
     busy.current = true;
     setOutcome(null);
     setUndoNote("");
@@ -615,11 +642,12 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       busy.current = false;
       await scan(new Set(filled.map(memoKeyOf).filter((key) => !memory.current.handedBack.has(key))));
       busy.current = true;
-      batch = (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !isAttachment(row as FillableRow));
+      // Held while the file settled (the tab moved on to another job): no answer goes on (PR #140's review).
+      batch = held.current ? [] : (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !isAttachment(row as FillableRow));
       const count = batch.length;
       setRun((current) => current && { ...current, total: files.length + count });
     }
-    for (let pass = 0; pass < passes && batch.length > 0; pass += 1) {
+    for (let pass = 0; pass < passes && batch.length > 0 && !held.current; pass += 1) {
       const count = batch.length;
       if (pass > 0) setRun((current) => current && { ...current, total: current.total + count });
       batch.forEach((row) => known.add(memoKeyOf(row)));
@@ -634,6 +662,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
       if (stopped) break;
       batch = (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !known.has(memoKeyOf(row)));
     }
+    // A run the hold cut short ends as stopped, so the panel says it didn't finish.
+    if (held.current) total.stopped = true;
     busy.current = false;
     setFilling(false);
     setRun(null);
@@ -646,6 +676,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     busy.current = true;
     setStep(STEP_CLEARING);
     for (const row of stale) {
+      if (held.current) break;
       const scanId = frames.current.scanIds.get(row.field.frameId);
       const target = { scanId: scanId ?? 0, fieldId: row.field.id };
       const isBack = scanId !== undefined && await takeBackField(tabId, row.field.frameId, target).catch(() => false);
@@ -672,6 +703,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     setStep(STEP_REMOVING);
     let isRemoved = false;
     for (const [key, name] of old) {
+      if (held.current) break;
       if (!await removeFileOnPage(tabId, name).catch(() => false)) continue;
       memory.current.attached.delete(key);
       memory.current.settled.delete(key);
@@ -700,7 +732,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     for (const [kind, type] of [["education", "education-school"], ["work", "current-company"]] as const) {
       const wanted = Math.min((bank.current?.history ?? NO_HISTORY)[kind].length, MAX_ENTRIES);
       let blocks = blocksOf(type);
-      while (blocks > 0 && blocks < wanted && await addEntryIn(tabId, kind).catch(() => false)) {
+      while (blocks > 0 && blocks < wanted && !held.current && await addEntryIn(tabId, kind, () => held.current).catch(() => false)) {
         await new Promise((resolve) => setTimeout(resolve, ENTRY_MS));
         if (resume.current !== picked) return;
         await scan(undefined, true);
@@ -714,13 +746,16 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   }, [fillRows, scan, tabId]);
 
   const autofill = useCallback(async () => {
-    if (busy.current || needsConfirmation) return;
+    if (busy.current || needsConfirmation || held.current) return;
     memory.current.autoSteps = true;
     setIsFollowingSteps(true);
     try {
       await removeOldFiles(bank.current?.file?.name ?? null);
+      // Each step checks the hold again: the tab can move on to another job while one runs (PR #140's review).
+      if (held.current) return;
       const stale = (shownRows.current ?? []).filter((row) => row.isStale);
       if (stale.length > 0) await takeBackStale(stale);
+      if (held.current) return;
       setStep(null);
       await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
       await addEntries();
@@ -757,7 +792,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     const pageCheck = page === null ? null : checkJob(job, page);
     const isOtherJob = page !== null && pageCheck !== null && pageCheck.conflict
       && !confirmedHosts.includes(confirmationKey(page.url, pageCheck.detected));
-    if (isOtherJob) return;
+    // Another job, by its page or by the panel's own rule (another posting on the job's site, not kept): no fill.
+    if (isOtherJob || held.current) return;
     if (memory.current.autoSteps && !busy.current && (shownRows.current ?? []).some(isFillable)) await autofill();
   }, [autofill, confirmedHosts, job, scan, settle]);
   useEffect(() => {
@@ -790,10 +826,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const choose = useCallback(async (row: ReviewRow, label: string) => {
     const { field } = row;
     const scanId = frames.current.scanIds.get(field.frameId);
-    if (busy.current || scanId === undefined) return;
+    if (busy.current || held.current || scanId === undefined) return;
     busy.current = true;
     const request = { scanId, fieldId: field.id, current: field.current, search: label };
-    const result = await chooseChoice(tabId, field.frameId, request, label).catch(() => STALE);
+    const result = await chooseChoice(tabId, field.frameId, request, label, () => held.current).catch(() => STALE);
     const key = memoKeyOf(row);
     if (result.status === "filled") {
       memory.current.handedBack.delete(key);

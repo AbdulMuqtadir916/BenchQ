@@ -70,7 +70,9 @@ export const keepMineChange = (entry: AutofillEntry, onlyThis: boolean): Autofil
 /** A question of the user's own, new or answered again (the same words find it, 07 Q43). */
 export const addChange = (question: string, answer: string, onlyThis: boolean): AutofillChange => ({ ...nothing(onlyThis), add: { [question.trim()]: answer.trim() } });
 
-export const removeChange = (entry: AutofillEntry, onlyThis: boolean): AutofillChange => ({ ...nothing(onlyThis), remove: [entry.question] });
+/** A question of the user's own, deleted: with the answer it had when shown, so one changed meanwhile isn't lost unseen. */
+export const removeChange = (entry: AutofillEntry, onlyThis: boolean): AutofillChange =>
+  ({ ...nothing(onlyThis), remove: [entry.question], answered: { [entry.question]: entry.answer ?? null } });
 
 /** A question the user may add: not blank, not too long, and not in the words of one of BenchQ's (`asked`). */
 export function questionError(question: string, asked: readonly AutofillEntry[]): string | null {

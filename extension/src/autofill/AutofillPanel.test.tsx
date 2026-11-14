@@ -9,9 +9,11 @@ import AutofillPanel from "./AutofillPanel";
 import type { AppliedForm, Connection, ReviewRow, TabField } from "./types";
 import { useAutofill } from "./use-autofill";
 import { useResumes, type ApplicationContextStatus, type Resumes } from "./use-resumes";
+import { useTailoring, type Tailoring } from "./use-tailoring";
 
 vi.mock("./use-autofill", () => ({ useAutofill: vi.fn() }));
 vi.mock("./use-resumes", () => ({ useResumes: vi.fn() }));
+vi.mock("./use-tailoring", async (actual) => ({ ...await actual<typeof import("./use-tailoring")>(), useTailoring: vi.fn() }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 installDialog();
@@ -35,10 +37,17 @@ const row = (label: string, required: boolean, current = ""): ReviewRow => ({
   key: label, status: "manual", field: { label, required, current } as TabField,
 });
 
-const base = { id: "res-2", label: "Base 1 · Java Developer · v2", meta: "Base 1 · v2", isTailored: false, isActive: true, title: "Java Developer" };
-const tailored = { id: "res-9", label: "Tailored for this job · from Base 1 · v1", meta: "Tailored for this job · from Base 1 · v1", isTailored: true, isActive: false, title: "Java Developer" };
+const base = { id: "res-2", label: "Base 1 · Java Developer · v2", meta: "Base 1 · v2", isTailored: false, isActive: true, title: "Java Developer", baseId: "base-1" };
+const tailored = { id: "res-9", label: "Tailored for this job · from Base 1 · v1", meta: "From Base 1 · v1", isTailored: true, isActive: false, title: "Java Developer", baseId: "base-1" };
 const pick = vi.fn();
 const retry = vi.fn();
+const refresh = vi.fn();
+/** What Tailor reads: Base 1's version 1. */
+const source = { resumeId: "res-1", baseId: "base-1", label: "Base 1 (Active)" };
+const tailorStart = vi.fn();
+const tailorDismiss = vi.fn();
+let tailoring: Tailoring = { status: "idle" };
+let refreshFailed = false;
 const oneResume: Resumes = { status: "ready", choices: [base], picked: base };
 
 let root: Root | null = null;
@@ -54,8 +63,9 @@ type State = {
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
 };
 
-function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null } = {}, resumes: Resumes = oneResume) {
-  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
+function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null; tabUrl?: string | null } = {}, resumes: Resumes = oneResume) {
+  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry, refresh, refreshFailed, source });
+  vi.mocked(useTailoring).mockReturnValue({ tailoring, start: tailorStart, dismiss: tailorDismiss });
   const applicationStatus = panel.applicationStatus ?? "ready";
   vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (applicationStatus === "ready" && resumes.status === "ready" ? { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
   fake = fakeChrome();
@@ -69,7 +79,8 @@ function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: str
 
 /** The panel again with what the hooks now say, as after the BDE's pick. */
 function update(state: State, resumes: Resumes) {
-  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry });
+  vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry, refresh, refreshFailed, source });
+  vi.mocked(useTailoring).mockReturnValue({ tailoring, start: tailorStart, dismiss: tailorDismiss });
   const appConnection = element.props.connection;
   vi.mocked(useAutofill).mockReturnValue({ ...reviewed, ...state, reviewedFor: state.reviewedFor ?? (resumes.status === "ready" ? { applicationId: appConnection.applicationId, candidateId: appConnection.candidateId, resumeId: resumes.picked?.id ?? null } : null) } as unknown as ReturnType<typeof useAutofill>);
   // A copy, so React renders the panel again instead of keeping the one it has.
@@ -86,6 +97,8 @@ afterEach(() => {
   act(() => { root?.unmount(); });
   root = null;
   host.remove();
+  tailoring = { status: "idle" };
+  refreshFailed = false;
   vi.clearAllMocks();
 });
 
@@ -169,7 +182,7 @@ describe("the résumé the answers come from", () => {
     expect(autofill).not.toHaveBeenCalled();
 
     vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows, fillCount: 1, reviewedFor: { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id } } as unknown as ReturnType<typeof useAutofill>);
-    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [base], picked: base }, pick, retry });
+    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [base], picked: base }, pick, retry, refresh, refreshFailed, source });
     element = cloneElement(element, { connection: { ...connection, applicationId: "app-2" } });
     await act(async () => { root!.render(element); });
 
@@ -193,7 +206,7 @@ describe("the résumé the answers come from", () => {
     expect(pick).toHaveBeenCalledWith(tailored.id);
     // The new résumé's review can't happen on a site BenchQ may not read: access is asked for, nothing is scanned.
     vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows: null, needsAccess: access, isAccessDenied: true, reviewedFor: null } as unknown as ReturnType<typeof useAutofill>);
-    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [tailored, base], picked: tailored }, pick, retry });
+    vi.mocked(useResumes).mockReturnValue({ resumes: { status: "ready", choices: [tailored, base], picked: tailored }, pick, retry, refresh, refreshFailed, source });
     element = cloneElement(element);
     await act(async () => { root!.render(element); });
     expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
@@ -217,23 +230,35 @@ describe("the résumé the answers come from", () => {
 
   it("says the one résumé is the only one, with a way to add another in BenchQ", () => {
     show({ fillCount: 1 }, { resumesUrl: "https://app.test/acme-staffing/candidates/cand-1?tab=resumes" });
-    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("· 1 resume");
+    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("1 resume");
     const only = picker().querySelector("[data-slot='resume-only']")!;
-    expect(only.textContent).toBe("Only resume·Add another in BenchQ");
-    expect(only.querySelector("a")!.getAttribute("href")).toBe("https://app.test/acme-staffing/candidates/cand-1?tab=resumes");
+    expect(only.textContent).toBe("Only resumeViewAdd another in BenchQ");
+    expect([...only.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toEqual([
+      "http://localhost:3000/acme-staffing/resumes/res-2", "https://app.test/acme-staffing/candidates/cand-1?tab=resumes"]);
     expect(picker().querySelector("[data-slot='resume-select']")).toBeNull();
   });
 
   it("says how many résumés there are to choose from, closed and open", async () => {
     show({ fillCount: 1 }, {}, twoResumes);
-    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("· 2 resumes");
-    expect(select().querySelector("[data-slot='resume-change']")!.textContent).toBe("Change");
+    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("2 resumes");
+    expect(select().querySelector("[data-slot='resume-change']")).not.toBeNull();
     expect(select().getAttribute("aria-label")).toBe(`Change the resume, 2 resumes to choose from. In use: ${base.label}`);
     expect(picker().querySelector("[data-slot='resume-only']")).toBeNull();
     await open();
-    const title = picker().querySelector("[data-slot='resume-list-title']")!;
-    expect(title.textContent).toBe("2 resumes for Priya");
-    expect(picker().querySelector("ul")!.getAttribute("aria-labelledby")).toBe(title.id);
+    // The menu is named by the section's "Resume", with no title of its own (less to read).
+    expect(picker().querySelector("[data-slot='resume-list-title']")).toBeNull();
+    expect(document.getElementById(select().getAttribute("aria-controls")!)!.getAttribute("aria-labelledby")).toBe("resume-picker-title");
+    // This job's tailored résumés, then the bases, each group named, and each group's list by its name.
+    const groups = [...picker().querySelectorAll("[data-slot='resume-group-title']")];
+    expect(groups.map(({ textContent }) => textContent)).toEqual(["Tailored for this job", "Base resumes"]);
+    expect([...picker().querySelectorAll("[data-slot='resume-group'] ul")].map((list) => list.getAttribute("aria-labelledby"))).toEqual(groups.map(({ id }) => id));
+  });
+
+  it("names no group when there are only bases", async () => {
+    show({ fillCount: 1 }, {}, { status: "ready", choices: [base, { ...base, id: "res-3", isActive: false, meta: "Base 2 · v1", baseId: "base-2" }], picked: base });
+    await open();
+    expect(picker().querySelector("[data-slot='resume-group-title']")).toBeNull();
+    expect(picker().querySelector("[data-slot='resume-group'] ul")!.getAttribute("aria-labelledby")).toBe("resume-picker-title");
   });
 
   it("starts closed on the résumé in use; its ▾ opens one row per résumé, the one in use ticked, and Esc closes them", async () => {
@@ -244,11 +269,12 @@ describe("the résumé the answers come from", () => {
     await open();
     expect(select().getAttribute("aria-expanded")).toBe("true");
     expect(options().map((option) => option.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
-    expect(options()[0]!.textContent).toContain("Tailored for this job · from Base 1 · v1");
+    expect(options()[0]!.textContent).toContain("From Base 1 · v1");
     expect(picker().querySelector("button")).toBe(select());
-    const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
-    expect(choices[0]!.querySelector("a")!.getAttribute("aria-label")).toBe(`View ${tailored.label} in BenchQ`);
-    expect(choices[0]!.querySelector("a")!.getAttribute("href")).toContain("/resumes/res-9");
+    // No link on each row: one "View in BenchQ" at the menu's foot, for the résumé in use.
+    expect([...picker().querySelectorAll("[data-slot='resume-choice'] a")]).toHaveLength(0);
+    const view = picker().querySelector("[data-slot='resume-view']")!;
+    expect([view.getAttribute("aria-label"), view.getAttribute("href")]).toEqual([`View ${base.label} in BenchQ`, "http://localhost:3000/acme-staffing/resumes/res-2"]);
     await press(options()[1]!, "Escape");
     expect(select().getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(select());
@@ -259,6 +285,10 @@ describe("the résumé the answers come from", () => {
     await press(select(), "ArrowDown");
     expect(document.activeElement).toBe(options()[1]);
     await press(options()[1]!, "ArrowUp");
+    expect(document.activeElement).toBe(options()[0]);
+    await press(options()[0]!, "End");
+    expect(document.activeElement).toBe(options()[1]);
+    await press(options()[1]!, "Home");
     expect(document.activeElement).toBe(options()[0]);
   });
 
@@ -281,6 +311,14 @@ describe("the résumé the answers come from", () => {
     const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
     expect(choices.map((choice) => choice.querySelector("[data-slot='resume-active']")?.textContent ?? null)).toEqual([null, "Active"]);
     expect(choices[1]!.querySelector("[data-slot='resume-picked']")!.textContent).toBe("Java Developer");
+  });
+
+  it("tags a résumé tailored for this job Tailored, as the website does, closed and in the list", async () => {
+    show({ fillCount: 1 }, {}, { ...twoResumes, picked: tailored });
+    expect(select().querySelector("[data-slot='resume-tailored']")!.parentElement!.textContent).toBe("From Base 1 · v1Tailored");
+    await open();
+    const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
+    expect(choices.map((choice) => choice.querySelector("[data-slot='resume-tailored']")?.textContent ?? null)).toEqual(["Tailored", null]);
   });
 
   it("closes once a résumé is picked", async () => {
@@ -676,5 +714,172 @@ describe("confirming Mark applied", () => {
       expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
       expect(scrolled.mock.contexts[0]).toBe(host.querySelector("[data-slot='autofill-result']"));
     });
+  });
+});
+
+describe("Tailor for this job", () => {
+  /** The connected job's saved record: `job_id` is the candidate's posting, which tailoring reads. */
+  const job = { id: "app-1", candidate_id: "cand-1", status: "saved", title: "Java Developer", company: "Acme", url: null, location: null, job_id: "posting-1" } as Application;
+  const twoResumes: Resumes = { status: "ready", choices: [tailored, base], picked: base };
+  const tailor = () => host.querySelector("[data-slot='tailor']");
+
+  it("sits at the foot of the résumés, says which base it reads, and starts from that base's version 1", async () => {
+    show({ fillCount: 1 }, { details: job });
+    expect(host.querySelector("[data-slot='resume-picker']")!.contains(tailor())).toBe(true);
+    // One line: how long it takes; what it does is the button's tooltip and description.
+    expect(tailor()!.querySelector("[data-slot='tailor-from']")!.textContent).toBe("Rewrites Base 1 (Active) to fit this job, about a minute");
+    expect(named("Tailor resume for this job").getAttribute("title")).toBe("Rewrites Base 1 (Active) to fit this job");
+    await click("Tailor resume for this job");
+    expect(tailorStart).toHaveBeenCalledWith("res-1");
+    expect(vi.mocked(useTailoring).mock.lastCall?.[0]).toMatchObject({ firmId: "firm-1", candidateId: "cand-1", jobId: "posting-1" });
+  });
+
+  it("says Tailor again once that base has a résumé tailored for this job", () => {
+    show({ fillCount: 1 }, { details: job }, twoResumes);
+    expect(named("Tailor again")).toBeDefined();
+  });
+
+  it("isn't offered before the job's record is confirmed, or for a candidate with no résumé", () => {
+    show({ fillCount: 1 }, { details: null });
+    expect(tailor()).toBeNull();
+    act(() => { root?.unmount(); });
+    host.remove();
+    show({ fillCount: 1 }, { details: job, applicationStatus: "loading" }, { status: "loading" });
+    expect(tailor()).toBeNull();
+    act(() => { root?.unmount(); });
+    host.remove();
+    show({ fillCount: 0 }, { details: job }, { status: "ready", choices: [], picked: null });
+    expect(tailor()).toBeNull();
+  });
+
+  it("shows the step it's on, how far along it is, and its clock while it runs", () => {
+    tailoring = { status: "running", runId: "run-1", step: "draft", startedAt: Date.now() - 65_000 };
+    show({ fillCount: 1 }, { details: job });
+    expect(tailor()!.querySelector("[role='status']")!.textContent).toBe("Writing the draft…");
+    const bar = tailor()!.querySelector("[role='progressbar']")!;
+    expect([bar.getAttribute("aria-valuenow"), bar.getAttribute("aria-valuetext")]).toEqual(["2", "Step 2 of 6: Writing the draft"]);
+    expect(tailor()!.querySelector("[data-slot='tailor-clock']")!.textContent).toMatch(/^1:0\d$/);
+    expect(tailor()!.querySelector("[data-slot='tailor-start']")).toBeNull();
+  });
+
+  it("offers the finished résumé to use, which picks it and so fills the form from it, once it's in the list", async () => {
+    tailoring = { status: "completed", resumeId: "res-9" };
+    show({ fillCount: 1 }, { details: job }, twoResumes);
+    expect(tailor()!.textContent).toContain("Tailored resume ready");
+    await click("Use this resume");
+    expect(pick).toHaveBeenCalledWith("res-9");
+    expect(tailor()!.querySelector("a")!.getAttribute("href")).toContain("/resumes/res-9");
+    act(() => { root?.unmount(); });
+    host.remove();
+    tailoring = { status: "completed", resumeId: "res-new" };
+    show({ fillCount: 1 }, { details: job }, twoResumes);
+    expect(named("Use this resume").disabled).toBe(true);
+    expect(tailor()!.textContent).toContain("Adding it to the list");
+  });
+
+  it("says when the list couldn't be read again once it finished, and reads it again on Reload resumes (PR #140 review)", async () => {
+    tailoring = { status: "completed", resumeId: "res-new" };
+    refreshFailed = true;
+    show({ fillCount: 1 }, { details: job }, twoResumes);
+    expect(tailor()!.querySelector("[data-slot='tailor-reload']")!.textContent).toContain("couldn't add the new resume to the list");
+    expect(tailor()!.textContent).not.toContain("Adding it to the list");
+    await click("Reload resumes");
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("says when the finished résumé is the one in use", () => {
+    tailoring = { status: "completed", resumeId: "res-9" };
+    show({ fillCount: 1 }, { details: job }, { ...twoResumes, picked: tailored });
+    expect(tailor()!.textContent).toContain("Tailored resume in use");
+    expect(named("Use this resume")).toBeUndefined();
+  });
+
+  it("says why it failed, with Try again when that can help", async () => {
+    tailoring = { status: "failed", message: "Tailoring didn't finish. Try again.", canRetry: true };
+    show({ fillCount: 1 }, { details: job });
+    expect(tailor()!.querySelector("[role='alert']")!.textContent).toContain("Tailoring didn't finish.");
+    await click("Try again");
+    expect(tailorStart).toHaveBeenCalledWith("res-1");
+    await click("Close");
+    expect(tailorDismiss).toHaveBeenCalled();
+  });
+});
+
+describe("the job's steps, for a BDE new to the panel", () => {
+  const steps = () => [...host.querySelectorAll("[data-slot='next-step']")]
+    .map((step) => [step.lastElementChild!.firstChild!.textContent, step.getAttribute("data-state")]);
+
+  it("say what's done and what to do now, from the resume to Mark applied", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() });
+    expect(steps()).toEqual([["Resume", "done"], ["Autofill", "now"], ["Submit on site", "later"], ["Mark applied", "later"]]);
+    expect(host.querySelector("[aria-current='step']")!.textContent).toContain("Autofill");
+  });
+
+  it("move on to submitting once nothing is left to fill, and are all done once the job is applied", () => {
+    show({ fillCount: 0, rows: [row("Email", true, "priya@example.test")], outcome: { filled: 1, handedBack: 0, stopped: false } }, { onApply: vi.fn() });
+    expect(steps().map(([, state]) => state)).toEqual(["done", "done", "now", "later"]);
+    act(() => { root?.unmount(); });
+    host.remove();
+    show({ fillCount: 0, rows: [row("Email", true, "priya@example.test")] }, { isApplied: true });
+    expect(steps().map(([, state]) => state)).toEqual(["done", "done", "done", "done"]);
+    expect(host.querySelector("[aria-current='step']")).toBeNull();
+  });
+});
+
+describe("what the panel shows first", () => {
+  const body = () => host.querySelector("[data-slot='autofill-body']")!;
+
+  it("puts Autofill above the resume it answers from", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] });
+    const run = body().querySelector("[data-slot='autofill-run']")!;
+    const resume = body().querySelector("[data-slot='resume-picker']")!;
+    expect(run.compareDocumentPosition(resume) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("asks for a site's permission alone, Mark applied kept, and shows the rest once it's given", () => {
+    show({ fillCount: 0, rows: null, needsAccess: { origins: ["https://jobs.acme.test/*"], host: "jobs.acme.test" } }, { onApply: vi.fn() });
+    expect(body().querySelector("[data-slot='resume-picker']")).toBeNull();
+    expect(body().querySelector("[data-slot='next-steps']")).toBeNull();
+    expect(body().querySelector("[data-slot='autofill-run']")).toBeNull();
+    expect(body().textContent).toContain("jobs.acme.test");
+    expect(named("Mark applied")).toBeDefined();
+    act(() => { root?.unmount(); });
+    host.remove();
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() });
+    expect(body().querySelector("[data-slot='resume-picker']")).not.toBeNull();
+  });
+
+  it("asks to disconnect when the tab moved on to another job on the job's site, and shows nothing else until answered", async () => {
+    const onDisconnect = vi.fn();
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn(), tabUrl: "https://jobs.acme.test/jobs/98765" });
+    element = cloneElement(element, { onDisconnect } as never);
+    act(() => { root!.render(element); });
+    expect(body().querySelector("[data-slot='moved-away']")!.textContent).toContain("This tab now shows another job.");
+    expect(body().querySelector("[data-slot='resume-picker']")).toBeNull();
+    expect(named("Mark applied")).toBeUndefined();
+    await click("Disconnect");
+    expect(onDisconnect).toHaveBeenCalled();
+    await click("Keep it connected");
+    expect(body().querySelector("[data-slot='moved-away']")).toBeNull();
+    expect(body().querySelector("[data-slot='resume-picker']")).not.toBeNull();
+  });
+
+  it("never asks on the job's own page, its application, or another site (an ATS the job sends the BDE to)", () => {
+    for (const tabUrl of ["https://jobs.acme.test/1", "https://jobs.acme.test/1/apply", "https://boards.greenhouse.io/acme/jobs/555"]) {
+      show({ fillCount: 2, rows: [row("Email", true)] }, { tabUrl });
+      expect(body().querySelector("[data-slot='moved-away']"), tabUrl).toBeNull();
+      act(() => { root?.unmount(); });
+      host.remove();
+    }
+    show({ fillCount: 2, rows: [row("Email", true)] });
+  });
+});
+
+describe("fills while the panel asks about another job (PR #140, second review)", () => {
+  it("are held, automatic ones included, until the BDE keeps the tab", async () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { tabUrl: "https://jobs.acme.test/jobs/98765" });
+    expect(vi.mocked(useAutofill).mock.lastCall?.[0].isHeld).toBe(true);
+    await click("Keep it connected");
+    expect(vi.mocked(useAutofill).mock.lastCall?.[0].isHeld).toBe(false);
   });
 });

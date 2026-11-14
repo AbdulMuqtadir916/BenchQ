@@ -1142,6 +1142,21 @@ describe("fields inside components (shadow DOM)", () => {
     expect(fieldsNow().map(({ label }) => label)).toEqual(["First name", "Last name", "Phone", "City"]);
   });
 
+  it("marks a sign-in form whose email and password sit in components, and no form beside it (PR 129 review)", () => {
+    document.body.innerHTML = `<form><email-box></email-box><password-box></password-box></form><contact-box></contact-box>`;
+    shadow(document.querySelector("email-box")!, `<label>Email <input type="email"></label>`);
+    shadow(document.querySelector("password-box")!, `<label>Password <input type="password"></label>`);
+    shadow(document.querySelector("contact-box")!, `<label>Email <input type="email"></label>`);
+    expect(fieldsNow().filter(({ label }) => label === "Email").map(({ inAccountForm }) => inAccountForm)).toEqual([true, false]);
+  });
+
+  it("looks for a form's password once a scan, and sees one the form gained since the last scan (PR #140 review)", () => {
+    document.body.innerHTML = `<form><label>Email <input type="email"></label><label>Phone <input type="tel"></label></form>`;
+    expect(fieldsNow().map(({ inAccountForm }) => inAccountForm)).toEqual([false, false]);
+    document.querySelector("form")!.insertAdjacentHTML("beforeend", `<label>Password <input type="password"></label>`);
+    expect(fieldsNow().filter(({ label }) => label !== "Password").map(({ inAccountForm }) => inAccountForm)).toEqual([true, true]);
+  });
+
   it("reads a question that sits on the component: its aria-label, an element naming it, its label, the text before it", () => {
     document.body.innerHTML = `<email-box aria-label="Email"></email-box><ui5-label for="z">Zip code</ui5-label><zip-box id="z"></zip-box>`
       + `<city-box label="City"></city-box><div>Country</div><country-box></country-box>`;
