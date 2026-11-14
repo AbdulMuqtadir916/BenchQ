@@ -77,10 +77,7 @@ NOT_PERSONAL = {
     ("analyzer/cv_scorer.py", "_fetch_job_text"): "a job page's fetch error",
     ("analyzer/llm_client.py", "call_llm"): "the provider's error names the status, not the prompt",
     ("analyzer/llm_cost.py", "refresh_openrouter_prices"): "OpenRouter's price list",
-    ("api/routes_applications.py", "_cache_job_page"): "a job posting's URL and page",
-    ("api/routes_applications.py", "_fetch_and_store_description"): "a job posting's page",
     ("api/routes_applications.py", "_known_posting"): "a job posting's URL",
-    ("api/routes_applications.py", "create_application"): "a company's name",
     ("api/routes_applications.py", "extract_posting"): "a job posting's URL",
     ("api/routes_autofill.py", "_events"): "the provider's error names the status, not the prompt",
     ("api/routes_autofill.py", "autofill_answer"): "the provider's error names the status, not the prompt",
@@ -93,6 +90,10 @@ NOT_PERSONAL = {
     ("scheduler.py", "run_auto_reject"): "a scheduler setting's error",
     ("scheduler.py", "run_db_backup"): "pg_dump's error; the password is in its environment, not its output",
     ("scraper/ats/phenom.py", "scrape"): "a job board's endpoint and fields",
+    # The résumé tailor's steps (docs/team/tailoring.md): a step's name ("analyse") and fixed reasons ("not in the
+    # CV", "dropped"), counted; never the CV, the résumé or the model's reply.
+    ("resume_tailor/pipeline.py", "_ask"): "a step's name",
+    ("resume_tailor/pipeline.py", "tailor"): "counts and fixed reasons of the edits and the fact gate",
 }
 
 # (file, function) -> who was told. Found by Abdul's review of #107, a search of every log call (2026-11-03) and this
@@ -101,7 +102,6 @@ KNOWN = {
     ("analyzer/cover_letter_generator.py", "generate_cover_letter_body"): "Zuhair: raw AI reply",
     ("analyzer/cv_scorer.py", "_score_job_inner"): "Zuhair: raw AI reply",
     ("analyzer/cv_scorer.py", "analyze_unscored_jobs"): "Zuhair: a résumé's name",
-    ("analyzer/legacy_tailoring.py", "_tailor_impl"): "Zuhair: raw AI reply (moved from routes_resumes.py)",
     ("api/routes_searches.py", "test_search"): "Zuhair: search name",
     ("scraper/orchestrator.py", "run_all"): "Zuhair: search name",
     ("scraper/orchestrator.py", "_run_search_by_id"): "Zuhair: search name",

@@ -30,7 +30,7 @@ export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct
   onMakeJobCopy?: () => void;
 }) {
   const candidates = useMemo(() => [candidate], [candidate]);
-  const labels = useTreeLabels(candidates);
+  const labels = useTreeLabels(candidates, shelf);
   const tree = useMemo(() => (shelf ? buildResumeTree(shelf, [candidate.id])[0] : undefined), [shelf, candidate.id]);
   const cards = useMemo(() => resumeCards(tree?.bases ?? [], candidate.primaryRole), [tree, candidate.primaryRole]);
   const hiddenCards = useMemo(() => resumeCards(tree?.hidden ?? [], candidate.primaryRole), [tree, candidate.primaryRole]);
