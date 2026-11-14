@@ -3,6 +3,7 @@ import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from backend.auth.platform_actions import logs_platform_action
 from backend.models.db import get_db, Setting
 from backend.scheduler import configure_scheduler
 from backend.analyzer.cv_scorer import reset_scoring_semaphore
@@ -34,7 +35,7 @@ def get_settings(db: Session = Depends(get_db)):
     return result
 
 
-@router.patch("")
+@router.patch("", dependencies=[Depends(logs_platform_action("Changed settings", entity_type="setting", action="UPDATE", fields=True))])
 def update_settings(updates: dict, db: Session = Depends(get_db)):
     """Update one or more settings; only keys the app reads are writable (unknown -> 400 as a group), and values are validated (integers non-negative, `*_cron` a parseable 5-field expression, enums known) since a bad one could crash configure_scheduler() and prevent the backend from starting."""
     from backend.seed import invalid_setting_values, unknown_setting_keys

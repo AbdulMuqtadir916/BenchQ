@@ -15,13 +15,13 @@ import { managerRowLabel, ownerRowLabel, type Rail, type Selection, type Viewer 
 const SEARCH_FROM = 6;
 
 /** Rows that sit under the person above them: managers under the owner, BDEs under a manager. */
-const Indented = ({ children }: { children: ReactNode }) => (
+export const Indented = ({ children }: { children: ReactNode }) => (
   <div className="ml-5 border-l border-[var(--color-border-strong)] pl-2">{children}</div>
 );
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
-function Row({ name, subtitle, count, avatar, icon, tag, isSelected, opens, onClick }: {
+export function Row({ name, subtitle, count, avatar, icon, tag, isSelected, opens, isDanger, onClick }: {
   name: string;
   subtitle: string;
   count: number;
@@ -30,6 +30,7 @@ function Row({ name, subtitle, count, avatar, icon, tag, isSelected, opens, onCl
   tag?: string;
   isSelected: boolean;
   opens?: boolean;
+  isDanger?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -42,13 +43,13 @@ function Row({ name, subtitle, count, avatar, icon, tag, isSelected, opens, onCl
       {avatar ? <CandidateAvatar name={avatar} colorKey={avatar} size="sm" /> : <span aria-hidden="true" className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-[var(--color-text-3)]">{icon}</span>}
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className={cn("truncate text-sm", isSelected ? "font-medium text-[var(--color-primary-subtle-fg)]" : "text-[var(--color-text)]")}>{name}</span>
+          <span className={cn("truncate text-sm", isDanger ? "text-[var(--color-danger-fg)]" : isSelected ? "font-medium text-[var(--color-primary-subtle-fg)]" : "text-[var(--color-text)]", isSelected && "font-medium")}>{name}</span>
           {tag ? <Tag tone="violet">{tag}</Tag> : null}
         </span>
         <span className="block truncate text-caption text-[var(--color-text-3)]">{subtitle}</span>
       </span>
       <span className="shrink-0 text-right">
-        <span className="block text-mono-sm text-[var(--color-text-2)]">{count}</span>
+        <span className={cn("block text-mono-sm", isDanger ? "text-[var(--color-danger-fg)]" : "text-[var(--color-text-2)]")}>{count}</span>
         <span className="block text-caption text-[var(--color-text-3)]">{count === 1 ? "action" : "actions"}</span>
       </span>
       {opens ? <ChevronRight size={14} aria-hidden="true" className="shrink-0 text-[var(--color-text-3)]" /> : null}
@@ -56,12 +57,53 @@ function Row({ name, subtitle, count, avatar, icon, tag, isSelected, opens, onCl
   );
 }
 
-const Group = ({ label, children }: { label: string; children: ReactNode }) => (
+export const Group = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="mt-2">
     <p className="px-2 py-1 text-label text-[var(--color-text-3)]">{label}</p>
     {children}
   </div>
 );
+
+interface RailFrameProps {
+  heading: string;
+  count: number | null;
+  back: { label: string; onClick: () => void } | null;
+  rangeLabel: string;
+  isLoading: boolean;
+  error: Error | null;
+  onRetry: () => void;
+  children: ReactNode;
+}
+
+/** The panel around a people list: its heading, the way back, and the loading and error states. */
+export function RailFrame({ heading, count, back, rangeLabel, isLoading, error, onRetry, children }: RailFrameProps) {
+  return (
+    <aside aria-label="People" className="min-w-0 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 max-lg:max-h-72 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-8rem)] lg:self-start">
+      <div className="border-b border-[var(--color-border)] px-2 pb-2">
+        {back ? (
+          <button type="button" onClick={back.onClick} className="mb-1 inline-flex items-center gap-1 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
+            <ArrowLeft size={14} aria-hidden="true" />
+            {back.label}
+          </button>
+        ) : null}
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="truncate text-sm font-medium text-[var(--color-text)]">{heading}</h2>
+          {count !== null ? <span className="text-mono-sm text-[var(--color-text-3)]">{count}</span> : null}
+        </div>
+        <p className="text-caption text-[var(--color-text-3)]">Logged actions · {rangeLabel}</p>
+      </div>
+      <div className="pt-2">
+        {isLoading ? (
+          <div className="space-y-2 p-2" aria-label="Loading people">
+            {[0, 1, 2].map((index) => <Skeleton key={index} className="h-10 w-full" />)}
+          </div>
+        ) : error ? (
+          <ErrorState error={error} onRetry={onRetry} />
+        ) : children}
+      </div>
+    </aside>
+  );
+}
 
 interface ActivityRailProps {
   rail: Rail | null;
@@ -136,29 +178,8 @@ export function ActivityRail({ rail, viewer, selection, back, rangeLabel, isLoad
   const headingCount = rail?.level === "team" ? rail.bdes.length + 1 : rail?.level === "firm" ? rail.managers.length : null;
 
   return (
-    <aside aria-label="People" className="min-w-0 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 max-lg:max-h-72 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-8rem)] lg:self-start">
-      <div className="border-b border-[var(--color-border)] px-2 pb-2">
-        {back ? (
-          <button type="button" onClick={() => onSelect(back.to)} className="mb-1 inline-flex items-center gap-1 text-sm text-[var(--color-text-3)] hover:text-[var(--color-text)]">
-            <ArrowLeft size={14} aria-hidden="true" />
-            {back.label}
-          </button>
-        ) : null}
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="truncate text-sm font-medium text-[var(--color-text)]">{heading}</h2>
-          {headingCount !== null ? <span className="text-mono-sm text-[var(--color-text-3)]">{headingCount}</span> : null}
-        </div>
-        <p className="text-caption text-[var(--color-text-3)]">Logged actions · {rangeLabel}</p>
-      </div>
-      <div className="pt-2">
-        {isLoading ? (
-          <div className="space-y-2 p-2" aria-label="Loading people">
-            {[0, 1, 2].map((index) => <Skeleton key={index} className="h-10 w-full" />)}
-          </div>
-        ) : error ? (
-          <ErrorState error={error} onRetry={onRetry} />
-        ) : body()}
-      </div>
-    </aside>
+    <RailFrame heading={heading} count={headingCount} back={back ? { label: back.label, onClick: () => onSelect(back.to) } : null} rangeLabel={rangeLabel} isLoading={isLoading} error={error} onRetry={onRetry}>
+      {body()}
+    </RailFrame>
   );
 }

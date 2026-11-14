@@ -130,7 +130,7 @@ const ROUTE_DEFS = [
   { id: "admin.firms.detail.plan", path: "/admin/firms/[firmId]/plan", title: "Firm plan", area: "platform", shell: "admin", access: PLATFORM },
   { id: "admin.firms.detail.activity", path: "/admin/firms/[firmId]/activity", title: "Firm activity", area: "platform", shell: "admin", access: PLATFORM },
   { id: "admin.plans", path: "/admin/plans", title: "Plans", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 3, icon: Layers }, shortcut: "p", palette: true },
-  { id: "admin.audit", path: "/admin/audit", title: "Audit", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 4, icon: ScrollText }, shortcut: "a", palette: true },
+  { id: "admin.audit", path: "/admin/audit", title: "Activity logs", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 4, icon: ScrollText, label: "Activity" }, shortcut: "a", palette: true },
   { id: "admin.system", path: "/admin/system", title: "System", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 5, icon: Activity }, shortcut: "s", palette: true },
   { id: "admin.team", path: "/admin/team", title: "Team", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 6, icon: Users }, shortcut: "t", palette: true },
   { id: "admin.notifications", path: "/admin/notifications", title: "Notifications", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "preferences", order: 1, icon: Bell }, palette: true },

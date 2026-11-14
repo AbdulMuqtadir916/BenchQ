@@ -42,6 +42,7 @@ NOT_REACHED: dict[str, str] = {
     "POST /api/applications/{app_id}/status-events/{event_id}/undo": "404: Automatic change not found",
     "POST /api/auth/password-reset/complete":
         "400: This link has expired. Contact your manager or firm owner for a new one",
+    "GET /api/admin/activity/{entry_id}/ip": "404: Not found",
     "POST /api/auth/sign-in": "401: Email or password is incorrect",
     "GET /api/cover-letters/{cl_id}/pdf": "422: Unknown template: <planted>",
     "POST /api/firms/{firm_id}/candidates": "404: That résumé read has expired. Upload it again",

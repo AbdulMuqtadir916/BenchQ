@@ -240,8 +240,8 @@ def test_a_support_view_cant_search_what_it_cant_read(test_db, world):
     assert ledger_entry_json(entry, hide_email=True)["changes"] is None
     filters = Filters(None, None, None, None, None, None, None, None, None, "Offer")
     query = test_db.query(ActivityEntry).filter(ActivityEntry.firm_id == world.id)
-    assert filters.apply(query, test_db, world.id, hide_email=True).count() == 0
-    assert filters.apply(query, test_db, world.id, hide_email=False).count() == 1
+    assert filters.apply(query, "UTC", hide_email=True).count() == 0
+    assert filters.apply(query, "UTC", hide_email=False).count() == 1
 
 
 # ── Filters ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -641,7 +641,7 @@ def test_the_old_ledger_is_copied_stamped_from_today_and_left_as_it_was(at_0015)
                            entity_label="x", action="CREATE", summary="Platform"))
         db.commit()
 
-    _alembic(url, "upgrade", "0028")
+    _alembic(url, "upgrade", "head")
     with Session(engine) as db:
         assert db.query(ActivityEntry).count() == 2 == db.query(LedgerEntry).count()
         row = db.get(ActivityEntry, entry_id)

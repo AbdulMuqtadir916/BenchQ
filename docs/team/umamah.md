@@ -97,6 +97,17 @@ the reads the screen needs. Change document:
 screen: people list, searchable actor and candidate dropdowns, dates, and the sidebar name. Change document:
 [pr-changes/activity-logs-pr4-activity-screen.md](./pr-changes/activity-logs-pr4-activity-screen.md).
 
+**Activity Log PR 6 (2026-11-07):** `activity-logs/pr6-signin-events-and-super-admin`, built on PR 5 part 2, not pushed
+yet. Sign-out, failed sign-ins and lockouts are logged (migration 0029), and the Super Admin has the full Activity page,
+with a Failed sign-ins view only they can see. Details in
+[pr-changes/activity-logs-pr6-signin-events-and-super-admin.md](./pr-changes/activity-logs-pr6-signin-events-and-super-admin.md).
+
+**Activity Log PR 5 (2026-11-06), two parts, the second built on the first, none pushed:**
+`activity-logs/pr5-part1-applications` (applications, interviews, autofill) and `activity-logs/pr5-part2-jobs-and-analysis`
+(background work: scrapes, scheduled runs, AI calls, Gmail and Telegram, for the Super Admin). Two PRs, one on the next
+(decided 2026-11-12). Part 3 (cover letters) is dropped, as cover letters are being removed, and the old job feed's
+logging left part 2 when main retired those routes. Change documents in [pr-changes](./pr-changes/).
+
 ## 1. Notifications inbox
 
 The main sidebar's **Preferences** section gets a **Notifications** page for firm users and the Super Admin.

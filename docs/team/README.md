@@ -121,4 +121,5 @@ it. Everyone else reads it.
 | 0026 | Arbaz | Applications let go of the old `jobs` pool: `applications_job_id_fkey` dropped. Schema only; a local database moves its rows with `python -m backend.scripts.move_local_jobs_to_postings` at 0026. Follows 0025 (another PR's, merging first; 0024 until it's on main) | `feat/autofill-screen` |
 | 0027 | Arbaz | Applications on `job_postings`: `candidate_id` NOT NULL, `(firm_id, candidate_id, job_id)` → `job_postings` ON DELETE RESTRICT; its new key refuses an application on an old job. Follows 0026 | `feat/autofill-screen` |
 | 0028 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows main's 0027 (#129) | `activity-log/pr3-new-table-and-endpoints` |
-| 0029+ | — | Claim the next number here in your PR | — |
+| 0029 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts. Follows 0028 | `activity-logs/pr6-signin-events-and-super-admin` |
+| 0030+ | — | Claim the next number here in your PR | — |

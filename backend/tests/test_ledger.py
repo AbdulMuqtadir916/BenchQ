@@ -87,7 +87,7 @@ def test_the_entry_has_the_frontends_shape(api_client, accounts, ledger):
     entry = api_client.get(_url(accounts.firm_id, "?limit=1")).json()[0]
     assert set(entry) == {"id", "firm_id", "actor_user_id", "actor_type", "actor_name", "entity_type", "entity_id",
                           "entity_label", "action", "summary", "note", "model_id", "prompt_version", "created_at",
-                          "candidate_id", "candidate_name", "cursor", "actor_role", "on_behalf_of_user_id", "on_behalf_of_name", "team_manager_id",
+                          "candidate_id", "candidate_name", "cursor", "actor_role", "attempt_count", "on_behalf_of_user_id", "on_behalf_of_name", "team_manager_id",
                           "candidate_manager_id", "candidate_bde_id", "changes"}   # no claim_state or evidence_ids since 0015
     assert entry["firm_id"] == str(accounts.firm_id)
 
