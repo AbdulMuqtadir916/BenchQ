@@ -268,6 +268,8 @@ async def run_all(force: bool = False):
             except Exception as e:
                 logger.exception(f"Search '{search.name}' failed: {e}")
                 result = {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": 0}
+                from backend.activity import log_activity
+                log_activity("scrape", f"Search '{search.name}' failed: {e}")
 
             # A clean run that found nothing is a warning (same rule company scrapes
             # use) so /health/entities can flag a search that quietly stopped returning results.

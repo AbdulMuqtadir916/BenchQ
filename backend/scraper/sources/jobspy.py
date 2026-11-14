@@ -528,7 +528,7 @@ def _run_sync(search, proxy_url: str = None) -> dict:
         from backend.activity import log_activity
         log_activity("scrape", f"JobSpy search '{search.name}': {new_jobs} new / {jobs_found} found"
                      + (f" ({ignored_jobs} filtered out)" if ignored_jobs else "")
-                     + f" in {duration:.1f}s")
+                     + f" in {duration:.1f}s", is_empty=not (new_jobs or jobs_found))
 
         return {"jobs_found": jobs_found, "new_jobs": new_jobs, "ignored_jobs": ignored_jobs,
                 "error": None, "duration": duration, "source_breakdown": breakdown}

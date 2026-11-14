@@ -76,7 +76,7 @@ def test_an_ai_answer_is_logged_as_the_agent_for_the_person(api_client, test_db,
     _mock_llm(monkeypatch)
     response = api_client.post("/api/autofill/answer", json={"question": "Why this job?", "company": "Acme", "position": "Data Engineer"})
     assert response.status_code == 200, response.text
-    entry = _entries(test_db, action="AI_GENERATE")[0]
+    entry = _entries(test_db, entity_type="autofill_answer")[0]
     owner = test_db.get(User, accounts.user_id)
     assert (entry.actor_type, entry.actor_user_id, entry.on_behalf_of_user_id) == ("AGENT", None, owner.id)
     assert entry.actor_name == f"AI agent ({owner.name})"
@@ -96,7 +96,7 @@ def test_a_streamed_ai_answer_is_logged_once_it_finishes(api_client, test_db, ac
     monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream", chunks, raising=False)
     response = api_client.post("/api/autofill/answer/stream", json={"question": "Why?", "company": "Acme", "position": "PM"})
     assert response.status_code == 200 and "[DONE]" in response.text
-    assert [e.entity_type for e in _entries(test_db, action="AI_GENERATE")] == ["autofill_answer"]
+    assert len(_entries(test_db, entity_type="autofill_answer")) == 1
 
 
 def test_a_failed_ai_answer_writes_nothing(api_client, test_db, monkeypatch):
@@ -110,4 +110,4 @@ def test_a_failed_ai_answer_writes_nothing(api_client, test_db, monkeypatch):
         raise RuntimeError("no key")
     monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm", fail, raising=False)
     assert api_client.post("/api/autofill/answer", json={"question": "Why?"}).status_code == 502
-    assert _entries(test_db, action="AI_GENERATE") == []
+    assert _entries(test_db, entity_type="autofill_answer") == []

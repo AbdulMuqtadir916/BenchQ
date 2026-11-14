@@ -237,14 +237,14 @@ async def send_email_alert(data: dict):
     await _send_message(chat_id, text)
 
 
-async def send_digest():
-    """Send daily digest."""
+async def send_digest() -> int:
+    """Send daily digest. Returns how many went out: 1, or 0 when Telegram is off."""
     if not _is_enabled():
-        return
+        return 0
 
     chat_id = _get_chat_id()
     if not chat_id:
-        return
+        return 0
 
     db = SessionLocal()
     try:
@@ -286,6 +286,7 @@ async def send_digest():
         from backend.activity import log_activity
         log_activity("telegram", f"Daily digest sent: {new_jobs} new jobs, {strong} strong matches", db=db)
         db.commit()
+        return 1
 
     finally:
         db.close()

@@ -18,10 +18,14 @@ SOURCE_FILES = [path for path in sorted(BACKEND.rglob("*.py"))
 TEST_FILES = sorted((BACKEND / "tests").glob("*.py"))
 WRITE_METHODS = {"post", "put", "patch", "delete"}
 WRITERS = {("auth/ledger.py", "record"), ("auth/ledger.py", "record_automated")}
+# Background work's own rows, for the Super Admin. They say a run or an AI call happened, not that a person's change was
+# logged, so reaching one doesn't count as a route writing its entry.
+BACKGROUND_LOGGING = {("activity.py", "log_activity"), ("analyzer/llm_logger.py", "_log_work"), ("job_monitor.py", "_log_run")}
 
-# Why a route that changes something writes no entry. Firm work marked TO_LOG leaves this list as its Activity logs PR
-# lands; every other reason is a decision. A new route doesn't belong here unless a reason below is true of it.
-TO_LOG = "firm work with no entry yet: the Activity logs PR that logs this area removes it from this list"
+# Why a route that changes something writes no entry. Each reason is a decision. A new route doesn't belong here unless
+# a reason below is true of it.
+RETIRED = "the old job pool's write route: it answers 410 (job search PR 2) and goes with the pool in the clean-up PR"
+COVER_LETTERS_REMOVED = "cover letters are being removed from BenchQ (decided 2026-11-12), so nothing logs them"
 NOT_FIRM_ACTIVITY = "a Super Admin operation, not a firm's activity"
 PERSONA_REMOVED = "the Persona table is being removed; its fields live on the candidate, whose edits routes_candidates logs"
 REFERENCE_DATA = "global reference data, not a firm's record (07 tenancy: Company is global)"
@@ -31,21 +35,21 @@ REFUSES_ALL = "refuses every application: each has a candidate (migration 0027) 
 RUN_LOGS = "only starts a background run; the run writes the entry once it has made the version (resume_tailor/runs.py)"
 
 NOT_LOGGED: dict[tuple[str, str], str] = {
-    ("api/routes_cover_letters.py", "create_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "update_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "delete_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "generate_cover_letter"): TO_LOG,
-    ("api/routes_jobs.py", "linkedin_import"): TO_LOG,
-    ("api/routes_jobs.py", "save_from_extension"): TO_LOG,
-    ("api/routes_jobs.py", "create_manual_job"): TO_LOG,
-    ("api/routes_jobs.py", "bulk_update_jobs"): TO_LOG,
-    ("api/routes_jobs.py", "update_job"): TO_LOG,
+    ("api/routes_cover_letters.py", "create_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "update_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "delete_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "generate_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_jobs.py", "linkedin_import"): RETIRED,
+    ("api/routes_jobs.py", "save_from_extension"): RETIRED,
+    ("api/routes_jobs.py", "create_manual_job"): RETIRED,
+    ("api/routes_jobs.py", "bulk_update_jobs"): RETIRED,
+    ("api/routes_jobs.py", "update_job"): RETIRED,
+    ("main.py", "trigger_analysis"): RETIRED,
     ("api/routes_resume_tailoring.py", "start_tailoring"): RUN_LOGS,
     ("api/routes_applications.py", "delete_application"): REFUSES_ALL,
     ("api/routes_applications.py", "bulk_delete_applications"): REFUSES_ALL,
     ("api/routes_persona.py", "update_persona"): PERSONA_REMOVED,
     ("api/routes_persona.py", "append_qa_bank"): PERSONA_REMOVED,
-    ("main.py", "trigger_analysis"): TO_LOG,
 
     ("api/routes_inbox.py", "sync_candidate_inbox"): NO_READ_ENTRIES,
     ("api/routes_inbox.py", "mark_candidate_message_read"): NO_READ_ENTRIES,
@@ -294,7 +298,7 @@ def _logging_functions(trees=None) -> set[tuple[str, str]]:
                         calls.setdefault(key, set()).add((file, ".".join(target)))
     grew = True
     while grew:
-        found = {key for key, called in calls.items() if called & logging} - logging
+        found = {key for key, called in calls.items() if (called - BACKGROUND_LOGGING) & logging} - logging
         logging |= found
         grew = bool(found)
     return logging
