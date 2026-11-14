@@ -440,7 +440,8 @@ def test_a_route_with_the_platform_action_dependency_counts_as_logging():
                       "@router.post('/y')\ndef y(): pass\n")
     real = _logging_functions(_source_trees(SOURCE_FILES) + logged)
     assert ("api/routes_example.py", "x") in real and ("api/routes_example.py", "y") not in real
-    assert ("auth/platform_actions.py", "logs_platform_action") in real
+    assert ("auth/platform_actions.py", "logs_platform_action.dependency") in real   # what FastAPI runs
+    assert ("auth/platform_actions.py", "logs_platform_action") not in real            # the factory alone doesn't log
 
 
 def test_a_renamed_ledger_model_is_still_seen_when_built_or_read():
