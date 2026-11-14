@@ -278,6 +278,7 @@ async def check_emails() -> int:
                     if matched_app:
                         _apply_email_to_app(db, matched_app, class_type, body, subject)
                     processed_ids.add(msg_id)
+                    replies += 1
                     continue
 
                 # Low confidence or ambiguous — try LLM pass 2 (max 5 per run)
@@ -342,7 +343,7 @@ async def check_emails() -> int:
 
         from backend.activity import log_activity
         log_activity("email", f"Email check: {len(messages)} messages found from known domains", db=db,
-                     is_empty=not messages)
+                     is_empty=not replies)
         db.commit()
         return replies
 
