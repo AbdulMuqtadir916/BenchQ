@@ -81,6 +81,48 @@ def test_a_scheduled_batch_is_one_row_with_the_totals(test_db):
     assert "80,000 tokens in, 4,000 out" in next(row.summary for row in rows if "80 jobs" in row.summary)
 
 
+def test_a_batch_that_used_two_models_credits_neither(test_db):
+    with one_row_per_run():
+        log_llm_call("score_light", "openrouter", "model-x", USAGE)
+        log_llm_call("score_light", "openrouter", "model-y", USAGE)          # a fallback joined in
+    (row,) = _rows(test_db, entity_type="llm_call")
+    assert row.model_id is None and "scored 2 jobs" in row.summary
+
+
+@pytest.mark.parametrize("path,worker,count,summary", [
+    ("/api/email/check-now", "backend.email_monitor.gmail_client.check_emails", 2, "2 replies"),
+    ("/api/email/check-now", "backend.email_monitor.gmail_client.check_emails", 0, "No new replies"),
+    ("/api/telegram/digest", "backend.notifier.telegram.send_digest", 1, "1 alert"),
+    ("/api/telegram/digest", "backend.notifier.telegram.send_digest", 0, "No digest sent"),
+])
+async def test_a_manual_email_check_or_digest_reports_what_its_worker_did(api_client, monkeypatch, path, worker, count, summary):
+    import backend.main
+    started = {}
+
+    def capture(job_type, func, **kwargs):
+        started["run"] = func
+        return "run-1"
+
+    async def did(*args, **kwargs):
+        return count
+    monkeypatch.setattr(backend.main, "launch_background", capture)
+    monkeypatch.setattr(worker, did)
+    assert api_client.post(path).status_code == 202
+    assert await started["run"]() == summary
+
+
+async def test_a_digest_telegram_refused_is_not_counted_as_sent(test_db, monkeypatch):
+    from backend.notifier import telegram
+
+    async def refused(*args, **kwargs):
+        return False
+    monkeypatch.setattr(telegram, "_is_enabled", lambda: True)
+    monkeypatch.setattr(telegram, "_get_chat_id", lambda: "chat-1")
+    monkeypatch.setattr(telegram, "_send_message", refused)
+    assert await telegram.send_digest() == 0
+    assert not [row for row in _rows(test_db, entity_type="system_event") if "digest sent" in row.summary]
+
+
 def test_a_firm_reader_never_gets_these_rows(api_client, test_db, accounts):
     log_activity("scrape", "Acme: 3 new / 9 found")
     log_llm_call("autofill", "openrouter", "model-x", USAGE)

@@ -97,3 +97,27 @@ that page with the Activity screen, which pages, sorts and searches on the serve
   after **any** change succeeds (`src/lib/query/client.ts`): the screen that is open reads the server at once, and one
   opened later does too. This covers every action a person can take, not just status moves. A change that fails writes no
   entry, so it leaves Activity alone. Both the firm's Activity and the Super Admin's are covered, with tests.
+
+## Review fixes (CodeRabbit and CodeAnt, 2026-11-14)
+
+- **A bad URL can't break the page.** A date that has the right shape but isn't a real day (`2026-02-30`, `2026-99-99`)
+  is dropped like any other bad value, so the date label no longer crashes. A person, team or candidate id must be a
+  UUID, as the backend requires, so `person=abc` is dropped instead of failing the request.
+- **A stale page number goes to the last page.** With page 9 in the URL and two pages of rows, the screen moves to page 2
+  once the count is in, instead of showing an empty page with no way back.
+- **Back and Forward move the search box too.** The box follows a `q` that changes in the URL, so it no longer writes the
+  old search back.
+- **The URL's pick waits for the current people list.** The list kept from the previous view (while the next one loads)
+  no longer decides that the picked person is out of reach and clears them.
+- **The calendar:** it reads today again each time it opens (a page left open overnight); clearing the dates while it is
+  open also clears its draft, so Apply can't bring them back; moving to another month leaves a day the keyboard can
+  reach; it says when the activity dots failed to load, with Retry; and it opens outside the table, so a short table
+  can't cut it off.
+- **The candidate filter** says when its list is loading or failed to load, with Retry, instead of showing only "All
+  candidates".
+- **The actor and candidate lists** scroll the highlighted option into view as you move with the arrow keys.
+- **The people list:** a search typed at one level (the managers) is cleared when you open a team, so it can't hide the
+  team's BDEs with no box to clear it. A team's count is the same collapsed and open: both include its former BDEs.
+
+The Actor column's "AI agent (name)" for an AI working for someone is filled in by PR 5 part 1, where those entries
+start; this PR has none.

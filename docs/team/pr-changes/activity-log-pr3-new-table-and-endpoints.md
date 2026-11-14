@@ -67,6 +67,30 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
   leaves it there.
 - **Capacity.** Main removed the capacity route (07 Q63), so its change here is gone.
 
+## Review fixes (CodeRabbit and CodeAnt, 2026-11-14)
+
+- **`TRUNCATE` is refused too.** A row trigger doesn't fire on `TRUNCATE`, so the table has a statement trigger with the
+  same rule as a delete: only a reset that names itself for one transaction gets through (the demo reset, and now the
+  test suite's clean-up in `tests/conftest.py`, which empties every table between tests).
+- **A support view can't search what it reads replaced.** It already couldn't search email summaries. Now it can't search
+  the summaries or labels of job searches and captured jobs either (the same list as `serialize._RESTRICTED`), so a
+  search can't reveal a hidden job title or query by which rows come back.
+- **A picked former member stays pickable.** If the filters find none of their rows, they used to drop out of the people
+  list and the screen then cleared the pick. They now stay, with 0 actions, as long as the reader can see any of their
+  history.
+- **The route example in `docs/integration/01-ledger.md`** shows the real role limit (`_limit_to_reader`), not the old
+  BDE-only filter.
+
+Left as they are, with the reason given on the PR:
+
+- **The reset setting.** Any database session could set it, but a session that can do that can also drop the trigger.
+  The trigger guards against the app's own code rewriting history, not against someone with database access; that is
+  the database's permissions' job in production.
+- **The team filter in the people counts.** Picking a team is a pick, like picking a person, so the counts beside the
+  list leave it out on purpose ("the list doesn't shrink as someone is chosen").
+- **A BDE's move to another manager** stays one entry about the BDE, naming how many candidates moved. One entry per
+  candidate is a product decision about how much the log holds.
+
 ## Edge cases checked
 
 Each has a test in `test_activity_logs.py`:

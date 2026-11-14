@@ -17,10 +17,12 @@ interface SearchableSelectProps {
   "aria-label": string;
   searchPlaceholder: string;
   className?: string;
+  /** Shown under the options, e.g. that they are still loading or failed to load. */
+  notice?: React.ReactNode;
 }
 
 /** A dropdown you can type into: click it, type part of a name, and pick from what's left. */
-export function SearchableSelect({ value, options, onValueChange, searchPlaceholder, className, "aria-label": ariaLabel }: SearchableSelectProps) {
+export function SearchableSelect({ value, options, onValueChange, searchPlaceholder, className, notice, "aria-label": ariaLabel }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -41,6 +43,10 @@ export function SearchableSelect({ value, options, onValueChange, searchPlacehol
     document.addEventListener("mousedown", dismiss);
     return () => document.removeEventListener("mousedown", dismiss);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) document.getElementById(`${listboxId}-${activeIndex}`)?.scrollIntoView?.({ block: "nearest" });
+  }, [isOpen, activeIndex, listboxId]);
 
   function open() {
     setQuery("");
@@ -129,6 +135,7 @@ export function SearchableSelect({ value, options, onValueChange, searchPlacehol
             })}
             {shown.length === 0 ? <li role="presentation" className="px-2 py-2 text-sm text-[var(--color-text-3)]">No matches</li> : null}
           </ul>
+          {notice ? <div role="status" className="border-t border-[var(--color-border)] px-2 py-2 text-sm text-[var(--color-text-3)]">{notice}</div> : null}
         </div>
       ) : null}
     </div>

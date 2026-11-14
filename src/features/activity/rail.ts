@@ -67,7 +67,9 @@ export function buildRail(people: LedgerPerson[], viewer: Viewer, selection: Sel
   const managers = people.filter((person) => isManagerRow(person) && !person.isFormer)
     .map((person) => {
       const bdes = currentBdesOf(people, person.userId);
-      return { person, bdes: bdes.length, actions: person.actions + bdes.reduce((sum, bde) => sum + bde.actions, 0) };
+      // The same people the open team adds up: its manager, its BDEs and its former BDEs.
+      const former = people.filter((row) => row.isFormer && isBdeRow(row) && row.managerId === person.userId);
+      return { person, bdes: bdes.length, actions: [person, ...bdes, ...former].reduce((sum, row) => sum + row.actions, 0) };
     })
     .sort(byActions);
   const owner = people.find((person) => isOwnerRow(person) && !person.isFormer) ?? null;
