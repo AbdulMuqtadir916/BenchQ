@@ -65,14 +65,17 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
         <ArrowLeft size={14} aria-hidden /> Candidates
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-4">
+      {/* Identity left, actions right, on one row from `md` up: the identity shrinks (its lines wrap), the actions never
+          move. Narrower, the actions stack under the identity, right-aligned (between `sm` and `md` the row left the
+          name too narrow to read). */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
           <motion.span initial={reduce ? false : { scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3, ease: EASE_OUT }} className="inline-flex">
             <CandidateAvatar name={candidate.fullName} colorKey={candidate.id} size="lg" />
           </motion.span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-h1 text-[var(--color-text)]">{candidate.fullName}</h1>
+              <h1 className="min-w-0 break-words text-h1 text-[var(--color-text)]">{candidate.fullName}</h1>
               <WorkAuthChip workAuth={candidate.workAuth} expiry={candidate.workAuthExpiry} />
               <Tag tone={status.tone}>{status.label}</Tag>
             </div>
@@ -89,7 +92,7 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-start gap-2">
+        <div className="flex w-full flex-wrap items-start justify-end gap-2 md:ml-auto md:w-auto">
           <Can action="candidate.assign"><ReassignAction candidate={candidate} /></Can>
           {search ? <FindJobs candidate={candidate} resumeHref={resumeHref} search={search} /> : null}
           {canAct ? (

@@ -284,7 +284,10 @@ Re-tailoring the same base for the same job is the next version of that résumé
 > **The workflow (tailoring, job search) always uses version 1 of the active base.**
 
 Every version a person selects becomes the first version of a new base, so the active base's v1 is always the
-résumé in use. Versions 2, 3… of any base are saved edits nobody selected. The workflow résumé is:
+résumé in use. Versions 2, 3… of any base are saved edits nobody selected. **Tailoring may also start from any of a
+visible base's versions** (decided 2026-11-12, tailoring part 3 R3-Q1): a later version then becomes v1 of a base of
+its own when the tailoring succeeds, **not made active**, so the résumé in use is unchanged (`base_for_tailoring`,
+[tailoring.md](./tailoring.md) §8). The workflow résumé is:
 
 ```sql
 SELECT r.* FROM resumes r
@@ -560,8 +563,8 @@ base is named "Base" (§4.2).
 - Deleting: by creator and by use, hidden when used, "Show again" not active (§4.7).
 - One candidate per person per firm: the email is required and unique within the firm, never checked across firms;
   one BDE per candidate, for all their target roles (Abdul's `candidates` table; not in PR 5).
-- Later, in the tailoring module: one active base but several target roles; whether tailoring may choose the base
-  per job is decided there.
+- In the tailoring module: one active base but several target roles. Decided 2026-11-12: tailoring starts from the
+  active base by default and the BDE may pick another ([tailoring.md](./tailoring.md) Q1).
 
 **Still to decide (Abdul):**
 - **The nightly clean-up** (`scheduler.py`, "skip" jobs older than `job_archive_after_days`) deletes shared jobs
@@ -583,10 +586,10 @@ base is named "Base" (§4.2).
   tailoring module or the extension.
 - **The old `/api/resumes` routes are removed in PR 6** (they took the firm from the session and didn't check the
   candidate). PR 5's routes replace list, open, save and delete; tailoring and the ATS score (`score-check`) are
-  rebuilt in the tailoring module. JobNavigator's tailoring pipeline and score-check are kept, unwired, in
-  `backend/analyzer/legacy_tailoring.py` for it to port (they still read the dropped `json_data`).
-- **Tailoring prompts** allow content not in the base; there is no claim state to hold it (§4.5), so the prompts
-  are worth tightening in §3.
+  rebuilt in the tailoring module ([tailoring.md](./tailoring.md)), whose part 2 deleted JobNavigator's old pipeline
+  (`backend/analyzer/legacy_tailoring.py`) on 2026-11-12.
+- **Tailoring prompts** (the old ones) allowed content not in the base. The tailoring module replaces them with the
+  handoff's workflow, whose rules and code gate keep every bullet to its own role's lines ([tailoring.md](./tailoring.md)).
 - **`personas`** (a singleton without `firm_id` on firm routes) is a firm-isolation gap, flagged to Abdul; not
   touched here. Kept for now (Abdul, 2026-11-05); its readers move to the candidate first
   ([persona-to-candidates.md](./persona-to-candidates.md)).
