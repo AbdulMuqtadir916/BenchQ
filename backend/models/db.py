@@ -84,7 +84,7 @@ class Search(Base):
     name = Column(String, nullable=False)
     active = Column(Boolean, default=True)
     sources = Column(JSON, default=["linkedin", "indeed", "zip_recruiter", "google", "direct"])
-    search_mode = Column(String, default="keyword")  # keyword | levels_fyi | linkedin_personal | jobright | freehire | extension | linkedin_extension
+    search_mode = Column(String, default="keyword")  # keyword | levels_fyi | linkedin_personal | jobright | extension | linkedin_extension (freehire: removed 2026-11-14, its rows are skipped)
     search_term = Column(String, nullable=True)
     direct_url = Column(String, nullable=True)
     # A city or a region, never a country: `country` is the single country

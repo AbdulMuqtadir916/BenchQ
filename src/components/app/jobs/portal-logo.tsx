@@ -4,12 +4,14 @@ import { Building2, Globe2 } from "lucide-react";
 import type { Job } from "@/lib/schemas/job";
 
 /**
- * Where a job came from, as the backend says (docs/02 §6.z): never a guessed job board. A search's jobs come through
- * freehire.me; a capture is by hand or from the extension. "Company site" is the employer's own mark in a preview.
+ * Where a job came from, as the backend says (docs/02 §6.z): never a guessed job board. A search's jobs come from
+ * Indeed (since 2026-11-14; freehire.me's from before stay labelled as such); a capture is by hand or from the
+ * extension. "Company site" is the employer's own mark in a preview.
  */
-export type PortalKey = "FREEHIRE" | "OTHER_SOURCE" | "MANUAL" | "EXTENSION" | "COMPANY";
+export type PortalKey = "INDEED" | "FREEHIRE" | "OTHER_SOURCE" | "MANUAL" | "EXTENSION" | "COMPANY";
 
 export const PORTALS: Record<PortalKey, { label: string; logo?: string; color: string }> = {
+  INDEED: { label: "Indeed", color: "var(--color-primary)" },
   FREEHIRE: { label: "freehire.me", color: "var(--color-primary)" },
   OTHER_SOURCE: { label: "Job search", color: "var(--color-primary)" },
   MANUAL: { label: "Added by hand", color: "var(--color-text-2)" },
@@ -18,11 +20,12 @@ export const PORTALS: Record<PortalKey, { label: string; logo?: string; color: s
 };
 
 /** The sources a job list can be filtered by. */
-export const SOURCE_KEYS = ["FREEHIRE", "OTHER_SOURCE", "MANUAL", "EXTENSION"] as const satisfies readonly PortalKey[];
+export const SOURCE_KEYS = ["INDEED", "FREEHIRE", "OTHER_SOURCE", "MANUAL", "EXTENSION"] as const satisfies readonly PortalKey[];
 
 export function portalForJob(job: Job): PortalKey {
   if (job.provenance.sourceType === "MANUAL") return "MANUAL";
   if (job.provenance.sourceType === "USER_SUBMITTED") return "EXTENSION";
+  if (job.provenance.sourceId === "indeed") return "INDEED";
   return job.provenance.sourceId === "freehire" ? "FREEHIRE" : "OTHER_SOURCE";
 }
 
