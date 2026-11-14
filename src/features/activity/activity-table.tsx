@@ -36,6 +36,8 @@ interface ActivityTableProps {
   columns: ColumnDef<LedgerEntry, unknown>[];
   entries: LedgerEntry[];
   matching: number;
+  /** Whether `matching` is the current view's count (not the previous one, kept while the next loads). */
+  isCountCurrent: boolean;
   isUpdating: boolean;
   isLoading: boolean;
   error: Error | null;
@@ -46,8 +48,20 @@ interface ActivityTableProps {
 }
 
 /** The log's table, with its search, paging, sorting and empty states, all kept in the URL. */
-export function ActivityTable({ title, countText, columns, entries, matching, isUpdating, isLoading, error, onRetry, params, update, toolbarActions }: ActivityTableProps) {
+export function ActivityTable({ title, countText, columns, entries, matching, isCountCurrent, isUpdating, isLoading, error, onRetry, params, update, toolbarActions }: ActivityTableProps) {
   const [search, setSearch] = useState(params.q ?? "");
+  // Back or Forward can change `q` while the table stays: follow it, unless the box already says the same.
+  const [syncedQ, setSyncedQ] = useState(params.q);
+  if (params.q !== syncedQ) {
+    setSyncedQ(params.q);
+    if ((search.trim() || undefined) !== params.q) setSearch(params.q ?? "");
+  }
+  const pageCount = Math.max(1, Math.ceil(matching / PAGE_SIZE));
+
+  // A stale URL (page 9 of 2) goes to the last page there is, once the count is the current one.
+  useEffect(() => {
+    if (isCountCurrent && params.page > pageCount) update({ page: pageCount });
+  }, [isCountCurrent, params.page, pageCount, update]);
 
   useEffect(() => {
     const value = search.trim() || undefined;
@@ -83,7 +97,7 @@ export function ActivityTable({ title, countText, columns, entries, matching, is
         pagination
         pageSize={PAGE_SIZE}
         search={{ value: search, onChange: setSearch }}
-        page={{ index: params.page - 1, onChange: (index) => update({ page: index + 1 }), count: Math.max(1, Math.ceil(matching / PAGE_SIZE)) }}
+        page={{ index: params.page - 1, onChange: (index) => update({ page: index + 1 }), count: pageCount }}
         sort={{
           value: { id: params.sort, desc: params.dir === "desc" },
           onChange: (next) => update({ sort: (next?.id ?? "when") as ActivityParams["sort"], dir: next?.desc === false ? "asc" : "desc" }),
@@ -97,6 +111,7 @@ export function ActivityTable({ title, countText, columns, entries, matching, is
             action={hasFilters ? <Button variant="secondary" size="sm" onClick={clearFilters}>{params.from ? "Show all dates" : "Clear filter"}</Button> : undefined}
           />
         }
+        toolbarPlacement="outside"
         toolbarActions={toolbarActions}
       />
     </div>

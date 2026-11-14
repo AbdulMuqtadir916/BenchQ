@@ -119,6 +119,13 @@ interface ActivityRailProps {
 
 export function ActivityRail({ rail, viewer, selection, back, rangeLabel, isLoading, error, onRetry, onSelect }: ActivityRailProps) {
   const [query, setQuery] = useState("");
+  // A search typed among the managers would hide a team's BDEs, with no box to clear it: start each level fresh.
+  const level = rail ? (rail.level === "team" ? `team:${rail.manager.userId}` : rail.level) : "";
+  const [searchedLevel, setSearchedLevel] = useState(level);
+  if (level !== searchedLevel) {
+    setSearchedLevel(level);
+    setQuery("");
+  }
   const person = (row: LedgerPerson, subtitle: string, tag?: string) => (
     <Row key={row.userId} name={row.name} avatar={row.name} subtitle={subtitle} count={row.actions} tag={tag} isSelected={selection.person === row.userId} onClick={() => onSelect({ person: row.userId })} />
   );

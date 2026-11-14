@@ -29,8 +29,10 @@ export function ActivityPage() {
   const peopleQuery = useLedgerPeople(filters);
   const people = useMemo(() => peopleQuery.data?.people ?? [], [peopleQuery.data]);
   const isReady = peopleQuery.data !== undefined;
+  // The previous view's people (kept while the next loads) can't say whether the URL's pick is out of reach.
+  const isSettled = isReady && !peopleQuery.isPlaceholderData;
   const selection = useMemo(() => (isReady ? resolveSelection(people, viewer, params) : {}), [isReady, people, viewer, params]);
-  const isOutOfReach = isReady && (selection.team !== params.team || selection.person !== params.person);
+  const isOutOfReach = isSettled && (selection.team !== params.team || selection.person !== params.person);
 
   // A URL naming someone outside the reader's view falls back to their own root.
   useEffect(() => {
@@ -61,6 +63,9 @@ export function ActivityPage() {
   useEscapeBack(back ? () => update({ team: back.to.team, person: back.to.person }) : null);
 
   const matching = peopleQuery.data?.matching ?? 0;
+  const candidatesNotice = candidatesQuery.isError && !candidatesQuery.data ? (
+    <span>Couldn’t load the candidates. <button type="button" className="underline" onClick={() => void candidatesQuery.refetch()}>Retry</button></span>
+  ) : candidatesQuery.isLoading ? "Loading candidates…" : undefined;
   const range = rangeLabel({ from: params.from, to: params.to });
 
   return (
@@ -74,6 +79,7 @@ export function ActivityPage() {
           columns={columns}
           entries={ledgerQuery.data ?? []}
           matching={matching}
+          isCountCurrent={isSettled}
           isUpdating={ledgerQuery.isPlaceholderData}
           isLoading={peopleQuery.isLoading || ledgerQuery.isLoading}
           error={peopleQuery.error ?? ledgerQuery.error}
@@ -84,7 +90,7 @@ export function ActivityPage() {
             <>
               <DateRangeFilter from={params.from} to={params.to} timeZone={firm.primaryTimezone} onChange={setDates} filters={filters} />
               <SearchableSelect className="w-40" aria-label="Filter by actor" searchPlaceholder="Find an actor…" value={params.type ?? params.person ?? "ALL"} options={actors} onValueChange={pickActor} />
-              <SearchableSelect className="w-40" aria-label="Filter by candidate" searchPlaceholder="Find a candidate…" value={params.candidate ?? "ALL"} options={candidates} onValueChange={(value) => update({ candidate: value === "ALL" ? undefined : value })} />
+              <SearchableSelect className="w-40" aria-label="Filter by candidate" searchPlaceholder="Find a candidate…" value={params.candidate ?? "ALL"} options={candidates} notice={candidatesNotice} onValueChange={(value) => update({ candidate: value === "ALL" ? undefined : value })} />
             </>
           }
         />

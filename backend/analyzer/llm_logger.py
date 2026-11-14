@@ -33,8 +33,8 @@ _WORK = {
 
 @dataclass
 class _Work:
-    """What a kind of AI work added up to."""
-    model: str
+    """What a kind of AI work added up to. `model` is None when more than one model did it."""
+    model: Optional[str]
     calls: int = 0
     failed: int = 0
     input_tokens: int = 0
@@ -93,7 +93,10 @@ def one_row_per_run():
 def _record_work(purpose: str, model: str, *, success: bool, usage: dict, cost: float) -> None:
     run = _run_work.get()
     if run is not None and run.is_open:
-        run.by_purpose.setdefault(purpose, _Work(model=model)).add(success=success, usage=usage, cost=cost)
+        work = run.by_purpose.setdefault(purpose, _Work(model=model))
+        if work.model != model:
+            work.model = None           # a fallback model joined in: the row doesn't credit one model with all of it
+        work.add(success=success, usage=usage, cost=cost)
         return
     work = _Work(model=model)
     work.add(success=success, usage=usage, cost=cost)

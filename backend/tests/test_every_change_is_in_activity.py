@@ -39,6 +39,12 @@ NO_ENTRY: dict[str, str] = {
         "a base that isn't hidden is already shown; showing a hidden one logs (below)",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base":
         "a base that is already the active one changes nothing; switching to another logs (below)",
+    "PATCH /api/settings":
+        "a request that changes no setting (none sent, or secrets sent back as their placeholder) writes nothing; a real "
+        "change logs its field names (test_activity_platform_actions.py)",
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/sync":
+        "an import that brings no new email writes nothing; one that does logs 'Imported N candidate emails' "
+        "(inbox/import_progress.py)",
 }
 
 
@@ -69,6 +75,7 @@ def test_a_route_that_changes_data_leaves_an_entry(route, swept, api_client, tes
     test_db.commit()
     before = _count(test_db)
     response = _send(api_client, backend.main.app, route, ids)
+    assert response.status_code < 500, f"{route} failed on the server ({response.status_code}): {response.text[:200]}"
     if response.status_code >= 400:
         pytest.skip(f"the sweep's request doesn't get through ({response.status_code}); see NOT_REACHED")
     wrote = _count(test_db) - before

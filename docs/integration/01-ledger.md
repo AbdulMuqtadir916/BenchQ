@@ -47,8 +47,7 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     if firm_id != my_firm:
         raise HTTPException(status_code=404, detail="Not found.")      # never confirm another firm exists
     entries = scoped(db, ActivityEntry, my_firm)                         # firm_id = :firm, always
-    if (actor := own_scope(principal)) is not None:                    # a BDE: only their own rows
-        entries = entries.filter(ActivityEntry.actor_user_id == actor)
+    entries = _limit_to_reader(entries, db, principal, my_firm, picked=False)   # by role: BDE, MANAGER, the firm
     entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id).offset(offset).limit(limit)
     return [ledger_entry_json(e) for e in entries]
 ```

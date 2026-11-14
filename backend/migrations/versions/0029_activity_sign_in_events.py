@@ -38,7 +38,7 @@ def _trigger(allow_count: bool):
     op.execute(f"""
         CREATE OR REPLACE FUNCTION activity_logs_append_only() RETURNS trigger AS $$
         BEGIN
-            IF TG_OP = 'DELETE' AND current_setting('benchq.activity_logs_demo_reset', true) = 'on' THEN
+            IF TG_OP IN ('DELETE', 'TRUNCATE') AND current_setting('benchq.activity_logs_demo_reset', true) = 'on' THEN
                 RETURN OLD;
             END IF;{allowed}
             RAISE EXCEPTION 'activity_logs is append-only' USING ERRCODE = 'restrict_violation';
