@@ -94,7 +94,7 @@ def _move(client, firm, cookie, user, manager):
 
 def test_the_owner_moves_a_bde_and_their_candidates_follow(anonymous_client, test_db, firm, owner, people):
     from backend.models.candidates import Candidate
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     adnan, fatima, priya = people["adnan"], people["fatima"], people["priya"]
     worked = [Candidate(firm_id=firm.id, manager_id=fatima.id, bde_id=adnan.id, created_by_user_id=fatima.id,
                         full_name=f"Candidate {n}", work_auth="H1B") for n in range(2)]
@@ -109,15 +109,15 @@ def test_the_owner_moves_a_bde_and_their_candidates_follow(anonymous_client, tes
     test_db.expire_all()
     assert [test_db.get(Candidate, c.id).manager_id for c in worked] == [priya.id, priya.id]
     assert test_db.get(Candidate, queued.id).manager_id == fatima.id          # a queue stays with its manager
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == str(adnan.id)).one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == str(adnan.id)).one()
     assert (entry.action, entry.summary) == ("UPDATE", "Adnan Khan now reports to Priya Shah (was Fatima Reddy); "
                                                        "2 candidates moved")
 
 
 def test_a_bde_without_a_manager_gets_one_the_same_way(anonymous_client, test_db, firm, owner, people):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     assert _move(anonymous_client, firm, owner, people["bob"], people["fatima"]).status_code == 200
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == str(people["bob"].id)).one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == str(people["bob"].id)).one()
     assert entry.summary == "Old Bob now reports to Fatima Reddy; 0 candidates moved"
 
 

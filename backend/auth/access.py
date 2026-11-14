@@ -112,7 +112,9 @@ ROUTE_ACCESS: dict[str, Access] = {
     # The job screens' firm-level reads (job search PR 3): only the candidates the principal sees.
     "GET /api/firms/{firm_id}/job-postings": F,
     "GET /api/firms/{firm_id}/job-postings/{posting_id}": F,
-    "GET /api/firms/{firm_id}/ledger": F,          # a BDE gets their own entries only (routes_ledger)
+    "GET /api/firms/{firm_id}/ledger": F,          # limited by role in routes_ledger
+    "GET /api/firms/{firm_id}/ledger/people": F,
+    "GET /api/firms/{firm_id}/ledger/candidates": F,
     "POST /api/analyze/{job_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": F,

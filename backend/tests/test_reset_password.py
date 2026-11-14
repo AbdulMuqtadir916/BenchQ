@@ -12,7 +12,7 @@ def _sign_in(client, email, password):
 
 
 def test_a_firm_user_gets_a_new_password_and_is_signed_out(anonymous_client, test_db, accounts, monkeypatch, capsys):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     me = {"cookie": f"bq_session={accounts.firm_token}"}
     assert anonymous_client.get("/api/auth/me", headers=me).status_code == 200
     monkeypatch.setattr("sys.stdin", io.StringIO("a-brand-new-pass\n"))
@@ -21,17 +21,17 @@ def test_a_firm_user_gets_a_new_password_and_is_signed_out(anonymous_client, tes
     assert anonymous_client.get("/api/auth/me", headers=me).status_code == 401
     assert _sign_in(anonymous_client, "owner@acme.test", TEST_PASSWORD).status_code == 401
     assert _sign_in(anonymous_client, "owner@acme.test", "a-brand-new-pass").status_code == 200
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == str(accounts.user_id), LedgerEntry.actor_name == "reset_password").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == str(accounts.user_id), ActivityEntry.actor_name == "reset_password").one()
     assert (entry.firm_id, entry.actor_type, entry.action, entry.entity_type) == (accounts.firm_id, "SYSTEM", "UPDATE", "user")
     assert "a-brand-new-pass" not in entry.summary
 
 
 def test_a_super_admin_too(anonymous_client, test_db, accounts, monkeypatch):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     monkeypatch.setattr("sys.stdin", io.StringIO("admin-new-pass\n"))
     assert cli.main(["--email", "admin@benchq.test", "--password-stdin"]) == 0
     assert _sign_in(anonymous_client, "admin@benchq.test", "admin-new-pass").json()["principal"]["kind"] == "platform"
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == str(accounts.admin_id), LedgerEntry.actor_name == "reset_password").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == str(accounts.admin_id), ActivityEntry.actor_name == "reset_password").one()
     assert (entry.firm_id, entry.entity_type) == (None, "platform_user")
 
 

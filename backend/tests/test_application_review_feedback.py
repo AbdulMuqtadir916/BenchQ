@@ -6,7 +6,7 @@ import pytest
 
 from backend.models.candidates import Candidate, FavoriteJob
 from backend.models.db import ApplicationStatusEvent, CoverLetter, Resume, utcnow
-from backend.models.tenancy import LedgerEntry
+from backend.models.tenancy import ActivityEntry
 from backend.tests.test_application_tracker import add_review
 from backend.tests.resume_support import make_version
 from backend.tests.test_candidate_application_status import _saved_candidate_application
@@ -40,7 +40,7 @@ def test_status_retry_preserves_a_later_notes_edit(api_client, test_db, submissi
     command = {'status': 'applied', 'expected_revision': 0, 'command_id': str(uuid.uuid4())}
     assert api_client.patch(path, headers=headers, json=command).status_code == 200
     assert api_client.patch(path, headers=headers, json={'notes': 'Newer notes'}).status_code == 200
-    before = test_db.query(LedgerEntry).filter_by(entity_id=str(app.id)).count()
+    before = test_db.query(ActivityEntry).filter_by(entity_id=str(app.id)).count()
     retry = dict(command)
     if retry_notes is not None:
         retry['notes'] = retry_notes
@@ -50,7 +50,7 @@ def test_status_retry_preserves_a_later_notes_edit(api_client, test_db, submissi
     assert app.notes == 'Newer notes'
     assert app.status_revision == 1
     assert test_db.query(ApplicationStatusEvent).filter_by(application_id=app.id).count() == 1
-    assert test_db.query(LedgerEntry).filter_by(entity_id=str(app.id)).count() == before
+    assert test_db.query(ActivityEntry).filter_by(entity_id=str(app.id)).count() == before
 
 
 def test_saved_applied_round_trip_keeps_first_submission_and_actor(api_client, test_db, accounts, submission, monkeypatch):

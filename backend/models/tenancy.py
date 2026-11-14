@@ -253,7 +253,9 @@ class Session(Base):
 
 
 class LedgerEntry(Base):
-    """The business ledger: who did what (docs/02 §10, 07-auth §6.6). Append-only, so no `updated_at`.
+    """The old business ledger, kept as it was. Nothing writes or reads it any more: `activity_logs` took its rows
+    (migration 0028) and its place. Removing it is Abdul's call.
+    Who did what (docs/02 §10, 07-auth §6.6). Append-only, so no `updated_at`.
     `firm_id` is null only for platform-only events (A13). The actor may be a firm user, a platform user or
     nobody (SYSTEM, AGENT), so `actor_user_id` has no foreign key; `actor_name` keeps the name as it was."""
     __tablename__ = "ledger_entries"
@@ -282,6 +284,53 @@ class LedgerEntry(Base):
         Index("ix_ledger_entries_firm_created", "firm_id", "created_at"),
         Index("ix_ledger_entries_firm_candidate_created", "firm_id", "candidate_id", "created_at"),
         Index("ix_ledger_entries_created", "created_at"),
+    )
+
+
+ACTIVITY_ACTOR_ROLES = (*FIRM_ROLES, "PLATFORM_ADMIN")
+
+
+class ActivityEntry(Base):
+    """The activity log: who did what, and who was responsible at that moment. A database trigger refuses UPDATE and
+    DELETE (migration 0028), so no code path can rewrite history. `firm_id` is null only for platform-only events
+    (A13). No foreign key but the firm: the log outlives what it describes, and an actor may be a firm user, a platform
+    user or nobody (SYSTEM, AGENT). Names and stamps are kept as they were at the time."""
+    __tablename__ = "activity_logs"
+
+    id = _pk()
+    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=True)
+    actor_type = Column(String, nullable=False)
+    actor_user_id = Column(UUID(as_uuid=True), nullable=True)
+    actor_name = Column(String, nullable=False)
+    actor_role = Column(String, nullable=True)            # at the time; null for SYSTEM and AGENT
+    on_behalf_of_user_id = Column(UUID(as_uuid=True), nullable=True)   # the person an AI agent worked for
+    team_manager_id = Column(UUID(as_uuid=True), nullable=True)        # the actor's team at the time
+    entity_type = Column(String, nullable=False)          # lowercase: firm, invite, user, support_view… (07 Q30)
+    entity_id = Column(String, nullable=False)
+    entity_label = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    summary = Column(Text, nullable=False)
+    note = Column(Text, nullable=True)                    # the handoff note on an ASSIGN entry (docs/02 §3.4)
+    changes = Column(JSONB, nullable=True)                # {field: {before, after}}, masked (ledger.diff)
+    request_id = Column(String, nullable=True)            # the request that wrote it, to find in the server logs
+    model_id = Column(String, nullable=True)
+    prompt_version = Column(String, nullable=True)
+    candidate_id = Column(UUID(as_uuid=True), nullable=True)           # the candidate it is about, if any (07 Q53h)
+    candidate_manager_id = Column(UUID(as_uuid=True), nullable=True)   # that candidate's manager at the time
+    candidate_bde_id = Column(UUID(as_uuid=True), nullable=True)       # that candidate's BDE at the time
+    created_at = _created_at()
+
+    __table_args__ = (
+        CheckConstraint(_in("actor_type", LEDGER_ACTOR_TYPES), name="ck_activity_logs_actor_type"),
+        CheckConstraint(f"actor_role IS NULL OR {_in('actor_role', ACTIVITY_ACTOR_ROLES)}",
+                        name="ck_activity_logs_actor_role"),
+        CheckConstraint(_in("action", LEDGER_ACTIONS), name="ck_activity_logs_action"),
+        Index("ix_activity_logs_created", "created_at"),
+        Index("ix_activity_logs_firm_created", "firm_id", "created_at", "id"),
+        Index("ix_activity_logs_firm_candidate_created", "firm_id", "candidate_id", "created_at"),
+        Index("ix_activity_logs_firm_actor_created", "firm_id", "actor_user_id", "created_at"),
+        Index("ix_activity_logs_firm_behalf_created", "firm_id", "on_behalf_of_user_id", "created_at"),
+        Index("ix_activity_logs_firm_team_created", "firm_id", "team_manager_id", "created_at"),
     )
 
 

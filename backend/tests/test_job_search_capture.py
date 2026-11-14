@@ -21,7 +21,7 @@ def _capture(client, world, candidate, who="adnan", **over):
 # ── capture ──────────────────────────────────────────────────────────────────
 
 def test_the_bde_captures_a_job_as_its_own_batch(anonymous_client, world, adnans, test_db):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     r = _capture(anonymous_client, world, adnans, location="Remote")
     assert r.status_code == 201, r.text
     job = r.json()
@@ -30,7 +30,7 @@ def test_the_bde_captures_a_job_as_its_own_batch(anonymous_client, world, adnans
     (batch,), (posting,) = _rows(test_db, adnans)
     assert (batch.kind, batch.state, batch.user_id) == ("capture", "success", world["people"]["adnan"].id)
     assert batch.finished_at is not None and posting.batch_id == batch.batch_id
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "job_posting").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "job_posting").one()
     assert (entry.summary, entry.entity_label) == ("Captured a job (manual)", "Java Developer at Example Corp")
 
 

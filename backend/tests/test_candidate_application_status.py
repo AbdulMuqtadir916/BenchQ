@@ -8,7 +8,7 @@ def _saved_candidate_application(test_db, accounts, firm_id, actor_role):
     from backend.auth.sessions import start_session
     from backend.models.candidates import Candidate, CandidateJob
     from backend.models.db import Application, Job, utcnow
-    from backend.models.tenancy import Firm, LedgerEntry, User
+    from backend.models.tenancy import Firm, ActivityEntry, User
     from backend.tests.auth_support import make_user
     from backend.tests.posting_support import posting_for
 
@@ -57,7 +57,7 @@ def _saved_candidate_application(test_db, accounts, firm_id, actor_role):
         if actor_role == "OWNER"
         else {"cookie": f"bq_session={token}"}
     )
-    return candidate, job, application, manager, owner_or_manager, LedgerEntry
+    return candidate, job, application, manager, owner_or_manager, ActivityEntry
 
 
 @pytest.mark.parametrize("actor_role", ["OWNER", "MANAGER"])

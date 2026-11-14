@@ -9,7 +9,7 @@ from sqlalchemy import event
 
 from backend.models.candidates import Candidate, CandidateGoogleOAuthAttempt, CandidateMailbox
 from backend.models.db import JobRun, utcnow
-from backend.models.tenancy import LedgerEntry, Plan
+from backend.models.tenancy import ActivityEntry, Plan
 from backend.tests.test_candidate_mailbox import mailbox_case, offline_mailbox_provider, import_provider, oauth, base
 
 
@@ -18,8 +18,8 @@ def test_progress_never_writes_or_updates_ledger_until_terminal(test_db, mailbox
     candidate, _, _, mailbox = mailbox_case
     def no_mutation(*args):
         raise AssertionError('Ledger is append-only')
-    event.listen(LedgerEntry, 'before_update', no_mutation)
-    event.listen(LedgerEntry, 'before_delete', no_mutation)
+    event.listen(ActivityEntry, 'before_update', no_mutation)
+    event.listen(ActivityEntry, 'before_delete', no_mutation)
     def fetch(http, path, token, params=None):
         if path == 'messages':
             return {'messages': [{'id': str(i)} for i in range(21)]}
@@ -27,22 +27,22 @@ def test_progress_never_writes_or_updates_ledger_until_terminal(test_db, mailbox
             test_db.expire_all()
             run = test_db.query(JobRun).filter_by(job_type='candidate_gmail_import').one()
             assert run.meta['imported'] == int(path.split('/')[1])
-            assert test_db.query(LedgerEntry).count() == 0
+            assert test_db.query(ActivityEntry).count() == 0
         return provider(http, path, token, params)
     monkeypatch.setattr(jobs.gmail, '_api_get', fetch)
     try:
         assert jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at) == 21
-        row = test_db.query(LedgerEntry).one()
+        row = test_db.query(ActivityEntry).one()
         snapshot = (row.id, row.created_at, row.summary)
         from backend.inbox.import_progress import recover_imports, finish_import
         recover_imports()
         finish_import(test_db, candidate.firm_id, uuid.UUID(row.entity_id))
         test_db.commit(); test_db.refresh(row)
         assert (row.id, row.created_at, row.summary) == snapshot
-        assert test_db.query(LedgerEntry).count() == 1
+        assert test_db.query(ActivityEntry).count() == 1
     finally:
-        event.remove(LedgerEntry, 'before_update', no_mutation)
-        event.remove(LedgerEntry, 'before_delete', no_mutation)
+        event.remove(ActivityEntry, 'before_update', no_mutation)
+        event.remove(ActivityEntry, 'before_delete', no_mutation)
 
 
 def test_restart_recovery_finalizes_saved_progress_once(test_db, mailbox_case, monkeypatch, import_provider):
@@ -55,7 +55,7 @@ def test_restart_recovery_finalizes_saved_progress_once(test_db, mailbox_case, m
         return provider(http, path, token, params)
     monkeypatch.setattr(jobs.gmail, '_api_get', fetch)
     with pytest.raises(Stopped): jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at)
-    assert test_db.query(LedgerEntry).count() == 0
+    assert test_db.query(ActivityEntry).count() == 0
     test_db.refresh(mailbox)
     mailbox.sync_lease_until = utcnow() - timedelta(seconds=1)
     test_db.commit()
@@ -63,7 +63,7 @@ def test_restart_recovery_finalizes_saved_progress_once(test_db, mailbox_case, m
     from backend.inbox.import_progress import recover_imports
     cleanup_stale_runs()
     recover_imports(); recover_imports()
-    result = test_db.query(LedgerEntry).one()
+    result = test_db.query(ActivityEntry).one()
     assert '10' in result.summary and 'Partial' in result.summary
     assert test_db.query(JobRun).one().meta['finalized'] is True
 
@@ -161,7 +161,7 @@ def test_partial_batch_rollback_does_not_inflate_durable_count(test_db, mailbox_
     from backend.models.candidates import InboxMessage
     assert test_db.query(InboxMessage).count() == 10
     assert test_db.query(JobRun).one().meta['imported'] == 10
-    assert '10' in test_db.query(LedgerEntry).one().summary
+    assert '10' in test_db.query(ActivityEntry).one().summary
 
 
 def test_disconnect_invalidates_pending_confirmation_for_revoked_grant(api_client, test_db, monkeypatch, mailbox_case):
@@ -241,7 +241,7 @@ def test_read_and_manual_empty_sync_do_not_write_business_ledger(api_client, tes
         assert api_client.post(base(candidate)+'/mailbox/sync').status_code == 200
     test_db.refresh(row)
     assert row.is_read is True
-    assert test_db.query(LedgerEntry).count() == 0
+    assert test_db.query(ActivityEntry).count() == 0
 
 
 @pytest.mark.parametrize('failure', ['provider', 'busy'])

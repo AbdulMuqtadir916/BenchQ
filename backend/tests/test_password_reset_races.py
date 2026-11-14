@@ -137,15 +137,15 @@ def test_completing_a_reset_ends_every_session(api_client, anonymous_client, acc
 
 def test_request_decision_reissue_and_completion_are_in_the_firm_ledger(api_client, anonymous_client, accounts, test_db):
     from backend.auth.password_reset import LEDGER_ENTITY
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
 
     bde, notice, row = _bde_with_request(anonymous_client, api_client, test_db, accounts, "audited@acme.test")
     _approve(api_client, notice)
     assert api_client.post(f"/api/notifications/{notice['id']}/password-reset-link").status_code == 200
 
     test_db.expire_all()
-    entries = (test_db.query(LedgerEntry).filter_by(entity_type=LEDGER_ENTITY, entity_id=str(row.id))
-               .order_by(LedgerEntry.created_at, LedgerEntry.id).all())
+    entries = (test_db.query(ActivityEntry).filter_by(entity_type=LEDGER_ENTITY, entity_id=str(row.id))
+               .order_by(ActivityEntry.created_at, ActivityEntry.id).all())
     assert all(entry.firm_id == accounts.firm_id for entry in entries)
     by_action = {(entry.action, entry.actor_type) for entry in entries}
     assert ("CREATE", "SYSTEM") in by_action                 # the request (from a signed-out page)
@@ -157,14 +157,14 @@ def test_request_decision_reissue_and_completion_are_in_the_firm_ledger(api_clie
 
 def test_denial_is_in_the_ledger(api_client, anonymous_client, accounts, test_db):
     from backend.auth.password_reset import LEDGER_ENTITY
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
 
     _, notice, row = _bde_with_request(anonymous_client, api_client, test_db, accounts, "denied@acme.test")
     deny = api_client.post(f"/api/notifications/{notice['id']}/password-reset-decision", json={"approve": False})
     assert deny.status_code == 200
 
     test_db.expire_all()
-    entry = (test_db.query(LedgerEntry)
+    entry = (test_db.query(ActivityEntry)
              .filter_by(entity_type=LEDGER_ENTITY, entity_id=str(row.id), action="STATE_CHANGE").one())
     assert "denied" in entry.summary
 
@@ -237,7 +237,7 @@ def test_the_polled_list_locks_only_requesters_with_an_open_request(api_client, 
 def test_an_expired_request_is_in_the_ledger(api_client, anonymous_client, accounts, test_db):
     from datetime import timedelta
     from backend.auth.password_reset import LEDGER_ENTITY
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
 
     _, _, row = _bde_with_request(anonymous_client, api_client, test_db, accounts, "timed-out@acme.test")
     now = utcnow()
@@ -247,7 +247,7 @@ def test_an_expired_request_is_in_the_ledger(api_client, anonymous_client, accou
     assert api_client.get("/api/notifications").status_code == 200
 
     test_db.expire_all()
-    entry = (test_db.query(LedgerEntry)
+    entry = (test_db.query(ActivityEntry)
              .filter_by(entity_type=LEDGER_ENTITY, entity_id=str(row.id), action="STATE_CHANGE").one())
     assert (entry.actor_type, entry.firm_id) == ("SYSTEM", accounts.firm_id)
     assert "expired" in entry.summary
@@ -257,7 +257,7 @@ def test_a_super_admins_decision_is_in_the_owners_firm_ledger(api_client, anonym
     from backend.auth.password_reset import LEDGER_ENTITY
     from backend.auth.sessions import COOKIE_NAME
     from backend.models.notifications import PasswordResetRequest
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
 
     assert anonymous_client.post("/api/auth/password-reset/request", json={"email": "owner@acme.test"}).status_code == 202
     anonymous_client.cookies.set(COOKIE_NAME, accounts.admin_token)
@@ -267,6 +267,6 @@ def test_a_super_admins_decision_is_in_the_owners_firm_ledger(api_client, anonym
     assert approve.status_code == 200
 
     row = test_db.query(PasswordResetRequest).filter_by(requester_user_id=accounts.user_id).one()
-    entry = (test_db.query(LedgerEntry)
+    entry = (test_db.query(ActivityEntry)
              .filter_by(entity_type=LEDGER_ENTITY, entity_id=str(row.id), action="STATE_CHANGE").one())
     assert (entry.actor_type, entry.actor_user_id, entry.firm_id) == ("PLATFORM_ADMIN", accounts.admin_id, accounts.firm_id)

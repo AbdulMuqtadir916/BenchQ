@@ -8,7 +8,7 @@ from backend import config
 from backend.inbox import backfill, classification_worker as worker, classifier_pause
 from backend.models.candidates import CandidateMailbox, InboxMessage
 from backend.models.db import Application, ApplicationReview, ApplicationStatusEvent, EmailClassification, JobRun, utcnow
-from backend.models.tenancy import LedgerEntry
+from backend.models.tenancy import ActivityEntry
 from backend.tests.test_pr3_matching import matching_case, mailbox_case, email  # noqa: F401 (fixtures)
 from backend.tests.test_pr3_pipeline import decision, pipeline  # noqa: F401 (fixture)
 
@@ -40,7 +40,7 @@ def _set(test_db, message_id, **fields):
 
 
 def _summaries(test_db, word):
-    return test_db.query(LedgerEntry).filter(LedgerEntry.summary.contains(word)).count()
+    return test_db.query(ActivityEntry).filter(ActivityEntry.summary.contains(word)).count()
 
 
 # ── setup-failure recovery ─────────────────────────────────────────────────────────────────────────────────────

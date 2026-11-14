@@ -3,6 +3,20 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Activity logs (Umamah; PRs 3 to 7)
+
+The ledger moves to a new table, `activity_logs`, that can only be added to (07 Q65; migrations 0028 to 0030). Each row
+names the PR that makes the change. Rows are added to this table by each PR.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Job search tests (Zuhair), PR 3 | `backend/tests/test_job_search_api.py`, `test_job_search_capture.py`, `test_job_search_review.py` | They read the entry from `ActivityEntry` (`activity_logs`) instead of `LedgerEntry`. The hand-off-note test builds an `ActivityEntry`. | `ledger.record` writes to the new table from PR 3. No expectation changed. | **Pending: Zuhair** |
+| Email classification tests (Samad), PR 3 | `backend/tests/test_pr4_automation.py`, `backend/tests/test_pr4_backfill.py` | They read the entry from `ActivityEntry` (`activity_logs`) instead of `LedgerEntry`. No expectation changed. | `ledger.record_automated` writes to the new table from PR 3. | **Pending: Samad** |
+| Résumé version tests (Zuhair), PR 3 | `backend/tests/test_resume_versions.py` | Reads the entries from `ActivityEntry`. | The same. | **Pending: Zuhair** |
+| Ledger tests (Samad), PR 3 | `backend/tests/test_ledger.py` | His manager-scope test stamps its entries after it sets the teams (`_stamp_from_today`). | What a role reads now follows the stamps on each entry (who was responsible at the time), not today's teams. | **Pending: Samad** |
+| Candidates and team routes (Abdul), PR 3 | `backend/api/routes_candidates.py`, `routes_team.py` | They pass before/after values to the log. The BDE-capacity route is gone with main's Q63. | The log keeps what changed on a candidate edit, an assignment and a manager change. | **Pending: Abdul** |
+| Platform admin reads, passwords, scripts, demo seed (Abdul), PR 3 | `backend/api/routes_admin.py`, `backend/auth/password_reset.py`, `backend/scripts/*`, `backend/scripts/seed_demo.py` | They write and read `activity_logs`. The demo reset names itself to the trigger that refuses deletes. | The old `ledger_entries` is no longer written. | **Pending: Abdul** |
+
 ## Résumé tailoring, part 3: the screens (`feat/resume-tailoring`, Zuhair)
 
 Grilled and built 2026-11-12 ([tailoring.md](./tailoring.md) §8). These rows wait for their owners.
@@ -98,6 +112,7 @@ Details: [pr8-owner-dashboard.md](./pr-changes/pr8-owner-dashboard.md), "Merged 
 | Activity dashboard (Umamah) | `src/features/dashboard/activity/{activity-numbers,activity-insights,activity-firm-cards,activity-tables,activity-team-cards}.ts(x)`, `owner-activity-views.tsx`, `src/features/managers/managers-list.tsx`, and their tests | Placements → Offers everywhere; "Offer → placed" removed; days to an offer; applications per offer; the per-BDE chart is Shortlisted / Interview scheduled / Offer. | Offer is the last stage on the new list; Placed is legacy. |
 | Dashboards (Umamah) | `src/features/dashboard/owner-dashboard.tsx`, `manager-dashboard.tsx`, `dashboard-errors.test.ts` | Finance tab: Offers this quarter and Time to offer, dated by reaching Offer; the per-BDE table's column says Offers (it already counted offers, D6), and its Interviews count the same way as the Activity dashboard (`applicationDate`, a skipped stage counts) in `src/lib/derive/bde-performance.ts`. | As above; on live data the column read 1 where the Activity tile read 3. |
 | Applications (Samad) | `src/lib/api/dto/applications.ts` (+ test) | `firstResponseAt`, `interviewAt` and `offerAt` are read off `status_transitions` and `interviews` instead of always `null`: the first move out of Applied (not back to Saved; Move On counts), the earliest booked interview not cancelled else the first move to Interview scheduled, the first move to Offer or a legacy Placed. **Not agreed yet: Samad reviews.** | The rule in [docs/integration/03-applications.md](../integration/03-applications.md) (field table), updated for the new stages; on live data Responses, % heard back, response rate and the Finance tab's Interviews showed 0. The `last_email_received` fallback is left out: the new inbox doesn't fill that column. |
+| Migration 0025 test (Samad), PR 3 | `backend/tests/test_migration_0025.py` | The two tests compare the database's version with `head_revision()` instead of the literal `'0027'`. | 0027 was main's newest migration; with the Activity logs migrations (0028 and later) on top it isn't. No behaviour checked has changed. | **Pending: Samad** |
 ## Job screens on the backend (`integrate/jobs`, Zuhair; job search PR 3)
 
 Decided 2026-11-11 (grilling rounds 1–3). In progress; rows are added as the work lands. Opened as a PR only after

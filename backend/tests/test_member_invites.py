@@ -60,7 +60,7 @@ def _invite(client, accounts, cookie, **body):
 
 @pytest.mark.parametrize("role", ["MANAGER", "BDE", "VIEWER"])
 def test_the_owner_invites_each_member_role(anonymous_client, accounts, owner, role, test_db):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     r = _invite(anonymous_client, accounts, owner, role=role, invitee_name=" Bea ")
     assert r.status_code == 201, r.text
     body = r.json()
@@ -69,7 +69,7 @@ def test_the_owner_invites_each_member_role(anonymous_client, accounts, owner, r
     assert body["invite"]["invited_by_user_id"] == str(accounts.user_id)
     assert body["invite"]["invitee_name"] == "Bea"
     assert len(body["invite_token"]) == 43
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.action == "INVITE_SENT").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.action == "INVITE_SENT").one()
     assert entry.summary == f"Invited Bea (bea@acme.test) as {role}"
     assert entry.actor_type == "USER" and entry.firm_id == accounts.firm_id
 
@@ -226,7 +226,7 @@ def test_onboarding_end_to_end(test_db, accounts, api_client):
     and signs in. Every step through the HTTP API, each person in their own browser."""
     from fastapi.testclient import TestClient
     from backend.main import app
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
 
     def browser():
         return TestClient(app)
@@ -276,7 +276,7 @@ def test_onboarding_end_to_end(test_db, accounts, api_client):
         assert roles == ["BDE", "MANAGER", "OWNER"]
         assert {i["status"] for i in nora.get(f"/api/firms/{firm_id}/invites").json()} == {"ACCEPTED"}
 
-    actions = [e.action for e in test_db.query(LedgerEntry).filter(LedgerEntry.firm_id == firm_id)
-               .order_by(LedgerEntry.created_at)]
+    actions = [e.action for e in test_db.query(ActivityEntry).filter(ActivityEntry.firm_id == firm_id)
+               .order_by(ActivityEntry.created_at)]
     assert actions.count("INVITE_SENT") == 3 and actions.count("INVITE_ACCEPTED") == 3
     assert "FIRM_CREATED" in actions and "LOGIN" in actions

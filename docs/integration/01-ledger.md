@@ -6,8 +6,9 @@ The ledger is the firm's record of who did what. It is the first module on the r
 built to be copied: every firm-scoped module takes the same steps, in the same files. Read this before
 you start your own track, and point to the step you're on in your PR.
 
-The ledger is the `ledger_entries` table (the contract's `LedgerEntry`, docs/02 §10). It is **not**
-`activity_log_v2`: that's the platform's system log (scrapes, scoring runs), with no actor, firm or action,
+The ledger is the `activity_logs` table (model `ActivityEntry`; the contract's `LedgerEntry`, docs/02 §10), which
+took over from `ledger_entries` in migration 0028. Every old row was copied, stamped from today's assignments, and
+`ledger_entries` is left as it was. It is **not** `activity_log_v2`: that's the platform's system log (scrapes, scoring runs), with no actor, firm or action,
 and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 
 ---
@@ -16,7 +17,7 @@ and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 
 | Step | File | What it does |
 |---|---|---|
-| 1. Table | `backend/models/tenancy.py` `LedgerEntry`, migration 0003 | `firm_id` (null only for platform events, A13), actor, entity, action, summary. CHECK constraints, not enums; RESTRICT foreign keys (Q38) |
+| 1. Table | `backend/models/tenancy.py` `ActivityEntry`, migration 0028 (a trigger refuses UPDATE and DELETE) | `firm_id` (null only for platform events, A13), actor, entity, action, summary. CHECK constraints, not enums; RESTRICT foreign keys (Q38) |
 | 2. Write | `backend/auth/ledger.py` `record()` | Every write a person makes calls it **in the same transaction** as the change; the caller commits |
 | 3. Read route | `backend/api/routes_ledger.py` | `GET /api/firms/{firm_id}/ledger?limit&offset` |
 | 4. Access class | `backend/auth/access.py` `ROUTE_ACCESS` | `F`: firm users, and a Super Admin inside a support view of the firm for GET only; a Super Admin without one and a suspended firm's users are refused before the route runs |
@@ -38,11 +39,22 @@ The ledger's DTO sits in `dto/session.ts` because `/admin/audit` uses it too. A 
 
 ### The route
 
-`GET /api/firms/{firm_id}/ledger` scopes the query to the session's firm, then applies the
-BDE or Manager scope before ordering by `created_at` descending and `id` ascending. For the Ledger screen, pass the
-last row’s original `created_at` and `id` as `cursor_at` and `cursor_id` to continue the scan. Existing callers can still use
-`offset`. Cursor requests require both fields and a timestamp with a timezone; an `offset` with a cursor skips that many rows after the cursor boundary.
-See [the route](../../backend/api/routes_ledger.py) for the optional filters and full query.
+```python
+@router.get("/ledger")
+def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
+                principal: Principal = Depends(current_principal), my_firm: uuid.UUID = Depends(reader_firm_id),
+                db: DbSession = Depends(get_db)):
+    if firm_id != my_firm:
+        raise HTTPException(status_code=404, detail="Not found.")      # never confirm another firm exists
+    entries = scoped(db, ActivityEntry, my_firm)                         # firm_id = :firm, always
+    if (actor := own_scope(principal)) is not None:                    # a BDE: only their own rows
+        entries = entries.filter(ActivityEntry.actor_user_id == actor)
+    entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id).offset(offset).limit(limit)
+    return [ledger_entry_json(e) for e in entries]
+```
+
+It limits the rows by role (`_limit_to_reader`: a BDE's own and their candidates' assignments, a MANAGER's team, 07 Q52 and Q65) and orders them newest first (`created_at` descending), then by lowest `id` for rows at exactly the same moment, so the order is
+the same on every read. To read on, pass the last row's `cursor`, or the same marker as two fields, `cursor_at` and `cursor_id` (both, and a timestamp with a timezone; what the whole-ledger paging on the frontend sends). An `offset` with a cursor skips that many rows after it. See [the route](../../backend/api/routes_ledger.py) for the filters.
 
 The rules it follows, which every track follows:
 
@@ -146,7 +158,7 @@ sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 
 ## Acceptance criteria
 
-- [x] `GET /api/firms/{firm_id}/ledger`: the firm's entries, newest first; a MANAGER's team only (07 Q64); a BDE's own only; another firm 404
+- [x] `GET /api/firms/{firm_id}/ledger`: the firm's entries, newest first; a MANAGER's team only (07 Q65); a BDE's own only; another firm 404
 - [x] `ledger_entries` covered by the scoping lint
 - [x] Adapter live, mapping and paging tested
 - [ ] Clicked through as OWNER and BDE on the live backend (the PR's test plan)

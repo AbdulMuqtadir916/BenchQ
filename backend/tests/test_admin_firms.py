@@ -47,9 +47,9 @@ def test_create_makes_an_onboarding_firm_with_the_plans_limits_and_an_owner_invi
 
 
 def test_create_logs_firm_created_and_invite_sent_in_the_firms_ledger(api_client, accounts, test_db):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     firm_id = _create(api_client, accounts).json()["firm"]["id"]
-    entries = {e.action: e for e in test_db.query(LedgerEntry).filter(LedgerEntry.firm_id == firm_id)}
+    entries = {e.action: e for e in test_db.query(ActivityEntry).filter(ActivityEntry.firm_id == firm_id)}
     assert set(entries) == {"FIRM_CREATED", "INVITE_SENT"}
     assert entries["FIRM_CREATED"].summary == "Created firm on Test plan (10 BDE seats, 100 candidates)"
     assert entries["INVITE_SENT"].summary == "Invited Nora North (nora@northwind.test) as OWNER"
@@ -152,7 +152,7 @@ def _invite(api_client, accounts):
 
 
 def test_resend_issues_a_new_link_and_the_old_one_stops_working(api_client, anonymous_client, accounts, test_db):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     invite_id, old = _invite(api_client, accounts)
     r = api_client.post(f"/api/admin/invites/{invite_id}/resend")
     assert r.status_code == 200
@@ -160,7 +160,7 @@ def test_resend_issues_a_new_link_and_the_old_one_stops_working(api_client, anon
     assert new != old
     assert anonymous_client.get(f"/api/invites/{old}").json() == {"status": "INVALID"}
     assert anonymous_client.get(f"/api/invites/{new}").json()["status"] == "VALID"
-    summaries = [e.summary for e in test_db.query(LedgerEntry).filter(LedgerEntry.action == "INVITE_SENT")]
+    summaries = [e.summary for e in test_db.query(ActivityEntry).filter(ActivityEntry.action == "INVITE_SENT")]
     assert "Invite resent to nora@northwind.test" in summaries
 
 
@@ -195,13 +195,13 @@ def test_resending_an_expired_owner_invite_needs_no_seat(api_client, accounts, t
 
 
 def test_revoke_kills_the_link_and_logs_it(api_client, anonymous_client, accounts, test_db):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     invite_id, token = _invite(api_client, accounts)
     r = api_client.post(f"/api/admin/invites/{invite_id}/revoke")
     assert r.status_code == 200
     assert r.json()["status"] == "REVOKED"
     assert anonymous_client.get(f"/api/invites/{token}").json()["status"] == "REVOKED"
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.action == "INVITE_REVOKED").count() == 1
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.action == "INVITE_REVOKED").count() == 1
     # Neither a revoked invite can be revoked again nor resent.
     assert api_client.post(f"/api/admin/invites/{invite_id}/revoke").status_code == 409
     assert api_client.post(f"/api/admin/invites/{invite_id}/resend").status_code == 409

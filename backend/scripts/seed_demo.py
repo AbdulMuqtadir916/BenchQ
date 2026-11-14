@@ -23,7 +23,7 @@ import pathlib
 import sys
 import uuid
 
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 
 from backend.auth.passwords import hash_password
 from backend.auth.tokens import hash_token, new_token
@@ -31,7 +31,7 @@ from backend.config import IS_PRODUCTION
 from backend.models.db import SessionLocal, utcnow, Resume
 from backend.models.candidates import BaseResume, Candidate, ResumeParse
 from backend.models.job_search import JobPosting, ScrapeJob
-from backend.models.tenancy import Firm, Invite, LedgerEntry, Plan, PlatformUser, Session, User
+from backend.models.tenancy import ActivityEntry, Firm, Invite, LedgerEntry, Plan, PlatformUser, Session, User
 
 DEMO_PASSWORD = "benchq-demo-2026"                                     # docs/03 §3.2
 NAMESPACE = uuid.UUID("6f1d4c2e-0b7a-5e3c-9a41-b3c0e5d2a7f8")           # fixed: changing it re-ids every demo row
@@ -77,6 +77,10 @@ def reset(db) -> None:
     db.query(Session).filter(or_(Session.user_id.in_(user_ids), Session.platform_user_id.in_(user_ids))) \
         .delete(synchronize_session=False)
     db.query(LedgerEntry).filter(or_(LedgerEntry.firm_id.in_(firm_ids), LedgerEntry.actor_user_id.in_(user_ids))) \
+        .delete(synchronize_session=False)
+    # The log refuses deletes (migration 0028); only this reset of local demo data names itself to get past that.
+    db.execute(text("SET LOCAL benchq.activity_logs_demo_reset = 'on'"))
+    db.query(ActivityEntry).filter(or_(ActivityEntry.firm_id.in_(firm_ids), ActivityEntry.actor_user_id.in_(user_ids))) \
         .delete(synchronize_session=False)
     # Their résumés first (a base's versions, then the bases): the candidates' names live there (07 Q57).
     db.query(BaseResume).filter(BaseResume.firm_id.in_(firm_ids)).update({BaseResume.promoted_from_resume_id: None},

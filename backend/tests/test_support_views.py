@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from backend.models.db import Application, Job
 from backend.models.candidates import Candidate
-from backend.models.tenancy import Firm, LedgerEntry, Session, SupportView
+from backend.models.tenancy import Firm, ActivityEntry, Session, SupportView
 from backend.tests.auth_support import TEST_PASSWORD, make_firm, make_plan, make_user
 from backend.tests.ledger_support import assert_logged
 from backend.tests.resume_support import make_version
@@ -73,16 +73,18 @@ def _exit(client, world):
 
 def _ledger(test_db, **filters):
     test_db.expire_all()
-    return test_db.query(LedgerEntry).filter_by(**filters).order_by(LedgerEntry.created_at).all()
+    return test_db.query(ActivityEntry).filter_by(**filters).order_by(ActivityEntry.created_at).all()
 
 
 def _expire(test_db, minutes=61):
     """Move every open view, and its start entry, back in time: the 60-minute check constraint holds, nobody
     sleeps."""
     shift = {"m": minutes}
-    test_db.execute(text("UPDATE ledger_entries SET created_at = created_at - make_interval(mins => :m) "
+    test_db.execute(text("ALTER TABLE activity_logs DISABLE TRIGGER activity_logs_append_only"))
+    test_db.execute(text("UPDATE activity_logs SET created_at = created_at - make_interval(mins => :m) "
                          "WHERE action = 'ADMIN_ACCESS' AND entity_id IN "
                          "(SELECT id::text FROM support_views WHERE ended_at IS NULL)"), shift)
+    test_db.execute(text("ALTER TABLE activity_logs ENABLE TRIGGER activity_logs_append_only"))
     test_db.execute(text("UPDATE support_views SET started_at = started_at - make_interval(mins => :m), "
                          "expires_at = expires_at - make_interval(mins => :m) WHERE ended_at IS NULL"), shift)
     test_db.commit()
@@ -365,7 +367,7 @@ def test_a_password_reset_ends_the_view(anonymous_client, world, test_db):
 # ── Expiry is settled once, wherever it is noticed ──────────────────────────
 
 def test_a_support_view_reads_the_whole_firms_ledger(anonymous_client, world):
-    """As the OWNER does (07 Q64): no role limit narrows it."""
+    """As the OWNER does (07 Q65): no role limit narrows it."""
     assert _start(anonymous_client, world).status_code == 200
     path = f"/api/firms/{world['acme']}/ledger"
     ids = lambda headers: [entry["id"] for entry in anonymous_client.get(path, headers=headers).json()]

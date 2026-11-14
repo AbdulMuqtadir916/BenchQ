@@ -5,7 +5,7 @@ A grep-like check over the backend, as `test_firm_scoping_lint.py` does for firm
 1. Every route that changes data writes a ledger entry, directly or through a helper it calls. A route that doesn't
    is listed in `NOT_LOGGED` with the reason. A listed route that starts logging must leave the list, so it shrinks.
 2. Every ledger write states `candidate_id`, even as None, and goes through `backend/auth/ledger.py`.
-3. Only the listed routes read `LedgerEntry`, so no new endpoint skips the role limit in `routes_ledger.py`.
+3. Only the listed routes read `ActivityEntry`, so no new endpoint skips the role limit in `routes_ledger.py`.
 """
 import ast
 from functools import lru_cache
@@ -96,7 +96,7 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("main.py", "telegram_test"): NOT_FIRM_ACTIVITY,
 }
 
-# (file, function) -> why it builds a LedgerEntry itself instead of calling backend/auth/ledger.py.
+# (file, function) -> why it builds a ActivityEntry itself instead of calling backend/auth/ledger.py.
 DIRECT_WRITES = {
     ("auth/ledger.py", "record"): "the writer",
     ("auth/ledger.py", "record_automated"): "the writer",
@@ -105,9 +105,11 @@ DIRECT_WRITES = {
     ("scripts/reset_password.py", "reset_password"): "a staff script, no signed-in actor",
 }
 
-# (file, function) that may read LedgerEntry.
+# (file, function) that may read ActivityEntry.
 LEDGER_READERS = {
-    ("api/routes_ledger.py", "list_ledger"): "a firm's ledger, limited by role",
+    ("api/routes_ledger.py", "_visible"): "a firm's log, limited by role",
+    ("api/routes_ledger.py", "list_ledger"): "pages what `_visible` allows",
+    ("api/routes_ledger.py", "_after_cursor"): "pages what `_visible` allows",
     ("api/routes_admin.py", "list_audit"): "the Super Admin's audit across the platform",
     ("scripts/seed_demo.py", "reset"): "clears local demo data; serves no one",
 }
@@ -218,18 +220,19 @@ def _callee(call: ast.Call, file: str, resolve, functions: dict, modules: dict) 
     return None
 
 
-def _ledger_model_names(tree: ast.Module) -> set[str]:
-    """The names `LedgerEntry` goes by in a file, including an `import ... as` alias."""
-    names = {"LedgerEntry"}
+def _ledger_model_names(tree: ast.Module, model: str = "ActivityEntry") -> set[str]:
+    """The names a model (the log's `ActivityEntry` unless told otherwise) goes by in a file, including an
+    `import ... as` alias."""
+    names = {model}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
-            names.update(alias.asname or alias.name for alias in node.names if alias.name == "LedgerEntry")
+            names.update(alias.asname or alias.name for alias in node.names if alias.name == model)
     return names
 
 
-def _is_ledger_model(node: ast.AST, names: set[str]) -> bool:
-    """`LedgerEntry`, an alias of it, or `module.LedgerEntry`."""
-    return (isinstance(node, ast.Name) and node.id in names) or (isinstance(node, ast.Attribute) and node.attr == "LedgerEntry")
+def _is_ledger_model(node: ast.AST, names: set[str], model: str = "ActivityEntry") -> bool:
+    """The model, an alias of it, or `module.<model>`."""
+    return (isinstance(node, ast.Name) and node.id in names) or (isinstance(node, ast.Attribute) and node.attr == model)
 
 
 def _own_nodes(function):
@@ -357,11 +360,12 @@ def test_every_ledger_write_states_its_candidate():
     assert not missing, "State candidate_id, or candidate_id=None for an entry about no candidate:\n" + "\n".join(missing)
 
 
-def _enclosing_calls(accept, trees=None) -> set[tuple[str, str]]:
-    """(file, outermost function) of every call `accept(call, ledger_model_names)` takes, across the backend."""
+def _enclosing_calls(accept, trees=None, model: str = "ActivityEntry") -> set[tuple[str, str]]:
+    """(file, outermost function) of every call `accept(call, names)` takes, across the backend, where `names` are what
+    `model` is called in that file."""
     found = set()
     for file, tree in _source_trees(SOURCE_FILES) if trees is None else trees:
-        names = _ledger_model_names(tree)
+        names = _ledger_model_names(tree, model)
 
         def visit(node, function):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and function is None:
@@ -383,6 +387,13 @@ def test_a_ledger_entry_is_built_only_by_the_writer():
     assert built <= set(DIRECT_WRITES), f"Write through backend/auth/ledger.py instead: {sorted(built - set(DIRECT_WRITES))}"
 
 
+def test_the_old_ledger_table_is_only_cleared_by_the_demo_reset():
+    """`activity_logs` replaced `ledger_entries` (migration 0028); an entry written there would never be seen."""
+    used = _enclosing_calls(lambda call, names: any(_is_ledger_model(node, names, "LedgerEntry") for node in ast.walk(call)),
+                            model="LedgerEntry")
+    assert used <= {("scripts/seed_demo.py", "reset")}, f"Use ActivityEntry instead: {sorted(used)}"
+
+
 def _reads_the_ledger(call: ast.Call, names: set[str]) -> bool:
     name = call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
     return name in {"query", "scoped", "select", "get", "join", "outerjoin"} and any(
@@ -393,7 +404,7 @@ def _reads_the_ledger(call: ast.Call, names: set[str]) -> bool:
 def test_only_the_listed_routes_read_the_ledger():
     """A new read would skip the role limit in `routes_ledger.py`: add to that route instead."""
     reads = _enclosing_calls(_reads_the_ledger)
-    assert reads <= set(LEDGER_READERS), f"These read LedgerEntry outside the role limit: {sorted(reads - set(LEDGER_READERS))}"
+    assert reads <= set(LEDGER_READERS), f"These read ActivityEntry outside the role limit: {sorted(reads - set(LEDGER_READERS))}"
 
 
 # The checks above are only as good as what they can see. These feed each one a small file that does the thing a
@@ -429,11 +440,11 @@ def test_a_route_added_with_api_route_or_add_api_route_is_a_write_route():
 
 
 def test_a_renamed_ledger_model_is_still_seen_when_built_or_read():
-    source = ("from backend.models.tenancy import LedgerEntry as Entry\nfrom backend.models import tenancy\n"
+    source = ("from backend.models.tenancy import ActivityEntry as Entry\nfrom backend.models import tenancy\n"
               "def build(db):\n    return Entry(firm_id=1)\n"
-              "def build_by_module(db):\n    return tenancy.LedgerEntry(firm_id=1)\n"
+              "def build_by_module(db):\n    return tenancy.ActivityEntry(firm_id=1)\n"
               "def read(db):\n    return db.query(Entry).all()\n"
-              "def read_by_module(db):\n    return db.query(tenancy.LedgerEntry).all()\n")
+              "def read_by_module(db):\n    return db.query(tenancy.ActivityEntry).all()\n")
     trees = _snippet(source)
     assert {name for _, name in _enclosing_calls(_builds_a_ledger_entry, trees)} == {"build", "build_by_module"}
     assert {name for _, name in _enclosing_calls(_reads_the_ledger, trees)} == {"read", "read_by_module"}
@@ -466,8 +477,8 @@ def test_a_function_counts_only_when_a_call_hands_it_over_to_run():
 
 
 def test_a_ledger_read_passed_by_keyword_is_seen():
-    source = ("from backend.models.tenancy import LedgerEntry\n"
-              "def by_keyword(db, row_id):\n    return db.get(entity=LedgerEntry, ident=row_id)\n"
-              "def by_position(db, row_id):\n    return db.get(LedgerEntry, row_id)\n"
+    source = ("from backend.models.tenancy import ActivityEntry\n"
+              "def by_keyword(db, row_id):\n    return db.get(entity=ActivityEntry, ident=row_id)\n"
+              "def by_position(db, row_id):\n    return db.get(ActivityEntry, row_id)\n"
               "def elsewhere(db, row_id):\n    return db.get(Other, row_id)\n")
     assert {name for _, name in _enclosing_calls(_reads_the_ledger, _snippet(source))} == {"by_keyword", "by_position"}
