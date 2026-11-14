@@ -151,9 +151,14 @@ def test_another_firm_is_not_found(anonymous_client, world, adnans, fake, launch
 
 # ── the role and the place (decided 2026-11-14) ─────────────────────────────
 
-def test_the_role_is_the_target_role_never_the_primary_role_or_the_request(anonymous_client, world, fake, launched):
-    c = _create(anonymous_client, world, bde="adnan", primary_role="Backend Engineer",
-                target_roles=["  Data  Engineer ", "Analytics Engineer"]).json()
+def test_the_role_is_the_target_role_never_the_primary_role_or_the_request(anonymous_client, world, fake, launched,
+                                                                          test_db):
+    from backend.models.candidates import Candidate
+    c = _create(anonymous_client, world, bde="adnan", primary_role="Backend Engineer").json()
+    # A candidate from before onboarding took one role (Q11) keeps several; the search uses the first.
+    test_db.query(Candidate).filter(Candidate.id == uuid.UUID(c["id"])).update(
+        {Candidate.target_roles: ["  Data  Engineer ", "Analytics Engineer"]})
+    test_db.commit()
     assert anonymous_client.post(_url(world, c, "job-searches"), json={"query": "Anything Else"},
                                  headers=world["as"]["adnan"]).status_code == 202
     assert launched[0]["kwargs"]["query"] == "Data Engineer"               # the first target role
@@ -181,7 +186,10 @@ def test_a_place_that_isnt_the_candidates_is_refused(anonymous_client, world, ad
 
 def test_no_search_without_a_target_role_or_a_place(anonymous_client, world, fake, launched, test_db):
     from backend.models.candidates import Candidate
-    c = _create(anonymous_client, world, bde="adnan", preferred_locations=[]).json()
+    c = _create(anonymous_client, world, bde="adnan").json()
+    # A candidate from before onboarding required a place (Q14, Q23) may have none.
+    test_db.query(Candidate).filter(Candidate.id == uuid.UUID(c["id"])).update({Candidate.preferred_locations: []})
+    test_db.commit()
     r = _post(anonymous_client, world, c)
     assert r.status_code == 422 and "city and state on their résumé, or a preferred location" in r.json()["detail"]
     test_db.query(Candidate).filter(Candidate.id == uuid.UUID(c["id"])).update(
