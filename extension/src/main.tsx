@@ -21,6 +21,7 @@ import {
   reloadIfManifestIsStale,
 } from "./autofill/manifest-check";
 import { forgetTabs } from "./autofill/use-autofill";
+import AddJobCard from "./autofill/AddJobCard";
 import { useTabConnection } from "./autofill/use-tab-connection";
 import type { AppliedForm } from "./autofill/types";
 import JobTabs, { JOB_PANEL, tabId, type JobTab } from "./JobTabs";
@@ -83,7 +84,7 @@ function App() {
   const savedJobs = jobs.filter((job) => job.status === "saved");
   const appliedJobs = jobs.filter((job) => job.status === "applied");
   const visibleJobs = activeTab === "saved" ? savedJobs : appliedJobs;
-  const { connection } = useTabConnection(session?.principal.user_id ?? null);
+  const { tab: activeBrowserTab, connection } = useTabConnection(session?.principal.user_id ?? null);
   const tabCandidateId = connection?.candidateId ?? null;
   const linkedJob =
     jobs.find((job) => job.id === connection?.applicationId && job.candidate_id === connection?.candidateId) ?? null;
@@ -323,6 +324,13 @@ function App() {
     }
   };
   // A job BenchQ can connect opens in a connected tab, and the panel scans it. If it's open already, this goes to its tab.
+  const connectThisTab = async (job: Application) => {
+    setError("");
+    const details = session && connectionFor(job, session.principal.user_id);
+    if (!details || !activeBrowserTab) return;
+    const reply = await sendToBackground({ type: "connect-tab", connection: details, tabId: activeBrowserTab.id }).catch(() => null);
+    if (!reply?.ok) setError("Could not use this tab. Try Open job.");
+  };
   const openJobLink = (job: Application) => {
     if (isConnectable(job)) {
       return (
@@ -353,8 +361,20 @@ function App() {
       </button>
     );
   };
+  const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId) ?? null;
+  // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then the tab connects.
+  const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
+    <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} candidateId={selectedCandidate.id}
+      candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
+      onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
+      onAdded={(application) => {
+        loadJobs(selectedCandidate.id).catch(() => undefined);
+        void openJob(application);
+      }} />
+  ) : null;
   const jobsArea = (
     <>
+      {addJobCard}
       <JobTabs
         active={activeTab}
         counts={
@@ -571,7 +591,9 @@ function App() {
           </div>
           {connection ? (
             <AutofillPanel
-              key={connection.tabId}
+              // One panel per tab and job: a tab connected to another job starts afresh (its own form memory, next pages
+              // off until the BDE runs Autofill for that job).
+              key={`${connection.tabId}:${connection.applicationId}`}
               connection={connection}
               applicationStatus={applicationStatus}
               onRetryContext={() => void refresh()}

@@ -324,13 +324,13 @@ def test_a_bde_deletes_their_unused_version_but_never_v1_or_an_owners(anonymous_
 
 
 def test_a_sent_version_is_refused_with_what_uses_it(anonymous_client, test_db, world):
-    from backend.models.db import Application, Job
+    from backend.models.db import Application
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     v1 = _v(anonymous_client, world, c)
     v2 = _save(anonymous_client, world, c, v1, "adnan", summary="Sent.").json()
-    job = Job(external_id="v-sent", title="Java Dev", company="Acme", url="https://jobs.example.test/s", source="manual")
-    test_db.add(job)
-    test_db.flush()
+    from backend.tests.posting_support import posting_for
+    job = posting_for(test_db, world["firm"].id, uuid.UUID(c["id"]), title="Java Dev", company="Acme",
+                      url="https://jobs.example.test/s")
     test_db.add(Application(firm_id=world["firm"].id, job_id=job.id, status="applied", candidate_id=uuid.UUID(c["id"]),
                             resume_id=uuid.UUID(v2["id"])))
     test_db.commit()
@@ -341,7 +341,7 @@ def test_a_sent_version_is_refused_with_what_uses_it(anonymous_client, test_db, 
 def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_used_one_is_hidden(
         anonymous_client, test_db, world, parser):
     from backend.models.candidates import BaseResume, ResumeParse
-    from backend.models.db import Application, Job, Resume
+    from backend.models.db import Application, Resume
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     as_bde = world["as"]["adnan"]
     base2 = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=as_bde).json()
@@ -377,9 +377,9 @@ def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_
     # Base 3 (the third file), inactive after the restore made Base 2 active again.
     third = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base3["id"])
     v1 = third["versions"][0]
-    job = Job(external_id="v-used", title="Java Dev", company="Acme", url="https://jobs.example.test/u", source="manual")
-    test_db.add(job)
-    test_db.flush()
+    from backend.tests.posting_support import posting_for
+    job = posting_for(test_db, world["firm"].id, uuid.UUID(c["id"]), title="Java Dev", company="Acme",
+                      url="https://jobs.example.test/u")
     test_db.add(Application(firm_id=world["firm"].id, job_id=job.id, status="applied", candidate_id=uuid.UUID(c["id"]),
                             resume_id=uuid.UUID(v1["id"])))
     test_db.commit()

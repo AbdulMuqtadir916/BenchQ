@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkJob, hostOf } from "./job-check";
+import { checkJob, hostOf, sameListing } from "./job-check";
 import type { JobSummary, PageSignals } from "./types";
 
 const job: JobSummary = { title: "Senior Java Developer", company: "Acme Corp, Inc.", url: "https://careers.acme.test/jobs/1" };
@@ -67,5 +67,14 @@ describe("checkJob", () => {
     expect(conflict({ title: "Globex careers" }, { title: null, company: null, url: job.url })).toBe(false);
     expect(conflict({ title: "Globex careers" }, { title: "Senior Java Developer", company: null, url: job.url })).toBe(true);
     expect(conflict({ posting: { title: "", company: "" } }, { title: null, company: null, url: job.url })).toBe(false);
+  });
+});
+
+describe("sameListing's places (CodeRabbit #129)", () => {
+  it("tells two cities in one state apart, and keeps a place named less closely", () => {
+    const job = { title: "QA Engineer", company: "Acme", location: "Dallas, TX" };
+    expect(sameListing({ ...job, location: "Austin, TX" }, job)).toBe(false);
+    expect(sameListing({ ...job, location: "Dallas, Texas, USA" }, job)).toBe(true);
+    expect(sameListing({ ...job, location: "TX" }, job)).toBe(true);
   });
 });

@@ -1,13 +1,13 @@
 """Application management endpoints."""
 import logging
 import uuid
-from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from pydantic import BaseModel
+from datetime import date, timedelta
+from typing import Annotated, Literal, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from backend.models.db import get_db, Application, Job, Company, Setting, utcnow, SessionLocal
-from backend.models.tenancy import link_job_to_firm
 from backend.api.routes_auth import current_principal
 from backend.api._input import uuid_filter
 from backend.auth.scoping import reader_firm_id, scoped, writer_firm_id
@@ -30,6 +30,7 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 
 VALID_STATUSES = {"applied", "interview", "offer", "rejected"}
 from backend.applications.tracking import STATUSES as CANDIDATE_STATUSES
+from backend.applications.postings import pay_text, posting_job, safe_url
 
 
 def _parse_dt(value):
@@ -44,14 +45,79 @@ def _parse_dt(value):
         return None
 
 
+def _http_url(value: str) -> str:
+    if safe_url(value) is None:
+        raise ValueError("an http(s) link")
+    return value.strip()
+
+
+_Line = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
+
+
+EMPLOYMENT_TYPES = ("Full-time", "Part-time", "Contract", "Contract-to-hire", "Temporary", "Internship", "Per diem",
+                    "Volunteer", "Seasonal")
+
+
+def _employment(value: str) -> str:
+    parts = list(dict.fromkeys(part.strip() for part in value.split(",")))
+    if not parts or len(parts) > 4 or any(part not in EMPLOYMENT_TYPES for part in parts):
+        raise ValueError(f"employment types from: {', '.join(EMPLOYMENT_TYPES)}")
+    return ", ".join(parts)
+
+
+def _posted(value: str) -> str:
+    try:
+        day = date.fromisoformat(value)
+    except ValueError:
+        raise ValueError("a date as YYYY-MM-DD") from None
+    if day.year < 2000 or day > date.today() + timedelta(days=1):
+        raise ValueError("a posting date that has come")
+    return day.isoformat()
+
+
+_Amount = Annotated[float, Field(gt=0, le=10_000_000), AfterValidator(lambda value: int(value) if value.is_integer() else value)]
+
+
+class AddedJob(BaseModel):
+    """A job the BDE adds for a candidate (the add-job plan, decided 2026-11-11), as job search PR 2 (#124) captures one:
+    `manual` (by hand) or `extension`, whose description may be the employer's HTML."""
+    source: Literal["manual", "extension"]
+    title: _Line
+    company: _Line
+    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100_000)]
+    url: Annotated[str, StringConstraints(max_length=2048), AfterValidator(_http_url)]
+    location: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
+    # What the page stated besides (the extension's deterministic reading, decided 2026-11-12), each only when stated;
+    # kept flat in `content` beside the capture's fields, as a moved job keeps its salary bounds.
+    work_mode: Literal["remote", "hybrid", "onsite"] | None = None
+    employment_type: Annotated[str, StringConstraints(max_length=100), AfterValidator(_employment)] | None = None
+    salary_min: _Amount | None = None
+    salary_max: _Amount | None = None
+    salary_currency: Annotated[str, StringConstraints(pattern=r"^[A-Z]{3}$")] | None = None
+    salary_period: Literal["hour", "day", "week", "month", "year"] | None = None
+    posted_at: Annotated[str, StringConstraints(max_length=10), AfterValidator(_posted)] | None = None
+    requisition_id: Annotated[str, StringConstraints(strip_whitespace=True, max_length=60,
+                                                    pattern=r"^[A-Za-z0-9][A-Za-z0-9_.#/-]*$")] | None = None
+
+    @model_validator(mode="after")
+    def _pay_holds_together(self):
+        if self.salary_min is not None and self.salary_max is not None and self.salary_min > self.salary_max:
+            raise ValueError("salary_min is above salary_max")
+        if (self.salary_currency or self.salary_period) and self.salary_min is None and self.salary_max is None:
+            raise ValueError("salary_currency and salary_period go with a salary")
+        return self
+
+
 class ApplicationCreate(BaseModel):
-    title: str
-    company: str
-    url: str
-    # Candidate-scoped Saved jobs are created from an existing canonical job; the
-    # title/company/url above remain required for the legacy manual-application path.
+    # Saving one of the candidate's jobs: `candidate_id` + `job_id` (its `job_postings.id`) + status 'saved'. Adding a
+    # job for the candidate, Saved at once: `candidate_id` + `job`.
     candidate_id: Optional[uuid.UUID] = None
     job_id: Optional[uuid.UUID] = None
+    job: Optional[AddedJob] = None
+    # The retired hand log's fields (410): still read, so an old client gets the reason, not a 422.
+    title: Optional[str] = None
+    company: Optional[str] = None
+    url: Optional[str] = None
     cv_version_used: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None          # applied|interview|offer (Log-application modal)
@@ -305,192 +371,64 @@ async def _fetch_and_store_description(job_id: str, url: str) -> None:
 @router.post("")
 def create_application(
     data: ApplicationCreate,
-    background_tasks: BackgroundTasks,
+    response: Response,
     db: Session = Depends(get_db),
     firm_id: uuid.UUID = Depends(writer_firm_id),
     principal: Principal = Depends(current_principal),
 ):
-    """Create application (used by Chrome extension). Also creates job record if needed."""
-    if data.candidate_id is not None or data.job_id is not None or (data.status or "").lower() == "saved":
-        from backend.api.routes_candidates import _candidate
-        from backend.auth.ledger import record as record_ledger
-        from backend.auth.policy import can
-        from backend.auth.scoping import scoped_jobs
-        from backend.models.candidates import CandidateJob, FavoriteJob
-        from backend.models.tenancy import User
+    """A candidate's Saved job (the add-job plan, decided 2026-11-11; docs/02 §6.y):
+    - `{candidate_id, job: {source, title, company, description, url, location?}}` adds the job for the candidate: one of
+      their `job_postings` (a batch of its own; the same job again is the one they have) and a Saved application at
+      once, or the application they already have for it. 201 when the job is new, else 200, with the application.
+    - `{candidate_id, job_id, status: 'saved'}` saves one of the candidate's jobs (`job_postings.id`).
+    Logging a job with no candidate (the old pool's hand log) is retired: 410."""
+    from backend.api.routes_candidates import _candidate
+    from backend.applications.saving import add_job, ensure_saved
+    from backend.auth.policy import can, can_add_job
+    from backend.models.job_search import JobPosting
+    from backend.models.tenancy import User
 
+    if data.job is not None:
+        if not can(principal, "job.capture"):
+            raise HTTPException(status_code=403, detail="You don't have permission to add jobs.")
+        if data.candidate_id is None:
+            raise HTTPException(status_code=400, detail="Adding a job needs its candidate (candidate_id).")
+        candidate = _candidate(db, firm_id, principal, data.candidate_id, lock=True)
+        if not can_add_job(principal, candidate):
+            raise HTTPException(status_code=403, detail="Only the candidate's BDE adds jobs for them.")
+        actor = db.get(User, principal.user_id)
+        posting, job_created = add_job(db, firm_id=firm_id, actor=actor, candidate=candidate, source=data.job.source,
+                                       job=data.job.model_dump(exclude={"source"}))
+        app, application_created = ensure_saved(db, firm_id=firm_id, actor=actor, candidate=candidate, posting=posting)
+        db.commit()
+        response.status_code = 201 if job_created else 200
+        return {**_application_responses(db, firm_id, [app])[0], "job_created": job_created,
+                "application_created": application_created}
+
+    if data.candidate_id is not None or data.job_id is not None or (data.status or "").lower() == "saved":
         if not can(principal, "job.apply"):
             raise HTTPException(status_code=403, detail="You don't have permission to save jobs.")
         if data.candidate_id is None or data.job_id is None or (data.status or "").lower() != "saved":
             raise HTTPException(status_code=400, detail="Saving requires candidate_id, job_id, and status='saved'.")
-
         candidate = _candidate(db, firm_id, principal, data.candidate_id, lock=True)
-        job = scoped_jobs(db, firm_id).filter(Job.id == data.job_id).first()
-        if job is None:
-            raise HTTPException(status_code=404, detail="Job not found.")
-        candidate_job = scoped(db, CandidateJob, firm_id).filter(
-            CandidateJob.candidate_id == candidate.id, CandidateJob.job_id == job.id
-        ).first()
-        if candidate_job is None:
+        posting = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id == candidate.id,
+                                                         JobPosting.id == data.job_id).first()
+        if posting is None:
             raise HTTPException(status_code=404, detail="Job not found for this candidate.")
-
-        actor = db.get(User, principal.user_id)
-        favorite = scoped(db, FavoriteJob, firm_id).filter(
-            FavoriteJob.candidate_id == candidate.id, FavoriteJob.job_id == job.id
-        ).first()
-        if favorite is None:
-            favorite = FavoriteJob(
-                firm_id=firm_id,
-                candidate_id=candidate.id,
-                job_id=job.id,
-                marked_by_user_id=principal.user_id,
-            )
-            db.add(favorite)
-            db.flush()
-            record_ledger(
-                db, actor=actor, action="CREATE", entity_type="favorite_job", entity_id=favorite.id,
-                entity_label=job.title or "Saved job", summary=f"Saved {job.title or 'a job'} for {candidate.full_name}.",
-                firm_id=firm_id, candidate_id=candidate.id,
-            )
-
-        application = scoped(db, Application, firm_id).filter(
-            Application.candidate_id == candidate.id, Application.job_id == job.id
-        ).first()
-        if application is None:
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc)
-            application = Application(
-                firm_id=firm_id,
-                candidate_id=candidate.id,
-                job_id=job.id,
-                resume_id=None,
-                submitted_by_user_id=None,
-                status="saved",
-                applied_at=None,
-                status_transitions=[{"from": None, "to": "saved", "at": now.isoformat(), "source": "ui"}],
-            )
-            db.add(application)
-            db.flush()
-            # SQLAlchemy supplies applied_at by default; a Saved draft is not a submission.
-            application.applied_at = None
-            record_ledger(
-                db, actor=actor, action="CREATE", entity_type="application", entity_id=application.id,
-                entity_label=job.title or "Saved job", summary=f"Added {job.title or 'a job'} to Saved for {candidate.full_name}.",
-                firm_id=firm_id, candidate_id=candidate.id,
-            )
-
+        application, _ = ensure_saved(db, firm_id=firm_id, actor=db.get(User, principal.user_id), candidate=candidate,
+                                      posting=posting)
         db.commit()
         return {
             "id": str(application.id),
-            "job_id": str(job.id),
+            "job_id": str(posting.id),
             "candidate_id": str(candidate.id),
             "status": application.status,
             "favorite": True,
         }
 
-    # Generate external_id for dedup (use same normalization as scrapers)
-    from backend.scraper._shared.dedup import make_external_id
-    external_id = make_external_id(data.company, data.title, data.url)
-
-    job = db.query(Job).filter(Job.external_id == external_id).first()
-    if not job:
-        job = Job(
-            external_id=external_id,
-            company=data.company,
-            title=data.title,
-            url=data.url,
-            source="manual",   # APPS-15: hand-logged via the Log modal / extension, not a scrape
-            status="applied",
-            location=data.location or None,
-            seen=True,
-        )
-        # A hand-logged job has to answer the feed's Location and Work filters
-        # like any other. There is no description yet, so only the title and a
-        # typed-in location say anything; the background fetch below covers the
-        # rest once the JD lands.
-        from backend.analyzer.location import apply_location_to_job
-        from backend.analyzer.work_arrangement import apply_arrangement_to_job
-        apply_arrangement_to_job(job)
-        apply_location_to_job(job)
-        db.add(job)
-        db.flush()
-    else:
-        job.status = "applied"
-    # The firm sees the job it logged, whether it was new or already in the shared pool (07 Q37).
-    link_job_to_firm(db, firm_id, job.id, "CAPTURED", captured_by_user_id=principal.user_id)
-
-    # One application per job — a duplicate log is refused with 409.
-    from backend.models.db import record_transition
-    new_status = data.status if data.status in VALID_STATUSES else "applied"
-    applied_at = None
-    if data.applied_at:
-        from datetime import datetime
-        try:
-            applied_at = datetime.fromisoformat(data.applied_at.replace("Z", "+00:00"))
-        except ValueError:
-            logger.info("ignoring unparseable applied_at %r", data.applied_at)
-
-    app = scoped(db, Application, firm_id).filter(Application.job_id == job.id).first()
-    if app:
-        # Refuse a second log for the same posting — it would silently overwrite
-        # notes and reset the stage, creating a bogus funnel edge.
-        db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail={"message": "An application already exists for this job", "application_id": str(app.id)},
-        )
-    app = Application(
-        firm_id=firm_id,
-        job_id=job.id,
-        status=new_status,
-        cv_version_used=data.cv_version_used,
-        notes=data.notes,
-        # seed the funnel edge so this application shows an initial edge in the Sankey chart
-        status_transitions=[{
-            "from": None, "to": new_status,
-            "at": utcnow().isoformat(), "source": "ui",
-        }],
-    )
-    if applied_at:
-        app.applied_at = applied_at
-    db.add(app)
-    db.commit()
-
-    # Auto-create company if it doesn't exist (only on application, not during scraping)
-    if data.company and data.company.strip():
-        company_name = data.company.strip()
-        from backend.models.db import find_company_by_name
-        existing_co = find_company_by_name(db, company_name)
-        if not existing_co:
-            default_resume_row = db.query(Setting).filter(Setting.key == "default_resume_id").first()
-            default_resume_ids = [default_resume_row.value] if default_resume_row and default_resume_row.value else []
-            new_co = Company(
-                name=company_name, tier=None, active=False, playwright_enabled=False,
-                selected_resume_ids=default_resume_ids,
-            )
-            db.add(new_co)
-            db.flush()
-            db.commit()
-            logger.info(f"Auto-created company '{company_name}' from application")
-            from backend.analyzer.h1b_checker import fetch_h1b_for_company_id
-            background_tasks.add_task(fetch_h1b_for_company_id, str(new_co.id))
-
-    if data.url and not job.has_cached_page:
-        background_tasks.add_task(_cache_job_page, str(job.id), data.url)
-
-    # A hand-logged job arrives with no description, which every LLM step needs.
-    # Fetch it once here instead of on first use, so the first score, tailor or
-    # cover letter does not pay for it.
-    if data.url and not (job.description or "").strip():
-        background_tasks.add_task(_fetch_and_store_description, str(job.id), data.url)
-
-    return {
-        "id": str(app.id),
-        "job_id": str(job.id),
-        "status": app.status,
-        "company": job.company,
-        "title": job.title,
-    }
+    raise HTTPException(status_code=410, detail="Logging a job with no candidate is retired. Add it for its "
+                                                "candidate: send candidate_id and job {source, title, company, "
+                                                "description, url}; it's Saved for them, then move it to Applied.")
 
 
 @router.get("")
@@ -506,7 +444,9 @@ def list_applications(
     from sqlalchemy.orm import selectinload
 
     q = _application_scope(db, firm_id, principal, status=status, candidate_id=candidate_id, tracked_only=tracked_only)
-    q = q.options(selectinload(Application.interviews), selectinload(Application.reviews))
+    # The posting too: every row reads its job from it (`posting_job`).
+    q = q.options(selectinload(Application.interviews), selectinload(Application.reviews),
+                  selectinload(Application.posting))
 
     total = q.count()
     apps = q.order_by(desc(Application.updated_at), Application.id).offset(offset).limit(limit).all()
@@ -647,7 +587,6 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
         from backend.api.routes_candidates import _candidate
         from backend.auth.ledger import record as record_ledger
         from backend.auth.policy import can
-        from backend.models.candidates import FavoriteJob
         from backend.models.tenancy import User
 
         unfavorite = updates.pop("unfavorite")
@@ -659,16 +598,8 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
             raise HTTPException(status_code=404, detail="Application not found")
         candidate = _candidate(db, firm_id, principal, app.candidate_id, lock=True)
         actor = db.get(User, principal.user_id)
-        favorite = scoped(db, FavoriteJob, firm_id).filter(
-            FavoriteJob.candidate_id == candidate.id, FavoriteJob.job_id == app.job_id
-        ).first()
-        if favorite is not None:
-            record_ledger(
-                db, actor=actor, action="DELETE", entity_type="favorite_job", entity_id=favorite.id,
-                entity_label=app.job.title or "Saved job", summary=f"Removed {app.job.title or 'a job'} from favorites for {candidate.full_name}.",
-                firm_id=firm_id, candidate_id=candidate.id,
-            )
-            db.delete(favorite)
+        # A Saved application is the favourite since applications moved onto job_postings (2026-11-11): no
+        # favorite_jobs row to remove.
 
         transitions = app.status_transitions or []
         untouched = (
@@ -690,13 +621,14 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
         if untouched:
             record_ledger(
                 db, actor=actor, action="DELETE", entity_type="application", entity_id=app.id,
-                entity_label=app.job.title or "Saved job", summary=f"Removed untouched Saved draft for {candidate.full_name}.",
+                entity_label=posting_job(app.posting).title or "Saved job", summary=f"Removed untouched Saved draft for {candidate.full_name}.",
                 firm_id=firm_id, candidate_id=candidate.id,
             )
             db.delete(app)
         db.commit()
         return {
-            "favorite": False,
+            # One kept (it has a history or notes) stays Saved, so it's still the favourite.
+            "favorite": not untouched,
             "application_id": application_id,
             "application_preserved": not untouched,
             "status": application_status if not untouched else None,
@@ -763,7 +695,7 @@ def _audit_application_edit(db, app, principal, summary):
     from backend.models.tenancy import User
     actor = scoped(db, User, app.firm_id).filter_by(id=principal.user_id).one()
     record(db, actor=actor, action="UPDATE", entity_type="application", entity_id=app.id,
-           entity_label=app.job.title or "Application", summary=summary,
+           entity_label=posting_job(app.posting).title or "Application", summary=summary,
            firm_id=app.firm_id, candidate_id=app.candidate_id)
 
 
@@ -787,11 +719,6 @@ def delete_application(app_id: str, principal: Principal = Depends(current_princ
         _candidate(db, firm_id, principal, app.candidate_id)
         raise HTTPException(409, "Candidate applications are removed through Saved/favorite actions; move their status instead.")
     _guard_application_history(db, firm_id, app.id)
-    # Deleting the application must also release the job, otherwise it stays
-    # status='applied' forever and keeps counting in the Companies "Apps" column.
-    job = app.job
-    if job is not None and job.status == "applied":
-        job.status = "saved"
     db.delete(app)
     db.commit()
     return {"deleted": True}
@@ -857,13 +784,21 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=
             continue
         app = _scoped_application(db, firm_id, principal, app.id, write=True)
         if app.candidate_id is not None:
+            if undo:
+                # The status command has no Undo of its own (PATCH refuses `undo` too): a move back is a move.
+                raise HTTPException(400, "Undo isn't available for a candidate's application: move it back instead.")
             from backend.applications.tracking import accessible_application, move
             app = accessible_application(db, firm_id, principal, app.id, lock=True)
             revisions = body.get("expected_revisions", {})
             if not isinstance(revisions, dict):
                 raise HTTPException(400, "expected_revisions must be an object keyed by application ID.")
+            revision = app.status_revision
             move(db, app, principal, status=status, expected_revision=revisions.get(str(app.id)))
-            updated += 1
+            # Checked like any move, but one already in that status changes nothing: it's skipped, not updated.
+            if app.status_revision == revision:
+                skipped += 1
+            else:
+                updated += 1
             continue
         if status not in VALID_STATUSES:
             raise HTTPException(400, "Legacy application does not support this status.")
@@ -914,9 +849,6 @@ def bulk_delete_applications(body: dict, principal: Principal = Depends(current_
         applications[app.id] = app
     # Validate the complete batch before the first mutation.
     for app in applications.values():
-        job = app.job
-        if job is not None and job.status == "applied":
-            job.status = "saved"
         db.delete(app)
         deleted += 1
     db.commit()
@@ -1206,14 +1138,7 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     """Assemble the interview prep handover (role, résumé, posting, and the editable `prep_ask` closing question) as plain context for an external model; no LLM call happens here."""
     from backend.models.db import Resume
     app = _scoped_application(db, firm_id, principal, app_id)
-    job = app.job
-
-    def money(lo, hi):
-        def k(v):
-            return "$" + str(round(v / 1000)) + "K"
-        if lo and hi and lo != hi:
-            return k(lo) + "–" + k(hi)
-        return k(lo or hi) if (lo or hi) else None
+    job = posting_job(app.posting)
 
     # Which optional sections to include (Settings -> Interview prep).
     inc_row = db.query(Setting).filter(Setting.key == "prep_include").first()
@@ -1221,8 +1146,8 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
 
     L = []
     add = L.append
-    title = (job.title if job else None) or "Unknown Role"
-    company = (job.company if job else None) or "Unknown Company"
+    title = job.title or "Unknown Role"
+    company = job.company or "Unknown Company"
 
     # ── 1. the role ──────────────────────────────────────────────────────────
     add("# " + title + " at " + company)
@@ -1230,14 +1155,20 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
     add("## The role")
     add("- Company: " + company)
     add("- Title: " + title)
-    if job:
-        if job.location:
-            add("- Location: " + job.location + (" (remote)" if job.remote else ""))
-        sal = money(job.salary_min, job.salary_max)
-        if sal:
-            add("- Listed salary: " + sal)
-        if job.url:
-            add("- Posting: " + job.url)
+    if job.location:
+        add("- Location: " + job.location)
+    if job.work_mode:
+        add("- Work mode: " + {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}[job.work_mode])
+    if job.employment_type:
+        add("- Employment type: " + job.employment_type)
+    if pay_text(job):
+        add("- Listed salary: " + pay_text(job))
+    if job.posted_at:
+        add("- Posted: " + job.posted_at)
+    if job.requisition_id:
+        add("- Requisition ID: " + job.requisition_id)
+    if job.url:
+        add("- Posting: " + job.url)
     add("- Stage: " + (app.status or "applied").capitalize())
     if app.interviews:
         add("- Interviews booked:")
@@ -1252,13 +1183,13 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
         add("- My notes on this application: " + " ".join(app.notes.split()))
 
     # ── 2. my résumé, flattened to plain text ────────────────────────────────
-    tailored = None
-    if app.job_id:
+    tailored = scoped(db, Resume, firm_id).filter(Resume.id == app.resume_id).first() if app.resume_id else None
+    if tailored is None and app.job_id:
         tailored = (scoped(db, Resume, firm_id)
                     .filter(Resume.job_id == app.job_id, Resume.category == "TAILORED",
                             Resume.candidate_id == app.candidate_id, Resume.deleted_at.is_(None))
                     .order_by(Resume.created_at.desc(), Resume.version.desc()).first())
-    cv_name = (tailored.name if tailored else None) or app.cv_version_used or (job.best_cv if job else None)
+    cv_name = (tailored.name if tailored else None) or app.cv_version_used
     src = tailored
     if not src and cv_name:
         src = scoped(db, Resume, firm_id).filter(Resume.name == cv_name, Resume.candidate_id == app.candidate_id,
@@ -1280,7 +1211,7 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
 
     # ── 3. the posting, plain text ───────────────────────────────────────────
     if "posting" in inc:
-        posting = ((job.cached_page_text or job.description) if job else "") or ""
+        posting = job.description
         add("")
         add("## The posting")
         add(posting.strip() or "[no posting text was captured]")
@@ -1294,12 +1225,14 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db), firm_id=Depends(read
 
 
 def _application_responses(db, firm_id, apps):
-    """Enrich every response consistently, batching candidate/job-scoped documents."""
+    """Enrich every response consistently, batching candidate/job-scoped documents. An application's documents
+    (tailored résumés, cover letters) name the same job posting it does (migrations 0023, 0027)."""
     from backend.models.db import build_company_lookup, Resume, CoverLetter
     if not apps:
         return []
     lookup = build_company_lookup(db)
-    job_ids = {app.job_id for app in apps}
+    document_job = {app.id: app.job_id for app in apps}
+    job_ids = set(document_job.values())
     candidate_scope = Resume.candidate_id.in_({app.candidate_id for app in apps if app.candidate_id})
     if any(app.candidate_id is None for app in apps):
         candidate_scope = candidate_scope | Resume.candidate_id.is_(None)
@@ -1320,14 +1253,18 @@ def _application_responses(db, firm_id, apps):
     # application without one falls back to the newest tailored résumé for its candidate and job (docs §4.7).
     own_ids = {app.resume_id for app in apps if app.resume_id}
     own = {r.id: r for r in scoped(db, Resume, firm_id).filter(Resume.id.in_(own_ids)).all()} if own_ids else {}
-    return [_app_to_dict(app, lookup, own.get(app.resume_id) or tailored.get((app.candidate_id, app.job_id)),
-                         (app.candidate_id, app.job_id) in with_letter) for app in apps]
+    return [_app_to_dict(app, lookup, own.get(app.resume_id) or tailored.get((app.candidate_id, document_job[app.id])),
+                         (app.candidate_id, document_job[app.id]) in with_letter) for app in apps]
 
 
 def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=False) -> dict:
-    """Serialize an Application; pass lookup={lowercase: Company} (from build_company_lookup) to populate company_canonical for alias-aware grouping, else it falls back to the raw company name."""
-    job = a.job
-    raw = job.company if job else None
+    """Serialize an Application; pass lookup={lowercase: Company} (from build_company_lookup) to populate company_canonical for alias-aware grouping, else it falls back to the raw company name.
+    The job is the application's posting (2026-11-11), read by `posting_job`: the keys stay as they were, so the
+    extension and the screens read the same JSON; what a posting doesn't hold (scores, a cached page; salary, except a
+    moved job's) is null."""
+    posting = a.posting
+    job = posting_job(posting)
+    raw = job.company or None
     canonical_co = (lookup or {}).get((raw or "").lower())
     return {
         "id": str(a.id),
@@ -1354,17 +1291,17 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
         "updated_at": a.updated_at.isoformat() if a.updated_at else None,
         "company": raw,
         "company_canonical": canonical_co.name if canonical_co else raw,
-        "title": job.title if job else None,
-        "url": job.url if job else None,
-        "best_cv": job.best_cv if job else None,
-        "short_id": job.short_id if job else None,
+        "title": job.title or None,
+        "url": job.url,
+        "best_cv": None,
+        "short_id": None,
         # posting details the detail pane shows, so it never has to re-fetch the job
-        "location": job.location if job else None,
-        "salary_min": job.salary_min if job else None,
-        "salary_max": job.salary_max if job else None,
-        "source": job.source if job else None,
-        "has_cached_page": bool(job.cached_page_html) if job else False,
-        "discovered_at": job.discovered_at.isoformat() if (job and job.discovered_at) else None,
+        "location": job.location,
+        "salary_min": job.salary_min,
+        "salary_max": job.salary_max,
+        "source": posting.source if posting else None,
+        "has_cached_page": False,
+        "discovered_at": posting.discovered_at.isoformat() if (posting and posting.discovered_at) else None,
         "tailored_resume_id": str(tailored.id) if tailored else None,
         "tailored_resume_name": tailored.name if tailored else None,
         "tailored_resume_deleted": bool(tailored and tailored.deleted_at),

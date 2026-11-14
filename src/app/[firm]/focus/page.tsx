@@ -2,17 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, Send, Mail, SkipForward, X, Clock, Check } from "lucide-react";
+import { Sparkles, Send, Mail, SkipForward, X, Clock, Check, Briefcase } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useJobs } from "@/lib/hooks/use-jobs";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { scopeCandidates } from "@/lib/auth/permissions";
+import { canManageResume, scopeCandidates } from "@/lib/auth/permissions";
+import { useMyTailorings, useStartTailoring } from "@/lib/hooks/use-tailoring";
+import { startRefusal, startedOutcomes } from "@/components/app/tailoring/messages";
 import { rankJobsForCandidate } from "@/lib/derive";
 import { MatchScore } from "@/components/app/match-score";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/app/empty-state";
+import { ErrorState } from "@/components/app/error-state";
 import { useHref } from "@/lib/routes/use-href";
 import { jobLocation } from "@/lib/format/job";
 
@@ -20,7 +25,6 @@ export default function FocusModePage() {
   const toHref = useHref();
   const principal = useSignedInPrincipal();
   const candidatesQuery = useCandidates();
-  const jobsQuery = useJobs({ limit: 400 });
   const applicationsQuery = useApplications();
 
   const myCandidates = useMemo(() => {
@@ -31,6 +35,9 @@ export default function FocusModePage() {
 
   const [candidateId, setCandidateId] = useState<string>("");
   const candidate = myCandidates.find((c) => c.id === candidateId) ?? myCandidates[0] ?? null;
+  // Only the selected candidate's jobs, read again when the dropdown changes (Zuhair 2026-11-12): each job's id is
+  // that candidate's own posting.
+  const jobsQuery = useJobs({ limit: 400, candidateId: candidate?.id }, { isEnabled: Boolean(candidate) });
 
   const queue = useMemo(() => {
     if (!candidate) return [];
@@ -40,7 +47,14 @@ export default function FocusModePage() {
 
   const [index, setIndex] = useState(0);
   const [applied, setApplied] = useState(0);
-  const [tailored, setTailored] = useState(0);
+  // The tailorings this run started; "Tailored" counts those that saved a résumé (Abdul's review, 2026-11-12).
+  const [startedRuns, setStartedRuns] = useState<string[]>([]);
+  const myTailorings = useMyTailorings();
+  const { tailored, running: stillTailoring } = startedOutcomes(myTailorings.data ?? [], startedRuns);
+  // T starts the real tailoring from the active base and moves on at once; it runs in the panel (part 3 Q1, Q4).
+  const startTailoring = useStartTailoring();
+  const [refused, setRefused] = useState<string | null>(null);
+  const [isLastPending, setLastPending] = useState(false);
   const [reviewed, setReviewed] = useState(0);
   const [finished, setFinished] = useState(false);
   const startRef = useRef(Date.now());
@@ -57,7 +71,7 @@ export default function FocusModePage() {
     function onKey(e: KeyboardEvent) {
       if (finished || !current) return;
       const k = e.key.toLowerCase();
-      if (k === "t") { setTailored((n) => n + 1); next(); }
+      if (k === "t") { tailor(); }
       else if (k === "a") { setApplied((n) => n + 1); next(); }
       else if (k === "o") { next(); }
       else if (k === "s") { next(); }
@@ -66,6 +80,26 @@ export default function FocusModePage() {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, finished, index]);
+
+  function tailor() {
+    if (!candidate || !current || !canManageResume(principal, candidate)) return;
+    const title = current.job.title;
+    // On the last job, wait for the answer: a refused start keeps the job open with the reason, so the BDE can see
+    // why and try again (Abdul's review, 2026-11-12). Elsewhere the queue moves on at once, the reason shown on the next.
+    const isLast = index + 1 >= queue.length;
+    if (isLast && isLastPending) return;
+    setRefused(null);
+    if (isLast) setLastPending(true);
+    // mutateAsync: each press gets its own answer (mutate's callbacks fire only for the latest of quick presses).
+    startTailoring.mutateAsync({ candidateId: candidate.id, jobId: current.job.id }).then(
+      (runId) => {
+        setStartedRuns((runs) => [...runs, runId]);
+        if (isLast) next();
+      },
+      (error: unknown) => setRefused(`${isLast ? "" : `${title}: `}${startRefusal(error).message}`),
+    ).finally(() => { if (isLast) setLastPending(false); });
+    if (!isLast) next();
+  }
 
   function next() {
     setReviewed((n) => n + 1);
@@ -81,7 +115,7 @@ export default function FocusModePage() {
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between">
         <div className="flex items-center gap-3 text-sm text-[var(--color-text-2)]">
           {candidate ? (
-            <select value={candidate.id} onChange={(e) => { setCandidateId(e.target.value); setIndex(0); setFinished(false); setApplied(0); setTailored(0); setReviewed(0); startRef.current = Date.now(); }} className="bq-input h-8 w-auto">
+            <select value={candidate.id} onChange={(e) => { setCandidateId(e.target.value); setIndex(0); setFinished(false); setApplied(0); setStartedRuns([]); setReviewed(0); startRef.current = Date.now(); }} className="bq-input h-8 w-auto">
               {myCandidates.map((c) => <option key={c.id} value={c.id}>{c.fullName}</option>)}
             </select>
           ) : <span>No candidate</span>}
@@ -92,8 +126,14 @@ export default function FocusModePage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 items-center justify-center">
-        {!candidate ? (
+        {candidatesQuery.isPending || (candidate && jobsQuery.isPending) ? (
+          <div role="status" aria-label="Loading the queue" className="w-full space-y-3"><Skeleton className="h-8 w-2/3" /><Skeleton className="h-48 w-full" /></div>
+        ) : candidatesQuery.error || jobsQuery.error ? (
+          <ErrorState error={(candidatesQuery.error ?? jobsQuery.error)!} onRetry={() => void (candidatesQuery.error ? candidatesQuery.refetch() : jobsQuery.refetch())} />
+        ) : !candidate ? (
           <p className="text-[var(--color-text-3)]">Assign a candidate to run the queue.</p>
+        ) : queue.length === 0 ? (
+          <EmptyState icon={Briefcase} title="No jobs to work" description={`${candidate.fullName} has no unapplied jobs yet. Run "Find jobs" on their page first.`} />
         ) : finished || !current ? (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-8 text-center shadow-[var(--shadow-lg)]">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-bg)] text-[var(--color-success-fg)]"><Check size={22} aria-hidden /></div>
@@ -107,6 +147,7 @@ export default function FocusModePage() {
                 </div>
               ))}
             </div>
+            {stillTailoring ? <p className="mt-3 text-caption text-[var(--color-text-3)]" aria-live="polite">{stillTailoring} still tailoring — the panel says when each is saved.</p> : null}
             <Button asChild className="mt-6 w-full"><Link href={toHref("dashboard")}>Back to dashboard</Link></Button>
           </motion.div>
         ) : (
@@ -135,12 +176,13 @@ export default function FocusModePage() {
               </div>
 
               <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <FocusAction k="T" label="Tailor" Icon={Sparkles} onClick={() => { setTailored((n) => n + 1); next(); }} primary />
+                <FocusAction k="T" label="Tailor" Icon={Sparkles} onClick={tailor} primary />
                 <FocusAction k="A" label="Applied" Icon={Send} onClick={() => { setApplied((n) => n + 1); next(); }} />
                 <FocusAction k="O" label="Outreach" Icon={Mail} onClick={next} />
                 <FocusAction k="S" label="Skip" Icon={SkipForward} onClick={next} />
               </div>
               <p className="mt-4 text-center text-caption text-[var(--color-text-3)]">One keystroke per job — T tailor · A applied · O outreach · S skip</p>
+              {refused ? <p role="alert" className="mt-2 text-center text-caption text-[var(--color-danger-fg)]">Not tailored — {refused}</p> : null}
             </motion.div>
           </AnimatePresence>
         )}
