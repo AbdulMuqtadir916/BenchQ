@@ -61,8 +61,9 @@ def _refuse_sign_in(db: DbSession, request: Request, email: str, account: User |
     try:
         ledger.record_sign_in_failure(db, account=account, email=email, ip=ip, reason=reason)
         if locked is not None:
-            attempts, window = locked
-            ledger.record_lockout(db, account=account, email=email, ip=ip, attempts=attempts, minutes=int(window // 60))
+            bucket, (attempts, window) = locked
+            ledger.record_lockout(db, account=account, email=email, ip=ip, attempts=attempts, minutes=int(window // 60),
+                                  by_address=bucket == "ip")
         db.commit()
     except SQLAlchemyError:
         db.rollback()

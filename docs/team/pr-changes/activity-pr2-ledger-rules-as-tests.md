@@ -76,3 +76,15 @@ Three more ways a change could get past the checks, each now with a test that fe
   `db.get(LedgerEntry, row_id)`.
 
 The real backend passes all three as it is: no route depended on the old, looser reading.
+
+## Review fixes (CodeRabbit and CodeAnt, second round, 2026-11-14)
+
+- **A writer call is found where it sits.** The candidate check resolved a bare `record(...)` against every function in
+  the file, so a nested `def record` anywhere hid the imported writer. Each call is now resolved in its own scope.
+- **An imported writer handed to a task counts.** `tasks.add_task(write_audit, ...)`, with `write_audit` imported from
+  `backend/auth/ledger.py`, now counts as logging.
+- **A factory only counts when FastAPI runs what it returns.** Returning a function no longer makes the factory log by
+  itself; `Depends(factory(...))` on a route does. A route that calls the factory and drops the result doesn't log.
+- **`Entry = LedgerEntry`** (and an alias of that alias) is seen when built or read.
+- **`sync_candidate_inbox` leaves `NOT_LOGGED`.** With imported callbacks counted, the check now sees that the import it
+  hands to a background task reaches the log's writer, so the list shrinks by one as designed.

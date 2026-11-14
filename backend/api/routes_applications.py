@@ -1136,8 +1136,10 @@ def update_interview(interview_id: str, updates: dict, db: Session = Depends(get
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
     app = _scoped_application(db, firm_id, principal, iv.application_id, write=True)
-    fields = ("what", "where_text", "status", "prep", "when_at")
+    # The preparation notes are free text: the log says they changed, never what they say (CLAUDE.md, no notes).
+    fields = ("what", "where_text", "status", "when_at")
     before = {key: getattr(iv, key) for key in fields}
+    notes_before = iv.prep
     for key in ("what", "where_text", "status", "prep"):
         if key in updates:
             setattr(iv, key, updates[key])
@@ -1145,8 +1147,10 @@ def update_interview(interview_id: str, updates: dict, db: Session = Depends(get
         iv.when_at = _parse_dt(updates["when_at"])
     from backend.auth.ledger import diff
     changes = diff(before, {key: getattr(iv, key) for key in fields})
-    if changes:
-        _audit_interview(db, app, principal, iv, "UPDATE", f"Updated interview: {iv.what or 'Interview'}", changes)
+    notes_changed = (notes_before or "") != (iv.prep or "")
+    if changes or notes_changed:
+        summary = f"Updated interview: {iv.what or 'Interview'}" + (" (changed the preparation notes)" if notes_changed else "")
+        _audit_interview(db, app, principal, iv, "UPDATE", summary, changes)
     db.commit()
     return _interview_to_dict(iv)
 

@@ -193,6 +193,9 @@ async def _oauth_browser_result(request: Request, call_next):
 # Added last, so it runs first: the request id covers every line of the request, and the access line times and
 # reports everything, a 413 or 401 from the middleware above included.
 app.add_middleware(RequestLog)
+# A Super Admin's operation is logged once its answer is known to be a success (auth/platform_actions.py).
+from backend.auth.platform_actions import PlatformActionLog  # noqa: E402
+app.add_middleware(PlatformActionLog)
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -424,12 +427,10 @@ async def trigger_all_scrapes():
 async def trigger_email_check():
     """Poll Gmail for new emails. Returns immediately with a run_id."""
     async def _do():
-        from datetime import datetime as _dt, timezone as _tz
-        from backend.scheduler import _activity_summary
-        started = _dt.now(_tz.utc)
+        from backend.scheduler import _count_summary
         from backend.email_monitor.gmail_client import check_emails
-        await check_emails()
-        return _activity_summary(started, "email", "reply", "replies") or "No new replies"
+        replies = await check_emails()
+        return _count_summary(replies, "reply", "replies") or "No new replies"
 
     try:
         run_id = launch_background("email_check", _do, trigger="manual")
@@ -700,16 +701,14 @@ async def trigger_db_backup():
         )
 
 
-@app.post("/api/telegram/digest", tags=["triggers"], summary="Send Telegram digest", status_code=202, dependencies=[Depends(logs_platform_action("Sent the Telegram digest", entity_type="platform_job"))])
+@app.post("/api/telegram/digest", tags=["triggers"], summary="Send Telegram digest", status_code=202, dependencies=[Depends(logs_platform_action("Started the Telegram digest", entity_type="platform_job"))])
 async def trigger_digest():
     """Send the daily Telegram digest immediately. Returns immediately with a run_id."""
     async def _do():
-        from datetime import datetime as _dt, timezone as _tz
-        from backend.scheduler import _activity_summary
-        started = _dt.now(_tz.utc)
+        from backend.scheduler import _count_summary
         from backend.notifier.telegram import send_digest
-        await send_digest()
-        return _activity_summary(started, "telegram", "alert") or "Digest sent"
+        alerts = await send_digest()
+        return _count_summary(alerts, "alert") or "No digest sent"
 
     try:
         run_id = launch_background("daily_digest", _do, trigger="manual")
@@ -839,7 +838,7 @@ async def telegram_rotate_webhook_secret():
     return {"ok": True, "webhook_secret": new_value}
 
 
-@app.post("/api/telegram/test", tags=["telegram"], summary="Send test message", status_code=202, dependencies=[Depends(logs_platform_action("Sent a Telegram test message", entity_type="telegram"))])
+@app.post("/api/telegram/test", tags=["telegram"], summary="Send test message", status_code=202, dependencies=[Depends(logs_platform_action("Started a Telegram test message", entity_type="telegram"))])
 async def telegram_test():
     """Send a test message to the configured Telegram chat. Returns immediately with a run_id."""
     async def _do():

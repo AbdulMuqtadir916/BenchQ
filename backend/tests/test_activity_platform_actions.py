@@ -1,14 +1,16 @@
 """Activity logs: a Super Admin's own operations (settings, companies, searches, scrapes, backups, Telegram and LinkedIn
 controls) are entries with no firm and the Super Admin as the actor. Which routes carry the dependency is checked by
 test_ledger_rules.py; this file checks what the dependency writes."""
+import json
 import uuid
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from backend.api.routes_auth import current_principal
 from backend.auth.passwords import hash_password
-from backend.auth.platform_actions import logs_platform_action
+from backend.auth.platform_actions import PlatformActionLog, did_nothing, logs_platform_action
 from backend.auth.sessions import Principal
 from backend.models.tenancy import ActivityEntry, PlatformUser
 
@@ -24,6 +26,16 @@ def test_the_dependency_writes_one_entry_on_success_and_none_on_failure(test_db)
     test_db.add(admin)
     test_db.commit()
     app = FastAPI()
+    app.add_middleware(PlatformActionLog)
+
+    @app.post("/busy", dependencies=[Depends(logs_platform_action("Started a busy thing", entity_type="thing"))])
+    def busy():
+        return JSONResponse(status_code=409, content={"detail": "already running"})
+
+    @app.post("/noop", dependencies=[Depends(logs_platform_action("Did a no-op", entity_type="thing"))])
+    def noop(request: Request):
+        did_nothing(request)
+        return {"ok": False}
 
     @app.post("/ok/{thing_id}", dependencies=[Depends(logs_platform_action("Changed a thing", entity_type="thing",
                                                                            action="UPDATE", id_param="thing_id", fields=True))])
@@ -38,13 +50,16 @@ def test_the_dependency_writes_one_entry_on_success_and_none_on_failure(test_db)
         kind="platform", user_id=admin.id, session_id=uuid.uuid4(), role="PLATFORM_ADMIN")
     client = TestClient(app)
     assert client.post("/bad").status_code == 400
-    assert _platform_entries(test_db) == []                                    # a failed route writes nothing
+    assert client.post("/busy").status_code == 409                             # returned, not raised: still a refusal
+    assert client.post("/noop").status_code == 200                             # answered, but did nothing
+    assert client.post("/ok/abc-123", json={"api_key": "•" * 6}).status_code == 200   # a secret left as it was
+    assert _platform_entries(test_db) == []                                    # none of these writes an entry
     assert client.post("/ok/abc-123", json={"api_key": "SECRET-VALUE-9", "name": "x"}).status_code == 200
     (entry,) = _platform_entries(test_db)
     assert (entry.actor_type, entry.actor_user_id, entry.actor_name, entry.firm_id) == ("PLATFORM_ADMIN", admin.id, "Sana", None)
     assert (entry.action, entry.entity_type, entry.entity_id, entry.candidate_id) == ("UPDATE", "thing", "abc-123", None)
     assert entry.summary == "Changed a thing (abc-123): api_key, name."          # the names, never the values
-    assert "SECRET-VALUE-9" not in entry.summary and "SECRET-VALUE-9" not in (entry.changes or "")
+    assert "SECRET-VALUE-9" not in f"{entry.summary} {json.dumps(entry.changes)} {entry.note}"
 
 
 def test_a_settings_change_is_an_entry_with_the_field_names_only(api_client, test_db):

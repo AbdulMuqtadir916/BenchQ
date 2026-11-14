@@ -6,6 +6,7 @@ people it happened under when a candidate or a BDE moves on.
 """
 from datetime import datetime, timedelta
 import json
+import re
 import uuid
 
 from fastapi.encoders import jsonable_encoder
@@ -89,10 +90,16 @@ def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_typ
     return entry
 
 
+_DOMAIN = re.compile(r"[a-z0-9-]+(\.[a-z0-9-]+)+")
+
+
 def mask_email(email: str) -> str:
-    """What the log keeps of an email nobody owns: anyone can type anything into the form."""
+    """What the log keeps of an email nobody owns: anyone can type anything into the form, a password included
+    (`P@ssw0rd2026`), so the part after `@` is kept only when it looks like a domain."""
     local, _, domain = email.partition("@")
-    return f"{local[:2]}***@{domain[:100]}" if local and domain else "***"
+    if local and len(domain) <= 100 and _DOMAIN.fullmatch(domain):
+        return f"{local[:2]}***@{domain}"
+    return "***"
 
 
 def _sign_in_entry(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str, action: str,
@@ -131,8 +138,12 @@ def record_sign_in_failure(db: DbSession, *, account: User | PlatformUser | None
 
 
 def record_lockout(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str, attempts: int,
-                   minutes: int) -> ActivityEntry:
+                   minutes: int, by_address: bool = False) -> ActivityEntry:
+    """`by_address`: the address (IP) ran out of tries, not the account, so the entry names no account."""
     unit = "minute" if minutes == 1 else "minutes"
+    if by_address:
+        return _sign_in_entry(db, account=None, email=email, ip=ip, action="LOCKED_OUT",
+                              summary=f"sign-ins from this address locked for {minutes} {unit} after {attempts} tries")
     return _sign_in_entry(db, account=account, email=email, ip=ip, action="LOCKED_OUT",
                           summary=f"Locked for {minutes} {unit} after {attempts} tries")
 

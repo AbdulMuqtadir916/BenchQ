@@ -57,7 +57,11 @@ export function AdminActivityPage() {
   const candidatesQuery = useAdminActivityCandidates(view, { ...viewFilters, candidateId: undefined, actorId: params.person, teamId: params.team });
 
   const columns = useMemo(() => activityColumns(Boolean(params.from), { hasFirm: !params.firm, hasNoCandidate: isFailed, summaryAction: signInIp }), [params.from, params.firm, isFailed]);
-  const actors = useMemo(() => actorOptions(people, FIRM_READER, overview?.actorTypes ?? []), [people, overview]);
+  // On the whole platform there are no firm people to list, but "Your actions" filters by the Super Admin: name them.
+  const actors = useMemo(() => {
+    const options = actorOptions(people, FIRM_READER, overview?.actorTypes ?? []);
+    return !params.firm && overview?.me ? [options[0], { value: overview.me.userId, label: `${overview.me.name} (you)` }, ...options.slice(1)] : options;
+  }, [people, overview, params.firm]);
   const candidates = useMemo(() => [{ value: "ALL", label: "All candidates" }, ...(candidatesQuery.data ?? []).map((candidate) => ({ value: candidate.id, label: candidate.name }))], [candidatesQuery.data]);
 
   const useDays = (dayFilters: LedgerFilters, options: { isEnabled: boolean }) =>
@@ -73,7 +77,8 @@ export function AdminActivityPage() {
   });
   const pickActor = (value: string) => {
     if (value === "ALL") update({ type: undefined, person: undefined });
-    else if (value === "SYSTEM" || value === "AGENT") update({ type: value, person: undefined, team: undefined });
+    else if (value === "SYSTEM") update({ type: "SYSTEM", person: undefined, team: undefined });
+    else if (value === "AGENT") update({ type: "AGENT" });                  // the AI within the team or person picked
     else update({ person: value, team: undefined, type: undefined });
   };
 
@@ -99,6 +104,7 @@ export function AdminActivityPage() {
           columns={columns}
           entries={ledgerQuery.data ?? []}
           matching={matching}
+          isCountCurrent={overview !== undefined && !overviewQuery.isPlaceholderData}
           isUpdating={ledgerQuery.isPlaceholderData}
           isLoading={overviewQuery.isLoading || ledgerQuery.isLoading}
           error={overviewQuery.error ?? ledgerQuery.error}

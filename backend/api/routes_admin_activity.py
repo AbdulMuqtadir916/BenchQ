@@ -55,7 +55,10 @@ def list_activity(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, g
         .offset(offset).limit(limit).all()
     candidates = {c.id: c.full_name for c in _named(db, {e.candidate_id for e in entries if e.candidate_id})}
     firms = dict(db.query(Firm.id, Firm.name).filter(Firm.id.in_({e.firm_id for e in entries if e.firm_id})).all())
-    return [{**ledger_entry_json(e, hide_email=True, candidate_name=candidates.get(e.candidate_id)),
+    people = dict(db.query(User.id, User.name).filter(
+        User.id.in_({e.on_behalf_of_user_id for e in entries if e.on_behalf_of_user_id is not None})).all())
+    return [{**ledger_entry_json(e, hide_email=True, candidate_name=candidates.get(e.candidate_id),
+                                 person_name=people.get(e.on_behalf_of_user_id)),
              "firm_name": firms.get(e.firm_id)} for e in entries]
 
 

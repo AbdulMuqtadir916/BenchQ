@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, type Query } from "@tanstack/react-query";
 import type { LedgerFilters, LedgerQuery } from "@/lib/api/analytics";
 import { platformApi, type ActivityView } from "@/lib/api/platform";
 import { queryKeys } from "@/lib/query/keys";
@@ -14,11 +14,21 @@ export const useAdminActivity = (view: ActivityView, params: LedgerQuery, option
 export const useAdminActivityOverview = (view: ActivityView, filters: LedgerFilters) =>
   useQuery({ queryKey: k("overview", view, filters), queryFn: () => platformApi.activity.overview(view, filters), placeholderData: keepPreviousData });
 
+/** Keep the last answer while the next loads, but only within the same firm: another firm's people or candidates
+ *  would be picked into this one's filters. The key is `[platform, activity, part, firm or view, filters]`. */
+function sameFirmOnly<T>(firmId: string | undefined) {
+  return (previous: T | undefined, previousQuery: Query<T, Error, T, readonly unknown[]> | undefined) => {
+    const scope = previousQuery?.queryKey[3];
+    const previousFirm = typeof scope === "object" && scope !== null ? (scope as ActivityView).firmId : scope;
+    return previousFirm === firmId ? previous : undefined;
+  };
+}
+
 export const useAdminActivityPeople = (firmId: string | undefined, filters: LedgerFilters) =>
-  useQuery({ queryKey: k("people", firmId, filters), queryFn: () => platformApi.activity.people(firmId as string, filters), enabled: firmId !== undefined, placeholderData: keepPreviousData });
+  useQuery({ queryKey: k("people", firmId, filters), queryFn: () => platformApi.activity.people(firmId as string, filters), enabled: firmId !== undefined, placeholderData: sameFirmOnly(firmId) });
 
 export const useAdminActivityCandidates = (view: ActivityView, filters: LedgerFilters) =>
-  useQuery({ queryKey: k("candidates", view, filters), queryFn: () => platformApi.activity.candidates(view, filters), placeholderData: keepPreviousData });
+  useQuery({ queryKey: k("candidates", view, filters), queryFn: () => platformApi.activity.candidates(view, filters), placeholderData: sameFirmOnly(view.firmId) });
 
 /** One failed sign-in's IP, fetched only when the Super Admin asks for it. */
 export const useSignInIp = (entryId: string, options: { isEnabled: boolean }) =>

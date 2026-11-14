@@ -281,7 +281,8 @@ async def send_digest() -> int:
             f"📬 Responses: {responses}  |  📋 Active apps: {active_apps}\n"
         )
 
-        await _send_message(chat_id, text)
+        if not await _send_message(chat_id, text):
+            return 0                    # Telegram didn't take it: nothing was sent, and nothing is logged as sent
 
         from backend.activity import log_activity
         log_activity("telegram", f"Daily digest sent: {new_jobs} new jobs, {strong} strong matches", db=db)

@@ -48,7 +48,9 @@ interface DateRangeFilterProps extends DateRange {
 }
 
 export function DateRangeFilter({ from, to, timeZone, onChange, filters, useDays = useLedgerDays }: DateRangeFilterProps) {
-  const today = useMemo(() => formatInTimeZone(new Date(), timeZone, DAY), [timeZone]);
+  const todayIn = (zone: string) => formatInTimeZone(new Date(), zone, DAY);
+  // Read again each time the picker opens, so a page left open overnight moves on to the new day.
+  const [today, setToday] = useState(() => todayIn(timeZone));
   const [isOpen, setIsOpen] = useState(false);
   const [month, setMonth] = useState(() => startOfMonth(parseISO(from ?? today)));
   const [start, setStart] = useState<string | undefined>(from);
@@ -86,12 +88,29 @@ export function DateRangeFilter({ from, to, timeZone, onChange, filters, useDays
   }, [focusDay, month]);
 
   function open() {
+    const now = todayIn(timeZone);
+    setToday(now);
     setStart(from);
     setEnd(to);
     setHovered(null);
-    setFocusDay(from ?? today);
-    setMonth(startOfMonth(parseISO(from ?? today)));
+    setFocusDay(from ?? now);
+    setMonth(startOfMonth(parseISO(from ?? now)));
     setIsOpen(true);
+  }
+
+  /** Another month, with a day in it that the keyboard can reach. */
+  function showMonth(next: Date) {
+    setMonth(next);
+    if (!isSameMonth(parseISO(focusDay), next)) {
+      const first = format(next, DAY);
+      setFocusDay(first > today ? today : first);
+    }
+  }
+
+  function clearDates() {
+    setStart(undefined);
+    setEnd(undefined);
+    onChange({});
   }
 
   function close() {
@@ -155,7 +174,7 @@ export function DateRangeFilter({ from, to, timeZone, onChange, filters, useDays
           <ChevronDown size={14} aria-hidden="true" className="text-[var(--color-text-3)]" />
         </button>
         {from ? (
-          <Button variant="ghost" size="sm" aria-label="Show all dates" onClick={() => onChange({})}>
+          <Button variant="ghost" size="sm" aria-label="Show all dates" onClick={clearDates}>
             <X size={14} aria-hidden="true" />
           </Button>
         ) : null}
@@ -176,11 +195,11 @@ export function DateRangeFilter({ from, to, timeZone, onChange, filters, useDays
           </ul>
           <div className="p-3">
             <div className="mb-2 flex items-center justify-between">
-              <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => setMonth((current) => subMonths(current, 1))}>
+              <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => showMonth(subMonths(month, 1))}>
                 <ChevronLeft size={16} aria-hidden="true" />
               </Button>
               <span className="text-sm font-medium text-[var(--color-text)]" aria-live="polite">{format(month, "MMMM yyyy")}</span>
-              <Button variant="ghost" size="sm" aria-label="Next month" disabled={isCurrentMonth} onClick={() => setMonth((current) => addMonths(current, 1))}>
+              <Button variant="ghost" size="sm" aria-label="Next month" disabled={isCurrentMonth} onClick={() => showMonth(addMonths(month, 1))}>
                 <ChevronRight size={16} aria-hidden="true" />
               </Button>
             </div>
@@ -216,6 +235,11 @@ export function DateRangeFilter({ from, to, timeZone, onChange, filters, useDays
                 );
               })}
             </div>
+            {daysQuery.isError ? (
+              <p role="status" className="mt-2 text-caption text-[var(--color-text-3)]">
+                Couldn’t load which days have activity. <button type="button" className="underline" onClick={() => void daysQuery.refetch()}>Retry</button>
+              </p>
+            ) : daysQuery.isLoading ? <p role="status" className="mt-2 text-caption text-[var(--color-text-3)]">Loading which days have activity…</p> : null}
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-3">
               <span className="text-caption text-[var(--color-text-3)]">{start ? (end ? `${short(start)} – ${short(end)}` : "Pick the end day, or Apply for one day") : "Pick a day, or a start and end day"}</span>
               <Button size="sm" disabled={!start} onClick={() => commit({ from: start, to: end ?? start })}>Apply</Button>
