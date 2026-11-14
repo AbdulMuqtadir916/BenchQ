@@ -9,6 +9,7 @@
 /backend/auth/                     @AbdulMuqtadir916
 /backend/migrations/               @AbdulMuqtadir916
 /backend/models/                   @AbdulMuqtadir916
+/backend/tests/test_ledger_rules.py @AbdulMuqtadir916
 /docs/02-DATA-CONTRACTS.md         @AbdulMuqtadir916
 /docs/07-ROUTES-AND-RBAC.md        @AbdulMuqtadir916
 /.github/                          @AbdulMuqtadir916
