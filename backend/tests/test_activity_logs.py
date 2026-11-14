@@ -160,9 +160,8 @@ def test_only_the_named_demo_reset_can_delete_and_never_edit(test_db, world):
     test_db.execute(text("SET LOCAL benchq.activity_logs_demo_reset = 'on'"))
     assert test_db.execute(text("DELETE FROM activity_logs")).rowcount >= 1
     test_db.rollback()
-    test_db.execute(text("SET LOCAL benchq.activity_logs_demo_reset = 'on'"))   # TRUNCATE is never let through
-    with pytest.raises(DBAPIError, match="append-only"):
-        test_db.execute(text("TRUNCATE activity_logs"))
+    test_db.execute(text("SET LOCAL benchq.activity_logs_demo_reset = 'on'"))   # a named reset may also TRUNCATE
+    test_db.execute(text("TRUNCATE activity_logs"))
     test_db.rollback()
 
 

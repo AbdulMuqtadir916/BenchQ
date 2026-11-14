@@ -77,11 +77,12 @@ def upgrade():
         LEFT JOIN candidates c ON c.id = l.candidate_id AND c.firm_id = l.firm_id
     """)
 
-    # A delete is let through only by the demo reset, which names itself for one transaction (scripts/seed_demo.py).
+    # A delete or truncate is let through only by a reset that names itself for one transaction: the demo reset
+    # (scripts/seed_demo.py) and the test suite's clean-up (tests/conftest.py). Any other session is refused.
     op.execute("""
         CREATE FUNCTION activity_logs_append_only() RETURNS trigger AS $$
         BEGIN
-            IF TG_OP = 'DELETE' AND current_setting('benchq.activity_logs_demo_reset', true) = 'on' THEN
+            IF TG_OP IN ('DELETE', 'TRUNCATE') AND current_setting('benchq.activity_logs_demo_reset', true) = 'on' THEN
                 RETURN OLD;
             END IF;
             RAISE EXCEPTION 'activity_logs is append-only' USING ERRCODE = 'restrict_violation';
@@ -92,7 +93,7 @@ def upgrade():
         CREATE TRIGGER activity_logs_append_only BEFORE UPDATE OR DELETE ON activity_logs
         FOR EACH ROW EXECUTE FUNCTION activity_logs_append_only()
     """)
-    # TRUNCATE fires no row trigger, so it gets its own; the function refuses it (only a DELETE can be let through).
+    # TRUNCATE fires no row trigger, so it gets its own, with the same rule: only a named reset gets through.
     op.execute("""
         CREATE TRIGGER activity_logs_no_truncate BEFORE TRUNCATE ON activity_logs
         FOR EACH STATEMENT EXECUTE FUNCTION activity_logs_append_only()
