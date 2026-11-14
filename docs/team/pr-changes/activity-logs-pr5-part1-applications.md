@@ -75,3 +75,11 @@ Logs the application work that wrote nothing. No table, route or response change
 ## Known limit
 
 The AI answer was tested with a stand-in model; the demo stack has no AI key.
+
+## Review fixes (CodeRabbit and CodeAnt, 2026-11-14)
+
+- **Interview notes never reach the log.** The preparation notes are free text, so an edit records that they changed
+  ("Updated interview: Phone screen (changed the preparation notes) for Data Engineer.") and never what they say, before
+  or after. The other fields keep their before and after.
+- **A streamed AI answer that came back empty** (nothing, or an empty answer) is now an error to the extension, and
+  writes no "AI agent" entry: there is no drafted answer to count.
