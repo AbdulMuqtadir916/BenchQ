@@ -29,8 +29,7 @@ has no firm, so a firm reader never gets one.
 
 - `log_activity` writes a system row. Its 22 callers still say what happened. A scrape with no new jobs, nothing found and
   no error writes nothing, and neither does a scoring or email check that handled nothing.
-- A scheduled run that did something or failed writes one system row, named Scheduler. Other manual runs and empty scheduled ones don't.
-- A scrape someone starts by hand (all sources, one company, one search) always writes its result as a system row, named Scraper, even when it found nothing or failed: "Scrape all: 3 sources - +5 new". It sits beside the "Started every scrape" row from PR 6, which says who started it. Only the Super Admin reads these rows.
+- A scheduled run that did something or failed writes one system row, named Scheduler. Manual runs and empty ones don't.
 - Every LLM call writes an AI agent row saying what it did, such as "AI agent scored 80 jobs against the résumés", with
   tokens and cost. A scheduled run writes one row for each kind of work, with the totals. These rows sit beside the
   person's own AI agent row, which is unchanged.
