@@ -61,6 +61,20 @@ def test_an_interview_edit_that_changes_nothing_writes_nothing(api_client, test_
     assert [e.action for e in _entries(test_db, entity_type="interview")] == ["CREATE"]
 
 
+def test_an_interviews_notes_are_never_in_the_log_only_that_they_changed(api_client, test_db, tracked):
+    created = api_client.post(f"/api/applications/{tracked.id}/interviews",
+                              json={"what": "Phone screen", "prep": "Ask about the PRIVATE-NOTE-1 team"}).json()
+    url = f"/api/applications/interviews/{created['id']}"
+    assert api_client.patch(url, json={"prep": "Bring PRIVATE-NOTE-2 examples"}).status_code == 200
+    assert api_client.patch(url, json={"prep": "Bring PRIVATE-NOTE-2 examples", "status": "completed"}).status_code == 200
+    updates = [e for e in _entries(test_db, entity_type="interview") if e.action == "UPDATE"]
+    assert updates[0].summary == "Updated interview: Phone screen (changed the preparation notes) for Data Engineer."
+    assert not updates[0].changes
+    assert updates[1].changes == {"status": {"before": "scheduled", "after": "completed"}}
+    for entry in _entries(test_db, entity_type="interview"):
+        assert "PRIVATE-NOTE" not in f"{entry.summary} {entry.changes} {entry.note}"
+
+
 def _mock_llm(monkeypatch):
     async def fake(*args, **kwargs):
         return {"text": '{"answer": "I have five years of experience."}', "input_tokens": 1, "output_tokens": 1}
@@ -97,6 +111,21 @@ def test_a_streamed_ai_answer_is_logged_once_it_finishes(api_client, test_db, ac
     response = api_client.post("/api/autofill/answer/stream", json={"question": "Why?", "company": "Acme", "position": "PM"})
     assert response.status_code == 200 and "[DONE]" in response.text
     assert len(_entries(test_db, entity_type="autofill_answer")) == 1
+
+
+def test_a_stream_with_no_answer_is_an_error_and_writes_nothing(api_client, test_db, accounts, monkeypatch):
+    from backend.seed import seed_persona
+    from backend.models.db import Setting
+    seed_persona(test_db)
+    test_db.add(Setting(key="autofill_prompt", value="{persona} {qa_bank} {question} {company} {position} {max_chars}"))
+    test_db.commit()
+
+    async def empty(*args, **kwargs):
+        yield '{"answer": ""}'
+    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream", empty, raising=False)
+    response = api_client.post("/api/autofill/answer/stream", json={"question": "Why?", "company": "Acme", "position": "PM"})
+    assert response.status_code == 200 and "[DONE]" not in response.text and "error" in response.text
+    assert _entries(test_db, action="AI_GENERATE") == []
 
 
 def test_a_failed_ai_answer_writes_nothing(api_client, test_db, monkeypatch):

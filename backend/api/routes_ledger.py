@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend.api.routes_auth import current_principal
 from backend.auth import support
 from backend.auth.scoping import own_scope, reader_firm_id, scoped, team_scope
-from backend.auth.serialize import EPOCH, ledger_entry_json
+from backend.auth.serialize import _RESTRICTED, EPOCH, ledger_entry_json
 from backend.auth.sessions import Principal
 from backend.candidates import profile
 from backend.models.candidates import Candidate
@@ -32,6 +32,10 @@ from backend.models.db import get_db
 from backend.models.tenancy import LEDGER_ACTOR_TYPES, ActivityEntry, Firm, User
 
 router = APIRouter(prefix="/firms/{firm_id}", tags=["ledger"])
+
+# What a support view reads replaced (serialize._RESTRICTED), so it can't search for it either.
+RESTRICTED_SUMMARIES = tuple(_RESTRICTED)
+RESTRICTED_LABELS = tuple(entity_type for entity_type, (label, _) in _RESTRICTED.items() if label is not None)
 
 
 class Filters:
@@ -70,10 +74,11 @@ class Filters:
                 entries = entries.filter(ActivityEntry.created_at < _start_of(self.to_date + timedelta(days=1), zone))
         if self.q is not None:
             summary = ActivityEntry.summary.icontains(self.q, autoescape=True)
-            if hide_email:      # what the support view can't read, it can't search for either
-                summary = and_(ActivityEntry.entity_type != "email", summary)
-            entries = entries.filter(or_(summary, ActivityEntry.actor_name.icontains(self.q, autoescape=True),
-                                         ActivityEntry.entity_label.icontains(self.q, autoescape=True)))
+            label = ActivityEntry.entity_label.icontains(self.q, autoescape=True)
+            if hide_email:      # what the support view can't read, it can't search for either (serialize._RESTRICTED)
+                summary = and_(ActivityEntry.entity_type.notin_(RESTRICTED_SUMMARIES), summary)
+                label = and_(ActivityEntry.entity_type.notin_(RESTRICTED_LABELS), label)
+            entries = entries.filter(or_(summary, ActivityEntry.actor_name.icontains(self.q, autoescape=True), label))
         return entries
 
 
@@ -174,6 +179,7 @@ def ledger_people(firm_id: uuid.UUID, filters: Filters = Depends(), principal: P
     if firm_id != my_firm:
         raise HTTPException(status_code=404, detail="Not found.")
     entries = _visible(db, principal, my_firm, filters, person=False)
+    picked = filters.actor_id if filters.actor_id is not None and _has_history(db, principal, my_firm, filters.actor_id) else None
     counts = Counter()
     for column in (ActivityEntry.actor_user_id, ActivityEntry.on_behalf_of_user_id):
         counts.update(dict(entries.filter(column.isnot(None)).with_entities(column, func.count()).group_by(column).all()))
@@ -184,7 +190,8 @@ def ledger_people(firm_id: uuid.UUID, filters: Filters = Depends(), principal: P
             continue
         in_view = user.is_active and (manager is None or manager in (user.id, user.manager_id))
         # A manager also reads the assignments others made; that doesn't make the owner a member of their team.
-        was_member = counts[user.id] > 0 and (manager is None or user.role == "BDE")
+        # A former member someone picked stays while their history is visible, even when the filters find none of it.
+        was_member = (counts[user.id] > 0 or user.id == picked) and (manager is None or user.role == "BDE")
         if in_view or was_member:
             people.append({"user_id": str(user.id), "name": user.name, "role": user.role,
                            "manager_id": str(user.manager_id) if user.manager_id else None,
@@ -203,6 +210,13 @@ def ledger_days(firm_id: uuid.UUID, filters: Filters = Depends(), principal: Pri
     zone = db.get(Firm, my_firm).primary_timezone
     day = func.to_char(func.timezone(zone, ActivityEntry.created_at), "YYYY-MM-DD")
     return sorted(row[0] for row in _visible(db, principal, my_firm, filters).with_entities(day).distinct())
+
+
+def _has_history(db: DbSession, principal: Principal, firm_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    """Whether the reader can see any row by `user_id` (or by an AI working for them), whatever the filters."""
+    entries = _limit_to_reader(scoped(db, ActivityEntry, firm_id), db, principal, firm_id, picked=False)
+    return db.query(entries.filter(or_(ActivityEntry.actor_user_id == user_id,
+                                       ActivityEntry.on_behalf_of_user_id == user_id)).exists()).scalar()
 
 
 @router.get("/ledger/candidates", summary="The candidates the reader can pick in the log")

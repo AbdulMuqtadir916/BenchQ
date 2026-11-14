@@ -31,6 +31,12 @@ export function ActivityPage() {
   const firm = useFirm();
   const [params, update] = useActivityParams();
   const [search, setSearch] = useState(params.q ?? "");
+  // Back or Forward can change `q` while the page stays: follow it, unless the box already says the same.
+  const [syncedQ, setSyncedQ] = useState(params.q);
+  if (params.q !== syncedQ) {
+    setSyncedQ(params.q);
+    if ((search.trim() || undefined) !== params.q) setSearch(params.q ?? "");
+  }
   const viewer: Viewer = useMemo(() => ({
     userId: principal.userId,
     scope: hasOwnScope(principal) ? "own" : hasTeamScope(principal) ? "team" : "firm",
@@ -48,8 +54,10 @@ export function ActivityPage() {
   const peopleQuery = useLedgerPeople(filters);
   const people = useMemo(() => peopleQuery.data?.people ?? [], [peopleQuery.data]);
   const isReady = peopleQuery.data !== undefined;
+  // The previous view's people (kept while the next loads) can't say whether the URL's pick is out of reach.
+  const isSettled = isReady && !peopleQuery.isPlaceholderData;
   const selection = useMemo(() => (isReady ? resolveSelection(people, viewer, params) : {}), [isReady, people, viewer, params]);
-  const isOutOfReach = isReady && (selection.team !== params.team || selection.person !== params.person);
+  const isOutOfReach = isSettled && (selection.team !== params.team || selection.person !== params.person);
 
   // A URL naming someone outside the reader's view falls back to their own root.
   useEffect(() => {
@@ -87,6 +95,14 @@ export function ActivityPage() {
   }, [back, update]);
 
   const matching = peopleQuery.data?.matching ?? 0;
+  const pageCount = Math.max(1, Math.ceil(matching / PAGE_SIZE));
+  // A stale URL (page 9 of 2) goes to the last page there is, once the count is the current one.
+  useEffect(() => {
+    if (isSettled && params.page > pageCount) update({ page: pageCount });
+  }, [isSettled, params.page, pageCount, update]);
+  const candidatesNotice = candidatesQuery.isError && !candidatesQuery.data ? (
+    <span>Couldn’t load the candidates. <button type="button" className="underline" onClick={() => void candidatesQuery.refetch()}>Retry</button></span>
+  ) : candidatesQuery.isLoading ? "Loading candidates…" : undefined;
   const range = rangeLabel({ from: params.from, to: params.to });
   const hasFilters = Boolean(params.from || params.q || params.type || params.candidate);
   const clearFilters = () => {
@@ -119,7 +135,7 @@ export function ActivityPage() {
             pagination
             pageSize={PAGE_SIZE}
             search={{ value: search, onChange: setSearch }}
-            page={{ index: params.page - 1, onChange: (index) => update({ page: index + 1 }), count: Math.max(1, Math.ceil(matching / PAGE_SIZE)) }}
+            page={{ index: params.page - 1, onChange: (index) => update({ page: index + 1 }), count: pageCount }}
             sort={{
               value: { id: params.sort, desc: params.dir === "desc" },
               onChange: (next) => update({ sort: (next?.id ?? "when") as typeof params.sort, dir: next?.desc === false ? "asc" : "desc" }),
@@ -133,11 +149,12 @@ export function ActivityPage() {
                 action={hasFilters ? <Button variant="secondary" size="sm" onClick={clearFilters}>{params.from ? "Show all dates" : "Clear filter"}</Button> : undefined}
               />
             }
+            toolbarPlacement="outside"
             toolbarActions={
               <>
                 <DateRangeFilter from={params.from} to={params.to} timeZone={firm.primaryTimezone} onChange={setDates} filters={filters} />
                 <SearchableSelect className="w-40" aria-label="Filter by actor" searchPlaceholder="Find an actor…" value={params.type ?? params.person ?? "ALL"} options={actors} onValueChange={pickActor} />
-                <SearchableSelect className="w-40" aria-label="Filter by candidate" searchPlaceholder="Find a candidate…" value={params.candidate ?? "ALL"} options={candidates} onValueChange={(value) => update({ candidate: value === "ALL" ? undefined : value })} />
+                <SearchableSelect className="w-40" aria-label="Filter by candidate" searchPlaceholder="Find a candidate…" value={params.candidate ?? "ALL"} options={candidates} notice={candidatesNotice} onValueChange={(value) => update({ candidate: value === "ALL" ? undefined : value })} />
               </>
             }
           />

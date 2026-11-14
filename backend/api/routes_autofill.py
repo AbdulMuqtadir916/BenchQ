@@ -453,9 +453,14 @@ async def autofill_answer_stream(body: dict, principal: Principal = Depends(curr
         try:
             raw_chunks = call_autofill_llm_stream(suffix, system, max_tokens=max_tokens,
                                                   cached_prefix=cached_prefix)
+            wrote = False
             async for chunk in _clean_stream(raw_chunks):
                 if chunk:
+                    wrote = wrote or bool(chunk.strip())
                     yield f"data: {_json.dumps({'delta': chunk})}\n\n"
+            if not wrote:               # nothing usable came back: an error, not a drafted answer, and no entry
+                yield f"data: {_json.dumps({'error': 'autofill generation failed'})}\n\n"
+                return
             _log_answer(principal, body)
             yield "data: [DONE]\n\n"
         except Exception as e:
