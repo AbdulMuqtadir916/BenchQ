@@ -28,6 +28,9 @@ ACTOR = ("CASE type WHEN 'scrape' THEN 'Scraper' WHEN 'h1b' THEN 'H-1B refresh' 
 
 
 def upgrade():
+    # Nothing may write to the old tables between the copy and the drop: a row added in between would go unsaved.
+    # Reads still work; the drops later in this transaction take the stronger lock they need.
+    op.execute("LOCK TABLE activity_log_v2, ledger_entries IN SHARE ROW EXCLUSIVE MODE")
     op.execute(f"""
         INSERT INTO activity_logs (id, firm_id, actor_type, actor_name, entity_type, entity_id, entity_label, action,
                                    summary, note, created_at)

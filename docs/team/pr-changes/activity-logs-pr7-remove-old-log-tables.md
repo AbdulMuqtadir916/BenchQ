@@ -63,3 +63,9 @@ The admin Overview's Recent activity list shows background rows too.
 `scrape_log`, `job_runs` and `llm_call_log` are untouched.
 
 The backend runs migrations on start, so restarting it on this branch drops both tables on that database. Back up first.
+
+## Review fix (CodeRabbit, 2026-11-14)
+
+The migration locks both old tables against writes before it copies them (`SHARE ROW EXCLUSIVE`, reads still work), so a
+row an older process wrote between the copy and the drop can't be lost. Nothing in this code writes those tables any
+more; the lock covers an older backend still running during a deploy.
