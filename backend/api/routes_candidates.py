@@ -42,6 +42,7 @@ router = APIRouter(prefix="/firms/{firm_id}/candidates", tags=["candidates"])
 
 PARSE_LIFETIME = timedelta(minutes=60)
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PLACE_NEEDED = "Add a preferred location, or the candidate's city and state: the job search needs a place."
 
 WorkAuth = Literal[WORK_AUTHS]
 EmploymentType = Literal[EMPLOYMENT_TYPES]
@@ -78,7 +79,7 @@ class CreateCandidateBody(BaseModel):
     rate_min: float | None = Field(default=None, gt=0)
     available_from: datetime | None = None
     notice_period_days: int | None = Field(default=None, ge=0, le=365)
-    target_roles: list[Required200] = Field(min_length=1, max_length=50)
+    target_roles: list[Required200] = Field(min_length=1, max_length=1)     # one (decided 2026-11-14, Q1, Q10)
     willing_to_relocate: bool = False
     work_settings: list[RemoteMode] = Field(default_factory=list)
     preferred_locations: list[str] = Field(default_factory=list, max_length=50)
@@ -240,6 +241,9 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
         raise _bad("Enter a valid email.")
     if body.rate_min is not None and body.rate_target is not None and body.rate_min > body.rate_target:
         raise _bad("The floor can't be above the target rate.")
+    # The job search needs a place (decided 2026-11-14, Q3, Q14): the city and state together, or a preferred location.
+    if not ((_clean(body.city) and _clean(body.state)) or any(p.strip() for p in body.preferred_locations)):
+        raise _bad(PLACE_NEEDED)
     firm = lock_firm(db, firm_id)
     manager, bde = _target(db, firm_id, principal, None, body.manager_id, body.bde_id)
     if bde is not None:

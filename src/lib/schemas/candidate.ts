@@ -135,7 +135,8 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   country: z.string().trim().min(1, "Enter the country."),
   yearsExperience: z.number().min(0).max(60),
   employmentTypes: z.array(EmploymentType).min(1, "Choose at least one engagement type."),
-  targetRoles: z.array(z.string().trim().min(1)).min(1, "Add at least one role they are looking for."),
+  /** One target role (decided 2026-11-14): the job search looks for it. */
+  targetRoles: z.array(z.string().trim().min(1)).length(1, "Enter the one role they are looking for."),
   fullName: z.string().trim().min(1, "Enter the candidate's name."),
   primaryRole: z.string().trim().min(1, "Enter the title they're marketed as."),
   email: z.string().trim().email("Enter a valid email."),
@@ -149,6 +150,10 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   managerId: z.string().min(1, "Choose a manager."),
   bdeId: z.string().nullable(),
   handoffNote: z.string().trim().max(1000).nullable(),
+}).refine((body) => (Boolean(body.city?.trim()) && Boolean(body.state?.trim())) || body.preferredLocations.some((place) => place.trim() !== ""), {
+  // The job search needs a place (decided 2026-11-14, Q3, Q14); the backend refuses the same.
+  message: "Add a preferred location, or the candidate's city and state: the job search needs a place.",
+  path: ["preferredLocations"],
 });
 export type CreateCandidate = z.infer<typeof CreateCandidateSchema>;
 

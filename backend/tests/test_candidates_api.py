@@ -178,6 +178,28 @@ def test_a_blank_or_empty_mandatory_field_is_refused(anonymous_client, world, fi
     assert r.status_code == 422 and field in {part for e in r.json()["detail"] for part in e["loc"]}
 
 
+def test_a_create_takes_one_target_role(anonymous_client, world):
+    """Decided 2026-11-14 (Q1, Q10): onboarding takes one target role; the job search looks for it."""
+    r = _create(anonymous_client, world, target_roles=["Java Developer", "Backend Engineer"])
+    assert r.status_code == 422 and "target_roles" in {part for e in r.json()["detail"] for part in e["loc"]}
+
+
+@pytest.mark.parametrize("place", [{"city": "Austin", "state": "TX", "preferred_locations": []},
+                                   {"city": None, "state": None, "preferred_locations": ["Dallas, TX"]},
+                                   {"city": None, "state": None, "preferred_locations": ["Remote"]}])
+def test_a_create_with_a_place_for_the_job_search_is_accepted(anonymous_client, world, place):
+    assert _create(anonymous_client, world, **place).status_code == 201
+
+
+@pytest.mark.parametrize("place", [{"city": None, "state": None, "preferred_locations": []},
+                                   {"city": "Austin", "state": None, "preferred_locations": []},   # a city alone
+                                   {"city": " ", "state": "TX", "preferred_locations": ["  "]}])
+def test_a_create_without_a_place_for_the_job_search_is_refused(anonymous_client, world, place):
+    """Decided 2026-11-14 (Q3, Q14): the city and state together, or a preferred location; else nothing to search."""
+    r = _create(anonymous_client, world, **place)
+    assert r.status_code == 400 and "the job search needs a place" in r.json()["detail"]
+
+
 @pytest.mark.parametrize("field", ["needs_sponsorship", "needs_transfer", "years_experience"])
 def test_a_null_mandatory_field_is_refused(anonymous_client, world, field):
     r = _create(anonymous_client, world, **{field: None})

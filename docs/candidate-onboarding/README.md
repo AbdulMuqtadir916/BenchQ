@@ -63,7 +63,7 @@ filled in; its "Owner" row becomes **"Assigned BDE"** (Q48).
 | 1 | [Resume](./screens/1-resume.webp) | Drop a PDF or Word file (≤ 10 MB); required (07 Q58). The parser fills steps 2–4. Sample resumes show only on mocks (§7 A1). | 04 |
 | 2 | [Basic details](./screens/2-basic-details.webp) | Identity (full name\*, "Marketed as"\*, years), contact (email\*, phone, LinkedIn, city, state), profile (skills, summary). | 04 |
 | 3 | [Work and rate](./screens/3-work-and-rate.webp) | Work authorization (one of nine), valid until, engagement types (C2C / W2 / 1099 / Full-time), target rate, walk-away floor, available from, notice period. | 04 |
-| 4 | [Preferences](./screens/4-preferences.webp) | Target roles, work setting, preferred locations, willing to relocate, industries, deal breakers, notes for the BDE. "Skip for now" allowed. | 04 |
+| 4 | [Preferences](./screens/4-preferences.webp) | The target role (one), work setting, preferred locations (required without a city and state: the job search needs a place), willing to relocate, industries, deal breakers, notes for the BDE. | 04 |
 | 5 | [Assign](./screens/5-assign.webp) | MANAGER: pick one of their BDEs. OWNER: pick a manager, then optionally a BDE. Load per BDE, capacity warning, handoff note. **Create candidate.** The "Notify the BDE" toggle is removed (Q50). | 05 |
 | 6 | [Done](./screens/6-done.webp) | "{name} is on the bench." Open profile · Add another (Find jobs removed 2026-11-11: only the candidate's BDE searches). Copy in module 05. | 05 |
 

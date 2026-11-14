@@ -923,7 +923,8 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   managerId: z.string().min(1),
   bdeId: z.string().nullable(),
   handoffNote: z.string().trim().max(1000).nullable(),
-});
+  // targetRoles: exactly one; and a place: city + state together, or a preferred location (2026-11-14, below)
+}).refine((body) => hasCityAndState(body) || hasPreferredLocation(body), { path: ["preferredLocations"] });
 
 export const ReassignCandidateSchema = z.object({
   managerId: z.string().min(1),
@@ -957,6 +958,13 @@ works nothing out and only checks that they were sent (a missing one is a 422 na
 `phone`, `yearsExperience`, `country` (any country; the flow's Country box starts empty, takes the parsed résumé's
 country, else the person types one, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
 `employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. `resumeParseId` is required: no candidate without their résumé (07 Q58), whose file becomes their first base.
+
+**One target role and a place — 2026-11-14 (Zuhair; Abdul reviews with the PR, Q1, Q3, Q10, Q14).** The job search looks
+for the target role in a place the BDE picks, so the create takes **exactly one** `targetRoles` entry (two is a 422
+naming the field) and needs **a place**: `city` and `state` together, or at least one non-blank `preferredLocations`
+entry (a city alone is ambiguous). Without one, the create is refused (400, "…the job search needs a place.") and the
+flow's step 4 doesn't continue. `targetRoles` stays a list: a candidate created before this keeps every role, and the
+search uses the first.
 
 **No default country — 2026-11-07 (Zuhair; raised by Abdul in the PR 7 review, #5, and approved in his re-review).**
 BenchQ never invents a country. `Candidate.country` is the active base résumé's (07 Q57) and is `null` when that résumé

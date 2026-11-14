@@ -138,6 +138,7 @@ def test_creating_and_editing_a_candidate(anonymous_client, accounts, test_db, l
             "employment_types": ["C2C"], "manager_id": str(manager.id), "summary": RESUME,
             "country": "US", "years_experience": 8, "needs_sponsorship": True, "needs_transfer": True,
             "target_roles": ["Java Developer"], "skills": [{"name": "Xylophonic", "family": "Canary"}],
+            "preferred_locations": ["Austin, TX"],      # the job search needs a place (decided 2026-11-14)
             "resume_parse_id": upload()}
     created = anonymous_client.post(url, json=body, headers=_cookie(accounts.firm_token))
     assert created.status_code == 201, created.text

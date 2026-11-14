@@ -51,7 +51,8 @@ export interface WizardValues {
   rateMin: string;
   availableFrom: string;
   noticePeriodDays: string;
-  targetRoles: string[];
+  /** One target role (decided 2026-11-14): the job search looks for this title. Sent as `targetRoles: [role]`. */
+  targetRole: string;
   workSettings: RemoteMode[];
   preferredLocations: string[];
   willingToRelocate: boolean;
@@ -71,7 +72,7 @@ export type DraftableField = (typeof DRAFTABLE)[number];
 export const EMPTY_VALUES: WizardValues = {
   resume: null, fullName: "", primaryRole: "", yearsExperience: "", email: "", phone: "", linkedinUrl: "", city: "", state: "",
   country: "", skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
-  rateMin: "", availableFrom: "", noticePeriodDays: "", targetRoles: [], workSettings: [], preferredLocations: [],
+  rateMin: "", availableFrom: "", noticePeriodDays: "", targetRole: "", workSettings: [], preferredLocations: [],
   willingToRelocate: false, preferredIndustries: [], dealBreakers: [], contactNotes: "", managerId: "", bdeId: null,
   handoffNote: "",
 };
@@ -130,6 +131,14 @@ export function applyDraft(values: WizardValues, draft: ResumeDraft): { values: 
 
 export type Errors = Partial<Record<keyof WizardValues, string>>;
 
+/** Shown on step 4 when there's no place to search (decided 2026-11-14, Q3, Q14). */
+export const PLACE_ERROR = "Add a preferred location, or their city and state on Basic details: the job search needs a place.";
+
+/** The job search needs a place: the city and state together (a city alone is ambiguous), or a preferred location. */
+export function hasPlace(values: Pick<WizardValues, "city" | "state" | "preferredLocations">): boolean {
+  return (values.city.trim() !== "" && values.state.trim() !== "") || values.preferredLocations.some((place) => place.trim() !== "");
+}
+
 const asNumber = (value: string): number | null => (value.trim() === "" ? null : Number(value));
 const isWhole = (value: number | null, min: number, max: number) => value === null || (Number.isInteger(value) && value >= min && value <= max);
 
@@ -166,7 +175,8 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
     if (!isWhole(asNumber(values.noticePeriodDays), 0, 365)) errors.noticePeriodDays = "Notice is a whole number of days, 0 to 365.";
   }
   if (step === "preferences") {
-    if (values.targetRoles.length === 0) errors.targetRoles = "Add at least one role they are looking for.";
+    if (!values.targetRole.trim()) errors.targetRole = "Enter the role they are looking for.";
+    if (!hasPlace(values)) errors.preferredLocations = PLACE_ERROR;
   }
   return errors;
 }
@@ -220,7 +230,7 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     rateMin: asNumber(values.rateMin),
     availableFrom: toIsoDate(values.availableFrom),
     noticePeriodDays: asNumber(values.noticePeriodDays),
-    targetRoles: values.targetRoles,
+    targetRoles: [values.targetRole.trim()],
     willingToRelocate: values.willingToRelocate,
     workSettings: values.workSettings,
     preferredLocations: values.preferredLocations,
