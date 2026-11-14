@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { documentOf } from "../autofill/documents";
+import { addEntry } from "./entries";
 import { createFiller } from "./fill";
 import { readFields, scanDocument, waitForQuiet, type Registry } from "./scan";
 
@@ -1119,5 +1120,93 @@ describe("a list box that keeps several choices", () => {
     const result = await filler.fill({ scanId, fieldId: fields[0]!.id, write: { type: "check", checked: true, optionIds: ["o0", "o2"] }, current: "" });
     expect(result).toEqual({ status: "filled", current: "Asian, White" });
     expect([...element<HTMLSelectElement>("#r").selectedOptions].map(({ text }) => text)).toEqual(["Asian", "White"]);
+  });
+});
+
+describe("fields inside components (shadow DOM)", () => {
+  const shadow = (host: Element, html: string, mode: ShadowRootMode = "open") => {
+    const root = host.attachShadow({ mode });
+    root.innerHTML = html;
+    return root;
+  };
+  const fieldsNow = () => scanDocument(document, 1, true).scan.fields;
+
+  afterEach(() => {
+    delete (globalThis as { chrome?: unknown }).chrome;
+  });
+
+  it("finds a component's fields in page order, nested components too, with the labels inside them", () => {
+    document.body.innerHTML = `<label>First name <input></label><name-box></name-box><label>City <input></label>`;
+    const outer = shadow(document.querySelector("name-box")!, `<label>Last name <input></label><phone-box></phone-box>`);
+    shadow(outer.querySelector("phone-box")!, `<label for="p">Phone</label><input id="p" type="tel">`);
+    expect(fieldsNow().map(({ label }) => label)).toEqual(["First name", "Last name", "Phone", "City"]);
+  });
+
+  it("reads a question that sits on the component: its aria-label, an element naming it, its label, the text before it", () => {
+    document.body.innerHTML = `<email-box aria-label="Email"></email-box><ui5-label for="z">Zip code</ui5-label><zip-box id="z"></zip-box>`
+      + `<city-box label="City"></city-box><div>Country</div><country-box></country-box>`;
+    for (const tag of ["email-box", "zip-box", "city-box", "country-box"]) shadow(document.querySelector(tag)!, `<input>`);
+    expect(fieldsNow().map(({ label }) => label)).toEqual(["Email", "Zip code", "City", "Country"]);
+  });
+
+  it("keeps two components' radios of the same name apart", () => {
+    document.body.innerHTML = `<yes-no aria-label="Are you 18 or older?"></yes-no><yes-no aria-label="Do you need sponsorship?"></yes-no>`;
+    for (const host of Array.from(document.querySelectorAll("yes-no"))) {
+      shadow(host, `<label><input type="radio" name="answer" value="yes"> Yes</label><label><input type="radio" name="answer" value="no"> No</label>`);
+    }
+    expect(fieldsNow().map(({ kind, label }) => [kind, label])).toEqual([["radio", "Are you 18 or older?"], ["radio", "Do you need sponsorship?"]]);
+  });
+
+  it("reads ids inside a component from the component, not the page", () => {
+    document.body.innerHTML = `<span id="q">Wrong question</span><ask-box></ask-box>`;
+    shadow(document.querySelector("ask-box")!, `<span id="q">Years of experience</span><input aria-labelledby="q">`);
+    expect(fieldsNow().map(({ label }) => label)).toEqual(["Years of experience"]);
+  });
+
+  it("finds a dropdown built from other elements inside a component", () => {
+    document.body.innerHTML = `<pick-box></pick-box>`;
+    shadow(document.querySelector("pick-box")!, `<div role="combobox" aria-label="State" tabindex="0"></div>`);
+    expect(fieldsNow().map(({ kind, label }) => [kind, label])).toEqual([["combobox", "State"]]);
+  });
+
+  it("reaches a closed component only through the extension's chrome.dom", () => {
+    document.body.innerHTML = `<secret-box></secret-box>`;
+    const root = shadow(document.querySelector("secret-box")!, `<input aria-label="Salary">`, "closed");
+    expect(fieldsNow()).toEqual([]);
+    (globalThis as { chrome?: unknown }).chrome = { dom: { openOrClosedShadowRoot: (host: Element) => (host.localName === "secret-box" ? root : null) } };
+    expect(fieldsNow().map(({ label }) => label)).toEqual(["Salary"]);
+  });
+
+  it("fills a component's field, and its events reach the page as a person's typing does", async () => {
+    const { filler, rescan } = setup(`<name-box></name-box>`);
+    const input = shadow(element("name-box"), `<input aria-label="Name">`).querySelector("input")!;
+    const seen: string[] = [];
+    const listener = (event: Event) => seen.push((event.target as Element).localName);
+    document.addEventListener("input", listener);
+    try {
+      const { scanId, fields } = rescan();
+      const result = await filler.fill({ scanId, fieldId: fields[0]!.id, write: { type: "text", value: "Priya" }, current: "" });
+      expect(result).toEqual({ status: "filled", current: "Priya" });
+      expect(input.value).toBe("Priya");
+      expect(seen).toContain("name-box");
+    } finally {
+      document.removeEventListener("input", listener);
+    }
+  });
+});
+
+describe("adding a school or job block (#132)", () => {
+  it("clicks the form's Add button for that kind, by its own words or its section's heading", () => {
+    document.body.innerHTML = `<button id="cart">Add to cart</button><section><h3>Education</h3><button id="edu">+ Add another</button></section>`
+      + `<button id="work">Add work experience</button>`;
+    const clicked: string[] = [];
+    for (const id of ["cart", "edu", "work"]) element(`#${id}`).addEventListener("click", () => clicked.push(id));
+    expect([addEntry(document, "education"), addEntry(document, "work")]).toEqual([true, true]);
+    expect(clicked).toEqual(["edu", "work"]);
+  });
+
+  it("finds nothing on a form without one", () => {
+    document.body.innerHTML = `<h3>Education</h3><input aria-label="School"><button>Submit application</button>`;
+    expect(addEntry(document, "education")).toBe(false);
   });
 });

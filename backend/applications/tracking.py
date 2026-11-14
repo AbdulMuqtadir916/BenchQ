@@ -1,11 +1,11 @@
 """Transactional status and review commands. Callers commit only after the whole command succeeds."""
 import uuid
 from fastapi import HTTPException
+from backend.applications.postings import posting_job
 from backend.auth.ledger import diff, record
 from backend.auth.policy import can
 from backend.auth.scoping import scoped
 from backend.models.db import Application, ApplicationStatusEvent, ApplicationReview, utcnow
-from backend.models.candidates import FavoriteJob
 from backend.models.tenancy import User
 
 STATUSES = frozenset({
@@ -128,14 +128,11 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
         note=note, command_id=command_id, review_id=review.id if review else None,
         occurred_at=now, revision=app.status_revision, original_payload=transition,
     ))
-    favorite = scoped(db, FavoriteJob, app.firm_id).filter_by(
-        candidate_id=app.candidate_id, job_id=app.job_id).first()
+    # A Saved application is the candidate's favourite since applications moved onto job_postings (2026-11-11): no
+    # favorite_jobs row is kept beside it.
     if status == 'saved':
         # Saved changes the queue, not the historical fact of a submission. The form goes: the next apply sends its own.
         app.form_data = None
-        if favorite is None:
-            db.add(FavoriteJob(firm_id=app.firm_id, candidate_id=app.candidate_id,
-                              job_id=app.job_id, marked_by_user_id=actor.id))
     else:
         if status == 'applied' and old_status == 'saved' and app.applied_at is None:
             app.applied_at = now
@@ -145,8 +142,6 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
             app.form_data = form_data
         if sent is not None:
             app.resume_id = sent.id
-        if favorite:
-            db.delete(favorite)
     if review:
         review.state = 'RESOLVED'
         review.revision += 1
@@ -154,9 +149,10 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
         review.resolved_by_user_id = actor.id
         review.resolved_status = status
         review.note = note
+    title = posting_job(app.posting).title
     record(db, actor=actor, action='UPDATE', entity_type='application', entity_id=app.id,
-           entity_label=app.job.title or 'Application',
-           summary=f"{'Reviewed' if review else 'Moved'} {app.job.title or 'application'}: {old_status} → {status}.",
+           entity_label=title or 'Application',
+           summary=f"{'Reviewed' if review else 'Moved'} {title or 'application'}: {old_status} → {status}.",
            firm_id=app.firm_id, candidate_id=app.candidate_id, at=now,
            changes=diff({'status': old_status}, {'status': status}))
     db.flush()
@@ -185,8 +181,8 @@ def request_review(db, app, message, *, reason):
     db.flush()
     from backend.auth.ledger import record_automated
     record_automated(db, actor_type='AGENT', actor_name='Email classifier', action='CREATE',
-                     entity_type='application_review', entity_id=review.id, entity_label=app.job.title or 'Application',
-                     summary=f"Email sent to BDE review ({reason.replace('_', ' ').lower()}) for {app.job.title or 'an application'}.",
+                     entity_type='application_review', entity_id=review.id, entity_label=posting_job(app.posting).title or 'Application',
+                     summary=f"Email sent to BDE review ({reason.replace('_', ' ').lower()}) for {posting_job(app.posting).title or 'an application'}.",
                      firm_id=app.firm_id, candidate_id=app.candidate_id)
     return review
 
@@ -257,11 +253,8 @@ def apply_email_decision(db, app, message, classification_id, *, target: str) ->
                 revision=app.status_revision, command_id=command_id, note=None, original_payload=payload)
             db.add(event)
             db.flush()
-            favorite = scoped(db, FavoriteJob, app.firm_id).filter_by(candidate_id=app.candidate_id, job_id=app.job_id).first()
-            if favorite:
-                db.delete(favorite)
             record_automated(db, actor_type='AGENT', actor_name='Email classifier', action='STATE_CHANGE',
-                             entity_type='application', entity_id=app.id, entity_label=app.job.title or 'Application',
+                             entity_type='application', entity_id=app.id, entity_label=posting_job(app.posting).title or 'Application',
                              summary=f'Automatic status change from email: {old_status} → {target}. Source email {message.id}.',
                              firm_id=app.firm_id, candidate_id=app.candidate_id, at=now,
                              changes=diff({'status': old_status}, {'status': target}))
@@ -308,11 +301,6 @@ def undo_email_decision(db, app, principal, *, event_id, expected_revision, comm
     undo_id = uuid.uuid4()
     payload['event_id'] = str(undo_id)
     app.status = original.from_status
-    if original.from_status == 'saved' and scoped(db, FavoriteJob, app.firm_id).filter_by(
-            candidate_id=app.candidate_id, job_id=app.job_id).first() is None:
-        # Back to Saved: the favorite the automatic change removed comes back, as a Saved move adds it (never twice).
-        db.add(FavoriteJob(firm_id=app.firm_id, candidate_id=app.candidate_id, job_id=app.job_id,
-                           marked_by_user_id=actor.id))
     app.status_revision += 1
     app.status_effective_at = now
     app.last_manual_change_at = now
@@ -323,7 +311,7 @@ def undo_email_decision(db, app, principal, *, event_id, expected_revision, comm
         to_status=original.from_status, actor_user_id=actor.id, source='email_undo', occurred_at=now,
         revision=app.status_revision, command_id=command_id, note=None, original_payload=payload))
     record(db, actor=actor, action='UPDATE', entity_type='application', entity_id=app.id,
-           entity_label=app.job.title or 'Application',
+           entity_label=posting_job(app.posting).title or 'Application',
            summary=f'Undid automatic change {original.id}: {old_status} → {original.from_status}.',
            firm_id=app.firm_id, candidate_id=app.candidate_id, at=now,
            changes=diff({'status': old_status}, {'status': original.from_status}))

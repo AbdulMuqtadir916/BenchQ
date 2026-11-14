@@ -332,14 +332,9 @@ async def handle_callback(callback_data: str, message_id: int = None):
             job_id = callback_data[8:]
             job = db.query(Job).filter(Job.id == job_id).first()
             if job:
+                # The old pool's flag only: an application names a candidate's job posting since 2026-11-11, and the
+                # platform's own bot has no candidate, so it records none.
                 job.status = "applied"
-                # Telegram is the platform's own bot, so what it records goes to the Default firm (F2b).
-                existing = db.query(Application).filter(Application.job_id == job.id,
-                                                        Application.firm_id == DEFAULT_FIRM_ID).first()
-                if not existing:
-                    app = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status="applied",
-                                     status_transitions=[{"from": None, "to": "applied", "at": datetime.now(timezone.utc).isoformat(), "source": "telegram"}])
-                    db.add(app)
                 db.commit()
                 return "Marked as applied!"
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Providers } from "./providers";
 import { RouteTitle } from "@/components/routes/route-title";
+import { NavigationTrail } from "@/components/routes/navigation-trail";
 import "@fontsource-variable/host-grotesk";
 import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
@@ -18,6 +19,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <RouteTitle />
+        <NavigationTrail />
         <Providers>{children}</Providers>
       </body>
     </html>

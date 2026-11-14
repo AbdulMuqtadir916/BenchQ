@@ -5,7 +5,7 @@ listed here: what changed, in whose area, and why. Newest PR first.
 
 ## Activity logs (Umamah; PRs 3 to 7)
 
-The ledger moves to a new table, `activity_logs`, that can only be added to (07 Q64; migrations 0028 to 0030). Each row
+The ledger moves to a new table, `activity_logs`, that can only be added to (07 Q65; migrations 0028 to 0030). Each row
 names the PR that makes the change. Rows are added to this table by each PR.
 
 | Area (owner) | File | What changed | Why | Agreed |
@@ -23,6 +23,49 @@ names the PR that makes the change. Rows are added to this table by each PR.
 | Gmail check (Samad), PR 5 part 2 | `backend/email_monitor/gmail_client.py`, `backend/tests/test_r4_failure_injection.py` | `check_emails()` returns the number of replies it read (0 when it can't run) instead of nothing, for the run summary. Two failure-injection tests expect `0` instead of `None`. | The run summary used to count rows in `activity_log_v2`, which PR 7 removes. Nothing else read the old return value. | **Pending: Samad** |
 | Scheduler, monitor, Telegram (Uzair), PR 5 part 2 | `backend/scheduler.py`, `backend/job_monitor.py`, `backend/notifier/telegram.py`, `backend/analyzer/llm_logger.py`, `backend/analyzer/cv_scorer.py` | A scheduled run that did something or failed writes one system row ("Scheduler"); each AI call writes an AI agent row with its cost; a check that handled nothing writes nothing. `llm_call_log`, `scrape_log` and `job_runs` keep their rows. | Background work is logged for the Super Admin, with no firm. | **Pending: Uzair** |
 | Scrapers (Zuhair), PR 5 part 2 | `backend/scraper/orchestrator.py`, `backend/scraper/sources/*.py` (company_pages, freehire, jobright, jobspy, levelsfyi, linkedin_personal), `backend/activity.py` | Their `log_activity` calls say when a scrape found nothing (`is_empty`), so an empty scrape writes no row. The message text is unchanged. | Keeps the Super Admin's log readable. | **Pending: Zuhair** |
+
+## Résumé tailoring, part 3: the screens (`feat/resume-tailoring`, Zuhair)
+
+Grilled and built 2026-11-12 ([tailoring.md](./tailoring.md) §8). These rows wait for their owners.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Route registry and 07 (Abdul) | `src/lib/routes/registry.ts`, `registry.test.ts`, `docs/07-ROUTES-AND-RBAC.md` (Q3, Q64, §2.2) | Focus mode is the BDE's only: OWNER and MANAGER `none` (Forbidden in place), out of their palette and shortcuts. | Decided by Zuhair 2026-11-12 (Q64, replaces Q3): its actions are the BDE's own work. | **Pending: Abdul** |
+| Firm layout (shared) | `src/app/[firm]/layout.tsx` | The tailoring panel mounted beside every firm page (inside `FirmGate`). | R2-Q2: the BDE's tailorings follow them across pages. | **Pending** |
+| BDE dashboard (candidate/dashboard owners) | `src/features/dashboard/bde-dashboard.tsx` | The queue's sparkle is the Tailor control (the picker beside it); it no longer links to the job page. | R2-Q5. | **Pending** |
+| Focus mode (shared) | `src/app/[firm]/focus/page.tsx` | T starts a real tailoring (the active base) and moves on; a refusal is said under the actions. | Q1, Q4. | **Pending** |
+| Mock tests (shared) | `src/mocks/agents.ts`, `membership.ts` (`FIRM_SCOPED_RESOURCES` without `agents`), `membership.test.ts`, `write-authorization.test.ts`; `src/components/dev/stage-one-showcase.tsx` | The agents mock's `tailorResume` and its rows deleted; `agents` keeps only `rewrite` (no firm). The dev showcase plays the staged panel without a call. | Q7: the theatre goes; tailoring is the backend's. | **Pending** |
+| Access table (Abdul) | `backend/auth/access.py` | `GET /api/firms/{firm_id}/tailorings` (FIRM; the caller's own runs, a support view gets none). | `test_access.py` refuses an unclassified route. | **Pending: Abdul** |
+| Isolation sweep (Uzair) | `backend/tests/isolation_cases.py` | The new route's case. | Every route stays classified and checked. | **Pending: Uzair** |
+| App wiring | `backend/main.py` | The tailoring `firm_router` included. | The new route. | Informational |
+
+## Résumé tailoring, part 3 step 1: only that candidate's jobs (`feat/resume-tailoring`, Zuhair)
+
+Zuhair's rule (2026-11-12): a screen about one candidate reads only that candidate's jobs ([tailoring.md](./tailoring.md)
+§8). Built 2026-11-12; these rows wait for their owners.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| BDE dashboard (candidate/dashboard owners) | `src/features/dashboard/bde-dashboard.tsx` | The queue reads its candidate's jobs only (it read the BDE's newest 300 to show 6); the jobs read waits for the candidate, and isn't counted while there is none. Its job links carry `?candidate=`. | A job shared by two of the BDE's candidates carried the other's posting id (tailoring answered 404); the newest 300 could leave this candidate's out. | **Pending** |
+| Dashboard tests (shared) | `src/features/dashboard/dashboard-errors.test.ts` | The render settles queries created by a later render (the queue's jobs wait for the candidates), skips disabled ones, and a new test checks the BDE dashboard reads jobs only for one candidate. | The same. | **Pending** |
+| Focus mode (shared) | `src/app/[firm]/focus/page.tsx` | The selected candidate's jobs only, read again on a switch; skeleton, error and "No jobs to work" states (it showed "Run complete" while loading). | The same, and the three states (CLAUDE.md). | **Pending** |
+
+## Résumé tailoring (`feat/resume-tailoring`, Zuhair; part 1, the package; part 2, the wiring)
+
+The tailor's backend package ([tailoring.md](./tailoring.md)). Built 2026-11-12; these rows were not asked about
+before the change, so each waits for its owner.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Settings (Abdul, F2c) | `backend/seed.py` (`DEFAULT_SETTINGS`, `ENUM_SETTING_VALUES`, `invalid_setting_values`), `backend/settings_scope.py` | 16 `resume_tailor_*` rows seeded (the tailor's model, nine prompts, four formats; the key empty), all AI presets; its provider limited to `openrouter`; the save check refuses a broken tailor prompt or format. The rows come from `backend/resume_tailor/settings.py`. | Decided 2026-11-12 (Q6, Q6b): the tailor keeps its prompts and formats in settings the way the résumé parser does. | **Pending: Abdul** |
+| AI presets (Abdul, 08) | `backend/ai/config.py` | A `resume_tailor` module in `AI_MODULES` (its prompts and formats). The old `tailoring` module stays until tailoring's part 2 deletes it with `legacy_tailoring.py`. | The same; the presets take the tailor's prompts later without a rewrite. | **Pending: Abdul** |
+| Shared AI helpers | `backend/analyzer/prompt_fence.py` | `without_fake_markers` added (the file is now JobNavigator's, unchanged); `fence` is untouched. New files beside it: `keyword_match.py`, `known_skills.py`, `job_requirements.py` (only `clean_job_text`), `data/skills_dictionary.json`. | The tailoring handoff takes fake fence markers out of a posting first, and its claim checks read the skills dictionary (Q5). Nothing else calls them yet. | Informational |
+| Background runs (Uzair) | `backend/job_monitor.py` | Part 2: `launch_background` takes an optional `firm_id` (stored on the run's `job_runs` row, which never had one); the tailor's own gate `resume_tailor` (`resume_tailor_max_concurrent`, 40); the old `tailor_resume` job type leaves the `tailoring` gate (cover letters keep it, at 2). | Decided 2026-11-12 (part 2 Q1, Q4c): the tailoring's row is its record, read by the firm; 2 at a time is too few for many firms. Your follow-up: `cleanup_stale_runs()` before more than one worker (uzair.md, Deferred). | **Pending: Uzair** |
+| Isolation and log sweeps (Uzair) | `backend/tests/isolation_cases.py`, `isolation_support.py`, `test_log_every_route.py` | Part 2: the three tailoring routes' cases; a finished tailoring row in each firm (`tailoring`); the offline fixture stubs the tailor's setup and launch; the old `cv_tailor_prompt` row no longer planted. The sweep lists `POST …/resumes/tailor` (OWNER: 403) and `GET …/tailorings/{run_id}` (no firm's run seeded) as not reached; their logging is tested in `test_resume_tailor_routes.py`. | Every route stays classified and checked. | **Pending: Uzair** |
+| LLM client and its tests (Uzair; AI timeouts handed to Zuhair) | `backend/analyzer/llm_client.py`, `backend/api/routes_llm.py`, `test_llm_client_propagation.py`, `test_llm_logged_pair_matches_dispatch.py`, `test_llm_reasoning_effort.py`, `test_log_lint.py`, `test_r4_contract_settings.py` | Part 2: `call_cv_tailor_llm` and the `cv_tailor_*` key slot deleted; the tests drop the `cv_tailor` feature (the effort test uses `cover_letter`); the log lint's allowance for `legacy_tailoring.py` goes with the file. | Decided 2026-11-12 (Q10, part 2 Q7): the old tailoring is deleted. | **Pending: Uzair** |
+| Access table (Abdul) | `backend/auth/access.py` | Part 2: three `FIRM` rows for the tailoring routes. | `test_access.py` refuses an unclassified route. | **Pending: Abdul** |
+| Settings and AI presets (Abdul) | `backend/seed.py`, `backend/settings_scope.py`, `backend/ai/config.py`, `test_ai_config.py` | Part 2: `resume_tailor_max_concurrent` (40, PLATFORM) seeded; the six old rows (`cv_tailor_llm_*`, `cv_tailor_prompt`, `persona_tailor_prompt`) no longer seeded or classified, and the old `tailoring` AI module gone (rows a database already holds stay); the empty-prompt test uses `cover_letter`. | The same. | **Pending: Abdul** |
+| App startup (shared) | `backend/main.py` | Part 2: the tailoring router registered before the résumé routes (`…/resumes/tailorings` is not a résumé id); the tailor's heartbeat started with the app. | Decided 2026-11-12 (part 2 Q10b). | Informational |
 
 ## For Arbaz: merging #129 after #127
 
@@ -146,6 +189,14 @@ of the AI answer routes and their `access.py` rows are undone (2026-11-09): the 
 | Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
 | Candidates / résumés (Zuhair) | `backend/api/routes_candidate_resumes.py`, `backend/candidates/versions.py` (`uploaded_file`), `backend/auth/access.py` (one `F` row, approved by Arbaz), `isolation_cases.py`, `test_resume_file.py`, `docs/02-DATA-CONTRACTS.md` §8.2 | `GET …/resumes/{rid}/file`: an uploaded base's version 1 as its file, as uploaded; 404 for any other version. | The extension attaches the picked résumé to the form's résumé upload (07 Q49–Q52). A file for every version is asked of Zuhair (Q25). |
 
+## The Autofill screen — phase 3 of résumé autofill (Arbaz; contract for Abdul's sign-off)
+
+Not agreed yet: docs/02 §8.4 is proposed for Abdul's sign-off; the `access.py` row was approved by Arbaz (2026-11-09).
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Candidates / résumés (Zuhair, Abdul) | `backend/candidates/autofill.py`, `backend/candidates/versions.py` (`save_autofill`, `_family`), `backend/api/routes_candidate_resumes.py`, `backend/api/routes_firm_resumes.py`, `backend/auth/access.py` (one `F` row), `isolation_cases.py`, `test_autofill.py`, `test_autofill_screen.py`, `docs/02-DATA-CONTRACTS.md` §8.1, §8.4 | `resumes.autofill.custom` is a list of `{question, also, answer}` (07 Q40–Q41; nothing wrote the map); the read marks an edit that stopped applying (`replaced`, Q15) and, with `&editor=true`, lists unanswered questions with each answer's `type` (Q34); `PATCH …/resumes/{rid}/autofill` saves edits, resets, added and removed questions in place, for the rest of the résumé unless `only_this` (Q7, Q14, Q30, Q44). | The Autofill screen (`/[firm]/resumes/[id]/autofill`), where a BDE sees and changes what the extension fills. |
+
 ## Job search tables (`feat/jobs-table`, Zuhair)
 
 `job_postings` and `scrape_jobs`, migration 0020 ([docs/02](../02-DATA-CONTRACTS.md) §6.y).
@@ -169,7 +220,7 @@ answer with its `key`, and each version stores only the entries the user typed (
 | Demo seed (Abdul) | `backend/scripts/seed_demo.py` | No `qa_bank` on the demo candidates; the unused camelCase helpers go. | The column is gone. |
 | Candidate DTO (shared) | `src/lib/api/dto/candidates.ts`, its sample and test | The backend sends no `qa_bank`; the mapper gives `qaBank: []`. `CandidateSchema.qaBank` stays. | The Documents tab's Screening answers panel reads it and shows its empty state until the Documents section is removed (planned, [abdul.md](./abdul.md) §3). Mock mode still shows the fixtures' answers. |
 | Autofill and the extension (Arbaz) | none | Nothing changed. **For you:** read the selected résumé's `GET …/resumes/{id}?autofill=true` instead of `persona.qa_bank`, and match each entry by its `key` before its wording. A hand-saved answer becomes one of the version's own entries (`resumes.autofill`); the route that writes them is planned ([persona-to-candidates.md](./persona-to-candidates.md) §5). | This PR builds the answers; switching the extension is your PR. |
-| Old tailoring (JobNavigator leftover) | `backend/analyzer/legacy_tailoring.py` | Not changed. It isn't wired to anything and can't make versions (it reads columns 0013 dropped). | **For the tailoring module (Zuhair):** a tailored v1 copies its source version's typed entries (`autofill.entries_of`), as a save and a promote do (docs/02 §8.1, Abdul's third review). Its fixed answers are built from its own text, and an edit applies only where that text still gives the answer it replaced. |
+| Old tailoring (JobNavigator leftover) | `backend/analyzer/legacy_tailoring.py` | Not changed (deleted later by tailoring part 2). It isn't wired to anything and can't make versions (it reads columns 0013 dropped). | **For the tailoring module (Zuhair), done in its part 2 (2026-11-12):** a tailored v1 copies its source version's typed entries (`autofill.entries_of`), as a save and a promote do (docs/02 §8.1, Abdul's third review). Its fixed answers are built from its own text, and an edit applies only where that text still gives the answer it replaced. |
 
 ## Résumé screens live — no claim states, the tree (`integrate/resumes`, Zuhair)
 

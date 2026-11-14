@@ -88,7 +88,7 @@ it. Everyone else reads it.
 | Inbox design (D8) | `docs/integration/06-open-decisions.md` D8, Samad's plan |
 | Applications (D3, 10 statuses) | `docs/integration/03-applications.md` |
 | Jobs, scraping | `docs/integration/02-jobs.md` |
-| Résumés, tailoring | `docs/integration/04-resumes-and-tailoring.md` |
+| Résumés, tailoring | [tailoring.md](./tailoring.md) (the tailoring module); `docs/integration/04-resumes-and-tailoring.md` is history |
 | `personas` is to be dropped: what `candidates` and `resumes` hold instead, and a suggested mapping | [persona-to-candidates.md](./persona-to-candidates.md) |
 | Connecting a module to the frontend | `docs/integration/README.md` "The workflow for one module" |
 | Password recovery approvals and Notifications inbox | [umamah.md](./umamah.md) |
@@ -118,6 +118,7 @@ it. Everyone else reads it.
 | 0023 | Zuhair | Job search PR 2: `resumes` / `cover_letters` / `job_runs` / `llm_call_log` point at `job_postings`; `scrape_jobs.kind`; `job_postings.first_source`; `UNIQUE (firm_id, candidate_id, id)` on `job_postings`. Follows 0022 | `feat/job-postings-repoint` |
 | 0024 | Abdul | Drop `firms.bde_capacity` (07 Q63, reverses Q46) | `feat/firm-settings-cleanup` |
 | 0025 | Samad | `email_classifications.outcome` allows `AUTO_APPLIED` (PR 4 automatic status updates); downgrade refuses while automatic evidence exists. Renumbered from 0016, 0022 and 0026; follows Abdul's 0024 | `feat/inbox-masking-and-review` (PR 4) |
-| 0026–0027 | Arbaz | Applications on `job_postings` (#129) | `feat/autofill-screen` |
-| 0028 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows 0027 (#129's); until #129 merges, its down revision is main's 0025 | `activity-log/pr3-new-table-and-endpoints` |
+| 0026 | Arbaz | Applications let go of the old `jobs` pool: `applications_job_id_fkey` dropped. Schema only; a local database moves its rows with `python -m backend.scripts.move_local_jobs_to_postings` at 0026. Follows 0025 (another PR's, merging first; 0024 until it's on main) | `feat/autofill-screen` |
+| 0027 | Arbaz | Applications on `job_postings`: `candidate_id` NOT NULL, `(firm_id, candidate_id, job_id)` → `job_postings` ON DELETE RESTRICT; its new key refuses an application on an old job. Follows 0026 | `feat/autofill-screen` |
+| 0028 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows main's 0027 (#129) | `activity-log/pr3-new-table-and-endpoints` |
 | 0029+ | — | Claim the next number here in your PR | — |

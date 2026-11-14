@@ -8,7 +8,8 @@ permission checked under the lock can't change before the commit. Nothing here c
   v3 and v4, Abdul); the second is told. An id stands for one exact text (§3.4, §4.5): an item kept as it was keeps
   its id; a changed or new item, bullet or summary gets a new id, while the versions that hold the old text keep theirs.
 - **Use as base / pick:** a base's v1 makes that base active; any other version is copied as v1 of a new PROMOTED
-  base, or the base already made from it is made active.
+  base, or the base already made from it is made active. A tailoring from a version goes the same way without making
+  anything active (`base_for_tailoring`).
 - **Upload:** a new UPLOAD base, active, its v1 from the parse (`first_base()` without a form).
 - **Delete:** by who made it and by what uses it: deleted, hidden (`archived_at`), or refused (§4.7). Deleting is soft:
   the row stays with `deleted_at`, out of every list and the workflow, so its text and its number are kept.
@@ -16,6 +17,7 @@ permission checked under the lock can't change before the commit. Nothing here c
 import copy
 import uuid
 from dataclasses import dataclass, field
+from datetime import date
 
 from fastapi import HTTPException
 from sqlalchemy import func, or_
@@ -159,11 +161,12 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
     return {**out, **content_of(row)} if with_content else out
 
 
-def opened_json(row: Resume, candidate, *, with_autofill: bool = False) -> dict:
+def opened_json(row: Resume, candidate, *, with_autofill: bool = False, editor: bool = False) -> dict:
     """One version as it is opened: its content and, with `with_autofill` (`?autofill=true`), its autofill, built
-    for this read (`autofill.merged`: nothing is written). Only these answers carry it, never the list or a save."""
+    for this read (`autofill.merged`: nothing is written), as the Autofill screen reads it with `editor`. Only these
+    answers carry it, never the list or a save."""
     out = version_json(row, with_content=True)
-    return {**out, "autofill": autofill.merged(candidate, row)} if with_autofill else out
+    return {**out, "autofill": autofill.merged(candidate, row, editor=editor)} if with_autofill else out
 
 
 def base_json(base: BaseResume, number: int) -> dict:
@@ -230,8 +233,30 @@ def listing_many(db, firm_id, candidate_ids) -> dict:
                                                 "made_by_lead": base.created_by_user_id in leads
                                                 or any(v["made_by_lead"] for v in versions),
                                                 "versions": versions})
+    jobs = _job_names(db, firm_id, {j for (_, _, j) in tailored})
     for (cid, b, j), v in tailored.items():
-        out[cid]["tailored"].append({"candidate_id": str(cid), "base_resume_id": str(b), "job_id": str(j), "versions": v})
+        out[cid]["tailored"].append({"candidate_id": str(cid), "base_resume_id": str(b), "job_id": str(j),
+                                     "job": jobs.get(j), "versions": v})
+    return out
+
+
+def _job_names(db, firm_id, job_ids) -> dict:
+    """{posting id: {"title", "company"}} for the tailored résumés' jobs, so a list names each copy by its own job
+    without the screen loading any jobs (Zuhair 2026-11-12: a candidate's screens read only that candidate's jobs).
+    Only the two fields are read, never the posting's description; each source's reader cleans them."""
+    if not job_ids:
+        return {}
+    from backend.job_search import providers
+    from backend.models.job_search import JobPosting
+    rows = scoped(db, JobPosting, firm_id).filter(JobPosting.id.in_(job_ids)) \
+        .with_entities(JobPosting.id, JobPosting.source, JobPosting.content["title"].astext,
+                       JobPosting.content["company"].astext).all()
+    out = {}
+    for posting_id, source, title, company in rows:
+        reader = providers.reader_for(source)
+        fields = reader.read({"title": title, "company": company}) if reader else None
+        out[posting_id] = {"title": fields.title if fields else (title or ""),
+                           "company": fields.company if fields else (company or "")}
     return out
 
 
@@ -266,6 +291,45 @@ class Saved:
     notice: str | None = None
 
 
+def _family(db, candidate, row: Resume) -> list[Resume]:
+    """The newest version of `row`'s base and of each live tailored résumé made from it, `row` left out: where a saved
+    answer goes for all of the candidate's jobs (07 Q30, Q44)."""
+    rows = scoped(db, Resume, candidate.firm_id).filter(Resume.candidate_id == candidate.id,
+                                                        Resume.base_resume_id == row.base_resume_id,
+                                                        Resume.deleted_at.is_(None)).all()
+    newest: dict = {}
+    for item in rows:
+        group = (item.category, item.job_id)
+        if group not in newest or item.version > newest[group].version:
+            newest[group] = item
+    return [item for item in newest.values() if item.id != row.id]
+
+
+def save_autofill(db, actor: User, candidate, row: Resume, change: dict, *, only_this: bool, today: date) -> int:
+    """`change` (from `autofill.checked_change`) made to `row`'s autofill in place, with no new version (07 Q7), and,
+    unless `only_this`, to the rest of its résumé that still answers as `row` did (`autofill.change`). One activity
+    entry names the questions, never the answers. How many versions changed."""
+    before = autofill.shown(candidate, row, today)
+    changed = 0
+    for target in [row, *([] if only_this else _family(db, candidate, row))]:
+        entries = autofill.change(candidate, target, change, before, today, is_opened=target is row)
+        if entries is not None:
+            target.autofill = entries
+            changed += 1
+    if changed:
+        number = base_numbers(db, candidate)[row.base_resume_id]
+        kind = "" if row.category == "BASE" else " (tailored)"
+        named = [autofill.QUESTIONS[key] for key in (*change["edit"], *change["reset"])] + [*change["add"],
+                                                                                          *change["remove"]]
+        listed = ", ".join(f'"{question}"' for question in named[:5]) + (f" and {len(named) - 5} more"
+                                                                         if len(named) > 5 else "")
+        others = f"; {changed - 1} other version{'s' if changed > 2 else ''} too" if changed > 1 else ""
+        _record(db, actor, candidate, "UPDATE", row.id, _label(candidate, number, row),
+                f"Changed the autofill answers of Base {number}{kind} v{row.version}: {listed}{others}")
+    db.flush()
+    return changed
+
+
 def save_version(db, actor: User, candidate, source: Resume, submitted: dict) -> Saved:
     """The next version of `source`'s résumé with `submitted` as its content (§4.3)."""
     before = content_of(source)
@@ -294,19 +358,31 @@ def save_version(db, actor: User, candidate, source: Resume, submitted: dict) ->
 
 def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
     """"Use this as the base?" Yes, or a pick in the base dropdown: the base the workflow uses from now on (§4.3)."""
+    return _base_from(db, actor, candidate, row, activate=True)
+
+
+def base_for_tailoring(db, actor: User, candidate, row: Resume) -> BaseResume:
+    """The base a tailoring from `row` goes under, the base the workflow uses left as it is (decided 2026-11-12,
+    tailoring part 3 R3-Q1, R3-Q4): a v1 is its own base; another version's is the base made from it before (a deleted
+    one comes back), else a new PROMOTED base, not active. A hidden one: 409, as for "Use as base"."""
+    return _base_from(db, actor, candidate, row, activate=False)
+
+
+def _base_from(db, actor: User, candidate, row: Resume, *, activate: bool) -> BaseResume:
     numbers = base_numbers(db, candidate)
     if row.category == "BASE" and row.version == 1:
         target = candidate_base(db, candidate, row.base_resume_id)
     else:                                                       # (deleted ones included: they come back, see below)
         target = scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.promoted_from_resume_id == row.id).first()
+    source = f"Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version}"
+    purpose = "" if activate else " (for tailoring)"
     if target is not None and target.deleted_at is not None:
         # Promoted before, deleted since: it comes back, named by the version it was made from.
-        how = f"by using Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version} again"
-        return restore_base(db, actor, candidate, target, how=how)
+        return restore_base(db, actor, candidate, target, how=f"by using {source} again{purpose}", activate=activate)
     if target is not None:
         if target.archived_at is not None:
             raise HTTPException(status_code=409, detail=f"Base {numbers[target.id]} is hidden. Show it again first.")
-        if not target.is_active:
+        if activate and not target.is_active:
             _activate(db, candidate, target)
             _record(db, actor, candidate, "STATE_CHANGE", target.id, _label(candidate, numbers[target.id]),
                     f"Made Base {numbers[target.id]} the base the workflow uses")
@@ -316,16 +392,16 @@ def use_as_base(db, actor: User, candidate, row: Resume) -> BaseResume:
                       promoted_from_resume_id=row.id, created_by_user_id=actor.id)
     db.add(base)
     db.flush()
-    _activate(db, candidate, base)
+    if activate:
+        _activate(db, candidate, base)
     copied = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
                     job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
                     created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)), **content_of(row))
     db.add(copied)
     db.flush()
     number = len(numbers) + 1
-    source = f"Base {numbers[row.base_resume_id]}{'' if row.category == 'BASE' else ' (tailored)'} v{row.version}"
     _record(db, actor, candidate, "CREATE", base.id, _label(candidate, number),
-            f"Made Base {number} from {source}; the workflow uses it")
+            f"Made Base {number} from {source}" + ("; the workflow uses it" if activate else purpose))
     return base
 
 
@@ -354,21 +430,24 @@ def deleted_base_for(db, candidate, parse_row: ResumeParse) -> BaseResume | None
                                                             BaseResume.deleted_at.isnot(None)).first()
 
 
-def restore_base(db, actor: User, candidate, base: BaseResume, how: str = "from the same file") -> BaseResume:
+def restore_base(db, actor: User, candidate, base: BaseResume, how: str = "from the same file",
+                 activate: bool = True) -> BaseResume:
     """A deleted base back, from what was stored: no new read of the file, no AI. Only its v1 (the file's own content)
-    comes back; later edits stay deleted. It becomes the base the workflow uses, as any upload does (§4.7). `how` says
-    what brought it back for the ledger: the same file uploaded again, or the version it was promoted from used again."""
+    comes back; later edits stay deleted. It becomes the base the workflow uses, as any upload does (§4.7), unless a
+    tailoring brought it back (`activate=False`). `how` says what brought it back for the ledger: the same file
+    uploaded again, or the version it was promoted from used again."""
     base.deleted_at = None
     base.archived_at = None
     db.flush()
     scoped(db, Resume, candidate.firm_id).filter(Resume.base_resume_id == base.id, Resume.category == "BASE",
                                                  Resume.version == 1).update({Resume.deleted_at: None},
                                                                               synchronize_session="fetch")
-    _activate(db, candidate, base)
+    if activate:
+        _activate(db, candidate, base)
     db.flush()
     number = base_numbers(db, candidate)[base.id]
     _record(db, actor, candidate, "STATE_CHANGE", base.id, _label(candidate, number),
-            f"Restored Base {number} (its v1) {how}; the workflow uses it")
+            f"Restored Base {number} (its v1) {how}" + ("; the workflow uses it" if activate else ""))
     return base
 
 

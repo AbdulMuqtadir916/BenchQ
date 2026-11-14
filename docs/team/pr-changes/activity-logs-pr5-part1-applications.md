@@ -7,7 +7,8 @@ Built on PR 4 (`activity-logs/pr4-activity-screen`), which holds PRs 1 to 3. Mer
 
 The log used to miss most of what people do with applications. This part adds it, so the Activity screen shows:
 
-- **Logging an application by hand** (no candidate), and **deleting** one or many at once: one entry for each.
+- ~~Logging an application by hand and deleting one~~: retired by main (2026-11-14, #129): every application now has a
+  candidate, logging one without is refused (410) and deleting is refused (409), so there is nothing left to log there.
 - **Interviews:** adding, editing (with before and after) and removing one, on the candidate.
 - **AI autofill answers:** an answer the AI wrote for a BDE shows as "AI agent (the BDE's name)", and counts towards that
   BDE. A failed answer writes nothing.
@@ -36,20 +37,17 @@ An AI agent working on a candidate works for that candidate's BDE, so these entr
 the entries from autofill already were. Before this, a BDE could not see an automatic status change on their own
 candidate unless they picked the candidate. The Actor column shows the BDE with the AI tag. Other teams' BDEs never see it.
 
-Hand-logged applications (no candidate) still use the older four statuses (applied, interview, offer, rejected), and their
-moves keep before and after too.
 
 ## An AI agent's person
 
 An agent's entry stores its person's role in `actor_role`, and the API returns the person's name as `on_behalf_of_name`,
 so the Actor column can show them (PR 4). A system entry has neither.
 
-## Status changes on hand-logged applications
+## Status changes on hand-logged applications: retired
 
-A status change on a hand-logged application used to read "Updated application details." or "Updated application
-status." and kept no change. It now reads like a candidate application's, "Moved <job>: <before> → <after>.", and keeps
-the status change. Note text is never written to the log, and an edit with no status change stays "Updated application
-details.". This covers the single and the bulk route.
+Part 1 first made a hand-logged application's status moves read "Moved <job>: a → b." with before and after. Main's #129 retired
+that path (migration 0027 makes `candidate_id` required; the old routes now refuse), so it is no longer reachable and has no
+tests. A candidate's application moves through `tracking.move`, which logs it (below).
 
 ## Scope and dependencies
 
@@ -71,7 +69,7 @@ Logs the application work that wrote nothing. No table, route or response change
 | `backend/api/routes_applications.py` | The entries above; `_audit_application_edit` takes an action; `_audit_interview`. |
 | `backend/api/routes_autofill.py` | Both answer routes know who asked, and log after a good answer. |
 | `backend/auth/ledger.py` | `record_agent` for what an AI does for a person; `record_automated` takes `model_id`. |
-| `backend/tests/test_activity_applications.py` | New: each entry, a refused delete, an empty edit, a failed AI answer. |
+| `backend/tests/test_activity_applications.py` | New: interviews from start to end, an empty edit, a refused delete, AI answers (the hand-logged tests went with the retired paths). |
 | `backend/tests/test_ledger_rules.py` | Seven routes leave `NOT_LOGGED`. |
 
 ## Known limit
