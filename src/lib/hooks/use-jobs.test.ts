@@ -25,6 +25,7 @@ const candidate = { targetRoles: ["Java Developer"], country: "US" };
 
 function search(id: string, state: JobSearch["state"]): JobSearch {
   return { id, kind: "SEARCH", state, query: "Java Developer", place: "Austin, TX", newCount: state === "SUCCESS" ? 12 : 0, seenAgainCount: 0, overLimitCount: 0,
+    leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0,
     errorCode: null, startedAt: "2026-11-11T12:00:00.000Z", finishedAt: state === "RUNNING" ? null : "2026-11-11T12:00:05.000Z" };
 }
 

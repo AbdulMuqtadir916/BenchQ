@@ -30,7 +30,8 @@ export function placeLabel(place: string | null): string | null {
   return place === "remote" ? "Remote" : place;
 }
 
-/** "12 new · 3 seen again · 5 over today's 100", "No new jobs for Java Developer in Austin, TX", or why it failed. */
+/** "12 new · 3 seen again · 5 over today's 100 · 4 left out: work authorization", "No new jobs for Java Developer in
+ * Austin, TX", or why it failed. */
 export function searchOutcome(search: JobSearch, jobsCap: number): string {
   if (search.state === "ERROR") return FAILED[search.errorCode ?? "internal"];
   if (search.state === "EMPTY") {
@@ -40,6 +41,9 @@ export function searchOutcome(search: JobSearch, jobsCap: number): string {
   const parts = [`${search.newCount} new`];
   if (search.seenAgainCount) parts.push(`${search.seenAgainCount} seen again`);
   if (search.overLimitCount) parts.push(`${search.overLimitCount} over today's ${jobsCap}`);
+  if (search.leftOutWorkAuthCount) parts.push(`${search.leftOutWorkAuthCount} left out: work authorization`);
+  if (search.leftOutOldCount) parts.push(`${search.leftOutOldCount} left out: posted over 14 days ago`);
+  if (search.leftOutNotRemoteCount) parts.push(`${search.leftOutNotRemoteCount} left out: not remote`);
   return parts.join(" · ");
 }
 

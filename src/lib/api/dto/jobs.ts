@@ -144,7 +144,10 @@ const SearchDto = z.object({
   query: z.string().nullable(),
   // Not on a search from before places (2026-11-14) nor on a capture.
   place: z.string().nullable().optional(),
-  counts: z.object({ saved: z.number().int(), refreshed: z.number().int(), skipped_over_cap: z.number().int() }).partial().nullable(),
+  counts: z.object({
+    saved: z.number().int(), refreshed: z.number().int(), skipped_over_cap: z.number().int(),
+    skipped_work_auth: z.number().int(), skipped_too_old: z.number().int(), skipped_not_remote: z.number().int(),
+  }).partial().nullable(),
   started_at: z.string(),
   finished_at: z.string().nullable(),
 });
@@ -176,6 +179,9 @@ function toSearch(dto: z.infer<typeof SearchDto>): JobSearch {
     newCount: dto.counts?.saved ?? 0,
     seenAgainCount: dto.counts?.refreshed ?? 0,
     overLimitCount: dto.counts?.skipped_over_cap ?? 0,
+    leftOutWorkAuthCount: dto.counts?.skipped_work_auth ?? 0,
+    leftOutOldCount: dto.counts?.skipped_too_old ?? 0,
+    leftOutNotRemoteCount: dto.counts?.skipped_not_remote ?? 0,
     errorCode: dto.error_code,
     startedAt: toIso(dto.started_at),
     finishedAt: toIsoOrNull(dto.finished_at),

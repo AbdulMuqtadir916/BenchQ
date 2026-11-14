@@ -36,7 +36,8 @@ class FakeProvider:
 
     def read(self, content):
         return JobFields(title=content.get("t", ""), company=content.get("c", ""), description=content.get("d", ""),
-                         apply_url=content.get("u"), location=content.get("loc"), is_closed=bool(content.get("closed")))
+                         apply_url=content.get("u"), location=content.get("loc"), is_closed=bool(content.get("closed")),
+                         posted_at=content.get("posted"), is_remote=bool(content.get("remote")))
 
 
 def _job(n, **over):
@@ -196,6 +197,47 @@ def test_remote_is_a_place_when_the_work_settings_say_so(anonymous_client, world
     assert [p["value"] for p in body["places"]] == ["Austin, TX", "remote"]
 
 
+# ── what a search leaves out (decided 2026-11-14) ───────────────────────────
+
+def _counts(test_db, candidate):
+    return _rows(test_db, candidate)[0][-1].meta["counts"]
+
+
+def test_a_job_posted_over_14_days_ago_is_left_out_and_one_without_a_date_is_kept(world, adnans, fake, test_db):
+    from datetime import timedelta
+    from backend.models.db import utcnow
+    day = lambda n: (utcnow() - timedelta(days=n)).date().isoformat()   # noqa: E731
+    fake.jobs = [_job(1, posted=day(14)), _job(2, posted=day(15)), _job(3, posted=day(400)), _job(4),
+                 _job(5, posted="not a date")]
+    assert _run(world, adnans) == "3 new, 0 seen again"
+    assert _counts(test_db, adnans)["skipped_too_old"] == 2
+
+
+def test_a_remote_search_keeps_only_remote_jobs(world, adnans, fake, test_db):
+    from backend.job_search.providers import REMOTE
+    fake.jobs = [_job(1, remote=True), _job(2), _job(3, remote=True)]
+    assert _run(world, adnans, place=REMOTE) == "2 new, 0 seen again"
+    assert _counts(test_db, adnans)["skipped_not_remote"] == 1
+    fake.jobs = [_job(4)]
+    assert _run(world, adnans) == "1 new, 0 seen again"                  # a city search keeps on-site jobs
+
+
+def test_a_job_whose_text_rules_out_the_candidates_work_authorization_is_left_out(world, adnans, fake, test_db):
+    """Adnan's candidate is H-1B and needs sponsorship and a transfer (the test body)."""
+    fake.jobs = [_job(1, d="We do not sponsor visas."), _job(2, d="US citizens only."), _job(3, d="No H1B transfers."),
+                 _job(4, d="Green card holders only."), _job(5, d="Build pipelines."), _job(6, t="Engineer (USC only)",
+                 d="Python.")]
+    assert _run(world, adnans) == "1 new, 0 seen again"                  # the title counts too ("USC only")
+    assert _counts(test_db, adnans)["skipped_work_auth"] == 5
+
+
+def test_a_citizen_keeps_citizens_only_jobs(anonymous_client, world, fake, test_db):
+    c = _create(anonymous_client, world, bde="adnan", work_auth="USC", needs_sponsorship=False,
+                needs_transfer=False).json()
+    fake.jobs = [_job(1, d="US citizens only."), _job(2, d="Active secret clearance.")]
+    assert _run(world, c) == "2 new, 0 seen again"
+
+
 def test_each_place_continues_from_its_own_last_search(world, adnans, fake):
     """The next 100 of a role is per place: Dallas starts at the top after Austin's search went on."""
     fake.next_cursor = "page-2"
@@ -310,7 +352,8 @@ def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, a
     (batch,), postings = _rows(test_db, adnans)
     assert (batch.state, batch.error, batch.user_id) == ("success", None, world["people"]["adnan"].id)
     assert batch.meta["counts"] == {"found": 5, "saved": 2, "refreshed": 0, "skipped_closed": 1,
-                                    "skipped_unreadable": 1, "skipped_duplicate": 1, "skipped_over_cap": 0}
+                                    "skipped_unreadable": 1, "skipped_duplicate": 1, "skipped_over_cap": 0,
+                                    "skipped_too_old": 0, "skipped_not_remote": 0, "skipped_work_auth": 0}
     assert batch.meta["request"] == {"query": "Java Developer", "country": "us", "place": "Austin, TX",
                                      "provider": "fake", "limit": 100, "posted_within_days": 14, "cursor": None,
                                      "exhausted": False}

@@ -4,7 +4,9 @@ request), then runs `run_search` in the background through `job_monitor.launch_b
     the batch still `running`? no (never saved, or already finished) → nothing, the source isn't asked
     provider.search(role, country, 100, cursor, place=the chosen place, posted_within_days=14)
       fails  → the batch finished as error (code) + ledger entry
-      answers → read each job; drop closed and unreadable ones; job_id = sha256(company | title | description)
+      answers → read each job; leave out closed and unreadable ones, ones posted over 14 days ago, ones not remote
+                on a Remote search, and ones whose text rules out the candidate's work authorization (decided
+                2026-11-14; each counted); job_id = sha256(company | title | description)
               → one transaction, the candidate row locked (two searches for one candidate count the cap in turn):
                   the batch finished as success | empty (counts in metadata)
                   a job the candidate has: batch_id, last_seen_at and content replaced; discovered_at kept
@@ -18,12 +20,13 @@ import logging
 import re
 import time
 import uuid
+from datetime import date
 
 from backend.auth import ledger
 from backend.auth.scoping import scoped
 from backend.job_monitor import mark_run_failed
-from backend.job_search import limits, places
-from backend.job_search.providers import READERS, REGISTRY, JobFields, ProviderError, SearchResult
+from backend.job_search import limits, places, work_auth
+from backend.job_search.providers import READERS, REGISTRY, REMOTE, JobFields, ProviderError, SearchResult
 from backend.job_search.providers.base import ERROR_MESSAGES
 from backend.job_search.text import clean_json
 from backend.models.candidates import Candidate
@@ -175,10 +178,31 @@ def _read(provider, raw: dict) -> JobFields | None:
     return fields if fields.title and fields.company and fields.description else None
 
 
+def _posted_too_long_ago(posted_at: str | None, today: date) -> bool:
+    """Posted more than `POSTED_WITHIN_DAYS` days ago, by the job's own date (decided 2026-11-14, Q7: a source's date
+    filter isn't trusted; Indeed's is "listed on Indeed"). No date, or one that doesn't read: kept."""
+    try:
+        posted = date.fromisoformat((posted_at or "")[:10])
+    except ValueError:
+        return False
+    return (today - posted).days > limits.POSTED_WITHIN_DAYS
+
+
+def _who(firm_id, candidate_id) -> tuple[str | None, bool, bool]:
+    """The candidate's work authorization as the filter reads it: the status code, needs sponsorship, needs transfer."""
+    with SessionLocal() as db:
+        row = scoped(db, Candidate, firm_id, Candidate.work_auth, Candidate.needs_sponsorship,
+                     Candidate.needs_transfer).filter(Candidate.id == candidate_id).first()
+    return (row[0], bool(row[1]), bool(row[2])) if row else (None, False, False)
+
+
 def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider, result: SearchResult,
           place: str | None = None) -> dict | None:
     counts = {"found": len(result.jobs), "saved": 0, "refreshed": 0, "skipped_closed": 0, "skipped_unreadable": 0,
-              "skipped_duplicate": 0, "skipped_over_cap": 0}
+              "skipped_duplicate": 0, "skipped_over_cap": 0, "skipped_too_old": 0, "skipped_not_remote": 0,
+              "skipped_work_auth": 0}
+    status, needs_sponsorship, needs_transfer = _who(firm_id, candidate_id)
+    today = utcnow().date()
     # Read and identify every job before the transaction: no lock is held while parsing HTML.
     picked: list[tuple[str, dict]] = []
     seen: set[str] = set()
@@ -189,6 +213,15 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
             continue
         if fields.is_closed:
             counts["skipped_closed"] += 1
+            continue
+        if _posted_too_long_ago(fields.posted_at, today):
+            counts["skipped_too_old"] += 1
+            continue
+        if place == REMOTE and not fields.is_remote:
+            counts["skipped_not_remote"] += 1
+            continue
+        if work_auth.ruled_out(f"{fields.title}\n{fields.description}", status, needs_sponsorship, needs_transfer):
+            counts["skipped_work_auth"] += 1
             continue
         key = job_id(fields)
         if key in seen:

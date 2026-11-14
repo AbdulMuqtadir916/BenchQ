@@ -16,6 +16,11 @@ export const JobSearchSchema = z.object({
   newCount: z.number().int(),
   seenAgainCount: z.number().int(),
   overLimitCount: z.number().int(),
+  /** Left out by the search (decided 2026-11-14): the job's text rules out the candidate's work authorization,
+   * it was posted over 14 days ago, or it isn't remote on a Remote search. */
+  leftOutWorkAuthCount: z.number().int(),
+  leftOutOldCount: z.number().int(),
+  leftOutNotRemoteCount: z.number().int(),
   errorCode: JobSearchErrorCode.nullable(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime().nullable(),
