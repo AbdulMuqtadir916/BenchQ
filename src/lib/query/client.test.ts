@@ -10,7 +10,7 @@ describe("isActivityKey", () => {
     expect(isActivityKey(queryKeys.ledger.list(FIRM, { limit: 15 }))).toBe(true);
     expect(isActivityKey(queryKeys.ledger.people(FIRM))).toBe(true);
     expect(isActivityKey(queryKeys.ledger.candidates(FIRM))).toBe(true);
-    expect(isActivityKey(queryKeys.platform.activity("list", { limit: 15 }))).toBe(true);
+    expect(isActivityKey(["platform", "activity", "list", { limit: 15 }])).toBe(true);
   });
 
   it("is false for everything else", () => {
@@ -24,7 +24,7 @@ describe("the app's query client", () => {
   const seed = () => {
     const client = createQueryClient();
     client.setQueryData(queryKeys.ledger.list(FIRM, { limit: 15 }), ["old row"]);
-    client.setQueryData(queryKeys.platform.activity("list"), ["old admin row"]);
+    client.setQueryData(["platform", "activity", "list"], ["old admin row"]);
     client.setQueryData(queryKeys.applications.all(FIRM), ["an application"]);
     return client;
   };
@@ -34,7 +34,7 @@ describe("the app's query client", () => {
     const client = seed();
     await new MutationObserver(client, { mutationFn: async () => "saved" }).mutate();
     expect(state(client, queryKeys.ledger.list(FIRM, { limit: 15 }))).toBe(true);
-    expect(state(client, queryKeys.platform.activity("list"))).toBe(true);
+    expect(state(client, ["platform", "activity", "list"])).toBe(true);
     expect(state(client, queryKeys.applications.all(FIRM))).toBe(false);          // not what this change was about
   });
 
