@@ -58,3 +58,20 @@ check a small file doing it:
 Main added `start_tailoring` (`api/routes_resume_tailoring.py`), which changes data and writes no entry itself: it only
 starts a background run, and the run writes the entry once it has made the tailored version (`resume_tailor/runs.py`).
 It is in `NOT_LOGGED` with that reason (`RUN_LOGS`), so the check passes again.
+
+## Review fixes (Abdul, 2026-11-14)
+
+Three more ways a change could get past the checks, each now with a test that feeds the check a small file doing it:
+
+- **Two routes with a helper of the same name.** `main.py` has several handlers that each define their own `_do()`. The
+  check named every function by its file and name only, so one `_do` that logs made every `_do` count as logging. Now a
+  function is named by where it sits (`run_all_scrapes._do`), and a call finds the helper the way Python does: the one
+  defined inside the function first, then one level out.
+- **A function only named, never run.** `unused = write_audit` used to count as the route calling `write_audit`. Now a
+  function passed by name counts only when it is handed to a call that runs it: `asyncio.to_thread`,
+  `run_in_threadpool`, `run_in_executor`, `add_task`, `launch_background`, `submit`, `Thread`, `partial`,
+  `create_task`, `ensure_future`.
+- **A ledger read passed by keyword.** `db.get(entity=LedgerEntry, ident=row_id)` is now seen as a read, like
+  `db.get(LedgerEntry, row_id)`.
+
+The real backend passes all three as it is: no route depended on the old, looser reading.
