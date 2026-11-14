@@ -27,6 +27,7 @@ PERSONA_REMOVED = "the Persona table is being removed; its fields live on the ca
 REFERENCE_DATA = "global reference data, not a firm's record (07 tenancy: Company is global)"
 NO_READ_ENTRIES = "no ledger entry for reads and manual sync (Abdul, 2026-11-03)"
 NOTHING_SAVED = "saves nothing about a firm's records"
+RUN_LOGS = "only starts a background run; the run writes the entry once it has made the version (resume_tailor/runs.py)"
 
 NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_applications.py", "delete_application"): TO_LOG,
@@ -43,6 +44,7 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_jobs.py", "create_manual_job"): TO_LOG,
     ("api/routes_jobs.py", "bulk_update_jobs"): TO_LOG,
     ("api/routes_jobs.py", "update_job"): TO_LOG,
+    ("api/routes_resume_tailoring.py", "start_tailoring"): RUN_LOGS,
     ("api/routes_persona.py", "update_persona"): PERSONA_REMOVED,
     ("api/routes_persona.py", "append_qa_bank"): PERSONA_REMOVED,
     ("api/routes_autofill.py", "autofill_answer"): TO_LOG,
