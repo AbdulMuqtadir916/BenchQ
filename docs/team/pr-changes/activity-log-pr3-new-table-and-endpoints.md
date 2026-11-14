@@ -60,7 +60,11 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 - **Order of rows at the same moment.** Newest first, then lowest id first, as on main. Both page markers (`cursor`, and
   main's `cursor_at` + `cursor_id`) read on in that order.
 - **A row not yet saved** has no page marker (`created_at` is empty until it is written).
-- **Main's tests** for job search and résumé versions read the entry from `activity_logs`.
+- **Main's tests** for job search, résumé versions, tailoring and the autofill screen read the entry from
+  `activity_logs` (tailoring and autofill added 2026-11-14).
+- **`test_migration_0025.py`.** Its first test checks the newest migration (`head_revision()`, now 0028). Its refused
+  downgrade still expects 0026, as on main: the test moves the database down to 0026 first, and a refused downgrade
+  leaves it there.
 - **Capacity.** Main removed the capacity route (07 Q63), so its change here is gone.
 
 ## Edge cases checked
