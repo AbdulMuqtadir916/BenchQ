@@ -51,7 +51,6 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_autofill.py", "autofill_answer_stream"): TO_LOG,
     ("main.py", "trigger_analysis"): TO_LOG,
 
-    ("api/routes_inbox.py", "sync_candidate_inbox"): NO_READ_ENTRIES,
     ("api/routes_inbox.py", "mark_candidate_message_read"): NO_READ_ENTRIES,
     ("api/routes_notifications.py", "mark_read"): NO_READ_ENTRIES,
 
@@ -227,6 +226,13 @@ def _ledger_model_names(tree: ast.Module, model: str = "ActivityEntry") -> set[s
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             names.update(alias.asname or alias.name for alias in node.names if alias.name == model)
+    grew = True
+    while grew:                                     # `Entry = ActivityEntry`, and an alias of that alias
+        before = len(names)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and _is_ledger_model(node.value, names, model):
+                names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+        grew = len(names) > before
     return names
 
 
@@ -254,13 +260,16 @@ def _ledger_writes(trees=None) -> list[tuple[str, ast.Call]]:
     """Every call of `record` / `record_automated` in backend/auth/ledger.py, under any name it was imported as."""
     found = []
     for file, tree in _source_trees(SOURCE_FILES + TEST_FILES) if trees is None else trees:
-        defined = {function.name for function in _functions(tree)}
+        if file == "auth/ledger.py":
+            continue
+        scoped = _scoped_functions(tree)
+        defined = {path for path, _ in scoped}
         functions, modules = _imports(tree)
-        resolve = lambda name: (name,) if name in defined else None
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.Call) and file != "auth/ledger.py"
-                    and _callee(node, file, resolve, functions, modules) in WRITERS):
-                found.append((file, node))
+        for path, owner in [((), tree), *scoped]:       # each call resolved where it sits, as Python would
+            resolve = _resolver(path, defined)
+            for node in _own_nodes(owner):
+                if isinstance(node, ast.Call) and _callee(node, file, resolve, functions, modules) in WRITERS:
+                    found.append((file, node))
     return found
 
 
@@ -270,13 +279,16 @@ def _dispatched(call: ast.Call):
     name = call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
     if name not in DISPATCH_CALLS:
         return []
-    return [value for value in (*call.args, *(keyword.value for keyword in call.keywords)) if isinstance(value, ast.Name)]
+    values = (*call.args, *(keyword.value for keyword in call.keywords))
+    return [value for value in values if isinstance(value, ast.Name) or (name == "Depends" and isinstance(value, ast.Call))]
 
 
 def _logging_functions(trees=None) -> set[tuple[str, str]]:
     """Every (file, function) that writes the ledger, directly or through another function it calls. A function is named
     by its path (`route._do` for one defined inside `route`), so same-named helpers in two routes are two functions."""
     calls: dict[tuple[str, str], set] = {}
+    returns: dict[tuple[str, str], set] = {}        # factory -> the functions it hands back
+    factories: dict[tuple[str, str], set] = {}      # function -> the factories whose result it gives to Depends
     logging = set(WRITERS)
     for file, tree in _source_trees(SOURCE_FILES) if trees is None else trees:
         scoped = _scoped_functions(tree)
@@ -291,11 +303,19 @@ def _logging_functions(trees=None) -> set[tuple[str, str]]:
                     if _is_ledger_model(node.func, names):
                         logging.add(key)
                     for value in _dispatched(node):            # handed to a thread pool or a background launcher
-                        if (target := resolve(value.id)) is not None:
+                        if isinstance(value, ast.Call):        # Depends(factory(...)): FastAPI runs what it returns
+                            if (factory := _callee(value, file, resolve, functions, modules)) is not None:
+                                factories.setdefault(key, set()).add(factory)
+                        elif (target := resolve(value.id)) is not None:
                             calls.setdefault(key, set()).add((file, ".".join(target)))
-                elif isinstance(node, ast.Return) and isinstance(node.value, ast.Name):   # a factory hands it back
-                    if (target := resolve(node.value.id)) is not None:
-                        calls.setdefault(key, set()).add((file, ".".join(target)))
+                        elif value.id in functions:            # imported, `from backend.auth.ledger import record`
+                            calls.setdefault(key, set()).add(functions[value.id])
+                elif isinstance(node, ast.Return) and isinstance(node.value, ast.Name):
+                    if (target := resolve(node.value.id)) is not None:   # returned, not run: only Depends runs it
+                        returns.setdefault(key, set()).add((file, ".".join(target)))
+    for key, made_by in factories.items():
+        for factory in made_by:
+            calls.setdefault(key, set()).update(returns.get(factory, set()))
     grew = True
     while grew:
         found = {key for key, called in calls.items() if called & logging} - logging
@@ -470,10 +490,37 @@ def test_a_function_counts_only_when_a_call_hands_it_over_to_run():
               "def tasked(db, tasks):\n    tasks.add_task(write_audit, db)\n"
               "def other_call(db):\n    return print(write_audit)\n"
               "def as_dependency(x=Depends(write_audit)):\n    return 1\n"
-              "def factory():\n    def inner(db):\n        write_audit(db)\n    return inner\n")
+              "def factory():\n    def inner(db):\n        write_audit(db)\n    return inner\n"
+              "def through_factory(x=Depends(factory())):\n    return 1\n"
+              "def discards_it(db):\n    factory()\n    return 1\n")
     logging = {name for _, name in _logging_functions(_snippet(source))}
-    assert {"threaded", "launched", "tasked", "as_dependency", "factory"} <= logging
-    assert not {"only_named", "only_listed", "other_call"} & logging
+    assert {"threaded", "launched", "tasked", "as_dependency", "through_factory"} <= logging
+    assert not {"only_named", "only_listed", "other_call", "factory", "discards_it"} & logging
+
+
+def test_an_imported_writer_handed_to_a_task_counts():
+    source = ("from backend.auth.ledger import record as write_audit\n"
+              "def tasked(db, tasks):\n    tasks.add_task(write_audit, db, candidate_id=None)\n"
+              "def named_only(db):\n    unused = write_audit\n")
+    logging = {name for _, name in _logging_functions(_snippet(source))}
+    assert "tasked" in logging and "named_only" not in logging
+
+
+def test_a_writer_call_is_found_even_beside_a_nested_function_of_the_same_name():
+    source = ("from backend.auth.ledger import record\n"
+              "def other():\n    def record():\n        return 1\n    record()\n"
+              "def route(db):\n    record(db, actor=1)\n")
+    (file, call), = _ledger_writes(_snippet(source))
+    assert call.lineno == 7 and not any(keyword.arg == "candidate_id" for keyword in call.keywords)
+
+
+def test_a_model_renamed_by_assignment_is_still_seen():
+    source = ("from backend.models.tenancy import ActivityEntry\nEntry = ActivityEntry\nAgain = Entry\n"
+              "def read(db):\n    return db.query(Again).all()\n"
+              "def build(db):\n    return Entry(firm_id=1)\n")
+    trees = _snippet(source)
+    assert {name for _, name in _enclosing_calls(_reads_the_ledger, trees)} == {"read"}
+    assert {name for _, name in _enclosing_calls(_builds_a_ledger_entry, trees)} == {"build"}
 
 
 def test_a_ledger_read_passed_by_keyword_is_seen():
