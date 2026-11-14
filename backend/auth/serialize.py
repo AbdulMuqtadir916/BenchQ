@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session as DbSession
 
+from backend.auth.ledger import agent_person
 from backend.auth.sessions import Principal
 from backend.models.tenancy import Firm, ActivityEntry, PlatformUser, SupportView, User
 
@@ -67,7 +68,8 @@ _RESTRICTED = {
 }
 
 
-def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False, candidate_name: str | None = None) -> dict:
+def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False, candidate_name: str | None = None,
+                      person_name: str | None = None) -> dict:
     """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case, with what the log adds to it.
     `hide_email`: the reader is a platform admin, so a restricted entry's content is replaced (`_RESTRICTED`) and its
     before/after values are left out."""
@@ -89,6 +91,10 @@ def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False, candida
         "created_at": _iso(entry.created_at), "cursor": _cursor(entry), "candidate_name": candidate_name,
         "actor_role": entry.actor_role,
         "on_behalf_of_user_id": str(entry.on_behalf_of_user_id) if entry.on_behalf_of_user_id else None,
+        # An agent named "AI agent (Name)" carries the name it had when written; another (the email classifier) is
+        # shown as the person it worked for, as they are now.
+        "on_behalf_of_name": ((agent_person(entry.actor_name) if entry.actor_name.startswith("AI agent (") else person_name)
+                              if entry.on_behalf_of_user_id else None),
         "team_manager_id": str(entry.team_manager_id) if entry.team_manager_id else None,
         "candidate_manager_id": str(entry.candidate_manager_id) if entry.candidate_manager_id else None,
         "candidate_bde_id": str(entry.candidate_bde_id) if entry.candidate_bde_id else None,

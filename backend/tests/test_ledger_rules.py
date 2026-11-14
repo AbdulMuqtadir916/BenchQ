@@ -27,14 +27,10 @@ PERSONA_REMOVED = "the Persona table is being removed; its fields live on the ca
 REFERENCE_DATA = "global reference data, not a firm's record (07 tenancy: Company is global)"
 NO_READ_ENTRIES = "no ledger entry for reads and manual sync (Abdul, 2026-11-03)"
 NOTHING_SAVED = "saves nothing about a firm's records"
+REFUSES_ALL = "refuses every application: each has a candidate (migration 0027) and is removed through Saved/favorite actions, which log"
 RUN_LOGS = "only starts a background run; the run writes the entry once it has made the version (resume_tailor/runs.py)"
 
 NOT_LOGGED: dict[tuple[str, str], str] = {
-    ("api/routes_applications.py", "delete_application"): TO_LOG,
-    ("api/routes_applications.py", "bulk_delete_applications"): TO_LOG,
-    ("api/routes_applications.py", "add_interview"): TO_LOG,
-    ("api/routes_applications.py", "update_interview"): TO_LOG,
-    ("api/routes_applications.py", "delete_interview"): TO_LOG,
     ("api/routes_cover_letters.py", "create_cover_letter"): TO_LOG,
     ("api/routes_cover_letters.py", "update_cover_letter"): TO_LOG,
     ("api/routes_cover_letters.py", "delete_cover_letter"): TO_LOG,
@@ -45,10 +41,10 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_jobs.py", "bulk_update_jobs"): TO_LOG,
     ("api/routes_jobs.py", "update_job"): TO_LOG,
     ("api/routes_resume_tailoring.py", "start_tailoring"): RUN_LOGS,
+    ("api/routes_applications.py", "delete_application"): REFUSES_ALL,
+    ("api/routes_applications.py", "bulk_delete_applications"): REFUSES_ALL,
     ("api/routes_persona.py", "update_persona"): PERSONA_REMOVED,
     ("api/routes_persona.py", "append_qa_bank"): PERSONA_REMOVED,
-    ("api/routes_autofill.py", "autofill_answer"): TO_LOG,
-    ("api/routes_autofill.py", "autofill_answer_stream"): TO_LOG,
     ("main.py", "trigger_analysis"): TO_LOG,
 
     ("api/routes_inbox.py", "sync_candidate_inbox"): NO_READ_ENTRIES,

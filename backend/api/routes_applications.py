@@ -667,6 +667,7 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
         raise HTTPException(status_code=400,
                             detail=f"status must be one of {sorted(VALID_STATUSES)}")
     changed = False
+    status_before = app.status
     undo = bool(updates.pop("undo", False))   # the toast's Undo: reverse the last move, do not log a new one
     if "status" in updates:
         if updates["status"] != app.status:
@@ -685,18 +686,40 @@ def update_application(app_id: str, updates: dict, principal: Principal = Depend
             changed = True
     if changed:
         app.updated_at = utcnow()
-        _audit_application_edit(db, app, principal, "Updated application details.")
+        if app.status != status_before:
+            _audit_status_move(db, app, principal, status_before)
+        else:
+            _audit_application_edit(db, app, principal, "Updated application details.")
     db.commit()
     return _application_responses(db, firm_id, [app])[0]
 
 
-def _audit_application_edit(db, app, principal, summary):
+def _audit_status_move(db, app, principal, before):
+    """A hand-logged application's status change, in the same words as a candidate application's (tracking.move)."""
+    from backend.auth.ledger import diff
+    title = posting_job(app.posting).title or "application"
+    _audit_application_edit(db, app, principal, f"Moved {title}: {before} → {app.status}.",
+                            changes=diff({"status": before}, {"status": app.status}))
+
+
+def _audit_application_edit(db, app, principal, summary, *, action="UPDATE", changes=None):
     from backend.auth.ledger import record
     from backend.models.tenancy import User
     actor = scoped(db, User, app.firm_id).filter_by(id=principal.user_id).one()
-    record(db, actor=actor, action="UPDATE", entity_type="application", entity_id=app.id,
+    record(db, actor=actor, action=action, entity_type="application", entity_id=app.id,
            entity_label=posting_job(app.posting).title or "Application", summary=summary,
-           firm_id=app.firm_id, candidate_id=app.candidate_id)
+           firm_id=app.firm_id, candidate_id=app.candidate_id, changes=changes)
+
+
+def _audit_interview(db, app, principal, interview, action, summary, changes=None):
+    from backend.auth.ledger import record
+    from backend.models.tenancy import User
+    actor = scoped(db, User, app.firm_id).filter_by(id=principal.user_id).one()
+    job_title = (posting_job(app.posting).title if app.posting is not None else None) or "a job"
+    record(db, actor=actor, action=action, entity_type="interview", entity_id=interview.id,
+           entity_label=f"{interview.what or 'Interview'} · {job_title}", summary=f"{summary} for {job_title}.",
+           firm_id=app.firm_id, candidate_id=app.candidate_id, changes=changes)
+
 
 
 def _guard_application_history(db, firm_id, app_id):
@@ -805,12 +828,13 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db), firm_id=
         if app.status == status:
             skipped += 1
             continue
+        status_before = app.status
         if undo:
             revert_transition(app, status)
         else:
             record_transition(app, status, "ui")
         app.updated_at = utcnow()
-        _audit_application_edit(db, app, principal, "Updated application status.")
+        _audit_status_move(db, app, principal, status_before)
         updated += 1
     db.commit()
     return {"updated": updated, "skipped": skipped, "not_found": not_found}
@@ -1098,6 +1122,8 @@ def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_
                    when_at=_parse_dt(data.when_at), status=data.status or "scheduled", prep=data.prep)
     db.add(iv)
     app.updated_at = utcnow()
+    db.flush()
+    _audit_interview(db, app, principal, iv, "CREATE", f"Added interview: {iv.what or 'Interview'}")
     db.commit()
     return _interview_to_dict(iv)
 
@@ -1109,12 +1135,18 @@ def update_interview(interview_id: str, updates: dict, db: Session = Depends(get
     iv = scoped(db, Interview, firm_id).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
-    _scoped_application(db, firm_id, principal, iv.application_id, write=True)
+    app = _scoped_application(db, firm_id, principal, iv.application_id, write=True)
+    fields = ("what", "where_text", "status", "prep", "when_at")
+    before = {key: getattr(iv, key) for key in fields}
     for key in ("what", "where_text", "status", "prep"):
         if key in updates:
             setattr(iv, key, updates[key])
     if "when_at" in updates:
         iv.when_at = _parse_dt(updates["when_at"])
+    from backend.auth.ledger import diff
+    changes = diff(before, {key: getattr(iv, key) for key in fields})
+    if changes:
+        _audit_interview(db, app, principal, iv, "UPDATE", f"Updated interview: {iv.what or 'Interview'}", changes)
     db.commit()
     return _interview_to_dict(iv)
 
@@ -1126,7 +1158,8 @@ def delete_interview(interview_id: str, db: Session = Depends(get_db), firm_id=D
     iv = scoped(db, Interview, firm_id).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
-    _scoped_application(db, firm_id, principal, iv.application_id, write=True)
+    app = _scoped_application(db, firm_id, principal, iv.application_id, write=True)
+    _audit_interview(db, app, principal, iv, "DELETE", f"Removed interview: {iv.what or 'Interview'}")
     db.delete(iv)
     db.commit()
     return {"deleted": True}
