@@ -148,7 +148,8 @@ def test_editing_a_candidate_logs_what_changed(api_client, test_db, world):
 # ── The table can't be rewritten ──────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("statement", ["UPDATE activity_logs SET summary = 'rewritten'", "DELETE FROM activity_logs"])
+@pytest.mark.parametrize("statement", ["UPDATE activity_logs SET summary = 'rewritten'", "DELETE FROM activity_logs",
+                                       "TRUNCATE activity_logs"])
 def test_the_database_refuses_a_rewrite(test_db, world, statement):
     _log(test_db, world.bea, "Bea")
     with pytest.raises(DBAPIError, match="append-only"):
@@ -164,6 +165,9 @@ def test_only_the_named_demo_reset_can_delete_and_never_edit(test_db, world):
     test_db.rollback()
     test_db.execute(text("SET LOCAL benchq.activity_logs_demo_reset = 'on'"))
     assert test_db.execute(text("DELETE FROM activity_logs")).rowcount >= 1
+    test_db.rollback()
+    test_db.execute(text("SET LOCAL benchq.activity_logs_demo_reset = 'on'"))   # a named reset may also TRUNCATE
+    test_db.execute(text("TRUNCATE activity_logs"))
     test_db.rollback()
 
 
@@ -242,6 +246,22 @@ def test_a_support_view_cant_search_what_it_cant_read(test_db, world):
     query = test_db.query(ActivityEntry).filter(ActivityEntry.firm_id == world.id)
     assert filters.apply(query, test_db, world.id, hide_email=True).count() == 0
     assert filters.apply(query, test_db, world.id, hide_email=False).count() == 1
+
+
+@pytest.mark.parametrize("entity_type,label,summary", [
+    ("job_search", "Job search: rust developer", "Saved 3 jobs (United States)"),
+    ("job_posting", "Rust developer at Acme", "Captured a job (linkedin)"),
+])
+def test_a_support_view_cant_search_a_label_it_reads_replaced(test_db, world, entity_type, label, summary):
+    from backend.api.routes_ledger import Filters
+    ledger.record(test_db, actor=world.bea, action="CREATE", entity_type=entity_type, entity_id=uuid.uuid4(),
+                  entity_label=label, summary=summary, firm_id=world.id, candidate_id=world.asha.id)
+    test_db.commit()
+    query = test_db.query(ActivityEntry).filter(ActivityEntry.firm_id == world.id)
+    for term in ("Rust", summary.split()[0]):
+        filters = Filters(None, None, None, None, None, None, None, None, None, term)
+        assert filters.apply(query, test_db, world.id, hide_email=True).count() == 0, term
+        assert filters.apply(query, test_db, world.id, hide_email=False).count() == 1, term
 
 
 # ── Filters ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -478,6 +498,15 @@ def test_a_deactivated_user_is_former(anonymous_client, test_db, world):
     _, people = _people(anonymous_client, world, world.owner)
     assert people["Ben"]["is_former"] is True
     assert "Cara" not in people
+
+
+def test_a_picked_former_member_stays_when_the_filters_find_none_of_their_rows(anonymous_client, test_db, world):
+    _log(test_db, world.ben, "Old")
+    world.ben.is_active = False
+    test_db.commit()
+    _, people = _people(anonymous_client, world, world.owner, f"?q=Offer&actor_id={world.ben.id}")
+    assert (people["Ben"]["is_former"], people["Ben"]["actions"]) == (True, 0)       # still pickable, nothing to show
+    assert "Ben" not in _people(anonymous_client, world, world.owner, "?q=Offer")[1]   # not picked: left out
 
 
 def test_counts_ignore_who_is_picked_but_follow_the_other_filters(anonymous_client, test_db, world):
