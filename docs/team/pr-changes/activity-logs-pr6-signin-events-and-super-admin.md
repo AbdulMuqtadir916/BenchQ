@@ -93,3 +93,32 @@ log. 51 routes pass; 30 can't be reached with the generic request and have their
 - **Same moment and day edges** behave as in the firm's log (newest first, then lowest id), but the Super Admin's days are
   cut in IST.
 - **A candidate with no name** shows "Unnamed candidate", as on the firm's screen.
+
+## Review fixes (CodeRabbit and CodeAnt, 2026-11-14)
+
+- **A Super Admin's action is logged only when it really happened.** The entry used to be written once the route
+  returned, so a returned "already running" (409), a PIN with no digits, or a refresh already under way was logged as
+  done. Now the route's dependency only notes the entry, and `PlatformActionLog` (middleware in `main.py`) writes it
+  after the answer has gone out with a status below 400. A route that answers 200 but did nothing says so with
+  `did_nothing(request)` (the two LinkedIn cases). An error in the work a route starts afterwards can no longer stop the
+  entry either.
+- **Only changed fields are named.** A secret the settings screen sends back as its placeholder (`••••••`) isn't a
+  change, and a request that changes no field writes no entry.
+- **Telegram:** the entries say "Started the Telegram digest" and "Started a Telegram test message", since the route only
+  starts them; the run itself records whether it went out.
+- **A typed email is kept only if it looks like one.** Anyone can type anything in the sign-in box, a password included:
+  `P@ssw0rd2026` was kept as `p***@ssw0rd2026`. Now the part after `@` is kept only when it is a domain; otherwise the
+  log keeps `***`.
+- **An address lockout names no account.** Ten wrong tries from one address lock that address, not the account the
+  tenth try named. That lockout is now an entry on no account ("sign-ins from this address locked for 1 minute after 10
+  tries"); an account's own lockout (five tries on it) is unchanged.
+- **The Super Admin's list names the person an AI worked for,** as the firm's list does.
+- **The Super Admin page:** "Your actions" shows the Super Admin in the actor list; choosing "AI agent" inside a firm keeps
+  the team or person picked; and switching firm no longer offers the last firm's people and candidates while the new ones
+  load.
+- **The shared table** (both Activity pages) follows Back and Forward in its search box, moves a stale page number to the
+  last page, and opens its filters outside the table.
+- **The sweep test fails on a server error** instead of skipping it. Two routes that went through and changed nothing
+  are listed in `NO_ENTRY` with why: a settings PATCH that changes no setting, and an inbox sync that imports no new email
+  (an import that does logs "Imported N candidate emails").
+- **0029 keeps 0028's TRUNCATE rule** when it rewrites the trigger function.
