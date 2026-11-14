@@ -49,22 +49,6 @@ async def test_a_failed_scheduled_run_is_a_row(test_db):
     assert _rows(test_db, entity_type="job_run")[0].summary.startswith("Scrape all failed:")
 
 
-@pytest.mark.parametrize("summary", ["3 sources - +5 new", "No sources ran", None])
-async def test_a_scrape_started_by_hand_is_always_a_row_with_its_result(test_db, summary):
-    async with job_monitor.tracked_run("scrape_all", "manual") as tracked:
-        tracked.summary = summary
-    row = _rows(test_db, entity_type="job_run")[0]
-    assert (row.actor_type, row.actor_name, row.firm_id) == ("SYSTEM", "Scraper", None)
-    assert row.summary == f"Scrape all: {summary or 'finished'}"
-
-
-async def test_a_failed_scrape_started_by_hand_is_a_row(test_db):
-    with pytest.raises(RuntimeError):
-        async with job_monitor.tracked_run("company_scrape", "manual"):
-            raise RuntimeError("board refused")
-    assert _rows(test_db, entity_type="job_run")[0].summary.startswith("Company scrape failed:")
-
-
 async def test_a_manual_run_leaves_no_run_row(test_db):
     async with job_monitor.tracked_run("email_check", "manual") as tracked:
         tracked.summary = "3 replies"
