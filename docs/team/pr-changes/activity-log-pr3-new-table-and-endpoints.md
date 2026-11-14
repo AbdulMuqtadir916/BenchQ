@@ -26,7 +26,7 @@ Backend only: the screen (PR 4) is unchanged, and the route stays `/ledger`. No 
 - **Can't be rewritten:** a database trigger refuses UPDATE and DELETE. The one way past it is the local demo reset, which
   may delete but never edit.
 - **Time-based history:** what the role reads now follows the stamps on each row, so history stays with the manager and
-  BDE at the time (07 Q64 replaces PR 1's today-based team lookup with this).
+  BDE at the time (07 Q65 replaces PR 1's today-based team lookup with this).
 - **Reads:** filters by person (`actor_id`, which includes what their AI did), team (`team_id`), `actor_type`, candidate,
   dates and search (`q`), plus `cursor` paging. `GET …/ledger/people` gives the people and their counts, the firm's time
   zone and the action types the reader may filter by. `GET …/ledger/candidates` gives the candidates the reader can pick.
@@ -80,7 +80,7 @@ Each has a test in `test_activity_logs.py`:
 
 ## Migration number
 
-0028 (renumbered 2026-11-12, after main's 0024 and 0025 (#127) and #129's 0026–0027 (not merged yet); it was 0016, following Zuhair's 0015, #112).
+0028 (renumbered 2026-11-12, after main's 0024 to 0027 (#127, #129); it was 0016, following Zuhair's 0015, #112).
 If another PR takes 0028 first (Zuhair's ATS score module may), this becomes the next free number: rename the file,
 `revision` / `down_revision`, the number in the tests and the row in the team README. 0015 dropped the ledger's `claim_state` and `evidence_ids`, so `activity_logs`
 doesn't have them either.

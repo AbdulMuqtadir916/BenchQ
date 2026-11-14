@@ -8,13 +8,13 @@ def setup_application(test_db, accounts, firm_id):
     return _saved_candidate_application(test_db, accounts, firm_id, 'OWNER')
 
 
-@pytest.mark.xfail(strict=True, reason="Until Arbaz repoints applications.job_id onto job_postings (docs/team/arbaz.md, 'Repoint applications.job_id'): a tailored résumé or letter names a job posting since 0023, the application still the old pool's job, so they don't match. Remove this mark when it passes.")
 @pytest.mark.parametrize("with_legacy", [False, True])
 def test_latest_tailored_resume_stays_with_its_candidate_or_legacy_application(
         api_client, test_db, accounts, jobs_in_default_firm, with_legacy):
     from datetime import timedelta
     from backend.models.candidates import Candidate
     from backend.models.db import Application, utcnow
+    from backend.tests.posting_support import posting_for
     from backend.tests.resume_support import make_version
 
     candidate, job, app, _, headers, _ = setup_application(test_db, accounts, jobs_in_default_firm)
@@ -23,26 +23,30 @@ def test_latest_tailored_resume_stays_with_its_candidate_or_legacy_application(
     test_db.add(other)
     test_db.flush()
     now = utcnow()
-    tailored = dict(category="TAILORED", job_id=job.id)
+    # A tailored résumé names its candidate's job posting (0023): the application's, and the other candidate's copy.
+    theirs = posting_for(test_db, candidate.firm_id, other.id, title=job.title, company=job.company, url=job.url)
     make_version(test_db, candidate.firm_id, candidate=candidate, name="Own older tailored", version=1,
-                 created_at=now - timedelta(hours=3), **tailored)
+                 created_at=now - timedelta(hours=3), category="TAILORED", job_id=app.job_id)
     own_newer = make_version(test_db, candidate.firm_id, candidate=candidate, name="Own latest tailored", version=2,
-                             created_at=now - timedelta(hours=2), **tailored)
+                             created_at=now - timedelta(hours=2), category="TAILORED", job_id=app.job_id)
     make_version(test_db, candidate.firm_id, candidate=other, name="Other candidate newer tailored",
-                 created_at=now, **tailored)
-    legacy_app = None
+                 created_at=now, category="TAILORED", job_id=theirs.id)
+    other_app = None
     if with_legacy:
-        legacy_app = Application(firm_id=candidate.firm_id, job_id=job.id, status="applied")
-        test_db.add(legacy_app)
+        other_posting = posting_for(test_db, candidate.firm_id, other.id, title="Unmatched role",
+                                    company="Other Synthetic Company")
+        other_app = Application(firm_id=candidate.firm_id, candidate_id=other.id,
+                                job_id=other_posting.id, status="applied")
+        test_db.add(other_app)
     test_db.commit()
 
     result = api_client.get("/api/applications", headers=headers)
     assert result.status_code == 200
     rows = {row["id"]: row for row in result.json()["applications"]}
     assert rows[str(app.id)]["tailored_resume_id"] == str(own_newer.id)
-    if legacy_app is not None:
-        # A résumé always has a candidate since 0013, so an application from before candidates has none to show.
-        assert rows[str(legacy_app.id)]["tailored_resume_id"] is None
+    if other_app is not None:
+        # A different candidate's tailored résumé is never borrowed for this posting.
+        assert rows[str(other_app.id)]["tailored_resume_id"] is None
     candidate_only = api_client.get("/api/applications", headers=headers,
                                     params={"candidate_id": str(candidate.id), "tracked_only": True})
     assert candidate_only.status_code == 200

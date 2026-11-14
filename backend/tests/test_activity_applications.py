@@ -4,7 +4,7 @@ import uuid
 import pytest
 
 from backend.models.candidates import Candidate
-from backend.models.db import Application, Job, utcnow
+from backend.models.db import Application, utcnow
 from backend.models.tenancy import ActivityEntry, Firm, User
 from backend.tests.auth_support import make_user
 
@@ -16,73 +16,26 @@ def _entries(test_db, **filters):
 
 @pytest.fixture
 def tracked(test_db, accounts):
-    """An application on a candidate, and the owner signed in through `api_client`."""
+    """An application on a candidate (naming one of the candidate's postings, since migration 0027), and the owner signed
+    in through `api_client`."""
+    from backend.tests.posting_support import posting_for
     firm = test_db.get(Firm, accounts.firm_id)
     owner = test_db.get(User, accounts.user_id)
     manager = make_user(test_db, firm, email="mira@acme.test", role="MANAGER", name="Mira")
     candidate = Candidate(firm_id=firm.id, manager_id=manager.id, created_by_user_id=owner.id, full_name="Asha",
                           work_auth="H1B")
-    job = Job(external_id="activity-job", title="Data Engineer", company="Acme", url="https://jobs.example.test/1",
-              source="manual")
-    test_db.add_all([candidate, job])
+    test_db.add(candidate)
     test_db.flush()
-    app = Application(firm_id=firm.id, job_id=job.id, candidate_id=candidate.id, status="applied", applied_at=utcnow())
+    posting = posting_for(test_db, firm.id, candidate.id, title="Data Engineer", company="Acme", url="https://jobs.example.test/1")
+    app = Application(firm_id=firm.id, job_id=posting.id, candidate_id=candidate.id, status="applied", applied_at=utcnow())
     test_db.add(app)
     test_db.commit()
     return app
 
 
-def _legacy(api_client, title="Backend Engineer"):
-    response = api_client.post("/api/applications", json={"title": title, "company": "Globex", "url": f"https://jobs.example.test/{uuid.uuid4()}"})
-    assert response.status_code < 300, response.text
-    return response.json()["id"]
-
-
-def test_logging_an_application_by_hand_writes_an_entry(api_client, test_db, accounts):
-    app_id = _legacy(api_client)
-    entry = _entries(test_db, entity_type="application", entity_id=app_id, action="CREATE")[0]
-    assert entry.summary == "Logged an application for Backend Engineer."
-    assert entry.actor_user_id == accounts.user_id
-
-
-def test_deleting_an_application_writes_an_entry(api_client, test_db):
-    app_id = _legacy(api_client)
-    assert api_client.delete(f"/api/applications/{app_id}").status_code == 200
-    entry = _entries(test_db, entity_id=app_id, action="DELETE")[0]
-    assert entry.summary == "Deleted the application for Backend Engineer."
-
-
-def test_a_bulk_delete_writes_one_entry_each(api_client, test_db):
-    ids = [_legacy(api_client, "First"), _legacy(api_client, "Second")]
-    response = api_client.post("/api/applications/bulk-delete", json={"ids": ids})
-    assert response.status_code == 200 and response.json()["deleted"] == 2
-    assert {e.summary for e in _entries(test_db, action="DELETE", entity_type="application")} == {
-        "Deleted the application for First.", "Deleted the application for Second."}
-
-
-def test_a_hand_logged_status_change_says_what_moved(api_client, test_db):
-    app_id = _legacy(api_client)
-    assert api_client.patch(f"/api/applications/{app_id}", json={"status": "interview"}).status_code == 200
-    entry = _entries(test_db, entity_id=app_id, action="UPDATE")[0]
-    assert entry.summary == "Moved Backend Engineer: applied → interview."
-    assert entry.changes == {"status": {"before": "applied", "after": "interview"}}
-
-
-def test_a_bulk_hand_logged_status_change_says_what_moved(api_client, test_db):
-    ids = [_legacy(api_client, "First"), _legacy(api_client, "Second")]
-    response = api_client.post("/api/applications/bulk-update", json={"ids": ids, "status": "rejected"})
-    assert response.status_code == 200, response.text
-    assert {e.summary for e in _entries(test_db, action="UPDATE", entity_type="application")} == {
-        "Moved First: applied → rejected.", "Moved Second: applied → rejected."}
-
-
-def test_a_hand_logged_edit_with_no_status_change_stays_a_details_entry(api_client, test_db):
-    app_id = _legacy(api_client)
-    assert api_client.patch(f"/api/applications/{app_id}", json={"status": "applied", "notes": "Private note."}).status_code == 200
-    entry = _entries(test_db, entity_id=app_id, action="UPDATE")[0]
-    assert entry.summary == "Updated application details."
-    assert entry.changes is None
-
+# Logging an application with no candidate, and its status moves, edits and deletes, were retired by main (#129: every
+# application has a candidate, and a delete is refused). A candidate's application moves through tracking.move, which
+# test_activity_application_status.py covers.
 
 def test_a_refused_delete_writes_nothing(api_client, test_db, tracked):
     assert api_client.delete(f"/api/applications/{tracked.id}").status_code == 409

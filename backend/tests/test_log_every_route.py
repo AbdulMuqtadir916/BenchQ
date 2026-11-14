@@ -31,7 +31,6 @@ SECONDS = 60
 # "METHOD path" -> why the built request doesn't reach the route's work.
 NOT_REACHED: dict[str, str] = {
     "GET /": "404: Not found",
-    "POST /api/applications": "400: Saving requires candidate_id, job_id, and status='saved'",
     "POST /api/applications/bulk-delete":
         "409: Candidate applications are removed through Saved/favorite actions; move their status instead",
     "POST /api/applications/bulk-update": "400: status is required",
@@ -57,6 +56,11 @@ NOT_REACHED: dict[str, str] = {
     # logging (ids, codes, counts; never the query) is checked in test_job_search_api.py.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": "403: Only this candidate's BDE searches jobs for them",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": "403: Only this candidate's BDE adds jobs for them",
+    # Only the candidate's BDE tailors (07 Q55) and the sweep signs in as the OWNER; its seeded job_runs row is no
+    # firm's tailoring. The tailor's own logging (ids, codes, counts; never a résumé or a posting) is checked in
+    # test_resume_tailor_routes.py.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailor": "403: This candidate's BDE changes their résumés",
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings/{run_id}": "404: Not found",
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}":
         "409: Base 1 holds what an owner or manager added, so it can't be deleted",
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}":
@@ -88,6 +92,8 @@ NOT_REACHED.update({route: "410: the old job pool is retired" for route in (
     "POST /api/cover-letters/generate", "POST /api/jobs/bulk-update")})
 # A letter's job is a job posting since 0023; the sweep's `job_id` names the old pool's seeded job, so this is 404.
 NOT_REACHED["PATCH /api/cover-letters/{cl_id}"] = "404: Job not found"
+# Only the candidate's BDE adds a job for them (backend/auth/policy.py can_add_job), and the sweep signs in as the OWNER.
+NOT_REACHED["POST /api/applications"] = "403: only the candidate's BDE adds a job"
 
 # "METHOD path" -> the state a seeded row needs for the route to do its work, set just before its request.
 ROUTE_STATE = {
