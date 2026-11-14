@@ -111,6 +111,11 @@ export const LedgerEntryDto = z.object({
   model_id: z.string().nullable(),
   prompt_version: z.string().nullable(),
   created_at: z.string(),
+  candidate_id: nullableId.optional(),
+  candidate_name: z.string().nullable().optional(),
+  actor_role: z.string().nullable().optional(),
+  on_behalf_of_user_id: nullableId.optional(),
+  on_behalf_of_name: z.string().nullable().optional(),
 });
 
 /** GET /api/invites/{token}: INVALID alone, or the state with what the link may show. */
@@ -247,6 +252,11 @@ export function toLedgerEntry(dto: z.infer<typeof LedgerEntryDto>): LedgerEntry 
     entityType: dto.entity_type,
     entityId: mapId(dto.entity_id),
     entityLabel: dto.entity_label,
+    candidateId: mapNullableId(dto.candidate_id ?? null),
+    candidateName: dto.candidate_name ?? null,
+    actorRole: dto.actor_role ?? null,
+    onBehalfOfUserId: mapNullableId(dto.on_behalf_of_user_id ?? null),
+    onBehalfOfName: dto.on_behalf_of_name ?? null,
     action: dto.action,
     summary: dto.summary,
     note: dto.note ?? null,

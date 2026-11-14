@@ -123,9 +123,13 @@ def _after_cursor(entries, cursor: str):
     return entries.filter(or_(ActivityEntry.created_at < at, and_(ActivityEntry.created_at == at, ActivityEntry.id > row_id)))
 
 
+SORTS = {"when": ActivityEntry.created_at, "actor": ActivityEntry.actor_name, "action": ActivityEntry.action}
+
+
 @router.get("/ledger", summary="The firm's activity log, newest first, limited by role")
 def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0),
-                cursor: str | None = Query(None, max_length=128), filters: Filters = Depends(),
+                cursor: str | None = Query(None, max_length=128), sort: str = Query("when", pattern="^(when|actor|action)$"),
+                direction: str = Query("desc", alias="dir", pattern="^(asc|desc)$"), filters: Filters = Depends(),
                 cursor_at: datetime | None = None, cursor_id: uuid.UUID | None = None,
                 principal: Principal = Depends(current_principal), my_firm: uuid.UUID = Depends(reader_firm_id),
                 db: DbSession = Depends(get_db)):
@@ -133,6 +137,10 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
         raise HTTPException(status_code=404, detail="Not found.")
     if (cursor_at is None) != (cursor_id is None) or (cursor_at is not None and cursor_at.utcoffset() is None):
         raise HTTPException(status_code=422, detail="Supply both cursor fields, with a timezone.")
+    if (cursor is not None or cursor_at is not None) and (sort != "when" or direction != "desc"):
+        # A marker says "the rows after this one, newest first". Under another order the next page would skip and
+        # repeat rows, so page a sorted list by `offset`.
+        raise HTTPException(status_code=422, detail="A page marker only works newest first; page a sorted list by offset.")
     support.settle_expired(db)      # a support view that ran out shows its end here, dated at its expiry
     db.commit()
     entries = _visible(db, principal, my_firm, filters)
@@ -143,9 +151,17 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
         # this order. Both or neither, with a timezone (checked above).
         entries = entries.filter(or_(ActivityEntry.created_at < cursor_at,
                                      and_(ActivityEntry.created_at == cursor_at, ActivityEntry.id > cursor_id)))
-    # Newest first; rows at the same moment by id, lowest first, as on main (the page markers depend on it).
-    entries = entries.order_by(ActivityEntry.created_at.desc(), ActivityEntry.id).offset(offset).limit(limit)
-    return [ledger_entry_json(e, hide_email=principal.support_view_id is not None) for e in entries]
+    column = SORTS[sort]
+    # Then newest first; rows at the same moment by id, lowest first, as on main (the page markers depend on it).
+    entries = entries.order_by(column.asc() if direction == "asc" else column.desc(), ActivityEntry.created_at.desc(),
+                               ActivityEntry.id).offset(offset).limit(limit).all()
+    # The log keeps the candidate's id; the name shown is the one they have now, from their résumé (07 Q57).
+    ids = {entry.candidate_id for entry in entries if entry.candidate_id is not None}
+    named = scoped(db, Candidate, my_firm).filter(Candidate.id.in_(ids)).all()
+    profile.prime(db, my_firm, named)
+    names = {candidate.id: candidate.full_name for candidate in named}
+    return [ledger_entry_json(e, hide_email=principal.support_view_id is not None,
+                              candidate_name=names.get(e.candidate_id)) for e in entries]
 
 
 @router.get("/ledger/people", summary="Who the reader can see in the log, with each person's action count")
@@ -173,7 +189,18 @@ def ledger_people(firm_id: uuid.UUID, filters: Filters = Depends(), principal: P
                            "is_former": not in_view, "actions": counts[user.id]})
     types = [] if bde is not None else [t for t in LEDGER_ACTOR_TYPES if manager is None or t in ("USER", "AGENT")]
     return {"timezone": db.get(Firm, my_firm).primary_timezone, "actor_types": types, "total": entries.count(),
-            "people": people}
+            "matching": _visible(db, principal, my_firm, filters).count(), "people": people}
+
+
+@router.get("/ledger/days", summary="The days with activity the reader can see, in the firm's time zone")
+def ledger_days(firm_id: uuid.UUID, filters: Filters = Depends(), principal: Principal = Depends(current_principal),
+                my_firm: uuid.UUID = Depends(reader_firm_id), db: DbSession = Depends(get_db)):
+    """For the calendar's dots: `from_date` and `to_date` name the month on show."""
+    if firm_id != my_firm:
+        raise HTTPException(status_code=404, detail="Not found.")
+    zone = db.get(Firm, my_firm).primary_timezone
+    day = func.to_char(func.timezone(zone, ActivityEntry.created_at), "YYYY-MM-DD")
+    return sorted(row[0] for row in _visible(db, principal, my_firm, filters).with_entities(day).distinct())
 
 
 @router.get("/ledger/candidates", summary="The candidates the reader can pick in the log")

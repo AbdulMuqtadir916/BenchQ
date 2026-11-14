@@ -28,7 +28,7 @@ and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 | 9. DTO + mapper | `src/lib/api/dto/session.ts` `LedgerEntryDto`, `toLedgerEntry` | Parses the wire shape, maps ids (`fromBackendId`) and timestamps (`toIso`) |
 | 10. Adapter | `src/lib/api/analytics.ts` `ledgerApi` | Live adapter, single-page reads and bounded pagination; the firm id goes out through `toBackendId` |
 | 11. Adapter test | `src/lib/api/live-ledger.test.ts` | URL and query, mapping, empty, error |
-| 12. Screen | `src/app/[firm]/(app)/(manage)/ledger/page.tsx` | Actor filter, search, sort and page in the URL; skeleton, empty and error states |
+| 12. Screen | `src/features/activity/`, mounted by `src/app/[firm]/(app)/(manage)/ledger/page.tsx` | The Activity logs screen: people list, filters, paging and search on the server, everything in the URL |
 
 The ledger's DTO sits in `dto/session.ts` because `/admin/audit` uses it too. A new module creates
 `src/lib/api/dto/<module>.ts`.
@@ -69,6 +69,10 @@ The rules it follows, which every track follows:
   ASSIGN entries for candidates they manage (Q47). Owner, Viewer and an active support view get the firm scope.
 - **Every new endpoint gets a `ROUTE_ACCESS` line.** `test_access.py` fails on a route without one.
 - **Cursor ordering is stable across newer inserts:** the last row’s timestamp and id identify the page boundary.
+- **A page marker works only newest first.** `cursor` (or `cursor_at` + `cursor_id`) means "the rows after this one, newest
+  first". Sent with `sort=actor`, `sort=action` or `dir=asc` it is refused (422), because the next page would skip and
+  repeat rows. Page a sorted list by `offset`. Rows at the same microsecond, rows a microsecond apart, and a day's edges
+  (midnight in the firm's zone, a 23-hour day) are covered by tests in `test_activity_logs.py`.
 
 ### Writes log to the ledger
 

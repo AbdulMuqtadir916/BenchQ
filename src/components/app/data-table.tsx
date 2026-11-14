@@ -55,12 +55,14 @@ interface DataTableProps<TData, TValue> {
    * page index is the caller's.
    */
   search?: { value: string; onChange: (value: string) => void };
-  page?: { index: number; onChange: (index: number) => void };
+  page?: { index: number; onChange: (index: number) => void; /** The caller pages on the server: how many pages there are. It then sorts there too. */ count?: number };
   /**
    * Controlled sort, for lists that keep it in the URL (CLAUDE.md): one column at a time, `null` for none. A header click
    * calls `onChange`; the caller resets its own page (so that one change updates the URL once).
    */
   sort?: { value: { id: string; desc: boolean } | null; onChange: (value: { id: string; desc: boolean } | null) => void };
+  /** Replaces "n rows" in the toolbar, for a list whose `data` is one page of many. */
+  countLabel?: string;
   /**
    * The list this screen is about: `J`/`K`/`x` (and `/` for the search box) then work from anywhere on the page, not only
    * once focus is inside the table (BUG-003). Set on at most one table per screen; see `src/lib/list-keys.ts`.
@@ -107,6 +109,7 @@ export function DataTable<TData, TValue>({
   search,
   page,
   sort,
+  countLabel,
   pageKeys = false,
   hasToolbar = true,
   label = "Data table",
@@ -183,6 +186,10 @@ export function DataTable<TData, TValue>({
       setOwnSorting(next);
       if (page && page.index !== 0) page.onChange(0);
     },
+    // A caller that pages on the server (`page.count`) also sorts there: `data` arrives as one sorted page.
+    manualSorting: page?.count !== undefined,
+    manualPagination: page?.count !== undefined,
+    pageCount: page?.count,
     onGlobalFilterChange: (value: string) => setGlobalFilter(value),
     // TanStack's default is to start over at page 1 whenever `data` changes. With the page in the URL that wiped `?page=2`
     // on a reload (the rows arrive after the first render) and on every refetch (BUG-002). The caller owns the page: it
@@ -325,8 +332,7 @@ export function DataTable<TData, TValue>({
           />
         </div>
         <span className="ml-auto text-mono-sm text-[var(--color-text-3)]" aria-live="polite">
-          {table.getFilteredRowModel().rows.length} rows
-          {isRowSelectable ? ` · ${table.getFilteredSelectedRowModel().rows.length} selected` : ""}
+          {countLabel ?? <>{table.getFilteredRowModel().rows.length} rows{isRowSelectable ? ` · ${table.getFilteredSelectedRowModel().rows.length} selected` : ""}</>}
         </span>
         <details data-column-chooser className="relative">
           <summary className="bq-secondary inline-flex h-7 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm list-none">

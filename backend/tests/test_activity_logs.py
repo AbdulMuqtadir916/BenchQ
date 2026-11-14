@@ -116,6 +116,12 @@ def test_an_entry_carries_the_requests_id(test_db, world):
         request_id.reset(token)
 
 
+def test_an_entry_with_no_changes_stores_a_real_null(test_db, world):
+    """Not a JSON `null`, which `changes IS NULL` and `count(changes)` would treat as a value."""
+    entry = _log(test_db, world.bea, "Bea")
+    assert test_db.execute(text("SELECT changes IS NULL FROM activity_logs WHERE id = :id"), {"id": entry.id}).scalar() is True
+
+
 def test_a_change_is_kept_with_contact_details_and_secrets_masked():
     changes = ledger.diff({"city": "Pune", "email": "a@x.test", "phone": "1", "api_key_hash": "h", "rate_min": 10},
                           {"city": "Delhi", "email": "b@x.test", "phone": "1", "api_key_hash": "i", "rate_min": 10})
@@ -500,6 +506,92 @@ def test_another_firms_people_and_candidates_are_not_found(anonymous_client, tes
     test_db.commit()
     response = anonymous_client.get(f"/api/firms/{other.id}/ledger{path}", headers=_as_session(world, world.owner))
     assert response.status_code == 404
+
+
+def test_a_row_shows_the_candidates_name(anonymous_client, test_db, world):
+    _log(test_db, world.bea, "Bea", world.asha)
+    assert _read(anonymous_client, world, world.owner)[0]["candidate_name"] == "Asha"
+
+
+def test_rows_sort_by_actor_and_action(anonymous_client, test_db, world):
+    _log(test_db, world.ben, "Ben", action="UPDATE")
+    _log(test_db, world.bea, "Bea", action="DELETE")
+    assert _summaries(anonymous_client, world, world.owner, "?sort=actor&dir=asc") == ["Bea", "Ben"]
+    assert _summaries(anonymous_client, world, world.owner, "?sort=action&dir=desc") == ["Ben", "Bea"]
+
+
+def test_matching_counts_the_rows_on_show_and_total_the_rows_beside_them(anonymous_client, test_db, world):
+    _log(test_db, world.bea, "Bea")
+    _log(test_db, world.ben, "Ben")
+    body, _ = _people(anonymous_client, world, world.owner, f"?actor_id={world.bea.id}")
+    assert (body["matching"], body["total"]) == (1, 2)
+
+
+def test_the_days_with_activity_are_the_firms_days_and_the_readers_own(anonymous_client, test_db, world):
+    moment = datetime(2026, 3, 3, 20, 0, tzinfo=timezone.utc)      # the 4th in Asia/Kolkata
+    ledger.record(test_db, actor=world.bea, action="UPDATE", entity_type="user", entity_id=world.bea.id,
+                  entity_label="Bea", summary="Late", firm_id=world.id, candidate_id=None, at=moment)
+    test_db.commit()
+    month = "?from_date=2026-03-01&to_date=2026-03-31"
+    assert _read(anonymous_client, world, world.owner, month, "/days") == ["2026-03-04"]
+    assert _read(anonymous_client, world, world.cara, month, "/days") == []
+
+
+def test_a_sorted_list_with_rows_at_the_same_moment_pages_by_offset_without_repeats(anonymous_client, test_db, world):
+    """Same actor and same microsecond for every row of a person: the order inside a group is still fixed (lowest id
+    first), so two pages never show a row twice or skip one."""
+    moment = datetime(2026, 3, 3, 12, 0, tzinfo=timezone.utc)
+    mine = {actor.name: [] for actor in (world.bea, world.ben)}
+    for number in range(3):
+        for actor in (world.bea, world.ben):
+            entry = ledger.record(test_db, actor=actor, action="UPDATE", entity_type="user", entity_id=actor.id,
+                                  entity_label=actor.name, summary=f"{actor.name} {number}", firm_id=world.id,
+                                  candidate_id=None, at=moment)
+            mine[actor.name].append(entry)
+    test_db.commit()
+    by_id = lambda entries: [entry.summary for entry in sorted(entries, key=lambda entry: entry.id)]
+    for direction, order in (("asc", ("Bea", "Ben")), ("desc", ("Ben", "Bea"))):
+        expected = [summary for name in order for summary in by_id(mine[name])]
+        query = f"?sort=actor&dir={direction}&limit=2"
+        pages = [_summaries(anonymous_client, world, world.owner, f"{query}&offset={offset}") for offset in (0, 2, 4)]
+        assert [summary for page in pages for summary in page] == expected
+        assert _summaries(anonymous_client, world, world.owner, f"?sort=actor&dir={direction}") == expected   # and whole
+
+
+@pytest.mark.parametrize("sorted_by", ["sort=actor", "sort=action", "sort=when&dir=asc", "dir=asc"])
+def test_a_page_marker_is_refused_under_any_order_but_newest_first(anonymous_client, test_db, world, sorted_by):
+    """A marker means "the rows after this one, newest first". Under another order the next page would skip and repeat
+    rows, so the server says so instead of answering with a plausible wrong page."""
+    for number in range(3):
+        _log(test_db, world.bea, str(number))
+    marker = _read(anonymous_client, world, world.owner, "?limit=1")[0]
+    for query in (f"?{sorted_by}&cursor={marker['cursor']}",
+                  f"?{sorted_by}&cursor_at={marker['created_at'].replace('+', '%2B')}&cursor_id={marker['id']}"):
+        response = anonymous_client.get(f"{world.url}{query}", headers=_as_session(world, world.owner))
+        assert response.status_code == 422, query
+    assert _read(anonymous_client, world, world.owner, f"?{sorted_by}&limit=2&offset=1")      # offset is fine
+    assert _read(anonymous_client, world, world.owner, f"?sort=when&dir=desc&cursor={marker['cursor']}")  # and so is newest first
+
+
+def test_the_calendar_dots_follow_midnight_and_a_day_when_the_clocks_change(anonymous_client, test_db, world):
+    """The same moments as the day filter: Kolkata's midnight is 18:30 UTC; New York's 8 March 2026 is 23 hours long."""
+    one = timedelta(microseconds=1)
+    midnight = datetime(2026, 3, 3, 18, 30, tzinfo=timezone.utc)
+    for name, moment in (("end of 3rd", midnight - one), ("start of 4th", midnight), ("start of 5th", midnight + timedelta(days=1))):
+        _at(test_db, world, name, moment)
+    month = "?from_date=2026-03-01&to_date=2026-03-31"
+    assert _read(anonymous_client, world, world.owner, month, "/days") == ["2026-03-03", "2026-03-04", "2026-03-05"]
+
+    test_db.get(Firm, world.id).primary_timezone = "America/New_York"
+    for name, moment in (("end of 7th", datetime(2026, 3, 8, 4, 59, 59, 999999, tzinfo=timezone.utc)),
+                         ("start of 8th", datetime(2026, 3, 8, 5, 0, tzinfo=timezone.utc)),
+                         ("end of 8th", datetime(2026, 3, 9, 3, 59, 59, 999999, tzinfo=timezone.utc)),
+                         ("start of 9th", datetime(2026, 3, 9, 4, 0, tzinfo=timezone.utc))):
+        _at(test_db, world, name, moment)
+    days = _read(anonymous_client, world, world.owner, "?from_date=2026-03-07&to_date=2026-03-09", "/days")
+    assert days == ["2026-03-07", "2026-03-08", "2026-03-09"]
+    assert _summaries(anonymous_client, world, world.owner, "?from_date=2026-03-08&to_date=2026-03-08") == [
+        "end of 8th", "start of 8th"]
 
 
 # ── The migration ─────────────────────────────────────────────────────────────────────────────────────────────────
