@@ -295,15 +295,25 @@ def _did_nothing(summary: Optional[str]) -> bool:
     return not summary or (not re.search(r"[1-9]", summary) and bool(re.search(r"^no\b|(^|\s)0\s", summary, re.IGNORECASE)))
 
 
+# Runs that fetch jobs. One a Super Admin starts always leaves its result as an entry, even when it found nothing; the
+# scheduler's runs keep the rule below (an empty one every half hour would only be noise).
+SCRAPE_RUN_TYPES = {"scrape_all", "company_scrape", "search_run"}
+
+
 def _log_run(db, run: JobRun) -> None:
-    """A scheduled run that did something or failed: a system row, with no firm, so only the Super Admin reads it."""
-    if run.trigger != "scheduler" or (run.status != "failed" and _did_nothing(run.result_summary)):
+    """A run's result as a system row, with no firm, so only the Super Admin reads it. The scheduler's run when it did
+    something or failed; a scrape someone started by hand always."""
+    by_hand_scrape = run.trigger == "manual" and run.job_type in SCRAPE_RUN_TYPES
+    if not by_hand_scrape and (run.trigger != "scheduler" or (run.status != "failed" and _did_nothing(run.result_summary))):
         return
     label = run.job_type.replace("_", " ").capitalize()
     summary = f"{label}: {run.result_summary}" if run.status != "failed" else f"{label} failed: {run.error or 'unknown error'}"
+    if run.status != "failed" and not run.result_summary:
+        summary = f"{label}: finished"
     try:
-        ledger.record_automated(db, actor_type="SYSTEM", actor_name="Scheduler", action="CREATE", entity_type="job_run",
-                                entity_id=run.id, entity_label=label, summary=summary, firm_id=None, candidate_id=None)
+        ledger.record_automated(db, actor_type="SYSTEM", actor_name="Scheduler" if run.trigger == "scheduler" else "Scraper",
+                                action="CREATE", entity_type="job_run", entity_id=run.id, entity_label=label, summary=summary,
+                                firm_id=None, candidate_id=None)
         db.commit()
     except Exception as e:
         db.rollback()
