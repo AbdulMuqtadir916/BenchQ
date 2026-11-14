@@ -115,6 +115,8 @@ describe("fieldTypeFor", () => {
     ["Please provide the name of your current (or most recent) company", "current-company"],
     ["Professional Profile (LinkedIn, Github, Website, etc)", "linkedin-url"], ["GitHub", "github-url"],
     ["Expected salary", "salary-expectation"], ["What are your salary expectations?", "salary-expectation"],
+    ["Minimum acceptable rate", "floor-rate"], ["What is your floor rate?", "floor-rate"], ["Lowest hourly rate", "floor-rate"],
+    ["Expected hourly rate", "pay-rate"],
     ["How did you hear about this job?", "referral-source"], ["How did you first hear about this role?", "referral-source"],
     ["Are you at least 18 years of age?", "over-18"], ["Are you 18 years of age or older?", "over-18"],
     ["What is your current work authorization?", "visa-type"], ["Phone country code", "phone-country-code"],

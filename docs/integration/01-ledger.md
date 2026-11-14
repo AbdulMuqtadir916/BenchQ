@@ -53,7 +53,7 @@ def list_ledger(firm_id: uuid.UUID, limit: int = Query(50, ge=1, le=500), offset
     return [ledger_entry_json(e) for e in entries]
 ```
 
-It limits the rows by role (`_limit_to_reader`: a BDE's own and their candidates' assignments, a MANAGER's team, 07 Q52 and Q64) and orders them newest first (`created_at` descending), then by lowest `id` for rows at exactly the same moment, so the order is
+It limits the rows by role (`_limit_to_reader`: a BDE's own and their candidates' assignments, a MANAGER's team, 07 Q52 and Q65) and orders them newest first (`created_at` descending), then by lowest `id` for rows at exactly the same moment, so the order is
 the same on every read. To read on, pass the last row's `cursor`, or the same marker as two fields, `cursor_at` and `cursor_id` (both, and a timestamp with a timezone; what the whole-ledger paging on the frontend sends). An `offset` with a cursor skips that many rows after it. See [the route](../../backend/api/routes_ledger.py) for the filters.
 
 The rules it follows, which every track follows:
@@ -158,7 +158,7 @@ sign in at `http://localhost:3000` and open `/<firm>/ledger`.
 
 ## Acceptance criteria
 
-- [x] `GET /api/firms/{firm_id}/ledger`: the firm's entries, newest first; a MANAGER's team only (07 Q64); a BDE's own only; another firm 404
+- [x] `GET /api/firms/{firm_id}/ledger`: the firm's entries, newest first; a MANAGER's team only (07 Q65); a BDE's own only; another firm 404
 - [x] `ledger_entries` covered by the scoping lint
 - [x] Adapter live, mapping and paging tested
 - [ ] Clicked through as OWNER and BDE on the live backend (the PR's test plan)

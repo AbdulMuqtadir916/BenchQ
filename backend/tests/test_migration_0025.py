@@ -31,6 +31,8 @@ def test_downgrade_refuses_while_automatic_evidence_exists(scratch_db):
     name, engine = scratch_db
     populated(scratch_db)
     _insert_result(engine, 'AUTO_APPLIED')
+    from backend.tests.migration_support import down_to_0026
+    down_to_0026(name, engine)  # #129's 0027 and its local move go first
     result = _alembic(name, 'downgrade', '0024')
     assert result.returncode != 0 and 'Refusing to discard automatic status evidence' in result.stderr
     with engine.connect() as conn:       # the refused downgrade leaves the database where it was (one transaction)

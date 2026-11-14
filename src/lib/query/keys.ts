@@ -30,6 +30,8 @@ export const queryKeys = {
     searches: (firmId: string, candidateId: string) => [firmId, "jobs", "searches", candidateId] as const,
     /** The search this tab started for the candidate, until its outcome is read (never fetched: set on the start). */
     startedSearch: (firmId: string, candidateId: string) => [firmId, "jobs", "started", candidateId] as const,
+    /** One of a candidate's own jobs (the job page opened for that candidate): under the job's detail key. */
+    candidateDetail: (firmId: string, candidateId: string, id: string) => [firmId, "jobs", "detail", id, candidateId] as const,
   },
   applications: {
     ...resource("applications"),
@@ -40,9 +42,14 @@ export const queryKeys = {
     /** Mutation key of status moves (the pending-move overlay reads it). */
     moves: (firmId: string) => [firmId, "applications", "move"] as const,
   },
+  /** The signed-in user's own tailorings (their panel, docs/02 §8.3). */
+  tailorings: { mine: (firmId: string) => [firmId, "tailorings", "mine"] as const },
   resumes: {
     ...resource("resumes"),
     byCandidate: (firmId: string, candidateId: string) => [firmId, "resumes", "byCandidate", candidateId] as const,
+    /** One version's autofill, as the Autofill screen reads it; `autofillAll` is every version's. */
+    autofill: (firmId: string, versionId: string) => [firmId, "resumes", "autofill", versionId] as const,
+    autofillAll: (firmId: string) => [firmId, "resumes", "autofill"] as const,
   },
   records: { byCandidate: (firmId: string, candidateId: string) => [firmId, "records", "byCandidate", candidateId] as const },
   documents: { byCandidate: (firmId: string, candidateId: string) => [firmId, "documents", "byCandidate", candidateId] as const },

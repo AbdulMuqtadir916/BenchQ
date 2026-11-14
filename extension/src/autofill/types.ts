@@ -1,3 +1,5 @@
+import type { SaveOffer } from "./save-answer";
+
 /** What the side panel, the background worker and the page script say to each other. Types only: the page script
  * must stay free of shared runtime code (vite.config.ts checks it). */
 
@@ -81,8 +83,26 @@ export type ChoiceList = { status: "open"; options: FieldOption[]; multiple?: bo
 export type FieldTarget = { scanId: number; fieldId: string };
 
 /** What the page script exposes in its isolated world. */
+/** A job as its page shows it, for adding it to a candidate's jobs (the add-job plan, 2026-11-11): `description` as the
+ * page wrote it (HTML from its JobPosting data, else its main text). */
+/** `isJobPage`: the page is a job's page (`page/job.ts`); on any other page the rest is empty. */
+export type PageJob = {
+  title: string; company: string; description: string; location: string | null; url: string; isJobPage: boolean;
+  /** The codes the page gives its job (its JobPosting identifier, a "Job ID:" line), lowercase, and the other links it
+   * gives itself (canonical, og:url), for knowing a job the candidate already has. */
+  ids?: string[]; links?: string[];
+  /** What the page states besides (`src/page/job-details.ts`), each only when it says it: how the job is done, its
+   * employment type ("Full-time, Contract"), its pay (the currency only when named, the period only when said), when it
+   * was posted (YYYY-MM-DD) and its requisition ID. */
+  workMode?: "remote" | "hybrid" | "onsite"; employmentType?: string; salaryMin?: number; salaryMax?: number;
+  salaryCurrency?: string; salaryPeriod?: "hour" | "day" | "week" | "month" | "year"; postedAt?: string; requisitionId?: string;
+};
+
 export type PageApi = {
   version: string;
+  readJob(): PageJob;
+  /** Clicks the form's "Add another" for a kind of history entry (#132): whether one was found. */
+  addEntry(kind: "education" | "work"): boolean;
   scan(): Promise<FrameScan>;
   read(): FrameRead | null;
   fill(request: FillRequest): Promise<FillResult>;
@@ -110,6 +130,8 @@ export type Connection = {
   candidateId: string;
   userId: string;
   job: JobSummary;
+  /** The jobs the BDE confirmed with "It's the right job", each as its site and the job the page showed
+   * (`confirmationKey`). */
   confirmedHosts: string[];
 };
 
@@ -117,8 +139,11 @@ export type NewConnection = Omit<Connection, "tabId" | "confirmedHosts">;
 
 export type PanelMessage =
   | { type: "open-job"; connection: NewConnection }
+  /** Connect a tab that already shows the job (one the BDE opened by hand), instead of opening it again. */
+  | { type: "connect-tab"; connection: NewConnection; tabId: number }
   | { type: "disconnect-tab"; tabId: number }
   | { type: "disconnect-job"; applicationId: string }
+  /** `host`: the confirmed job's `confirmationKey`, its site and the job the page showed. */
   | { type: "confirm-host"; tabId: number; host: string }
   | { type: "clear-connections" };
 
@@ -147,6 +172,12 @@ export type ReviewRow = {
   /** BenchQ filled it from another résumé, it's unchanged since, and the picked résumé doesn't answer it: Autofill takes
    * it back, so the old résumé's value doesn't stay on the form. */
   isStale?: boolean;
+  /** BenchQ filled it from another résumé than the picked one, and it's unchanged since: Autofill replaces it or takes it
+   * back. While a switch of résumé refills the form, the progress doesn't count it, so the count starts afresh. */
+  isOldFill?: boolean;
+  /** An answer the BDE typed while BenchQ watched, which they can keep for next time (07 Q58): what saving it would do,
+   * or "saved" once it's kept. */
+  saveOffer?: SaveOffer | "saved";
   /** For a question no saved answer clearly matches: the closest of the candidate's own screening answers, which the
    * BDE can use with a click. Never filled on their own. */
   suggestions?: BankEntry[];
