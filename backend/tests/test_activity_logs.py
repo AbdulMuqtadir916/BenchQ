@@ -498,9 +498,9 @@ def test_a_picked_former_member_stays_when_the_filters_find_none_of_their_rows(a
     _log(test_db, world.ben, "Old")
     world.ben.is_active = False
     test_db.commit()
-    _, people = _people(anonymous_client, world, world.owner, f"q=Offer&actor_id={world.ben.id}")
+    _, people = _people(anonymous_client, world, world.owner, f"?q=Offer&actor_id={world.ben.id}")
     assert (people["Ben"]["is_former"], people["Ben"]["actions"]) == (True, 0)       # still pickable, nothing to show
-    assert "Ben" not in _people(anonymous_client, world, world.owner, "q=Offer")[1]   # not picked: left out
+    assert "Ben" not in _people(anonymous_client, world, world.owner, "?q=Offer")[1]   # not picked: left out
 
 
 def test_counts_ignore_who_is_picked_but_follow_the_other_filters(anonymous_client, test_db, world):

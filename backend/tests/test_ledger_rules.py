@@ -109,6 +109,7 @@ LEDGER_READERS = {
     ("api/routes_ledger.py", "_visible"): "a firm's log, limited by role",
     ("api/routes_ledger.py", "list_ledger"): "pages what `_visible` allows",
     ("api/routes_ledger.py", "_after_cursor"): "pages what `_visible` allows",
+    ("api/routes_ledger.py", "_has_history"): "whether a picked person has rows, inside `_limit_to_reader`",
     ("api/routes_admin.py", "list_audit"): "the Super Admin's audit across the platform",
     ("scripts/seed_demo.py", "reset"): "clears local demo data; serves no one",
 }
