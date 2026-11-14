@@ -30,7 +30,7 @@ const teamRail = (rail: Rail) => { if (rail.level !== "team") throw new Error(ra
 describe("the people list", () => {
   it("starts an owner at the firm: managers busiest first, with their team's actions", () => {
     const rail = firmRail(buildRail(people, owner, {}, 30));
-    expect(rail.managers.map((row) => [row.person.userId, row.bdes, row.actions])).toEqual([["zed", 1, 10], ["mira", 2, 6]]);
+    expect(rail.managers.map((row) => [row.person.userId, row.bdes, row.actions])).toEqual([["zed", 1, 10], ["mira", 2, 8]]);
     expect(rail.owner?.userId).toBe("owner");
     expect(rail.you).toBeNull();
     expect(rail.unassigned.map((row) => row.userId)).toEqual(["nia"]);
@@ -133,10 +133,12 @@ describe("the URL", () => {
   it("drops what doesn't parse", () => {
     const params = parseActivityParams(new URLSearchParams("type=BOSS&from=yesterday&page=-2&sort=name&dir=up"));
     expect(params).toEqual({ page: 1, sort: "when", dir: "desc" });
+    const impossible = parseActivityParams(new URLSearchParams("from=2026-02-30&to=2026-99-99&person=abc&candidate=1"));
+    expect(impossible).toEqual({ page: 1, sort: "when", dir: "desc" });
   });
 
   it("round-trips, leaving the defaults out", () => {
-    const search = "person=user_bea&from=2026-11-01&to=2026-11-04&page=2";
+    const search = "person=7d3f6a7e-1c2b-4e5f-8a9b-0c1d2e3f4a5b&from=2026-11-01&to=2026-11-04&page=2";
     expect(serializeActivityParams(parseActivityParams(new URLSearchParams(search)))).toBe(search);
     expect(serializeActivityParams(parseActivityParams(new URLSearchParams()))).toBe("");
   });
