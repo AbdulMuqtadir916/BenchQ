@@ -222,8 +222,8 @@ def ledger_days(firm_id: uuid.UUID, filters: Filters = Depends(), principal: Pri
 def _has_history(db: DbSession, principal: Principal, firm_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     """Whether the reader can see any row by `user_id` (or by an AI working for them), whatever the filters."""
     entries = _limit_to_reader(scoped(db, ActivityEntry, firm_id), db, principal, firm_id, picked=False)
-    return db.query(entries.filter(or_(ActivityEntry.actor_user_id == user_id,
-                                       ActivityEntry.on_behalf_of_user_id == user_id)).exists()).scalar()
+    return entries.filter(or_(ActivityEntry.actor_user_id == user_id, ActivityEntry.on_behalf_of_user_id == user_id)) \
+        .with_entities(ActivityEntry.id).first() is not None
 
 
 @router.get("/ledger/candidates", summary="The candidates the reader can pick in the log")
