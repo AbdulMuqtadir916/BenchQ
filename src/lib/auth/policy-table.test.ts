@@ -22,7 +22,7 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   // firm work
   ["candidate.create", "Y Y - - - -"],   // 07 Q41: a BDE no longer adds candidates
   ["candidate.edit", "Y Y Y - - -"],
-  ["candidate.editProfile", "Y Y - - - -"],
+  ["candidate.editProfile", "Y Y Y - - -"],   // then canEditProfile: the résumé rule (2026-11-14, Q17)
   ["email.retry", "Y Y Y - - -"],
   ["email.reclassify", "Y Y - - - -"],
   ["job.capture", "Y Y Y - - -"],

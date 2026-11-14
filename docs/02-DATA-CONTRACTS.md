@@ -2017,13 +2017,19 @@ an `ApplicationEvent` — the same write the kanban makes.
 - Endpoints: `GET/POST /api/candidates/:id/documents` (POST takes metadata only in the mock),
   `DELETE /api/documents/:id`.
 
-### 9.z Candidate submission facts
+### 9.z Candidate submission facts and details
 
-`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — a partial of `workAuth`, `needsSponsorship`, `needsTransfer`,
-`workAuthExpiry`, `rateTarget`, `rateMin`, `availableFrom`, `noticePeriodDays`, `willingToRelocate`,
-`employmentTypes`, sent to `PATCH /api/firms/{firm}/candidates/{id}`. A changed `workAuth` is sent with
-`needsSponsorship` and `needsTransfer` worked out by the same rule as the new-candidate flow (`workAuthChange` in
-`src/lib/constants/work-auth.ts`); the backend refuses a new `work_auth` without both.
+`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — **since 2026-11-14 (07 Q65)** a partial of every onboarding answer
+that isn't on the résumé: `primaryRole`, `targetRoles` (exactly one), `yearsExperience`, `workAuth`,
+`needsSponsorship`, `needsTransfer`, `workAuthExpiry`, `employmentTypes` (at least one), `rateTarget`, `rateMin`,
+`availableFrom`, `noticePeriodDays`, `workSettings`, `preferredLocations`, `willingToRelocate`, `preferredIndustries`,
+`dealBreakers`, `contactNotes`, sent to `PATCH /api/firms/{firm}/candidates/{id}` by the "Additional candidate
+details" tab. Only the fields sent change; a required one sent as null is a 400, and list items are trimmed, blanks
+dropped, repeats removed. After the edit the candidate must still have a place for the job search (the résumé's city
+and state, or a preferred location; else 400). Who: `canEditProfile` (the résumé rule). A changed `workAuth` is sent
+with `needsSponsorship` and `needsTransfer` worked out by the same rule as the new-candidate flow (`workAuthChange` in
+`src/lib/constants/work-auth.ts`); the backend refuses a new `work_auth` without both. The `UPDATE` ledger entry
+names only the fields whose value changed (none: no entry); a changed target role keeps the old list in its note.
 
 `CreateCandidate` (`src/lib/schemas/candidate.ts`, Phase B fix PR 1) — the New candidate form (docs/04 §4.2),
 sent to `POST /api/candidates`: `fullName`, `primaryRole`, `email`, `phone`, `workAuth`, `needsSponsorship`,

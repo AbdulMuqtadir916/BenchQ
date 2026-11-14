@@ -345,8 +345,9 @@ show on Applications and Resumes; a dot marks Overview and Inbox when something 
 | 3 | **Inbox** | What recruiters said, matched to applications, with suggested status updates |
 | 4 | **Jobs** | Where to submit next, ranked for this profile |
 | 5 | **Resumes** | What to submit — the base résumés, their versions and the copies tailored from each |
-| 6 | **Documents** | What vendors ask for: visa papers, ID, certificates, screening answers. **Planned to be dropped** (see Documents below) |
-| 7 | **Activity** | The audit trail a manager opens |
+| 6 | **Additional candidate details** | Every onboarding answer that isn't on the résumé (07 Q65, 2026-11-14), edited in the new-candidate flow's own fields |
+| 7 | **Documents** | What vendors ask for: visa papers, ID, certificates, screening answers. **Planned to be dropped** (see Documents below) |
+| 8 | **Activity** | The audit trail a manager opens |
 
 There is no separate Profile/Record tab: it duplicated the base résumé and left the BDE unsure where to fix a line.
 
@@ -357,8 +358,18 @@ stage the pipeline hasn't caught up with (one-click *Move to …*),
 *Show more*; resolving one animates it out. Then **Pipeline** (current count per stage, animated
 bars, each row opens the board) and **Latest from recruiters** (four newest emails, or the connect
 prompt). Right: **Submission facts** (work authorization + validity, rate and floor, availability
-and notice, employment types, relocation, target roles — editable in place by the OWNER and the candidate's MANAGER,
-not the BDE (07 Q56); the rate floor can't exceed the target), **Base résumé** (its name, newest version and how many tailored copies hang off it, with *Open*), **Best new matches**.
+and notice, employment types, relocation, the target role — read-only since 2026-11-14 (07 Q65): *Edit* opens the
+**Additional candidate details** tab for whoever may edit them), **Base résumé** (its name, newest version and how many tailored copies hang off it, with *Open*), **Best new matches**.
+
+#### Additional candidate details
+Decided 2026-11-14 (07 Q65). What onboarding asked that isn't on the résumé, in the new-candidate flow's own fields:
+**Role** ("Marketed as", years), then the flow's step 3 (work authorization and its expiry, engagement types, target
+rate and floor, available from, notice) and step 4 (the target role, one box; work setting; preferred locations;
+relocation; industries; deal breakers; notes for the BDE). The same rules as onboarding: one target role, and a place
+for the job search (the résumé's city and state, or a preferred location; the hint says which the search will use).
+*Save details* and *Discard changes* sit in a bar at the bottom, enabled once something changed. Edited by the
+candidate's BDE once one is assigned, before that by the OWNER and the candidate's MANAGER (the résumé rule); everyone
+else sees the same details read-only, with a line saying who edits them.
 
 #### Applications
 Toolbar: *Active / All* and *Board / List*, plus a one-line summary. When emails suggest updates, a

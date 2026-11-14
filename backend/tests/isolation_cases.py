@@ -108,10 +108,14 @@ CASES: dict[str, Case] = {
         "full_name": "New candidate", "primary_role": "Data Engineer", "email": "new@example.test", "work_auth": "GC",
         "phone": "+1 555 0100", "country": "US", "years_experience": 5, "needs_sponsorship": False,
         "needs_transfer": False, "target_roles": ["Data Engineer"], "employment_types": ["W2"],
+        "preferred_locations": ["Austin, TX"],      # the job search needs a place (decided 2026-11-14, Q14)
         "manager_id": str(i["manager"]), "bde_id": str(i["bde_user"]),
         "resume_parse_id": str(i["pending_parse"])}, body_ids=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": Case(),
-    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(body=lambda i: {"rate_target": 90}),
+    # The candidate has a BDE, so only that BDE edits its details; an edit leaves a place for the job search (decided
+    # 2026-11-14, Q17, Q20), and this candidate's résumé has no city, so the edit sends a preferred location.
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(
+        body=lambda i: {"rate_target": 90, "preferred_locations": ["Austin, TX"]}, as_bde=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": Case(
         body=lambda i: {"manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
     # The firm's résumés across candidates (résumé versioning PR 7): read-only, in the principal's scope.

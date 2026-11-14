@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
-import { can, canSearchJobs } from "@/lib/auth/permissions";
+import { can, canEditProfile, canSearchJobs } from "@/lib/auth/permissions";
 import { useJobSearches, useStartJobSearch } from "@/lib/hooks/use-jobs";
 import { blockedReason, searchRole, type FindJobsSearch } from "@/components/app/candidate/find-jobs";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
@@ -29,6 +29,7 @@ import { ApplicationDrawer } from "@/components/app/candidate/applications/appli
 import { InboxTab } from "@/components/app/candidate/inbox/inbox-tab";
 import { ResumesTab } from "@/components/app/candidate/resumes-tab";
 import { ActivityTab } from "@/components/app/candidate/activity-tab";
+import { CandidateDetailsTab } from "@/components/app/candidate/details/details-tab";
 import { STATUS_LABEL } from "@/components/app/applications/status-meta";
 import { safeReturnTo } from "@/lib/routes/landing";
 import { useHref } from "@/lib/routes/use-href";
@@ -53,7 +54,8 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const { access } = useRouteAccess();
   const updateStatus = useUpdateApplicationStatus();
   const canAct = can(principal, "candidate.edit");
-  const canEditProfile = can(principal, "candidate.editProfile");
+  // The details tab: the résumé rule, the BDE once assigned, else the OWNER and MANAGER (decided 2026-11-14, Q17).
+  const canEditDetails = ws.candidate ? canEditProfile(principal, ws.candidate) : false;
   // "Find jobs" is the candidate's BDE's (docs/02 §6.z); while their search runs, the matching sequence waits for it.
   const canSearch = ws.candidate ? canSearchJobs(principal, ws.candidate) : false;
   const searchesQuery = useJobSearches(id, canSearch);
@@ -199,7 +201,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
           exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
           transition={{ duration: 0.18, ease: EASE_OUT }}
         >
-          {tab === "overview" ? <OverviewTab ws={ws} actions={actions} canAct={canAct} canEditProfile={canEditProfile} onNotify={setToast} /> : null}
+          {tab === "overview" ? <OverviewTab ws={ws} actions={actions} canAct={canAct} canEditDetails={canEditDetails} /> : null}
           {tab === "applications" ? <ApplicationsTab ws={ws} actions={actions} canAct={canAct} onMove={moveApplication} /> : null}
           {tab === "inbox" ? <InboxTab ws={ws} actions={actions} canAct={canAct} selectedId={selectedMessageId} onSelect={setSelectedMessageId} /> : null}
           {tab === "jobs" ? (
@@ -217,6 +219,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
             />
           ) : null}
           {tab === "resumes" ? <ResumesTab candidate={candidate} shelf={ws.shelfQuery.data} isLoading={ws.shelfQuery.isLoading} error={ws.shelfQuery.error} onRetry={() => void ws.shelfQuery.refetch()} canAct={canAct} /> : null}
+          {tab === "details" ? <CandidateDetailsTab candidate={candidate} canEdit={canEditDetails} onSaved={() => setToast("Details saved")} /> : null}
           {tab === "documents" ? <DocumentsTab ws={ws} canAct={canAct} onNotify={setToast} /> : null}
           {tab === "activity" ? <ActivityTab applications={ws.applications} messages={ws.messages} teamName={ws.teamName} onOpenApplication={setOpenApplicationId} /> : null}
         </motion.div>

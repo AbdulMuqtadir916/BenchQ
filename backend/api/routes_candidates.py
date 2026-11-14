@@ -6,7 +6,8 @@ and another firm is the same 404 as a missing one (principle 4).
 - GET /candidates, GET /candidates/{id}: in the principal's scope (07 Q47): the OWNER, a VIEWER and a support view
   the whole firm; a MANAGER the candidates they manage; a BDE the ones they work. Outside it is 404.
 - POST /candidates: create, with its manager and optional BDE (Q41), skills and summary UNVERIFIED (Q49).
-- PATCH /candidates/{id}: the submission facts (the frontend's UpdateCandidateSchema).
+- PATCH /candidates/{id}: the candidate's details, every onboarding answer that isn't on the résumé (the "Additional
+  candidate details" tab, decided 2026-11-14), by the résumé rule: the BDE once assigned, else the OWNER and MANAGER.
 - POST /candidates/{id}/assign: move it to another manager and/or BDE (Q43).
 Assigning a BDE to a candidate that had none is blocked at the plan's candidate limit (Q45). Every assignment change
 is one ASSIGN ledger entry, with the handoff note.
@@ -25,7 +26,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend.api.routes_auth import current_principal
 from backend.auth import ledger
 from backend.auth.invites import lock_firm
-from backend.auth.policy import can_assign_to, require
+from backend.auth.policy import can_assign_to, can_edit_profile, require
 from backend.auth.scoping import own_scope, scoped, team_scope
 from backend.auth.sessions import Principal
 from backend.candidates.first_base import first_base
@@ -43,6 +44,7 @@ router = APIRouter(prefix="/firms/{firm_id}/candidates", tags=["candidates"])
 PARSE_LIFETIME = timedelta(minutes=60)
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PLACE_NEEDED = "Add a preferred location, or the candidate's city and state: the job search needs a place."
+PLACE_NEEDED_ON_EDIT = "Add a preferred location, or the city and state on the candidate's résumé: the job search needs a place."
 
 WorkAuth = Literal[WORK_AUTHS]
 EmploymentType = Literal[EMPLOYMENT_TYPES]
@@ -95,18 +97,34 @@ class CreateCandidateBody(BaseModel):
 
 
 class UpdateCandidateBody(BaseModel):
-    """The frontend's UpdateCandidateSchema: the submission facts the owner or the candidate's manager edits (07 Q56)."""
+    """The frontend's UpdateCandidateSchema: the candidate's details, every onboarding answer that isn't on the résumé
+    (decided 2026-11-14, Q18). Only the fields sent change. The same rules as onboarding (Q20): one target role, at
+    least one engagement type, and a place for the job search afterwards."""
+    primary_role: Required200 | None = None
+    target_roles: list[Required200] | None = Field(default=None, min_length=1, max_length=1)
+    years_experience: float | None = Field(default=None, ge=0, le=60)
     work_auth: WorkAuth | None = None
     work_auth_expiry: datetime | None = None
+    # A changed work_auth must come with both (the flow sends all three together); nothing is worked out here.
+    needs_sponsorship: bool | None = None
+    needs_transfer: bool | None = None
+    employment_types: list[EmploymentType] | None = Field(default=None, min_length=1)
     rate_target: float | None = Field(default=None, gt=0)
     rate_min: float | None = Field(default=None, gt=0)
     available_from: datetime | None = None
     notice_period_days: int | None = Field(default=None, ge=0, le=365)
+    work_settings: list[RemoteMode] | None = None
+    preferred_locations: list[str] | None = Field(default=None, max_length=50)
     willing_to_relocate: bool | None = None
-    employment_types: list[EmploymentType] | None = None
-    # A changed work_auth must come with both (the flow sends all three together); nothing is worked out here.
-    needs_sponsorship: bool | None = None
-    needs_transfer: bool | None = None
+    preferred_industries: list[str] | None = Field(default=None, max_length=50)
+    deal_breakers: list[str] | None = Field(default=None, max_length=50)
+    contact_notes: str | None = Field(default=None, max_length=2000)
+
+
+# The fields an edit can't empty (null): the rest (expiry, rates, availability, notice, notes) can be cleared.
+_NOT_NULL = ("primary_role", "target_roles", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer",
+             "employment_types", "work_settings", "preferred_locations", "willing_to_relocate", "preferred_industries",
+             "deal_breakers")
 
 
 class AssignBody(BaseModel):
@@ -296,30 +314,54 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
     return candidate_json(candidate)
 
 
-@router.patch("/{candidate_id}", summary="Edit a candidate's submission facts")
+def _edited(changes: dict) -> dict:
+    """The sent values as stored: text trimmed, blank list items dropped, each list without repeats."""
+    out = dict(changes)
+    for field in ("work_settings", "employment_types", "target_roles"):
+        if out.get(field) is not None:
+            out[field] = list(dict.fromkeys(out[field]))
+    for field in ("preferred_locations", "preferred_industries", "deal_breakers"):
+        if out.get(field) is not None:
+            out[field] = list(dict.fromkeys(item.strip() for item in out[field] if item.strip()))
+    if "contact_notes" in out:
+        out["contact_notes"] = _clean(out["contact_notes"])
+    return out
+
+
+@router.patch("/{candidate_id}", summary="Edit a candidate's details (every onboarding answer not on the résumé)")
 def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCandidateBody,
                      principal: Principal = Depends(require("candidate.editProfile")), db: DbSession = Depends(get_db)):
-    """07 Q56: the owner and the candidate's manager edit the profile; the BDE edits only the résumés (Q55)."""
+    """Decided 2026-11-14 (Q17, reversing 07 Q56): the résumé rule (Q55): the candidate's BDE once one is assigned;
+    before that the OWNER and the candidate's MANAGER. One UPDATE ledger entry naming the fields that changed; a changed
+    target role keeps the old list in the entry's note (Q24)."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
-    changes = body.model_dump(exclude_unset=True)
+    if not can_edit_profile(principal, candidate):
+        raise HTTPException(status_code=403, detail="This candidate's BDE edits their details; you can view them.")
+    changes = _edited(body.model_dump(exclude_unset=True))
     for field, value in changes.items():
-        if value is None and field in ("work_auth", "willing_to_relocate", "employment_types", "needs_sponsorship",
-                                       "needs_transfer"):
+        if value is None and field in _NOT_NULL:
             raise _bad(f"{field} can't be empty.")
     # Nothing is worked out here: a changed work authorization comes with both values, or it is refused.
     if "work_auth" in changes and changes["work_auth"] != candidate.work_auth:
         missing = [f for f in ("needs_sponsorship", "needs_transfer") if f not in changes]
         if missing:
             raise _bad(f"A new work_auth needs {' and '.join(missing)} in the same request.")
-    for field, value in changes.items():
-        setattr(candidate, field, value)
+    changed = [field for field, value in changes.items() if getattr(candidate, field) != value]
+    roles_before = list(candidate.target_roles or [])
+    for field in changed:
+        setattr(candidate, field, changes[field])
     if candidate.rate_min is not None and candidate.rate_target is not None and candidate.rate_min > candidate.rate_target:
         raise _bad("The floor can't be above the target rate.")
-    if changes:
+    # The job search needs a place (Q20): the résumé's city and state together, or a preferred location.
+    if changed and not ((candidate.city and candidate.state) or candidate.preferred_locations):
+        raise _bad(PLACE_NEEDED_ON_EDIT)
+    if changed:
+        note = (f"Target roles before: {', '.join(roles_before)}"
+                if "target_roles" in changed and roles_before else None)
         ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="candidate",
                       entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changes)}")
+                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changed)}", note=note)
         db.commit()
     return candidate_json(candidate)
 

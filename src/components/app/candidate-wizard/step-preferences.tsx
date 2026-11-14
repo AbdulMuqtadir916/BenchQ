@@ -7,8 +7,8 @@ import type { RemoteMode } from "@/lib/schemas/enums";
 import { ChoicePill, fieldAria, WizardField } from "./field";
 import { SwitchRow } from "./parts";
 import { TagInput } from "./tag-input";
-import type { Errors } from "./model";
-import type { Wizard } from "./use-wizard";
+import { HOME_WHERE, type Errors, type HomeFrom } from "./model";
+import type { WizardForm } from "./use-wizard";
 
 const WORK_SETTINGS: { value: RemoteMode; label: string }[] = [
   { value: "REMOTE", label: "Remote" },
@@ -21,7 +21,7 @@ const WORK_SETTINGS: { value: RemoteMode; label: string }[] = [
  * a preferred location, or the city and state from step 2 (decided 2026-11-14). Every other field is optional. Work
  * setting, preferred locations and the notes are provisional fields (07 Q50).
  */
-export function StepPreferences({ wizard, errors }: { wizard: Wizard; errors: Errors }) {
+export function StepPreferences({ wizard, errors, homeFrom = "basic" }: { wizard: WizardForm; errors: Errors; /** Where the city and state are entered: the flow's step 2, or the résumé (the details tab). */ homeFrom?: HomeFrom }) {
   const { values, set } = wizard;
   const marketedAs = values.primaryRole.trim();
   const hasHome = values.city.trim() !== "" && values.state.trim() !== "";
@@ -55,7 +55,7 @@ export function StepPreferences({ wizard, errors }: { wizard: Wizard; errors: Er
       </fieldset>
 
       <WizardField id="cw-locations" label="Preferred locations" required={!hasHome} error={errors.preferredLocations}
-        hint={hasHome ? `The job search looks in ${values.city.trim()}, ${values.state.trim()} and in each place here.` : "The job search needs a place: add one here, or their city and state on Basic details."}>
+        hint={hasHome ? `The job search looks in ${values.city.trim()}, ${values.state.trim()} and in each place here.` : `The job search needs a place: add one here, or ${HOME_WHERE[homeFrom]}.`}>
         <TagInput id="cw-locations" label="preferred locations" describedBy={errors.preferredLocations ? "cw-locations-error" : "cw-locations-hint"} values={values.preferredLocations} onChange={(next) => set("preferredLocations", next)} suggestions={LOCATION_SUGGESTIONS} placeholder="City, state" />
       </WizardField>
 

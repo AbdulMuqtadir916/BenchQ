@@ -76,8 +76,8 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   /** 07 Q41: only the OWNER and MANAGERs add candidates; a BDE no longer does. */
   "candidate.create": OWNER_AND_MANAGER,
   "candidate.edit": ALL_ACTING,
-  /** 07 Q56: the profile (submission facts) is the OWNER's and MANAGER's; a BDE edits only the résumés (Q55). */
-  "candidate.editProfile": OWNER_AND_MANAGER,
+  /** Who, for one candidate: `canEditProfile` (decided 2026-11-14, Q17; reverses 07 Q56). */
+  "candidate.editProfile": ALL_ACTING,
   "email.retry": ALL_ACTING,
   "email.reclassify": OWNER_AND_MANAGER,
   "job.capture": ALL_ACTING,
@@ -146,6 +146,17 @@ export function canAssignTo(
  */
 export function canChangeResume(principal: Principal, candidate: { bdeId: string | null }): boolean {
   if (!can(principal, "resume.edit") || principal.kind !== "firm") return false;
+  if (candidate.bdeId === null) return OWNER_AND_MANAGER.includes(principal.role);
+  return candidate.bdeId === principal.userId;
+}
+
+/**
+ * Who edits a candidate's details, every onboarding answer that isn't on the résumé (the "Additional candidate details"
+ * tab; decided 2026-11-14, Q17, reversing 07 Q56): the résumé rule (Q55). The candidate's BDE once one is assigned;
+ * before that the OWNER and a MANAGER. VIEWER and a support view never. The backend's `can_edit_profile` is the same rule.
+ */
+export function canEditProfile(principal: Principal, candidate: { bdeId: string | null }): boolean {
+  if (!can(principal, "candidate.editProfile") || principal.kind !== "firm") return false;
   if (candidate.bdeId === null) return OWNER_AND_MANAGER.includes(principal.role);
   return candidate.bdeId === principal.userId;
 }
