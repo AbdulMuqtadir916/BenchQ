@@ -924,6 +924,53 @@ describe("the form for Mark applied", () => {
     expect((await finalForm()).fields).toEqual([]);
   });
 
+  // The panel holds while it asks whether the tab moved on to another job (PR #140, fifth review).
+  const holdOn = async (isHeld: boolean) => {
+    await act(async () => { root.render(<Harness value={connection} isHeld={isHeld} />); });
+    await wait(5);
+  };
+  const otherJob = { ...page([field("s", "Salary expectation", "text", "90000")]), scanIds: new Map([[0, 2]]) };
+
+  it("takes nothing from another job's page while held, and the job's own page once the tab is back", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
+    await mount();
+    await holdOn(true);
+    vi.mocked(scanTab).mockResolvedValue(otherJob);
+    await run(() => hook.rescan());
+    // The look goes on while held (it's how the job is checked), but none of it goes into this application's form.
+    expect(hook.rows?.map(({ field: { id } }) => id)).toEqual(["s"]);
+    typed(["0:s", "95000"]);
+    expect((await finalForm()).fields.map(({ label }) => label)).toEqual(["Nickname"]);
+    vi.mocked(readTab).mockResolvedValue({ values: new Map(), moved: false });
+    vi.mocked(scanTab).mockResolvedValue({ ...page([field("n", "Nickname", "text", "Priya")]), scanIds: new Map([[0, 3]]) });
+    await holdOn(false);
+    expect((await finalForm()).fields.map(({ label, value }) => [label, value])).toEqual([["Nickname", "Priya"]]);
+  });
+
+  it("takes in the page the BDE kept the tab connected on", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
+    await mount();
+    await holdOn(true);
+    vi.mocked(scanTab).mockResolvedValue({ ...page([field("c", "Cover note", "text", "Hello")]), scanIds: new Map([[0, 2]]) });
+    await run(() => hook.rescan());
+    expect((await finalForm()).fields.map(({ label }) => label)).toEqual(["Nickname"]);
+    await holdOn(false);
+    expect((await finalForm()).fields.map(({ label }) => label)).toEqual(["Nickname", "Cover note"]);
+  });
+
+  it("keeps the rows from a held look out of the form, though the hold lifts, until a fresh look replaces them", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
+    await mount();
+    await holdOn(true);
+    vi.mocked(scanTab).mockResolvedValue(otherJob);
+    await run(() => hook.rescan());
+    // The fresh look after the hold can't read the page, so the rows on show are still the other job's.
+    vi.mocked(scanTab).mockRejectedValue(new Error("The frame went away"));
+    await holdOn(false);
+    typed(["0:s", "95000"]);
+    expect((await finalForm()).fields.map(({ label }) => label)).toEqual(["Nickname"]);
+  });
+
   it("takes in the latest change as it marks the job applied", async () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
     await mount();

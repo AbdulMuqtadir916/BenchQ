@@ -221,6 +221,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   // Read when a fill is about to start, which can be well after the render that started its run (a next page settles).
   const held = useRef(isHeld);
   useEffect(() => { held.current = isHeld; });
+  // Whether the rows on show came from a look begun or ended while held, which may have read another job's page.
+  const heldLook = useRef(false);
   const { tabId, applicationId, candidateId, job, confirmedHosts } = connection;
   // The résumé and application context the review in hand answers from; selection changes wait for this exact scan.
   const [answeredFrom, setAnsweredFrom] = useState<string | null | undefined>(undefined);
@@ -343,6 +345,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
     const reviewed = withResumeFile(withHistory(buildReview(fields, answers, job), bank.current?.history ?? NO_HISTORY), bank.current?.file ?? null);
     const next = withMemory(reviewed, memory.current, resume.current, justFilled).map((row) => withSaveOffer(row, answers));
     showRows(next);
+    // While the panel asks whether the tab moved on to another job, the look goes on (it's how the job is checked), but
+    // that page's fields aren't this application's: none go into its form for Mark applied (PR #140's review).
+    if (held.current || heldLook.current) return;
     const { settled } = memory.current;
     const autofilled = new Map(next.flatMap((row) => {
       const value = settled.get(memoKeyOf(row));
@@ -354,13 +359,14 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   const scan = useCallback(async (justFilled?: ReadonlySet<string>, reuseBank = false) => {
     // The résumés are still loading: there's nothing to answer from yet.
     if (busy.current || resumeId === undefined) return;
+    const isHeldAtStart = held.current;
     latestScan.current += 1;
     const run = latestScan.current;
     const isCurrent = () => run === latestScan.current && !busy.current;
     isScanRunning.current = true;
     setScanning(true);
-    const held = reuseBank && bank.current?.resumeId === resumeId ? bank.current : null;
-    const [answers, file] = held ? [held, held.file] : await Promise.all([loadAnswers(), loadFile()]);
+    const reused = reuseBank && bank.current?.resumeId === resumeId ? bank.current : null;
+    const [answers, file] = reused ? [reused, reused.file] : await Promise.all([loadAnswers(), loadFile()]);
     const page = answers ? await readPage(isCurrent) : null;
     if (answers && page && isCurrent()) {
       try {
@@ -372,6 +378,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
         }
         memory.current.lastScan = topScan;
         bank.current = { ...answers, resumeId, file };
+        heldLook.current = isHeldAtStart || held.current;
         review(page.fields, answers.entries, justFilled);
         setAttachment(file?.name ?? null);
         frames.current = page;
@@ -395,6 +402,18 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, onS
   // The scan for the current résumé, for a click that started before the résumé changed (Allow, while Chrome asks).
   const currentScan = useRef(scan);
   useEffect(() => { currentScan.current = scan; }, [scan]);
+
+  // The hold lifted: the BDE kept the tab connected on the page it moved to, or the tab went back to the job. Nothing
+  // went into this application's form while held, so a fresh look takes in the page the tab shows now; never the rows
+  // from while it was held, which can be the other job's (PR #140's review).
+  const wasHeld = useRef(isHeld);
+  useEffect(() => {
+    const isLifted = wasHeld.current && !isHeld;
+    wasHeld.current = isHeld;
+    if (!isLifted) return;
+    const look = window.setTimeout(() => void currentScan.current(), 0);
+    return () => window.clearTimeout(look);
+  }, [isHeld]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void scan(), 0);
