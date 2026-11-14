@@ -129,6 +129,16 @@ def test_a_retailor_is_the_next_version_and_carries_what_the_bde_typed(anonymous
     assert row.version == 2 and row.autofill == typed
 
 
+def test_a_tailored_version_has_its_match_against_its_job(anonymous_client, test_db, world, launched, setup,
+                                                         monkeypatch):
+    """Decided 2026-11-14 (Q39): the "Resume sent" tag's Match, worked out when the tailoring writes the version."""
+    _start(anonymous_client, world, setup)
+    done = _status(anonymous_client, world, setup, _drive(test_db, launched, list(REPLIES), monkeypatch)).json()
+    test_db.expire_all()
+    row = test_db.get(Resume, uuid.UUID(done["resume_id"]))
+    assert 0 <= row.match_score <= 100 and len(row.match_basis) == 64
+
+
 def test_a_step_that_fails_writes_no_version(anonymous_client, test_db, world, launched, setup, monkeypatch):
     from backend.models.tenancy import LedgerEntry
     run_id = _start(anonymous_client, world, setup).json()["run_id"]

@@ -27,7 +27,7 @@ from backend.auth import ledger
 from backend.auth.scoping import scoped
 from backend.job_monitor import mark_run_failed
 from backend.job_search import limits, places
-from backend.match import score as match
+from backend.match import score as match, store as match_store
 from backend.job_search.providers import READERS, REGISTRY, REMOTE, JobFields, ProviderError, SearchResult
 from backend.job_search.providers.base import ERROR_MESSAGES
 from backend.job_search.text import clean_json
@@ -190,11 +190,12 @@ def _posted_too_long_ago(posted_at: str | None, today: date) -> bool:
     return (today - posted).days > limits.POSTED_WITHIN_DAYS
 
 
-def _who(firm_id, candidate_id, country: str | None) -> match.Who | None:
-    """The candidate as the Match calculator reads them (its eligibility rules filter the search: Q32)."""
+def _scorer(firm_id, candidate_id) -> match_store.Scorer | None:
+    """The candidate's side of the Match score, read once for the whole search: their active résumé's v1 and themselves
+    as the calculator reads them (its eligibility rules also filter the search: Q32)."""
     with SessionLocal() as db:
         row = scoped(db, Candidate, firm_id).filter(Candidate.id == candidate_id).first()
-        return match.who(row, country) if row is not None else None
+        return match_store.scorer_for(db, row) if row is not None else None
 
 
 def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider, result: SearchResult,
@@ -202,7 +203,7 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
     counts = {"found": len(result.jobs), "saved": 0, "refreshed": 0, "skipped_closed": 0, "skipped_unreadable": 0,
               "skipped_duplicate": 0, "skipped_over_cap": 0, "skipped_too_old": 0, "skipped_not_remote": 0,
               "skipped_work_auth": 0}
-    candidate = _who(firm_id, candidate_id, country)
+    scorer = _scorer(firm_id, candidate_id)
     today = utcnow().date()
     # Read and identify every job before the transaction: no lock is held while parsing HTML.
     picked: list[tuple[str, dict]] = []
@@ -221,7 +222,7 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
         if place == REMOTE and not fields.is_remote:
             counts["skipped_not_remote"] += 1
             continue
-        if candidate is not None and match.ruled_out(fields, candidate):    # the posting rules them out (Q32)
+        if scorer is not None and match.ruled_out(fields, scorer.who):    # the posting rules them out (Q32)
             counts["skipped_work_auth"] += 1
             continue
         key = job_id(fields)
@@ -253,12 +254,16 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
                 row.batch_id, row.last_seen_at, row.content, row.source = batch_id, now, content, provider.name
                 counts["refreshed"] += 1
             elif counts["saved"] < room:
-                db.add(JobPosting(firm_id=firm_id, candidate_id=candidate_id, batch_id=batch_id, source=provider.name,
-                                  first_source=provider.name, job_id=key, content=content, discovered_at=now,
-                                  last_seen_at=now))
+                row = JobPosting(firm_id=firm_id, candidate_id=candidate_id, batch_id=batch_id, source=provider.name,
+                                 first_source=provider.name, job_id=key, content=content, discovered_at=now,
+                                 last_seen_at=now)
+                db.add(row)
                 counts["saved"] += 1
             else:
                 counts["skipped_over_cap"] += 1
+                continue
+            if scorer is not None:
+                match_store.apply(row, scorer, match_store.fields_of(row))     # its Match, as it is saved (Q35)
         batch.meta = {**batch.meta, "counts": counts}
         _ledger(db, firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
                 country=country, summary=f"{_searched(query, place)}: {counts['saved']} new, "
@@ -291,6 +296,9 @@ def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict, admit
                          first_source=source, job_id=key, content=content, discovered_at=now, last_seen_at=now)
     db.add(posting)
     db.flush()
+    candidate = scoped(db, Candidate, firm_id).filter(Candidate.id == candidate_id).first()
+    if candidate is not None:
+        match_store.score_posting(db, candidate, posting)          # its Match, as it is saved (Q35)
     actor = db.get(User, user_id)
     ledger.record(db, actor=actor, action="CREATE", entity_type="job_posting", entity_id=posting.id,
                   entity_label=f"{fields.title} at {fields.company}"[:200], firm_id=firm_id, candidate_id=candidate_id,

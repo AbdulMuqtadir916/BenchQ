@@ -20,6 +20,8 @@ os.environ["BENCHQ_ENV"] = "development"
 # Synthetic Gmail encryption key, never used outside the disposable test environment.
 os.environ["CANDIDATE_GMAIL_ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
 os.environ["CANDIDATE_GMAIL_ENABLED"] = "true"
+# The Match score's startup pass (backend/match/store.py) stays off: each test owns its rows.
+os.environ["MATCH_PASS_ON_START"] = "false"
 
 
 def pytest_configure(config):

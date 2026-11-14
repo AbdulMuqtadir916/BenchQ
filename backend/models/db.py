@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, String, Integer, Float, Boolean, Text, DateTime, Date,
+    Column, String, Integer, Float, Boolean, Text, DateTime, Date, SmallInteger,
     ForeignKey, JSON, Index, UniqueConstraint, create_engine, text, CheckConstraint, ForeignKeyConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -652,9 +652,15 @@ class Resume(Base):
     # the one it replaced as `over`: for the work history, the whole list.
     # Not content: a save never compares it, and copies it to the next version.
     autofill = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    # The Match score (0028; backend/match/store.py): 0–100, for a tailored version against its job, the first reason it is held at 40, and a SHA-256 of what it
+    # was worked out from. A row whose basis no longer matches is scored again; null until it is scored.
+    match_score = Column(SmallInteger, nullable=True)
+    match_note = Column(String(200), nullable=True)
+    match_basis = Column(String(64), nullable=True)
 
     __table_args__ = (
         CheckConstraint("category IN ('BASE', 'TAILORED')", name="ck_resumes_category_values"),
+        CheckConstraint("match_score IS NULL OR match_score BETWEEN 0 AND 100", name="ck_resumes_match_score_range"),
         CheckConstraint("(category = 'BASE' AND job_id IS NULL) OR (category = 'TAILORED' AND job_id IS NOT NULL)",
                         name="ck_resumes_category_job"),
         ForeignKeyConstraint(["base_resume_id", "candidate_id"], ["base_resumes.id", "base_resumes.candidate_id"],

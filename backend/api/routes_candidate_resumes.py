@@ -24,7 +24,7 @@ from datetime import date
 from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend.api.routes_auth import current_principal
 from backend.api.routes_candidates import _candidate, _member_of
 from backend.auth.policy import can_change_resume, can_manage_resume, require
+from backend.match import store as match_store
 from backend.auth.sessions import Principal
 from backend.candidates import autofill as autofill_answers
 from backend.candidates import versions
@@ -230,30 +231,34 @@ def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid
 
 @router.post("/{resume_id}/save", status_code=201, summary="Save an edit as the résumé's next version")
 def save_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID, body: ContentIn,
-                principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+                background: BackgroundTasks, principal: Principal = Depends(require("resume.edit")),
+                db: DbSession = Depends(get_db)):
     """`resume_id` is the version the edit was made from. The answer's `notice` says when another version was saved
     meanwhile (both are kept; the new one doesn't include the other's changes)."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_change_resume)
     source = versions.candidate_version(db, candidate, resume_id)
     saved = versions.save_version(db, actor, candidate, source, body.stored())
     db.commit()
+    match_store.rescore_later(background, firm_id, candidate_id)    # its Match scores (decided 2026-11-14, Q35)
     return {**versions.version_json(saved.row, with_content=True), "notice": saved.notice}
 
 
 @router.post("/{resume_id}/use-as-base", summary="Make this version the base the workflow uses")
-def use_resume_as_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+def use_resume_as_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID, background: BackgroundTasks,
                        principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
     """A base's v1: that base becomes active. Any other version: copied as v1 of a new base, which becomes active; if
     a base was already made from it, that one becomes active instead."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_change_resume)
     base = versions.use_as_base(db, actor, candidate, versions.candidate_version(db, candidate, resume_id))
     db.commit()
+    match_store.rescore_later(background, firm_id, candidate_id)    # a new active résumé (Q34, Q35)
     return versions.base_json(base, versions.base_numbers(db, candidate)[base.id])
 
 
 @router.post("/upload", status_code=201, summary="Upload a later résumé as the candidate's new base")
-async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, file: UploadFile = File(...),
-                        principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, background: BackgroundTasks,
+                        file: UploadFile = File(...), principal: Principal = Depends(require("resume.edit")),
+                        db: DbSession = Depends(get_db)):
     """PDF or Word, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
     with the base it is; if that base was deleted, it comes back instead (its v1, `restored` true, no parser run).
     Otherwise the parser reads it and one transaction keeps the file and writes a new active base with its v1.
@@ -267,8 +272,10 @@ async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, file: Uploa
     if await asyncio.to_thread(_is_new_file, db, firm_id, principal, candidate_id, sha256):
         text = await asyncio.to_thread(extract_text, kind, content)
         parse = await read_resume(text, kind, db, firm_id=firm_id)
-    return await asyncio.to_thread(_keep_upload, db, firm_id, principal, candidate_id, file.filename or "", kind,
+    kept = await asyncio.to_thread(_keep_upload, db, firm_id, principal, candidate_id, file.filename or "", kind,
                                    content, sha256, parse)
+    match_store.rescore_later(background, firm_id, candidate_id)    # a new active résumé (Q34, Q35)
+    return kept
 
 
 def _may_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID) -> None:
@@ -337,13 +344,15 @@ def base_removal(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID
 
 
 @router.delete("/bases/{base_id}", summary="Delete a base, or hide it if something uses it")
-def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID, keep_used: bool = False,
-                principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID, background: BackgroundTasks,
+                keep_used: bool = False, principal: Principal = Depends(require("resume.edit")),
+                db: DbSession = Depends(get_db)):
     """`keep_used=true`: a base that is in use is hidden and what nothing uses is deleted with it (the `rest` of the
     preview); without it the base is only hidden (docs/team/resume-versioning.md §4.7)."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
     removal = versions.delete_base(db, actor, candidate, versions.candidate_base(db, candidate, base_id), keep_used)
     db.commit()
+    match_store.rescore_later(background, firm_id, candidate_id)    # the active résumé may have changed (Q35)
     return removal.json()
 
 

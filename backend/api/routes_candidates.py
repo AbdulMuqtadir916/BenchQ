@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
@@ -34,6 +34,7 @@ from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.candidates import profile
 from backend.candidates.serialize import candidate_json
+from backend.match import store as match_store
 from backend.models.candidates import (EMPLOYMENT_TYPES, REMOTE_MODES, WORK_AUTHS, WORKING_STATUSES, Candidate,
                                        ResumeParse)
 from backend.models.db import get_db, utcnow
@@ -121,6 +122,9 @@ class UpdateCandidateBody(BaseModel):
     contact_notes: str | None = Field(default=None, max_length=2000)
 
 
+# The candidate's fields the Match score reads (backend/match/score.py `who`): an edit to one scores their jobs again.
+_SCORED = {"primary_role", "target_roles", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer",
+           "employment_types"}
 # The fields an edit can't empty (null): the rest (expiry, rates, availability, notice, notes) can be cleared.
 _NOT_NULL = ("primary_role", "target_roles", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer",
              "employment_types", "work_settings", "preferred_locations", "willing_to_relocate", "preferred_industries",
@@ -329,7 +333,7 @@ def _edited(changes: dict) -> dict:
 
 
 @router.patch("/{candidate_id}", summary="Edit a candidate's details (every onboarding answer not on the résumé)")
-def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCandidateBody,
+def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCandidateBody, background: BackgroundTasks,
                      principal: Principal = Depends(require("candidate.editProfile")), db: DbSession = Depends(get_db)):
     """Decided 2026-11-14 (Q17, reversing 07 Q56): the résumé rule (Q55): the candidate's BDE once one is assigned;
     before that the OWNER and the candidate's MANAGER. One UPDATE ledger entry naming the fields that changed; a changed
@@ -363,6 +367,8 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
                       entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
                       summary=f"Updated {', '.join(f.replace('_', ' ') for f in changed)}", note=note)
         db.commit()
+        if set(changed) & _SCORED:
+            match_store.rescore_later(background, firm_id, candidate_id)   # what the Match reads (Q35)
     return candidate_json(candidate)
 
 

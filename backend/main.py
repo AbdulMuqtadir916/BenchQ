@@ -1,6 +1,7 @@
 """FastAPI entry point for JobNavigator."""
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -72,6 +73,12 @@ async def lifespan(app: FastAPI):
     configure_scheduler()
     scheduler.start()
     logger.info("Database initialized, seeded, scheduler started.")
+
+    # The Match score of every job and tailored version whose score is missing or out of date, in one background
+    # thread (decided 2026-11-14, Q49; backend/match/store.py). Off in the tests, which own their database.
+    if os.environ.get("MATCH_PASS_ON_START", "true").strip().lower() != "false":
+        from backend.match import store as match_store
+        match_store.start_pass()
 
     # Warm the OpenRouter live-pricing cache used for LLM cost logging (non-fatal).
     try:

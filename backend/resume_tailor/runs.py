@@ -33,6 +33,7 @@ from sqlalchemy import func, text as sql
 from backend.auth import ledger
 from backend.auth.scoping import scoped
 from backend.candidates import autofill, versions
+from backend.match import store as match_store
 from backend.candidates.values import text
 from backend.job_monitor import get_all_running, mark_run_failed
 from backend.job_search import providers
@@ -380,6 +381,7 @@ def _finish(run_id, firm_id, candidate_id, source_resume_id, job_posting_id, use
                      autofill=copy.deepcopy(autofill.entries_of(newest or source)), **content)
         db.add(row)
         db.flush()
+        match_store.score_tailored(db, candidate, row, posting)    # its Match against the job (decided 2026-11-14, Q39)
         number = versions.base_numbers(db, candidate)[base.id]
         entry = ledger.record(db, actor=actor, action="CREATE", entity_type="resume",
                               entity_id=row.id,

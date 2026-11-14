@@ -28,7 +28,7 @@ Tenancy: `(firm_id, candidate_id)` references `candidates (firm_id, id)` on both
 firm other than its candidate's; and `job_postings (firm_id, candidate_id, batch_id)` references the same three on
 `scrape_jobs`, so a posting can't name another candidate's or another firm's batch.
 """
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKeyConstraint, Index, String, Text, \
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKeyConstraint, Index, SmallInteger, String, Text, \
     UniqueConstraint, event, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
@@ -99,6 +99,12 @@ class JobPosting(Base):
     # the adapter's decision, not this table's — see the module docstring.
     content = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
 
+    # The Match score (0028; backend/match/store.py): 0–100, the first reason it is held at 40, and a SHA-256 of what it
+    # was worked out from. A row whose basis no longer matches is scored again; null until it is scored.
+    match_score = Column(SmallInteger, nullable=True)
+    match_note = Column(String(200), nullable=True)
+    match_basis = Column(String(64), nullable=True)
+
     discovered_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, server_default=text("now()"))
     last_seen_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, server_default=text("now()"))
     created_at = _created_at()
@@ -121,6 +127,9 @@ class JobPosting(Base):
         Index("ix_job_postings_firm_candidate_batch", "firm_id", "candidate_id", "batch_id"),
         # A candidate's jobs newest first, and the new jobs saved since the last 6:30 PM IST (migration 0022).
         Index("ix_job_postings_candidate_discovered", "candidate_id", "discovered_at"),
+        CheckConstraint("match_score IS NULL OR match_score BETWEEN 0 AND 100", name="ck_job_postings_match_score_range"),
+        # One candidate's jobs best Match first, 100 at a time (0028).
+        Index("ix_job_postings_candidate_match", "candidate_id", text("match_score DESC NULLS LAST"), "id"),
     )
 
 
