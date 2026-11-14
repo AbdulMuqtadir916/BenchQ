@@ -204,7 +204,6 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/admin/activity/days": A,
     "GET /api/admin/activity/candidates": A,
     "GET /api/admin/activity/{entry_id}/ip": A,
-    "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)
     "POST /api/auto-reject/run": A,
     "POST /api/companies": A,                      # companies are global reference data
     "POST /api/companies/auto-create-from-jobs": A,

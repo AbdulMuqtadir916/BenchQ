@@ -360,13 +360,6 @@ def test_a_ledger_entry_is_built_only_by_the_writer():
     assert built <= set(DIRECT_WRITES), f"Write through backend/auth/ledger.py instead: {sorted(built - set(DIRECT_WRITES))}"
 
 
-def test_the_old_ledger_table_is_only_cleared_by_the_demo_reset():
-    """`activity_logs` replaced `ledger_entries` (migration 0028); an entry written there would never be seen."""
-    used = _enclosing_calls(lambda call, names: any(_is_ledger_model(node, names, "LedgerEntry") for node in ast.walk(call)),
-                            model="LedgerEntry")
-    assert used <= {("scripts/seed_demo.py", "reset")}, f"Use ActivityEntry instead: {sorted(used)}"
-
-
 def _reads_the_ledger(call: ast.Call, names: set[str]) -> bool:
     name = call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
     return name in {"query", "scoped", "select", "get", "join", "outerjoin"} and any(

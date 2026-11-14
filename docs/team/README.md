@@ -48,7 +48,7 @@ it. Everyone else reads it.
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
 | `applications`, `interviews` | Samad | |
 | `candidate_mailboxes`, `inbox_messages`, `candidate_google_oauth_attempts` (0010) | Samad | Candidate connection, imported mail and one-use OAuth handoff state |
-| `ledger_entries` | Abdul | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table |
+| `activity_logs` | Umamah | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table. It replaced `ledger_entries` and `activity_log_v2` (migration 0018) |
 | billing tables (new) | Abdul | |
 | `users`, `firms`, `plans`, `invites`, `sessions`, `support_views` | Abdul | Tenancy |
 | `notifications`, `password_reset_requests` | Mohammed Abdul Ahad Umamah | Extensible inbox; password recovery approvals |
@@ -122,4 +122,5 @@ it. Everyone else reads it.
 | 0027 | Arbaz | Applications on `job_postings`: `candidate_id` NOT NULL, `(firm_id, candidate_id, job_id)` → `job_postings` ON DELETE RESTRICT; its new key refuses an application on an old job. Follows 0026 | `feat/autofill-screen` |
 | 0028 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows main's 0027 (#129) | `activity-log/pr3-new-table-and-endpoints` |
 | 0029 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts. Follows 0028 | `activity-logs/pr6-signin-events-and-super-admin` |
-| 0030+ | — | Claim the next number here in your PR | — |
+| 0030 | Mohammed Abdul Ahad Umamah | Remove `activity_log_v2` and `ledger_entries` after copying their rows into `activity_logs`. Follows 0029 | `activity-logs/pr7-remove-old-log-tables` |
+| 0031+ | — | Claim the next number here in your PR | — |

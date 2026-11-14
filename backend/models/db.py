@@ -577,18 +577,6 @@ class LlmCallLog(Base):
     error = Column(Text, nullable=True)
 
 
-# ── Activity Log ────────────────────────────────────────────────────────────
-class ActivityLog(Base):
-    __tablename__ = "activity_log_v2"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    type = Column(String, nullable=False)       # scrape | h1b | cv_score | email | telegram
-    message = Column(Text, nullable=False)
-    company = Column(String, nullable=True)
-    details = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow)
-
-
 # ── Resumes ─────────────────────────────────────────────────────────────────
 
 def first_template(kind: str) -> str:

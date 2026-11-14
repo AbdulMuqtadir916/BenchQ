@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.models.candidates import Candidate, ResumeParse
 from backend.models.db import utcnow
-from backend.models.tenancy import Firm, Invite, LedgerEntry, User
+from backend.models.tenancy import ActivityEntry, Firm, Invite, User
 from backend.tests.auth_support import make_user
 
 
@@ -47,9 +47,9 @@ def test_only_a_bde_invite_names_a_manager(test_db, firm, accounts):
 
 
 def test_the_ledger_takes_assign_with_a_note(test_db, firm):
-    test_db.add(LedgerEntry(firm_id=firm.id, actor_type="USER", actor_name="Owner", entity_type="candidate",
-                            entity_id=str(uuid.uuid4()), entity_label="Ravi", action="ASSIGN",
-                            summary="Assigned to Adnan Khan (Fatima Reddy)", note="Push banking clients first."))
+    test_db.add(ActivityEntry(firm_id=firm.id, actor_type="USER", actor_name="Owner", entity_type="candidate",
+                              entity_id=str(uuid.uuid4()), entity_label="Ravi", action="ASSIGN",
+                              summary="Assigned to Adnan Khan (Fatima Reddy)", note="Push banking clients first."))
     test_db.flush()
 
 

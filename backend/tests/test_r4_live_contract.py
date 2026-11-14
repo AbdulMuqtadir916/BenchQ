@@ -110,7 +110,6 @@ NEGATIVE_LIMIT_PATHS = [
     "/api/jobs/unscored-ids?limit=-5",
     "/api/monitor/history?limit=-5",
     "/api/monitor/finished?limit=-5",
-    "/api/activity-log?limit=-3",
     "/api/scrape-log?limit=-3",
     "/api/applications?limit=-3",
 ]
@@ -166,7 +165,7 @@ def test_wrongly_typed_query_params_are_422(live, path):
 
 @pytest.mark.parametrize("path", [
     "/api/jobs?company=%F0%9F%9A%80", "/api/jobs?title_search=%F0%9F%9A%80%20Se%C3%B1or",
-    "/api/activity-log?company=%F0%9F%9A%80", "/api/jobs?status=zzz",
+    "/api/jobs?status=zzz",
     "/api/jobs?source=zzz", "/api/applications?status=zzz",
 ])
 def test_unicode_and_unknown_filter_values_return_an_empty_page(live, path):

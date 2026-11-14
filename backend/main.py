@@ -1113,38 +1113,6 @@ def get_run_detail(run_id: str):
         db.close()
 
 
-@app.get("/api/activity-log", tags=["scheduler"], summary="Activity log")
-def get_activity_log(
-    limit: Annotated[int, Query(ge=0, le=1000)] = 50,
-    offset: int = 0,
-    type: str = None,
-    company: str = None,
-):
-    """Recent activity log entries, optionally filtered by exact `type` and case-insensitive `company` substring, paginated with limit/offset."""
-    from backend.models.db import ActivityLog
-    db = SessionLocal()
-    try:
-        q = db.query(ActivityLog)
-        if type:
-            q = q.filter(ActivityLog.type == type)
-        if company:
-            q = q.filter(ActivityLog.company.ilike(f"%{company}%"))
-        logs = q.order_by(ActivityLog.created_at.desc()).offset(max(0, offset)).limit(limit).all()
-        return [
-            {
-                "id": str(log.id),
-                "type": log.type,
-                "message": log.message,
-                "company": log.company,
-                "details": log.details,
-                "created_at": log.created_at.isoformat() if log.created_at else None,
-            }
-            for log in logs
-        ]
-    finally:
-        db.close()
-
-
 @app.get("/api/scrape-log", tags=["stats"], summary="Scrape log history")
 def get_scrape_log(
     limit: Annotated[int, Query(ge=0, le=1000)] = 50,

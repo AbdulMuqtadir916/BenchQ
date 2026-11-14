@@ -7,9 +7,9 @@ built to be copied: every firm-scoped module takes the same steps, in the same f
 you start your own track, and point to the step you're on in your PR.
 
 The ledger is the `activity_logs` table (model `ActivityEntry`; the contract's `LedgerEntry`, docs/02 §10), which
-took over from `ledger_entries` in migration 0028. Every old row was copied, stamped from today's assignments, and
-`ledger_entries` is left as it was. It is **not** `activity_log_v2`: that's the platform's system log (scrapes, scoring runs), with no actor, firm or action,
-and it stays Super Admin only for `/admin/system` (07-auth §6.6).
+took over from `ledger_entries` in migration 0028. Every old row was copied, stamped from today's assignments. Migration
+0030 removed `ledger_entries` and `activity_log_v2`, the old system log, after copying its rows in as system rows.
+Background work now writes here too, with no firm, so only the Super Admin reads it (`/api/admin/activity`).
 
 ---
 
