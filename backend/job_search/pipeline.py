@@ -2,7 +2,7 @@
 request), then runs `run_search` in the background through `job_monitor.launch_background` (job type `job_search`):
 
     the batch still `running`? no (never saved, or already finished) → nothing, the source isn't asked
-    provider.search(query, country, 100)
+    provider.search(query, country, 100, cursor, posted_within_days=14)
       fails  → the batch finished as error (code) + ledger entry
       answers → read each job; drop closed and unreadable ones; job_id = sha256(company | title | description)
               → one transaction, the candidate row locked (two searches for one candidate count the cap in turn):
@@ -282,7 +282,8 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
     try:
         # The source had nothing more for this role today: finish empty without asking again.
         result = SearchResult(jobs=[], metadata={"exhausted": True}) if exhausted else \
-            await provider.search(query, country, limits.JOBS_PER_SEARCH, cursor)
+            await provider.search(query, country, limits.JOBS_PER_SEARCH, cursor,
+                                  posted_within_days=limits.POSTED_WITHIN_DAYS)
     except ProviderError as error:
         code = error.code
     except Exception as error:          # the provider's own bug: its message may hold a URL, so only its type is logged

@@ -23,10 +23,12 @@ class FakeProvider:
         self.next_cursor: str | None = "more"      # the source has more by default; None: it ran out
         self.calls: list[tuple] = []
         self.cursors: list = []
+        self.asks: list[dict] = []                  # the place and the age each search asked for
 
-    async def search(self, query, country, limit, cursor=None):
+    async def search(self, query, country, limit, cursor=None, *, place=None, posted_within_days=None):
         self.calls.append((query, country, limit))
         self.cursors.append(cursor)
+        self.asks.append({"place": place, "posted_within_days": posted_within_days})
         if self.error:
             raise ProviderError(self.error)
         return SearchResult(jobs=list(self.jobs), metadata={"meta": {"total": len(self.jobs)}},
@@ -248,6 +250,7 @@ def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, a
     fake.jobs = [_job(1), _job(2), _job(3, closed=True), {"t": "No company"}, _job(1)]
     assert _run(world, adnans) == "2 new, 0 seen again"
     assert fake.calls == [("Java Developer", "us", 100)]
+    assert fake.asks == [{"place": None, "posted_within_days": 14}]     # the last 14 days (2026-11-14, Q7)
     (batch,), postings = _rows(test_db, adnans)
     assert (batch.state, batch.error, batch.user_id) == ("success", None, world["people"]["adnan"].id)
     assert batch.meta["counts"] == {"found": 5, "saved": 2, "refreshed": 0, "skipped_closed": 1,

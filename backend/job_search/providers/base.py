@@ -1,10 +1,13 @@
 """The contract every job source implements (job search PR 1, decided 2026-11-10).
 
 A provider does two things:
-- `search(query, country, limit, cursor)`: ask the source for jobs, return them as it sent them (`SearchResult.jobs`,
-  each a JSON object) with the rest of its response (`SearchResult.metadata`), or raise `ProviderError` with a fixed
-  code. `cursor` is where to continue (None: from the top); `SearchResult.next_cursor` is where the next search of the
-  same role continues, None when the source has no more (job search PR 2: a repeated search brings the next page).
+- `search(query, country, limit, cursor, *, place, posted_within_days)`: ask the source for jobs, return them as it
+  sent them (`SearchResult.jobs`, each a JSON object) with the rest of its response (`SearchResult.metadata`), or raise
+  `ProviderError` with a fixed code. `cursor` is where to continue (None: from the top); `SearchResult.next_cursor` is
+  where the next search of the same role continues, None when the source has no more (job search PR 2: a repeated
+  search brings the next page). `place` is one "City, ST", `REMOTE` (remote jobs anywhere in the country) or None (the
+  whole country); `posted_within_days` asks the source for recent jobs only, when it can (decided 2026-11-14). A
+  source's own date filter is a hint, never trusted: the pipeline checks each job's posted date itself.
 - `read(content)`: one stored job (`job_postings.content`, the object exactly as `search` returned it) into the
   common fields everything else reads (`JobFields`). Pure: no I/O.
 
@@ -14,6 +17,9 @@ through its own provider's `read()`, picked by `job_postings.source`. Nothing ou
 """
 from dataclasses import dataclass, field
 from typing import Protocol
+
+# The place that asks for remote jobs anywhere in the search country (decided 2026-11-14, Q12).
+REMOTE = "remote"
 
 # The failure codes a search can end with (`scrape_jobs.error` starts with one). Never the source's body or URL.
 ERROR_MESSAGES = {
@@ -52,6 +58,8 @@ class JobFields:
     is_closed: bool = False
     # The source marks the employer a known H-1B sponsor. False means not known, never "doesn't sponsor".
     h1b_sponsor: bool = False
+    # The source labels the job remote (its own label or location, never a word in the description). False: not known.
+    is_remote: bool = False
 
 
 @dataclass
@@ -64,6 +72,7 @@ class SearchResult:
 class Provider(Protocol):
     name: str           # stored in job_postings.source; never renamed once rows carry it
 
-    async def search(self, query: str, country: str, limit: int, cursor: str | None = None) -> SearchResult: ...
+    async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
+                     place: str | None = None, posted_within_days: int | None = None) -> SearchResult: ...
 
     def read(self, content: dict) -> JobFields: ...

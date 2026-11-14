@@ -270,8 +270,9 @@ FULL_POSTING_KEY = "_full_posting"
 
 
 def _fill_full_posting(db: DbSession, row: JobPosting, principal: Principal) -> None:
-    """A searched job's description is the search's first ~1,000 characters (freehire.me cuts it). Its first open asks
-    the provider for the whole posting (decided 2026-11-11) and keeps it in `content`, so it is asked once. A support
+    """For a provider whose search cuts descriptions and that has a `full_description` read (freehire.me cut them at
+    ~1,000 characters; retired 2026-11-14, so none today: Indeed sends whole descriptions), a job's first open asks the
+    provider for the whole posting (decided 2026-11-11) and keeps it in `content`, so it is asked once. A support
     view shows it but never writes it (no platform-admin write into a firm). A failed call leaves the search's text
     and is tried again on the next open."""
     content = row.content or {}

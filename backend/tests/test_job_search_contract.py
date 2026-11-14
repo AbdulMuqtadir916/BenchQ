@@ -132,7 +132,7 @@ def test_a_job_the_provider_cannot_read_is_skipped_not_fatal(world, adnans, fake
 
 
 def test_metadata_the_database_cannot_store_is_cleaned(world, adnans, fake, test_db, monkeypatch):
-    async def odd(query, country, limit, cursor=None):
+    async def odd(query, country, limit, cursor=None, **ask):
         from backend.job_search.providers import SearchResult
         return SearchResult(jobs=[_job(1, extra=float("nan"))],
                             metadata={"note": "nul\x00byte", "ratio": float("inf"), "nested": [{"k": "\x07"}]})
@@ -212,7 +212,7 @@ def test_the_cap_holds_when_two_searches_finish_together(world, adnans, fake, te
         from backend.job_search.providers import SearchResult
         originals = {"Java Developer": list(fake.jobs), "Spring Developer": jobs_b}
 
-        async def by_query(query, country, limit, cursor=None):
+        async def by_query(query, country, limit, cursor=None, **ask):
             return SearchResult(jobs=originals[query], metadata={})
         fake.search = by_query
         cid = uuid.UUID(adnans["id"])

@@ -29,6 +29,7 @@ JOBS_PER_CANDIDATE_PER_DAY = 100
 ATTEMPTS_PER_BDE_PER_DAY = 20
 CAPTURES_PER_BDE_PER_DAY = 20
 JOBS_PER_SEARCH = 100            # always asked for, even with less room left (Q28)
+POSTED_WITHIN_DAYS = 14          # only jobs posted in the last 14 days (decided 2026-11-14, Q7)
 JOB_TYPE = "job_search"          # job_runs.job_type (the background launcher's own record of the task)
 IST = ZoneInfo("Asia/Kolkata")
 DAY_STARTS = time(18, 30)

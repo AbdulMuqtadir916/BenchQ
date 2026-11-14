@@ -311,7 +311,7 @@ DEFAULT_SETTINGS = {
     "tracer_links_base_url": ("", "Public base URL for tracer links (e.g., https://yourdomain.com)"),
     "tracer_links_url_style": ("path", "URL format: path or param. Token: random or job_id. Combinations: path, param, path_jobid, param_jobid"),
     # Job search (backend/job_search/providers/): the source every firm's BDE searches; one of the registered providers.
-    "job_search_provider": ("freehire", "The job source a BDE's search uses, the same for every firm: one of the registered providers (backend/job_search/providers/)"),
+    "job_search_provider": ("indeed", "The job source a BDE's search uses, the same for every firm: one of the registered providers (backend/job_search/providers/)"),
     "dedup_tracking_params": (json.dumps([
         "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "mode",
         "src", "source", "ref", "refid", "refsrc", "refsource",
@@ -558,6 +558,7 @@ def seed_settings(db):
             db.add(Setting(key=key, value=value, description=desc))
     db.commit()
     upgrade_resume_parse_prompt(db)
+    retire_job_search_provider(db)
     # One-shot: a DB that already holds a mock account keeps signing in with it;
     # every other DB starts on the personal account.
     if "linkedin_use_mock_account" not in existing:
@@ -583,6 +584,18 @@ def upgrade_resume_parse_prompt(db):
         row.description = DEFAULT_SETTINGS["resume_parse_prompt"][1]
         db.commit()
         logger.info("resume_parse_prompt upgraded to the base-résumé parser's default")
+
+
+def retire_job_search_provider(db):
+    """Seeding never replaces a row, so a database that chose a source later retired (freehire.me, 2026-11-14) would
+    keep naming it: searches already fall back to the default (`providers.active`), but the Settings page would show a
+    value it can't save back. A name that isn't a registered provider becomes the default. Idempotent."""
+    from backend.job_search.providers import DEFAULT_PROVIDER, REGISTRY
+    row = db.query(Setting).filter(Setting.key == "job_search_provider").first()
+    if row is not None and (row.value or "").strip() not in REGISTRY:
+        logger.info("job_search_provider %r is not a registered provider; set to %s", row.value, DEFAULT_PROVIDER)
+        row.value = DEFAULT_PROVIDER
+        db.commit()
 
 
 def seed_companies(db):

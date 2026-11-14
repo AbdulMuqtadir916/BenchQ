@@ -3,6 +3,19 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Job search on Indeed, its inputs, and the candidate's details (`feat/job-search-indeed-and-candidate-details`, Zuhair)
+
+Grilled 2026-11-14 (Zuhair); not built yet. Built in parallel with Abdul's review: **the PR doesn't merge without
+Abdul's OK on the rows below** (Q22). No migration and no new column: every field already exists.
+
+| Area (owner) | File | What changes | Why | Agreed |
+|---|---|---|---|---|
+| `candidates` rules (Abdul approves) | `backend/api/routes_candidates.py` (`CreateCandidateBody`), `src/components/app/candidate-wizard/` | **One target role.** The create route refuses more than one; onboarding asks for one role (one box, not tags). `target_roles` stays a list column. Candidates that already have several keep them; the search uses the first; the new tab's one box saves one (the Activity entry keeps the old list). | Zuhair 2026-11-14 (Q1, Q10, Q11, Q24): the job search searches the target role only. | **Pending: Abdul** |
+| `candidates` rules (Abdul approves) | the same | **A place is required.** The résumé's city and state together, or at least one preferred location; without either, onboarding's preferences step doesn't continue (it says the job search needs a place) and the create route refuses it. | Q13, Q14: the search runs by place (Indeed takes "City, ST"). | **Pending: Abdul** |
+| Permissions and 07 (Abdul) | `backend/auth/policy.py`, `src/lib/auth/policy.ts`, `docs/07-ROUTES-AND-RBAC.md` (Q56 → a new Q) | **Who edits the profile follows the résumé rule (Q55):** the candidate's BDE once one is assigned; the OWNER and the MANAGER only while no BDE is assigned. Reverses Q56 (OWNER and MANAGER always, never the BDE). | Zuhair 2026-11-14 (Q17). | **Pending: Abdul** |
+| `candidates` edit route (Abdul approves) | `backend/api/routes_candidates.py` (`UpdateCandidateBody`, `PATCH …/candidates/{id}`) | The edit takes every onboarding answer that isn't on the résumé: primary role, target role, years; work authorization, expiry, sponsorship, transfer; employment types, target and minimum rate, available from, notice; work settings, preferred locations, relocation, industries, deal breakers; contact notes. Same rules as onboarding (one target role, a place). A new candidate-profile tab, **Additional candidate details**, edits them; Overview's Submission facts become read-only. Each save writes the ledger's `UPDATE` entry, as today. | Q18, Q19, Q20. | **Pending: Abdul** |
+| Settings (Abdul, F2c) | `backend/seed.py` (`DEFAULT_SETTINGS`, new `retire_job_search_provider` called by `seed_settings`) | `job_search_provider` defaults to `indeed` (was `freehire`). A database whose row still names a provider that is no longer registered (`freehire`) has it set to the default when settings are seeded (seeding never replaces a row, so the Settings page would otherwise show a value it can't save). freehire.me stops searching; its reader stays, so saved freehire jobs still open. | Zuhair 2026-11-14 (8a): Indeed through python-jobspy replaces freehire.me. | **Pending: Abdul** |
+
 ## Résumé tailoring, part 3: the screens (`feat/resume-tailoring`, Zuhair)
 
 Grilled and built 2026-11-12 ([tailoring.md](./tailoring.md) §8). These rows wait for their owners.
