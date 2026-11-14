@@ -15,6 +15,7 @@ Never their values (a setting can hold a key or a token), and never the body.
 """
 import json
 import logging
+from functools import partial
 
 from fastapi import Depends, Request
 from starlette.concurrency import run_in_threadpool
@@ -84,7 +85,7 @@ class PlatformActionLog:
             return
         for entry in pending:
             try:
-                await run_in_threadpool(_write, **entry)
+                await run_in_threadpool(entry)
             except Exception:                              # the answer has gone; the log can't change it
                 logger.exception("platform action not logged")
 
@@ -103,7 +104,7 @@ def logs_platform_action(summary: str, *, entity_type: str, action: str = "STATE
         if names:
             text += f": {', '.join(names)}"
         # Written by PlatformActionLog once the answer is known to be a success.
-        request.scope.setdefault("state", {}).setdefault(PENDING, []).append(dict(
-            principal=principal, action=action, entity_type=entity_type, entity_id=record_id or entity_type,
+        request.scope.setdefault("state", {}).setdefault(PENDING, []).append(partial(
+            _write, principal, action=action, entity_type=entity_type, entity_id=record_id or entity_type,
             summary=text + "."))
     return dependency
