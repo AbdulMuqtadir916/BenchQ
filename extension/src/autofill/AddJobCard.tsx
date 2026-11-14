@@ -73,6 +73,14 @@ function isSameJob(page: string, known: string): boolean {
   });
 }
 
+/** The connected tab moved on to another job's page on the job's own site (another posting on its board): not the job's
+ * page or one under it (its application form), so the panel asks whether to disconnect. A page on another site never
+ * asks: an application often goes on there (a company page that sends the BDE to its ATS). */
+export function isOtherJobOnSite(page: string, job: string): boolean {
+  const [here, saved] = [jobKeyOf(page), jobKeyOf(job)];
+  return Boolean(here && saved && here.site === saved.site) && isJobLink(page) && !isSameJob(page, job);
+}
+
 /** Codes that name one job in a link: a UUID (Lever, Ashby), a long number (Greenhouse, LinkedIn, SmartRecruiters), a
  * requisition code (Workday's R123456, JR-1234, REQ_5678), and a job key in the query (gh_jid, Indeed's jk). */
 const ID_IN_LINK = /(?<![a-z0-9])(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d{5,}|(?:jr|req|r)[-_]?\d{4,})(?![a-z0-9])/gi;

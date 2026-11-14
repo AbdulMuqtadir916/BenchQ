@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { resumeStudioUrl, type Application } from "../api";
 import { ALERT, BELOW_TOP_BAR, button, CARD, FITTED_BUTTONS, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON, WARNING } from "../ui";
 import { sendToBackground } from "./connection-store";
+import { isOtherJobOnSite } from "./AddJobCard";
 import DocumentSections from "./DocumentSections";
 import { documentOf, resumeFileName } from "./documents";
 import { filledValue } from "./form-memory";
@@ -23,6 +24,8 @@ import { useTailoring } from "./use-tailoring";
 
 type AutofillPanelProps = {
   connection: Connection;
+  /** The connected tab's address now: on another job's page of the job's site, the panel asks whether to disconnect. */
+  tabUrl?: string | null;
   /** The BDE's firm: its id reaches the candidate's résumés, its slug links to them on the website. */
   firmId?: string | null;
   firmSlug?: string | null;
@@ -67,7 +70,7 @@ type PendingFill = { context: string; resumeId: string | null };
 
 /** The connected tab's job and its form, top to bottom: the job, the résumé the answers come from, Autofill, the run as
  * it goes, the résumé and the cover letter, then the rest of the form. The form stays theirs to submit. */
-export default function AutofillPanel({ connection, firmId = null, firmSlug = null, details = null, applicationStatus = "ready", onRetryContext = () => {}, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
+export default function AutofillPanel({ connection, tabUrl = null, firmId = null, firmSlug = null, details = null, applicationStatus = "ready", onRetryContext = () => {}, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
   const { tabId, job } = connection;
   const { resumes, pick, retry, refresh, refreshFailed, source } = useResumes({
     firmId, candidateId: connection.candidateId, applicationId: connection.applicationId, applicationStatus,
@@ -148,6 +151,8 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     return () => chrome.runtime.onMessage.removeListener(onShortcut);
   }, [tabId]);
   const [isCollecting, setIsCollecting] = useState(false);
+  // The address the BDE said to keep this tab connected on, though it shows another job's page.
+  const [keptUrl, setKeptUrl] = useState<string | null>(null);
   const card = useRef<HTMLElement>(null);
   const wasFilling = useRef(filling);
   // The note of a run that stopped, once the BDE closed it. A new run brings a new one.
@@ -189,62 +194,78 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     onApply?.(form, picked?.id ?? null);
   };
 
+  const jobName = `${job.title || "Untitled role"}${job.company ? ` at ${job.company}` : ""}`;
+  // The tab moved on to another job's page on the job's own site, and the BDE hasn't said to keep it connected there.
+  const movedAway = Boolean(tabUrl && job.url && tabUrl !== keptUrl && isOtherJobOnSite(tabUrl, job.url));
+  // The panel's own content shows once nothing is asked first: neither that, nor a site's permission (Mark applied stays).
+  const isOpen = !movedAway && !state.needsAccess;
   return <section ref={card} data-slot="autofill" className={`mb-3 ${CARD}`} aria-labelledby="autofill-title">
     <JobCard job={job} details={details} candidateName={candidateName} onDisconnect={onDisconnect} />
 
     <div data-slot="autofill-body" className="grid grid-cols-[minmax(0,1fr)] gap-3 p-3 empty:hidden">
-      <NextSteps steps={[
+      {/* The tab moved on to another job: asked first, and nothing else shows until the BDE answers. */}
+      {movedAway && <div data-slot="moved-away" className={WARNING} role="alert">
+        <strong>This tab now shows another job.</strong>
+        <p className="mt-0.5 mb-2 wrap-anywhere">It&apos;s still connected to {jobName}. Disconnect it to add or open the job on this page.</p>
+        <div className={FITTED_BUTTONS}>
+          <button type="button" className={button("secondary", "compact")} onClick={onDisconnect}>Disconnect</button>
+          <button type="button" className={button("secondary", "compact")} onClick={() => setKeptUrl(tabUrl)}>Keep it connected</button>
+        </div>
+      </div>}
+      {/* A site BenchQ may not read yet: its permission first, alone; the rest shows once it's given. */}
+      {!movedAway && state.needsAccess && <SiteAccessNotice access={state.needsAccess} isDenied={state.isAccessDenied} isAsking={state.isAsking} onAllow={() => void state.allowAccess()} />}
+      {isOpen && <NextSteps steps={[
         { key: "resume", label: "Resume", isDone: resumes.status === "ready" && Boolean(picked) },
         { key: "fill", label: "Autofill", isDone: hasForm && !hasFillsLeft },
         { key: "submit", label: "Submit on site", isDone: isApplied },
         { key: "applied", label: "Mark applied", isDone: isApplied },
-      ]} />
-      {needsConfirmation && <div className={WARNING} role="alert">
+      ]} />}
+      {isOpen && needsConfirmation && <div className={WARNING} role="alert">
         <strong>This page may be a different job.</strong>
-        <p className="mt-0.5 mb-2 wrap-anywhere">Saved: {job.title || "Untitled role"}{job.company ? ` at ${job.company}` : ""}.{state.check.detected ? ` This page: ${state.check.detected}.` : ""}</p>
+        <p className="mt-0.5 mb-2 wrap-anywhere">Saved: {jobName}.{state.check.detected ? ` This page: ${state.check.detected}.` : ""}</p>
         <div className={FITTED_BUTTONS}>
           <button type="button" className={button("secondary", "compact")} onClick={confirmHost}>It&apos;s the right job</button>
           <button type="button" className={button("secondary", "compact")} onClick={onDisconnect}>Disconnect</button>
         </div>
       </div>}
 
-      <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl}
-        isBusy={isWorking || applicationStatus !== "ready"} onPick={pickResume} onRetry={retry} onRetryContext={onRetryContext} footer={tailorFooter} />
+      {/* Autofill first, the résumé it answers from under it. */}
+      {isOpen && hasForm && <FormProgress rows={currentRows} isRestarting={pendingFill !== null} />}
 
-      {hasForm && <FormProgress rows={currentRows} isRestarting={pendingFill !== null} />}
-
-      {hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={isWorking || !reviewMatches || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
+      {isOpen && hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={isWorking || !reviewMatches || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
         {isWorking ? "Filling…" : <>{SPARKLES_ICON}Autofill</>}
       </button>}
-      {hasFillsLeft && reviewMatches && !filling && fillCount > 0 && <p data-slot="autofill-ready" className={`-mt-1.5 text-center ${MUTED_TEXT}`}>
+      {isOpen && hasFillsLeft && reviewMatches && !filling && fillCount > 0 && <p data-slot="autofill-ready" className={`-mt-1.5 text-center ${MUTED_TEXT}`}>
         Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id ? ", the resume file first" : ""}.
       </p>}
-      {isComplete && <p data-slot="autofill-done" className={`flex items-center gap-1 ${BELOW_TOP_BAR} text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`} role="status">{CHECK}Autofill complete</p>}
+      {isOpen && isComplete && <p data-slot="autofill-done" className={`flex items-center gap-1 ${BELOW_TOP_BAR} text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`} role="status">{CHECK}Autofill complete</p>}
       {/* Once the BDE has run Autofill on this application, its form's next pages fill as they open (07 Q4). */}
-      {state.isFollowingSteps && hasForm && !isWorking && <p data-slot="autofill-follows" className={`-mt-1.5 ${MUTED_TEXT}`}>Next pages of this form fill on their own as they open.</p>}
+      {isOpen && state.isFollowingSteps && hasForm && !isWorking && <p data-slot="autofill-follows" className={`-mt-1.5 ${MUTED_TEXT}`}>Next pages of this form fill on their own as they open.</p>}
 
-      {state.needsAccess && <SiteAccessNotice access={state.needsAccess} isDenied={state.isAccessDenied} isAsking={state.isAsking} onAllow={() => void state.allowAccess()} />}
-      {error && <div role="alert">
+      {isOpen && <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl}
+        isBusy={isWorking || applicationStatus !== "ready"} onPick={pickResume} onRetry={retry} onRetryContext={onRetryContext} footer={tailorFooter} />}
+
+      {isOpen && error && <div role="alert">
         <p data-slot="error" className={ALERT}>{error}</p>
         <button type="button" className={TEXT_BUTTON} disabled={scanning} onClick={() => void state.rescan()}>Try again</button>
       </div>}
-      {canReview && currentRows === null && !error && !state.needsAccess && <div className={SKELETON} role="status" aria-label="Scanning this page"><span /><span /><span /></div>}
-      {currentRows?.length === 0 && !scanning && !error && <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] p-2.5">
+      {isOpen && canReview && currentRows === null && !error && <div className={SKELETON} role="status" aria-label="Scanning this page"><span /><span /><span /></div>}
+      {isOpen && currentRows?.length === 0 && !scanning && !error && <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] p-2.5">
         <h3 className="text-sm font-[550]">No form on this page yet</h3>
         <p className={`mt-0.5 ${SOFT_TEXT}`}>Click Apply on the employer&apos;s page. BenchQ scans the form when it opens, in this tab or a new one.</p>
         {state.unreadableFrames > 0 && <p className={`mt-1 ${SOFT_TEXT}`}>If you can already see a form, BenchQ can&apos;t read that part of the page, so fill it in yourself.</p>}
       </div>}
-      {hasForm && state.bankEmpty && picked && <p className={MUTED_TEXT}>This resume has no answers BenchQ can fill yet.</p>}
+      {isOpen && hasForm && state.bankEmpty && picked && <p className={MUTED_TEXT}>This resume has no answers BenchQ can fill yet.</p>}
 
-      {step && <p data-slot="autofill-step" role="status" className={STEP}>{SPINNER_ICON}{step}</p>}
-      {filling && run && <RunList run={run} />}
-      {reviewMatches && outcome?.stopped && outcome !== dismissed && <OutcomeNote onDismiss={dismiss} />}
-      {state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
+      {isOpen && step && <p data-slot="autofill-step" role="status" className={STEP}>{SPINNER_ICON}{step}</p>}
+      {isOpen && filling && run && <RunList run={run} />}
+      {isOpen && reviewMatches && outcome?.stopped && outcome !== dismissed && <OutcomeNote onDismiss={dismiss} />}
+      {isOpen && state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
 
-      {hasForm && <DocumentSections rows={currentRows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
+      {isOpen && hasForm && <DocumentSections rows={currentRows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
         picked={picked ? { label: picked.label, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null } : null} attached={state.attachedFile}
         onChangeResume={hasOtherResumes ? changeResume : undefined} />}
-      {!filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
+      {isOpen && !filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
         onSuggest={(row, entry) => void state.fillWith(row, entry)} onSave={state.saveAnswer} />}
     </div>
@@ -252,9 +273,10 @@ export default function AutofillPanel({ connection, firmId = null, firmSlug = nu
     <div data-slot="autofill-actions" className="sticky bottom-0 z-1 grid gap-1.5 rounded-b-[var(--radius-lg)] border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pt-2 pb-3 empty:hidden">
       {/* Mark applied steps aside while a run fills the form, and is back once it ends. */}
       {/* On a site BenchQ may not read yet there is no review to wait for: the BDE who declines fills the form by hand, and may still mark it applied. */}
-      {onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || (!reviewMatches && !state.needsAccess)} jobLine={jobLine} emptyRequired={emptyRequired} onConfirm={() => void apply()} onGoTo={goTo} />}
+      {/* Not while the tab shows another job: marking it would mark the connected job from another job's page. */}
+      {!movedAway && onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || (!reviewMatches && !state.needsAccess)} jobLine={jobLine} emptyRequired={emptyRequired} onConfirm={() => void apply()} onGoTo={goTo} />}
       {isApplied && applicationStatus === "ready" && <button type="button" className={button("secondary", "large")} disabled>{CHECK}Applied</button>}
-      {undoable > 0 && <button type="button" className={button("secondary", "compact")} disabled={filling} onClick={() => void state.undo()}>Undo</button>}
+      {isOpen && undoable > 0 && <button type="button" className={button("secondary", "compact")} disabled={filling} onClick={() => void state.undo()}>Undo</button>}
     </div>
   </section>;
 }

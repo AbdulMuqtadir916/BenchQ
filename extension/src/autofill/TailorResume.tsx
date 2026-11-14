@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ALERT, button, ICON_BUTTON_QUIET, MOTION, MUTED_TEXT } from "../ui";
 import { CHECK, CROSS_ICON, EXTERNAL_ICON, SPARKLES_ICON, SPINNER_ICON } from "./icons";
 import { stepIndex, stepLabel, TAILORING_STEPS, type Tailoring } from "./use-tailoring";
@@ -58,14 +58,19 @@ function useNow(isTicking: boolean) {
  * again when that can help. Nothing changes under the BDE until they use it. */
 export default function TailorResume({ tailoring, from, isAgain, isReadyListed, isInUse, studioUrl, isBusy, refreshFailed, onStart, onUse, onDismiss, onReload }: TailorResumeProps) {
   const now = useNow(tailoring.status === "running");
-  return <div data-slot="tailor" className="grid gap-2 border-t border-[var(--color-border)] pt-2.5">
-    {(tailoring.status === "idle" || tailoring.status === "starting") && <div className={ROW}>
+  const explainId = useId();
+  return <div data-slot="tailor" className="grid gap-2 pt-1">
+    {(tailoring.status === "idle" || tailoring.status === "starting") && <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* What Tailor does, in plain words, on the button itself (its tooltip and description), so the row stays one
+          line: which résumé it rewrites, and how long it takes. */}
       <button type="button" data-slot="tailor-start" className={`${button("secondary", "compact")} ${tailoring.status === "starting" ? SPIN : ""}`}
-        disabled={!from || tailoring.status === "starting"} onClick={onStart}>
+        disabled={!from || tailoring.status === "starting"} onClick={onStart} title={from ? `Rewrites ${from} to fit this job` : undefined}
+        aria-describedby={explainId}>
         {tailoring.status === "starting" ? <>{SPINNER_ICON}Starting…</> : <>{SPARKLES_ICON}{isAgain ? "Tailor again" : "Tailor resume for this job"}</>}
       </button>
-      {/* What Tailor does, in plain words, for a BDE who hasn't used it: which résumé it rewrites, and how long it takes. */}
-      <span data-slot="tailor-from" className={MUTED_TEXT}>{from ? `Rewrites ${from} to fit this job · about a minute` : "No base resume to tailor from"}</span>
+      <span id={explainId} data-slot="tailor-from" className="text-caption text-[var(--color-text-3)]">
+        {from ? <><span className="sr-only">Rewrites {from} to fit this job, </span>about a minute</> : "No base resume to tailor from"}
+      </span>
     </div>}
 
     {tailoring.status === "running" && <div data-slot="tailor-running" className="grid gap-1.5">

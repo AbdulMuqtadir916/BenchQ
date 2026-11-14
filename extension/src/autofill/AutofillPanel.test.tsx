@@ -63,7 +63,7 @@ type State = {
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
 };
 
-function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null } = {}, resumes: Resumes = oneResume) {
+function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null; tabUrl?: string | null } = {}, resumes: Resumes = oneResume) {
   vi.mocked(useResumes).mockReturnValue({ resumes, pick, retry, refresh, refreshFailed, source });
   vi.mocked(useTailoring).mockReturnValue({ tailoring, start: tailorStart, dismiss: tailorDismiss });
   const applicationStatus = panel.applicationStatus ?? "ready";
@@ -230,23 +230,24 @@ describe("the résumé the answers come from", () => {
 
   it("says the one résumé is the only one, with a way to add another in BenchQ", () => {
     show({ fillCount: 1 }, { resumesUrl: "https://app.test/acme-staffing/candidates/cand-1?tab=resumes" });
-    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("· 1 resume");
+    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("1 resume");
     const only = picker().querySelector("[data-slot='resume-only']")!;
-    expect(only.textContent).toBe("Only resume·Add another in BenchQ");
-    expect(only.querySelector("a")!.getAttribute("href")).toBe("https://app.test/acme-staffing/candidates/cand-1?tab=resumes");
+    expect(only.textContent).toBe("Only resumeViewAdd another in BenchQ");
+    expect([...only.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toEqual([
+      "http://localhost:3000/acme-staffing/resumes/res-2", "https://app.test/acme-staffing/candidates/cand-1?tab=resumes"]);
     expect(picker().querySelector("[data-slot='resume-select']")).toBeNull();
   });
 
   it("says how many résumés there are to choose from, closed and open", async () => {
     show({ fillCount: 1 }, {}, twoResumes);
-    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("· 2 resumes");
-    expect(select().querySelector("[data-slot='resume-change']")!.textContent).toBe("Change");
+    expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("2 resumes");
+    expect(select().querySelector("[data-slot='resume-change']")).not.toBeNull();
     expect(select().getAttribute("aria-label")).toBe(`Change the resume, 2 resumes to choose from. In use: ${base.label}`);
     expect(picker().querySelector("[data-slot='resume-only']")).toBeNull();
     await open();
-    const title = picker().querySelector("[data-slot='resume-list-title']")!;
-    expect(title.textContent).toBe("2 resumes for Priya");
-    expect(document.getElementById(select().getAttribute("aria-controls")!)!.getAttribute("aria-labelledby")).toBe(title.id);
+    // The menu is named by the section's "Resume", with no title of its own (less to read).
+    expect(picker().querySelector("[data-slot='resume-list-title']")).toBeNull();
+    expect(document.getElementById(select().getAttribute("aria-controls")!)!.getAttribute("aria-labelledby")).toBe("resume-picker-title");
     // This job's tailored résumés, then the bases, each group named, and each group's list by its name.
     const groups = [...picker().querySelectorAll("[data-slot='resume-group-title']")];
     expect(groups.map(({ textContent }) => textContent)).toEqual(["Tailored for this job", "Base resumes"]);
@@ -257,7 +258,7 @@ describe("the résumé the answers come from", () => {
     show({ fillCount: 1 }, {}, { status: "ready", choices: [base, { ...base, id: "res-3", isActive: false, meta: "Base 2 · v1", baseId: "base-2" }], picked: base });
     await open();
     expect(picker().querySelector("[data-slot='resume-group-title']")).toBeNull();
-    expect(picker().querySelector("[data-slot='resume-group'] ul")!.getAttribute("aria-labelledby")).toBe(picker().querySelector("[data-slot='resume-list-title']")!.id);
+    expect(picker().querySelector("[data-slot='resume-group'] ul")!.getAttribute("aria-labelledby")).toBe("resume-picker-title");
   });
 
   it("starts closed on the résumé in use; its ▾ opens one row per résumé, the one in use ticked, and Esc closes them", async () => {
@@ -270,9 +271,10 @@ describe("the résumé the answers come from", () => {
     expect(options().map((option) => option.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
     expect(options()[0]!.textContent).toContain("From Base 1 · v1");
     expect(picker().querySelector("button")).toBe(select());
-    const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
-    expect(choices[0]!.querySelector("a")!.getAttribute("aria-label")).toBe(`View ${tailored.label} in BenchQ`);
-    expect(choices[0]!.querySelector("a")!.getAttribute("href")).toContain("/resumes/res-9");
+    // No link on each row: one "View in BenchQ" at the menu's foot, for the résumé in use.
+    expect([...picker().querySelectorAll("[data-slot='resume-choice'] a")]).toHaveLength(0);
+    const view = picker().querySelector("[data-slot='resume-view']")!;
+    expect([view.getAttribute("aria-label"), view.getAttribute("href")]).toEqual([`View ${base.label} in BenchQ`, "http://localhost:3000/acme-staffing/resumes/res-2"]);
     await press(options()[1]!, "Escape");
     expect(select().getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(select());
@@ -724,7 +726,9 @@ describe("Tailor for this job", () => {
   it("sits at the foot of the résumés, says which base it reads, and starts from that base's version 1", async () => {
     show({ fillCount: 1 }, { details: job });
     expect(host.querySelector("[data-slot='resume-picker']")!.contains(tailor())).toBe(true);
-    expect(tailor()!.querySelector("[data-slot='tailor-from']")!.textContent).toBe("Rewrites Base 1 (Active) to fit this job · about a minute");
+    // One line: how long it takes; what it does is the button's tooltip and description.
+    expect(tailor()!.querySelector("[data-slot='tailor-from']")!.textContent).toBe("Rewrites Base 1 (Active) to fit this job, about a minute");
+    expect(named("Tailor resume for this job").getAttribute("title")).toBe("Rewrites Base 1 (Active) to fit this job");
     await click("Tailor resume for this job");
     expect(tailorStart).toHaveBeenCalledWith("res-1");
     expect(vi.mocked(useTailoring).mock.lastCall?.[0]).toMatchObject({ firmId: "firm-1", candidateId: "cand-1", jobId: "posting-1" });
@@ -819,5 +823,54 @@ describe("the job's steps, for a BDE new to the panel", () => {
     show({ fillCount: 0, rows: [row("Email", true, "priya@example.test")] }, { isApplied: true });
     expect(steps().map(([, state]) => state)).toEqual(["done", "done", "done", "done"]);
     expect(host.querySelector("[aria-current='step']")).toBeNull();
+  });
+});
+
+describe("what the panel shows first", () => {
+  const body = () => host.querySelector("[data-slot='autofill-body']")!;
+
+  it("puts Autofill above the resume it answers from", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] });
+    const run = body().querySelector("[data-slot='autofill-run']")!;
+    const resume = body().querySelector("[data-slot='resume-picker']")!;
+    expect(run.compareDocumentPosition(resume) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("asks for a site's permission alone, Mark applied kept, and shows the rest once it's given", () => {
+    show({ fillCount: 0, rows: null, needsAccess: { origins: ["https://jobs.acme.test/*"], host: "jobs.acme.test" } }, { onApply: vi.fn() });
+    expect(body().querySelector("[data-slot='resume-picker']")).toBeNull();
+    expect(body().querySelector("[data-slot='next-steps']")).toBeNull();
+    expect(body().querySelector("[data-slot='autofill-run']")).toBeNull();
+    expect(body().textContent).toContain("jobs.acme.test");
+    expect(named("Mark applied")).toBeDefined();
+    act(() => { root?.unmount(); });
+    host.remove();
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() });
+    expect(body().querySelector("[data-slot='resume-picker']")).not.toBeNull();
+  });
+
+  it("asks to disconnect when the tab moved on to another job on the job's site, and shows nothing else until answered", async () => {
+    const onDisconnect = vi.fn();
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn(), tabUrl: "https://jobs.acme.test/jobs/98765" });
+    element = cloneElement(element, { onDisconnect } as never);
+    act(() => { root!.render(element); });
+    expect(body().querySelector("[data-slot='moved-away']")!.textContent).toContain("This tab now shows another job.");
+    expect(body().querySelector("[data-slot='resume-picker']")).toBeNull();
+    expect(named("Mark applied")).toBeUndefined();
+    await click("Disconnect");
+    expect(onDisconnect).toHaveBeenCalled();
+    await click("Keep it connected");
+    expect(body().querySelector("[data-slot='moved-away']")).toBeNull();
+    expect(body().querySelector("[data-slot='resume-picker']")).not.toBeNull();
+  });
+
+  it("never asks on the job's own page, its application, or another site (an ATS the job sends the BDE to)", () => {
+    for (const tabUrl of ["https://jobs.acme.test/1", "https://jobs.acme.test/1/apply", "https://boards.greenhouse.io/acme/jobs/555"]) {
+      show({ fillCount: 2, rows: [row("Email", true)] }, { tabUrl });
+      expect(body().querySelector("[data-slot='moved-away']"), tabUrl).toBeNull();
+      act(() => { root?.unmount(); });
+      host.remove();
+    }
+    show({ fillCount: 2, rows: [row("Email", true)] });
   });
 });
