@@ -62,6 +62,31 @@ def test_the_dependency_writes_one_entry_on_success_and_none_on_failure(test_db)
     assert "SECRET-VALUE-9" not in f"{entry.summary} {json.dumps(entry.changes)} {entry.note}"
 
 
+def test_a_success_whose_background_task_fails_afterwards_is_still_an_entry(test_db):
+    """CodeRabbit on #145: a company's H-1B lookup runs after the answer; its failure doesn't undo the creation."""
+    from fastapi import BackgroundTasks
+    admin = PlatformUser(email="op2@admin.test", name="Sana", password_hash=hash_password("A-long-test-password-2026"))
+    test_db.add(admin)
+    test_db.commit()
+    app = FastAPI()
+    app.add_middleware(PlatformActionLog)
+
+    def failing_lookup():
+        raise RuntimeError("lookup failed")
+
+    @app.post("/things", dependencies=[Depends(logs_platform_action("Created a thing", entity_type="thing", action="CREATE"))])
+    def create(tasks: BackgroundTasks):
+        tasks.add_task(failing_lookup)
+        return {"ok": True}
+
+    app.dependency_overrides[current_principal] = lambda: Principal(
+        kind="platform", user_id=admin.id, session_id=uuid.uuid4(), role="PLATFORM_ADMIN")
+    client = TestClient(app, raise_server_exceptions=False)
+    assert client.post("/things").status_code == 200
+    (entry,) = _platform_entries(test_db)
+    assert (entry.action, entry.summary) == ("CREATE", "Created a thing.")
+
+
 def test_a_settings_change_is_an_entry_with_the_field_names_only(api_client, test_db):
     assert api_client.patch("/api/settings", json={"scrape_interval_minutes": "17"}).status_code == 200
     (entry,) = _platform_entries(test_db)

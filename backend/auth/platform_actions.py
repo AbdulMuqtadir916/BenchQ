@@ -7,7 +7,8 @@ written with no firm and the Super Admin as the actor.
 
 "Succeeds" is decided by the answer, not by the route returning: `PlatformActionLog` (installed on the app) writes the
 entry once the response has a status below 400. So an exception, an HTTPException, or a returned `JSONResponse(409)`
-("already running") writes nothing. A route that answers 200 but did nothing (a PIN with no digits, a refresh already
+("already running") writes nothing, while a success whose background task fails afterwards (an H-1B lookup) still
+writes its entry. A route that answers 200 but did nothing (a PIN with no digits, a refresh already
 under way) calls `did_nothing(request)`.
 
 What goes in the entry: what was done, the id in the path, and for a change the *names* of the fields in the request body.
@@ -79,9 +80,16 @@ class PlatformActionLog:
                 status["code"] = message["status"]
             await send(message)
 
-        await self.app(scope, receive, capture)
+        try:
+            await self.app(scope, receive, capture)
+        finally:
+            # Also when a background task the route started fails after its answer went out: the action was done.
+            await self._write_pending(scope, status.get("code", 500))
+
+    @staticmethod
+    async def _write_pending(scope, code: int) -> None:
         pending = scope.get("state", {}).pop(PENDING, None)
-        if not pending or status.get("code", 500) >= 400:
+        if not pending or code >= 400:
             return
         for entry in pending:
             try:
