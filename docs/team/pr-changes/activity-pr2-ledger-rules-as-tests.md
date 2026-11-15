@@ -88,3 +88,16 @@ The real backend passes all three as it is: no route depended on the old, looser
 - **`Entry = LedgerEntry`** (and an alias of that alias) is seen when built or read.
 - **`sync_candidate_inbox` leaves `NOT_LOGGED`.** With imported callbacks counted, the check now sees that the import it
   hands to a background task reaches the log's writer, so the list shrinks by one as designed.
+
+## Review fixes (CodeRabbit, third round, 2026-11-15)
+
+- **Only the argument a dispatcher runs is handed over.** Each dispatch call has its callback's position and keyword
+  (`add_task(func, ...)`, `run_in_executor(executor, func, ...)`, `Thread(target=...)`, `launch_background(job_type,
+  coro_func, ...)`). A writer passed as the task's data, as in `add_task(ignore, write_audit)`, no longer makes the route
+  log. A callback named through its module (`runs.run_tailoring`, `ledger.record`) now counts.
+- **A writer handed to a task must state its candidate.** `tasks.add_task(record, db, ...)` is checked like a direct
+  `record(...)` call: the forwarded keywords (or a `func_kwargs={...}` literal) must include `candidate_id`.
+- **A model alias stays in its own function.** `model = LedgerEntry` in one function no longer makes `model` the ledger
+  in another, and rebinding the name to something else in the same function drops it.
+- **`start_tailoring` leaves `NOT_LOGGED`.** With module-named callbacks counted, the check sees that the run it hands
+  to `launch_background` (`runs.run_tailoring`) writes the entry, which was the reason it was listed.

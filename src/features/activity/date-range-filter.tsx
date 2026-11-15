@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isAfter, isSameMonth, parseISO, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { LedgerFilters } from "@/lib/api/analytics";
 import { useLedgerDays } from "@/lib/hooks/use-ledger";
 import { cn } from "@/lib/cn";
+import { todayIn, watchToday } from "./today";
 
 const DAY = "yyyy-MM-dd";
 const WEEK_DAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -46,8 +46,7 @@ interface DateRangeFilterProps extends DateRange {
 }
 
 export function DateRangeFilter({ from, to, timeZone, onChange, filters }: DateRangeFilterProps) {
-  const todayIn = (zone: string) => formatInTimeZone(new Date(), zone, DAY);
-  // Read again each time the picker opens, so a page left open overnight moves on to the new day.
+  // Read again each time the picker opens, and watched while it is open, so it moves on to the new day at midnight.
   const [today, setToday] = useState(() => todayIn(timeZone));
   const [isOpen, setIsOpen] = useState(false);
   const [month, setMonth] = useState(() => startOfMonth(parseISO(from ?? today)));
@@ -78,6 +77,8 @@ export function DateRangeFilter({ from, to, timeZone, onChange, filters }: DateR
     document.addEventListener("mousedown", dismiss);
     return () => document.removeEventListener("mousedown", dismiss);
   }, [isOpen]);
+
+  useEffect(() => (isOpen ? watchToday(timeZone, setToday) : undefined), [isOpen, timeZone]);
 
   useEffect(() => {
     if (!shouldMoveFocus.current) return;
