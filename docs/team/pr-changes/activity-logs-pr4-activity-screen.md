@@ -121,3 +121,10 @@ that page with the Activity screen, which pages, sorts and searches on the serve
 
 The Actor column's "AI agent (name)" for an AI working for someone is filled in by PR 5 part 1, where those entries
 start; this PR has none.
+
+## Review fixes (CodeRabbit, third round, 2026-11-15)
+
+- **The calendar's today moves on while it is open.** `today` was read again on each open, but a picker left open
+  across the firm's midnight kept the old day: the quick ranges stopped a day short and the new day stayed disabled.
+  `watchToday` (`src/features/activity/today.ts`) checks the firm's date once a minute while the picker is open and
+  updates it when midnight passes. `today.test.ts` covers the change at midnight and stopping on close.

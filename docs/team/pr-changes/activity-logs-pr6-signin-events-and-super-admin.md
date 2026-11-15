@@ -25,7 +25,7 @@ address a try came from (IP) is kept but is never in a list; the Super Admin ope
 | Case | Row |
 |---|---|
 | Known account | On that person, in their firm, with the reason: wrong password, account deactivated, or password reset in progress |
-| Email with no account | Actor "Unknown account", no firm, the email masked as `ab***@mail.com` |
+| Email with no account | Actor "Unknown account", no firm, the email masked as `a***@***.com` |
 | Repeat tries | Same account and IP within 10 seconds of the row's first try: one row, `attempt_count` goes up, and Activity shows "Name (3)" |
 | A limit used up | One `LOCKED_OUT` row: 5 tries on an account in 15 minutes, or 10 tries from an IP in a minute |
 
@@ -122,3 +122,16 @@ log. 51 routes pass; 30 can't be reached with the generic request and have their
   are listed in `NO_ENTRY` with why: a settings PATCH that changes no setting, and an inbox sync that imports no new email
   (an import that does logs "Imported N candidate emails").
 - **0029 keeps 0028's TRUNCATE rule** when it rewrites the trigger function.
+
+## Review fixes (CodeRabbit, third round, 2026-11-15)
+
+- **A typed email keeps only its first letter and its ending.** A password can look like a domain (`P@ssword.2026`), so
+  keeping the domain still kept part of it. `mask_email` now masks an email nobody owns the way the server log does
+  (`backend/logging_setup.py`): `n***@***.test` for an address ending in letters, `***` for anything else.
+- **A success whose background task fails afterwards is still an entry.** Starlette runs a route's background tasks
+  (the H-1B lookup after creating a company) after the answer has gone out, and a failure there reached
+  `PlatformActionLog` as an exception, so the creation wasn't logged. The middleware now writes the pending entries
+  whenever the answer was a success, also when something fails after it.
+- **The candidate picker keeps the last answer only within the same view.** Switching between the whole platform and
+  failed sign-ins (both with no firm) showed the previous view's candidates while the next ones loaded.
+  `sameScopeOnly` compares the firm and the view; `use-admin-activity.test.ts` covers it.

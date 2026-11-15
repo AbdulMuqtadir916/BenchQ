@@ -217,6 +217,7 @@ async def check_emails() -> int:
     db = SessionLocal()
     try:
         processed_ids = _load_processed_ids(db)
+        already_handled = len(processed_ids)
         query = _build_gmail_query(db)
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -342,8 +343,10 @@ async def check_emails() -> int:
         _save_processed_ids(db, processed_ids)
 
         from backend.activity import log_activity
+        # A row when this check handled a message (read a reply, skipped an auto-reply, or could not classify one, which
+        # is then not looked at again); a check that only saw messages it had handled before leaves none.
         log_activity("email", f"Email check: {len(messages)} messages found from known domains", db=db,
-                     is_empty=not replies)
+                     is_empty=len(processed_ids) == already_handled)
         db.commit()
         return replies
 

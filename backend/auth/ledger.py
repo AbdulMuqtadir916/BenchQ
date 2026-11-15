@@ -90,16 +90,17 @@ def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_typ
     return entry
 
 
-_DOMAIN = re.compile(r"[a-z0-9-]+(\.[a-z0-9-]+)+")
+# The shape backend/logging_setup.py masks in the server log: an address ending in letters (`.com`, `.test`).
+_EMAIL = re.compile(r"[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.([a-z]{2,})")
 
 
 def mask_email(email: str) -> str:
-    """What the log keeps of an email nobody owns: anyone can type anything into the form, a password included
-    (`P@ssw0rd2026`), so the part after `@` is kept only when it looks like a domain."""
-    local, _, domain = email.partition("@")
-    if local and len(domain) <= 100 and _DOMAIN.fullmatch(domain):
-        return f"{local[:2]}***@{domain}"
-    return "***"
+    """What the log keeps of an email nobody owns, as the server log masks one: its first letter and its ending
+    (`f***@***.test`). Anyone can type anything into the form, a password included, and a password can look like a
+    domain (`P@ssword.2026`, `p@ss.word.com`), so nothing after `@` but the ending is kept, and nothing at all of
+    text that isn't an address."""
+    match = _EMAIL.fullmatch(email) if len(email) <= 254 else None
+    return f"{email[0]}***@***.{match.group(1)}" if match else "***"
 
 
 def _sign_in_entry(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str, action: str,

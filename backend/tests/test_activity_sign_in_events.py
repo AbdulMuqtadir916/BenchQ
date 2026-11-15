@@ -58,7 +58,7 @@ def test_an_unknown_email_is_masked_and_belongs_to_no_firm(anonymous_client, tes
     assert _sign_in(anonymous_client, "nobody@example.test").status_code == 401
     entry = _failed(test_db)[0]
     assert (entry.actor_type, entry.actor_name, entry.actor_user_id, entry.firm_id) == ("UNKNOWN", "Unknown account", None, None)
-    assert entry.summary == "no***@example.test, no such account"
+    assert entry.summary == "n***@***.test, no such account"
     assert "nobody" not in f"{entry.summary} {entry.entity_label}"
 
 
@@ -176,12 +176,14 @@ def test_an_address_that_runs_out_of_tries_names_no_account(anonymous_client, te
 
 
 @pytest.mark.parametrize("typed,kept", [
-    ("nobody@example.test", "no***@example.test"),
+    ("nobody@example.test", "n***@***.test"),
     ("P@ssw0rd2026", "***"),                               # a password typed into the email box: nothing of it is kept
+    ("P@ssword.2026", "***"),                              # one that looks like a domain: still nothing
+    ("p@ss.word.com", "p***@***.com"),                     # one shaped like an address: its first letter and ending only
     ("ab@", "***"),
-    ("x@" + "a" * 120 + ".test", "***"),
+    ("x@" + "a" * 260 + ".test", "***"),
 ])
-def test_a_typed_email_keeps_its_domain_only_when_it_looks_like_one(typed, kept):
+def test_a_typed_email_keeps_only_its_first_letter_and_ending(typed, kept):
     from backend.auth.ledger import mask_email
     assert mask_email(typed.lower()) == kept
 
