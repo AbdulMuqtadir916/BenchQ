@@ -62,3 +62,10 @@ has no firm, so a firm reader never gets one.
   the "empty scrape writes nothing" rule hid real work or a failure there; since that code isn't BenchQ's, it is left as
   it was rather than fixed.
 - **The cover letter routes** stay in `NOT_LOGGED`: cover letters are being removed from BenchQ (decided 2026-11-12).
+
+## Review fixes (CodeRabbit, third round, 2026-11-15)
+
+- **An email check that handled a message leaves a row, whatever happened to it.** The row was skipped when no reply
+  was counted, but a message the AI could not classify (or an auto-reply) is still marked handled and never looked at
+  again. The row now depends on whether this check handled any new message, not on the replies count.
+  `test_an_email_check_that_could_not_classify_a_new_message_still_leaves_a_row` drives `check_emails` with a fake Gmail.

@@ -123,6 +123,54 @@ async def test_a_digest_telegram_refused_is_not_counted_as_sent(test_db, monkeyp
     assert not [row for row in _rows(test_db, entity_type="system_event") if "digest sent" in row.summary]
 
 
+class _FakeGmail:
+    """httpx.AsyncClient for check_emails: lists the given message ids and returns each one."""
+    ids: list[str] = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def get(self, url, **kwargs):
+        import httpx
+        payload = {"headers": [{"name": "From", "value": "jobs@acme.test"}, {"name": "Subject", "value": "Hello"}]}
+        body = {"messages": [{"id": i} for i in self.ids]} if url.endswith("/messages") else {"payload": payload}
+        return httpx.Response(200, json=body)
+
+
+@pytest.mark.parametrize("seen_before,rows", [(set(), 1), ({"m1"}, 0)])
+async def test_an_email_check_that_could_not_classify_a_new_message_still_leaves_a_row(test_db, monkeypatch, seen_before, rows):
+    """CodeRabbit on #144: a failed classification marks the message handled, so the check did something."""
+    from backend.email_monitor import gmail_client as gmail, response_parser
+
+    async def token():
+        return "token"
+
+    async def no_result(*args, **kwargs):
+        return None
+
+    async def no_wait(*args):
+        return None
+    _FakeGmail.ids = ["m1"]
+    monkeypatch.setattr(gmail, "_get_access_token", token)
+    monkeypatch.setattr(gmail, "_load_processed_ids", lambda db: set(seen_before))
+    monkeypatch.setattr(gmail, "_save_processed_ids", lambda db, ids: None)
+    monkeypatch.setattr(gmail, "_build_gmail_query", lambda db: "from:acme.test")
+    monkeypatch.setattr(gmail, "_get_active_apps_for_llm", lambda db: [])
+    monkeypatch.setattr(gmail, "classify_email", lambda subject, body: {"classification": "other", "confidence": 0.1})
+    monkeypatch.setattr(response_parser, "classify_email_llm", no_result)
+    monkeypatch.setattr(gmail.asyncio, "sleep", no_wait)
+    monkeypatch.setattr(gmail.httpx, "AsyncClient", _FakeGmail)
+    assert await gmail.check_emails() == 0
+    checks = [row for row in _rows(test_db, entity_type="system_event") if row.summary.startswith("Email check:")]
+    assert len(checks) == rows
+
+
 def test_a_firm_reader_never_gets_these_rows(api_client, test_db, accounts):
     log_activity("scrape", "Acme: 3 new / 9 found")
     log_llm_call("autofill", "openrouter", "model-x", USAGE)
