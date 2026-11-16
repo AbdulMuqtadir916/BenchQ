@@ -128,3 +128,9 @@ start; this PR has none.
   across the firm's midnight kept the old day: the quick ranges stopped a day short and the new day stayed disabled.
   `watchToday` (`src/features/activity/today.ts`) checks the firm's date once a minute while the picker is open and
   updates it when midnight passes. `today.test.ts` covers the change at midnight and stopping on close.
+
+## Review fixes (CodeRabbit, fourth round, 2026-11-16)
+
+- **The calendar catches up as soon as it starts watching.** If the firm's midnight passed in the moment between the
+  picker reading the date and its once-a-minute check starting, the picker kept the old day until the next midnight.
+  `watchToday` now takes the date the picker shows and compares it at once, then each minute. `today.test.ts` covers it.
