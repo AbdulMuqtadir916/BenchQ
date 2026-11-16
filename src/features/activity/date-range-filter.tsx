@@ -80,7 +80,7 @@ export function DateRangeFilter({ from, to, timeZone, onChange, filters, useDays
     return () => document.removeEventListener("mousedown", dismiss);
   }, [isOpen]);
 
-  useEffect(() => (isOpen ? watchToday(timeZone, setToday) : undefined), [isOpen, timeZone]);
+  useEffect(() => (isOpen ? watchToday(timeZone, today, setToday) : undefined), [isOpen, timeZone, today]);
 
   useEffect(() => {
     if (!shouldMoveFocus.current) return;
