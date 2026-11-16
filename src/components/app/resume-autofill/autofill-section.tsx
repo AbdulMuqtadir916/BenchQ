@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { isEditable } from "@/lib/derive/autofill";
-import { statusOf, topicOf, type AutofillSection } from "@/lib/derive/autofill-view";
+import { draftRowOf, statusOf, topicOf, type AutofillSection } from "@/lib/derive/autofill-view";
 import type { AutofillEntry } from "@/lib/schemas/resume-autofill";
 import type { ResumeSectionKey } from "@/lib/schemas/resume-document";
 import { AddQuestion } from "./add-question";
@@ -24,7 +24,12 @@ type AutofillSectionCardProps = {
   openKey: string | null;
   onOpened: () => void;
   onPickQuestion: (key: string) => void;
+  /** By row (`draftRowOf`), the Reloads after that row's save was refused: only its open editor re-bases on the answers
+   * each brought (Abdul's review of #140). */
+  reloads?: ReadonlyMap<string, number>;
 };
+
+const NO_RELOADS: ReadonlyMap<string, number> = new Map();
 
 /** Self-identification, then screening, then the rest, in the list Add a question offers. */
 const PERSONAL_ORDER: Partial<Record<AutofillSection["id"], number>> = { "self-id": 2, screening: 1 };
@@ -37,7 +42,7 @@ const HINTS: Partial<Record<AutofillSection["id"], string>> = {
 
 /** One topic of the Autofill tab, as a card: its icon, title and counts, then its questions. "Your questions" holds Add
  * a question. */
-export function AutofillSectionCard({ section, entries, canEdit, isSaving, onSave, onEditInBuilder, openKey, onOpened, onPickQuestion }: AutofillSectionCardProps) {
+export function AutofillSectionCard({ section, entries, canEdit, isSaving, onSave, onEditInBuilder, openKey, onOpened, onPickQuestion, reloads = NO_RELOADS }: AutofillSectionCardProps) {
   const [isAdding, setIsAdding] = useState(false);
   const Icon = TOPIC_ICONS[section.id];
   const missing = section.entries.filter((entry) => statusOf(entry) === "missing").length;
@@ -71,7 +76,7 @@ export function AutofillSectionCard({ section, entries, canEdit, isSaving, onSav
         <ul className="divide-y divide-[var(--color-border)]">
           {section.entries.map((entry) => (
             <AutofillRow key={entry.key ?? `own:${entry.question}`} entry={entry} entries={entries} canEdit={canEdit} isSaving={isSaving} onSave={onSave} onEditInBuilder={onEditInBuilder}
-              isOpened={openKey !== null && openKey === entry.key} onOpened={onOpened} />
+              isOpened={openKey !== null && openKey === entry.key} onOpened={onOpened} reloads={reloads.get(draftRowOf(entry)) ?? 0} />
           ))}
         </ul>
       ) : isCustom && !isAdding ? (
