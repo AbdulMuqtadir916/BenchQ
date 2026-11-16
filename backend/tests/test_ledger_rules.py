@@ -127,9 +127,9 @@ DISPATCH_CALLS = {"to_thread": (0, "func"), "run_in_threadpool": (0, "func"), "r
                   "add_task": (0, "func"), "launch_background": (1, "coro_func"), "submit": (0, "fn"),
                   "Thread": (1, "target"), "partial": (0, "func"), "create_task": (0, "coro"),
                   "ensure_future": (0, "coro_or_future"), "Depends": (0, "dependency")}
-# These two only build something: a thread runs its target once it is started, a partial once it is called or handed to
-# one of the calls above. Built and left alone, the function never runs.
-BUILDERS = {"Thread": {"start", "run"}, "partial": set()}
+# These two only build something: a thread runs its target once it is started, a partial once it is called. Built and
+# dropped, the function never runs (`_never_run`).
+BUILDERS = {"Thread", "partial"}
 # The dispatchers that pass their callback's keywords as one dict; the rest pass their own keywords on.
 KEYWORD_DICTS = {"Thread": "kwargs", "launch_background": "func_kwargs"}
 
@@ -327,36 +327,21 @@ def _dispatched(call: ast.Call):
 
 
 def _never_run(owner: ast.AST) -> set[int]:
-    """The `Thread(...)` and `partial(...)` calls in `owner` (by `id`) whose function never runs here: a thread nobody
-    starts, a partial nobody calls or hands to a dispatcher. One is run directly (`Thread(...).start()`, `partial(f)()`,
-    `add_task(partial(f))`) or through the name it was given (`t = Thread(...)`, then `t.start()`)."""
-    built, named, run, used = [], {}, set(), {}
-    for node in _own_nodes(owner):
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
-            named[id(node.value)] = {target.id for target in node.targets if isinstance(target, ast.Name)}
-        if not isinstance(node, ast.Call):
-            continue
-        if _called_name(node) in BUILDERS:
-            built.append(node)
-        func, handed = node.func, _callback(node)
-        if isinstance(func, ast.Call):                                   # partial(f)(...)
-            run.add(id(func))
-        elif isinstance(func, ast.Name):                                 # send(...)
-            used.setdefault(func.id, set()).add("")
-        elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Call):      # Thread(...).start()
-            used.setdefault(id(func.value), set()).add(func.attr)
-        elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):      # worker.start()
-            used.setdefault(func.value.id, set()).add(func.attr)
-        if isinstance(handed, ast.Call):                                 # add_task(partial(f, ...))
-            run.add(id(handed))
-        elif isinstance(handed, ast.Name):                               # add_task(send)
-            used.setdefault(handed.id, set()).add("")
+    """The `Thread(...)` and `partial(...)` calls in `owner` (by `id`) that are built and dropped, so their function
+    never runs: one left as a statement of its own, or given a name nothing reads afterwards. Any other use counts as
+    running it: `.start()`, a call, or handing it on (returned, passed along, or queued for later, as
+    `logs_platform_action` queues its partial for the middleware)."""
+    read = {node.id for node in _own_nodes(owner) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)}
     idle = set()
-    for call in built:
-        by = BUILDERS[_called_name(call)] or {""}                        # a thread by .start(), a partial by being called
-        ways = set(used.get(id(call), set())).union(*(used.get(name, set()) for name in named.get(id(call), set())))
-        if id(call) not in run and not ways & by:
-            idle.add(id(call))
+    for node in _own_nodes(owner):
+        value = getattr(node, "value", None)
+        if not (isinstance(value, ast.Call) and _called_name(value) in BUILDERS):
+            continue
+        if isinstance(node, ast.Expr):                                       # Thread(target=f) and nothing else
+            idle.add(id(value))
+        elif isinstance(node, ast.Assign) and all(isinstance(target, ast.Name) and target.id not in read
+                                                  for target in node.targets):
+            idle.add(id(value))                                              # worker = Thread(target=f), never used
     return idle
 
 
@@ -644,11 +629,13 @@ def test_only_the_argument_a_dispatcher_runs_is_handed_over():
     assert {"as_callback", "by_module", "threaded"} <= logging and "as_data" not in logging
 
 
-def test_a_thread_or_partial_counts_only_once_it_is_run():
+def test_a_thread_or_partial_that_is_built_and_dropped_does_not_count():
     source = ("from backend.auth import ledger\n"
               "def write_audit(db):\n    ledger.record(db, candidate_id=None)\n"
               "def never_started(db):\n    Thread(target=write_audit)\n"
-              "def named_never_started(db):\n    worker = Thread(target=write_audit)\n    return worker\n"
+              "def named_never_started(db):\n    worker = Thread(target=write_audit)\n    return 1\n"
+              "def handed_back(db):\n    worker = Thread(target=write_audit)\n    return worker\n"
+              "def queued(db, pending):\n    pending.append(partial(write_audit, db))\n"
               "def started(db):\n    Thread(target=write_audit).start()\n"
               "def named_started(db):\n    worker = threading.Thread(target=write_audit, args=(db,))\n    worker.start()\n"
               "def never_called(db):\n    send = partial(write_audit, db)\n    return 1\n"
@@ -658,7 +645,8 @@ def test_a_thread_or_partial_counts_only_once_it_is_run():
               "def named_handed_on(tasks, db):\n    send = partial(write_audit, db)\n    tasks.add_task(send)\n")
     file = "api/routes_example.py"
     logging = {name for found, name in _logging_functions(_snippet(source, file)) if found == file} - {"write_audit"}
-    assert logging == {"started", "named_started", "called", "called_at_once", "handed_on", "named_handed_on"}
+    assert logging == {"started", "named_started", "called", "called_at_once", "handed_on", "named_handed_on",
+                       "handed_back", "queued"}
 
 
 def test_a_writer_handed_to_a_task_must_state_its_candidate():
