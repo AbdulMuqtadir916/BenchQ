@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { addJob, BENCHQ_URL, type Application } from "../api";
 import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CHECK, SPINNER_ICON } from "./icons";
@@ -73,6 +73,14 @@ function isSameJob(page: string, known: string): boolean {
   });
 }
 
+/** The connected tab moved on to another job's page on the job's own site (another posting on its board): not the job's
+ * page or one under it (its application form), so the panel asks whether to disconnect. A page on another site never
+ * asks: an application often goes on there (a company page that sends the BDE to its ATS). */
+export function isOtherJobOnSite(page: string, job: string): boolean {
+  const [here, saved] = [jobKeyOf(page), jobKeyOf(job)];
+  return Boolean(here && saved && here.site === saved.site) && isJobLink(page) && !isSameJob(page, job);
+}
+
 /** Codes that name one job in a link: a UUID (Lever, Ashby), a long number (Greenhouse, LinkedIn, SmartRecruiters), a
  * requisition code (Workday's R123456, JR-1234, REQ_5678), and a job key in the query (gh_jid, Indeed's jk). */
 const ID_IN_LINK = /(?<![a-z0-9])(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d{5,}|(?:jr|req|r)[-_]?\d{4,})(?![a-z0-9])/gi;
@@ -120,18 +128,33 @@ function isOtherRequisition(found: PageJob, known: KnownJob): boolean {
 export const isSavedJob = (found: PageJob, known: KnownJob) =>
   (sameListing(found, known) && !isOtherRequisition(found, known)) || sharesJobId(found, known);
 
+/** How much a reading of a page holds: its stated fields. */
+const fieldsOf = (job: PageJob) => Object.values(job).filter((value) => value !== undefined && value !== null && value !== "").length;
+
+/** A later reading says more: more fields, or as many and a longer description (a page that shows a teaser first,
+ * then its whole job description: PR #140's review). */
+const isFuller = (found: PageJob, shown: PageJob) => fieldsOf(found) > fieldsOf(shown)
+  || (fieldsOf(found) === fieldsOf(shown) && found.description.length > shown.description.length);
 const MODE_LABEL = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" } as const;
 const PER = { hour: "an hour", day: "a day", week: "a week", month: "a month", year: "a year" } as const;
 const amount = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
-/** What the page stated besides its title, company and place, as the card shows it before the BDE adds the job:
- * "Remote · Full-time · USD 120,000–150,000 a year · Posted 2026-11-10 · Req R123456". */
-export function detailsOf(job: PageJob): string {
+/** A posted date as anyone reads it, day first and the month in words: "10 Nov 2026", never an ambiguous 11/10. */
+const dateWords = (iso: string) => {
+  const date = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};
+
+/** What the page stated besides its title, company and place, each with its name, as the card shows it before the BDE
+ * adds the job, so anyone can check it at a glance: [["Work mode", "Remote"], ["Pay", "USD 120,000–150,000 a year"],
+ * ["Type", "Full-time"], ["Posted", "10 Nov 2026"], ["Job ID", "R123456"]]. Only what the page stated. */
+export function detailsOf(job: PageJob): Array<[string, string]> {
   const pay = job.salaryMin === undefined ? "" : [job.salaryCurrency, job.salaryMax !== undefined && job.salaryMax !== job.salaryMin
     ? `${amount(job.salaryMin)}–${amount(job.salaryMax)}` : amount(job.salaryMin), job.salaryPeriod ? PER[job.salaryPeriod] : ""]
     .filter(Boolean).join(" ");
-  return [job.workMode ? MODE_LABEL[job.workMode] : "", job.employmentType ?? "", pay, job.postedAt ? `Posted ${job.postedAt}` : "",
-    job.requisitionId ? `Req ${job.requisitionId}` : ""].filter(Boolean).join(" · ");
+  const facts: Array<[string, string]> = [["Work mode", job.workMode ? MODE_LABEL[job.workMode] : ""], ["Pay", pay],
+    ["Type", job.employmentType ?? ""], ["Posted", job.postedAt ? dateWords(job.postedAt) : ""], ["Job ID", job.requisitionId ?? ""]];
+  return facts.filter(([, value]) => value);
 }
 
 /** Whether the panel looks at the page at all: a web page that isn't BenchQ's own and isn't one of the candidate's jobs. */
@@ -159,15 +182,25 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   const [isDenied, setIsDenied] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [allowed, setAllowed] = useState(0);
+  // The posting "Yes, add it" was asked about: when the card moves on to another posting (the tab showed another one
+  // with the same title), the question closes, so a click never adds a posting the BDE didn't see (PR #140's review).
+  const [askedUrl, setAskedUrl] = useState<string | null>(null);
+  if (state.status === "confirming" && job && askedUrl !== null && job.url !== askedUrl) {
+    setAskedUrl(null);
+    setState({ status: "idle" });
+  }
 
   useEffect(() => {
     if (tabId === null) return;
     let timers: ReturnType<typeof setTimeout>[] = [];
     let isLive = true;
+    // Looks for the whole schedule: a page that adds its JobPosting data after it shows (Oracle's) gives more on a later
+    // look, and the card takes that fuller reading of the same job.
     const look = () => void readJobPage(tabId).then((found) => {
       if (!isLive || !found?.isJobPage || !found.title || !found.company || !found.description) return;
-      timers.forEach(clearTimeout);
-      setJob(found);
+      // The same page (or the same title) read more fully: its JobPosting may also name the job better than the page's
+      // heading did, so the title may change. Another page's reading never replaces this one (PR #140's review).
+      setJob((shown) => (!shown || ((shown.url === found.url || shown.title === found.title) && isFuller(found, shown)) ? found : shown));
     }, () => undefined);
     const read = () => {
       look();
@@ -213,7 +246,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
       <h2 id="add-job-access-title" className="text-sm font-[550]">A job on this page?</h2>
       <p className={SOFT_TEXT}>
         To add it to {candidateName}&apos;s Saved jobs, BenchQ needs to read <strong className="font-[550]">{access.host}</strong>.
-        Chrome asks once for this site, and you can take it back any time in chrome://extensions.
+        Chrome asks you once for this site. You can turn it off later in Chrome&apos;s settings for extensions.
       </p>
       {isDenied && <p role="alert" className={ALERT}>Not allowed. BenchQ can&apos;t read {access.host}, so it can&apos;t add this job from here.</p>}
       <button type="button" data-slot="add-job-allow" className={button("primary")} disabled={isAsking} onClick={() => void allow()}>
@@ -223,6 +256,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   }
   if (tabId === null || !job) return null;
 
+  const details = detailsOf(job);
   const cancel = () => setState({ status: "idle" });
   const add = async () => {
     setState({ status: "adding" });
@@ -238,7 +272,12 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   return <section data-slot="add-job" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-title">
     <h2 id="add-job-title" className="text-sm font-[550]">A job on this page</h2>
     <p className={SOFT_TEXT}>{[job.title, job.company, job.location].filter(Boolean).join(" · ")}</p>
-    {detailsOf(job) ? <p data-slot="add-job-details" className={MUTED_TEXT}>{detailsOf(job)}</p> : null}
+    {details.length > 0 && <dl data-slot="add-job-details" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
+      {details.map(([name, value]) => <Fragment key={name}>
+        <dt className="text-[var(--color-text-3)]">{name}</dt>
+        <dd className="min-w-0 text-[var(--color-text-2)] wrap-anywhere">{value}</dd>
+      </Fragment>)}
+    </dl>}
     {state.status === "confirming"
       ? <div role="group" aria-labelledby="add-job-ask" className="grid gap-2"
         onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); cancel(); } }}>
@@ -248,7 +287,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
           <button type="button" data-slot="add-job-cancel" className={button("secondary")} onClick={cancel}>Cancel</button>
         </div>
       </div>
-      : <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding"} onClick={() => setState({ status: "confirming" })}>
+      : <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding"} onClick={() => { setAskedUrl(job.url); setState({ status: "confirming" }); }}>
         {state.status === "adding" ? <>{SPINNER_ICON}Adding…</> : `Add this job for ${candidateName}`}
       </button>}
     {state.status === "added" && <p role="status" className={`flex items-center gap-1 ${MUTED_TEXT} [&_svg]:size-[var(--icon-sm)]`}>{CHECK}{state.text}</p>}

@@ -595,6 +595,7 @@ function App() {
               // off until the BDE runs Autofill for that job).
               key={`${connection.tabId}:${connection.applicationId}`}
               connection={connection}
+              tabUrl={activeBrowserTab?.id === connection.tabId ? activeBrowserTab.url : null}
               applicationStatus={applicationStatus}
               onRetryContext={() => void refresh()}
               firmId={session.principal.firm_id ?? null}
