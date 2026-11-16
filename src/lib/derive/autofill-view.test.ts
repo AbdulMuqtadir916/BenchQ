@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AutofillEntry } from "@/lib/schemas/resume-autofill";
-import { autofillSections, builderSectionOf, displayAnswer, matchesSearch, recordLines, SELF_ID_SUGGESTIONS, sourceOf, statusOf, summarize, topicOf } from "./autofill-view";
+import { autofillSections, builderSectionOf, displayAnswer, matchesSearch, recordLines, reloadRows, SELF_ID_SUGGESTIONS, sourceOf, statusOf, summarize, topicOf } from "./autofill-view";
 
 const fixed = (key: string, answer: AutofillEntry["answer"], extra: Partial<AutofillEntry> = {}): AutofillEntry => ({
   question: `Question ${key}?`, answer, kind: "FIXED", key, type: "text", also: [], ...extra,
@@ -83,5 +83,17 @@ describe("the Autofill tab's reading", () => {
     expect(autofillSections(entries, "missing", "").map(({ id, entries: shown }) => [id, shown.length])).toEqual([["contact", 1]]);
     expect(autofillSections(entries.slice(0, 7), "all", "").at(-1)?.id).toBe("custom");
     expect(autofillSections(entries.slice(0, 7), "all", "atlanta").map(({ id }) => id)).toEqual(["location"]);
+  });
+});
+
+describe("a Reload after a refused save (Abdul's review of #140)", () => {
+  it("counts only for the rows whose save was refused, so no other open editor re-bases", () => {
+    const once = reloadRows(new Map(), new Set(["rate"]));
+    expect([...once]).toEqual([["rate", 1]]);
+    expect(once.has("years_experience")).toBe(false);
+    const twice = reloadRows(once, new Set(["rate", "own:Why this job?"]));
+    expect([...twice]).toEqual([["rate", 2], ["own:Why this job?", 1]]);
+    // A Reload after a refused add (no row of its own) re-bases nothing.
+    expect([...reloadRows(twice, new Set())]).toEqual([...twice]);
   });
 });

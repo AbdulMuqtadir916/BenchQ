@@ -97,9 +97,10 @@ def _same_role(content: dict, fields, url) -> bool:
     return _same_place(content.get("location"), fields.location)
 
 
-def add_job(db, *, firm_id, actor, candidate, source: str, job: dict) -> tuple[JobPosting, bool]:
+def add_job(db, *, firm_id, actor, candidate, source: str, job: dict, admit=None) -> tuple[JobPosting, bool]:
     """The candidate's posting for `job` (`{title, company, description, url, location}`) added from `source` (`manual`
-    or `extension`), and whether it is new."""
+    or `extension`), and whether it is new. Only an add that would create a posting calls `admit()` first (the BDE's
+    daily capture cap, as `pipeline.capture` does), so the same job again is returned even at the cap."""
     if source not in ADDED_SOURCES:
         raise ValueError(f"unknown source {source!r}")
     content = {key: _clean(value) for key, value in job.items() if value not in (None, "")}
@@ -129,6 +130,8 @@ def add_job(db, *, firm_id, actor, candidate, source: str, job: dict) -> tuple[J
             break
     if existing is not None:
         return existing, False
+    if admit is not None:
+        admit()
     now = utcnow()
     batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate.id, user_id=actor.id, batch_id=uuid.uuid4(),
                       kind="capture", state="success", finished_at=now, meta={"request": {"source": source}})

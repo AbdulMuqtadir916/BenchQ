@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
-import { chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, scanTab, undoCount, undoFills } from "./tab-bridge";
+import { addEntryIn, chooseChoice, fillChoice, fillField, flaggedFields, focusField, listChoices, readTab, rejectedFields, scanTab, undoCount, undoFills } from "./tab-bridge";
 import type { ScannedField } from "./types";
 
 type Injection = { target: { tabId: number; frameIds?: number[]; allFrames?: boolean }; func?: (...args: never[]) => unknown; args?: unknown[]; files?: string[] };
@@ -329,5 +329,81 @@ describe("other wordings and the panel's own pick", () => {
     page.pickChoice!.mockResolvedValue({ status: "filled", current: "Blue" });
     expect(await chooseChoice(7, 0, request, "Blue")).toEqual({ status: "filled", current: "Blue" });
     expect(page.pickChoice).toHaveBeenCalledWith({ ...request, optionId: "c1" });
+  });
+});
+
+describe("the panel's hold, when the tab moves on to another job mid-write (PR #140's review)", () => {
+  let isHeld = false;
+  const shouldStop = () => isHeld;
+  beforeEach(() => { isHeld = false; });
+
+  it("picks nothing when the hold starts while the list opens, and closes the list again", async () => {
+    page.openChoices!.mockImplementation(async () => {
+      isHeld = true;
+      return { status: "open", options: [{ id: "c0", label: "Yes" }] };
+    });
+    expect(await fillChoice(7, 0, request, "Yes", [], shouldStop)).toEqual({ status: "stale", current: "" });
+    expect(page.pickChoice).not.toHaveBeenCalled();
+    expect(page.closeChoices).toHaveBeenCalled();
+  });
+
+  it("picks nothing when the hold starts while the list is searched", async () => {
+    page.openChoices!.mockResolvedValue({ status: "open", options: [{ id: "c0", label: "Austin, Texas, United States" }] });
+    page.searchChoices!.mockImplementation(async () => {
+      isHeld = true;
+      return { status: "open", options: [{ id: "c1", label: "Dallas, Texas, United States" }] };
+    });
+    expect((await fillChoice(7, 0, request, "Dallas, TX", [], shouldStop)).status).toBe("stale");
+    expect(page.pickChoice).not.toHaveBeenCalled();
+    expect(page.closeChoices).toHaveBeenCalled();
+  });
+
+  it("picks no further part of a several-choice answer once the hold starts", async () => {
+    page.openChoices!.mockResolvedValue({ status: "open", multiple: true, options: [{ id: "c0", label: "Python" }, { id: "c1", label: "Java" }] });
+    page.pickChoice!.mockImplementation(async () => {
+      isHeld = true;
+      return { status: "filled", current: "Python" };
+    });
+    expect((await fillChoice(7, 0, request, "Python, Java", [], shouldStop)).status).toBe("stale");
+    expect(page.pickChoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't pick the option chosen in the panel when the hold starts while the list opens", async () => {
+    page.openChoices!.mockImplementation(async () => {
+      isHeld = true;
+      return { status: "open", options: [{ id: "c0", label: "Blue" }] };
+    });
+    expect((await chooseChoice(7, 0, request, "Blue", shouldStop)).status).toBe("stale");
+    expect(page.pickChoice).not.toHaveBeenCalled();
+    expect(page.closeChoices).toHaveBeenCalled();
+  });
+
+  it("clicks no Add when the hold starts while the frames are listed", async () => {
+    page.addEntry = vi.fn(() => false);
+    fake.webNavigation.getAllFrames.mockImplementation(async () => {
+      isHeld = true;
+      return [{ frameId: 0, url: "https://jobs.example.com/a" }, { frameId: 3, url: "https://jobs.example.com/form" }];
+    });
+    expect(await addEntryIn(7, "work", shouldStop)).toBe(false);
+    expect(page.addEntry).not.toHaveBeenCalled();
+  });
+
+  it("tries no later frame's Add once the hold starts", async () => {
+    page.addEntry = vi.fn(() => {
+      isHeld = true;
+      return false;
+    });
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "https://jobs.example.com/a" }, { frameId: 3, url: "https://jobs.example.com/form" }]);
+    expect(await addEntryIn(7, "work", shouldStop)).toBe(false);
+    expect(page.addEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes as before when there is no hold", async () => {
+    page.openChoices!.mockResolvedValue({ status: "open", options: [{ id: "c0", label: "Yes" }] });
+    page.pickChoice!.mockResolvedValue({ status: "filled", current: "Yes" });
+    expect(await fillChoice(7, 0, request, "Yes", [], shouldStop)).toEqual({ status: "filled", current: "Yes" });
+    page.addEntry = vi.fn(() => true);
+    fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: "https://jobs.example.com/a" }]);
+    expect(await addEntryIn(7, "education", shouldStop)).toBe(true);
   });
 });
