@@ -230,7 +230,8 @@ async def run(search: Search) -> dict:
 
         duration = time.time() - start
         from backend.activity import log_activity
-        log_activity("scrape", f"freehire '{search.name}': {new_jobs} new / {kept} kept in {duration:.1f}s")
+        log_activity("scrape", f"freehire '{search.name}': {new_jobs} new / {kept} kept in {duration:.1f}s",
+                     is_empty=not (new_jobs or kept))
         return {"jobs_found": kept, "new_jobs": new_jobs, "error": None, "duration": duration}
 
     except Exception as e:

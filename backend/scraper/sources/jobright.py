@@ -496,7 +496,8 @@ async def run(search: Search) -> dict:
 
         duration = time.time() - start_time
         from backend.activity import log_activity
-        log_activity("scrape", f"Jobright '{search.name}': {new_jobs} new / {jobs_found} found in {duration:.1f}s")
+        log_activity("scrape", f"Jobright '{search.name}': {new_jobs} new / {jobs_found} found in {duration:.1f}s",
+                     is_empty=not (new_jobs or jobs_found))
 
         return {"jobs_found": jobs_found, "new_jobs": new_jobs, "error": None, "duration": duration}
 
