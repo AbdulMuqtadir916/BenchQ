@@ -118,7 +118,8 @@ def test_a_retailor_is_the_next_version_and_carries_what_the_bde_typed(anonymous
                                                                        setup, monkeypatch):
     _start(anonymous_client, world, setup)
     first = _status(anonymous_client, world, setup, _drive(test_db, launched, list(REPLIES), monkeypatch)).json()
-    # The stored shape since autofill #129: `custom` is a list of {question, also, answer} (docs/02 §8.1).
+    # The shape the autofill code keeps (`autofill.entries_of`): custom answers are a list of {question, also, answer}.
+    # The older {question: answer} object is read as no entry at all, so a re-tailor would rightly carry nothing.
     typed = {"edited": {}, "custom": [{"question": "Why this job?", "also": [], "answer": "Payments work."}]}
     test_db.get(Resume, uuid.UUID(first["resume_id"])).autofill = typed
     test_db.commit()

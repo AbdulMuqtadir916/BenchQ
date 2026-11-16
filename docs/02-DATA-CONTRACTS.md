@@ -1465,7 +1465,7 @@ counts the Adzuna jobs it left out (`skipped_adzuna`, 2026-11-16, Q64).
 
 **Onboarding and the details.** The create takes exactly one target role and needs a place (§4); the candidate's
 details (every onboarding answer that isn't on the résumé) are edited on their "Additional candidate details" tab
-(§9.z, 07 Q65).
+(§9.z, 07 Q66).
 
 **The Match** ([docs/team/ats-score.md](./team/ats-score.md)): a candidate's fit for a job, 0–100, worked out in
 plain code (`backend/match/`) against the active résumé's v1, and a tailored version's against its job. Stored on
@@ -2100,7 +2100,7 @@ an `ApplicationEvent` — the same write the kanban makes.
 
 ### 9.z Candidate submission facts and details
 
-`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — **since 2026-11-14 (07 Q65)** a partial of every onboarding answer
+`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — **since 2026-11-14 (07 Q66)** a partial of every onboarding answer
 that isn't on the résumé: `primaryRole`, `targetRoles` (exactly one), `yearsExperience`, `workAuth`,
 `needsSponsorship`, `needsTransfer`, `workAuthExpiry`, `employmentTypes` (at least one), `rateTarget`, `rateMin`,
 `availableFrom`, `noticePeriodDays`, `workSettings`, `preferredLocations`, `willingToRelocate`, `preferredIndustries`,
