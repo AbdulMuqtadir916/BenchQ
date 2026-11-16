@@ -21,6 +21,8 @@ export const JobSearchSchema = z.object({
   leftOutWorkAuthCount: z.number().int(),
   leftOutOldCount: z.number().int(),
   leftOutNotRemoteCount: z.number().int(),
+  /** Left out because freehire.me passed it on from Adzuna, as a preview only (decided 2026-11-16, Q64). */
+  leftOutAdzunaCount: z.number().int(),
   errorCode: JobSearchErrorCode.nullable(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime().nullable(),

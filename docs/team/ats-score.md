@@ -91,8 +91,9 @@ A score that can't be worked out never fails a save: the job stays unscored ("â€
 ## Limits
 
 - A posting cut short scores lower than the whole posting would: Indeed and freehire.me's agent search (since
-  2026-11-16) send whole postings, but freehire.me only has a preview of some (an Adzuna listing, often 500
-  characters); freehire.me jobs saved before 2026-11-14 keep the ~1,000 characters the old search gave.
+  2026-11-16) send whole postings (freehire.me's search leaves out Adzuna's listings, which it has only as a
+  500-character preview, Q64); freehire.me jobs saved before 2026-11-14 keep the ~1,000 characters the old search
+  gave.
 - Each list read reads every visible job's fields (not its description) to filter and sort: fine for a candidate's
   or a team's few thousand jobs; a firm with far more would need these fields as columns.
 - A job title that names no subject ("Full Stack Developer") still counts against a candidate whose title does

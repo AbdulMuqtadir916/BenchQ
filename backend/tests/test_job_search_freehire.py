@@ -55,10 +55,11 @@ def test_a_city_search_sends_its_metro_alone_and_asks_for_the_whole_posting(serv
     result = _search("Austin, TX")
     params = served["searches"][0]["params"]
     assert params == {"q": "Java Developer", "q_fields": "title", "limit": "100", "offset": "0",
-                      "description_format": "text", "metros": "Austin (US)", "posted_within_days": "14"}
+                      "description_format": "text", "source_exclude": "adzuna", "metros": "Austin (US)",
+                      "posted_within_days": "14"}
     assert "authorization" not in served["searches"][0]["headers"]                # no key: none sent
     assert [job["_description_format"] for job in result.jobs] == ["text", "text"]
-    assert result.next_cursor is None and result.metadata == {"total": 2, "by_metro": True}
+    assert result.next_cursor is None and result.metadata == {"total": 2, "by_metro": True, "skipped_adzuna": 0}
 
 
 def test_a_remote_search_sends_the_country_and_remote_and_the_key_when_set(served, monkeypatch):
@@ -87,6 +88,33 @@ def test_a_full_page_continues_from_its_offset(served):
     assert served["searches"][1]["params"]["offset"] == "100" and second.next_cursor == "200"
     served["total"] = 200                                                         # the last page: no more
     assert _search("Austin, TX", cursor="100").next_cursor is None
+
+
+def test_an_adzuna_job_that_gets_through_is_left_out_and_counted(served):
+    """Q64: `source_exclude=adzuna` is sent; one that comes back anyway (the parameter ignored) is dropped here."""
+    served["jobs"] = [_made_up(1, source="greenhouse"), _made_up(2, source="adzuna"), _made_up(3, source="Adzuna")]
+    result = _search("Austin, TX")
+    assert [job["title"] for job in result.jobs] == ["Java Developer 1"]
+    assert result.metadata["skipped_adzuna"] == 2
+
+
+def test_an_ignored_source_exclude_is_logged_as_a_code(served, monkeypatch, caplog):
+    monkeypatch.setattr(http, "transport", httpx.MockTransport(
+        lambda r: httpx.Response(200, json=METROS if r.url.path.endswith("/facets") else
+                                 {"data": [], "meta": {"total": 0, "ignored_params": ["source_exclude"]}})))
+    with caplog.at_level("WARNING", logger="benchq.job_search"):
+        _search("Austin, TX")
+    assert "code=source_exclude_ignored" in caplog.text
+
+
+def test_a_search_counts_the_adzuna_jobs_its_source_left_out(world, fake, adnans, test_db):
+    from backend.models.job_search import ScrapeJob
+    fake.jobs = [_job(1)]
+    fake.metadata = {"skipped_adzuna": 4}
+    _run(world, adnans)
+    test_db.expire_all()
+    batch = test_db.query(ScrapeJob).filter(ScrapeJob.candidate_id == uuid.UUID(adnans["id"])).one()
+    assert batch.meta["counts"]["skipped_adzuna"] == 4 and batch.meta["counts"]["saved"] == 1
 
 
 def test_a_reply_without_a_job_list_is_a_bad_response(served, monkeypatch):

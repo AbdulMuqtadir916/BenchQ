@@ -27,8 +27,8 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 - **Daily limits** (since 6:30 PM IST): 100 new jobs per candidate, 20 searches and 20 captures per BDE. The same role
   searched again continues where the last search stopped.
 - **The whole posting:** Indeed and freehire.me's agent search (since 2026-11-16) send whole postings. Jobs saved by
-  freehire.me's old search keep the ~1,000 characters it sent. Postings freehire.me itself only has a preview of (an
-  Adzuna listing, often 500 characters) stay a preview; "Open original" has the rest.
+  freehire.me's old search keep the ~1,000 characters it sent. freehire.me only has a preview of Adzuna's listings
+  (often 500 characters), so its search leaves Adzuna out (Q64).
 
 ## Decisions (2026-11-14): Indeed, places, the Match
 
@@ -57,6 +57,9 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 - **The job list shows only jobs posted in the last 14 days**, any source (by the job's date; a job without one
   counts from the day it was saved). Older jobs stay saved; their job pages and applications still open.
 - **The job list's source filter opens at Indeed**; freehire.me's jobs and captures show when picked.
+- **No Adzuna** (Q64): freehire.me's search asks for no jobs it took from Adzuna (`source_exclude=adzuna`), which it
+  has only as a 500-character preview; one that comes back anyway is left out and counted ("N left out: Adzuna
+  preview"). A live check (Dallas) went from 88 jobs, 18 of them previews, to 56 jobs, none.
 
 ## Frontend surface
 

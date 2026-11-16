@@ -162,6 +162,7 @@ const SearchDto = z.object({
   counts: z.object({
     saved: z.number().int(), refreshed: z.number().int(), skipped_over_cap: z.number().int(),
     skipped_work_auth: z.number().int(), skipped_too_old: z.number().int(), skipped_not_remote: z.number().int(),
+    skipped_adzuna: z.number().int(),
   }).partial().nullable(),
   started_at: z.string(),
   finished_at: z.string().nullable(),
@@ -199,6 +200,7 @@ function toSearch(dto: z.infer<typeof SearchDto>): JobSearch {
     leftOutWorkAuthCount: dto.counts?.skipped_work_auth ?? 0,
     leftOutOldCount: dto.counts?.skipped_too_old ?? 0,
     leftOutNotRemoteCount: dto.counts?.skipped_not_remote ?? 0,
+    leftOutAdzunaCount: dto.counts?.skipped_adzuna ?? 0,
     errorCode: dto.error_code,
     startedAt: toIso(dto.started_at),
     finishedAt: toIsoOrNull(dto.finished_at),

@@ -202,7 +202,9 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
           place: str | None = None) -> dict | None:
     counts = {"found": len(result.jobs), "saved": 0, "refreshed": 0, "skipped_closed": 0, "skipped_unreadable": 0,
               "skipped_duplicate": 0, "skipped_over_cap": 0, "skipped_too_old": 0, "skipped_not_remote": 0,
-              "skipped_work_auth": 0}
+              "skipped_work_auth": 0,
+              # Left out by the source itself before the save (freehire.me's Adzuna previews, Q64).
+              "skipped_adzuna": int((result.metadata or {}).get("skipped_adzuna") or 0)}
     scorer = _scorer(firm_id, candidate_id)
     today = utcnow().date()
     # Read and identify every job before the transaction: no lock is held while parsing HTML.

@@ -11,7 +11,11 @@ One search (Q55), the same inputs as Indeed's:
 - `posted_within_days=14`, a hint: the pipeline checks each job's posted date itself;
 - 100 jobs a page, continuing from the last offset (`cursor` is the offset as text);
 - `description_format=text`: the whole posting as plain text, so the Match reads all of it (the old search cut it at
-  about 1,000 characters, in HTML).
+  about 1,000 characters, in HTML);
+- `source_exclude=adzuna` (decided 2026-11-16, Q64): freehire.me passes on Adzuna's listings as Adzuna's preview
+  (often 500 characters), so they are left out of the search. freehire.me ignores a parameter it doesn't read rather
+  than refusing it, and names it in `meta.ignored_params`: that is logged (a code), and any Adzuna job that still
+  comes back is dropped here and counted (`SearchResult.metadata["skipped_adzuna"]`).
 
 freehire.me's terms allow the API without a key for personal, non-commercial use only; showing its jobs in a product
 offered to others needs an API plan (freehire.me/terms#data-licence). `FREEHIRE_API_KEY` (backend/.env) is sent as a
@@ -38,6 +42,7 @@ MOST_PER_PAGE = 100                     # the API's page limit
 METROS_KEPT_FOR_SECONDS = 6 * 3600      # how long a fetched list of metro names is reused
 FACETS_TIMEOUT_SECONDS = 10.0           # the metro list's call; failing it searches the country instead
 TEXT = "text"                           # `_description_format` of a job saved by the agent search
+LEFT_OUT_ORIGINS = ("adzuna",)          # freehire.me's `source` values the search leaves out (Q64)
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 _SPACES = re.compile(r"\s+")
 
@@ -100,7 +105,7 @@ class Freehire:
         offset = int(cursor) if cursor and cursor.isdigit() else 0
         size = max(1, min(limit, MOST_PER_PAGE))
         params: dict = {"q": _line(query, 200), "q_fields": "title", "limit": size, "offset": offset,
-                        "description_format": TEXT}
+                        "description_format": TEXT, "source_exclude": list(LEFT_OUT_ORIGINS)}
         metro = await metro_for(_line(place, 100) if place != REMOTE else place, country)
         if metro:
             params["metros"] = metro                # alone: a country beside it would widen the search
@@ -117,11 +122,17 @@ class Freehire:
             raise ProviderError("bad_response")
         meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
         total = meta.get("total") if isinstance(meta.get("total"), int) else None
-        jobs = [{**job, "_description_format": TEXT} for job in data if isinstance(job, dict)]
+        ignored = meta.get("ignored_params")
+        if isinstance(ignored, (list, dict)) and "source_exclude" in ignored:
+            logger.warning("job search source=freehire code=source_exclude_ignored")
+        jobs = [{**job, "_description_format": TEXT} for job in data if isinstance(job, dict)
+                and str(job.get("source") or "").lower() not in LEFT_OUT_ORIGINS]
+        skipped = sum(1 for job in data if isinstance(job, dict)) - len(jobs)
         following = offset + len(data)
         more = len(data) >= size and (total is None or following < total)
-        logger.info("job search source=freehire jobs=%d by_metro=%s more=%s", len(jobs), bool(metro), more)
-        return SearchResult(jobs=jobs, metadata={"total": total, "by_metro": bool(metro)},
+        logger.info("job search source=freehire jobs=%d skipped_adzuna=%d by_metro=%s more=%s", len(jobs), skipped,
+                    bool(metro), more)
+        return SearchResult(jobs=jobs, metadata={"total": total, "by_metro": bool(metro), "skipped_adzuna": skipped},
                             next_cursor=str(following) if more else None)
 
     def read(self, content: dict) -> JobFields:

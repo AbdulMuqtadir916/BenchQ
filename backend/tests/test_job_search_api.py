@@ -25,6 +25,7 @@ class FakeProvider:
         self.calls: list[tuple] = []
         self.cursors: list = []
         self.asks: list[dict] = []                  # the place and the age each search asked for
+        self.metadata: dict = {}                    # more of the source's metadata (a count it left out itself)
 
     async def search(self, query, country, limit, cursor=None, *, place=None, posted_within_days=None):
         self.calls.append((query, country, limit))
@@ -32,7 +33,7 @@ class FakeProvider:
         self.asks.append({"place": place, "posted_within_days": posted_within_days})
         if self.error:
             raise ProviderError(self.error)
-        return SearchResult(jobs=list(self.jobs), metadata={"meta": {"total": len(self.jobs)}},
+        return SearchResult(jobs=list(self.jobs), metadata={"meta": {"total": len(self.jobs)}, **self.metadata},
                             next_cursor=self.next_cursor)
 
     def read(self, content):
@@ -362,7 +363,8 @@ def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, a
     assert (batch.state, batch.error, batch.user_id) == ("success", None, world["people"]["adnan"].id)
     assert batch.meta["counts"] == {"found": 5, "saved": 2, "refreshed": 0, "skipped_closed": 1,
                                     "skipped_unreadable": 1, "skipped_duplicate": 1, "skipped_over_cap": 0,
-                                    "skipped_too_old": 0, "skipped_not_remote": 0, "skipped_work_auth": 0}
+                                    "skipped_too_old": 0, "skipped_not_remote": 0, "skipped_work_auth": 0,
+                                    "skipped_adzuna": 0}
     assert batch.meta["request"] == {"query": "Java Developer", "country": "us", "place": "Austin, TX",
                                      "provider": "fake", "limit": 100, "posted_within_days": 14, "cursor": None,
                                      "exhausted": False}

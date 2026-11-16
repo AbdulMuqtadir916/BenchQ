@@ -1445,7 +1445,8 @@ beside the place picker (Indeed first). `POST …/job-searches {place?, source?}
 agent search (`backend/job_search/providers/freehire.py`) gets the same inputs as Indeed: the role on job titles, the
 city's metro area (freehire.me's own list; alone, since its geography widens) or the country when it has none or the
 place is Remote (`work_mode=remote`), 14 days, 100 from the last offset, the whole posting as plain text (stored with
-`_description_format: "text"`). The same filters at save; the daily limits are shared by both sources. A key
+`_description_format: "text"`), and `source_exclude=adzuna` (Q64: freehire.me passes Adzuna's listings on as a
+preview, often 500 characters; one that comes back anyway is dropped and counted, `skipped_adzuna`). The same filters at save; the daily limits are shared by both sources. A key
 (`FREEHIRE_API_KEY`) is sent when set: freehire.me's terms allow the API without one for non-commercial use only, so
 the licence is settled before production.
 
@@ -1459,7 +1460,8 @@ no role or no place is 422 with what to add. `GET …/job-searches` adds `role` 
 **What a search leaves out**, each counted in the batch's `counts` and said on the panel: a job posted over 14 days
 ago by its own date (`skipped_too_old`: Indeed's date filter means "listed on Indeed"), a job that isn't remote on a
 Remote search (`skipped_not_remote`), and a job whose text rules out the candidate's work authorization
-(`skipped_work_auth`: the Match calculator's rules, `backend/match/score.py` `ruled_out`).
+(`skipped_work_auth`: the Match calculator's rules, `backend/match/score.py` `ruled_out`). A freehire.me search also
+counts the Adzuna jobs it left out (`skipped_adzuna`, 2026-11-16, Q64).
 
 **Onboarding and the details.** The create takes exactly one target role and needs a place (§4); the candidate's
 details (every onboarding answer that isn't on the résumé) are edited on their "Additional candidate details" tab
