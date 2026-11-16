@@ -45,6 +45,9 @@
   --color-focus-ring: #4264e9;
   --color-success-fg: #187253;
   --color-success-bg: #eaf7f1;
+  /* The website's teal tag (src/app/globals.css), which marks a tailored résumé there too. */
+  --color-teal-fg: #227479;
+  --color-teal-bg: #eaf7f7;
   --color-warning-fg: #936019;
   --color-warning-bg: #fff5e4;
   --color-danger-fg: #b13e4c;
@@ -109,6 +112,8 @@
   --color-focus-ring: #4d82f7;
   --color-success-fg: #4ade80;
   --color-success-bg: rgb(74 222 128 / 16%);
+  --color-teal-fg: #2dd4bf;
+  --color-teal-bg: rgb(45 212 191 / 16%);
   --color-warning-fg: #fbbf24;
   --color-warning-bg: rgb(251 191 36 / 16%);
   --color-danger-fg: #f87171;

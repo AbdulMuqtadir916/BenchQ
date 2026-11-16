@@ -49,7 +49,8 @@ export function ApplicationBoard({ apps, onMove, canAct, candidateName, onOpen, 
     return (id: string) => map.get(id) ?? "Unassigned";
   }, [teamQuery.data]);
 
-  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: ownerName(app.submittedByUserId), isSaving: saving?.has(app.id) });
+  // A Saved draft has no submitter: no one on its card, rather than "Unassigned".
+  const face = (app: Application) => ({ app, candidateName: candidateName?.(app.candidateId), owner: app.submittedByUserId ? ownerName(app.submittedByUserId) : null, isSaving: saving?.has(app.id) });
   const active = apps.find((a) => a.id === activeId) ?? null;
   const hasLegacy = apps.some((a) => isLegacy(a.status));
   const columns: Array<{ id: string; statuses: StoredApplicationStatus[] }> = [

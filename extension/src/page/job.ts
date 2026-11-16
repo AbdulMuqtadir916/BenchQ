@@ -1,5 +1,5 @@
 import type { PageJob } from "../autofill/types";
-import { DETAIL_KEYS, microdataDetails, modeIn, pageDetails, postingDetails, type JobDetails } from "./job-details";
+import { DETAIL_KEYS, linesOf, microdataDetails, modeIn, pageDetails, postingDetails, type JobDetails } from "./job-details";
 import { collapse, textOf } from "./labels";
 
 /** The job a page shows, for adding it to a candidate's jobs (the add-job plan, decided 2026-11-11): the page's own
@@ -169,7 +169,7 @@ function fromPosting(posting: JsonRecord): Omit<PageJob, "url" | "isJobPage"> {
   const organisation = posting.hiringOrganization;
   return {
     title: text(posting.title),
-    company: typeof organisation === "string" ? collapse(organisation) : text((organisation as JsonRecord | undefined)?.name),
+    company: companyOf(typeof organisation === "string" ? collapse(organisation) : text((organisation as JsonRecord | undefined)?.name)),
     description: typeof posting.description === "string" ? posting.description.trim() : "",
     location: placeOf(posting) || null,
     ids: identifiersOf(posting),
@@ -192,6 +192,18 @@ function companyFromTitle(pageTitle: string, jobTitle: string): string {
     .find((part) => part && part.length <= MAX_COMPANY && !/^(careers?|jobs?|job board)$/i.test(part) && !JOB_SITES.test(part)) ?? "";
 }
 
+/** The words a site adds to its own name: "Careers", "Jobs site", "Candidate Experience page", "Talent Community". */
+const SITE_WORDS = String.raw`(?:candidate experience(?:\s+(?:page|site))?|career(?:s)?(?:\s+(?:site|page|portal|home|center))?|job(?:s)?(?:\s+(?:site|board|page|portal))?|talent\s+(?:community|network))`;
+
+/** A company as a site names itself: "Amazon.jobs" is Amazon, "JPMC Candidate Experience page" JPMC, "Careers at Acme"
+ * Acme. The site's words go only after a space or a separator, so a name that ends in one keeps it ("AcmeJobs"), and a
+ * name that is only those words is no company (PR #140's review). */
+export function companyOf(name: string): string {
+  const named = name.replace(/\.(?:jobs|careers|com|io|co)$/i, "").replace(/^(?:careers|jobs)\s+(?:at|with)\s+/i, "").trim();
+  if (new RegExp(`^${SITE_WORDS}$`, "i").test(named)) return "";
+  return named.replace(new RegExp(String.raw`(?:\s*[-–|:·]\s*|\s+)${SITE_WORDS}\s*$`, "i"), "").trim();
+}
+
 /** The company a page's own logo names: "Discord Logo" gives "Discord". */
 function logoCompany(doc: Document): string {
   for (const image of Array.from(doc.querySelectorAll("img[alt]"))) {
@@ -199,6 +211,28 @@ function logoCompany(doc: Document): string {
     if (name && !JOB_SITES.test(name)) return name;
   }
   return "";
+}
+
+/** The page's text from the job's own title on (the site's chrome comes before it) to its copyright line, if any. */
+/** The words of a line or title, to compare them: case and spacing aside. */
+const wordsOf = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
+
+/** The line the job's title heads, else the line a title like "QA Engineer | Acme Careers" begins with: the description
+ * starts there, after the site's breadcrumbs. With neither, the whole page (PR #140's review). */
+function titleLine(lines: string[], title: string): number {
+  const wanted = wordsOf(title);
+  const exact = lines.findIndex((line) => wordsOf(line) === wanted);
+  if (exact >= 0 || !wanted) return exact;
+  return lines.findIndex((line) => {
+    const words = wordsOf(line);
+    return words.length >= 4 && wanted.startsWith(words) && /^\s*(?:[|:,(–—-]|at\s)/.test(wanted.slice(words.length));
+  });
+}
+
+function descriptionOf(lines: string[], title: string): string {
+  const start = Math.max(0, titleLine(lines, title));
+  const end = lines.findIndex((line, n) => n > start && /^(?:©|copyright\b)/i.test(line));
+  return lines.slice(start, end > start ? end : undefined).join("\n");
 }
 
 function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"> {
@@ -209,9 +243,9 @@ function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"
   const siteName = meta("og:site_name");
   return {
     title,
-    company: (JOB_SITES.test(siteName) ? "" : siteName) || companyFromTitle(collapse(doc.title), title) || logoCompany(doc)
+    company: (JOB_SITES.test(siteName) ? "" : companyOf(siteName)) || companyFromTitle(collapse(doc.title), title) || logoCompany(doc)
       || new URL(url).hostname.replace(/^www\./, ""),
-    description: main ? (main as HTMLElement).innerText?.trim() ?? collapse(textOf(main)) : "",
+    description: descriptionOf(main ? linesOf(main) : [], title),
     location: null,
   };
 }

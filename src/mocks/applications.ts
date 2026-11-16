@@ -47,6 +47,12 @@ export const applicationsMock = firmScoped("applications", {
       emailId: null,
     });
     application.statusRevision += 1;
+    // The first move out of Saved is the submission, whichever stage it lands on: whoever moves it is its submitter, as
+    // the backend records it (backend/applications/tracking.py), so a BDE's board keeps the card (Abdul's review of
+    // #140, #3). Never overwritten.
+    if (application.status === "SAVED" && update.status !== "SAVED" && !application.submittedByUserId) {
+      application.submittedByUserId = currentUser().id;
+    }
     application.status = update.status;
     if (update.status === "APPLIED" && !application.appliedAt) application.appliedAt = now;
     if (update.status === "SCREENING_CALL" && !application.firstResponseAt) application.firstResponseAt = now;
@@ -64,7 +70,8 @@ export const applicationsMock = firmScoped("applications", {
     const now = new Date().toISOString();
     const application = ApplicationSchema.parse({
       id: `app_saved_${body.candidateId}_${body.jobId}`, firmId, candidateId: body.candidateId, jobId: body.jobId,
-      resumeVersionId: null, submittedByUserId: currentUser().id, status: "SAVED", statusRevision: 0, pendingReviewCount: 0,
+      // No submitter, as the backend's: a Saved draft isn't a submission (docs/02 §9), so no one shows on its card.
+      resumeVersionId: null, submittedByUserId: "", status: "SAVED", statusRevision: 0, pendingReviewCount: 0,
       companyNameAtApply: body.company, jobTitleAtApply: body.title, appliedAt: null, firstResponseAt: null, interviewAt: null,
       offerAt: null, closedAt: null, expiresAt: null, coverLetterText: null, notes: null, events: [], createdAt: now,
     });
