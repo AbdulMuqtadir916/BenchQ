@@ -19,7 +19,7 @@ from backend.logging_setup import configure_logging
 from backend.request_log import HEADER as REQUEST_ID_HEADER, NO_ROUTE, RequestLog
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
-from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, is_running, _get_running_by_job_type, cleanup_stale_runs, sanitize_run_error
+from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, start_heartbeat, sanitize_run_error
 
 from backend.api.routes_settings import router as settings_router
 from backend.api.routes_jobs import router as jobs_router
@@ -52,8 +52,9 @@ logger = logging.getLogger("jobnavigator")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: check the schema, seed data, start scheduler. The schema itself is built by Alembic
-    before this process starts (backend/scripts/db_upgrade.py); deploy exactly one worker (docs/integration/07)."""
+    """Startup: check the schema, seed data. The schema itself is built by Alembic before this process starts
+    (backend/scripts/db_upgrade.py). The scheduler is not started here: it runs in its own process,
+    `python -m backend.worker` (production layer step 3), so the API never runs a scheduled job."""
     logger.info("Starting JobNavigator backend...")
     check_schema_at_head()
     from backend.config import CANDIDATE_GMAIL_ENABLED
@@ -64,14 +65,7 @@ async def lifespan(app: FastAPI):
     require_reset_base_url()
     run_seeds()
 
-    # Clean up stale job runs from previous process
-    cleanup_stale_runs()
-
-    # Start scheduler
-    from backend.scheduler import scheduler, configure_scheduler
-    configure_scheduler()
-    scheduler.start()
-    logger.info("Database initialized, seeded, scheduler started.")
+    logger.info("Database initialized, seeded.")
 
     # Warm the OpenRouter live-pricing cache used for LLM cost logging (non-fatal).
     try:
@@ -80,14 +74,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"OpenRouter price warmup failed: {e}")
 
-    # The résumé tailor's heartbeat: this worker stamps the tailorings it holds (backend/resume_tailor/runs.py).
-    from backend.resume_tailor.runs import keep_stamping
-    heartbeat = asyncio.create_task(keep_stamping())
+    # This process's heartbeat (job_monitor.start_heartbeat): it stamps the runs it holds, tailorings included, and
+    # fails any process's runs that went silent, so a restart or a second copy never fails a live copy's runs.
+    stop_heartbeat = start_heartbeat()
 
     yield
 
-    heartbeat.cancel()
-    scheduler.shutdown()
+    stop_heartbeat()
     logger.info("Shutting down JobNavigator backend...")
 
 
@@ -854,116 +847,13 @@ async def telegram_test():
         )
 
 
-@app.get("/api/scheduler/jobs", tags=["scheduler"], summary="List scheduled jobs")
+@app.get("/api/scheduler/jobs", tags=["scheduler"], summary="List scheduled jobs (retired)")
 def get_scheduler_jobs():
-    """Return all scheduler jobs with their schedule, next run time (UTC), trigger URL, and running state."""
-    from backend.scheduler import scheduler
-    from backend.models.db import Company
-
-    # Map scheduler job IDs to (trigger_url, job_type for monitor)
-    job_map = {
-        "scrape_all": ("/scrape/run-all", "scrape_all"),
-        "email_check": ("/email/check-now", "email_check"),
-        "daily_digest": ("/telegram/digest", "daily_digest"),
-        "h1b_refresh": ("/h1b/refresh", "h1b_refresh"),
-        "db_backup": ("/db/backup", "db_backup"),
-        "job_cleanup": ("/db/cleanup", "job_cleanup"),
-        "auto_reject": ("/auto-reject/run", "auto_reject"),
-    }
-
-    # Human-friendly display names for the core scheduler jobs.
-    display_names = {
-        "scrape_all": "Scrape all searches & companies",
-        "email_check": "Check Gmail for replies",
-        "daily_digest": "Send daily Telegram digest",
-        "h1b_refresh": "Refresh H-1B / LCA data",
-        "db_backup": "Back up database (pg_dump)",
-        "job_cleanup": "Clean up stale skipped jobs",
-        "auto_reject": "Auto-reject ghosted applications",
-    }
-
-    jobs = scheduler.get_jobs()
-    result = []
-    for job in jobs:
-        trigger = job.trigger
-        if hasattr(trigger, 'interval'):
-            schedule = f"Every {int(trigger.interval.total_seconds() / 60)} min"
-        elif hasattr(trigger, 'fields'):
-            fields = {f.name: str(f) for f in trigger.fields}
-            minute = fields.get('minute', '*')
-            hour = fields.get('hour', '*')
-            day = fields.get('day', '*')
-            month = fields.get('month', '*')
-            dow = fields.get('day_of_week', '*')
-            schedule = f"{minute} {hour} {day} {month} {dow}"
-        else:
-            schedule = str(trigger)
-
-        trigger_url, job_type = job_map.get(job.id, (None, None))
-        running_info = _get_running_by_job_type(job_type) if job_type else None
-
-        result.append({
-            "id": job.id,
-            "name": display_names.get(job.id, job.name or job.id),
-            "schedule": schedule,
-            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-            "pending": job.pending,
-            "trigger_url": trigger_url,
-            "running": running_info,
-        })
-
-    # Per-search and per-company custom scrape intervals
-    db = SessionLocal()
-    try:
-        from backend.models.db import Search
-        searches = db.query(Search).filter(
-            Search.active == True,
-            Search.run_interval_minutes != None,
-            Search.run_interval_minutes > 0,
-        ).all()
-        for s in searches:
-            next_run = None
-            if s.last_run_at:
-                from datetime import timedelta
-                next_run = (s.last_run_at + timedelta(minutes=s.run_interval_minutes)).isoformat()
-            result.append({
-                "id": f"search_{s.id}",
-                "name": f"Search: {s.name}",
-                "schedule": f"Every {s.run_interval_minutes} min (search override)",
-                "next_run": next_run,
-                "pending": False,
-                "trigger_url": f"/searches/{s.id}/run",
-                "running": None,
-            })
-
-        companies = db.query(Company).filter(
-            Company.active == True,
-            Company.scrape_interval_minutes != None,
-        ).all()
-        for c in companies:
-            next_run = None
-            if c.last_scraped_at:
-                from datetime import timedelta
-                next_run = (c.last_scraped_at + timedelta(minutes=c.scrape_interval_minutes)).isoformat()
-            company_running = is_running("company_scrape", str(c.id))
-            running_info = None
-            if company_running:
-                from datetime import datetime, timezone
-                elapsed = (datetime.now(timezone.utc) - company_running.started_at).total_seconds()
-                running_info = {"run_id": str(company_running.run_id), "elapsed_seconds": round(elapsed, 1)}
-            result.append({
-                "id": f"company_{c.id}",
-                "name": f"Scrape: {c.name}",
-                "schedule": f"Every {c.scrape_interval_minutes} min (company override)",
-                "next_run": next_run,
-                "pending": False,
-                "trigger_url": f"/scrape/company/{c.id}",
-                "running": running_info,
-            })
-    finally:
-        db.close()
-
-    return result
+    """Retired (production layer step 3, decided 2026-11-14): it read the scheduler in this process's memory, and the
+    scheduler now runs in its own process (backend/worker.py). No BenchQ screen called it; run history stays at
+    /api/monitor/history."""
+    raise HTTPException(status_code=410, detail="Scheduled jobs run in the worker process. "
+                                                "See run history at /api/monitor/history.")
 
 
 # ── Monitor endpoints ────────────────────────────────────────────────────────

@@ -15,7 +15,8 @@ every signed-in request, all in memory (`backend/auth/throttle.py`; the table be
 (`backend/body_limit.py`); database statement and connect timeouts (`backend/statement_timeout.py`, step 2b below);
 one logging setup with request ids and masking (`backend/logging_setup.py`, `backend/request_log.py`, step 4a below);
 per-scraper throttles
-(`backend/scraper/sources/*`); one uvicorn worker with the scheduler inside it.
+(`backend/scraper/sources/*`); one uvicorn worker for the API, and the scheduler in its own worker process
+(`backend/worker.py`, step 3 below).
 
 1. **Requests per second:** rate limits per IP for sign-in and invite acceptance (brute force), per user for the API,
    per firm for the AI routes (parse, tailor, score: they cost money). 429 with `Retry-After`; the frontend's
@@ -61,15 +62,13 @@ All answer 429 with `Retry-After` and `{"detail": "Too many attempts. Try again 
   **From tailoring (2026-11-12, [tailoring.md](./tailoring.md) §7):** one tailoring is 5 model calls, about a minute.
   The tailor has its own gate, `resume_tailor`, 40 per worker (`resume_tailor_max_concurrent`), and at most 5 running
   per BDE; nothing yet stops one firm taking most of the gate. Your cap is that missing per-firm layer.
-- **More than one worker, for the tailor (2026-11-12):** each worker stamps the tailorings it holds every 30 s
-  (`backend/resume_tailor/runs.py`), so a run lost to a crash shows within 2 minutes on any number of workers. But
-  `job_monitor.cleanup_stale_runs()` at startup fails *every* running `job_runs` row: with several workers, one
-  restarting would fail the others' live runs. Before running more than one worker, it should fail only rows not
-  stamped recently (or its own).
+- **More than one worker, for the tailor (2026-11-12):** done in step 3. Every process stamps every run it holds
+  (`job_monitor.start_heartbeat`, generalising the tailor's stamp), and a run is failed only after 2 minutes without a
+  stamp, so a restart, a deploy's overlap or a second copy never fails a live copy's runs.
 - **AI quotas per plan,** with billing (Abdul). The cap above is not a quota.
 - **AI work started in the background** (scoring after a scrape, the score a tailor chains): a request limit doesn't see it. It is covered once AI spend is recorded per firm (07-auth issue 8).
 - **The IP-count fix.** A successful sign-in resets the IP's count as well as the email's, so someone with their own account can keep resetting the per-IP lock. The fix is to reset only the email's count (`throttle.clear()`).
-- **More than one backend process (step 3).** In-memory counts are per process, so N processes allow about N times each limit. Choose then:
+- **More than one API process (after step 3).** In-memory counts are per process, so N processes allow about N times each limit. Choose then:
   - stay at one process (likely enough at BenchQ's load; §2 measures it)
   - counters in Postgres, which is already paid for (needs a table: Abdul)
   - sticky sessions at the proxy (per-user only)
@@ -235,6 +234,54 @@ Python's `logging` sends every module's records up to one root logger. Each file
   `docs/team/cross-area-changes.md`. Found in Abdul's review of #107 and a search of every log call (2026-11-03).
 - **Abdul (deployment):** the collector reads JSON lines from stdout. If the production proxy sets `X-Request-ID`, the
   backend keeps it, so the proxy's lines and ours share one id. Log retention is the deployment's.
+
+### Step 3, the scheduler out of the API (plan agreed 2026-11-14)
+
+**Why.** The scheduler (APScheduler, `backend/scheduler.py`) keeps its job list in memory, so every process that starts
+one runs every job: two API workers, or the old and new API side by side during a zero-downtime deploy, would classify
+each email twice and run two backups at once. That is why the API had to run as exactly one worker (07 Q37). Moving
+the scheduler into its own process lifts that tie: the API may run as many copies as it needs, the scheduler exactly
+one. This is the standard web/worker split (Twelve-Factor process types; Celery beat, Sidekiq), in its light form: a
+separate scheduler process and Postgres for coordination, no Redis and no new table.
+
+**What was built** (`feat/scheduler-worker`, one PR):
+- **The worker:** `python -m backend.worker` (`backend/worker.py`), started by `backend/scripts/start_worker.sh` as
+  the `worker` service in `docker-compose.yml`, from the same image. It runs the startup checks the jobs need (schema at
+  head, the statement timeout, the Gmail token key), cleans its own stale runs, then the scheduler. Run exactly one.
+  The API's `lifespan` no longer starts the scheduler; the tailor's heartbeat stays in the API (its runs live there).
+- **Settings reach the worker by polling** (decided): `scheduler.reload_schedule_if_changed` runs every minute and
+  reconfigures only when a schedule setting (`SCHEDULE_SETTING_KEYS`) changed. `PATCH /api/settings` no longer calls
+  the scheduler. Side fix: `candidate_gmail_sync_interval_minutes` was never in the API's reconfigure list, so a change
+  waited for a restart; it is reloaded like the rest now.
+- **`GET /api/scheduler/jobs` retired (410)** (decided): it read the in-process scheduler, and no BenchQ screen or the
+  extension called it. Run history stays at `/api/monitor/history`.
+- **Stale runs: a heartbeat, not "I just started"** (decided 2026-11-14, replacing a first per-process split). The
+  old start-up clean-up failed every `running` row, assuming whoever ran them was dead. That is wrong as soon as two
+  copies overlap: a zero-downtime deploy starts the new API before the old one stops, and a second copy for capacity
+  overlaps for good. A tailoring failed that way read as lost while its old copy went on to save it.
+  Now every process (each API copy and the worker) stamps `meta.seen_at` on the runs it holds every 30 s, from its own
+  thread (`job_monitor.start_heartbeat`; a run blocking the event loop can't silence it), and each beat fails any
+  `running` row not stamped for 2 minutes (`cleanup_stale_runs`; a row never stamped counts from its start). The same
+  rule and numbers as the tailor's (tailoring.md Q10b), which it generalises. A crashed process's runs read
+  `running` for up to 2 minutes before they fail. The inbox's rows recover on their own and are left alone: an import
+  (`recover_imports`), the classifier's pause (a state; failing it cleared the pause) and command rows. A
+  classification row is never stamped (it isn't held in `_running`) and is failed only once it is 10 minutes old,
+  well past its 2-minute claim lease. Fixes R4-T1-27 (its strict-xfail test now passes).
+  For Zuhair: the tailor's save stops only on an error code (`runs.py`, `_Stop(LOST)`); it should also stop when its
+  row is no longer `running`, so a run failed as silent can never come back as completed.
+- **A manual trigger and a scheduled run never overlap:** the seven job types both processes start
+  (`job_monitor.SHARED_JOB_TYPES`: `scrape_all`, `email_check`, `daily_digest`, `h1b_refresh`, `auto_reject`,
+  `job_cleanup`, `db_backup`) are claimed in `job_runs`: a transaction-scoped advisory lock, then "is one running?",
+  then the insert. Neither process can see the other's `_running` dict. Other job types keep the in-memory check.
+- **Unchanged:** the API wakes the classifier from a route (`wake_worker`), in the API process. Emails are claimed
+  with `SKIP LOCKED` and a lease, so two processes never take the same one (Samad's design). Same for "sync now".
+
+**Not in step 3: more than one API worker.** Still per process: the rate-limit counters (deferred list above), the
+tailor's gate and the scoring/tailoring semaphores (each N per worker), and `_running` for the other job types.
+Whether to run several API workers is decided from the §2 load test.
+
+**Open, carried from 2026-11-03:** "Q2/Q3 of #104's grilling still need Abdul." Not found in the docs; ask Abdul
+whether they were settled.
 
 ### Step 4b, errors: one error shape (planned)
 

@@ -121,17 +121,6 @@ async def test_every_scheduled_job_skips_a_busy_scope_without_raising(test_db, f
 
 
 
-def test_scheduler_jobs_view_reports_a_scoped_company_run_as_running(client, test_db):
-    import backend.job_monitor as jm
-    c = make_company(test_db, name="A", active=True, scrape_interval_minutes=30)
-    jm._running[f"company_scrape:{c.id}"] = jm.RunningJob(
-        run_id=uuid.uuid4(), job_type="company_scrape", trigger="manual",
-        started_at=datetime.now(timezone.utc), scope_key=str(c.id), company_id=str(c.id))
-    rows = assert_clean(client.get("/api/scheduler/jobs"), 200).json()
-    row = next(r for r in rows if r["id"] == f"company_{c.id}")
-    assert row["running"] and row["running"]["elapsed_seconds"] >= 0
-
-
 # ══ In-memory state vs JobRun rows ═══════════════════════════════════════════
 
 @pytest.mark.asyncio
@@ -264,44 +253,22 @@ def test_monitor_history_shows_a_recovered_run_as_failed(client, test_db):
     assert rows[0]["status"] == "failed" and rows[0]["error"] == "Process restarted"
 
 
-def test_stale_recovery_does_not_touch_a_run_that_is_genuinely_live(test_db):
-    """A restart clears memory too, so this documents the limitation, not a fix.
-
-    `cleanup_stale_runs()` runs only in the lifespan, when `_running` is empty by
-    construction — but if it were ever called mid-process it would fail a live run.
-    """
+def test_stale_recovery_skips_runs_the_monitor_still_owns(test_db):
+    """A live run is never failed, however long it has run: its process stamps it (R4-T1-27, fixed by the heartbeat,
+    production layer step 3). Two copies of the API, or a restart during a deploy, no longer fail each other's runs."""
     from backend.models.db import JobRun
-    from backend.job_monitor import cleanup_stale_runs
     import backend.job_monitor as jm
 
     rid = uuid.uuid4()
-    test_db.add(JobRun(id=rid, job_type="scrape_all", trigger="manual", status="running",
-                       started_at=datetime.now(timezone.utc)))
+    started = datetime.now(timezone.utc) - timedelta(minutes=45)
+    test_db.add(JobRun(id=rid, job_type="scrape_all", trigger="manual", status="running", started_at=started))
     test_db.commit()
-    jm._running["scrape_all"] = jm.RunningJob(run_id=rid, job_type="scrape_all",
-                                              trigger="manual",
-                                              started_at=datetime.now(timezone.utc))
-    assert cleanup_stale_runs() == 1        # current behaviour: memory is not consulted
+    jm._running["scrape_all"] = jm.RunningJob(run_id=rid, job_type="scrape_all", trigger="manual",
+                                              started_at=started)
+    jm.beat_once()
     test_db.expire_all()
-    assert test_db.query(JobRun).filter(JobRun.id == rid).first().status == "failed"
-    assert "scrape_all" in jm._running       # …while the monitor still shows it running
-
-
-@pytest.mark.xfail(strict=True, reason="R4-T1-27")
-def test_stale_recovery_should_skip_runs_the_monitor_still_owns(test_db):
-    """A mid-process call must not fail a run the in-memory monitor is still driving."""
-    from backend.models.db import JobRun
-    from backend.job_monitor import cleanup_stale_runs
-    import backend.job_monitor as jm
-
-    rid = uuid.uuid4()
-    test_db.add(JobRun(id=rid, job_type="scrape_all", trigger="manual", status="running",
-                       started_at=datetime.now(timezone.utc)))
-    test_db.commit()
-    jm._running["scrape_all"] = jm.RunningJob(run_id=rid, job_type="scrape_all",
-                                              trigger="manual",
-                                              started_at=datetime.now(timezone.utc))
-    assert cleanup_stale_runs() == 0
+    assert test_db.query(JobRun).filter(JobRun.id == rid).first().status == "running"
+    assert "scrape_all" in jm._running
 
 
 # ══ Monitor endpoints agree with memory ══════════════════════════════════════

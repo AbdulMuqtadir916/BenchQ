@@ -226,16 +226,16 @@ breaks joins, unless both use the seeded ids (F5 derives backend UUIDs from the 
 | Task | Command |
 |---|---|
 | Env files (once) | `cp .env.example .env.local` and `cp backend/.env.example backend/.env` |
-| Start backend + database | `docker compose up -d db backend` (add `--build` after backend code changes) |
+| Start backend + database | `docker compose up -d db backend worker` (add `--build` after backend code changes). `worker` runs the scheduler: inbox sync, email classification and the timed jobs; without it the app works but nothing runs on a timer |
 | Backend health | `curl http://localhost:8000/health` |
-| Backend logs | `docker compose logs -f backend` |
+| Backend logs | `docker compose logs -f backend` (the scheduler's: `docker compose logs -f worker`) |
 | Demo accounts (local only) | `docker compose exec backend python -m backend.scripts.seed_demo`: the mocks' firms, users and invites; every account in docs/03 §3.2 signs in with `benchq-demo-2026`. `--reset` starts over. Refused when `BENCHQ_ENV` is production |
 | First Super Admin (any environment) | `docker compose exec backend python -m backend.scripts.create_platform_admin --email you@example.com --name "Your Name"` (asks for the password twice); everyone else joins by invite |
 | Reset someone's password (any environment) | `docker compose exec backend python -m backend.scripts.reset_password --email someone@example.com` (asks for the new password twice). Works for firm users and Super Admins, signs the account out everywhere and logs it. There is no self-service reset until email exists (07 Q39) |
 | Stop backend + database | `docker compose stop` (data is kept in the `pgdata` volume) |
 | Frontend | `pnpm dev`, then `http://localhost:3000/health` shows the backend's JSON |
 | Switch a module to the backend | add it to `NEXT_PUBLIC_LIVE_MODULES` in `.env.local` (not `session` or `ledger`: those are always on), restart `pnpm dev` |
-| Sign in, onboarding, `/admin` (F6) | Always the backend's. `docker compose up -d db backend`, seed the demo accounts (above), `pnpm dev`, open `http://localhost:3000` (not `127.0.0.1`: the backend checks the origin). Sign-in, `/invite/[token]`, the team list, the ledger and `/admin` firms, plans, users, invites, team and audit are live; every other module stays on mock data, and a demo account keeps its mock dashboards. Admin actions without an endpoint yet say "Not available on the live backend yet" |
+| Sign in, onboarding, `/admin` (F6) | Always the backend's. `docker compose up -d db backend worker`, seed the demo accounts (above), `pnpm dev`, open `http://localhost:3000` (not `127.0.0.1`: the backend checks the origin). Sign-in, `/invite/[token]`, the team list, the ledger and `/admin` firms, plans, users, invites, team and audit are live; every other module stays on mock data, and a demo account keeps its mock dashboards. Admin actions without an endpoint yet say "Not available on the live backend yet" |
 | Backend tests (Postgres) | `docker compose up -d db-test backend`, then `docker compose exec -T backend python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider` (details in "Schema changes and the test database" below) |
 | Create a migration | `docker compose exec backend alembic -c backend/alembic.ini revision --autogenerate -m "what changed"`, then review the file (below) |
 | Look inside the database | [`database-viewer.md`](./database-viewer.md) (Adminer at `http://localhost:8081`) |
@@ -251,8 +251,9 @@ baked in at start.
 The database schema changes **only through Alembic** (`backend/migrations/`). Nothing creates or alters
 tables at startup any more: `docker compose up` runs `python -m backend.scripts.db_upgrade` before the API
 starts (see the `CMD` in `Dockerfile.backend`), and the API refuses to start if the database is not at the
-newest revision. Run **exactly one backend worker** until the scheduler leaves the API process
-([07-auth-and-tenancy.md](./07-auth-and-tenancy.md), Q37).
+newest revision. The scheduler runs in its own process, the `worker` service (`backend/worker.py`); run **exactly
+one** of it, since every copy runs every scheduled job. The API stays at one worker for now: its rate-limit counters
+are per process ([docs/team/uzair.md](../team/uzair.md), step 3).
 
 ### Make a schema change
 
@@ -281,7 +282,7 @@ nothing is changed. You are fine if `SELECT version_num FROM alembic_version` re
 
 1. keep the data: `git checkout 14ba662` (the last commit that still stamps), `docker compose up -d --build backend`
    once, then come back to your branch; or
-2. start empty: `docker compose down -v` (this deletes the database volume), then `docker compose up -d db backend`.
+2. start empty: `docker compose down -v` (this deletes the database volume), then `docker compose up -d db backend worker`.
 
 The legacy schema path was deleted at F6 ([07-auth-and-tenancy.md](./07-auth-and-tenancy.md)).
 

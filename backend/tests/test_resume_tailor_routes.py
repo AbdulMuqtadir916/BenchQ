@@ -297,6 +297,7 @@ def test_a_stamped_run_stays_running_until_the_thirty_minute_backstop(anonymous_
 def test_a_run_failed_by_the_startup_clean_up_reads_as_lost(anonymous_client, test_db, world, launched, setup):
     from backend.job_monitor import cleanup_stale_runs
     run_id = _start(anonymous_client, world, setup).json()["run_id"]
+    _age(test_db, run_id, 3)          # never stamped since: its process stopped
     cleanup_stale_runs()
     test_db.expire_all()
     assert _status(anonymous_client, world, setup, run_id).json()["error_code"] == "lost"
