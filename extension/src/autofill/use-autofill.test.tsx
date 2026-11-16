@@ -51,9 +51,9 @@ const report = (state: ReturnType<typeof useAutofill>) => { hook = state; };
 /** A résumé id that stands for "the panel is still loading the résumés". */
 const LOADING = "loading";
 
-function Harness({ value, resumeId = "res-1" }: { value: Connection; resumeId?: string | null }) {
+function Harness({ value, resumeId = "res-1", isHeld = false }: { value: Connection; resumeId?: string | null; isHeld?: boolean }) {
   const state = useAutofill({
-    connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, fileName: "Priya Shah - Java Developer", onSessionExpired, onAccessLost,
+    connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, fileName: "Priya Shah - Java Developer", onSessionExpired, onAccessLost, isHeld,
   });
   useEffect(() => report(state));
   return null;
@@ -357,7 +357,7 @@ describe("autofill", () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Location (City)", "combobox")]));
     await mount();
     await run(() => hook.autofill());
-    expect(fillChoice).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", search: "Phoenix" }, "Phoenix, AZ", undefined);
+    expect(fillChoice).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", search: "Phoenix" }, "Phoenix, AZ", undefined, expect.any(Function));
     expect(fillField).not.toHaveBeenCalled();
   });
 
@@ -924,6 +924,53 @@ describe("the form for Mark applied", () => {
     expect((await finalForm()).fields).toEqual([]);
   });
 
+  // The panel holds while it asks whether the tab moved on to another job (PR #140, fifth review).
+  const holdOn = async (isHeld: boolean) => {
+    await act(async () => { root.render(<Harness value={connection} isHeld={isHeld} />); });
+    await wait(5);
+  };
+  const otherJob = { ...page([field("s", "Salary expectation", "text", "90000")]), scanIds: new Map([[0, 2]]) };
+
+  it("takes nothing from another job's page while held, and the job's own page once the tab is back", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
+    await mount();
+    await holdOn(true);
+    vi.mocked(scanTab).mockResolvedValue(otherJob);
+    await run(() => hook.rescan());
+    // The look goes on while held (it's how the job is checked), but none of it goes into this application's form.
+    expect(hook.rows?.map(({ field: { id } }) => id)).toEqual(["s"]);
+    typed(["0:s", "95000"]);
+    expect((await finalForm()).fields.map(({ label }) => label)).toEqual(["Nickname"]);
+    vi.mocked(readTab).mockResolvedValue({ values: new Map(), moved: false });
+    vi.mocked(scanTab).mockResolvedValue({ ...page([field("n", "Nickname", "text", "Priya")]), scanIds: new Map([[0, 3]]) });
+    await holdOn(false);
+    expect((await finalForm()).fields.map(({ label, value }) => [label, value])).toEqual([["Nickname", "Priya"]]);
+  });
+
+  it("takes in the page the BDE kept the tab connected on", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
+    await mount();
+    await holdOn(true);
+    vi.mocked(scanTab).mockResolvedValue({ ...page([field("c", "Cover note", "text", "Hello")]), scanIds: new Map([[0, 2]]) });
+    await run(() => hook.rescan());
+    expect((await finalForm()).fields.map(({ label }) => label)).toEqual(["Nickname"]);
+    await holdOn(false);
+    expect((await finalForm()).fields.map(({ label }) => label)).toEqual(["Nickname", "Cover note"]);
+  });
+
+  it("keeps the rows from a held look out of the form, though the hold lifts, until a fresh look replaces them", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
+    await mount();
+    await holdOn(true);
+    vi.mocked(scanTab).mockResolvedValue(otherJob);
+    await run(() => hook.rescan());
+    // The fresh look after the hold can't read the page, so the rows on show are still the other job's.
+    vi.mocked(scanTab).mockRejectedValue(new Error("The frame went away"));
+    await holdOn(false);
+    typed(["0:s", "95000"]);
+    expect((await finalForm()).fields.map(({ label }) => label)).toEqual(["Nickname"]);
+  });
+
   it("takes in the latest change as it marks the job applied", async () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
     await mount();
@@ -1008,6 +1055,26 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     vi.mocked(undoFills).mockResolvedValue({ restored: 2, kept: 0, skipped: 0 });
     await act(async () => { const undoing = hook.undo(); await vi.advanceTimersByTimeAsync(500 * 24); await undoing; });
     expect(hook.attachedFile).toBeNull();
+  });
+
+  it("writes nothing more once the tab moves on to another job while the file settles (PR #140, third review)", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) =>
+      ({ status: "filled", current: write.type === "file" ? NAME : write.type === "text" ? write.value : "" }));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} />); });
+    await advance(1);
+    const running = hook.autofill();
+    await advance(500);
+    expect(vi.mocked(fillField).mock.calls.map(([, , { fieldId }]) => fieldId)).toEqual(["r"]);
+    // The file went on and the form is settling: the panel now asks whether the tab moved on to another job.
+    await act(async () => { root.render(<Harness value={connection} isHeld />); });
+    await advance(500 * 24);
+    await act(async () => { await running; });
+    expect(vi.mocked(fillField).mock.calls.map(([, , { fieldId }]) => fieldId)).toEqual(["r"]);
+    expect(hook.outcome).toMatchObject({ stopped: true });
   });
 
   it("goes on with the answers when the page swapped its upload out, and leaves that upload to the BDE", async () => {
@@ -1305,5 +1372,44 @@ describe("a site BenchQ may not read yet", () => {
     await mount();
     expect(hook.needsAccess).toBeNull();
     expect(fake.permissions.contains).not.toHaveBeenCalled();
+  });
+});
+
+describe("while the panel asks whether the tab moved to another job (PR #140, second review)", () => {
+  it("fills nothing, and fills once the BDE keeps the tab", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")]));
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} isHeld />); });
+    await wait(5);
+    await run(() => hook.autofill());
+    expect(fillField).not.toHaveBeenCalled();
+    await act(async () => { root.render(<Harness value={connection} isHeld={false} />); });
+    await wait(5);
+    await run(() => hook.autofill());
+    expect(fillField).toHaveBeenCalled();
+  });
+
+  it("hands a dropdown write the hold, which turns true when the tab moves on while its list opens (PR #140, fourth review)", async () => {
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("Current location", "Phoenix, AZ")]);
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Location (City)", "combobox")]));
+    let shouldStop: (() => boolean) | undefined;
+    let openList: (() => void) | undefined;
+    vi.mocked(fillChoice).mockImplementation(async (...args) => {
+      shouldStop = args[5];
+      await new Promise<void>((resolve) => { openList = resolve; });
+      return shouldStop?.() ? { status: "stale", current: "" } : { status: "filled", current: "Phoenix" };
+    });
+    await mount();
+    let running: Promise<void> | undefined;
+    await act(async () => { running = hook.autofill(); });
+    await wait(5);
+    expect(shouldStop?.()).toBe(false);
+    await act(async () => { root.render(<Harness value={connection} isHeld />); });
+    expect(shouldStop?.()).toBe(true);
+    await act(async () => {
+      openList?.();
+      await running;
+    });
+    expect(hook.outcome).toMatchObject({ filled: 0, stopped: true });
   });
 });
