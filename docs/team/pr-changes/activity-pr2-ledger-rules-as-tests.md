@@ -107,9 +107,10 @@ The real backend passes all three as it is: no route depended on the old, looser
 - **A model alias is read at each call, not at the end of the function.** In `model = LedgerEntry; db.query(model);
   model = Candidate` the query reads the ledger, and the check missed it because it used the name's last meaning. It now
   uses the assignments that come before each call. The same holds for an entry built under a name that is rebound later.
-- **A thread or a partial counts only once it is run.** `Thread(target=write_audit)` that nobody starts, and
-  `partial(write_audit, db)` that nobody calls or hands on, no longer make a route log. Started (`.start()`), called, or
-  handed to a dispatcher, directly or through the name they were given, they count as before.
+- **A thread or a partial that is built and dropped doesn't count.** `Thread(target=write_audit)` left as a statement
+  of its own, or given a name nothing reads afterwards, no longer makes a route log; the same for a `partial`. Started,
+  called, or handed on (returned, passed along, queued for later), it counts as before. The check does not follow one
+  further than that: PR 6's Super Admin logging queues a partial that the middleware runs after the answer.
 - **Each dispatcher forwards keywords its own way.** `Thread` and `launch_background` pass the callback's keywords as one
   dict (`kwargs={...}`, `func_kwargs={...}`), so the candidate rule reads that dict for those two and their own
   keywords (`firm_id=` on the launcher) are not the callback's. The other dispatchers pass their keywords on as they are.
