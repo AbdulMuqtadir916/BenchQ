@@ -6,7 +6,6 @@ people it happened under when a candidate or a BDE moves on.
 """
 from datetime import datetime, timedelta
 import json
-import re
 import uuid
 
 from fastapi.encoders import jsonable_encoder
@@ -90,26 +89,18 @@ def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_typ
     return entry
 
 
-# The shape backend/logging_setup.py masks in the server log: an address ending in letters (`.com`, `.test`).
-_EMAIL = re.compile(r"[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.([a-z]{2,})")
+# What the log shows in place of an email nobody owns. Anyone can type anything into the sign-in form, a password
+# included, and a password can be shaped like an address (`p@x.secretword`), so no part of the typed text is kept.
+EMAIL_NOT_SHOWN = "Email not shown"
 
 
-def mask_email(email: str) -> str:
-    """What the log keeps of an email nobody owns, as the server log masks one: its first letter and its ending
-    (`f***@***.test`). Anyone can type anything into the form, a password included, and a password can look like a
-    domain (`P@ssword.2026`, `p@ss.word.com`), so nothing after `@` but the ending is kept, and nothing at all of
-    text that isn't an address."""
-    match = _EMAIL.fullmatch(email) if len(email) <= 254 else None
-    return f"{email[0]}***@***.{match.group(1)}" if match else "***"
-
-
-def _sign_in_entry(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str, action: str,
+def _sign_in_entry(db: DbSession, *, account: User | PlatformUser | None, ip: str, action: str,
                    summary: str) -> ActivityEntry:
     """A failed sign-in's entry: on the account it tried, or on nobody for an email with no account."""
     if account is None:
         entry = ActivityEntry(firm_id=None, actor_type="UNKNOWN", actor_name="Unknown account", entity_type="sign_in",
-                              entity_id=str(uuid.uuid4()), entity_label=mask_email(email), action=action,
-                              summary=f"{mask_email(email)}, {summary}", request_id=request_id.get())
+                              entity_id=str(uuid.uuid4()), entity_label=EMAIL_NOT_SHOWN, action=action,
+                              summary=f"{EMAIL_NOT_SHOWN}, {summary}", request_id=request_id.get())
         db.add(entry)
     else:
         is_firm_user = isinstance(account, User)
@@ -120,7 +111,7 @@ def _sign_in_entry(db: DbSession, *, account: User | PlatformUser | None, email:
     return entry
 
 
-def record_sign_in_failure(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str,
+def record_sign_in_failure(db: DbSession, *, account: User | PlatformUser | None, ip: str,
                            reason: str) -> ActivityEntry:
     """Tries on one account from one IP within `SAME_ATTEMPT_WINDOW` of the first share a row, which counts them."""
     # Two tries at the same instant would both find no row and both insert one. A lock on this account and IP, held until
@@ -133,19 +124,19 @@ def record_sign_in_failure(db: DbSession, *, account: User | PlatformUser | None
                                          same_account, ActivityEntry.created_at >= utcnow() - SAME_ATTEMPT_WINDOW) \
         .order_by(ActivityEntry.created_at.desc()).with_for_update().first()
     if row is None:
-        return _sign_in_entry(db, account=account, email=email, ip=ip, action="SIGN_IN_FAILED", summary=reason)
+        return _sign_in_entry(db, account=account, ip=ip, action="SIGN_IN_FAILED", summary=reason)
     row.attempt_count += 1
     return row
 
 
-def record_lockout(db: DbSession, *, account: User | PlatformUser | None, email: str, ip: str, attempts: int,
+def record_lockout(db: DbSession, *, account: User | PlatformUser | None, ip: str, attempts: int,
                    minutes: int, by_address: bool = False) -> ActivityEntry:
     """`by_address`: the address (IP) ran out of tries, not the account, so the entry names no account."""
     unit = "minute" if minutes == 1 else "minutes"
     if by_address:
-        return _sign_in_entry(db, account=None, email=email, ip=ip, action="LOCKED_OUT",
+        return _sign_in_entry(db, account=None, ip=ip, action="LOCKED_OUT",
                               summary=f"sign-ins from this address locked for {minutes} {unit} after {attempts} tries")
-    return _sign_in_entry(db, account=account, email=email, ip=ip, action="LOCKED_OUT",
+    return _sign_in_entry(db, account=account, ip=ip, action="LOCKED_OUT",
                           summary=f"Locked for {minutes} {unit} after {attempts} tries")
 
 

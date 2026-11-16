@@ -54,12 +54,11 @@ def test_a_wrong_password_writes_an_entry_on_the_account(anonymous_client, test_
     assert entry.ip_address and entry.attempt_count == 1
 
 
-def test_an_unknown_email_is_masked_and_belongs_to_no_firm(anonymous_client, test_db):
+def test_an_unknown_email_is_not_kept_and_belongs_to_no_firm(anonymous_client, test_db):
     assert _sign_in(anonymous_client, "nobody@example.test").status_code == 401
     entry = _failed(test_db)[0]
     assert (entry.actor_type, entry.actor_name, entry.actor_user_id, entry.firm_id) == ("UNKNOWN", "Unknown account", None, None)
-    assert entry.summary == "n***@***.test, no such account"
-    assert "nobody" not in f"{entry.summary} {entry.entity_label}"
+    assert (entry.entity_label, entry.summary) == ("Email not shown", "Email not shown, no such account")
 
 
 def test_a_deactivated_account_gets_the_same_answer_and_its_own_reason(anonymous_client, test_db, people):
@@ -100,11 +99,11 @@ def test_two_failed_tries_at_the_same_instant_share_one_row(test_db, people):
     _, bde, _ = people
     first, second, done = SessionLocal(), SessionLocal(), threading.Event()
     try:
-        ledger.record_sign_in_failure(first, account=bde, email=bde.email, ip="203.0.113.9", reason="Wrong password.")
+        ledger.record_sign_in_failure(first, account=bde, ip="203.0.113.9", reason="Wrong password.")
         first.flush()                                        # its row is written but not yet committed
 
         def other():
-            ledger.record_sign_in_failure(second, account=bde, email=bde.email, ip="203.0.113.9", reason="Wrong password.")
+            ledger.record_sign_in_failure(second, account=bde, ip="203.0.113.9", reason="Wrong password.")
             second.commit()
             done.set()
         worker = threading.Thread(target=other)
@@ -126,11 +125,11 @@ def test_two_tries_at_once_on_unknown_emails_from_one_ip_share_one_row(test_db, 
 
     first, second, done = SessionLocal(), SessionLocal(), threading.Event()
     try:
-        ledger.record_sign_in_failure(first, account=None, email="Nobody@Example.test", ip="203.0.113.9", reason="Wrong password.")
+        ledger.record_sign_in_failure(first, account=None, ip="203.0.113.9", reason="Wrong password.")
         first.flush()
 
         def other():
-            ledger.record_sign_in_failure(second, account=None, email="someone.else@example.test", ip="203.0.113.9", reason="Wrong password.")
+            ledger.record_sign_in_failure(second, account=None, ip="203.0.113.9", reason="Wrong password.")
             second.commit()
             done.set()
         worker = threading.Thread(target=other)
@@ -175,17 +174,23 @@ def test_an_address_that_runs_out_of_tries_names_no_account(anonymous_client, te
     assert "sign-ins from this address locked for 1 minute after 10 tries" in locked.summary
 
 
-@pytest.mark.parametrize("typed,kept", [
-    ("nobody@example.test", "n***@***.test"),
-    ("P@ssw0rd2026", "***"),                               # a password typed into the email box: nothing of it is kept
-    ("P@ssword.2026", "***"),                              # one that looks like a domain: still nothing
-    ("p@ss.word.com", "p***@***.com"),                     # one shaped like an address: its first letter and ending only
-    ("ab@", "***"),
-    ("x@" + "a" * 260 + ".test", "***"),
+# CodeRabbit on #145: a password can be shaped like an address, ending included, so no part of the typed text is kept.
+@pytest.mark.parametrize("typed", [
+    "nobody@example.test",
+    "P@ssw0rd2026",                                        # a password typed into the email box
+    "P@ssword.2026",                                       # one that looks like a domain
+    "p@x.supersecretpassword",                             # one shaped like an address, with a long ending of letters
+    "q@" + "z" * 260 + ".test",
 ])
-def test_a_typed_email_keeps_only_its_first_letter_and_ending(typed, kept):
-    from backend.auth.ledger import mask_email
-    assert mask_email(typed.lower()) == kept
+def test_nothing_typed_into_the_email_box_is_kept_for_an_unknown_account(anonymous_client, test_db, typed):
+    _sign_in(anonymous_client, typed)
+    test_db.expire_all()
+    rows = test_db.execute(text("SELECT row_to_json(a)::text FROM activity_logs a")).scalars().all()
+    assert rows, "the try is still an entry"
+    name, _, rest = typed.lower().partition("@")
+    for part in (name, rest, rest.rpartition(".")[2]):
+        if len(part) > 4:                                  # shorter than that, it matches a date or an id by chance
+            assert not any(part in row.lower() for row in rows), part
 
 
 def test_the_row_can_only_gain_a_try(test_db, anonymous_client, people):
