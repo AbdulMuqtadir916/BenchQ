@@ -21,3 +21,12 @@ describe("the BDE review badge on an application card", () => {
     expect(html({ ...base, pendingReviewCount: 2 }, false)).not.toContain("BDE review");
   });
 });
+
+describe("who an application card names", () => {
+  it("the person who submitted it, and no one for a Saved draft, which nobody has submitted", () => {
+    expect(html(base)).toContain("Sneha Rao");
+    const draft = renderToStaticMarkup(<ApplicationCardFace app={{ ...base, status: "SAVED", submittedByUserId: "" }} owner={null} />);
+    expect(draft).not.toContain("Unassigned");
+    expect(draft).not.toContain("Sneha Rao");
+  });
+});
