@@ -61,6 +61,7 @@ describe("a candidate's searches", () => {
       usage: { jobs_saved_today: 47, jobs_cap: 100, attempts_today: 3, attempts_cap: 20, captures_today: 2, captures_cap: 20, resets_at: "2026-11-12T13:00:00+00:00" },
       role: "Java Developer",
       places: [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }, { value: "remote", label: "Remote (anywhere in the US)", kind: "remote" }],
+      sources: [{ value: "indeed", label: "Indeed" }, { value: "freehire", label: "freehire.me" }],
     }));
     expect(searches.running).toMatchObject({ id: "b1", kind: "SEARCH", state: "RUNNING", newCount: 0, finishedAt: null, place: "remote" });
     expect(searches.searches[0].place).toBeNull();                    // a search from before places (2026-11-14)
@@ -68,6 +69,7 @@ describe("a candidate's searches", () => {
     expect(searches.searches[1]).toMatchObject({ leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0 });
     expect(searches.role).toBe("Java Developer");
     expect(searches.places.map((p) => p.value)).toEqual(["Austin, TX", "remote"]);
+    expect(searches.sources.map((s) => s.value)).toEqual(["indeed", "freehire"]);     // Indeed first (Q53)
     expect(searches.searches.map((s) => [s.kind, s.state, s.newCount, s.seenAgainCount, s.overLimitCount, s.errorCode])).toEqual([
       ["SEARCH", "SUCCESS", 12, 3, 5, null], ["SEARCH", "ERROR", 0, 0, 0, "timeout"], ["CAPTURE", "SUCCESS", 0, 0, 0, null],
     ]);

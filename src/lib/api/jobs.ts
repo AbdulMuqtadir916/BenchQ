@@ -68,9 +68,10 @@ const live = {
   },
   searches: async (firmId: string, candidateId: string): Promise<JobSearches> =>
     toJobSearches(await http.get(`${candidatePath(firmId, candidateId)}/job-searches`, JobSearchesDto)),
-  /** Starts a search of the candidate's target role in `place`, one of their places (`JobSearches.places`). */
-  startSearch: async (firmId: string, candidateId: string, place: string): Promise<string> =>
-    (await http.post(`${candidatePath(firmId, candidateId)}/job-searches`, z.object({ batch_id: z.string() }), { body: { place } })).batch_id,
+  /** Starts a search of the candidate's target role in `place`, one of their places (`JobSearches.places`), on
+   * `source`, one of `JobSearches.sources` (none: the platform's default). */
+  startSearch: async (firmId: string, candidateId: string, place: string, source?: string): Promise<string> =>
+    (await http.post(`${candidatePath(firmId, candidateId)}/job-searches`, z.object({ batch_id: z.string() }), { body: { place, source } })).batch_id,
 };
 
 /**
@@ -96,7 +97,7 @@ export const jobsApi = {
   searches: (firmId: string, candidateId: string): Promise<JobSearches> => live.searches(firmId, candidateId),
 
   /** "Find jobs": start a search for a role (the candidate's BDE only); it runs in the background. Its batch id. */
-  startSearch: (firmId: string, candidateId: string, place: string): Promise<string> => live.startSearch(firmId, candidateId, place),
+  startSearch: (firmId: string, candidateId: string, place: string, source?: string): Promise<string> => live.startSearch(firmId, candidateId, place, source),
 };
 
 /** The capture was refused because the candidate already has this job; `jobId` is the existing job. */

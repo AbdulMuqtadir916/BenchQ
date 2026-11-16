@@ -4,7 +4,7 @@
 · **Depends on:** 00 · **Owner:** Zuhair · **Contracts:** docs/02 §6.y (the tables and routes), §6.z (the screens),
 §6.w (Indeed, places, the Match, the paged list)
 
-A candidate's jobs come from a **job search** run by the candidate's BDE (Indeed since 2026-11-14; freehire.me
+A candidate's jobs come from a **job search** run by the candidate's BDE (Indeed or freehire.me, picked per search since 2026-11-16; Indeed since 2026-11-14; freehire.me
 before), or a job **captured** by
 hand or from the extension. They live in `job_postings` (one row per candidate per job) and `scrape_jobs` (one row
 per search or capture). The old shared `jobs` pool that this page used to describe is retired: its write routes
@@ -26,9 +26,9 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
   read; a support view reads only.
 - **Daily limits** (since 6:30 PM IST): 100 new jobs per candidate, 20 searches and 20 captures per BDE. The same role
   searched again continues where the last search stopped.
-- **The whole posting:** freehire.me's search cuts descriptions at about 1,000 characters, so a searched job's first
-  open fetches the whole posting from freehire.me once and keeps it. Postings freehire.me itself only has a preview
-  of (an Adzuna listing ends in "…") stay a preview; "Open original" has the rest.
+- **The whole posting:** Indeed and freehire.me's agent search (since 2026-11-16) send whole postings. Jobs saved by
+  freehire.me's old search keep the ~1,000 characters it sent. Postings freehire.me itself only has a preview of (an
+  Adzuna listing, often 500 characters) stay a preview; "Open original" has the rest.
 
 ## Decisions (2026-11-14): Indeed, places, the Match
 
@@ -44,6 +44,19 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 - **Every job, 100 at a time.** The job list is sorted and filtered by the backend, with "Load more"; a candidate's
   list opens at "Any score", best Match first. ⌘K searches jobs on the backend.
 - **A search's job is labelled "Indeed"**, with no legal-basis text.
+
+## Decisions (2026-11-16): freehire.me as a second source (Q53–Q56)
+
+- **The BDE picks the source** for each search, beside the place picker: Indeed (first, the default) or freehire.me.
+  The daily limits are shared by both.
+- **freehire.me gets Indeed's inputs**: the role on job titles, the city's metro area (else the country; Remote sends
+  the country and remote only), the last 14 days, 100 at a time from the last offset, the whole posting. The same
+  filters at save.
+- **Its licence:** a key (`FREEHIRE_API_KEY` in `backend/.env`) is sent when set. Without one, freehire.me's terms
+  allow non-commercial use only, so the licence is settled before production.
+- **The job list shows only jobs posted in the last 14 days**, any source (by the job's date; a job without one
+  counts from the day it was saved). Older jobs stay saved; their job pages and applications still open.
+- **The job list's source filter opens at Indeed**; freehire.me's jobs and captures show when picked.
 
 ## Frontend surface
 
@@ -62,8 +75,8 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 | the firm's jobs (one per job, the visible `candidate_ids` and their `matches`), sorted, filtered, 100 at a time with the total | `GET /api/firms/{firm}/job-postings?candidate_id=&sort=&min_score=&source=&remote=&q=&exclude_applied=&offset=&limit=` |
 | one job (with the whole posting) | `GET /api/firms/{firm}/job-postings/{id}` |
 | a candidate's jobs / one | `GET …/candidates/{id}/job-postings`, `…/job-postings/{posting_id}` |
-| start a search (BDE) | `POST …/candidates/{id}/job-searches` `{place?}` (one of the candidate's places) → 202 `{batch_id, run_id}` |
-| searches, today's usage, the role and the places | `GET …/candidates/{id}/job-searches` |
+| start a search (BDE) | `POST …/candidates/{id}/job-searches` `{place?, source?}` (one of the candidate's places; `indeed` or `freehire`) → 202 `{batch_id, run_id}` |
+| searches, today's usage, the role, the places and the sources | `GET …/candidates/{id}/job-searches` |
 | capture a job (BDE) | `POST …/candidates/{id}/job-postings` → 201, or 200 with `created: false` for the job the candidate has |
 
 ## Acceptance criteria

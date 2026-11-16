@@ -1,7 +1,7 @@
-"""Job search PR 1, offline parts: the registry (Indeed searches; freehire.me, retired 2026-11-14, only reads), the
+"""Job search PR 1, offline parts: the registry (Indeed, then freehire.me: decided 2026-11-16, Q53), the
 shared outbound call's timeout / retry / cap / error codes, the résumé country, the 6:30 PM IST day and the job
 identity. No network: httpx.MockTransport. Every job here is made up (no real postings in the repo). Indeed's own
-search: test_job_search_indeed.py."""
+search: test_job_search_indeed.py; freehire.me's: test_job_search_freehire.py."""
 import asyncio
 import json
 from datetime import datetime, timedelta, timezone
@@ -12,7 +12,7 @@ import pytest
 from backend.job_search import http, limits
 from backend.job_search.country import search_country
 from backend.job_search.pipeline import job_id
-from backend.job_search.providers import DEFAULT_PROVIDER, REGISTRY, RETIRED, ProviderError, reader_for
+from backend.job_search.providers import DEFAULT_PROVIDER, REGISTRY, ProviderError, choices, reader_for
 from backend.job_search.providers.base import JobFields
 from backend.job_search.providers.freehire import Freehire
 
@@ -44,16 +44,12 @@ def _get():
     return asyncio.run(http.get_json("https://source.example.test/jobs", {"q": "java developer"}, source="test"))
 
 
-# ── freehire.me: retired as a source 2026-11-14; its saved jobs still read (8a) ──
+# ── the registry: Indeed and freehire.me search; a job the old freehire.me search saved still reads ──
 
-def test_freehire_no_longer_searches_but_its_jobs_still_read():
-    assert "freehire" not in REGISTRY and "freehire" in RETIRED
-    assert not hasattr(reader_for("freehire"), "search")
-    assert reader_for("freehire").read(MADE_UP_JOB).title == "Java Developer"
-
-
-def test_indeed_is_the_registered_source_and_the_default():
-    assert list(REGISTRY) == ["indeed"] and DEFAULT_PROVIDER == "indeed"
+def test_indeed_and_freehire_search_indeed_first_and_the_default():
+    assert list(REGISTRY) == ["indeed", "freehire"] and DEFAULT_PROVIDER == "indeed"
+    assert choices() == [{"value": "indeed", "label": "Indeed"}, {"value": "freehire", "label": "freehire.me"}]
+    assert reader_for("freehire").read(MADE_UP_JOB).title == "Java Developer"     # HTML, cut: the old search's
 
 
 def test_freehire_read_gives_the_common_fields_in_plain_text():

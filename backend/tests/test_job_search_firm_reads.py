@@ -103,6 +103,7 @@ def test_a_firm_with_no_jobs_lists_none(anonymous_client, world, adnans):
 class _FullPostings:
     """freehire.me's single-job read, made up: counts the calls; `fail` makes the next ones fail."""
     name = "freehire"
+    label = "freehire.me"
 
     def __init__(self):
         self.calls, self.fail = 0, False

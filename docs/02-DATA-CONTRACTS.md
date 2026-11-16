@@ -1420,6 +1420,9 @@ export const JobSearchesSchema = z.object({
   running: JobSearchSchema.nullable(),
   searches: z.array(JobSearchSchema),               // newest first, searches and captures
   usage: JobSearchUsageSchema,
+  role: z.string().nullable(),                      // the target role a search asks for (§6.w)
+  places: z.array(JobSearchPlaceSchema),            // {value, label, kind}: where a search can look (§6.w)
+  sources: z.array(JobSearchSourceSchema),          // {value, label}: Indeed, freehire.me; the first is the default (§6.w, 2026-11-16)
 });
 ```
 
@@ -1433,9 +1436,18 @@ has.
 
 **The source.** Indeed, through a small subclass of python-jobspy's Indeed scraper
 (`backend/job_search/providers/indeed.py`): at most 3 requests a search, Indeed's own next-page cursor, every failed
-reply a failed search, TLS checked, 60 s for the whole search, no retry. freehire.me no longer searches; its reader
-stays (`RETIRED`), so the jobs it saved still read. `job_search_provider` defaults to `indeed`, and a stored value
-that names a retired provider is set to the default when settings are seeded.
+reply a failed search, TLS checked, 60 s for the whole search, no retry. `job_search_provider` defaults to `indeed`,
+and a stored value that names a provider no longer registered is set to the default when settings are seeded.
+
+**freehire.me, the second source (decided 2026-11-16, Q53–Q56).** The BDE picks Indeed or freehire.me for each search,
+beside the place picker (Indeed first). `POST …/job-searches {place?, source?}`: `source` is `indeed` or `freehire`
+(none: `job_search_provider`); `GET …/job-searches` adds `sources` (`{value, label}`, Indeed first). freehire.me's
+agent search (`backend/job_search/providers/freehire.py`) gets the same inputs as Indeed: the role on job titles, the
+city's metro area (freehire.me's own list; alone, since its geography widens) or the country when it has none or the
+place is Remote (`work_mode=remote`), 14 days, 100 from the last offset, the whole posting as plain text (stored with
+`_description_format: "text"`). The same filters at save; the daily limits are shared by both sources. A key
+(`FREEHIRE_API_KEY`) is sent when set: freehire.me's terms allow the API without one for non-commercial use only, so
+the licence is settled before production.
 
 **What a search asks.** The candidate's **target role** (one: onboarding takes one; a candidate from before keeps
 several and the first is searched) in **one of their places** (`backend/job_search/places.py`): the résumé's city and
@@ -1484,7 +1496,9 @@ list on the backend and answers `{items, total, next_offset}`:
 | `q` | text in the title, company or location (case ignored) |
 | `exclude_applied` | one candidate's jobs with an application past Saved, left out |
 
-A closed job is never listed. Each item adds `matches` (`{candidate_id: {score, note}}` for its visible candidates) and
+A closed job is never listed, nor one posted more than 14 days ago (by its own date; one without a date counts from
+the day it was first saved; decided 2026-11-16, Q56, any source): it stays saved, and its job page, application and
+tailored résumés still open. The job list's source filter opens at Indeed (Q53). Each item adds `matches` (`{candidate_id: {score, note}}` for its visible candidates) and
 `remote_mode`; a candidate's own posting (`…/candidates/{id}/job-postings/{id}`, a capture's answer) adds `match`.
 The job list reads it a page at a time with "Load more"; a candidate's list opens at "Any score", best Match first.
 ⌘K asks it for the jobs matching what is typed (`q`, 20).

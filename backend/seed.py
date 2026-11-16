@@ -587,8 +587,8 @@ def upgrade_resume_parse_prompt(db):
 
 
 def retire_job_search_provider(db):
-    """Seeding never replaces a row, so a database that chose a source later retired (freehire.me, 2026-11-14) would
-    keep naming it: searches already fall back to the default (`providers.active`), but the Settings page would show a
+    """Seeding never replaces a row, so a database that chose a source later retired would keep naming it (freehire.me
+    was retired 2026-11-14 and is back since 2026-11-16): searches already fall back to the default (`providers.active`), but the Settings page would show a
     value it can't save back. A name that isn't a registered provider becomes the default. Idempotent."""
     from backend.job_search.providers import DEFAULT_PROVIDER, REGISTRY
     row = db.query(Setting).filter(Setting.key == "job_search_provider").first()

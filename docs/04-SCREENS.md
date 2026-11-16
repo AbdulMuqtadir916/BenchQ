@@ -405,6 +405,8 @@ A job whose work authorization is unknown (a searched job's) is shown, never fil
 sorted and filtered by the backend; it opens at "Any score", best Match first, and a score held at 40 says why on
 hover ("Held at 40: no C2C…"). Beside **Find jobs**, the BDE picks where to search: the résumé's city and state, a
 preferred location, or Remote.
+**Since 2026-11-16 (docs/02 §6.w, Q53, Q56):** beside the place, the BDE also picks the source, Indeed (first) or
+freehire.me. The job lists show only jobs posted in the last 14 days, and the source filter opens at Indeed.
 
 #### Resumes
 This candidate's résumés as a collapsible tree (the same component as the Resume Builder library): each **base**

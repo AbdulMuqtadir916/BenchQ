@@ -114,7 +114,8 @@ export function JobExplorer({
   const [renderedAt] = useState(() => Date.now());
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const [portal, setPortal] = useState("ALL");
+  // The list opens at Indeed's jobs (decided 2026-11-16, Q53): freehire.me's and captures show when picked.
+  const [portal, setPortal] = useState("INDEED");
   const [remote, setRemote] = useState("ALL");
   // Every job a candidate has, best Match first (decided 2026-11-14, Q36): no score floor to start with.
   const [scoreFloor, setScoreFloor] = useState("0");

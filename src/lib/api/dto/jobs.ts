@@ -181,6 +181,8 @@ export const JobSearchesDto = z.object({
   }),
   role: z.string().nullable().optional(),
   places: z.array(z.object({ value: z.string(), label: z.string(), kind: z.enum(["home", "preferred", "remote"]) })).optional(),
+  // The search sources, Indeed first (decided 2026-11-16, Q53).
+  sources: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
 });
 export type JobSearchesDto = z.infer<typeof JobSearchesDto>;
 
@@ -214,5 +216,6 @@ export function toJobSearches(dto: JobSearchesDto): JobSearches {
     },
     role: dto.role ?? null,
     places: dto.places ?? [],
+    sources: dto.sources ?? [],
   };
 }

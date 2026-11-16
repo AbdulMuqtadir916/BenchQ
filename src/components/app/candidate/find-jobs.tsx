@@ -81,6 +81,9 @@ export interface FindJobsSearch {
   /** The place the next search uses (one of `JobSearches.places`), or null while none is known. */
   place: string | null;
   setPlace: (value: string) => void;
+  /** The source the next search uses (one of `JobSearches.sources`, Indeed first), or null while none is known. */
+  source: string | null;
+  setSource: (value: string) => void;
   isStarting: boolean;
   /** Why the backend refused the last start (409, 422, 429, 503), as it says it. */
   refusal: string | null;
@@ -95,7 +98,8 @@ interface FindJobsProps {
 
 /**
  * "Find jobs" for the candidate's BDE (docs/02 §6.z): starts a real search for the candidate's target role in the place
- * picked beside it, then shows its outcome and today's usage under the button. Disabled, with the reason, when it
+ * picked beside it, on the source picked beside that (Indeed or freehire.me, decided 2026-11-16, Q53), then shows its
+ * outcome and today's usage under the button. Disabled, with the reason, when it
  * can't start.
  */
 export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
@@ -109,6 +113,7 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   // Today's searches didn't load: whether one runs, and the day's usage, are unknown, so no start (CodeRabbit on #135).
   const isUnknown = !searches && Boolean(searchesQuery.error);
   const places = searches?.places ?? [];
+  const sources = searches?.sources ?? [];
   // The résumé fixes a missing country, city or state; a preferred location can't be edited here yet.
   const linksToResume = Boolean(resumeHref && role && (!candidate.country?.trim() || (searches && places.length === 0)));
   const running = searches?.running ?? null;
@@ -121,6 +126,10 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {sources.length > 1 ? (
+          <Select value={search.source ?? sources[0].value} options={sources.map((s) => ({ value: s.value, label: s.label }))}
+            onValueChange={search.setSource} disabled={isSearching} aria-label="Where to look for jobs" className="w-auto min-w-28" />
+        ) : null}
         {places.length ? (
           <Select value={search.place ?? places[0].value} options={places.map((p) => ({ value: p.value, label: p.label }))}
             onValueChange={search.setPlace} disabled={isSearching} aria-label="Where to search" className="w-auto min-w-40" />

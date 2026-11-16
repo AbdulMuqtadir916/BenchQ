@@ -1,11 +1,13 @@
 """A candidate's job searches and the jobs they found (job search PR 1; docs/02 §6.y; docs/integration/02-jobs.md).
 Under the candidate's URL: another firm, a candidate outside the principal's scope, or a posting that isn't the
 candidate's is the same 404 as a missing one.
-- POST …/job-searches              start a search `{place?}`: the candidate's target role in one of their places
-                                   (none: the first); its batch is written `running`, the search runs in the
-                                   background: 202 `{batch_id, run_id}`
+- POST …/job-searches              start a search `{place?, source?}`: the candidate's target role in one of their
+                                   places (none: the first), on the source the BDE picked (none: the platform
+                                   setting; decided 2026-11-16, Q53); its batch is written `running`, the search runs
+                                   in the background: 202 `{batch_id, run_id}`
 - GET  …/job-searches              the running search, the finished ones (newest first), today's usage and caps, the
-                                   role a search asks for and the candidate's places (decided 2026-11-14)
+                                   role a search asks for, the candidate's places (decided 2026-11-14) and the sources
+                                   a search can use (Q53)
 - POST …/job-postings              capture one job `{source: manual | extension, title, company, description, url,
                                    location?}`: 201, or 200 with the job the candidate already has (job search PR 2)
 - GET  …/job-postings?page=&size=  the candidate's jobs, newest first, in the common fields
@@ -14,7 +16,8 @@ Firm level (job search PR 3, docs/02 §6.z), for the job screens:
 - GET  /firms/{firm_id}/job-postings?candidate_id=&sort=&min_score=&source=&remote=&q=&offset=&limit=
                                    the jobs of every candidate the principal sees (or of one), one item per job (the
                                    content hash), each with the visible `candidate_ids` and their `matches`; sorted and
-                                   filtered here, 100 at a time with the `total` (decided 2026-11-14, Q28, Q29, Q47)
+                                   filtered here, 100 at a time with the `total` (decided 2026-11-14, Q28, Q29, Q47);
+                                   only jobs posted in the last 14 days (decided 2026-11-16, Q56)
 - GET  /firms/{firm_id}/job-postings/{posting_id}          one of those, with its description
 Who (decided 2026-11-10): a search, only the candidate's assigned BDE (`job.search` + `can_search_jobs`); reads,
 anyone who can see the candidate. A support view reads only (backend/auth/access.py). The country is the candidate's
@@ -24,6 +27,7 @@ candidate's own (`backend/job_search/places.py`), never free text.
 import asyncio
 import re
 import uuid
+from datetime import date, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -65,6 +69,8 @@ class SearchBody(BaseModel):
     # isn't a request field (decided 2026-11-14: the candidate's target role).
     place: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
                      AfterValidator(typed_text)] | None = None
+    # The source the BDE picked (`providers.choices()`, decided 2026-11-16, Q53); none: the platform setting.
+    source: Literal["indeed", "freehire"] | None = None
 
 
 def _http_url(value: str) -> str:
@@ -101,7 +107,8 @@ def _resets(now) -> str:
     return f"resets {limits.next_reset(now).astimezone(limits.IST):%I:%M %p} IST".replace("resets 0", "resets ")
 
 
-def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: str | None, principal: Principal) -> dict:
+def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: str | None, principal: Principal,
+           source: str | None = None) -> dict:
     """The search's admission, in one transaction, committed: the checks, then its `running` batch row. Blocking (it
     waits for the candidate's row and the BDE's lock), so it runs in a worker thread, never on the event loop (Abdul's
     comment on PR 2: a wait there stalled every request on the worker until the lock's holder, whose release needs
@@ -133,7 +140,9 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: st
         raise _too_many(f"{limits.JOBS_PER_CANDIDATE_PER_DAY} jobs saved for this candidate today; {_resets(now)}.")
     if limits.attempts_today(db, firm_id, principal.user_id, now) >= limits.ATTEMPTS_PER_BDE_PER_DAY:
         raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today; {_resets(now)}.")
-    provider = providers.active(db)
+    provider = providers.REGISTRY.get(source) if source else providers.active(db)
+    if provider is None:
+        raise HTTPException(status_code=422, detail="Pick one of the job sources.")
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
                                 query=query, country=country, provider=provider.name, place=chosen["value"])
     task = {"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
@@ -165,7 +174,7 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
     candidate take turns: the second sees the first one's `running` row and gets 409, on any worker. The BDE is locked
     too (a Postgres lock on their id, after the candidate's), so two searches of theirs for different candidates count
     their 20 attempts in turn (Abdul's review, P2)."""
-    task = await run_in_threadpool(_admit, db, firm_id, candidate_id, body.place, principal)
+    task = await run_in_threadpool(_admit, db, firm_id, candidate_id, body.place, principal, body.source)
     batch_id = task["batch_id"]
     try:
         # The run names nothing of the firm's (no meta; its scope is the opaque batch id): Super Admin's monitor lists
@@ -211,7 +220,9 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
             "usage": limits.usage(db, firm_id, candidate.id, candidate.bde_id, now),
             # What a search asks for (decided 2026-11-14): the target role, and the places the BDE picks from.
             "role": places.search_role(candidate),
-            "places": places.places(candidate, search_country(candidate.country))}
+            "places": places.places(candidate, search_country(candidate.country)),
+            # The sources the BDE picks from, Indeed first (decided 2026-11-16, Q53).
+            "sources": providers.choices()}
 
 
 @router.post(CANDIDATE + "/job-postings", status_code=201, summary="Capture one job for a candidate (by hand or the extension)")
@@ -351,6 +362,16 @@ def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
     return out
 
 
+def _is_recent(posted_at: str | None, discovered_at, today: date) -> bool:
+    """Posted in the last `limits.POSTED_WITHIN_DAYS` days, by the job's own date; a job with no date that reads (a
+    capture by hand) counts from the day it was first saved (decided 2026-11-16, Q56)."""
+    try:
+        posted = date.fromisoformat((posted_at or "")[:10])
+    except ValueError:
+        posted = discovered_at.date()
+    return today - posted <= timedelta(days=limits.POSTED_WITHIN_DAYS)
+
+
 def _source_key(source: str) -> str:
     return source if source in KNOWN_SOURCES else "other"
 
@@ -372,7 +393,8 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
     Q47): `sort` (`match`, one candidate's best first, unscored last; `newest`; `company`), `min_score` (one
     candidate's; above 0 leaves out unscored jobs), `source`, `remote` (the job's work mode), `q` (in the title,
     company or location), `exclude_applied` (one candidate's jobs they have an application for past Saved). A closed
-    job is never listed. Every visible job is read once per call without its description (job search PR 3 reads
+    job is never listed, nor one posted more than 14 days ago (decided 2026-11-16, Q56, any source; `_is_recent`): it
+    stays in the database, and its job page, application and tailored résumés still open. Every visible job is read once per call without its description (job search PR 3 reads
     stay a candidate's or a team's: a few thousand rows)."""
     _member_of(firm_id, principal)
     one = None
@@ -393,6 +415,7 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
     for row in light:
         groups.setdefault(row.job_id, []).append(row)
     wanted = (q or "").lower()
+    today = utcnow().date()
     kept = []
     for key, rows in groups.items():
         newest = max(rows, key=lambda row: (row.last_seen_at, str(row.id)))
@@ -402,6 +425,8 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
         except Exception:
             fields = None
         if fields is None or fields.is_closed or any(row.id in applied for row in rows):
+            continue
+        if not _is_recent(fields.posted_at, max(row.discovered_at for row in rows), today):
             continue
         if source is not None and _source_key(newest.source) != source:
             continue

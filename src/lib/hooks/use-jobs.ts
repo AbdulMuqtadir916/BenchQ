@@ -113,13 +113,13 @@ export function useJobSearches(candidateId: string, enabled = true) {
   return useQuery({ ...jobSearchesQuery(queryClient, firmId, candidateId), enabled: enabled && !!candidateId });
 }
 
-/** "Find jobs": start a search of the candidate's target role in one of their places (their BDE only). The searches are
- * read again at once, and the search is remembered until its outcome is read. */
+/** "Find jobs": start a search of the candidate's target role in one of their places, on the source picked (their BDE
+ * only). The searches are read again at once, and the search is remembered until its outcome is read. */
 export function useStartJobSearch(candidateId: string) {
   const firmId = useFirmId();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (place: string) => jobsApi.startSearch(firmId, candidateId, place),
+    mutationFn: ({ place, source }: { place: string; source?: string }) => jobsApi.startSearch(firmId, candidateId, place, source),
     onSuccess: (batchId) => queryClient.setQueryData(queryKeys.jobs.startedSearch(firmId, candidateId), batchId),
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.jobs.searches(firmId, candidateId) }),
   });

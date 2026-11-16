@@ -31,7 +31,7 @@ function search(id: string, state: JobSearch["state"]): JobSearch {
 
 function searches(over: Partial<JobSearches> = {}, usage: Partial<JobSearches["usage"]> = {}): JobSearches {
   return { running: null, searches: [], usage: { jobsToday: 0, jobsCap: 100, searchesToday: 1, searchesCap: 20, capturesToday: 0, capturesCap: 20, resetsAt: RESET, ...usage },
-    role: "Java Developer", places: [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }], ...over };
+    role: "Java Developer", places: [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }], sources: [{ value: "indeed", label: "Indeed" }], ...over };
 }
 
 /** The page: a job list already loaded, then the searches query, each with a subscriber, as mounted screens have. */

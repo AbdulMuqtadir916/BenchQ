@@ -90,8 +90,9 @@ A score that can't be worked out never fails a save: the job stays unscored ("â€
 
 ## Limits
 
-- A posting cut short scores lower than the whole posting would: Indeed sends whole postings; freehire.me jobs saved
-  before 2026-11-14 keep the ~1,000 characters the search gave unless they were opened.
+- A posting cut short scores lower than the whole posting would: Indeed and freehire.me's agent search (since
+  2026-11-16) send whole postings, but freehire.me only has a preview of some (an Adzuna listing, often 500
+  characters); freehire.me jobs saved before 2026-11-14 keep the ~1,000 characters the old search gave.
 - Each list read reads every visible job's fields (not its description) to filter and sort: fine for a candidate's
   or a team's few thousand jobs; a firm with far more would need these fields as columns.
 - The calculator reads text, not meaning: a job that is the same work under a very different title can score low.

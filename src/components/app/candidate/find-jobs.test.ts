@@ -10,7 +10,7 @@ const search = (over: Partial<JobSearch> = {}): JobSearch => ({
 const searches = (over: Partial<JobSearches["usage"]> = {}, places: JobSearches["places"] = [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }]): JobSearches => ({
   running: null, searches: [],
   usage: { jobsToday: 47, jobsCap: 100, searchesToday: 3, searchesCap: 20, capturesToday: 2, capturesCap: 20, resetsAt: "2026-11-12T13:00:00.000Z", ...over },
-  role: "Backend Engineer", places,
+  role: "Backend Engineer", places, sources: [{ value: "indeed", label: "Indeed" }, { value: "freehire", label: "freehire.me" }],
 });
 const candidate = { targetRoles: ["Backend Engineer"], country: "US" };
 

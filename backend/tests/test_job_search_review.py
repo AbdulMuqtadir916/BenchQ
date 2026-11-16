@@ -89,18 +89,18 @@ def test_the_provider_is_a_platform_setting_and_must_be_registered(api_client, t
     assert SETTING_SCOPES["job_search_provider"][0] == Scope.PLATFORM
     assert api_client.patch("/api/settings", json={"job_search_provider": "indeed"}).status_code == 200
     assert providers.active(test_db).name == "indeed"
-    # freehire.me no longer searches (retired 2026-11-14): it can't be chosen, and a database that still names it
-    # searches with the default and has the name replaced when the app seeds its settings.
-    assert api_client.patch("/api/settings", json={"job_search_provider": "freehire"}).status_code == 400
+    # freehire.me searches again (decided 2026-11-16, Q53), so it can be the default too.
+    assert api_client.patch("/api/settings", json={"job_search_provider": "freehire"}).status_code == 200
+    assert providers.active(test_db).name == "freehire"
     r = api_client.patch("/api/settings", json={"job_search_provider": "nope"})
     assert r.status_code == 400 and "job_search_provider" in r.json()["detail"]
 
 
-def test_a_retired_provider_in_the_settings_searches_with_the_default_and_is_replaced(test_db):
+def test_an_unregistered_provider_in_the_settings_searches_with_the_default_and_is_replaced(test_db):
     from backend.job_search import providers
     from backend.models.db import Setting
     from backend.seed import retire_job_search_provider
-    test_db.merge(Setting(key=providers.SETTING_KEY, value="freehire"))
+    test_db.merge(Setting(key=providers.SETTING_KEY, value="jobright"))      # a source that isn't registered
     test_db.commit()
     assert providers.active(test_db).name == "indeed"
     retire_job_search_provider(test_db)

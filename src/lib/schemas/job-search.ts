@@ -48,6 +48,14 @@ export const JobSearchPlaceSchema = z.object({
 });
 export type JobSearchPlace = z.infer<typeof JobSearchPlaceSchema>;
 
+/** A job source a search can use (backend/job_search/providers `choices()`, decided 2026-11-16, Q53): `value` is what a
+ * search sends ("indeed", "freehire"), `label` how the picker names it. */
+export const JobSearchSourceSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+});
+export type JobSearchSource = z.infer<typeof JobSearchSourceSchema>;
+
 export const JobSearchesSchema = z.object({
   running: JobSearchSchema.nullable(),
   /** Newest first, searches and captures. */
@@ -57,5 +65,7 @@ export const JobSearchesSchema = z.object({
   role: z.string().nullable(),
   /** The places the BDE picks from, in order; empty when the candidate has none (no search then). */
   places: z.array(JobSearchPlaceSchema),
+  /** The sources the BDE picks from, Indeed first; the first is the default. */
+  sources: z.array(JobSearchSourceSchema),
 });
 export type JobSearches = z.infer<typeof JobSearchesSchema>;

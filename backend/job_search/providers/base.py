@@ -71,6 +71,7 @@ class SearchResult:
 
 class Provider(Protocol):
     name: str           # stored in job_postings.source; never renamed once rows carry it
+    label: str          # how the search-source picker names it ("Indeed", "freehire.me")
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None) -> SearchResult: ...

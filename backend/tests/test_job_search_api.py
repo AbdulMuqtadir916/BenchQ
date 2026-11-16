@@ -16,6 +16,7 @@ from backend.tests.test_candidates_api import _create, world  # noqa: F401  (the
 
 class FakeProvider:
     name = "fake"
+    label = "Fake source"
 
     def __init__(self):
         self.jobs: list[dict] = []

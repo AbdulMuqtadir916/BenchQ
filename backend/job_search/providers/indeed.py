@@ -184,6 +184,7 @@ def _search(query: str, country: str, limit: int, cursor: str | None, place: str
 
 class Indeed:
     name = "indeed"
+    label = "Indeed"
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None) -> SearchResult:
