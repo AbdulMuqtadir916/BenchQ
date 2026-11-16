@@ -110,7 +110,8 @@ The real backend passes all three as it is: no route depended on the old, looser
 - **A thread or a partial that is built and dropped doesn't count.** `Thread(target=write_audit)` left as a statement
   of its own, or given a name nothing reads afterwards, no longer makes a route log; the same for a `partial`. Started,
   called, or handed on (returned, passed along, queued for later), it counts as before. The check does not follow one
-  further than that: PR 6's Super Admin logging queues a partial that the middleware runs after the answer.
+  further than that: PR 6's Super Admin logging queues a partial that the middleware runs after the answer. A name
+  used inside a nested function counts as used when the route calls that function (`flush()` whose body calls `send()`).
 - **Each dispatcher forwards keywords its own way.** `Thread` and `launch_background` pass the callback's keywords as one
   dict (`kwargs={...}`, `func_kwargs={...}`), so the candidate rule reads that dict for those two and their own
   keywords (`firm_id=` on the launcher) are not the callback's. The other dispatchers pass their keywords on as they are.
