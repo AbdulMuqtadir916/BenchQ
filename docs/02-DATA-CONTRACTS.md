@@ -1446,7 +1446,29 @@ agent search (`backend/job_search/providers/freehire.py`) gets the same inputs a
 city's metro area (freehire.me's own list; alone, since its geography widens) or the country when it has none or the
 place is Remote (`work_mode=remote`), 14 days, 100 from the last offset, the whole posting as plain text (stored with
 `_description_format: "text"`), and `source_exclude=adzuna` (Q64: freehire.me passes Adzuna's listings on as a
-preview, often 500 characters; one that comes back anyway is dropped and counted, `skipped_adzuna`). The same filters at save; the daily limits are shared by both sources. A key
+preview, often 500 characters; one that comes back anyway is dropped and counted, `skipped_adzuna`).
+
+**LinkedIn, the third source (decided 2026-11-16, Q75–Q86).** `source: "linkedin"`: LinkedIn's public job search
+through python-jobspy (`backend/job_search/providers/linkedin.py`), the same inputs as Indeed (the titles, the place
+and 50 miles or remote anywhere in the country, 14 days, 100 jobs). LinkedIn answers 10 jobs a request and sends no
+description. Every LinkedIn request, from every firm, takes one of 4 slots kept in Postgres (migration 0029,
+`backend/job_search/linkedin_queue.py`): 4 at a time, a slot busy 5 s after it is given back, a refusal (429) sent
+again after 7 s (3 tries), opens before searches, firms in turn. A search stops at 4 minutes and the next continues
+from there. A LinkedIn job is identified by its own id (`JobFields.source_id`), saved without a Match and without the
+work-authorization and level filters (Q80), and its posting is fetched once per firm on its first open (Q83, Q85),
+put on every copy of the job in the firm, and then scored; "Open on LinkedIn" shows at once (Q86). Measured live: about
+16 requests in 25 s before refusals, which clear within 7 s. LinkedIn's terms forbid scraping: settled before
+production.
+
+**The role's titles (Q69).** A search asks for every title of the target role, split the way Match reads a title
+(`places.search_titles`: "A | B" is two, "GenAI / LLM Engineer" is "GenAI Engineer" and "LLM Engineer", at most 4).
+Indeed and LinkedIn get them in quotes joined by OR (live: 15 of 20 jobs with a wanted title, against 7 unquoted);
+freehire.me as title alternatives. The batch's `request` keeps `titles`.
+
+**The candidate's level (Q70, Q74).** A search leaves out a job Match holds at 40 for the candidate's level (far more
+years asked, or two rungs away), counted as `skipped_level`. freehire.me also asks only for jobs within the
+candidate's years (`experience_years_max`, the most Match accepts: their years + max(2, 40%)) and those that state
+none. The same filters at save; the daily limits are shared by both sources. A key
 (`FREEHIRE_API_KEY`) is sent when set: freehire.me's terms allow the API without one for non-commercial use only, so
 the licence is settled before production.
 
@@ -1461,7 +1483,8 @@ no role or no place is 422 with what to add. `GET …/job-searches` adds `role` 
 ago by its own date (`skipped_too_old`: Indeed's date filter means "listed on Indeed"), a job that isn't remote on a
 Remote search (`skipped_not_remote`), and a job whose text rules out the candidate's work authorization
 (`skipped_work_auth`: the Match calculator's rules, `backend/match/score.py` `ruled_out`). A freehire.me search also
-counts the Adzuna jobs it left out (`skipped_adzuna`, 2026-11-16, Q64).
+counts the Adzuna jobs it left out (`skipped_adzuna`, 2026-11-16, Q64), and every search the jobs at the wrong
+level (`skipped_level`, Q70).
 
 **Onboarding and the details.** The create takes exactly one target role and needs a place (§4); the candidate's
 details (every onboarding answer that isn't on the résumé) are edited on their "Additional candidate details" tab
@@ -1491,9 +1514,9 @@ list on the backend and answers `{items, total, next_offset}`:
 |---|---|
 | `candidate_id` | one candidate's jobs (one the person sees; another is 404); none: every visible candidate's |
 | `limit`, `offset` | 1–400 (default 100) from `offset`; `next_offset` is null at the end |
-| `sort` | `match` (one candidate's best first, unscored last), `newest` (default), `company` |
+| `sort` | `match` (one candidate's best first, unscored last), `newest` (default; by the job's posted date, else the day it was saved: 2026-11-16, Q87), `company` |
 | `min_score` | one candidate's; above 0 leaves out unscored jobs |
-| `source` | `indeed`, `freehire`, `manual`, `extension`, `other` |
+| `source` | `indeed`, `freehire`, `linkedin`, `manual`, `extension`, `other` |
 | `remote` | `REMOTE`, `HYBRID`, `ONSITE` (the job's work mode) |
 | `q` | text in the title, company or location (case ignored) |
 | `exclude_applied` | one candidate's jobs with an application past Saved, left out |

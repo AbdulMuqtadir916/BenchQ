@@ -3,7 +3,11 @@ Q53–Q55). It was the first source (2026-11-09), stopped searching on 2026-11-1
 through freehire.me's agent search, which sends the whole posting.
 
 One search (Q55), the same inputs as Indeed's:
-- `q` the target role, matched on job titles only (`q_fields=title`);
+- `q` the target role, matched on job titles only (`q_fields=title`); a role of several titles searches them all as
+  alternatives (`title:"A" OR title:"B"`, decided 2026-11-16, Q69);
+- `experience_years_max` with `experience_include_unspecified` (Q74): only jobs asking no more years than the
+  candidate can take (Match's rule, `score.most_years_asked`), and those that state none; not sent when the
+  candidate's years aren't known;
 - the place: a city's metro area as freehire.me names it ("Dallas (US)", from its facets list, kept for six hours),
   else the country: on freehire.me the geography is one "or" group (countries, metros and cities widen each other),
   so a metro is sent alone. A Remote search sends the country and `work_mode=remote`. A city with no metro there
@@ -96,16 +100,28 @@ async def metro_for(place: str | None, country: str) -> str | None:
                  if name.endswith(suffix) and name[:-len(suffix)].strip().lower() == city), None)
 
 
+def title_query(query: str, titles=()) -> str:
+    """freehire.me's words: several titles as alternatives, each matched in the job title (`title:"A" OR title:"B"`,
+    at most 5: its limit; decided 2026-11-16, Q69); one title, or none, the query as it is."""
+    clean = [t for t in (" ".join(str(t).replace('"', " ").split())[:100] for t in titles or ()) if t][:5]
+    return " OR ".join(f'title:"{t}"' for t in clean) if len(clean) > 1 else _line(clean[0] if clean else query, 200)
+
+
 class Freehire:
     name = "freehire"
     label = "freehire.me"
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
-                     place: str | None = None, posted_within_days: int | None = None) -> SearchResult:
+                     place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
+                     firm_id=None) -> SearchResult:
         offset = int(cursor) if cursor and cursor.isdigit() else 0
         size = max(1, min(limit, MOST_PER_PAGE))
-        params: dict = {"q": _line(query, 200), "q_fields": "title", "limit": size, "offset": offset,
+        params: dict = {"q": title_query(query, titles), "q_fields": "title", "limit": size, "offset": offset,
                         "description_format": TEXT, "source_exclude": list(LEFT_OUT_ORIGINS)}
+        if years is not None:
+            # Only jobs the candidate's years can take, and those that state none (decided 2026-11-16, Q74).
+            params["experience_years_max"] = int(years)
+            params["experience_include_unspecified"] = "true"
         metro = await metro_for(_line(place, 100) if place != REMOTE else place, country)
         if metro:
             params["metros"] = metro                # alone: a country beside it would widen the search

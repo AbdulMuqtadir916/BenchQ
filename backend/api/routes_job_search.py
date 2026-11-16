@@ -25,6 +25,7 @@ résumé country (`Candidate.country`) and the role their target role, never req
 candidate's own (`backend/job_search/places.py`), never free text.
 """
 import asyncio
+import hashlib
 import re
 import uuid
 from datetime import date, timedelta
@@ -33,7 +34,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import AfterValidator, BaseModel, StringConstraints
-from sqlalchemy import func, literal
+from sqlalchemy import func, literal, text
 from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
@@ -58,7 +59,7 @@ HISTORY = 50
 PAGE_SIZE_MAX = 100
 FIRM_LIST_MAX = 400          # the most one read returns (the dashboards'); a job list asks for 100 (LIST_PAGE)
 LIST_PAGE = 100              # a job list's page (decided 2026-11-14, Q29)
-KNOWN_SOURCES = ("indeed", "freehire", "manual", "extension")
+KNOWN_SOURCES = ("indeed", "freehire", "linkedin", "manual", "extension")
 _REMOTE = re.compile(r"\bremote\b", re.I)
 _HYBRID = re.compile(r"\bhybrid\b", re.I)
 
@@ -70,7 +71,7 @@ class SearchBody(BaseModel):
     place: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
                      AfterValidator(typed_text)] | None = None
     # The source the BDE picked (`providers.choices()`, decided 2026-11-16, Q53); none: the platform setting.
-    source: Literal["indeed", "freehire"] | None = None
+    source: Literal["indeed", "freehire", "linkedin"] | None = None
 
 
 def _http_url(value: str) -> str:
@@ -143,11 +144,14 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: st
     provider = providers.REGISTRY.get(source) if source else providers.active(db)
     if provider is None:
         raise HTTPException(status_code=422, detail="Pick one of the job sources.")
+    # The role's titles, searched together (decided 2026-11-16, Q69): "A | B" is two, "GenAI / LLM Engineer" two more.
+    titles = places.search_titles(candidate)
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
-                                query=query, country=country, provider=provider.name, place=chosen["value"])
+                                query=query, country=country, provider=provider.name, place=chosen["value"],
+                                titles=titles)
     task = {"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
             "batch_id": batch.batch_id, "query": query, "country": country, "provider_name": provider.name,
-            "place": chosen["value"]}
+            "place": chosen["value"], "titles": titles}
     # Committed before the search is launched, so a launched search always has its row (Abdul's review, P2); the task
     # also checks it is still `running` before asking the source. A crash between the two leaves the row `running`,
     # and it becomes an `internal` error after 15 minutes, like a restart.
@@ -322,30 +326,71 @@ FULL_POSTING_KEY = "_full_posting"
 
 
 def _fill_full_posting(db: DbSession, row: JobPosting, principal: Principal) -> None:
-    """For a provider whose search cuts descriptions and that has a `full_description` read (freehire.me cut them at
-    ~1,000 characters; retired 2026-11-14, so none today: Indeed sends whole descriptions), a job's first open asks the
-    provider for the whole posting (decided 2026-11-11) and keeps it in `content`, so it is asked once. A support
-    view shows it but never writes it (no platform-admin write into a firm). A failed call leaves the search's text
-    and is tried again on the next open."""
+    """For a source whose search sends no description or a cut one, and that has a `full_description` read
+    (LinkedIn's posting page, decided 2026-11-16, Q83; freehire.me's old search cut them at ~1,000 characters), a
+    job's first open asks the source for the whole posting (decided 2026-11-11) and keeps it in `content`, so it is
+    asked once. A support view shows it but never writes it (no platform-admin write into a firm). A failed call
+    leaves the search's text and is tried again on the next open.
+
+    Once per job per firm (Q85): the fetch holds a lock on (firm, job), so a second open of the same job waits for the
+    first one's posting instead of asking again; the posting goes on every copy of the job in the firm (one per
+    candidate it was found for), and each copy's Match is worked out from it."""
+    import inspect
     content = row.content or {}
     fetch = getattr(providers.REGISTRY.get(row.source), "full_description", None)
     if fetch is None or content.get(FULL_POSTING_KEY):
         return
-    try:
-        full = asyncio.run(fetch(content))           # this sync route runs in a worker thread, outside the event loop
-    except ProviderError:
+    takes_firm = "firm_id" in inspect.signature(fetch).parameters
+    if principal.kind != "firm":
+        full = _fetch_posting(fetch, content, row.firm_id, takes_firm)
+        if full is not None:
+            row.content = {**content, **full, FULL_POSTING_KEY: True}
+        return                                      # shown, never written (a support view)
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _posting_lock(row.firm_id, row.job_id)})
+    db.refresh(row)
+    if (row.content or {}).get(FULL_POSTING_KEY):   # another open fetched it while this one waited
+        db.commit()
         return
+    full = _fetch_posting(fetch, row.content or {}, row.firm_id, takes_firm)
+    if full is None:
+        db.rollback()
+        return
+    from backend.match import store as match_store
+    # Re-read every copy under a lock: a search may have refreshed one while the call waited (CodeRabbit on #135), so
+    # only the posting and the marker are laid over its latest content.
+    copies = scoped(db, JobPosting, row.firm_id).filter(JobPosting.job_id == row.job_id,
+                                                        JobPosting.source == row.source) \
+        .populate_existing().with_for_update().all()
+    candidates = {c.id: c for c in scoped(db, Candidate, row.firm_id).filter(
+        Candidate.id.in_({copy.candidate_id for copy in copies}))}
+    for copy in copies:
+        copy.content = {**(copy.content or {}), **full, FULL_POSTING_KEY: True}
+        if copy.candidate_id in candidates:
+            match_store.score_posting(db, candidates[copy.candidate_id], copy)
+    db.commit()
+    db.refresh(row)
+
+
+def _posting_lock(firm_id, job_id: str) -> int:
+    """A signed 64-bit advisory lock key for one job of one firm (the top bits say "a posting's first open")."""
+    digest = hashlib.sha256(f"{firm_id}:{job_id}".encode()).digest()
+    return ((0x4650 << 48) | int.from_bytes(digest[:6], "big")) - (1 << 63)
+
+
+def _fetch_posting(fetch, content: dict, firm_id, takes_firm: bool) -> dict | None:
+    """The source's whole posting as content updates ({"description": …, …}), cleaned; None when it failed."""
+    try:
+        # This sync route runs in a worker thread, outside the event loop.
+        full = asyncio.run(fetch(content, firm_id=firm_id) if takes_firm else fetch(content))
+    except ProviderError:
+        return None
+    if isinstance(full, str):
+        full = {"description": full}
+    if not isinstance(full, dict) or not full.get("description"):
+        return None
     # The search's clean-up, before it is stored or shown: Postgres refuses \u0000 in JSONB, so an escaped NUL in the
     # source's text would fail this job's every open (Abdul on #135).
-    full = clean_json(full) if isinstance(full, str) else None
-    if principal.kind != "firm":
-        row.content = {**content, **({"description": full} if full else {}), FULL_POSTING_KEY: True}
-        return                                      # shown, never written (a support view)
-    # Re-read the row under a lock: a search may have refreshed it while the call waited (CodeRabbit on #135), so only
-    # the description and the marker are laid over its latest content.
-    db.refresh(row, with_for_update=True)
-    row.content = {**(row.content or {}), **({"description": full} if full else {}), FULL_POSTING_KEY: True}
-    db.commit()
+    return {key: clean_json(value) for key, value in full.items() if isinstance(value, str)}
 
 
 def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
@@ -362,14 +407,18 @@ def _job_json(rows: list[JobPosting], with_description: bool) -> dict:
     return out
 
 
-def _is_recent(posted_at: str | None, discovered_at, today: date) -> bool:
-    """Posted in the last `limits.POSTED_WITHIN_DAYS` days, by the job's own date; a job with no date that reads (a
-    capture by hand) counts from the day it was first saved (decided 2026-11-16, Q56)."""
+def _posted_on(posted_at: str | None, discovered_at) -> date:
+    """The day the job was posted, by its own date; a job with no date that reads (a capture by hand) the day it was
+    first saved (decided 2026-11-16, Q56, Q87)."""
     try:
-        posted = date.fromisoformat((posted_at or "")[:10])
+        return date.fromisoformat((posted_at or "")[:10])
     except ValueError:
-        posted = discovered_at.date()
-    return today - posted <= timedelta(days=limits.POSTED_WITHIN_DAYS)
+        return discovered_at.date()
+
+
+def _is_recent(posted_at: str | None, discovered_at, today: date) -> bool:
+    """Posted in the last `limits.POSTED_WITHIN_DAYS` days (Q56)."""
+    return today - _posted_on(posted_at, discovered_at) <= timedelta(days=limits.POSTED_WITHIN_DAYS)
 
 
 def _source_key(source: str) -> str:
@@ -380,7 +429,7 @@ def _source_key(source: str) -> str:
 def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
                    limit: int = Query(LIST_PAGE, ge=1, le=FIRM_LIST_MAX), offset: int = Query(0, ge=0, le=1_000_000),
                    sort: Literal["match", "newest", "company"] = "newest", min_score: int = Query(0, ge=0, le=100),
-                   source: Literal["indeed", "freehire", "manual", "extension", "other"] | None = None,
+                   source: Literal["indeed", "freehire", "linkedin", "manual", "extension", "other"] | None = None,
                    remote: Literal["REMOTE", "HYBRID", "ONSITE"] | None = None,
                    q: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None,
                    exclude_applied: bool = False,
@@ -394,7 +443,8 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
     candidate's; above 0 leaves out unscored jobs), `source`, `remote` (the job's work mode), `q` (in the title,
     company or location), `exclude_applied` (one candidate's jobs they have an application for past Saved). A closed
     job is never listed, nor one posted more than 14 days ago (decided 2026-11-16, Q56, any source; `_is_recent`): it
-    stays in the database, and its job page, application and tailored résumés still open. Every visible job is read once per call without its description (job search PR 3 reads
+    stays in the database, and its job page, application and tailored résumés still open. `newest` is by the job's
+    posted date (Q87), and breaks the other orders' ties. Every visible job is read once per call without its description (job search PR 3 reads
     stay a candidate's or a team's: a few thousand rows)."""
     _member_of(firm_id, principal)
     one = None
@@ -437,13 +487,17 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
         score = rows[0].match_score if one is not None else None
         if one is not None and min_score > 0 and (score is None or score < min_score):
             continue
-        kept.append((key, score, max(row.discovered_at for row in rows), (fields.company or "").lower()))
+        saved = max(row.discovered_at for row in rows)
+        # Newest is by the job's posted date (decided 2026-11-16, Q87; a search saves its jobs at one moment), then
+        # the latest saved; it also breaks the ties of the other two orders.
+        newest_first = (-_posted_on(fields.posted_at, saved).toordinal(), -saved.timestamp())
+        kept.append((key, score, newest_first, (fields.company or "").lower()))
     if sort == "match" and one is not None:
-        kept.sort(key=lambda item: (item[1] is None, -(item[1] or 0), -item[2].timestamp(), item[0]))
+        kept.sort(key=lambda item: (item[1] is None, -(item[1] or 0), item[2], item[0]))
     elif sort == "company":
-        kept.sort(key=lambda item: (item[3], -item[2].timestamp(), item[0]))
+        kept.sort(key=lambda item: (item[3], item[2], item[0]))
     else:
-        kept.sort(key=lambda item: (-item[2].timestamp(), item[0]))
+        kept.sort(key=lambda item: (item[2], item[0]))
     page = [item[0] for item in kept[offset:offset + limit]]
     by_job: dict[str, list[JobPosting]] = {key: [] for key in page}
     for row in postings.filter(JobPosting.job_id.in_(page)).all() if page else []:

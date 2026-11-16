@@ -55,6 +55,17 @@ A score is **held at 40** (never more) when a recruiter would screen the candida
 The first reason is stored with the score (`match_note`) and shown when the pointer rests on a held score: "Held at
 40: no C2C or third-party candidates; the candidate works only C2C or 1099".
 
+## The wrong level: left out of a search
+
+Since 2026-11-16 (Q70), a search also leaves out a job held at 40 for the candidate's level (far more years asked
+than the résumé covers, or a level two rungs away), counted on the result line ("N left out: level"); freehire.me is
+asked only for jobs within `score.most_years_asked` (Q74). A capture is never left out.
+
+## A job without its text
+
+A LinkedIn job comes without its posting (Q80): it has no Match ("—") and skips the text-based filters until its
+posting is fetched on the first open (Q83); it is scored then.
+
 ## Work authorization: left out, not held
 
 A search **leaves out** a job whose text rules the candidate out on work authorization (`score.ruled_out`): no

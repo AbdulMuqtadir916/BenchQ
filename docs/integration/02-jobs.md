@@ -57,6 +57,21 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 - **The job list shows only jobs posted in the last 14 days**, any source (by the job's date; a job without one
   counts from the day it was saved). Older jobs stay saved; their job pages and applications still open.
 - **The job list's source filter opens at Indeed**; freehire.me's jobs and captures show when picked.
+
+## Decisions (2026-11-16): the role's titles, the level, LinkedIn (Q68–Q86)
+
+- **Every title of the role is searched** (Q69): "GenAI / LLM Engineer | Python Backend Engineer" is "GenAI
+  Engineer", "LLM Engineer" and "Python Backend Engineer", in one request: Indeed and LinkedIn in quotes joined by OR,
+  freehire.me as title alternatives. The whole string found nothing on either source.
+- **No skills in the search** (Q71): live, a skill added the same good jobs and only trimmed weak ones.
+- **Jobs at the wrong level are left out** (Q70) and counted ("N left out: level"); freehire.me asks only for jobs
+  within the candidate's years (Q74). One place per search stays (Q68).
+- **LinkedIn is the third source** (Q75–Q86), through python-jobspy: 10 jobs a request, no descriptions; one pace
+  for the whole backend in Postgres (4 at a time, 5 s, a 429 retried after 7 s, opens first, firms in turn). Its jobs
+  have no Match until their posting is fetched on the first open (once per firm, for every copy); "Open on LinkedIn"
+  at once. No LinkedIn page in a frame (LinkedIn forbids framing). LinkedIn's terms forbid scraping: to settle before
+  production.
+- **"Newest" is by the job's posted date** (Q87), else the day it was saved; one search saves its jobs at one moment.
 - **No Adzuna** (Q64): freehire.me's search asks for no jobs it took from Adzuna (`source_exclude=adzuna`), which it
   has only as a 500-character preview; one that comes back anyway is left out and counted ("N left out: Adzuna
   preview"). A live check (Dallas) went from 88 jobs, 18 of them previews, to 56 jobs, none.
@@ -78,7 +93,7 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 | the firm's jobs (one per job, the visible `candidate_ids` and their `matches`), sorted, filtered, 100 at a time with the total | `GET /api/firms/{firm}/job-postings?candidate_id=&sort=&min_score=&source=&remote=&q=&exclude_applied=&offset=&limit=` |
 | one job (with the whole posting) | `GET /api/firms/{firm}/job-postings/{id}` |
 | a candidate's jobs / one | `GET …/candidates/{id}/job-postings`, `…/job-postings/{posting_id}` |
-| start a search (BDE) | `POST …/candidates/{id}/job-searches` `{place?, source?}` (one of the candidate's places; `indeed` or `freehire`) → 202 `{batch_id, run_id}` |
+| start a search (BDE) | `POST …/candidates/{id}/job-searches` `{place?, source?}` (one of the candidate's places; `indeed`, `freehire` or `linkedin`) → 202 `{batch_id, run_id}` |
 | searches, today's usage, the role, the places and the sources | `GET …/candidates/{id}/job-searches` |
 | capture a job (BDE) | `POST …/candidates/{id}/job-postings` → 201, or 200 with `created: false` for the job the candidate has |
 

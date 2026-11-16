@@ -136,7 +136,8 @@ def test_a_saved_agent_job_reads_as_plain_text_and_its_work_mode():
 
 def test_the_bde_picks_the_source_and_the_list_names_both_indeed_first(anonymous_client, world, adnans, launched):
     r = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["adnan"])
-    assert r.json()["sources"] == [{"value": "indeed", "label": "Indeed"}, {"value": "freehire", "label": "freehire.me"}]
+    assert r.json()["sources"] == [{"value": "indeed", "label": "Indeed"}, {"value": "freehire", "label": "freehire.me"},
+                                   {"value": "linkedin", "label": "LinkedIn"}]
     r = anonymous_client.post(_url(world, adnans, "job-searches"), json={"source": "freehire"},
                               headers=world["as"]["adnan"])
     assert r.status_code == 202 and launched[-1]["kwargs"]["provider_name"] == "freehire"
@@ -159,11 +160,31 @@ def test_the_job_list_shows_only_jobs_posted_in_the_last_14_days(anonymous_clien
     from backend.models.job_search import JobPosting
     with SessionLocal() as db:                                                    # job 1 is now 20 days old
         row = db.query(JobPosting).filter(JobPosting.candidate_id == uuid.UUID(adnans["id"]),
-                                          JobPosting.content["t"].astext == "Java Developer 1").one()
+                                          JobPosting.content["t"].astext == "Java Developer #1").one()
         row.content = {**row.content, "posted": (today - timedelta(days=20)).isoformat()}
         db.commit()
     r = anonymous_client.get(f"/api/firms/{world['firm'].id}/job-postings", params={"candidate_id": adnans["id"]},
                              headers=world["as"]["adnan"])
     assert r.status_code == 200
-    assert sorted(item["title"] for item in r.json()["items"]) == ["Java Developer 2", "Java Developer 3"]
+    assert sorted(item["title"] for item in r.json()["items"]) == ["Java Developer #2", "Java Developer #3"]
     assert r.json()["total"] == 2
+
+
+def test_a_search_asks_only_for_jobs_within_the_candidates_years(served):
+    """Q74: the most years Match accepts for the candidate, and jobs that state none."""
+    asyncio.run(fh.Freehire().search("Java Developer", "us", 100, None, place="Austin, TX", posted_within_days=14,
+                                     years=2))
+    params = served["searches"][0]["params"]
+    assert params["experience_years_max"] == "2" and params["experience_include_unspecified"] == "true"
+    _search("Austin, TX")                                                       # years not known: no filter
+    assert "experience_years_max" not in served["searches"][1]["params"]
+
+
+def test_newest_is_by_the_posted_date_not_the_moment_a_search_saved_them(anonymous_client, world, adnans, fake):
+    """Q87: one search saves its jobs at one moment; Newest orders them by when they were posted."""
+    today = utcnow().date()
+    fake.jobs = [_job(n, posted=(today - timedelta(days=days)).isoformat()) for n, days in ((1, 11), (2, 2), (3, 5))]
+    _run(world, adnans)
+    r = anonymous_client.get(f"/api/firms/{world['firm'].id}/job-postings",
+                             params={"candidate_id": adnans["id"], "sort": "newest"}, headers=world["as"]["adnan"])
+    assert [item["title"] for item in r.json()["items"]] == ["Java Developer #2", "Java Developer #3", "Java Developer #1"]

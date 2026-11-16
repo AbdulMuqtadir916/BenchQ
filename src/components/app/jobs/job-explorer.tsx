@@ -35,7 +35,7 @@ import { MatchScore } from "@/components/app/match-score";
 import { VerificationBadge } from "@/components/app/verification-badge";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { EmptyState } from "@/components/app/empty-state";
-import { PORTALS, PortalLogo, SOURCE_KEYS, portalForJob, type PortalKey } from "@/components/app/jobs/portal-logo";
+import { PORTALS, PortalLogo, SOURCE_KEYS, openSourceLabel, portalForJob, type PortalKey } from "@/components/app/jobs/portal-logo";
 import { canManageResume, useCan } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { TailorButton } from "@/components/app/tailoring/tailor-button";
@@ -64,7 +64,7 @@ const SOURCE_OPTIONS: SelectOption[] = [
 
 /** The source filter's backend names (backend/api/routes_job_search.py `list_firm_jobs`). */
 const SOURCE_FILTER: Record<string, JobSourceFilter> = {
-  INDEED: "indeed", FREEHIRE: "freehire", MANUAL: "manual", EXTENSION: "extension", OTHER_SOURCE: "other",
+  INDEED: "indeed", FREEHIRE: "freehire", LINKEDIN: "linkedin", MANUAL: "manual", EXTENSION: "extension", OTHER_SOURCE: "other",
 };
 const SORT_PARAM: Record<string, JobSort> = { MATCH: "match", NEWEST: "newest", COMPANY: "company" };
 
@@ -441,7 +441,7 @@ function JobDetailHeader({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)}>Open source<ExternalLink size={13} /></a></Button>
+          <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)}>{openSourceLabel(portalForJob(job))}<ExternalLink size={13} /></a></Button>
           {context && canTailor ? <TailorButton candidate={context} job={job} /> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id }, { candidate: context?.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
           <Button variant="secondary" size="icon" aria-label="More job actions" aria-expanded={menuOpen} onClick={onMenuToggle}><MoreHorizontal size={15} /></Button>
         </div>

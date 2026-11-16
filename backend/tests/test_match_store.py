@@ -26,7 +26,7 @@ def test_a_search_saves_each_jobs_match_and_why_one_is_held_at_40(world, fake, a
     rows = _postings(test_db, adnans)
     for row in rows.values():
         assert 0 <= row.match_score <= 100 and len(row.match_basis) == 64
-    held = rows["Java Developer 2"]                       # the candidate takes C2C only (the test body's engagement)
+    held = rows["Java Developer #2"]                       # the candidate takes C2C only (the test body's engagement)
     assert held.match_score <= 40 and "C2C" in held.match_note
     assert rows["Senior Java Developer"].match_note is None
 
@@ -40,12 +40,12 @@ def test_a_capture_saves_its_match(anonymous_client, world, adnans, test_db):
 def test_a_row_is_scored_again_only_when_what_it_read_changed(anonymous_client, world, fake, adnans, test_db):
     fake.jobs = [_job(2, d=NO_C2C)]
     _run(world, adnans)
-    before = _postings(test_db, adnans)["Java Developer 2"].match_basis
+    before = _postings(test_db, adnans)["Java Developer #2"].match_basis
     assert store.rescore(world["firm"].id, uuid.UUID(adnans["id"])) == 0          # nothing changed: nothing written
     r = anonymous_client.patch(f"/api/firms/{world['firm'].id}/candidates/{adnans['id']}",
                                json={"employment_types": ["C2C", "W2"]}, headers=world["as"]["adnan"])
     assert r.status_code == 200
-    after = _postings(test_db, adnans)["Java Developer 2"]                       # scored again after the answer
+    after = _postings(test_db, adnans)["Java Developer #2"]                       # scored again after the answer
     assert after.match_basis != before and after.match_note is None              # W2 now: no C2C caps nothing
 
 

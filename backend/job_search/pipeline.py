@@ -2,12 +2,15 @@
 request), then runs `run_search` in the background through `job_monitor.launch_background` (job type `job_search`):
 
     the batch still `running`? no (never saved, or already finished) → nothing, the source isn't asked
-    provider.search(role, country, 100, cursor, place=the chosen place, posted_within_days=14)
+    provider.search(role, country, 100, cursor, place=the chosen place, posted_within_days=14, titles=the role's
+                    titles (Q69), years=the most years the candidate can take (Q74), firm_id)
       fails  → the batch finished as error (code) + ledger entry
       answers → read each job; leave out closed and unreadable ones, ones posted over 14 days ago, ones not remote
-                on a Remote search, and ones whose text rules out the candidate's work authorization (decided
-                2026-11-14; the Match calculator's eligibility rules, backend/match/score.py `ruled_out`, Q32; each
-                counted); job_id = sha256(company | title | description)
+                on a Remote search, ones whose text rules out the candidate's work authorization (decided
+                2026-11-14; the Match calculator's eligibility rules, backend/match/score.py `ruled_out`, Q32), and
+                ones Match holds at 40 for the candidate's level (2026-11-16, Q70); each counted. A job without its
+                text (LinkedIn's, Q80) skips the two text rules; job_id = sha256(company | title | description), or
+                of the source's own id for a job without its text
               → one transaction, the candidate row locked (two searches for one candidate count the cap in turn):
                   the batch finished as success | empty (counts in metadata)
                   a job the candidate has: batch_id, last_seen_at and content replaced; discovered_at kept
@@ -46,13 +49,15 @@ def job_id(fields: JobFields) -> str:
     whitespace collapsed. A content change is a new job by design (docs/02 §6.y)."""
     def norm(s: str) -> str:
         return re.sub(r"\s+", " ", s or "").strip().lower()
+    if fields.source_id:                # a job the source sends without its text (LinkedIn): its own id
+        return hashlib.sha256(fields.source_id.encode("utf-8")).hexdigest()
     return hashlib.sha256("\x1f".join(norm(p) for p in (fields.company, fields.title, fields.description))
                           .encode("utf-8")).hexdigest()
 
 
 def _request(query: str, country: str, provider: str, place: str | None, cursor: str | None = None,
-             exhausted: bool = False) -> dict:
-    return {"query": query, "country": country, "place": place, "provider": provider,
+             exhausted: bool = False, titles=()) -> dict:
+    return {"query": query, "titles": list(titles or ()), "country": country, "place": place, "provider": provider,
             "limit": limits.JOBS_PER_SEARCH, "posted_within_days": limits.POSTED_WITHIN_DAYS, "cursor": cursor,
             "exhausted": exhausted}
 
@@ -88,13 +93,13 @@ def _ledger(db, *, firm_id, candidate_id, user_id, batch_id, query, country, sum
                   summary=f"{summary} ({COUNTRY_LABELS.get(country, country)})")
 
 
-def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider, place=None) -> ScrapeJob:
+def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider, place=None, titles=()) -> ScrapeJob:
     """The search's row, `running`, written when the BDE starts it (the caller holds the candidate row), with where
     it continues from. Flushed."""
     cursor, exhausted = _continue_from(db, firm_id, candidate_id, query, country, provider, place)
     batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=uuid.uuid4(),
                       kind="search", state="running",
-                      meta={"request": _request(query, country, provider, place, cursor, exhausted)})
+                      meta={"request": _request(query, country, provider, place, cursor, exhausted, titles)})
     db.add(batch)
     db.flush()
     return batch
@@ -173,11 +178,14 @@ def _save_error(*, firm_id, candidate_id, user_id, batch_id, query, country, pro
 
 
 def _read(provider, raw: dict) -> JobFields | None:
+    """The job's fields, or None when it can't be read: a title, a company and its text, unless the source sends none
+    (LinkedIn, Q80: then its own id)."""
     try:
         fields = provider.read(raw)
     except Exception:
         return None
-    return fields if fields.title and fields.company and fields.description else None
+    has_text = bool(fields.description) or (not getattr(provider, "sends_descriptions", True) and bool(fields.source_id))
+    return fields if fields.title and fields.company and has_text else None
 
 
 def _posted_too_long_ago(posted_at: str | None, today: date) -> bool:
@@ -199,13 +207,14 @@ def _scorer(firm_id, candidate_id) -> match_store.Scorer | None:
 
 
 def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider, result: SearchResult,
-          place: str | None = None) -> dict | None:
+          place: str | None = None, scorer=False) -> dict | None:
     counts = {"found": len(result.jobs), "saved": 0, "refreshed": 0, "skipped_closed": 0, "skipped_unreadable": 0,
               "skipped_duplicate": 0, "skipped_over_cap": 0, "skipped_too_old": 0, "skipped_not_remote": 0,
-              "skipped_work_auth": 0,
+              "skipped_work_auth": 0, "skipped_level": 0,
               # Left out by the source itself before the save (freehire.me's Adzuna previews, Q64).
               "skipped_adzuna": int((result.metadata or {}).get("skipped_adzuna") or 0)}
-    scorer = _scorer(firm_id, candidate_id)
+    if scorer is False:                 # not read by the caller
+        scorer = _scorer(firm_id, candidate_id)
     today = utcnow().date()
     # Read and identify every job before the transaction: no lock is held while parsing HTML.
     picked: list[tuple[str, dict]] = []
@@ -224,8 +233,12 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
         if place == REMOTE and not fields.is_remote:
             counts["skipped_not_remote"] += 1
             continue
-        if scorer is not None and match.ruled_out(fields, scorer.who):    # the posting rules them out (Q32)
+        if scorer is not None and fields.description and match.ruled_out(fields, scorer.who):    # the posting rules them out (Q32)
             counts["skipped_work_auth"] += 1
+            continue
+        if scorer is not None and scorer.resume is not None and fields.description \
+                and match.score(scorer.resume, fields, scorer.who).wrong_level:      # not the candidate's level (Q70)
+            counts["skipped_level"] += 1
             continue
         key = job_id(fields)
         if key in seen:
@@ -309,7 +322,7 @@ def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict, admit
 
 
 async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uuid.UUID, batch_id: uuid.UUID,
-                     query: str, country: str, provider_name: str, place: str | None = None) -> str:
+                     query: str, country: str, provider_name: str, place: str | None = None, titles=()) -> str:
     """The background task: finishes the `running` batch `batch_id`. Returns the run's summary; a failed search also
     marks its `job_runs` row failed."""
     provider = REGISTRY[provider_name]
@@ -333,11 +346,18 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
                        candidate_id)
         return "dropped: the search was no longer running"
     cursor, exhausted = request.get("cursor"), bool(request.get("exhausted"))
+    titles = list(titles or request.get("titles") or ())
+    try:
+        scorer = await asyncio.to_thread(_scorer, firm_id, candidate_id)
+    except Exception:
+        scorer = None                   # scored and filtered without it: the save reads it again
+    years = match.most_years_asked(scorer.resume, scorer.who) if scorer is not None else None
     try:
         # The source had nothing more for this role today: finish empty without asking again.
         result = SearchResult(jobs=[], metadata={"exhausted": True}) if exhausted else \
             await provider.search(query, country, limits.JOBS_PER_SEARCH, cursor, place=place,
-                                  posted_within_days=limits.POSTED_WITHIN_DAYS)
+                                  posted_within_days=limits.POSTED_WITHIN_DAYS, titles=titles, years=years,
+                                  firm_id=firm_id)
     except ProviderError as error:
         code = error.code
     except Exception as error:          # the provider's own bug: its message may hold a URL, so only its type is logged
@@ -346,7 +366,8 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
         code = "internal"
     else:
         try:
-            counts = await asyncio.to_thread(_save, provider=provider, result=result, **ids)
+            counts = await asyncio.to_thread(_save, provider=provider, result=result,
+                                             scorer=scorer if scorer is not None else False, **ids)
         except Exception as error:
             logger.error("job search batch=%s candidate=%s save failed %s", batch_id, candidate_id,
                          type(error).__name__)

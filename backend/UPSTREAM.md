@@ -56,5 +56,7 @@ lab's labelled sets, which are gone):
    (the dictionary held some as lower-case tags, which are left out, and two as other keywords); `main_skills.py`
    `NEVER_MAIN` keeps them from being what a job is mainly about (Q59).
 6. `main_skills.py` `IMPLIES`: TypeScript used in a role is JavaScript used (Q61).
+7. `ats_match.py` returns `wrong_level` (held at 40 for far more years asked, or a level two rungs away), which a
+   search leaves out (2026-11-16, Q70). It changes no score, so the version stays `benchq.2`.
 
 `match/score.py` is BenchQ's own: the only door into the package.

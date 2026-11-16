@@ -4,7 +4,7 @@ import { blockedReason, placeLabel, searchOutcome, searchRole, usageLine } from 
 
 const search = (over: Partial<JobSearch> = {}): JobSearch => ({
   id: "b1", kind: "SEARCH", state: "SUCCESS", query: "Java Developer", place: "Austin, TX", newCount: 12, seenAgainCount: 3, overLimitCount: 0,
-  leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0, leftOutAdzunaCount: 0,
+  leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0, leftOutAdzunaCount: 0, leftOutLevelCount: 0,
   errorCode: null, startedAt: "2026-11-11T14:00:00.000Z", finishedAt: "2026-11-11T14:00:09.000Z", ...over,
 });
 const searches = (over: Partial<JobSearches["usage"]> = {}, places: JobSearches["places"] = [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }]): JobSearches => ({
@@ -33,6 +33,7 @@ describe("Find jobs (docs/02 §6.z)", () => {
     expect(searchOutcome(search({ leftOutWorkAuthCount: 4, leftOutOldCount: 31, leftOutNotRemoteCount: 2 }), 100)).toBe(
       "12 new · 3 seen again · 4 left out: work authorization · 31 left out: posted over 14 days ago · 2 left out: not remote");
     expect(searchOutcome(search({ leftOutAdzunaCount: 3 }), 100)).toBe("12 new · 3 seen again · 3 left out: Adzuna preview");
+    expect(searchOutcome(search({ leftOutLevelCount: 7 }), 100)).toBe("12 new · 3 seen again · 7 left out: level");
     expect(searchOutcome(search({ state: "EMPTY", newCount: 0, seenAgainCount: 0 }), 100)).toBe("No new jobs for Java Developer in Austin, TX right now.");
     expect(searchOutcome(search({ state: "EMPTY", place: "remote" }), 100)).toBe("No new jobs for Java Developer in Remote right now.");
     expect(searchOutcome(search({ state: "EMPTY", place: null }), 100)).toBe("No new jobs for Java Developer right now.");

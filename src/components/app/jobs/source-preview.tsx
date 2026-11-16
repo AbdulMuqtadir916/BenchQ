@@ -25,14 +25,14 @@ export function SourcePreview({ job, portal, onOpenSource = null }: { job: Job; 
             <PortalLogo portal={portal} domain={job.company.domain} size={32} />
             <div className="min-w-0"><div className="text-body-strong text-[var(--color-text)]">Source preview · {PORTALS[portal].label}</div><div className="truncate text-caption text-[var(--color-text-3)]">{sourceUrl ?? job.company.websiteUrl ?? "Source URL unavailable"}</div></div>
           </div>
-          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)} className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">Open original<ArrowUpRight size={13} /></a> : null}
+          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)} className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">{portal === "LINKEDIN" ? "Open on LinkedIn" : "Open original"}<ArrowUpRight size={13} /></a> : null}
         </header>
         <div className="p-5">
           <div className="mb-5 flex items-start gap-3">
             <PortalLogo portal="COMPANY" domain={job.company.domain} size={40} />
             <div><h3 className="text-h2 text-[var(--color-text)]">{job.title}</h3><p className="mt-0.5 text-sm text-[var(--color-text-2)]">{job.company.name} · {jobLocation(job)}</p><p className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><Clock3 size={12} />{job.postedAt ? `Posted ${formatRelative(job.postedAt)}` : "Posting date not given"}{job.applicantCount ? ` · ${job.applicantCount} applicants` : ""}</p></div>
           </div>
-          <Description job={job} />
+          <Description job={job} portal={portal} />
           {job.requirements.length > 0 ? (
             <div className="mt-6 flex flex-wrap gap-1.5 border-t border-[var(--color-border)] pt-4">
               {job.requirements.slice(0, 8).map((requirement) => <Tag key={requirement.id} tone={requirement.kind === "MANDATORY" ? "blue" : "neutral"}>{requirement.value}</Tag>)}
@@ -45,7 +45,7 @@ export function SourcePreview({ job, portal, onOpenSource = null }: { job: Job; 
 }
 
 /** The full description from the one job's read; a list item's own text when it has one. Loading and error states. */
-function Description({ job }: { job: Job }) {
+function Description({ job, portal }: { job: Job; portal: PortalKey }) {
   const detail = useJob(job.id);
   const description = detail.data?.description || job.description;
   if (!description && detail.isLoading) {
@@ -62,6 +62,15 @@ function Description({ job }: { job: Job }) {
       <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-2)]">
         <span>The description didn&apos;t load.</span>
         <Button variant="secondary" size="sm" onClick={() => void detail.refetch()}>Retry</Button>
+      </div>
+    );
+  }
+  // A LinkedIn job's posting arrives on its first open, in turn with every firm's LinkedIn requests (Q83, Q86).
+  if (!description && portal === "LINKEDIN") {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-2)]">
+        <span>LinkedIn didn&apos;t send the posting this time. Read it on LinkedIn, or try again.</span>
+        <Button variant="secondary" size="sm" onClick={() => void detail.refetch()}>Try again</Button>
       </div>
     );
   }

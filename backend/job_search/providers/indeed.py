@@ -30,7 +30,7 @@ import logging
 import re
 import time
 
-from backend.job_search.providers.base import REMOTE, JobFields, ProviderError, SearchResult
+from backend.job_search.providers.base import REMOTE, JobFields, ProviderError, SearchResult, quoted_or
 from backend.job_search.text import clean_str, html_to_text, safe_url
 
 logger = logging.getLogger("benchq.job_search")
@@ -187,10 +187,13 @@ class Indeed:
     label = "Indeed"
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
-                     place: str | None = None, posted_within_days: int | None = None) -> SearchResult:
+                     place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
+                     firm_id=None) -> SearchResult:
         if country not in COUNTRIES:
             raise ProviderError("internal")     # the route admits us, ca and in only
-        query, place = _text(query, 200), (place if place == REMOTE else _text(place, 100) or None)
+        # Several titles: one search for all of them, each in quotes (decided 2026-11-16, Q69; Indeed takes OR).
+        query = quoted_or(titles) or _text(next(iter(titles or ()), query), 200)
+        place = place if place == REMOTE else _text(place, 100) or None
         deadline = time.monotonic() + TIME_LIMIT_SECONDS
         try:
             # The thread keeps to the deadline itself; this is only the backstop (a thread can't be cancelled).

@@ -28,6 +28,14 @@ def search_role(candidate) -> str | None:
     return next((role for role in (_line(r) for r in candidate.target_roles or []) if role), None)
 
 
+def search_titles(candidate) -> list[str]:
+    """The role a search asks for, split into its titles the way Match reads a title (decided 2026-11-16, Q69): "|"
+    separates titles, "GenAI / LLM Engineer" is "GenAI Engineer" or "LLM Engineer"; at most 4. One title: [it]."""
+    from backend.match.job_quality import split_title
+    role = search_role(candidate)
+    return split_title(role) if role else []
+
+
 def places(candidate, country: str | None) -> list[dict]:
     """The candidate's places for the picker: `{value, label, kind}` with kind `home`, `preferred` or `remote`."""
     out: list[dict] = []

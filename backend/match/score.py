@@ -12,13 +12,19 @@ only door into it:
   it is held at 40 (`note`), and the calculator's version.
 - `ruled_out(fields, candidate)`: whether the job's text rules the candidate out on work authorization, which a
   search leaves out (Q32): the posting states it, and the candidate's status is one it excludes.
+- `Match.wrong_level`: held at 40 for the candidate's level (far more years asked, or a level two rungs away), which
+  a search also leaves out (decided 2026-11-16, Q70).
+- `most_years_asked(resume, candidate)`: the most years a job may ask before Match holds it at 40 for them, for a
+  source that filters on it (freehire.me, Q74); None when the candidate's years aren't known.
 
-A job held at 40 for another reason (no C2C, a title for another subject, far more years than the résumé covers, a
-level two rungs away, a language the résumé lacks) is kept: its score says so.
+A job held at 40 for another reason (no C2C, a title for another subject, a language the résumé lacks) is kept: its
+score says so.
 """
+import math
 from dataclasses import dataclass
 
 from backend.match.ats_match import CAP, VERSION, ats_match, eligibility_flags
+from backend.match.title_fit import EXPERIENCE_GAP_SHARE, EXPERIENCE_GAP_YEARS
 from backend.match.ats_match_terms import ResumeFacts
 
 # The eligibility flags that rule the candidate out, when capped: a search leaves such a job out (Q32).
@@ -48,6 +54,7 @@ class Match:
     score: int
     note: str | None                  # the first reason the score is held at 40, or None
     version: str = VERSION
+    wrong_level: bool = False         # held at 40 for far more years asked, or a level two rungs away (Q70)
 
 
 def who(candidate, country: str | None) -> Who:
@@ -78,7 +85,17 @@ def score(resume: ResumeFacts, fields, candidate: Who) -> Match:
                       candidate=candidate.fields())
     caps = found["caps"]
     note = str(caps[0])[:NOTE_MOST] if caps and found["score"] <= CAP else None
-    return Match(score=found["score"], note=note, version=found["version"])
+    return Match(score=found["score"], note=note, version=found["version"], wrong_level=bool(found.get("wrong_level")))
+
+
+def most_years_asked(resume: ResumeFacts | None, candidate: Who) -> int | None:
+    """The most years a job may ask before Match calls it far more than the candidate has (ats_match `_experience`:
+    held + max(EXPERIENCE_GAP_YEARS, EXPERIENCE_GAP_SHARE × held)). The candidate's recorded years, else the résumé's;
+    None when neither is known."""
+    held = candidate.years if candidate.years is not None else (resume.years if resume is not None else None)
+    if held is None:
+        return None
+    return math.floor(held + max(EXPERIENCE_GAP_YEARS, EXPERIENCE_GAP_SHARE * held))
 
 
 def ruled_out(fields, candidate: Who) -> str | None:

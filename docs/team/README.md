@@ -121,4 +121,5 @@ it. Everyone else reads it.
 | 0026 | Arbaz | Applications let go of the old `jobs` pool: `applications_job_id_fkey` dropped. Schema only; a local database moves its rows with `python -m backend.scripts.move_local_jobs_to_postings` at 0026. Follows 0025 (another PR's, merging first; 0024 until it's on main) | `feat/autofill-screen` |
 | 0027 | Arbaz | Applications on `job_postings`: `candidate_id` NOT NULL, `(firm_id, candidate_id, job_id)` → `job_postings` ON DELETE RESTRICT; its new key refuses an application on an old job. Follows 0026 | `feat/autofill-screen` |
 | 0028 | Zuhair | The Match score: `match_score`, `match_note`, `match_basis` on `job_postings` and `resumes` (a 0–100 check each) and `ix_job_postings_candidate_match`. Additive; the backend scores what has no score when it starts. Follows 0027 (Arbaz's) | `feat/job-search-indeed-and-candidate-details` |
-| 0029+ | — | Claim the next number here in your PR | — |
+| 0029 | Zuhair | LinkedIn's pace for the whole backend: `linkedin_slots` (4 rows, filled here) and `linkedin_waiting` (who waits: opens before searches, firms in turn). Additive. Follows 0028 | `feat/job-search-indeed-and-candidate-details` |
+| 0030+ | — | Claim the next number here in your PR | — |

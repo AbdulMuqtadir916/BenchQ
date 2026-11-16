@@ -145,3 +145,35 @@ for _model in (JobPosting, ScrapeJob):
         if isinstance(_col.type, String):
             event.listen(getattr(_model, _col.name), "set", _sanitize_field, retval=True)
 del _model, _col
+
+
+# ── LinkedIn's pace, one for the whole backend (decided 2026-11-16, Q76, Q81, Q82; migration 0029) ──
+# backend/job_search/linkedin_queue.py is the only reader and writer. Not firm data: a waiting row names its firm only
+# so firms take turns, and it is gone once its request has a slot.
+
+class LinkedInSlot(Base):
+    """One of the 4 requests LinkedIn may have from us at a time; free once `busy_until` has passed."""
+    __tablename__ = "linkedin_slots"
+
+    slot = Column(SmallInteger, primary_key=True)
+    busy_until = Column(DateTime(timezone=True), nullable=False, server_default=text("now()"))
+    holder = Column(UUID(as_uuid=True), nullable=True)
+
+    __table_args__ = (CheckConstraint("slot >= 0 AND slot < 4", name="ck_linkedin_slots_slot"),)
+
+
+class LinkedInWaiting(Base):
+    """A request waiting for a slot: `open` (someone is looking at a job) or `search`."""
+    __tablename__ = "linkedin_waiting"
+
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    kind = Column(String(10), nullable=False)
+    firm_id = Column(UUID(as_uuid=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("now()"))
+    seen_at = Column(DateTime(timezone=True), nullable=False, server_default=text("now()"))
+
+    __table_args__ = (
+        ForeignKeyConstraint(["firm_id"], ["firms.id"], name="linkedin_waiting_firm_id_fkey", ondelete="CASCADE"),
+        CheckConstraint("kind IN ('open', 'search')", name="ck_linkedin_waiting_kind"),
+        Index("ix_linkedin_waiting_kind_created", "kind", "created_at"),
+    )

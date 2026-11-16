@@ -72,7 +72,7 @@ def test_a_bde_captures_20_jobs_a_day_and_they_are_not_search_attempts(anonymous
 
 
 def test_a_search_that_finds_a_captured_job_merges_into_it(anonymous_client, world, adnans, fake, test_db):
-    captured = _capture(anonymous_client, world, adnans, title="Java Developer 1", company="Example 1",
+    captured = _capture(anonymous_client, world, adnans, title="Java Developer #1", company="Example 1",
                         description="Made-up description 1.").json()
     fake.jobs = [_job(1), _job(2)]
     assert _run(world, adnans) == "1 new, 1 seen again"
@@ -188,7 +188,7 @@ def test_a_captured_job_a_search_refreshes_stays_out_of_the_100(anonymous_client
     The cap counts how a job was first saved (`first_source`), not its latest `source`."""
     fake.jobs = [_job(n) for n in range(100, 199)]
     assert _run(world, adnans) == "99 new, 0 seen again"
-    captured = _capture(anonymous_client, world, adnans, title="Java Developer 1", company="Example 1",
+    captured = _capture(anonymous_client, world, adnans, title="Java Developer #1", company="Example 1",
                         description="Made-up description 1.").json()
     fake.jobs = [_job(1), _job(2)]
     assert _run(world, adnans, query="Spring Developer") == "1 new, 1 seen again"

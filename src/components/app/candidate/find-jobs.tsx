@@ -44,6 +44,7 @@ export function searchOutcome(search: JobSearch, jobsCap: number): string {
   if (search.leftOutWorkAuthCount) parts.push(`${search.leftOutWorkAuthCount} left out: work authorization`);
   if (search.leftOutOldCount) parts.push(`${search.leftOutOldCount} left out: posted over 14 days ago`);
   if (search.leftOutNotRemoteCount) parts.push(`${search.leftOutNotRemoteCount} left out: not remote`);
+  if (search.leftOutLevelCount) parts.push(`${search.leftOutLevelCount} left out: level`);
   if (search.leftOutAdzunaCount) parts.push(`${search.leftOutAdzunaCount} left out: Adzuna preview`);
   return parts.join(" · ");
 }

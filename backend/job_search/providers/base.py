@@ -14,6 +14,9 @@ A provider does two things:
 `job_postings.content` holds the source's own object, so a new source needs no migration and an old row keeps reading
 through its own provider's `read()`, picked by `job_postings.source`. Nothing outside a provider looks inside
 `content`.
+
+`quoted_or(titles)`: several titles as one search's words, each in quotes, joined by OR (decided 2026-11-16, Q69; live
+on Indeed: 15 of 20 jobs with a wanted title, against 7 unquoted).
 """
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -30,6 +33,12 @@ ERROR_MESSAGES = {
     "too_large": "The job source sent too much at once.",
     "internal": "Something went wrong running the search.",
 }
+
+
+def quoted_or(titles, most: int = 400) -> str | None:
+    """`"A" OR "B" OR "C"` for two titles or more; None for fewer (the query is then searched as it is)."""
+    clean = [t for t in (" ".join(str(t).replace('"', " ").split())[:100] for t in titles or ()) if t]
+    return " OR ".join(f'"{t}"' for t in clean)[:most] if len(clean) > 1 else None
 
 
 class ProviderError(Exception):
@@ -60,6 +69,9 @@ class JobFields:
     h1b_sponsor: bool = False
     # The source labels the job remote (its own label or location, never a word in the description). False: not known.
     is_remote: bool = False
+    # The source's own id for a job that comes without its text ("linkedin:<id>"): its identity (`job_id`) then, since
+    # title and company alone don't tell two jobs apart. None for a source that sends the whole posting.
+    source_id: str | None = None
 
 
 @dataclass
@@ -71,9 +83,13 @@ class SearchResult:
 
 class Provider(Protocol):
     name: str           # stored in job_postings.source; never renamed once rows carry it
-    label: str          # how the search-source picker names it ("Indeed", "freehire.me")
+    label: str          # how the search-source picker names it ("Indeed", "freehire.me", "LinkedIn")
 
+    # `titles`: the role split into its titles (decided 2026-11-16, Q69: "A | B", "A / B Engineer"), searched together;
+    # `years`: the most years asked the candidate can take (Q74), for a source that filters on it; `firm_id`: whose
+    # search it is, for a source that paces requests across firms (LinkedIn, Q81).
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
-                     place: str | None = None, posted_within_days: int | None = None) -> SearchResult: ...
+                     place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
+                     firm_id=None) -> SearchResult: ...
 
     def read(self, content: dict) -> JobFields: ...

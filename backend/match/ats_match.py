@@ -452,6 +452,8 @@ def ats_match(resume, job: dict, wanted_titles=(), years_held: float | None = No
                               "missing": [r["line"] for r in parts["requirement_lines"].get("lines", []) if r["credit"] < 1.0]},
         "certifications": {"found": parts["certifications"]["found"], "missing": parts["certifications"]["missing"]},
         "experience": {"asked": parts["experience"]["asked"], "held": parts["experience"]["held"]},
+        # BenchQ (2026-11-16, Q70): held at 40 for the candidate's level: far more years asked, or two rungs away.
+        "wrong_level": bool(parts["experience"]["far_over"] or parts["seniority"]["capped"]),
         "version": VERSION,
     }
 

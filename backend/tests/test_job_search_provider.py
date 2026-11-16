@@ -46,9 +46,10 @@ def _get():
 
 # ── the registry: Indeed and freehire.me search; a job the old freehire.me search saved still reads ──
 
-def test_indeed_and_freehire_search_indeed_first_and_the_default():
-    assert list(REGISTRY) == ["indeed", "freehire"] and DEFAULT_PROVIDER == "indeed"
-    assert choices() == [{"value": "indeed", "label": "Indeed"}, {"value": "freehire", "label": "freehire.me"}]
+def test_indeed_freehire_and_linkedin_search_indeed_first_and_the_default():
+    assert list(REGISTRY) == ["indeed", "freehire", "linkedin"] and DEFAULT_PROVIDER == "indeed"
+    assert choices() == [{"value": "indeed", "label": "Indeed"}, {"value": "freehire", "label": "freehire.me"},
+                         {"value": "linkedin", "label": "LinkedIn"}]
     assert reader_for("freehire").read(MADE_UP_JOB).title == "Java Developer"     # HTML, cut: the old search's
 
 

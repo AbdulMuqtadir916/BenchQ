@@ -13,7 +13,7 @@ export const JOBS_PAGE = 100;
 
 export type JobSort = "match" | "newest" | "company";
 /** The backend's source names for the list's source filter (portal-logo.tsx `PortalKey`). */
-export type JobSourceFilter = "indeed" | "freehire" | "manual" | "extension" | "other";
+export type JobSourceFilter = "indeed" | "freehire" | "linkedin" | "manual" | "extension" | "other";
 
 export interface JobListParams {
   limit?: number;

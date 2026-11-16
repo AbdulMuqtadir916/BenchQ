@@ -23,6 +23,8 @@ export const JobSearchSchema = z.object({
   leftOutNotRemoteCount: z.number().int(),
   /** Left out because freehire.me passed it on from Adzuna, as a preview only (decided 2026-11-16, Q64). */
   leftOutAdzunaCount: z.number().int(),
+  /** Left out because Match holds it at 40 for the candidate's level: far more years asked, or two rungs away (Q70). */
+  leftOutLevelCount: z.number().int(),
   errorCode: JobSearchErrorCode.nullable(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime().nullable(),

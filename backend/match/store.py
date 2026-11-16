@@ -87,8 +87,9 @@ def basis(scorer: Scorer, fields) -> str:
 
 
 def apply(row, scorer: Scorer, fields) -> bool:
-    """Score `row` (a JobPosting or a tailored Resume) against `fields` unless its basis matches. True when written."""
-    if scorer.resume is None or fields is None:
+    """Score `row` (a JobPosting or a tailored Resume) against `fields` unless its basis matches. True when written. A
+    job without its text (a LinkedIn job before its first open, decided 2026-11-16, Q80) isn't scored: "—"."""
+    if scorer.resume is None or fields is None or not fields.description:
         return False
     current = basis(scorer, fields)
     if row.match_basis == current:

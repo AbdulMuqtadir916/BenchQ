@@ -27,10 +27,12 @@ class FakeProvider:
         self.asks: list[dict] = []                  # the place and the age each search asked for
         self.metadata: dict = {}                    # more of the source's metadata (a count it left out itself)
 
-    async def search(self, query, country, limit, cursor=None, *, place=None, posted_within_days=None):
+    async def search(self, query, country, limit, cursor=None, *, place=None, posted_within_days=None, titles=(),
+                     years=None, firm_id=None):
         self.calls.append((query, country, limit))
         self.cursors.append(cursor)
-        self.asks.append({"place": place, "posted_within_days": posted_within_days})
+        self.asks.append({"place": place, "posted_within_days": posted_within_days, "titles": list(titles or ()),
+                          "years": years, "firm_id": firm_id})
         if self.error:
             raise ProviderError(self.error)
         return SearchResult(jobs=list(self.jobs), metadata={"meta": {"total": len(self.jobs)}, **self.metadata},
@@ -43,7 +45,7 @@ class FakeProvider:
 
 
 def _job(n, **over):
-    return {"t": f"Java Developer {n}", "c": f"Example {n}", "d": f"Made-up description {n}.",
+    return {"t": f"Java Developer #{n}", "c": f"Example {n}", "d": f"Made-up description {n}.",
             "u": f"https://jobs.example.test/{n}", **over}
 
 
@@ -358,18 +360,20 @@ def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, a
     fake.jobs = [_job(1), _job(2), _job(3, closed=True), {"t": "No company"}, _job(1)]
     assert _run(world, adnans) == "2 new, 0 seen again"
     assert fake.calls == [("Java Developer", "us", 100)]
-    assert fake.asks == [{"place": "Austin, TX", "posted_within_days": 14}]   # the last 14 days (2026-11-14, Q7)
+    # The last 14 days (2026-11-14, Q7); 9 years held: up to 12 asked (9 + 40%, Q74); the search's firm (Q81).
+    assert fake.asks == [{"place": "Austin, TX", "posted_within_days": 14, "titles": [], "years": 12,
+                          "firm_id": world["firm"].id}]
     (batch,), postings = _rows(test_db, adnans)
     assert (batch.state, batch.error, batch.user_id) == ("success", None, world["people"]["adnan"].id)
     assert batch.meta["counts"] == {"found": 5, "saved": 2, "refreshed": 0, "skipped_closed": 1,
                                     "skipped_unreadable": 1, "skipped_duplicate": 1, "skipped_over_cap": 0,
                                     "skipped_too_old": 0, "skipped_not_remote": 0, "skipped_work_auth": 0,
-                                    "skipped_adzuna": 0}
-    assert batch.meta["request"] == {"query": "Java Developer", "country": "us", "place": "Austin, TX",
+                                    "skipped_level": 0, "skipped_adzuna": 0}
+    assert batch.meta["request"] == {"query": "Java Developer", "titles": [], "country": "us", "place": "Austin, TX",
                                      "provider": "fake", "limit": 100, "posted_within_days": 14, "cursor": None,
                                      "exhausted": False}
     assert batch.meta["meta"] == {"total": 5}
-    assert sorted(p.content["t"] for p in postings) == ["Java Developer 1", "Java Developer 2"]
+    assert sorted(p.content["t"] for p in postings) == ["Java Developer #1", "Java Developer #2"]
     assert {p.batch_id for p in postings} == {batch.batch_id} and {p.source for p in postings} == {"fake"}
     entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "job_search").one()
     assert (entry.candidate_id, entry.actor_user_id) == (uuid.UUID(adnans["id"]), world["people"]["adnan"].id)
@@ -396,8 +400,8 @@ def test_the_cap_keeps_the_sources_order_and_still_refreshes(world, adnans, fake
     assert _run(world, adnans) == "10 new, 5 seen again"
     batches, postings = _rows(test_db, adnans)
     assert len(postings) == 100 and batches[1].meta["counts"]["skipped_over_cap"] == 10
-    assert {p.content["t"] for p in postings} >= {f"Java Developer {n}" for n in range(90, 100)}
-    assert not {p.content["t"] for p in postings} & {f"Java Developer {n}" for n in range(100, 110)}
+    assert {p.content["t"] for p in postings} >= {f"Java Developer #{n}" for n in range(90, 100)}
+    assert not {p.content["t"] for p in postings} & {f"Java Developer #{n}" for n in range(100, 110)}
 
 
 def test_no_jobs_is_an_empty_batch(world, adnans, fake, test_db):
@@ -440,7 +444,7 @@ def test_everyone_who_sees_the_candidate_reads_its_jobs(anonymous_client, world,
         r = anonymous_client.get(_url(world, adnans, "job-postings"), headers=world["as"][who])
         assert r.status_code == 200, (who, r.text)
         body = r.json()
-        assert body["total"] == 2 and {i["title"] for i in body["items"]} == {"Java Developer 1", "Java Developer 2"}
+        assert body["total"] == 2 and {i["title"] for i in body["items"]} == {"Java Developer #1", "Java Developer #2"}
         assert "description" not in body["items"][0] and "content" not in body["items"][0]
     for who in ("vikram", "priya"):
         assert anonymous_client.get(_url(world, adnans, "job-postings"), headers=world["as"][who]).status_code == 404

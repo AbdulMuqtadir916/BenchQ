@@ -6,17 +6,19 @@ to `RETIRED` (only its `read` is used), so the jobs it saved still read (`reader
 
 - `indeed`: Indeed through python-jobspy, the source since 2026-11-14.
 - `freehire`: freehire.me's agent search (the first source, 2026-11-09; stopped 2026-11-14; back 2026-11-16, Q55).
+- `linkedin`: LinkedIn's public job search through python-jobspy, at one pace for the whole backend (2026-11-16, Q75–Q86).
 """
 from backend.job_search.providers.base import REMOTE, JobFields, Provider, ProviderError, SearchResult  # noqa: F401
 from backend.job_search.providers.capture import CAPTURE_SOURCES, Capture
 from backend.job_search.providers.freehire import Freehire
 from backend.job_search.providers.indeed import Indeed
+from backend.job_search.providers.linkedin import LinkedIn
 
 DEFAULT_PROVIDER = "indeed"
 SETTING_KEY = "job_search_provider"
 
 # The sources a search can use, in the picker's order.
-REGISTRY: dict[str, Provider] = {p.name: p for p in (Indeed(), Freehire())}
+REGISTRY: dict[str, Provider] = {p.name: p for p in (Indeed(), Freehire(), LinkedIn())}
 # Sources that no longer search; kept for the jobs they saved (none today).
 RETIRED: dict = {}
 # Everything that can have written a posting: search providers, retired ones and captures, by `job_postings.source`.
