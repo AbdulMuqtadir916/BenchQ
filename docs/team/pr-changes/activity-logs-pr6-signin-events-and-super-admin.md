@@ -25,7 +25,7 @@ address a try came from (IP) is kept but is never in a list; the Super Admin ope
 | Case | Row |
 |---|---|
 | Known account | On that person, in their firm, with the reason: wrong password, account deactivated, or password reset in progress |
-| Email with no account | Actor "Unknown account", no firm, the email masked as `a***@***.com` |
+| Email with no account | Actor "Unknown account", no firm, shown as "Email not shown": nothing typed is kept |
 | Repeat tries | Same account and IP within 10 seconds of the row's first try: one row, `attempt_count` goes up, and Activity shows "Name (3)" |
 | A limit used up | One `LOCKED_OUT` row: 5 tries on an account in 15 minutes, or 10 tries from an IP in a minute |
 
@@ -135,3 +135,10 @@ log. 51 routes pass; 30 can't be reached with the generic request and have their
 - **The candidate picker keeps the last answer only within the same view.** Switching between the whole platform and
   failed sign-ins (both with no firm) showed the previous view's candidates while the next ones loaded.
   `sameScopeOnly` compares the firm and the view; `use-admin-activity.test.ts` covers it.
+
+## Review fixes (CodeRabbit, fourth round, 2026-11-16)
+
+- **Nothing typed into the email box is kept for an unknown account.** The third-round mask kept the first letter and
+  the ending, and a password shaped like an address (`p@x.supersecretpassword`) has most of itself in the ending. The
+  entry now says "Email not shown" and keeps no part of the typed text; `mask_email` is gone. The Super Admin still sees
+  the time, the address (IP) and the number of tries. An entry on a real account is unchanged: it names that account.

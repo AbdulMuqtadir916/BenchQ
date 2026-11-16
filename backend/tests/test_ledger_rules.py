@@ -103,6 +103,11 @@ DISPATCH_CALLS = {"to_thread": (0, "func"), "run_in_threadpool": (0, "func"), "r
                   "add_task": (0, "func"), "launch_background": (1, "coro_func"), "submit": (0, "fn"),
                   "Thread": (1, "target"), "partial": (0, "func"), "create_task": (0, "coro"),
                   "ensure_future": (0, "coro_or_future"), "Depends": (0, "dependency")}
+# These two only build something: a thread runs its target once it is started, a partial once it is called or handed to
+# one of the calls above. Built and left alone, the function never runs.
+BUILDERS = {"Thread": {"start", "run"}, "partial": set()}
+# The dispatchers that pass their callback's keywords as one dict; the rest pass their own keywords on.
+KEYWORD_DICTS = {"Thread": "kwargs", "launch_background": "func_kwargs"}
 
 
 def _scoped_functions(tree: ast.AST) -> list[tuple[tuple[str, ...], ast.AST]]:
@@ -197,19 +202,28 @@ def _callee(call: ast.Call, file: str, resolve, functions: dict, modules: dict) 
 def _ledger_model_names(tree: ast.Module, model: str = "ActivityEntry") -> set[str]:
     """The names a model (the log's `ActivityEntry` unless told otherwise) goes by at the top of a file: an
     `import ... as` alias, and `Entry = ActivityEntry`."""
+    return _assigned_names(tree, _imported_names(tree, model), model)
+
+
+def _imported_names(tree: ast.Module, model: str = "ActivityEntry") -> set[str]:
     names = {model}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             names.update(alias.asname or alias.name for alias in node.names if alias.name == model)
-    return _assigned_names(tree, names, model)
+    return names
 
 
-def _assigned_names(scope: ast.AST, outer: set[str], model: str = "ActivityEntry") -> set[str]:
+def _assigned_names(scope: ast.AST, outer: set[str], model: str = "ActivityEntry",
+                    before: ast.AST | None = None) -> set[str]:
     """The names the model goes by inside `scope` (a file or one function), given those it goes by outside: an assignment
     in this scope binds the name here only, and binding it to anything else replaces an alias, in source order. A
-    function's assignments don't reach another function."""
+    function's assignments don't reach another function. With `before` (a call in this scope), only the assignments
+    that end before it starts count: `model = ActivityEntry; db.query(model); model = Candidate` reads the log."""
     names = set(outer)
     assigns = sorted((node for node in _own_nodes(scope) if isinstance(node, ast.Assign)), key=lambda node: node.lineno)
+    if before is not None:
+        start = (before.lineno, before.col_offset)
+        assigns = [node for node in assigns if (node.end_lineno, node.end_col_offset) <= start]
     for node in assigns:
         targets = {target.id for target in node.targets if isinstance(target, ast.Name)}
         names = names | targets if _is_ledger_model(node.value, names, model) else names - targets
@@ -254,9 +268,9 @@ def _ledger_writes(trees=None) -> list[tuple[str, ast.Call]]:
         defined = {path for path, _ in scoped}
         functions, modules = _imports(tree)
         for path, owner in [((), tree), *scoped]:       # each call resolved where it sits, as Python would
-            resolve = _resolver(path, defined)
+            resolve, idle = _resolver(path, defined), _never_run(owner)
             for node in _own_nodes(owner):
-                if not isinstance(node, ast.Call):
+                if not isinstance(node, ast.Call) or id(node) in idle:
                     continue
                 if _callee(node, file, resolve, functions, modules) in WRITERS:
                     found.append((file, node))
@@ -267,18 +281,61 @@ def _ledger_writes(trees=None) -> list[tuple[str, ast.Call]]:
     return found
 
 
+def _called_name(call: ast.Call) -> str | None:
+    return call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
+
+
+def _callback(call: ast.Call) -> ast.AST | None:
+    """The argument in a DISPATCH_CALLS call's callback position or keyword, whatever it is."""
+    name = _called_name(call)
+    if name not in DISPATCH_CALLS:
+        return None
+    position, keyword = DISPATCH_CALLS[name]
+    return call.args[position] if len(call.args) > position else next(
+        (k.value for k in call.keywords if k.arg == keyword), None)
+
+
 def _dispatched(call: ast.Call):
     """The function a call hands over to be run, when it is one of DISPATCH_CALLS: the argument in its callback's position
     or keyword, if that is a name, `module.name`, or (for `Depends`) a factory's call."""
-    name = call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
-    if name not in DISPATCH_CALLS:
-        return []
-    position, keyword = DISPATCH_CALLS[name]
-    value = call.args[position] if len(call.args) > position else next(
-        (k.value for k in call.keywords if k.arg == keyword), None)
-    if isinstance(value, (ast.Name, ast.Attribute)) or (name == "Depends" and isinstance(value, ast.Call)):
+    value = _callback(call)
+    if isinstance(value, (ast.Name, ast.Attribute)) or (_called_name(call) == "Depends" and isinstance(value, ast.Call)):
         return [value]
     return []
+
+
+def _never_run(owner: ast.AST) -> set[int]:
+    """The `Thread(...)` and `partial(...)` calls in `owner` (by `id`) whose function never runs here: a thread nobody
+    starts, a partial nobody calls or hands to a dispatcher. One is run directly (`Thread(...).start()`, `partial(f)()`,
+    `add_task(partial(f))`) or through the name it was given (`t = Thread(...)`, then `t.start()`)."""
+    built, named, run, used = [], {}, set(), {}
+    for node in _own_nodes(owner):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            named[id(node.value)] = {target.id for target in node.targets if isinstance(target, ast.Name)}
+        if not isinstance(node, ast.Call):
+            continue
+        if _called_name(node) in BUILDERS:
+            built.append(node)
+        func, handed = node.func, _callback(node)
+        if isinstance(func, ast.Call):                                   # partial(f)(...)
+            run.add(id(func))
+        elif isinstance(func, ast.Name):                                 # send(...)
+            used.setdefault(func.id, set()).add("")
+        elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Call):      # Thread(...).start()
+            used.setdefault(id(func.value), set()).add(func.attr)
+        elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):      # worker.start()
+            used.setdefault(func.value.id, set()).add(func.attr)
+        if isinstance(handed, ast.Call):                                 # add_task(partial(f, ...))
+            run.add(id(handed))
+        elif isinstance(handed, ast.Name):                               # add_task(send)
+            used.setdefault(handed.id, set()).add("")
+    idle = set()
+    for call in built:
+        by = BUILDERS[_called_name(call)] or {""}                        # a thread by .start(), a partial by being called
+        ways = set(used.get(id(call), set())).union(*(used.get(name, set()) for name in named.get(id(call), set())))
+        if id(call) not in run and not ways & by:
+            idle.add(id(call))
+    return idle
 
 
 def _handed_over(value: ast.AST, file: str, resolve, functions: dict, modules: dict) -> tuple[str, str] | None:
@@ -289,12 +346,16 @@ def _handed_over(value: ast.AST, file: str, resolve, functions: dict, modules: d
 
 
 def _forwarded(call: ast.Call) -> ast.Call:
-    """A dispatch call with the keywords it forwards to its callback, including a `func_kwargs={...}` literal's keys."""
-    keywords = [k for k in call.keywords if k.arg != "func_kwargs"]
-    for k in call.keywords:
-        if k.arg == "func_kwargs" and isinstance(k.value, ast.Dict):
-            keywords += [ast.keyword(arg=key.value, value=v) for key, v in zip(k.value.keys, k.value.values)
-                         if isinstance(key, ast.Constant) and isinstance(key.value, str)]
+    """A dispatch call with the keywords its callback gets: its own keywords, or, for a dispatcher that passes them as
+    one dict (`Thread(kwargs={...})`, `launch_background(func_kwargs={...})`), that literal's keys."""
+    as_dict = KEYWORD_DICTS.get(_called_name(call))
+    if as_dict is None:
+        keywords = list(call.keywords)
+    else:
+        keywords = [ast.keyword(arg=key.value, value=value)
+                    for k in call.keywords if k.arg == as_dict and isinstance(k.value, ast.Dict)
+                    for key, value in zip(k.value.keys, k.value.values, strict=True)
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str)]
     return ast.Call(func=call.func, args=call.args, keywords=keywords, lineno=call.lineno, col_offset=call.col_offset)
 
 
@@ -311,13 +372,13 @@ def _logging_functions(trees=None) -> set[tuple[str, str]]:
         functions, modules = _imports(tree)
         names_in = _names_by_scope(tree)
         for path, function in scoped:
-            key, resolve = (file, ".".join(path)), _resolver(path, defined)
+            key, resolve, idle = (file, ".".join(path)), _resolver(path, defined), _never_run(function)
             for node in _own_nodes(function):
                 if isinstance(node, ast.Call):
                     calls.setdefault(key, set()).add(_callee(node, file, resolve, functions, modules))
-                    if _is_ledger_model(node.func, names_in[path]):
+                    if _is_ledger_model(node.func, _assigned_names(function, names_in[path[:-1]], before=node)):
                         logging.add(key)
-                    for value in _dispatched(node):            # handed to a thread pool or a background launcher
+                    for value in _dispatched(node) if id(node) not in idle else []:   # handed to a pool or a launcher
                         if isinstance(value, ast.Call):        # Depends(factory(...)): FastAPI runs what it returns
                             if (factory := _callee(value, file, resolve, functions, modules)) is not None:
                                 factories.setdefault(key, set()).add(factory)
@@ -399,14 +460,15 @@ def _enclosing_calls(accept, trees=None, model: str = "ActivityEntry") -> set[tu
     found = set()
     for file, tree in _source_trees(SOURCE_FILES) if trees is None else trees:
 
-        def visit(node, function, names):
+        def visit(node, function, scope, outer):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                function, names = function or node.name, _assigned_names(node, names, model)   # the model's names in here
-            if isinstance(node, ast.Call) and accept(node, names):
-                found.add((file, function or "<module>"))
+                # Inside a function, the names around it are what they end up as: it runs after they are all bound.
+                function, scope, outer = function or node.name, node, _assigned_names(scope, outer, model)
+            if isinstance(node, ast.Call) and accept(node, _assigned_names(scope, outer, model, before=node)):
+                found.add((file, function or "<module>"))        # the model's names at this call, not at the end
             for child in ast.iter_child_nodes(node):
-                visit(child, function, names)
-        visit(tree, None, _ledger_model_names(tree, model))
+                visit(child, function, scope, outer)
+        visit(tree, None, tree, _imported_names(tree, model))
     return found
 
 
@@ -543,8 +605,21 @@ def test_a_name_bound_to_the_model_in_one_function_is_not_the_model_in_another()
     source = ("from backend.models.tenancy import ActivityEntry, Candidate\n"
               "def reads_the_log(db):\n    model = ActivityEntry\n    return db.query(model).all()\n"
               "def reads_candidates(db):\n    model = Candidate\n    return db.query(model).all()\n"
-              "def rebinds(db):\n    model = ActivityEntry\n    model = Candidate\n    return db.query(model).all()\n")
-    assert {name for _, name in _enclosing_calls(_reads_the_ledger, _snippet(source))} == {"reads_the_log"}
+              "def rebinds(db):\n    model = ActivityEntry\n    model = Candidate\n    return db.query(model).all()\n"
+              "def reads_then_rebinds(db):\n    model = ActivityEntry\n    rows = db.query(model).all()\n    model = Candidate\n    return rows\n"
+              "def binds_after_reading(db):\n    model = Candidate\n    rows = db.query(model).all()\n    model = ActivityEntry\n    return rows\n")
+    trees = _snippet(source)
+    assert {name for _, name in _enclosing_calls(_reads_the_ledger, trees)} == {"reads_the_log", "reads_then_rebinds"}
+
+
+def test_an_entry_built_under_a_name_that_is_rebound_later_is_still_a_write():
+    source = ("from backend.models.tenancy import ActivityEntry\n"
+              "def builds_then_rebinds(db):\n    Row = ActivityEntry\n    db.add(Row(firm_id=1))\n    Row = dict\n"
+              "def binds_after_building(db):\n    Row = dict\n    db.add(Row(firm_id=1))\n    Row = ActivityEntry\n")
+    trees = _snippet(source)
+    assert {name for _, name in _enclosing_calls(_builds_a_ledger_entry, trees)} == {"builds_then_rebinds"}
+    logging = {name for _, name in _logging_functions(trees)}
+    assert "builds_then_rebinds" in logging and "binds_after_building" not in logging
 
 
 def test_only_the_argument_a_dispatcher_runs_is_handed_over():
@@ -554,18 +629,39 @@ def test_only_the_argument_a_dispatcher_runs_is_handed_over():
               "def as_data(tasks):\n    tasks.add_task(ignore, write_audit)\n"
               "def as_callback(tasks):\n    tasks.add_task(write_audit, 1)\n"
               "def by_module(tasks):\n    tasks.add_task(ledger.record, 1, candidate_id=None)\n"
-              "def threaded():\n    Thread(target=write_audit)\n")
+              "def threaded():\n    Thread(target=write_audit).start()\n")
     logging = {name for _, name in _logging_functions(_snippet(source))}
     assert {"as_callback", "by_module", "threaded"} <= logging and "as_data" not in logging
+
+
+def test_a_thread_or_partial_counts_only_once_it_is_run():
+    source = ("from backend.auth import ledger\n"
+              "def write_audit(db):\n    ledger.record(db, candidate_id=None)\n"
+              "def never_started(db):\n    Thread(target=write_audit)\n"
+              "def named_never_started(db):\n    worker = Thread(target=write_audit)\n    return worker\n"
+              "def started(db):\n    Thread(target=write_audit).start()\n"
+              "def named_started(db):\n    worker = threading.Thread(target=write_audit, args=(db,))\n    worker.start()\n"
+              "def never_called(db):\n    send = partial(write_audit, db)\n    return 1\n"
+              "def called(db):\n    send = partial(write_audit, db)\n    send()\n"
+              "def called_at_once(db):\n    partial(write_audit, db)()\n"
+              "def handed_on(tasks, db):\n    tasks.add_task(partial(write_audit, db))\n"
+              "def named_handed_on(tasks, db):\n    send = partial(write_audit, db)\n    tasks.add_task(send)\n")
+    file = "api/routes_example.py"
+    logging = {name for found, name in _logging_functions(_snippet(source, file)) if found == file} - {"write_audit"}
+    assert logging == {"started", "named_started", "called", "called_at_once", "handed_on", "named_handed_on"}
 
 
 def test_a_writer_handed_to_a_task_must_state_its_candidate():
     source = ("from backend.auth import ledger\nfrom backend.auth.ledger import record\n"
               "def missing(tasks, db):\n    tasks.add_task(record, db, actor=1)\n"
               "def stated(tasks, db):\n    tasks.add_task(ledger.record, db, actor=1, candidate_id=None)\n"
-              "def launched(db):\n    launch_background('x', record, func_kwargs={'candidate_id': None})\n")
+              "def launched(db):\n    launch_background('x', record, func_kwargs={'candidate_id': None})\n"
+              "def threaded(db):\n    Thread(target=record, args=(db,), kwargs={'actor': 1, 'candidate_id': None}).start()\n"
+              "def threaded_missing(db):\n    Thread(target=record, args=(db,), kwargs={'actor': 1}).start()\n"
+              "def launched_missing(db):\n    launch_background('x', record, firm_id=1, func_kwargs={'actor': 1})\n"
+              "def never_started(db):\n    Thread(target=record, args=(db,))\n")
     writes = {call.lineno: any(k.arg == "candidate_id" for k in call.keywords) for _, call in _ledger_writes(_snippet(source))}
-    assert writes == {4: False, 6: True, 8: True}
+    assert writes == {4: False, 6: True, 8: True, 10: True, 12: False, 14: False}    # the unstarted thread writes nothing
 
 
 def test_a_ledger_read_passed_by_keyword_is_seen():

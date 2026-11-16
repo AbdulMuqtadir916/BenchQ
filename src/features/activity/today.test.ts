@@ -17,7 +17,7 @@ describe("the calendar's today", () => {
 
   it("moves on when the firm's midnight passes while the calendar is open", () => {
     const onDay = vi.fn();
-    const stop = watchToday("Asia/Kolkata", onDay);
+    const stop = watchToday("Asia/Kolkata", todayIn("Asia/Kolkata"), onDay);
     vi.advanceTimersByTime(30_000);
     expect(onDay).not.toHaveBeenCalled();
     vi.advanceTimersByTime(60_000);                           // 00:00 in Kolkata
@@ -27,9 +27,20 @@ describe("the calendar's today", () => {
     stop();
   });
 
+  it("catches up at once when midnight passed between reading the date and starting to watch", () => {
+    const onDay = vi.fn();
+    const shown = todayIn("Asia/Kolkata");                    // read at 23:59
+    vi.setSystemTime(new Date("2026-11-15T18:30:01Z"));      // 00:00:01 before the watch starts
+    const stop = watchToday("Asia/Kolkata", shown, onDay);
+    expect(onDay).toHaveBeenCalledExactlyOnceWith("2026-11-16");
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(onDay).toHaveBeenCalledOnce();
+    stop();
+  });
+
   it("stops watching once the calendar closes", () => {
     const onDay = vi.fn();
-    watchToday("Asia/Kolkata", onDay)();
+    watchToday("Asia/Kolkata", todayIn("Asia/Kolkata"), onDay)();
     vi.advanceTimersByTime(5 * 60_000);
     expect(onDay).not.toHaveBeenCalled();
   });

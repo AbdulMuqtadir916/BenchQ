@@ -9,16 +9,20 @@ export function todayIn(timeZone: string, now: Date = new Date()): string {
 
 /**
  * Calls `onDay` with the zone's new date when its midnight passes, checked once a minute, until the returned function is
- * called. The calendar runs it while it is open, so "Today" and the newest selectable day move on with the clock.
+ * called. `shown` is the date the caller has now: if midnight passed between reading it and starting to watch, `onDay`
+ * is called straight away. The calendar runs it while it is open, so "Today" and the newest selectable day move on with
+ * the clock.
  */
-export function watchToday(timeZone: string, onDay: (day: string) => void): () => void {
-  let last = todayIn(timeZone);
-  const timer = setInterval(() => {
+export function watchToday(timeZone: string, shown: string, onDay: (day: string) => void): () => void {
+  let last = shown;
+  const check = () => {
     const day = todayIn(timeZone);
     if (day !== last) {
       last = day;
       onDay(day);
     }
-  }, CHECK_EVERY_MS);
+  };
+  check();
+  const timer = setInterval(check, CHECK_EVERY_MS);
   return () => clearInterval(timer);
 }

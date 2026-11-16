@@ -59,10 +59,10 @@ def _refuse_sign_in(db: DbSession, request: Request, email: str, account: User |
     locked = throttle.record_failure(request, email)
     ip = throttle.client_ip(request)
     try:
-        ledger.record_sign_in_failure(db, account=account, email=email, ip=ip, reason=reason)
+        ledger.record_sign_in_failure(db, account=account, ip=ip, reason=reason)
         if locked is not None:
             bucket, (attempts, window) = locked
-            ledger.record_lockout(db, account=account, email=email, ip=ip, attempts=attempts, minutes=int(window // 60),
+            ledger.record_lockout(db, account=account, ip=ip, attempts=attempts, minutes=int(window // 60),
                                   by_address=bucket == "ip")
         db.commit()
     except SQLAlchemyError:
