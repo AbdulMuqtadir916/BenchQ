@@ -81,6 +81,15 @@ def _add_review(db, message, app, result):
         application_id=app.id if app else None, application_revision=app.status_revision if app else None,
         inbox_message_id=message.id, classification_id=result.id, classification_version=result.result_version, reason=result.reason)
     db.add(row)
+    db.flush()
+    from backend.auth.ledger import record_automated
+    from backend.applications.postings import posting_job
+    title = posting_job(app.posting).title if app is not None and app.posting is not None else None
+    record_automated(db, actor_type='AGENT', actor_name='Email classifier', action='CREATE',
+                     entity_type='application_review', entity_id=row.id, entity_label=title or 'Candidate inbox',
+                     summary=f"Email sent to BDE review ({str(result.reason).replace('_', ' ').lower()})"
+                             + (f" for {title}." if title else "."),
+                     firm_id=message.firm_id, candidate_id=message.candidate_id)
     return row
 
 
