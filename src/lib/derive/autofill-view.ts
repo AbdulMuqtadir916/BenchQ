@@ -213,6 +213,14 @@ export type AutofillSection = { id: AutofillTopicId; title: string; entries: Aut
 
 /** The row an answer being written is on: the question's key, or the user's own question's words. */
 export const draftRowOf = (entry: AutofillEntry) => entry.key ?? `own:${entry.question}`;
+/** A Reload after a refused save counts once more for each row whose save was refused (`draftRowOf`), and for no other:
+ * only those rows' open editors re-base on the answers now saved; any other keeps the answer it opened on (Abdul's
+ * review of #140). */
+export function reloadRows(reloads: ReadonlyMap<string, number>, refused: ReadonlySet<string>): ReadonlyMap<string, number> {
+  const next = new Map(reloads);
+  refused.forEach((row) => next.set(row, (next.get(row) ?? 0) + 1));
+  return next;
+}
 /** The row of a question being added (Add a question). */
 export const ADD_ROW = "add";
 const NO_DRAFTS: ReadonlySet<string> = new Set();

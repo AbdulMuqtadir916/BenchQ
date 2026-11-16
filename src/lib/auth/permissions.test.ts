@@ -52,9 +52,9 @@ describe("scope helpers (07 §2.2, Q47)", () => {
   ];
   const context = { users, candidates };
   const applications = [
-    { id: "a1", submittedByUserId: "u_BDE", candidateId: "c1" },
-    { id: "a2", submittedByUserId: "b2", candidateId: "c2" },
-    { id: "a3", submittedByUserId: "b2", candidateId: "c1" }, // c1 moved from b2's team: its history moves with it (Q43)
+    { id: "a1", submittedByUserId: "u_BDE", candidateId: "c1", status: "APPLIED" },
+    { id: "a2", submittedByUserId: "b2", candidateId: "c2", status: "APPLIED" },
+    { id: "a3", submittedByUserId: "b2", candidateId: "c1", status: "APPLIED" }, // c1 moved from b2's team: its history moves with it (Q43)
   ];
   const ledger = [
     { id: "l1", actorUserId: "u_BDE", entityType: "application", entityId: "a1", action: "UPDATE" },
@@ -63,6 +63,15 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     { id: "l4", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c3", action: "UPDATE" },
   ];
   const ids = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
+
+  it("a BDE also sees the Saved drafts of the candidates they work, which have no submitter, and no other BDE's", () => {
+    // Found testing (2026-11-13): a BDE's Saved column was empty, since a Saved draft (#129) has no submitter.
+    // PR #140's review: Saved drafts only; one with no submitter that moved on from Saved stays out.
+    const drafts = [...applications, { id: "d1", submittedByUserId: "", candidateId: "c1", status: "SAVED" },
+      { id: "d2", submittedByUserId: "", candidateId: "c2", status: "SAVED" }, { id: "d3", submittedByUserId: "", candidateId: "c1", status: "SCREENING_CALL" }];
+    expect(ids(scopeApplications(firmUser("BDE"), drafts, candidates))).toEqual(["a1", "d1"]);
+    expect(ids(scopeApplications(firmUser("MANAGER"), drafts, candidates))).toEqual(["a1", "a3", "d1", "d3"]);
+  });
 
   it("a BDE sees their own", () => {
     const bde = firmUser("BDE");
@@ -94,7 +103,12 @@ describe("scope helpers (07 §2.2, Q47)", () => {
     expect(ids(scopeCandidates(manager, candidates))).toEqual(["c1", "c3"]);
     expect(ids(scopeApplications(manager, applications, candidates))).toEqual(["a1", "a3"]);
     expect(ids(scopeByCandidate(manager, [{ id: "r1", candidateId: "c1" }, { id: "r2", candidateId: "c2" }], candidates))).toEqual(["r1"]);
-    expect(ids(scopeLedger(manager, ledger, context))).toEqual(["l1", "l4"]);
+    // 07 Q64: what their team did, plus who assigned the candidates they manage; never the firm's other work on them.
+    const managed = [
+      { id: "l8", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c3", action: "ASSIGN" },
+      { id: "l9", actorUserId: "u_OWNER", entityType: "candidate", entityId: "c2", action: "ASSIGN" },
+    ];
+    expect(ids(scopeLedger(manager, [...ledger, ...managed], context))).toEqual(["l1", "l8"]);
     expect(ids(scopeTeam(manager, users, candidates))).toEqual(["u_MANAGER", "u_BDE"]);
     expect([hasTeamScope(manager), hasOwnScope(manager)]).toEqual([true, false]);
   });
