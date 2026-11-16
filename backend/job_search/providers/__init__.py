@@ -8,6 +8,7 @@ to `RETIRED` (only its `read` is used), so the jobs it saved still read (`reader
 - `freehire`: freehire.me's agent search (the first source, 2026-11-09; stopped 2026-11-14; back 2026-11-16, Q55).
 - `linkedin`: LinkedIn's public job search through python-jobspy, at one pace for the whole backend (2026-11-16, Q75–Q86).
 """
+from backend.applications.postings import LEGACY
 from backend.job_search.providers.base import REMOTE, JobFields, Provider, ProviderError, SearchResult  # noqa: F401
 from backend.job_search.providers.capture import CAPTURE_SOURCES, Capture
 from backend.job_search.providers.freehire import Freehire
@@ -21,8 +22,11 @@ SETTING_KEY = "job_search_provider"
 REGISTRY: dict[str, Provider] = {p.name: p for p in (Indeed(), Freehire(), LinkedIn())}
 # Sources that no longer search; kept for the jobs they saved (none today).
 RETIRED: dict = {}
-# Everything that can have written a posting: search providers, retired ones and captures, by `job_postings.source`.
-READERS = {**RETIRED, **REGISTRY, **{name: Capture(name) for name in CAPTURE_SOURCES}}
+# Everything that can have written a posting, by `job_postings.source`: search providers, retired ones, captures, and
+# the jobs a developer's database moved from the old `jobs` pool (`legacy`, backend/scripts/
+# move_local_jobs_to_postings.py), read as a job added by hand is. Without it they read blank and couldn't be tailored
+# (the PR 129 review, finding 6).
+READERS = {**RETIRED, **REGISTRY, **{name: Capture(name) for name in (*CAPTURE_SOURCES, LEGACY)}}
 
 
 def active(db) -> Provider:
