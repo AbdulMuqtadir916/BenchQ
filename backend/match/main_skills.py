@@ -16,7 +16,12 @@ TITLE_WEIGHT, SENTENCE_WEIGHT, YEARS_WEIGHT = 5, 1, 3
 USED_ENOUGH = 0.5
 # Ways of working and everyday tools: they are never what a job is mainly about.
 NEVER_MAIN = frozenset({"Agile", "Scrum", "Jira", "Confluence", "Excel", "Git", "GitHub", "Bitbucket", "SQL", "REST APIs",
-                        "Microservices", "CI/CD"})
+                        "Microservices", "CI/CD",
+                        # BenchQ (2026-11-16, Q59): core concepts count as technologies, never as what a job is about.
+                        "Multithreading", "Concurrency", "JVM", "OOP", "Design Patterns", "Memory Management",
+                        "Data Structures", "Algorithms", "System Design", "Distributed Systems"})
+# BenchQ (2026-11-16, Q61): a role that used the first used the second (TypeScript is JavaScript with types).
+IMPLIES = {"TypeScript": "JavaScript"}
 SENTENCE = re.compile(r"\n+|(?<=[.!?;])\s+")
 YEARS = re.compile(r"\d{1,2}\s*\+?\s*(?:years|yrs)", re.I)
 # A heading that starts an optional part, and one that ends it.
@@ -71,7 +76,8 @@ def used_in_roles(resume: dict) -> frozenset:
     text = "\n".join(" ".join([str(e.get("title") or e.get("name") or ""), str(e.get("description") or ""),
                                str(e.get("technologies") or ""), *map(str, e.get("bullets") or [])])
                      for e in entries if isinstance(e, dict))
-    return frozenset(technologies(text))
+    used = technologies(text)
+    return frozenset(used | {IMPLIES[name] for name in used if name in IMPLIES})
 
 
 def required_part(description: str) -> str:

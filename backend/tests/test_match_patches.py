@@ -140,3 +140,40 @@ def test_benchq_a_us_citizen_takes_a_job_open_to_green_card_holders():
     accepted, _ = work_auth.status_lists("Green card holders only.")
     assert work_auth.accepts(accepted, "USC") and work_auth.accepts(accepted, "GC")
     assert not work_auth.accepts(accepted, "H1B")
+
+
+# ── BenchQ's changes, benchq.2 (2026-11-16) ──────────────────────────────────────────────────────────────────────────
+
+def test_benchq2_not_able_to_offer_a_transfer_or_sponsorship_rules_both_out():
+    """Q58: "not able to / unable to / not in a position to" offer sponsorship or a transfer."""
+    text = "Please note, this role is not able to offer visa transfer or sponsorship now or in the future."
+    assert work_auth.NO_SPONSORSHIP.search(text) and work_auth.NO_TRANSFER.search(text)
+    assert work_auth.NO_SPONSORSHIP.search("We are not in a position to sponsor visas.")
+    both = "We are unable to offer sponsorship or a visa transfer."
+    assert work_auth.NO_SPONSORSHIP.search(both) and work_auth.NO_TRANSFER.search(both)
+    assert _flags(text)["no sponsorship"] is True
+
+
+def test_benchq2_other_things_a_job_cannot_offer_rule_nothing_out():
+    for text in ("We are not able to offer relocation. Visa sponsorship available.",
+                 "Unable to offer remote work; transfers between teams are common.", "We are able to offer sponsorship."):
+        assert not work_auth.NO_SPONSORSHIP.search(text) and not work_auth.NO_TRANSFER.search(text), text
+
+
+def test_benchq2_core_concepts_count_as_technologies_but_never_as_the_main_skill():
+    """Q59: the fixed list, in its usual spellings."""
+    named = technologies("Multi-threading, concurrency, JVM tuning, OOPs, design patterns, memory management, data "
+                         "structures and algorithms, system design, distributed systems; object-oriented programming.")
+    assert named == {"Multithreading", "Concurrency", "JVM", "OOP", "Design Patterns", "Memory Management",
+                     "Data Structures", "Algorithms", "System Design", "Distributed Systems"}
+    asked = "5+ years of multithreading and concurrency."
+    weights = m.technology_weights("Software Engineer", asked, "", [], {})
+    assert weights["Multithreading"] == 4                               # a required sentence with years
+    assert m.main_skills_used(weights, [], frozenset()) == (1.0, [])    # yet never what the job is mainly about
+
+
+def test_benchq2_typescript_used_in_a_role_is_javascript_used():
+    """Q61."""
+    facts = ResumeFacts.read({"experience": [{"title": "Developer", "bullets": ["Built screens in TypeScript."]}]})
+    assert {"TypeScript", "JavaScript"} <= facts.used
+    assert "TypeScript" not in ResumeFacts.read({"experience": [{"bullets": ["Built screens in JavaScript."]}]}).used

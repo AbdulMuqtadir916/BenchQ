@@ -9,7 +9,12 @@ import re
 
 # BenchQ (2026-11-14): word boundaries ("casino sponsor" is no "no sponsor"), "don't"/"doesn't" and curly apostrophes,
 # and "sponsorship unavailable": the wordings BenchQ's first rules caught (job search part 3).
+# BenchQ (2026-11-16, Q58): "not able to offer …", "unable to offer …" and "not in a position to …", with a visa
+# transfer before the sponsorship ("not able to offer visa transfer or sponsorship").
+_CANNOT = r"\b(?:not\s+able\s+to|unable\s+to|not\s+in\s+a\s+position\s+to)\s+"
+_TRANSFER_WORDS = r"(?:an?\s+)?(?:visa\s+|h-?1-?b\s+)?transfers?"
 NO_SPONSORSHIP = re.compile(
+    rf"{_CANNOT}(?:(?:offer|provide|support)\s+)?(?:{_TRANSFER_WORDS}\s+(?:or|and|/)\s+)?(?:an?\s+)?(?:visa\s+)?sponsor|"
     r"\b(not|unable to|cannot|can['’]t|won['’]t|will not|do not|does not|don['’]t|doesn['’]t|no)\s+(provide\s+|offer\s+)?"
     r"(visa\s+)?sponsor|\bwithout\s+(the\s+need\s+for\s+|requiring\s+|needing\s+)?(visa\s+)?sponsorship|"
     r"\b(not|never)\s+(now\s+or\s+in\s+the\s+future\s+)?(require|need)\s+(visa\s+)?sponsorship|"
@@ -28,8 +33,13 @@ NO_C2C = re.compile(r"(?:no|not\s+open\s+to|not\s+accepting|cannot\s+accept|will
 # "H-1B transfer candidates are encouraged", "H1B transfers welcome": no new petition, but a transfer is taken.
 TRANSFER_WELCOME = re.compile(r"h-?1b\s+transfers?\s+(?:candidates\s+)?(?:are\s+|is\s+)?(?:welcome|encouraged|accepted|considered|ok|okay|fine)"
                               r"|(?:accept|consider|welcome)s?\s+h-?1b\s+transfers?", re.I)
-# BenchQ (2026-11-14): word boundaries, "can't", and "unable to consider transfers".
-NO_TRANSFER = re.compile(r"\b(no|not|cannot|can['’]t|unable to)\s+(accept\s+|consider\s+)?(h-?1b\s+)?transfers?", re.I)
+# BenchQ (2026-11-14): word boundaries, "can't", and "unable to consider transfers". 2026-11-16 (Q58): "not able to /
+# unable to / not in a position to" offer, provide, support, accept or consider a transfer, also after a sponsorship
+# ("unable to offer sponsorship or a visa transfer").
+NO_TRANSFER = re.compile(
+    r"\b(no|not|cannot|can['’]t|unable to)\s+(accept\s+|consider\s+)?(h-?1b\s+)?transfers?|"
+    rf"{_CANNOT}(?:offer|provide|support|accept|consider)\s+(?:(?:an?\s+)?(?:visa\s+)?sponsorship\s+(?:or|and|/)\s+)?"
+    rf"{_TRANSFER_WORDS}", re.I)
 
 
 def is_citizen(work_auth: str) -> bool:

@@ -39,12 +39,22 @@ Imports point at `backend.match`; the rest they need is BenchQ's own (`analyzer/
 - v17: a title with no subject never caps; "GC/Citizen"; a clearance named in the title; a required language.
 - v18: the title cap only for a title with another subject.
 
-**BenchQ's changes** (version `match-1.6+benchq.1`, each tested in `tests/test_match_patches.py`):
+**BenchQ's changes** (version `match-1.6+benchq.2`, each tested in `tests/test_match_patches.py`):
 1. A candidate's country that isn't known (None) is never assumed to be the US: no job reads as abroad.
 2. A required language is checked against the résumé's languages also when the résumé is passed read once
    (`ResumeFacts`); the lab's v18 read none then.
 3. `work_auth.py`: word boundaries (`plus citizens only`, `casino sponsor`), "don't/doesn't sponsor", curly
    apostrophes, "sponsorship unavailable", "unable to consider transfers", and a US citizen takes a job open to
    green-card holders: what BenchQ's first rules (job search part 3) caught and the lab's v18 missed.
+
+benchq.2 (2026-11-16, Q58–Q62; found by scoring one résumé against three real postings, not measured against the
+lab's labelled sets, which are gone):
+4. `work_auth.py`: "not able to / unable to / not in a position to" offer sponsorship or a (visa, H-1B) transfer, in
+   either order ("not able to offer visa transfer or sponsorship") rules out both (Q58).
+5. `keyword_match.py` `CORE_CONCEPTS`: Multithreading, Concurrency, JVM, OOP, Design Patterns, Memory Management, Data
+   Structures, Algorithms, System Design and Distributed Systems count as technologies, in their usual spellings
+   (the dictionary held some as lower-case tags, which are left out, and two as other keywords); `main_skills.py`
+   `NEVER_MAIN` keeps them from being what a job is mainly about (Q59).
+6. `main_skills.py` `IMPLIES`: TypeScript used in a role is JavaScript used (Q61).
 
 `match/score.py` is BenchQ's own: the only door into the package.

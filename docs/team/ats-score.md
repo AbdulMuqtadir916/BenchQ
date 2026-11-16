@@ -14,8 +14,8 @@ lab's "v18" of 2026-11-13: JobNavigator's match-1.1 with the lab's patches and t
 `backend/match/` (the list of files and changes is in [`backend/UPSTREAM.md`](../../backend/UPSTREAM.md)).
 `backend/match/score.py` is the only door into it; `backend/match/store.py` stores what it works out.
 
-The version is `match-1.6+benchq.1` (`backend/match/ats_match.py` `VERSION`). Changing the calculator means changing
-the version: every stored score is then worked out again (below).
+The version is `match-1.6+benchq.2` (`backend/match/ats_match.py` `VERSION`; benchq.2 on 2026-11-16, Q58–Q62).
+Changing the calculator means changing the version: every stored score is then worked out again (below).
 
 ## What it compares
 
@@ -27,7 +27,7 @@ points shared among the rest):
 
 | Part | Points | What counts |
 |---|---|---|
-| Technologies the job asks for | 35 | each one the résumé names: in full when a role used it, 0.4 when only the skills list names it |
+| Technologies the job asks for | 35 | each one the résumé names: in full when a role used it, 0.4 when only the skills list names it. Core concepts count too (multithreading, concurrency, JVM, OOP, design patterns, memory management, data structures, algorithms, system design, distributed systems; Q59), and TypeScript used in a role counts as JavaScript used (Q61) |
 | Job title | 20 | how close the job's title is to the titles the candidate wants (target roles, "Marketed as") and the résumé's |
 | Requirement lines covered | 10 | the posting's requirement lines the résumé covers |
 | Years of experience | 10 | the years asked against the candidate's years |
@@ -38,7 +38,7 @@ points shared among the rest):
 | Industry | 5 | |
 
 The total is then scaled by the share of the job's main technologies the candidate has used in a role (keeping no
-less than 40% of it).
+less than 40% of it). A core concept is never a main technology.
 
 ## What holds it at 40
 
@@ -60,7 +60,7 @@ The first reason is stored with the score (`match_note`) and shown when the poin
 A search **leaves out** a job whose text rules the candidate out on work authorization (`score.ruled_out`): no
 sponsorship for a candidate who needs it, US citizens only, citizens or green-card holders only, a list of the only
 statuses taken that leaves theirs out (or one that excludes it), an active clearance for a non-citizen, no H-1B
-transfers for a candidate who needs one. The search's result counts them ("N left out: work authorization"). A
+transfers for a candidate who needs one ("not able to offer visa transfer or sponsorship" says both, Q58). The search's result counts them ("N left out: work authorization"). A
 capture is never left out; its score is held at 40 instead. A posting that says nothing keeps the job.
 
 ## When it is worked out
@@ -95,5 +95,8 @@ A score that can't be worked out never fails a save: the job stays unscored ("�
   characters); freehire.me jobs saved before 2026-11-14 keep the ~1,000 characters the old search gave.
 - Each list read reads every visible job's fields (not its description) to filter and sort: fine for a candidate's
   or a team's few thousand jobs; a firm with far more would need these fields as columns.
+- A job title that names no subject ("Full Stack Developer") still counts against a candidate whose title does
+  ("Senior Full Stack Java Developer": 47%). Leaving the title out then was asked and put off on 2026-11-16 (Q60);
+  on one real posting it would move the score from 73 to about 84.
 - The calculator reads text, not meaning: a job that is the same work under a very different title can score low.
   The lab tried an AI "decider" for that (2026-11-13); it isn't part of this (Q31).

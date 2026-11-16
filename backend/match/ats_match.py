@@ -35,8 +35,8 @@ from backend.match.title_fit import (EXPERIENCE_GAP_SHARE, EXPERIENCE_GAP_YEARS,
                                           experience_asked, title_fit)
 
 # The lab's v18 ("match-1.6-lab", 2026-11-13) with BenchQ's changes (backend/UPSTREAM.md). A stored score
-# whose version differs is worked out again (decided 2026-11-14, Q49).
-VERSION = "match-1.6+benchq.1"
+# whose version differs is worked out again (decided 2026-11-14, Q49). benchq.2 (2026-11-16): Q58, Q59, Q61.
+VERSION = "match-1.6+benchq.2"
 # What each part is worth when the posting states all of them; a part it does not state is left out.
 WEIGHTS = {"hard_skills": 35, "title": 20, "requirement_lines": 10, "experience": 10, "seniority": 5,
            "education": 5, "certifications": 5, "soft_skills": 5, "industry": 5}

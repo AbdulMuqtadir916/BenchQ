@@ -17,6 +17,22 @@ WORD = re.compile(r"[A-Za-z0-9+#]+(?:[./-][A-Za-z0-9+#]+)*|\.[A-Za-z]+")
 ENDS_A_PHRASE = re.compile(r"[,;:()\[\]{}|\n•]|\.\s")
 
 
+# BenchQ (2026-11-16, Q59): core concepts a posting asks for count like technologies, written any of these ways. The
+# dictionary held some only as lower-case tags (left out) or as other keywords, and the rest not at all.
+CORE_CONCEPTS = {
+    "multithreading": "Multithreading", "multi-threading": "Multithreading", "multithreaded": "Multithreading",
+    "multi-threaded": "Multithreading", "concurrency": "Concurrency", "concurrent programming": "Concurrency",
+    "jvm": "JVM", "java virtual machine": "JVM",
+    "oop": "OOP", "oops": "OOP", "object-oriented": "OOP", "object oriented": "OOP",
+    "object-oriented programming": "OOP", "object oriented programming": "OOP",
+    "design patterns": "Design Patterns", "design pattern": "Design Patterns",
+    "memory management": "Memory Management",
+    "data structures": "Data Structures", "data structure": "Data Structures", "algorithms": "Algorithms",
+    "system design": "System Design", "systems design": "System Design",
+    "distributed systems": "Distributed Systems", "distributed system": "Distributed Systems",
+}
+
+
 @lru_cache(maxsize=1)
 def _dictionary() -> dict:
     """How a text may write a keyword, lower case -> [standard name, 1 when it needs its capital, type number]."""
@@ -26,6 +42,8 @@ def _dictionary() -> dict:
         forms[form] = [name, 0, 0]
     for form, name in {'puppet': 'Puppet', 'cucumber': 'Cucumber', 'sas': 'SAS', 'looker': 'Looker', 'lte': 'LTE', 'plc': 'PLC'}.items():     # also everyday words: count only when written with a capital
         forms[form] = [name, 1, 0]
+    for form, name in CORE_CONCEPTS.items():
+        forms[form] = [name, 0, 0]
     return forms
 
 
