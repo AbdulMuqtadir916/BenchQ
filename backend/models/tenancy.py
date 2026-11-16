@@ -33,7 +33,6 @@ LEDGER_ACTIONS = (
     "INVITE_SENT", "INVITE_ACCEPTED", "INVITE_REVOKED",
     "ASSIGN",   # a candidate's manager or BDE set or changed (docs/02 §3.4, 07 Q43)
 )
-# `activity_logs` also takes these; `ledger_entries` is frozen, so its list stays as it was.
 SUPER_ADMIN_ONLY_ACTIONS = ("SIGN_IN_FAILED", "LOCKED_OUT")    # never served to a firm reader
 ACTIVITY_ACTIONS = (*LEDGER_ACTIONS, "LOGOUT", *SUPER_ADMIN_ONLY_ACTIONS)
 ACTIVITY_ACTOR_TYPES = (*LEDGER_ACTOR_TYPES, "UNKNOWN")        # UNKNOWN: a sign-in for an email with no account
@@ -253,41 +252,6 @@ class Session(Base):
                         name="ck_sessions_support_view_is_platform"),
         CheckConstraint("expires_at <= absolute_expires_at", name="ck_sessions_expiry_within_cap"),
         CheckConstraint("absolute_expires_at <= created_at + interval '30 days'", name="ck_sessions_thirty_day_cap"),
-    )
-
-
-class LedgerEntry(Base):
-    """The old business ledger, kept as it was. Nothing writes or reads it any more: `activity_logs` took its rows
-    (migration 0028) and its place. Removing it is Abdul's call.
-    Who did what (docs/02 §10, 07-auth §6.6). Append-only, so no `updated_at`.
-    `firm_id` is null only for platform-only events (A13). The actor may be a firm user, a platform user or
-    nobody (SYSTEM, AGENT), so `actor_user_id` has no foreign key; `actor_name` keeps the name as it was."""
-    __tablename__ = "ledger_entries"
-
-    id = _pk()
-    firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=True)
-    actor_type = Column(String, nullable=False)
-    actor_user_id = Column(UUID(as_uuid=True), nullable=True)
-    actor_name = Column(String, nullable=False)
-    entity_type = Column(String, nullable=False)          # lowercase: firm, invite, user, support_view… (07 Q30)
-    entity_id = Column(String, nullable=False)
-    entity_label = Column(String, nullable=False)
-    action = Column(String, nullable=False)
-    summary = Column(Text, nullable=False)
-    note = Column(Text, nullable=True)                    # the handoff note on an ASSIGN entry (docs/02 §3.4)
-    model_id = Column(String, nullable=True)
-    prompt_version = Column(String, nullable=True)
-    # The candidate the entry is about, if any (07 Q53h): the candidate's activity is one query. No foreign key: the
-    # ledger outlives what it describes. Every write about a candidate passes it (ledger.record).
-    candidate_id = Column(UUID(as_uuid=True), nullable=True)
-    created_at = _created_at()
-
-    __table_args__ = (
-        CheckConstraint(_in("actor_type", LEDGER_ACTOR_TYPES), name="ck_ledger_entries_actor_type"),
-        CheckConstraint(_in("action", LEDGER_ACTIONS), name="ck_ledger_entries_action"),
-        Index("ix_ledger_entries_firm_created", "firm_id", "created_at"),
-        Index("ix_ledger_entries_firm_candidate_created", "firm_id", "candidate_id", "created_at"),
-        Index("ix_ledger_entries_created", "created_at"),
     )
 
 
