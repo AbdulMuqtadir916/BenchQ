@@ -65,17 +65,19 @@ export async function scanTab(tabId: number): Promise<TabScan> {
   };
 }
 
-/** The job the tab's page shows (its top frame), for adding it to a candidate's jobs. */
 /** Clicks the form's "Add another" for a kind of history entry (#132) in the frame that has one: whether one was found. */
-export async function addEntryIn(tabId: number, kind: "education" | "work"): Promise<boolean> {
+export async function addEntryIn(tabId: number, kind: "education" | "work", shouldStop: ShouldStop = NEVER): Promise<boolean> {
   const frames = (await chrome.webNavigation.getAllFrames({ tabId })) ?? [];
   for (const { frameId } of frames.length > 0 ? frames : [{ frameId: MAIN_FRAME }]) {
+    // Each frame's Add is a click on the page: asked again before each one (PR #140's review).
+    if (shouldStop()) return false;
     const [found] = await inFrames<boolean>({ tabId, frameIds: [frameId] }, "addEntry", [kind]).catch(() => []);
     if (found?.result === true) return true;
   }
   return false;
 }
 
+/** The job the tab's page shows (its top frame), for adding it to a candidate's jobs. */
 export async function readJobPage(tabId: number): Promise<PageJob | null> {
   await chrome.scripting.executeScript({ target: { tabId, frameIds: [MAIN_FRAME] }, files: [PAGE_SCRIPT] });
   const [found] = await inFrames<PageJob>({ tabId, frameIds: [MAIN_FRAME] }, "readJob", []);
@@ -102,14 +104,27 @@ const PARTS = /\s*(?:[,;]|\band\b)\s*/;
 
 type Target = { tabId: number; frameIds: number[] };
 
+/** Asked before each later step of a write that takes several (open, search, pick; one frame after another): true stops
+ * it there. The panel's hold, when the tab moved on to another job: a page that changes in place keeps its form and its
+ * scan, so the page's own stale check doesn't catch it (PR #140's review). */
+export type ShouldStop = () => boolean;
+const NEVER: ShouldStop = () => false;
+
 const askList = async (target: Target, method: "openChoices" | "searchChoices", request: ChoiceRequest) =>
   (await inFrames<ChoiceList>(target, method, [request]))[0]?.result;
 
+/** A write stopped part way: an open list closes again, untouched, and the run treats it as a page that moved on. */
+async function stopIn(target: Target, request: ChoiceRequest): Promise<FillResult> {
+  await inFrames<boolean>(target, "closeChoices", [request]).catch(() => []);
+  return STALE;
+}
+
 /** Picks the option with this wording: the list opens, or is searched for it when it shows only some options. */
-async function pickByLabel(target: Target, request: ChoiceRequest, label: string): Promise<FillResult> {
+async function pickByLabel(target: Target, request: ChoiceRequest, label: string, shouldStop: ShouldStop = NEVER): Promise<FillResult> {
   const list = await askList(target, "openChoices", request);
   if (!list || list.status === "stale") return STALE;
   if (list.status === "changed") return { status: "changed", current: "" };
+  if (shouldStop()) return stopIn(target, request);
   let option = list.status === "open" ? list.options.find((item) => item.label === label) : undefined;
   if (!option && list.status === "open") {
     const searched = await askList(target, "searchChoices", { ...request, search: label });
@@ -119,15 +134,17 @@ async function pickByLabel(target: Target, request: ChoiceRequest, label: string
     await inFrames<boolean>(target, "closeChoices", [request]);
     return { status: "no-match", current: "" };
   }
+  if (shouldStop()) return stopIn(target, request);
   const [picked] = await inFrames<FillResult>(target, "pickChoice", [{ ...request, optionId: option.id }]);
   return picked?.result ?? STALE;
 }
 
 /** A dropdown that keeps several choices gets each part of the answer, all of them or none: every part has to find its
  * option before anything is picked. */
-async function pickEach(target: Target, request: ChoiceRequest, options: FieldOption[], parts: string[]): Promise<FillResult> {
+async function pickEach(target: Target, request: ChoiceRequest, options: FieldOption[], parts: string[], shouldStop: ShouldStop = NEVER): Promise<FillResult> {
   const labels: string[] = [];
   for (const part of parts) {
+    if (shouldStop()) return stopIn(target, request);
     let shown = options;
     let optionId = optionFor(part, shown);
     if (!optionId) {
@@ -145,7 +162,8 @@ async function pickEach(target: Target, request: ChoiceRequest, options: FieldOp
   await inFrames<boolean>(target, "closeChoices", [request]);
   let result: FillResult = { status: "filled", current: request.current };
   for (const label of labels) {
-    result = await pickByLabel(target, { ...request, current: result.current }, label);
+    if (shouldStop()) return STALE;
+    result = await pickByLabel(target, { ...request, current: result.current }, label, shouldStop);
     if (result.status !== "filled") return result;
   }
   return result;
@@ -160,15 +178,15 @@ export async function listChoices(tabId: number, frameId: number, request: Choic
 }
 
 /** Picks the option the BDE chose in the panel, by its wording. */
-export const chooseChoice = (tabId: number, frameId: number, request: ChoiceRequest, label: string) =>
-  pickByLabel({ tabId, frameIds: [frameId] }, request, label);
+export const chooseChoice = (tabId: number, frameId: number, request: ChoiceRequest, label: string, shouldStop: ShouldStop = NEVER) =>
+  pickByLabel({ tabId, frameIds: [frameId] }, request, label, shouldStop);
 
 /** A custom dropdown: open it, match the answer against what it offers, then pick. The matching runs here because the
  * page script can't share code with the panel. A list can show only some of its options, like a lookup's suggestions
  * or a long list's first page, so an answer not on show gets one search, in a dropdown that takes typing. `also` are
  * other wordings of the answer, tried in turn. A dropdown that keeps several choices gets each part of the answer. An
  * answer with no clear option closes the list again, untouched. */
-export async function fillChoice(tabId: number, frameId: number, request: ChoiceRequest, answer: string, also: string[] = []): Promise<FillResult> {
+export async function fillChoice(tabId: number, frameId: number, request: ChoiceRequest, answer: string, also: string[] = [], shouldStop: ShouldStop = NEVER): Promise<FillResult> {
   const target = { tabId, frameIds: [frameId] };
   const ask = (method: "openChoices" | "searchChoices") => askList(target, method, request);
   const fits = (list?: ChoiceList) => (list?.status === "open"
@@ -176,9 +194,10 @@ export async function fillChoice(tabId: number, frameId: number, request: Choice
   const list = await ask("openChoices");
   if (!list || list.status === "stale") return STALE;
   if (list.status === "changed") return { status: "changed", current: "" };
+  if (shouldStop()) return stopIn(target, request);
   if (list.status === "open" && list.multiple) {
     const parts = (racePartsFor(answer, list.options) ?? answer.split(PARTS)).map((part) => part.trim()).filter(Boolean);
-    if (parts.length > 1) return pickEach(target, request, list.options, parts);
+    if (parts.length > 1) return pickEach(target, request, list.options, parts, shouldStop);
   }
   const optionId = fits(list) ?? (list.status === "open" ? fits(await ask("searchChoices")) : null);
   if (!optionId) {
@@ -186,6 +205,7 @@ export async function fillChoice(tabId: number, frameId: number, request: Choice
     const reason = list.status === "open" ? pickOneReason(answer, list.options) : null;
     return reason ? { status: "no-match", current: "", reason } : { status: "no-match", current: "" };
   }
+  if (shouldStop()) return stopIn(target, request);
   const [picked] = await inFrames<FillResult>(target, "pickChoice", [{ ...request, optionId }]);
   return picked?.result ?? STALE;
 }
