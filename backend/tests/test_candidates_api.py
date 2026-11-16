@@ -78,7 +78,7 @@ def _list(client, world, who):
 # ── Creating ─────────────────────────────────────────────────────────────────
 
 def test_the_owner_hands_a_candidate_to_a_manager(anonymous_client, test_db, world):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     r = _create(anonymous_client, world, handoff_note="  Prefers banking.  ")
     assert r.status_code == 201, r.text
     c = r.json()
@@ -86,7 +86,7 @@ def test_the_owner_hands_a_candidate_to_a_manager(anonymous_client, test_db, wor
                                                                        "ON_BENCH", "ravi@example.com")
     assert not {"persona", "skills", "summary_state"} & set(c)            # the active base's now (migration 0015)
     assert c["target_roles"] == ["Java Developer"]
-    entries = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"]).order_by(LedgerEntry.created_at).all()
+    entries = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"]).order_by(ActivityEntry.created_at).all()
     assert [(e.action, e.summary, e.note) for e in entries] == [
         ("CREATE", "Added Ravi Teja", None), ("ASSIGN", "Handed to Fatima Reddy", "Prefers banking.")]
 
@@ -274,11 +274,11 @@ def _assign(client, world, who, candidate, manager, bde=None, note=None):
 
 
 def test_the_owner_moves_a_candidate_across_teams_into_the_new_queue(anonymous_client, test_db, world):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     c = _create(anonymous_client, world, bde="adnan").json()
     r = _assign(anonymous_client, world, "owner", c, "priya", note="Over to you.")
     assert (r.json()["manager_id"], r.json()["bde_id"]) == (str(world["people"]["priya"].id), None)
-    last = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"]).order_by(LedgerEntry.created_at.desc()).first()
+    last = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"]).order_by(ActivityEntry.created_at.desc()).first()
     assert (last.action, last.summary, last.note) == ("ASSIGN", "Handed to Priya Shah (from Adnan Khan)", "Over to you.")
     assert _list(anonymous_client, world, "priya") == {"Ravi Teja"} and _list(anonymous_client, world, "adnan") == set()
 
@@ -292,10 +292,10 @@ def test_a_manager_moves_only_between_their_own_bdes(anonymous_client, world):
 
 
 def test_an_unchanged_assignment_writes_nothing(anonymous_client, test_db, world):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     c = _create(anonymous_client, world, bde="adnan").json()
     _assign(anonymous_client, world, "owner", c, "fatima", "adnan")
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"], LedgerEntry.action == "ASSIGN").count() == 1
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"], ActivityEntry.action == "ASSIGN").count() == 1
 
 
 # ── Editing ──────────────────────────────────────────────────────────────────

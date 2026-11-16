@@ -1,12 +1,12 @@
 """A firm's ledger (backend/api/routes_ledger.py; docs/integration/01-ledger.md): the firm's own entries, newest
-first; a MANAGER's team only (07 Q64); a BDE's own entries only; another firm's ledger and a Super Admin get no
+first; a MANAGER's team only (07 Q65); a BDE's own entries only; another firm's ledger and a Super Admin get no
 answer."""
 from datetime import timedelta
 
 import pytest
 
 from backend.models.db import utcnow
-from backend.models.tenancy import Firm, LedgerEntry
+from backend.models.tenancy import Firm, ActivityEntry
 from backend.tests.auth_support import make_firm, make_plan, make_user
 from backend.tests.ledger_support import assert_logged
 
@@ -23,7 +23,7 @@ def _session_for(test_db, user):
 
 
 def _entry(firm_id, actor, summary, minutes_ago, action="UPDATE"):
-    return LedgerEntry(firm_id=firm_id, actor_type="USER", actor_user_id=actor.id if actor else None,
+    return ActivityEntry(firm_id=firm_id, actor_type="USER", actor_user_id=actor.id if actor else None,
                        actor_name=actor.name if actor else "System", entity_type="candidate", entity_id="c-1",
                        entity_label="Priya", action=action, summary=summary,
                        created_at=utcnow() - timedelta(minutes=minutes_ago))
@@ -87,7 +87,8 @@ def test_the_entry_has_the_frontends_shape(api_client, accounts, ledger):
     entry = api_client.get(_url(accounts.firm_id, "?limit=1")).json()[0]
     assert set(entry) == {"id", "firm_id", "actor_user_id", "actor_type", "actor_name", "entity_type", "entity_id",
                           "entity_label", "action", "summary", "note", "model_id", "prompt_version", "created_at",
-                          "candidate_id"}                         # no claim_state or evidence_ids since 0015
+                          "candidate_id", "cursor", "actor_role", "on_behalf_of_user_id", "team_manager_id",
+                          "candidate_manager_id", "candidate_bde_id", "changes"}   # no claim_state or evidence_ids since 0015
     assert entry["firm_id"] == str(accounts.firm_id)
 
 
@@ -125,6 +126,17 @@ def test_a_write_shows_up_in_the_ledger(anonymous_client, accounts, ledger, test
 
 # 07 Q52: a BDE also reads the ASSIGN entries about the candidates they work now; and every reader can filter.
 
+def _stamp_from_today(test_db):
+    """These entries are built by hand, so they get their stamps as migration 0028 gave the rows it copied."""
+    from sqlalchemy import text
+    test_db.execute(text("ALTER TABLE activity_logs DISABLE TRIGGER activity_logs_append_only"))
+    test_db.execute(text("UPDATE activity_logs a SET team_manager_id = CASE u.role WHEN 'MANAGER' THEN u.id "
+                         "WHEN 'BDE' THEN u.manager_id END FROM users u WHERE u.id = a.actor_user_id"))
+    test_db.execute(text("UPDATE activity_logs a SET candidate_manager_id = c.manager_id, candidate_bde_id = c.bde_id "
+                         "FROM candidates c WHERE c.id = a.candidate_id"))
+    test_db.execute(text("ALTER TABLE activity_logs ENABLE TRIGGER activity_logs_append_only"))
+
+
 def _candidate(test_db, firm, manager, bde, name):
     from backend.models.candidates import Candidate
     candidate = Candidate(firm_id=firm.id, manager_id=manager.id, bde_id=bde.id if bde else None,
@@ -156,6 +168,8 @@ def test_manager_scope_excludes_non_assignment_events_on_managed_candidates(anon
     edit = _entry(firm.id, owner, "Owner edited Ravi", 1)
     edit.entity_id, edit.candidate_id = str(candidate.id), candidate.id
     test_db.add_all([assignment, edit])
+    test_db.flush()
+    _stamp_from_today(test_db)         # the teams are set after the fixture's entries; scope follows the stamps
     test_db.commit()
 
     def entries(manager, query=""):
@@ -264,7 +278,7 @@ def test_filters_by_candidate_their_whole_activity(api_client, accounts, ledger,
         ["Applied for Asha", "Mira edited Asha", "Assigned Asha to Bea"]
 
 
-# 07 Q64: a MANAGER reads their own team, not the firm.
+# 07 Q65: a MANAGER reads their own team, not the firm.
 
 @pytest.fixture
 def teams(test_db, accounts, ledger, assignments):
@@ -288,6 +302,8 @@ def teams(test_db, accounts, ledger, assignments):
         owner_edit, zed_assign,
         _entry(acme.id, None, "System sync", 0.5),
     ])
+    test_db.flush()
+    _stamp_from_today(test_db)
     test_db.commit()
     return {"mira": _session_for(test_db, mira), "zed": _session_for(test_db, zed), "cara": _session_for(test_db, cara),
             "asha": asha, "ravi": ravi}

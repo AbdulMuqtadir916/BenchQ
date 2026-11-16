@@ -119,10 +119,10 @@ def test_only_the_tokens_hash_is_stored(anonymous_client, accounts, test_db):
 
 
 def test_sign_in_is_logged_in_the_ledger(anonymous_client, accounts, test_db):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     _sign_in(anonymous_client, "owner@acme.test")
     _sign_in(anonymous_client, "admin@benchq.test")
-    entries = {e.entity_type: e for e in test_db.query(LedgerEntry).filter(LedgerEntry.action == "LOGIN")}
+    entries = {e.entity_type: e for e in test_db.query(ActivityEntry).filter(ActivityEntry.action == "LOGIN")}
     assert entries["user"].firm_id == accounts.firm_id
     assert entries["user"].actor_type == "USER"
     assert entries["user"].actor_user_id == accounts.user_id
@@ -279,7 +279,7 @@ def test_sign_out_without_a_session_is_still_204(anonymous_client):
 def test_sign_out_ends_an_open_support_view_and_logs_it(anonymous_client, accounts, test_db):
     from backend.auth.tokens import hash_token
     from backend.models.db import utcnow
-    from backend.models.tenancy import LedgerEntry, Session, SupportView
+    from backend.models.tenancy import ActivityEntry, Session, SupportView
     now = utcnow()
     view = SupportView(platform_user_id=accounts.admin_id, firm_id=accounts.firm_id,
                        reason="Checking a reported export bug", started_at=now,
@@ -298,7 +298,7 @@ def test_sign_out_ends_an_open_support_view_and_logs_it(anonymous_client, accoun
                                  headers={"cookie": f"bq_session={accounts.admin_token}"}).status_code == 204
     test_db.refresh(view)
     assert view.ended_at is not None
-    end = test_db.query(LedgerEntry).filter(LedgerEntry.action == "ADMIN_ACCESS_END").one()
+    end = test_db.query(ActivityEntry).filter(ActivityEntry.action == "ADMIN_ACCESS_END").one()
     assert end.firm_id == accounts.firm_id
     assert end.entity_id == str(view.id)
 

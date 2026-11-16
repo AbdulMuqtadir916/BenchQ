@@ -63,7 +63,7 @@ ID_ALIASES = {"app": "applications", "cl": "cover_letters", "base": "base_resume
               "review": "application_reviews", "posting": "job_postings"}
 JOB_URL = "https://jobs.example.test/posting/1"
 # Values the routes check in code, not in their schema, by field name.
-FIELD_VALUES = {"role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",
+FIELD_VALUES = {"cursor": "1_00000000-0000-4000-8000-000000000001", "role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",
                 "country": "United States", "tiers": ["1"], "slug": "zorvath-firm", "template": "traditional",
                 # The Autofill save resets fixed questions by key, and refuses a key no question has: none reset.
                 "reset": []}

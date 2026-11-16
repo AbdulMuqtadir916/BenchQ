@@ -11,7 +11,7 @@ from backend.auth.passwords import verify_password
 from backend.config import IS_PRODUCTION, PASSWORD_RESET_BASE_URL
 from backend.models.db import utcnow
 from backend.models.notifications import Notification, PasswordResetRequest
-from backend.models.tenancy import Firm, LedgerEntry, PlatformUser, User
+from backend.models.tenancy import Firm, ActivityEntry, PlatformUser, User
 
 REQUEST_LIFETIME = timedelta(hours=24)
 LINK_LIFETIME = timedelta(minutes=30)
@@ -30,7 +30,7 @@ def require_reset_base_url() -> None:
 
 def system_entry(db: Session, row: PasswordResetRequest, label: str, action: str, summary: str) -> None:
     """A ledger entry no person acted for (the request comes from a signed-out page; an expiry has no actor)."""
-    db.add(LedgerEntry(firm_id=row.firm_id, actor_type="SYSTEM", actor_user_id=None, actor_name="password_reset",
+    db.add(ActivityEntry(firm_id=row.firm_id, actor_type="SYSTEM", actor_user_id=None, actor_name="password_reset",
                        entity_type=LEDGER_ENTITY, entity_id=str(row.id), entity_label=label, action=action,
                        summary=summary))
 

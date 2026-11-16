@@ -10,7 +10,7 @@ contract changes and the migration number with Abdul.
 ## Status
 
 **Activity logs (from 2026-11-05):** the ledger plan, agreed with Abdul, runs as one branch per PR named `activity/…`.
-PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q64).
+PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q65).
 Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
 Next: PR 2, the ledger rules as tests.
 
@@ -87,6 +87,11 @@ Abdul (07 Q61). A manager now has only the Activity dashboard, with a per-BDE st
 writes no ledger entry (unless listed in `NOT_LOGGED` with a reason), a ledger write without `candidate_id`, and a ledger
 read outside the role-limited routes. No behaviour change. Change document:
 [pr-changes/activity-pr2-ledger-rules-as-tests.md](./pr-changes/activity-pr2-ledger-rules-as-tests.md).
+
+**Activity log PR 3 (2026-11-06):** `activity-log/pr3-new-table-and-endpoints`, built on PR 1 and PR 2, not pushed yet.
+The new `activity_logs` table with the old rows copied in, history that stays with the manager and BDE at the time, and
+the reads the screen needs. Change document:
+[pr-changes/activity-log-pr3-new-table-and-endpoints.md](./pr-changes/activity-log-pr3-new-table-and-endpoints.md).
 
 ## 1. Notifications inbox
 

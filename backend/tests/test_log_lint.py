@@ -34,7 +34,7 @@ PEOPLE_MODELS = {
     "Candidate", "ResumeParse", "BaseResume", "CandidateMailbox", "CandidateGoogleOAuthAttempt", "InboxMessage",
     "Evidence", "Claim", "Application", "ApplicationReview", "ApplicationStatusEvent", "Interview", "Resume",
     "CoverLetter", "Persona", "User", "PlatformUser", "Invite", "SupportView", "PasswordResetRequest", "Notification",
-    "LedgerEntry",
+    "ActivityEntry",
 }
 # A field that holds a person's data, on any object: `candidate.email`, `invite.invitee_name`.
 PERSONAL_FIELDS = {"full_name", "first_name", "last_name", "invitee_name", "email", "phone", "phone_number",
