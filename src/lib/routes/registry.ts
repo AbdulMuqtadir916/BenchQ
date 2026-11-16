@@ -58,7 +58,7 @@ export interface RouteDef {
   access: RouteAccess;
   /** What a role with "none" sees. Default: the Forbidden screen in place. */
   onDenied?: "forbidden" | "landing";
-  nav?: { section: "workspace" | "preferences" | "settings" | "notifications" | "admin"; order: number; icon?: LucideIcon };
+  nav?: { section: "workspace" | "preferences" | "settings" | "notifications" | "admin"; order: number; icon?: LucideIcon; /** The sidebar's name, when it isn't `title`. */ label?: string };
   /** Second key of a `g` shortcut, e.g. "c" for `g c`. */
   shortcut?: string;
   palette?: boolean;
@@ -102,7 +102,7 @@ const ROUTE_DEFS = [
   // One version's Autofill screen (07 Q6, Q13): the studio's access; editing follows canChangeResume, as saving does.
   { id: "resumes.autofill", path: "/[firm]/resumes/[id]/autofill", title: "Autofill answers", area: "firm", shell: "studio", access: firm(roles("full", "team", "assigned", "read")) },
   { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 7, icon: Mail }, palette: true },
-  { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 8, icon: ScrollText }, palette: true },
+  { id: "ledger", path: "/[firm]/ledger", title: "Activity logs", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 8, icon: ScrollText, label: "Activity" }, palette: true },
   { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", palette: true, access: firm(roles("none", "none", "full", "none"), "none") }, // BDE only (Zuhair 2026-11-12, replaces Q3)
 
   // Preferences

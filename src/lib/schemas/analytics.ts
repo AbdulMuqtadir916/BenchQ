@@ -1,3 +1,4 @@
+import { FirmRole } from "./enums";
 import { z } from "zod";
 import { ApplicationStatus, CandidateStatus } from "./enums";
 
@@ -68,6 +69,14 @@ export const LedgerEntrySchema = z.object({
   entityType: z.string(),
   entityId: z.string(),
   entityLabel: z.string(),
+  /** The candidate the entry is about, and the name they have now. Absent on the Super Admin's audit. */
+  candidateId: z.string().nullable().optional(),
+  candidateName: z.string().nullable().optional(),
+  /** The actor's role when the entry was written; an AI agent has its person's, the system none. */
+  actorRole: z.enum([...FirmRole.options, "PLATFORM_ADMIN"]).nullable().optional(),
+  /** The person an AI agent worked for: its action counts towards them. */
+  onBehalfOfUserId: z.string().nullable().optional(),
+  onBehalfOfName: z.string().nullable().optional(),
   action: z.enum([
     "CREATE",
     "UPDATE",
@@ -100,6 +109,32 @@ export const LedgerEntrySchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
+
+/** One person in the activity log's people list, with the count of what they did in the current view. */
+export const LedgerPersonSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  role: FirmRole,
+  managerId: z.string().nullable(),
+  /** Left the firm or the reader's team, and still has rows to show. */
+  isFormer: z.boolean(),
+  actions: z.number().int(),
+});
+export type LedgerPerson = z.infer<typeof LedgerPersonSchema>;
+
+export const LedgerPeopleSchema = z.object({
+  /** The actor types this reader may filter by. */
+  actorTypes: z.array(z.enum(["USER", "SYSTEM", "AGENT", "PLATFORM_ADMIN"])),
+  /** Rows in the view, whoever is picked. */
+  total: z.number().int(),
+  /** Rows on show, with the person or team picked. */
+  matching: z.number().int(),
+  people: z.array(LedgerPersonSchema),
+});
+export type LedgerPeople = z.infer<typeof LedgerPeopleSchema>;
+
+export const LedgerCandidateSchema = z.object({ id: z.string(), name: z.string() });
+export type LedgerCandidate = z.infer<typeof LedgerCandidateSchema>;
 
 /** Merged activity stream for a candidate. */
 export const TimelineEventSchema = z.object({

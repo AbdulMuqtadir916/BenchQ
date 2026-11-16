@@ -50,6 +50,33 @@ describe("the ledger on the live backend", () => {
     expect(entry).toMatchObject({ firmId: "firm_hts", actorUserId: "user_imran", actorType: "USER", action: "INVITE_SENT", createdAt: "2026-10-23T10:00:00.000Z" });
   });
 
+  it("sends the log's filters, naming seeded people by their backend ids", async () => {
+    await ledgerApi.list("firm_hts", { limit: 15, sort: "actor", dir: "asc", actorId: "user_imran", actorType: "AGENT", fromDate: "2026-11-01", q: "resume" });
+    expect(urls).toEqual([`/api/firms/${HTS}/ledger?limit=15&sort=actor&dir=asc&actor_id=${demoIds.user_imran}&actor_type=AGENT&from_date=2026-11-01&q=resume`]);
+  });
+
+  it("maps the people list, translating seeded ids back", async () => {
+    answer = { status: 200, body: { timezone: "Asia/Kolkata", actor_types: ["USER", "AGENT"], total: 4, matching: 2, people: [
+      { user_id: demoIds.user_imran, name: "Imran", role: "OWNER", manager_id: null, is_former: false, actions: 2 },
+    ] } };
+    await expect(ledgerApi.people("firm_hts")).resolves.toEqual({ actorTypes: ["USER", "AGENT"], total: 4, matching: 2, people: [
+      { userId: "user_imran", name: "Imran", role: "OWNER", managerId: null, isFormer: false, actions: 2 },
+    ] });
+  });
+
+  it("reads the candidates to pick and the days with activity", async () => {
+    answer = { status: 200, body: [] };
+    await ledgerApi.candidates("firm_hts");
+    await ledgerApi.days("firm_hts", { fromDate: "2026-11-01", toDate: "2026-11-30" });
+    expect(urls).toEqual([`/api/firms/${HTS}/ledger/candidates`, `/api/firms/${HTS}/ledger/days?from_date=2026-11-01&to_date=2026-11-30`]);
+  });
+
+  it("a candidate with no name on their résumé is listed as unnamed, never blank", async () => {
+    answer = { status: 200, body: [{ id: "6f1c0000-0000-4000-8000-000000000011", name: "" }, { id: "6f1c0000-0000-4000-8000-000000000012", name: "Asha Rao" }] };
+    const candidates = await ledgerApi.candidates("firm_hts");
+    expect(candidates.map((candidate) => candidate.name)).toEqual(["Unnamed candidate", "Asha Rao"]);
+  });
+
   it("an empty ledger is an empty list, for the page's empty state", async () => {
     await expect(ledgerApi.list("firm_hts")).resolves.toEqual([]);
   });
