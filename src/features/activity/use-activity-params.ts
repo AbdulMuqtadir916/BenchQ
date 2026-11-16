@@ -15,6 +15,9 @@ const id = z.uuid();
 
 /** Everything the log shows lives in the URL. A value that doesn't parse is dropped rather than an error. */
 export const ActivityParamsSchema = z.object({
+  /** The Super Admin's log: one firm, or only the failed sign-ins. */
+  firm: id.optional().catch(undefined),
+  view: z.enum(["failed"]).optional().catch(undefined),
   team: id.optional().catch(undefined),
   person: id.optional().catch(undefined),
   candidate: id.optional().catch(undefined),

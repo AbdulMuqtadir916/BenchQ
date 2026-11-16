@@ -59,12 +59,15 @@ export const BdeDashboardSchema = z.object({
 });
 export type BdeDashboard = z.infer<typeof BdeDashboardSchema>;
 
+const ActorType = z.enum(["USER", "SYSTEM", "AGENT", "PLATFORM_ADMIN", "UNKNOWN"]);
+
 export const LedgerEntrySchema = z.object({
   id: z.string(),
   /** Set for any event about a firm (shows in that firm's ledger); null only for platform-only events (A13). */
   firmId: z.string().nullable(),
   actorUserId: z.string().nullable(),
-  actorType: z.enum(["USER", "SYSTEM", "AGENT", "PLATFORM_ADMIN"]),
+  /** UNKNOWN: a failed sign-in for an email with no account. */
+  actorType: ActorType,
   actorName: z.string(),
   entityType: z.string(),
   entityId: z.string(),
@@ -77,6 +80,10 @@ export const LedgerEntrySchema = z.object({
   /** The person an AI agent worked for: its action counts towards them. */
   onBehalfOfUserId: z.string().nullable().optional(),
   onBehalfOfName: z.string().nullable().optional(),
+  /** How many tries a failed sign-in row stands for: repeats within 10 seconds from one IP share a row. */
+  attemptCount: z.number().int().optional(),
+  /** The firm's name, on the Super Admin's log. */
+  firmName: z.string().nullable().optional(),
   action: z.enum([
     "CREATE",
     "UPDATE",
@@ -100,6 +107,10 @@ export const LedgerEntrySchema = z.object({
     "INVITE_REVOKED",
     /** A candidate's manager or BDE set or changed (docs/02 §3.4, 07 Q43); `note` is the handoff note. */
     "ASSIGN",
+    "LOGOUT",
+    /** The Super Admin's alone: the backend serves these to no firm reader. */
+    "SIGN_IN_FAILED",
+    "LOCKED_OUT",
   ]),
   summary: z.string(),
   /** The handoff note on an ASSIGN entry; null on every other entry. */
@@ -124,7 +135,7 @@ export type LedgerPerson = z.infer<typeof LedgerPersonSchema>;
 
 export const LedgerPeopleSchema = z.object({
   /** The actor types this reader may filter by. */
-  actorTypes: z.array(z.enum(["USER", "SYSTEM", "AGENT", "PLATFORM_ADMIN"])),
+  actorTypes: z.array(ActorType),
   /** Rows in the view, whoever is picked. */
   total: z.number().int(),
   /** Rows on show, with the person or team picked. */
@@ -132,6 +143,18 @@ export const LedgerPeopleSchema = z.object({
   people: z.array(LedgerPersonSchema),
 });
 export type LedgerPeople = z.infer<typeof LedgerPeopleSchema>;
+
+/** The counts beside the Super Admin's log. */
+export const PlatformActivityOverviewSchema = z.object({
+  timezone: z.string(),
+  actorTypes: z.array(ActorType),
+  total: z.number().int(),
+  matching: z.number().int(),
+  failed: z.number().int(),
+  me: z.object({ userId: z.string(), name: z.string(), actions: z.number().int() }),
+  firms: z.array(z.object({ id: z.string(), name: z.string(), managers: z.number().int(), actions: z.number().int() })),
+});
+export type PlatformActivityOverview = z.infer<typeof PlatformActivityOverviewSchema>;
 
 export const LedgerCandidateSchema = z.object({ id: z.string(), name: z.string() });
 export type LedgerCandidate = z.infer<typeof LedgerCandidateSchema>;

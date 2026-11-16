@@ -30,7 +30,7 @@ export type LedgerFilters = {
 
 const backendId = (value: string | undefined) => (value === undefined ? undefined : toBackendId(value));
 
-const filterQuery = (filters: LedgerFilters) => ({
+export const filterQuery = (filters: LedgerFilters) => ({
   entity_type: filters.entityType,
   entity_id: backendId(filters.entityId),
   action: filters.action,

@@ -43,9 +43,11 @@ interface DateRangeFilterProps extends DateRange {
   onChange: (range: DateRange) => void;
   /** The view's other filters, so the calendar's dots mean this view's activity. */
   filters: LedgerFilters;
+  /** Where the calendar's dots come from, when it isn't the signed-in firm's log. */
+  useDays?: typeof useLedgerDays;
 }
 
-export function DateRangeFilter({ from, to, timeZone, onChange, filters }: DateRangeFilterProps) {
+export function DateRangeFilter({ from, to, timeZone, onChange, filters, useDays = useLedgerDays }: DateRangeFilterProps) {
   // Read again each time the picker opens, and watched while it is open, so it moves on to the new day at midnight.
   const [today, setToday] = useState(() => todayIn(timeZone));
   const [isOpen, setIsOpen] = useState(false);
@@ -63,7 +65,7 @@ export function DateRangeFilter({ from, to, timeZone, onChange, filters }: DateR
     start: startOfWeek(month, { weekStartsOn: 1 }),
     end: endOfWeek(endOfMonth(month), { weekStartsOn: 1 }),
   }), [month]);
-  const daysQuery = useLedgerDays(
+  const daysQuery = useDays(
     { ...filters, fromDate: format(startOfMonth(month), DAY), toDate: format(endOfMonth(month), DAY) },
     { isEnabled: isOpen },
   );

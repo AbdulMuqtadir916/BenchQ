@@ -1,9 +1,12 @@
-import type { LedgerEntry } from "@/lib/schemas/analytics";
+import { z } from "zod";
+import type { LedgerCandidate, LedgerEntry, LedgerPeople, PlatformActivityOverview } from "@/lib/schemas/analytics";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { Firm, User } from "@/lib/schemas/session";
 import type { Invite, Plan, PlatformUser } from "@/lib/schemas/tenancy";
+import { filterQuery, type LedgerFilters, type LedgerQuery } from "./analytics";
 import { arrayOf, notLiveYet } from "./client";
 import { fromBackendId, toBackendId } from "./dto/demo-ids";
+import { LedgerCandidateDto, LedgerPeopleDto, PlatformActivityOverviewDto, toLedgerCandidate, toLedgerPeople, toPlatformActivityOverview } from "./dto/ledger";
 import { CandidateStatus } from "@/lib/schemas/enums";
 import {
   CandidateUsageDto, CreatedFirmDto, FirmDto, InviteDto, InviteWithTokenDto, LedgerEntryDto, PlanDto, PlatformUserDto, UserDto,
@@ -11,6 +14,14 @@ import {
 } from "./dto/session";
 import { http } from "./http";
 
+
+/** Which part of the Super Admin's log is on show: one firm, or only the failed sign-ins. */
+export interface ActivityView {
+  firmId?: string;
+  isFailed?: boolean;
+}
+
+const viewQuery = (view: ActivityView) => ({ firm_id: view.firmId ? toBackendId(view.firmId) : undefined, failed: view.isFailed ? true : undefined });
 
 /** docs/04 §14.4 Create firm. The owner's name becomes the invite's `inviteeName` (07 Q31). */
 export interface CreateFirmInput {
@@ -68,6 +79,22 @@ const live = {
   audit: {
     list: async () => (await http.get("/api/admin/audit", arrayOf(LedgerEntryDto))).map(toLedgerEntry),
   },
+  activity: {
+    list: async (view: ActivityView, params: LedgerQuery) =>
+      (await http.get("/api/admin/activity", arrayOf(LedgerEntryDto), {
+        query: { limit: params.limit, offset: params.offset, sort: params.sort, dir: params.dir, ...viewQuery(view), ...filterQuery(params) },
+      })).map(toLedgerEntry),
+    overview: async (view: ActivityView, filters: LedgerFilters) =>
+      toPlatformActivityOverview(await http.get("/api/admin/activity/overview", PlatformActivityOverviewDto, { query: { ...viewQuery(view), ...filterQuery(filters) } })),
+    people: async (firmId: string, filters: LedgerFilters) =>
+      toLedgerPeople(await http.get("/api/admin/activity/people", LedgerPeopleDto, { query: { firm_id: toBackendId(firmId), ...filterQuery(filters) } })),
+    candidates: async (view: ActivityView, filters: LedgerFilters) =>
+      (await http.get("/api/admin/activity/candidates", arrayOf(LedgerCandidateDto), { query: { ...viewQuery(view), ...filterQuery(filters) } })).map(toLedgerCandidate),
+    days: (view: ActivityView, filters: LedgerFilters) =>
+      http.get("/api/admin/activity/days", z.array(z.string()), { query: { ...viewQuery(view), ...filterQuery(filters) } }),
+    /** One failed sign-in's IP: it is never part of a list. */
+    ip: async (entryId: string) => (await http.get(`/api/admin/activity/${entryId}/ip`, z.object({ ip_address: z.string().nullable() }))).ip_address,
+  },
   team: {
     list: async () => (await http.get("/api/admin/team", arrayOf(PlatformUserDto))).map(toPlatformUser),
   },
@@ -113,6 +140,14 @@ export const platformApi = {
     create: unavailable<[PlanInput], Plan>(),
     update: unavailable<[string, PlanInput], Plan>(),
     setActive: unavailable<[string, boolean], Plan>(),
+  },
+  activity: {
+    list: (view: ActivityView, params: LedgerQuery): Promise<LedgerEntry[]> => live.activity.list(view, params),
+    overview: (view: ActivityView, filters: LedgerFilters): Promise<PlatformActivityOverview> => live.activity.overview(view, filters),
+    people: (firmId: string, filters: LedgerFilters): Promise<LedgerPeople> => live.activity.people(firmId, filters),
+    candidates: (view: ActivityView, filters: LedgerFilters): Promise<LedgerCandidate[]> => live.activity.candidates(view, filters),
+    days: (view: ActivityView, filters: LedgerFilters): Promise<string[]> => live.activity.days(view, filters),
+    ip: (entryId: string): Promise<string | null> => live.activity.ip(entryId),
   },
   audit: {
     list: async (): Promise<LedgerEntry[]> => live.audit.list(),
