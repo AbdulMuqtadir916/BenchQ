@@ -8,7 +8,7 @@ import { NotFoundState } from "@/components/app/not-found-state";
 import { Button } from "@/components/ui/button";
 import { useStudio } from "@/components/app/resume-studio/studio-store";
 import { ApiError, isNotFoundError } from "@/lib/api/client";
-import { autofillSections, summarize, type AutofillShow } from "@/lib/derive/autofill-view";
+import { autofillSections, reloadRows, summarize, type AutofillShow } from "@/lib/derive/autofill-view";
 import { useResumeAutofill, useSaveResumeAutofill } from "@/lib/hooks/use-resume-autofill";
 import { useHref } from "@/lib/routes/use-href";
 import { useUrlState } from "@/lib/routes/use-url-state";
@@ -61,8 +61,10 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
     if (view.q !== written) setSearch(view.q);
   }
   const [isStale, setIsStale] = useState(false);
-  // Reloads finished after a refused save: an open editor re-bases on the answers each brought.
-  const [reloads, setReloads] = useState(0);
+  // The rows whose save was refused (409) since the last Reload, then the Reloads that re-based each: only those rows'
+  // open editors re-base on the answers each brought (Abdul's review of #140).
+  const [refused, setRefused] = useState<ReadonlySet<string>>(() => new Set());
+  const [reloads, setReloads] = useState<ReadonlyMap<string, number>>(() => new Map());
   // One of BenchQ's questions picked from Add a question: its row opens its editor (the list shows every question).
   const [openKey, setOpenKey] = useState<string | null>(null);
   const pickQuestion = useCallback((key: string) => {
@@ -95,14 +97,17 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
   }, []);
 
   const candidateId = autofillQuery.data?.candidateId;
-  const onSave = useCallback<SaveAutofill>(async (build) => {
+  const onSave = useCallback<SaveAutofill>(async (build, row) => {
     if (!candidateId) return false;
     try {
       await saving.mutateAsync({ candidateId, change: build(true) });
       notify("Saved to this version.");
       return true;
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) setIsStale(true);
+      if (error instanceof ApiError && error.status === 409) {
+        setIsStale(true);
+        if (row) setRefused((current) => new Set(current).add(row));
+      }
       notify(error instanceof Error ? error.message : "The save didn't go through. Try again.", "danger");
       return false;
     }
@@ -145,8 +150,10 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
           {isStale ? (
             <Note tone="danger" action={<Button size="sm" variant="secondary" onClick={() => {
               setIsStale(false);
-              // Once the answers now saved are in, an open editor re-bases on them (Abdul's review of #140, #2).
-              void autofillQuery.refetch().then(() => setReloads((count) => count + 1));
+              setRefused(new Set());
+              // Once the answers now saved are in, the editors whose save was refused re-base on them and show them; any
+              // other open editor keeps the answer it opened on (Abdul's reviews of #140).
+              void autofillQuery.refetch().then(() => setReloads((current) => reloadRows(current, refused)));
             }}>Reload</Button>}>
               An answer changed since you opened this page. Reload to see the latest, then make your change again.
             </Note>

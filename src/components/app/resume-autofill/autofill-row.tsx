@@ -12,8 +12,9 @@ import type { ResumeSectionKey } from "@/lib/schemas/resume-document";
 import { AnswerEditor } from "./answer-editor";
 import { AnswerView } from "./answer-view";
 
-/** Saves a change, given whether it's for this version only; true once saved. */
-export type SaveAutofill = (build: (onlyThis: boolean) => AutofillChange) => Promise<boolean>;
+/** Saves a change, given whether it's for this version only; true once saved. `row` is the row it's from (`draftRowOf`):
+ * a Reload after it was refused re-bases that row's editor only. */
+export type SaveAutofill = (build: (onlyThis: boolean) => AutofillChange, row?: string) => Promise<boolean>;
 
 type AutofillRowProps = {
   entry: AutofillEntry;
@@ -25,7 +26,7 @@ type AutofillRowProps = {
   onEditInBuilder: (section: ResumeSectionKey) => void;
   /** Picked from Add a question: the row shows its editor until it's saved or cancelled. */
   isOpened?: boolean;
-  /** Reloads finished after a refused save: an open editor re-bases on the answer each brought. */
+  /** Reloads finished after this row's save was refused: its open editor re-bases on the answer each brought. */
   reloads?: number;
   onOpened?: () => void;
 };
@@ -60,7 +61,7 @@ export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditI
     onOpened?.();
     requestAnimationFrame(() => rowRef.current?.focus());
   };
-  const save = (build: (onlyThis: boolean) => AutofillChange) => void onSave(build).then((saved) => { if (saved) closeEditor(); });
+  const save = (build: (onlyThis: boolean) => AutofillChange) => void onSave(build, draftRowOf(entry)).then((saved) => { if (saved) closeEditor(); });
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>) => {
     if (event.target === event.currentTarget && event.key === "Enter" && mayEdit && !isEditing && status !== "review") {
       event.preventDefault();
@@ -139,7 +140,7 @@ export function AutofillRow({ entry, entries, canEdit, isSaving, onSave, onEditI
 
 type RowEditorProps = {
   entry: AutofillEntry;
-  /** Reloads finished after a refused save: each re-bases the editor on the answer it brought. */
+  /** Reloads finished after this row's save was refused: each re-bases the editor on the answer it brought. */
   reloads?: number;
   isSaving: boolean;
   onSave: (build: (onlyThis: boolean) => AutofillChange) => void;
@@ -150,8 +151,9 @@ type RowEditorProps = {
  * A row's editor, which keeps the answer as it stood when it opened: a save sends that as the answer the user was
  * shown, so one changed meanwhile (another tab, the extension) is refused (409), not saved over, even after another
  * row's save read the whole list again (the PR 129 review, finding 3). An explicit Reload after that refusal re-bases it
- * on the answer now saved, the answer typed kept, so the next save goes through; background reads never move it
- * (Abdul's review of #140, #2). Exported for its test.
+ * on the answer now saved and shows that answer in place of the draft, so the user sees it before the next save goes
+ * through. Only the editor whose save was refused re-bases: another open editor keeps the answer it opened on, and its
+ * own save is refused in turn. Background reads never move it (Abdul's reviews of #140). Exported for its test.
  */
 export function RowEditor({ entry, reloads = 0, isSaving, onSave, onCancel }: RowEditorProps) {
   const [opened, setOpened] = useState({ reloads, entry });
@@ -164,8 +166,9 @@ export function RowEditor({ entry, reloads = 0, isSaving, onSave, onCancel }: Ro
     onSave((onlyThis) => (shown.kind === "CUSTOM"
       ? { edit: {}, built: {}, reset: [], add: { [shown.question]: String(answer) }, remove: [], answered: { [shown.question]: shown.answer ?? null }, onlyThis }
       : editChange(shown, answer, onlyThis)));
+  // A Reload that re-based this editor opens it afresh on the answer now saved, so no draft typed before it stays.
   return (
-    <AnswerEditor question={shown.question} type={shown.type} initial={shown.answer} isSaving={isSaving} draftRow={draftRowOf(shown)}
+    <AnswerEditor key={opened.reloads} question={shown.question} type={shown.type} initial={shown.answer} isSaving={isSaving} draftRow={draftRowOf(shown)}
       suggestions={shown.key ? ANSWER_SUGGESTIONS[shown.key] : undefined}
       isMultiline={shown.kind === "CUSTOM" || shown.key === "summary"} onSave={saveAnswer} onCancel={onCancel} />
   );
