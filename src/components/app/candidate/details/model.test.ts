@@ -10,7 +10,7 @@ const candidate: Candidate = {
   rateMin: 70, rateTarget: 85, status: "ON_BENCH", benchStartDate: null, availableFrom: null, noticePeriodDays: 14,
   yearsExperience: 9, primaryRole: "Java Developer", targetRoles: ["Java Developer", "Backend Engineer"],
   managerId: "user_m", bdeId: "user_b", workSettings: ["REMOTE"], preferredLocations: ["Dallas, TX"],
-  contactNotes: null, preferredIndustries: [], dealBreakers: [], qaBank: [],
+  contactNotes: null, preferredIndustries: [], dealBreakers: [], searchTitles: [], qaBank: [],
   createdAt: "2026-11-01T00:00:00.000Z", updatedAt: "2026-11-01T00:00:00.000Z",
 };
 
@@ -45,5 +45,14 @@ describe("the details tab's form (decided 2026-11-14, Q18–Q20, Q24)", () => {
       preferredLocations: "Add a preferred location, or a city and state on the résumé: the job search needs a place.",
     });
     expect(validateDetails({ ...values, city: "", state: "" })).toEqual({});   // the preferred location is enough
+  });
+});
+
+describe("the job search's extra titles on the details tab (decided 2026-11-17, Q143, Q144)", () => {
+  it("are edited by hand and sent as they are, at most 4", () => {
+    const values = { ...detailsValues(candidate), searchTitles: ["AI Engineer", "ML Engineer"] };
+    expect(isChanged(candidate, values)).toBe(true);
+    expect(toUpdate(candidate, values).searchTitles).toEqual(["AI Engineer", "ML Engineer"]);
+    expect(validateDetails({ ...values, searchTitles: ["A", "B", "C", "D", "E"] }).searchTitles).toBe("At most 4 titles.");
   });
 });

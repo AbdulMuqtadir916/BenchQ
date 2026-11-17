@@ -6,6 +6,7 @@ from backend.models.db import SessionLocal, Setting, Company, Search, Resume
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.analyzer.llm_client import REASONING_EFFORTS
 from backend.candidates import parse as resume_parse
+from backend.job_search import search_titles
 from backend.candidates.parse_defaults import (DEFAULT_PROMPT as RESUME_PARSE_PROMPT,
                                                DEFAULT_RESPONSE_FORMAT as RESUME_PARSE_RESPONSE_FORMAT,
                                                DEFAULT_SYSTEM_PROMPT as RESUME_PARSE_SYSTEM_PROMPT,
@@ -32,6 +33,11 @@ DEFAULT_SETTINGS = {
     # The résumé tailor (docs/team/tailoring.md), as an AI preset like the parser: its own model (three rows, all
     # required, the key seeded empty), its nine prompts and four strict response formats.
     **resume_tailor_settings.DEFAULT_SETTINGS,
+    # The job search's extra titles (backend/job_search/search_titles.py, decided 2026-11-17): its model, prompt and
+    # strict format; it uses the parser's OpenRouter key.
+    "search_titles_llm_model": ("openai/gpt-6-luna", "Search titles model: 2 related titles for a target role"),
+    "search_titles_prompt": (search_titles.DEFAULT_PROMPT, "Search titles prompt; {target_role} is the candidate's target role"),
+    "search_titles_response_format": (search_titles.DEFAULT_FORMAT, "Search titles strict response format (2 titles)"),
     "fit_score_threshold": ("60", "Minimum fit score to trigger Telegram alert"),
     "scrape_interval_minutes": ("60", "How often the job checker runs"),
     "email_check_interval_minutes": ("30", "How often Gmail is polled"),

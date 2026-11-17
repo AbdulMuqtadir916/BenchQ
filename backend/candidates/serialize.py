@@ -40,5 +40,7 @@ def candidate_json(c: Candidate) -> dict:
         "work_settings": list(c.work_settings or []), "preferred_locations": list(c.preferred_locations or []),
         "contact_notes": c.contact_notes, "preferred_industries": list(c.preferred_industries or []),
         "deal_breakers": list(c.deal_breakers or []),
+        # The job search's extra titles (the active base's v1, decided 2026-11-17): shown on the details tab only.
+        "search_titles": list(c.search_titles or []),
         "created_at": _iso(c.created_at), "updated_at": _iso(c.updated_at),
     }

@@ -99,6 +99,10 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 - **Same job on two sources: saved once.** One source failing doesn't fail the click.
 - **Batches:** each click is a batch; the Jobs list opens at the newest, with All batches, and each source's count.
   LinkedIn's jobs (no Match) come first in Top match and Newest. Each job's work mode is what its source says.
+- **Extra search titles:** an AI call suggests 2 for the target role when the candidate is added (on the active
+  résumé; edited by hand on the details tab, up to 4); the search asks for them with the target role (5 at most) and
+  the Match counts them. Live: good fits (70+) went 44 → 80 for a Business Analyst and 0 → 22 for an entry GenAI
+  candidate.
 - **No Adzuna** (Q64): freehire.me's search asks for no jobs it took from Adzuna (`source_exclude=adzuna`), which it
   has only as a 500-character preview; one that comes back anyway is left out and counted ("N left out: Adzuna
   preview"). A live check (Dallas) went from 88 jobs, 18 of them previews, to 56 jobs, none.

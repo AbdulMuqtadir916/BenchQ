@@ -275,7 +275,9 @@ def _record(db, actor: User, candidate, action: str, entity_id, label: str, summ
 
 
 def _activate(db, candidate, base: BaseResume) -> None:
-    """`base` becomes the one the workflow uses; the previous one is switched off first (the database allows one)."""
+    """`base` becomes the one the workflow uses; the previous one is switched off first (the database allows one). The
+    job search's extra titles go with it (decided 2026-11-17, Q142): they come from the target role, not the résumé."""
+    candidate.__dict__["_carried_titles"] = candidate.search_titles
     scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.candidate_id == candidate.id, BaseResume.is_active,
                                                      BaseResume.id != base.id) \
         .update({BaseResume.is_active: False}, synchronize_session="fetch")
@@ -285,6 +287,19 @@ def _activate(db, candidate, base: BaseResume) -> None:
     # The candidate's name and contact are the active base's (07 Q57): forget the ones read from the old base, so the
     # ledger entry written next and the response carry the new ones (Abdul's PR 7 review, #3).
     profile.refresh(candidate)
+    carry_titles(db, candidate)
+
+
+def carry_titles(db, candidate) -> None:
+    """The extra search titles the previous active base had, onto the new active base's v1 when it has none yet (its
+    v1 may be written after `_activate`: `upload_base` calls this again)."""
+    from backend.job_search import search_titles
+    carried = candidate.__dict__.get("_carried_titles")
+    row = search_titles.active_v1(db, candidate) if carried else None
+    if row is not None and row.search_titles is None:
+        row.search_titles = list(carried)
+        db.flush()
+        profile.refresh(candidate)
 
 
 @dataclass
@@ -401,6 +416,8 @@ def _base_from(db, actor: User, candidate, row: Resume, *, activate: bool) -> Ba
                     created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)), **content_of(row))
     db.add(copied)
     db.flush()
+    if activate:
+        carry_titles(db, candidate)             # its v1 exists only now
     number = len(numbers) + 1
     _record(db, actor, candidate, "CREATE", base.id, _label(candidate, number),
             f"Made Base {number} from {source}" + ("; the workflow uses it" if activate else purpose))
@@ -478,6 +495,7 @@ def upload_base(db, actor: User, candidate, parse_row: ResumeParse) -> BaseResum
     _activate(db, candidate, base)
     db.add(version)
     db.flush()
+    carry_titles(db, candidate)
     number = base_numbers(db, candidate)[base.id]
     _record(db, actor, candidate, "CREATE", base.id, _label(candidate, number),
             f"Uploaded a new résumé ({parse_row.file_name}) as Base {number}; the workflow uses it")

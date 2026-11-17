@@ -58,6 +58,8 @@ export interface WizardValues {
   willingToRelocate: boolean;
   preferredIndustries: string[];
   dealBreakers: string[];
+  /** The details tab only: the job search's extra titles (onboarding doesn't ask; an AI call makes them, Q131). */
+  searchTitles: string[];
   contactNotes: string;
   /** Step 5 (07 Q41): the candidate's manager, its BDE (null = the manager's "Needs a BDE" queue) and the handoff note. */
   managerId: string;
@@ -73,7 +75,7 @@ export const EMPTY_VALUES: WizardValues = {
   resume: null, fullName: "", primaryRole: "", yearsExperience: "", email: "", phone: "", linkedinUrl: "", city: "", state: "",
   country: "", skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
   rateMin: "", availableFrom: "", noticePeriodDays: "", targetRole: "", workSettings: [], preferredLocations: [],
-  willingToRelocate: false, preferredIndustries: [], dealBreakers: [], contactNotes: "", managerId: "", bdeId: null,
+  willingToRelocate: false, preferredIndustries: [], dealBreakers: [], searchTitles: [], contactNotes: "", managerId: "", bdeId: null,
   handoffNote: "",
 };
 

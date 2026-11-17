@@ -87,6 +87,10 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "resume_parse_llm_provider": (AI, "AI presets"),
     "resume_parse_llm_model": (AI, "AI presets"),
     "resume_parse_llm_api_key": (AI, "AI presets"),
+    # The job search's extra titles (backend/job_search/search_titles.py, decided 2026-11-17).
+    "search_titles_llm_model": (AI, "AI presets"),
+    "search_titles_prompt": (AI, "AI presets"),
+    "search_titles_response_format": (AI, "AI presets"),
     # The résumé tailor's model, prompts and formats (backend/resume_tailor/settings.py).
     **{key: (AI, "AI presets") for key in tailor_settings.DEFAULT_SETTINGS},
     "cover_letter_voice_presets": (AI, "AI presets"),

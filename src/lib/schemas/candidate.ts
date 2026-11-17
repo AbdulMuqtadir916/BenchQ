@@ -64,6 +64,9 @@ export const CandidateSchema = z.object({
   /** What the candidate prefers and refuses (wizard step 4). The summary is the active base résumé's, not here. */
   preferredIndustries: z.array(z.string()),
   dealBreakers: z.array(z.string()),
+  /** The extra titles the job search asks for besides the target role (decided 2026-11-17, Q131–Q144): made by AI when
+   * the candidate is added, edited by hand on the details tab (up to 4). Kept on the active résumé. */
+  searchTitles: z.array(z.string()).default([]),
   qaBank: z.array(QaBankEntrySchema),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -110,6 +113,7 @@ export const UpdateCandidateSchema = CandidateSchema.pick({
   preferredIndustries: true,
   dealBreakers: true,
   contactNotes: true,
+  searchTitles: true,
 }).partial();
 export type UpdateCandidate = z.infer<typeof UpdateCandidateSchema>;
 

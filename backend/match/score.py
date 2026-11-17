@@ -59,7 +59,9 @@ class Match:
 
 def who(candidate, country: str | None) -> Who:
     """`candidate` is a `Candidate` (or anything with its fields); `country` the search's code (`us`) or None."""
-    wanted = [*(candidate.target_roles or []), *([candidate.primary_role] if candidate.primary_role else [])]
+    wanted = [*(candidate.target_roles or []), *([candidate.primary_role] if candidate.primary_role else []),
+              # The job search's extra titles count as wanted (decided 2026-11-17, Q133).
+              *(getattr(candidate, "search_titles", None) or [])]
     years = candidate.years_experience
     return Who(wanted=tuple(t for t in (str(t).strip() for t in wanted) if t),
                years=float(years) if years is not None else None,

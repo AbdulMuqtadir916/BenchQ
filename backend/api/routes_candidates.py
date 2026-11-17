@@ -120,11 +120,15 @@ class UpdateCandidateBody(BaseModel):
     preferred_industries: list[str] | None = Field(default=None, max_length=50)
     deal_breakers: list[str] | None = Field(default=None, max_length=50)
     contact_notes: str | None = Field(default=None, max_length=2000)
+    # The extra titles the job search asks for (decided 2026-11-17, Q143, Q144): typed by the BDE on the details tab,
+    # kept as typed; stored on the active base's v1 (`resumes.search_titles`), not on `candidates`.
+    search_titles: list[Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]] | None = Field(
+        default=None, max_length=4)
 
 
 # The candidate's fields the Match score reads (backend/match/score.py `who`): an edit to one scores their jobs again.
 _SCORED = {"primary_role", "target_roles", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer",
-           "employment_types"}
+           "employment_types", "search_titles"}
 # The fields an edit can't empty (null): the rest (expiry, rates, availability, notice, notes) can be cleared.
 _NOT_NULL = ("primary_role", "target_roles", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer",
              "employment_types", "work_settings", "preferred_locations", "willing_to_relocate", "preferred_industries",
@@ -252,7 +256,7 @@ def get_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
 
 
 @router.post("", status_code=201, summary="Add a candidate with its manager and optional BDE")
-def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
+def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody, background: BackgroundTasks,
                      principal: Principal = Depends(require("candidate.create")), db: DbSession = Depends(get_db)):
     """One transaction: the candidate (ON_BENCH), the kept résumé parse with the candidate's first base résumé and its
     version 1 (07 Q58: never without the résumé), their Record (one UNVERIFIED claim per item,
@@ -315,6 +319,9 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody,
                   entity_label=candidate.full_name, firm_id=firm_id, summary=_assign_summary(manager, bde, None),
                   note=_clean(body.handoff_note))
     db.commit()
+    # The job search's 2 extra titles for the target role, after the answer (decided 2026-11-17, Q131).
+    from backend.job_search import search_titles
+    background.add_task(search_titles.generate, firm_id, candidate.id)
     return candidate_json(candidate)
 
 
@@ -343,6 +350,7 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     if not can_edit_profile(principal, candidate):
         raise HTTPException(status_code=403, detail="This candidate's BDE edits their details; you can view them.")
     changes = _edited(body.model_dump(exclude_unset=True))
+    typed_titles = changes.pop("search_titles", None) if "search_titles" in changes else ...
     for field, value in changes.items():
         if value is None and field in _NOT_NULL:
             raise _bad(f"{field} can't be empty.")
@@ -352,9 +360,17 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
         if missing:
             raise _bad(f"A new work_auth needs {' and '.join(missing)} in the same request.")
     changed = [field for field, value in changes.items() if getattr(candidate, field) != value]
+    if typed_titles is not ...:
+        from backend.job_search import search_titles
+        titles = search_titles.clean_typed(typed_titles or [])
+        if titles != list(candidate.search_titles or []):
+            if not search_titles.store(db, candidate, titles):
+                raise HTTPException(status_code=409, detail="The candidate has no active résumé to keep the titles on.")
+            changed.append("search_titles")
     roles_before = list(candidate.target_roles or [])
     for field in changed:
-        setattr(candidate, field, changes[field])
+        if field != "search_titles":
+            setattr(candidate, field, changes[field])
     if candidate.rate_min is not None and candidate.rate_target is not None and candidate.rate_min > candidate.rate_target:
         raise _bad("The floor can't be above the target rate.")
     # The job search needs a place (Q20): the résumé's city and state together, or a preferred location.

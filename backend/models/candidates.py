@@ -122,7 +122,7 @@ def _resume_field(name: str) -> property:
     return property(get, put)
 
 
-for _field in ("full_name", "email", "phone", "linkedin_url", "city", "state", "country"):
+for _field in ("full_name", "email", "phone", "linkedin_url", "city", "state", "country", "search_titles"):
     setattr(Candidate, _field, _resume_field(_field))
 
 class ResumeParse(Base):

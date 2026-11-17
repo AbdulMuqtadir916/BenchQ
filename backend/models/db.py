@@ -657,6 +657,9 @@ class Resume(Base):
     match_score = Column(SmallInteger, nullable=True)
     match_note = Column(String(200), nullable=True)
     match_basis = Column(String(64), nullable=True)
+    # The extra titles a job search asks for besides the target role (migration 0030, decided 2026-11-17): on the
+    # active base's version 1 only; null until made.
+    search_titles = Column(JSONB, nullable=True)
 
     __table_args__ = (
         CheckConstraint("category IN ('BASE', 'TAILORED')", name="ck_resumes_category_values"),

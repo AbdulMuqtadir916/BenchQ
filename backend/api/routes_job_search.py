@@ -145,7 +145,9 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: st
     # One click asks every source the place's mode names (decided 2026-11-17, Q90, Q122): no source picker.
     provider_name = pipeline.ALL_SOURCES
     # The role's titles, searched together (decided 2026-11-16, Q69): "A | B" is two, "GenAI / LLM Engineer" two more.
-    titles = places.search_titles(candidate)
+    # Plus the extra titles on the candidate's résumé (2026-11-17, Q131–Q144): 5 at most, the target role's first.
+    from backend.job_search import search_titles
+    titles = search_titles.for_search(places.search_titles(candidate), candidate.search_titles)
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
                                 query=query, country=country, provider=provider_name, place=chosen["value"],
                                 titles=titles)

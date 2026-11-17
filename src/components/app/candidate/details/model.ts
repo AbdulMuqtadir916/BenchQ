@@ -40,9 +40,13 @@ export function detailsValues(candidate: Candidate): WizardValues {
     willingToRelocate: candidate.willingToRelocate,
     preferredIndustries: candidate.preferredIndustries,
     dealBreakers: candidate.dealBreakers,
+    searchTitles: candidate.searchTitles,
     contactNotes: candidate.contactNotes ?? "",
   };
 }
+
+/** The job search's extra titles a candidate may keep (decided 2026-11-17, Q144). */
+export const MOST_SEARCH_TITLES = 4;
 
 /** The form's problems, by field: onboarding's own rules (Q20) for these fields, the place named as the résumé's. */
 export function validateDetails(values: WizardValues): Errors {
@@ -50,6 +54,7 @@ export function validateDetails(values: WizardValues): Errors {
   const errors: Errors = { ...validateStep("work", values), ...validateStep("preferences", values, { homeFrom: "resume" }) };
   if (basic.primaryRole) errors.primaryRole = basic.primaryRole;
   if (basic.yearsExperience) errors.yearsExperience = basic.yearsExperience;
+  if (values.searchTitles.length > MOST_SEARCH_TITLES) errors.searchTitles = `At most ${MOST_SEARCH_TITLES} titles.`;
   return errors;
 }
 
@@ -73,6 +78,7 @@ export function toUpdate(candidate: Candidate, values: WizardValues): UpdateCand
     willingToRelocate: values.willingToRelocate,
     preferredIndustries: values.preferredIndustries,
     dealBreakers: values.dealBreakers,
+    searchTitles: values.searchTitles,
     contactNotes: values.contactNotes.trim() === "" ? null : values.contactNotes.trim(),
   };
 }

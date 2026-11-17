@@ -15,7 +15,8 @@ import { StepPreferences } from "@/components/app/candidate-wizard/step-preferen
 import { StepWorkRate } from "@/components/app/candidate-wizard/step-work-rate";
 import type { Errors, WizardValues } from "@/components/app/candidate-wizard/model";
 import type { WizardForm } from "@/components/app/candidate-wizard/use-wizard";
-import { detailsValues, isChanged, toUpdate, validateDetails } from "./model";
+import { MOST_SEARCH_TITLES, detailsValues, isChanged, toUpdate, validateDetails } from "./model";
+import { TagInput } from "@/components/app/candidate-wizard/tag-input";
 
 const NOTHING_DRAFTED: ReadonlySet<never> = new Set();
 const SETTING_LABEL = { REMOTE: "Remote", HYBRID: "Hybrid", ONSITE: "On-site" } as const;
@@ -67,6 +68,14 @@ function DetailsForm({ candidate, onSaved }: { candidate: Candidate; onSaved: ()
       <Card>
         <StepPreferences wizard={form} errors={errors} homeFrom="resume" />
       </Card>
+      <Card>
+        <StepSection title="Job search" description="Extra titles the job search asks for besides the target role (5 titles in all). Made by AI when the candidate was added; change them freely.">
+          <WizardField id="cw-search-titles" label={`Extra search titles (up to ${MOST_SEARCH_TITLES})`} error={errors.searchTitles}>
+            <TagInput id="cw-search-titles" label="extra search titles" values={values.searchTitles}
+              onChange={(next) => set("searchTitles", next)} placeholder="Machine Learning Engineer…" />
+          </WizardField>
+        </StepSection>
+      </Card>
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] py-3">
         {update.error ? <p role="alert" className="mr-auto text-sm text-[var(--color-danger-fg)]">{update.error.message}</p> : null}
         <Button type="button" variant="ghost" size="sm" disabled={!changed || update.isPending} onClick={() => { setValues(detailsValues(candidate)); setErrors({}); update.reset(); }}>Discard changes</Button>
@@ -112,6 +121,7 @@ function DetailsView({ candidate }: { candidate: Candidate }) {
         <Row label="Willing to relocate">{candidate.willingToRelocate ? "Yes" : "No"}</Row>
         <Row label="Preferred industries">{tags(candidate.preferredIndustries)}</Row>
         <Row label="Deal breakers">{tags(candidate.dealBreakers)}</Row>
+        <Row label="Extra search titles">{tags(candidate.searchTitles)}</Row>
         <Row label="Notes for the BDE"><span className="whitespace-pre-line">{candidate.contactNotes ?? "—"}</span></Row>
       </dl>
     </Card>
