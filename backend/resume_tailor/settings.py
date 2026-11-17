@@ -106,6 +106,49 @@ DEFAULT_SETTINGS = {
 }
 
 
+# ── Stored defaults brought up to date ───────────────────────────────────────────────────────────────────────────────
+
+# Wording the defaults changed, (old, new): seeding never replaces a row, so a database seeded before keeps the old
+# default until `upgrade_stored_defaults` swaps it, and only a row still holding that old default (an edited prompt or
+# format is left alone). 2026-11-17 (Zuhair): bullets 6, 4, then 3 a role, in place of the handoff's ranges.
+DEFAULT_CHANGES = (
+    ("- 4-6 bullets for the most recent role, 3-4 for the previous one, 2-3 for older roles: count them before you "
+     "finish; never more.",
+     "- Exactly 6 bullets for the most recent role, 4 for the previous one and 3 for each older role (fewer only when "
+     "the role's resume lines hold fewer): count them before you finish; never more, never fewer."),
+    ("(4-6, 3-4, then 2-3 a role:", "(exactly 6, 4, then 3 a role:"),
+    ("- Bullet counts: at most 6 for the most recent role, 4 for the previous one, 3 for each older role (the CV shows "
+     "each role's count).",
+     "- Bullet counts: exactly 6 for the most recent role, 4 for the previous one, 3 for each older role, fewer only "
+     "when the resume's role holds fewer (the CV shows each role's count)."),
+    ("4-6 for the most recent role, 3-4 for the previous one, 2-3 for older roles.",
+     "exactly 6 for the most recent role, 4 for the previous one, 3 for each older role (fewer only when the resume "
+     "role holds fewer)."),
+)
+
+
+def _as_before(value: str) -> str:
+    for old, new in DEFAULT_CHANGES:
+        value = value.replace(new, old)
+    return value
+
+
+def upgrade_stored_defaults(db) -> list[str]:
+    """The tailor's prompt and format rows still holding an earlier default, set to today's (the caller commits).
+    Returns the rows changed. Idempotent, so every worker may run it."""
+    from backend.models.db import Setting
+    changed = []
+    for row, (value, _) in DEFAULT_SETTINGS.items():
+        before = _as_before(value)
+        if before == value:
+            continue
+        stored = db.query(Setting).filter(Setting.key == row).first()
+        if stored is not None and (stored.value or "").strip() == before.strip():
+            stored.value = value
+            changed.append(row)
+    return changed
+
+
 # ── Checks ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def format_problem(step: str, value) -> str | None:

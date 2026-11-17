@@ -34,6 +34,7 @@ not started. Committed, not pushed.
 | Q10 | part 2 deletes `backend/analyzer/legacy_tailoring.py` and the old `tailoring` AI module (`cv_tailor_*`, `persona_tailor_prompt`) once nothing reads them. 422 when the posting has no description; 409 when the candidate has no usable base, or the same base and job is already being tailored. |
 | Q11 | Part 1's tests port JobNavigator's (`test_mads_tailor.py`, `test_mads_fact_gate.py`) and add the handoff's §13 list and the mappers. |
 | Q12 | A tailored version may leave out whole printed sections of the base (projects, certifications, awards). The header is the base's but for the title (the tailored headline). Every job stays. **Languages always stay as the base has them** (2026-11-12): they are never printed, and autofill reads them from the version. |
+| Bullets | Decided by Zuhair 2026-11-17 (**replaces the handoff's ranges** 4–6, 3–4, 2–3, under which an older role often got 2): **6 bullets for the most recent role, 4 for the previous one, 3 for each older role**, fewer only when the résumé's role holds fewer. The draft, revise and verify prompts and the draft format ask for the counts (verify cuts a role that is over); `bullet_counts.to_count` runs after the fact gate: a role over its count keeps its first bullets, a short one gets its own unused résumé bullets, those naming more of the posting's keywords first, never one the draft already says in other words. `bullets_added` is kept in the run's counts. A database seeded before gets the new wording on start (`settings.upgrade_stored_defaults`), only where a row still holds the old default. |
 
 ## 2. What part 1 holds (`backend/resume_tailor/`)
 
@@ -97,6 +98,7 @@ handoff's base résumé (`build_base_resume`).
 Into `job_runs.meta`, counts only:
 - `gaps`;
 - `fact_gate_changes`;
+- `bullets_added` (2026-11-17): résumé bullets the count step put back to reach 6, 4, then 3;
 - `review_edits_applied` and `review_edits_missed`, and the same two for verify;
 - `keywords`: covered, synonym only, missing (has it), missing (gap);
 - `seconds` and `tokens` (input, output) per step.

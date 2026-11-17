@@ -58,7 +58,7 @@ Core competencies
 - Use the posting's own core term in the matching label when it truthfully applies: ATS and skim-reading hiring managers match literally.
 Professional experience
 - Rewrite bullet points to emphasize the aspects most relevant to the target role. Each bullet one or two lines, at most about 30 words.
-- 4-6 bullets for the most recent role, 3-4 for the previous one, 2-3 for older roles: count them before you finish; never more. Every role stays. Each requirement is shown once, in its strongest bullet: no two bullets say the same thing, and repetition reads as padding.
+- Exactly 6 bullets for the most recent role, 4 for the previous one and 3 for each older role (fewer only when the role's resume lines hold fewer): count them before you finish; never more, never fewer. Every role stays. Each requirement is shown once, in its strongest bullet: no two bullets say the same thing, and repetition reads as padding.
 - Keep the candidate's own verbs and ownership: "participated in code reviews" never becomes "led code reviews".
 - Emphasize measurable results where the resume states them ("Reduced processing time by X%"). Never add a number.
 - Check tenure against visible output: a long role shown by one project reads as low output. Fix it honestly by surfacing more of the role's real work or making its phases explicit; never pad with invented projects.
@@ -134,7 +134,7 @@ The reviewer's structured edits (Part A) are already applied to the draft below.
 - Missed keywords/requirements: add a keyword to a role's bullet only when that role's own lines in the resume state it. A keyword the resume shows only in its SKILLS LIST goes in a core competency; one the resume does not show at all is a gap and stays out.
 - Action-oriented reframing: rewrite passive or generic phrasing (profile statement, bullet leads).
 - Tone and style: apply the writing-style fixes (no em-dashes, no cliches, no apologetic hedging, active voice).
-Do NOT incorporate any suggestion that would fabricate skills or experience. If a requirement is a genuine gap, acknowledge it honestly and frame adjacent experience instead. Keep the CV rules, including the bullet counts (4-6, 3-4, then 2-3 a role: to add something, merge it into a bullet or replace the least relevant one, never add a bullet past the count) and the 2-page limit.
+Do NOT incorporate any suggestion that would fabricate skills or experience. If a requirement is a genuine gap, acknowledge it honestly and frame adjacent experience instead. Keep the CV rules, including the bullet counts (exactly 6, 4, then 3 a role: to add something, merge it into a bullet or replace the least relevant one, never add a bullet past the count) and the 2-page limit.
 
 Reply with the whole revised CV in the response format; each field's description says what goes in it.
 
@@ -174,7 +174,7 @@ VERIFY_PROMPT = """STEP 5 - VERIFY THE CV
 - Profile statement: 3-4 lines (about 80 words at most), total years only, no dates or role-by-role timeline.
 - Competencies one short line each; bullets at most about 30 words.
 - No commentary about the resume: no line says what the resume lists, documents or does not state ("is listed", "is not listed", "not documented"); rewrite it about the candidate's work or remove it.
-- Bullet counts: at most 6 for the most recent role, 4 for the previous one, 3 for each older role (the CV shows each role's count).
+- Bullet counts: exactly 6 for the most recent role, 4 for the previous one, 3 for each older role, fewer only when the resume's role holds fewer (the CV shows each role's count).
 - No repetition: no two bullets or competencies make the same claim.
 - Verbs and ownership match the resume: "led", "owned" or "designed" only where the resume says so.
 3. Edits: for each synonym-only or missing (have it) row and each failed checklist item, an exact edit, quoted from THE TAILORED CV below and never from the RESUME. Only edits the resume supports.

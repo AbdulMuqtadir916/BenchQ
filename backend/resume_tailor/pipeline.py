@@ -25,6 +25,7 @@ from backend.analyzer.llm_client import call_llm
 from backend.analyzer.llm_logger import track_llm_call
 from backend.analyzer.model_json import parse_model_json
 from backend.analyzer.prompt_fence import fence
+from backend.resume_tailor import bullet_counts
 from backend.resume_tailor import copy_builder as cb
 from backend.resume_tailor import fact_gate
 from backend.resume_tailor import resume_bits as rs
@@ -85,6 +86,9 @@ async def tailor(base: dict, jd_text: str, title_of_the_job: str = "", *, setup:
     if gated:
         logger.warning(f"Mads tailor: {len(gated)} bullet(s) named what their role does not state: "
                        + "; ".join(sorted({entry['action'] for entry in gated})))
+    # 6, 4, then 3 bullets a role (Zuhair 2026-11-17): a short role gets its own unused résumé bullets.
+    draft, topped_up = bullet_counts.to_count(
+        draft, base, [row.get("keyword") for row in analysis.get("keywords") or [] if isinstance(row, dict)])
 
     copy = cb.assemble_v2_resume(as_v2_reply(draft, analysis), base, jd_text, title_of_the_job)
     copy[REPORT_KEY].update({
@@ -95,6 +99,7 @@ async def tailor(base: dict, jd_text: str, title_of_the_job: str = "", *, setup:
         "review_edits_applied": applied, "verify_edits_applied": verified,
         "review_edits_missed": review_missed, "verify_edits_missed": verify_missed,
         "fact_gate_changes": gated,
+        "bullets_added": topped_up,
         "keyword_coverage": verification.get("keyword_coverage") or [],
         "checklist": verification.get("checklist") or [],
         "steps": steps, "seconds": seconds, "usage": usage,

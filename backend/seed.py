@@ -565,6 +565,11 @@ def seed_settings(db):
     db.commit()
     upgrade_resume_parse_prompt(db)
     retire_job_search_provider(db)
+    # The tailor's prompts and formats still holding an earlier default (resume_tailor/settings.py DEFAULT_CHANGES).
+    upgraded = resume_tailor_settings.upgrade_stored_defaults(db)
+    if upgraded:
+        db.commit()
+        logger.info("resume tailor defaults upgraded rows=%d", len(upgraded))
     # One-shot: a DB that already holds a mock account keeps signing in with it;
     # every other DB starts on the personal account.
     if "linkedin_use_mock_account" not in existing:
