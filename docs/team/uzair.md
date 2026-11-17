@@ -267,8 +267,11 @@ separate scheduler process and Postgres for coordination, no Redis and no new ta
   (`recover_imports`), the classifier's pause (a state; failing it cleared the pause) and command rows. A
   classification row is never stamped (it isn't held in `_running`) and is failed only once it is 10 minutes old,
   well past its 2-minute claim lease. Fixes R4-T1-27 (its strict-xfail test now passes).
-  For Zuhair: the tailor's save stops only on an error code (`runs.py`, `_Stop(LOST)`); it should also stop when its
-  row is no longer `running`, so a run failed as silent can never come back as completed.
+  Fixed in #147 (CodeRabbit): the tailor's save (`runs.py`, `_Stop(LOST)`) also stops when its row is no longer
+  `running`, not only on an error code, so a run failed as silent can never come back as completed (a row for Zuhair
+  in cross-area-changes.md).
+- **`GET /api/monitor/active` reads `job_runs`**, so the worker's runs show: every `running` row, with this process's
+  own runs from memory (their scope and company), minus the classifier's pause row. `_running` stays per process.
 - **A manual trigger and a scheduled run never overlap:** the seven job types both processes start
   (`job_monitor.SHARED_JOB_TYPES`: `scrape_all`, `email_check`, `daily_digest`, `h1b_refresh`, `auto_reject`,
   `job_cleanup`, `db_backup`) are claimed in `job_runs`: a transaction-scoped advisory lock, then "is one running?",

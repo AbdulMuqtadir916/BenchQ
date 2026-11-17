@@ -251,6 +251,41 @@ def get_all_running() -> list[dict]:
     ]
 
 
+def get_all_active() -> list[dict]:
+    """Every process's running jobs, for /api/monitor/active: this process's own (`get_all_running`, with its
+    in-memory detail), then the `running` rows in `job_runs` it doesn't hold: the worker's scheduled runs, another
+    API copy's (production layer step 3). Such a row has no scope_key or company_id (they aren't stored). The
+    classifier's pause row is left out: it stays `running` while paused, a state, not a job. `get_all_running` stays
+    this process's only: the tailor's stamp reads it to know which runs it holds."""
+    own = get_all_running()
+    held = {r["run_id"] for r in own}
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    try:
+        rows = (db.query(JobRun)
+                .filter(JobRun.status == "running", JobRun.job_type != "candidate_email_classifier_pause")
+                .order_by(JobRun.started_at).all())
+        others = []
+        for row in rows:
+            if str(row.id) in held:
+                continue
+            started = row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=timezone.utc)
+            others.append({
+                "run_id": str(row.id),
+                "job_type": row.job_type,
+                "trigger": row.trigger,
+                "started_at": started.isoformat(),
+                "elapsed_seconds": round((now - started).total_seconds(), 1),
+                "scope_key": None,
+                "target_job_id": str(row.target_job_id) if row.target_job_id else None,
+                "company_id": None,
+            })
+        db.commit()
+    finally:
+        db.close()
+    return own + others
+
+
 def _get_running_by_job_type(job_type: str) -> Optional[dict]:
     """Check if any job with the given job_type is running (ignoring scope_key)."""
     for key, r in _running.items():

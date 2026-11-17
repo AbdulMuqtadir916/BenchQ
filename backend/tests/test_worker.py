@@ -275,3 +275,35 @@ async def test_a_job_type_only_one_process_runs_is_not_claimed(test_db):
     run_id = jm.launch_background("search_run", _noop, scope_key="other")
     await jm._running["search_run:other"].task
     assert _status(test_db, uuid.UUID(run_id)) == "completed"
+
+
+# ── /api/monitor/active shows every process's runs ──────────────────────────
+
+def test_monitor_active_lists_a_run_another_process_holds(test_db, api_client):
+    """The worker's scheduled run is only in `job_runs`, not in the API's memory."""
+    theirs = _run(test_db, "email_check", "scheduler", minutes_ago=2)
+    body = api_client.get("/api/monitor/active").json()
+    assert [r["run_id"] for r in body] == [str(theirs)]
+    row = body[0]
+    assert (row["job_type"], row["trigger"], row["scope_key"], row["company_id"], row["target_job_id"]) == (
+        "email_check", "scheduler", None, None, None)
+    assert row["elapsed_seconds"] >= 119
+    assert set(row) == {"run_id", "job_type", "trigger", "started_at", "elapsed_seconds", "scope_key",
+                        "target_job_id", "company_id"}
+
+
+def test_monitor_active_lists_a_run_this_process_holds_once_with_its_detail(test_db, api_client):
+    mine = _run(test_db, "search_run", "manual")
+    jm._running["search_run:scope-1"] = jm.RunningJob(run_id=mine, job_type="search_run", trigger="manual",
+                                                      started_at=datetime.now(timezone.utc), scope_key="scope-1")
+    body = api_client.get("/api/monitor/active").json()
+    assert [(r["run_id"], r["scope_key"]) for r in body] == [(str(mine), "scope-1")]
+
+
+def test_monitor_active_leaves_out_the_classifier_pause_and_finished_runs(test_db, api_client):
+    _run(test_db, "candidate_email_classifier_pause", "scheduler", minutes_ago=60)
+    _run(test_db, "db_backup", "scheduler", status="completed")
+    _run(test_db, "email_check", "scheduler", status="failed")
+    importing = _run(test_db, "candidate_gmail_import", "scheduler")
+    body = api_client.get("/api/monitor/active").json()
+    assert [r["run_id"] for r in body] == [str(importing)]

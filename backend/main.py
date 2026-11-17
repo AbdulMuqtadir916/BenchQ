@@ -19,7 +19,7 @@ from backend.logging_setup import configure_logging
 from backend.request_log import HEADER as REQUEST_ID_HEADER, NO_ROUTE, RequestLog
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
-from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_running, start_heartbeat, sanitize_run_error
+from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_active, start_heartbeat, sanitize_run_error
 
 from backend.api.routes_settings import router as settings_router
 from backend.api.routes_jobs import router as jobs_router
@@ -859,8 +859,8 @@ def get_scheduler_jobs():
 # ── Monitor endpoints ────────────────────────────────────────────────────────
 @app.get("/api/monitor/active", tags=["monitor"], summary="Currently running jobs")
 def get_active_jobs():
-    """Return all currently running jobs with elapsed time in seconds."""
-    return get_all_running()
+    """Return every process's running jobs (the worker's too, read from job_runs) with elapsed time in seconds."""
+    return get_all_active()
 
 
 @app.get("/api/monitor/in-flight", tags=["monitor"], summary="Per-job active operations")
