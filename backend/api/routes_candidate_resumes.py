@@ -217,7 +217,7 @@ def save_resume_autofill(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id:
 @router.get("/{resume_id}/file", summary="The file an uploaded résumé was read from")
 def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
                     principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
-    """An uploaded base's version 1 as its PDF or Word file, as uploaded: the extension attaches it to a form (docs/02
+    """An uploaded base's version 1 as its PDF or DOCX file, as uploaded: the extension attaches it to a form (docs/02
     §8.2). Any other version has no file of its own and answers 404, so the BDE attaches that one by hand."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
@@ -259,7 +259,7 @@ def use_resume_as_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: u
 async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, background: BackgroundTasks,
                         file: UploadFile = File(...), principal: Principal = Depends(require("resume.edit")),
                         db: DbSession = Depends(get_db)):
-    """PDF or Word, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
+    """PDF or DOCX, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
     with the base it is; if that base was deleted, it comes back instead (its v1, `restored` true, no parser run).
     Otherwise the parser reads it and one transaction keeps the file and writes a new active base with its v1.
     Nothing is saved if the parse fails (§4.6). The database work runs off the event loop

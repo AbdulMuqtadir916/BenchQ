@@ -82,8 +82,8 @@ def test_the_file_kind_comes_from_the_name_and_the_bytes():
     assert parser.file_kind("Ravi.PDF", b"%PDF-1.4 ...") == "pdf"
     assert parser.file_kind("ravi.docx", b"PK\x03\x04...") == "docx"
     cases = [("ravi.doc", b"\xd0\xcf", 415, "Save it as .docx or PDF, then try again."),
-             ("ravi.pdf", b"PK\x03\x04", 415, "PDF or Word only."),          # a renamed file
-             ("ravi.txt", b"hello", 415, "PDF or Word only."),
+             ("ravi.pdf", b"PK\x03\x04", 415, "PDF or DOCX only."),          # a renamed file
+             ("ravi.txt", b"hello", 415, "PDF or DOCX only."),
              ("ravi.pdf", b"", 422, "This file is empty."),
              ("ravi.pdf", b"%PDF" + b"0" * parser.MAX_BYTES, 413, "Up to 10 MB.")]
     for name, content, status, detail in cases:

@@ -1,8 +1,10 @@
 """Reading a résumé for the new-candidate flow (docs/candidate-onboarding/06-backend.md §4; 07 Q49), with the
 base-résumé parser (docs/team/resume-versioning.md §2).
 
-PDF or Word in, the parser's response format out (mapped on the frontend by src/lib/api/dto/resume-parse.ts). The
-text comes from pdfplumber or python-docx, with the link addresses the file embeds added at the end. One call to the
+PDF or DOCX in (nothing else, 2026-11-17 Q108), the parser's response format out (mapped on the frontend by
+src/lib/api/dto/resume-parse.ts). The text comes from pdfplumber or python-docx, with the link addresses the file embeds
+added at the end. A PDF that is only a picture of a résumé (a scan; pdfplumber finds no text) is read by RapidOCR, its
+first pages only, on this server: no file leaves it. One call to the
 `resume_parse` module's own model (its own settings, never the shared ones; §2.2) turns it into the strict format,
 and `clean_reply` (backend/candidates/base_resume.py) fixes the values while keeping the format's keys. Nothing here
 saves a candidate: the route keeps the file and the answer for 60 minutes (`resume_parses`).
@@ -23,6 +25,8 @@ MAX_BYTES = 10 * 1024 * 1024                       # the frontend's RESUME_FILE.
 PDF_MIME = "application/pdf"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 MIN_TEXT = 50                                      # fewer characters than this is a scan or an empty file
+OCR_MOST_PAGES = 4                                 # a scanned résumé's pages read by OCR; a page takes a few seconds
+OCR_RESOLUTION = 200                               # dots per inch the page is drawn at for OCR
 
 # The parse call (resume-versioning.md §2.1): a long résumé needs about 8k output tokens; someone watches the spinner.
 MAX_OUTPUT_TOKENS = 16000
@@ -54,7 +58,7 @@ def file_kind(file_name: str, content: bytes) -> str:
         return "pdf"
     if name.endswith(".docx") and content.startswith(b"PK"):
         return "docx"
-    raise HTTPException(status_code=415, detail="PDF or Word only.")
+    raise HTTPException(status_code=415, detail="PDF or DOCX only.")
 
 
 def _links_block(links: list[str], where: str) -> str:
@@ -67,12 +71,60 @@ def _pdf_text(content: bytes) -> tuple[str, list[str]]:
     import pdfplumber
     with pdfplumber.open(io.BytesIO(content)) as pdf:
         text = "".join(page_text + "\n" for page_text in (page.extract_text() for page in pdf.pages) if page_text)
+        if len(text.strip()) < MIN_TEXT:
+            text = _ocr_text(pdf) or text
         links = []
         try:
             links = [str(link.get("uri") or "") for page in pdf.pages for link in page.hyperlinks]
         except Exception:
             logger.warning("Couldn't read the PDF's link addresses; parsing without them", exc_info=True)
     return text, links
+
+
+_ocr_engine = None
+
+
+def _ocr():
+    """RapidOCR, loaded once per process (its models ship inside the package: nothing is downloaded)."""
+    global _ocr_engine
+    if _ocr_engine is None:
+        from rapidocr_onnxruntime import RapidOCR
+        _ocr_engine = RapidOCR()
+    return _ocr_engine
+
+
+def ocr_lines(boxes) -> list[str]:
+    """RapidOCR's boxes ([corners, text, score], in no set order) as lines, top to bottom and left to right: boxes whose
+    middles sit within half a box's height of each other are one line."""
+    found = []
+    for corners, words, _score in boxes or ():
+        ys, xs = [point[1] for point in corners], [point[0] for point in corners]
+        if str(words).strip():
+            found.append(((min(ys) + max(ys)) / 2, max(max(ys) - min(ys), 1), min(xs), str(words).strip()))
+    lines: list[list] = []
+    for middle, height, left, words in sorted(found):
+        if lines and abs(middle - lines[-1][0]) <= height / 2:
+            lines[-1][1].append((left, words))
+        else:
+            lines.append([middle, [(left, words)]])
+    return [" ".join(words for _left, words in sorted(parts)) for _middle, parts in lines]
+
+
+def _ocr_text(pdf) -> str:
+    """The text of a scanned PDF's first pages by OCR, or "" when it can't be read. Logs counts and timings only."""
+    import time
+    started = time.monotonic()
+    pages = pdf.pages[:OCR_MOST_PAGES]
+    try:
+        engine = _ocr()
+        text = "".join("\n".join(ocr_lines(engine(page.to_image(resolution=OCR_RESOLUTION).original.convert("RGB"))[0]))
+                       + "\n" for page in pages)
+    except Exception as error:
+        logger.warning("Résumé OCR failed %s", type(error).__name__)
+        return ""
+    logger.info("Résumé PDF read by OCR pages=%d of=%d characters=%d seconds=%.1f", len(pages), len(pdf.pages),
+                len(text.strip()), time.monotonic() - started)
+    return text
 
 
 def _docx_text(content: bytes) -> tuple[str, list[str]]:
@@ -107,7 +159,7 @@ def extract_text(kind: str, content: bytes) -> str:
     except Exception:
         raise HTTPException(status_code=422, detail="Couldn't open this file. It may be damaged.")
     if len(text.strip()) < MIN_TEXT:
-        raise HTTPException(status_code=422, detail="This résumé has no readable text. It may be a scanned image.")
+        raise HTTPException(status_code=422, detail="This résumé has no readable text, even read as an image.")
     return text.rstrip() + _links_block(links, "PDF" if kind == "pdf" else "document")
 
 

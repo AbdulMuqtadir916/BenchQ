@@ -219,7 +219,7 @@ def _member_of(firm_id: uuid.UUID, principal: Principal) -> None:
 @router.post("/parse-resume", summary="Read a résumé into a draft (saves nothing about a candidate)")
 async def parse_resume(firm_id: uuid.UUID, file: UploadFile = File(...),
                        principal: Principal = Depends(require("candidate.create")), db: DbSession = Depends(get_db)):
-    """PDF or Word, up to 10 MB. Returns `{parse_id, file_name, parse}` with `parse` in Zuhair's format; the create
+    """PDF or DOCX, up to 10 MB. Returns `{parse_id, file_name, parse}` with `parse` in Zuhair's format; the create
     sends `resume_parse_id` back to keep the file (06 §4)."""
     _member_of(firm_id, principal)
     content = await file.read(MAX_BYTES + 1)
