@@ -29,7 +29,7 @@ export function runFailure(code: string | null): { message: string; canRetry: bo
 export function startRefusal(error: unknown): { message: string; needsBase: boolean } {
   const status = error instanceof ApiError ? error.status : 0;
   const said = error instanceof Error ? error.message : "";
-  if (status === 422) return { message: "This job has no description to tailor to.", needsBase: false };
+  if (status === 422) return { message: "This job has no posting text yet: paste it to tailor.", needsBase: false };
   if (status === 429) return { message: "You have 5 tailorings running. Wait for one to finish.", needsBase: false };
   if (status === 500) return { message: "Tailoring isn't set up yet. Tell your admin.", needsBase: false };
   if (status === 404) return { message: "This job or résumé isn't this candidate's.", needsBase: false };

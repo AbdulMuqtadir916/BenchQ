@@ -15,11 +15,13 @@ import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import { startRefusal } from "./messages";
+import { PastePostingDialog } from "./paste-posting-dialog";
+import { ApiError } from "@/lib/api/client";
 
 interface TailorButtonProps {
   candidate: Candidate;
   /** One of the candidate's own jobs (its id is their posting's). */
-  job: { id: string; title: string };
+  job: { id: string; title: string; company?: { name: string } | null };
   /** "icon": a row's sparkle (the dashboard queue), the same picker beside it. */
   variant?: "button" | "icon";
   className?: string;
@@ -77,6 +79,8 @@ function TailorControl({ candidate, job, variant = "button", className }: Tailor
     [shelfQuery.data, candidate.id],
   );
   const [picked, setPicked] = useState<string | null>(null);
+  // A job without its text (a LinkedIn job, Q107): the tailor refuses it (422), so the BDE pastes the posting first.
+  const [isPasting, setPasting] = useState(false);
   const sourceId = picked && sources.some((s) => s.value === picked && !s.disabled) ? picked : defaultId;
   const source = sources.find((s) => s.value === sourceId) ?? null;
 
@@ -92,7 +96,9 @@ function TailorControl({ candidate, job, variant = "button", className }: Tailor
 
   function tailor() {
     if (!isReady || !sourceId) return;
-    start.mutate({ candidateId: candidate.id, jobId: job.id, resumeId: sourceId });
+    start.mutate({ candidateId: candidate.id, jobId: job.id, resumeId: sourceId }, {
+      onError: (error) => { if (error instanceof ApiError && error.status === 422) setPasting(true); },
+    });
   }
 
   const Icon = isRunning || start.isPending ? LoaderCircle : Sparkles;
@@ -104,6 +110,10 @@ function TailorControl({ candidate, job, variant = "button", className }: Tailor
 
   return (
     <div className={cn("flex flex-col items-end gap-1", className)}>
+      {isPasting ? (
+        <PastePostingDialog candidateId={candidate.id} job={{ id: job.id, title: job.title, company: job.company?.name }}
+          onClose={() => setPasting(false)} onSaved={() => { setPasting(false); start.reset(); tailor(); }} />
+      ) : null}
       <div className="flex items-center gap-1.5">
         {variant === "icon" ? (
           <Button variant="ghost" size="icon" aria-label={`Tailor resume for ${job.title}`} title={label} onClick={tailor} disabled={!isReady}>

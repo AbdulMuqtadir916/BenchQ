@@ -1,7 +1,7 @@
-"""LinkedIn as a search source (decided 2026-11-16, Q75–Q86): the search's inputs (the titles in quotes joined by OR, the
-place and 50 miles, or remote anywhere in the country, 14 days), 10 jobs a request 4 at a time from the cursor, what a
-failed page keeps, the reading of a card (no description; its own id is its identity), and the posting fetched once
-per firm on a job's first open, for every copy, then scored. No network: the queue's request is faked; every job and
+"""LinkedIn as a search source (decided 2026-11-16, Q75–Q86; 2026-11-17, Q96–Q114): the search's inputs (the titles in
+quotes joined by OR, the place and 50 miles, 14 days, the other levels left out), 10 jobs a request 4 at a time from
+the cursor, what a failed page keeps, the reading of a card (no description; its own id is its identity), and the
+posting the BDE pastes to tailor (never fetched, never scored). No network: the queue's request is faked; every job and
 card here is made up."""
 import asyncio
 import hashlib
@@ -124,33 +124,43 @@ def _saved(test_db, world, candidate, linkedin_id="7654321"):
     return posting.id
 
 
-@pytest.fixture
-def postings(monkeypatch):
-    calls = []
-
-    def posting(linkedin_id, firm_id, deadline):
-        calls.append((linkedin_id, firm_id))
-        return {"description": "<p>Build Java services with Spring.</p><p>US citizens only.</p>",
-                "job_url_direct": "https://jobs.example.test/apply/7654321"}
-    monkeypatch.setattr(li, "_posting", posting)
-    return calls
+def _paste(client, world, candidate, posting_id, text, who="adnan"):
+    return client.put(f"/api/firms/{world['firm'].id}/candidates/{candidate['id']}/job-postings/{posting_id}/posting",
+                      json={"text": text}, headers=world["as"][who])
 
 
-def test_the_first_open_fetches_the_posting_once_for_every_copy_in_the_firm(anonymous_client, world, adnans,
-                                                                           postings, test_db):
+POSTING = ("Java Developer at Example Corp. Build Java services with Spring Boot and Kafka. 3+ years of Java. "
+           "Work with a small team in Austin, TX.")
+
+
+def test_the_bde_pastes_a_linkedin_posting_for_every_copy_and_it_stays_unscored(anonymous_client, world, adnans,
+                                                                               test_db):
+    """Q107, Q114: BenchQ never fetches a LinkedIn posting; the BDE pastes it to tailor. Every copy in the firm gets it;
+    LinkedIn jobs are never scored."""
     from backend.models.job_search import JobPosting
+    from backend.models.tenancy import LedgerEntry
+    assert not hasattr(li.LinkedIn(), "full_description")
     other = _create(anonymous_client, world, bde="adnan").json()
     first, second = _saved(test_db, world, adnans), _saved(test_db, world, other)
-    r = anonymous_client.get(f"/api/firms/{world['firm'].id}/job-postings/{first}", headers=world["as"]["adnan"])
-    assert r.status_code == 200 and "Build Java services with Spring." in r.json()["description"]
-    assert r.json()["apply_url"] == "https://jobs.example.test/apply/7654321"       # the employer's own link
-    assert postings == [("7654321", world["firm"].id)]
+    r = _paste(anonymous_client, world, adnans, first, POSTING)
+    assert r.status_code == 200 and "Spring Boot" in r.json()["description"]
     test_db.expire_all()
     for posting_id in (first, second):
         row = test_db.get(JobPosting, posting_id)
-        assert row.content["_full_posting"] is True and row.match_score is not None  # every copy, then scored
-    anonymous_client.get(f"/api/firms/{world['firm'].id}/job-postings/{second}", headers=world["as"]["owner"])
-    assert len(postings) == 1                                                       # kept: never asked again
+        assert row.content["_pasted"] is True and "Kafka" in row.content["description"] and row.match_score is None
+    assert test_db.query(LedgerEntry).filter(LedgerEntry.summary == "Added the job's posting by hand").count() == 1
+    assert _paste(anonymous_client, world, adnans, first, POSTING).status_code == 409          # it has its text now
+
+
+def test_a_paste_that_names_neither_the_title_nor_the_company_is_refused(anonymous_client, world, adnans, test_db):
+    posting_id = _saved(test_db, world, adnans)
+    r = _paste(anonymous_client, world, adnans, posting_id, "Cookie settings. Sign in to see more jobs like this. " * 3)
+    assert r.status_code == 422
+
+
+def test_only_the_candidates_bde_pastes(anonymous_client, world, adnans, test_db):
+    posting_id = _saved(test_db, world, adnans)
+    assert _paste(anonymous_client, world, adnans, posting_id, POSTING, who="owner").status_code == 403
 
 
 def test_a_job_without_its_text_is_saved_unscored(world, adnans, test_db):

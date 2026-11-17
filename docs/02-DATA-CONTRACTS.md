@@ -1472,7 +1472,18 @@ none. Since 2026-11-17 (Q96–Q99) the search also gets the candidate's level (`
 LinkedIn leaves the other levels out with NOT words (its own level filter is ignored by its public search),
 freehire.me asks for those seniorities (`seniority`, with the unstated ones), Indeed takes nothing more (one filter
 type per search; excluded words apply to the whole posting); a job without its text gets the level check from its
-title alone. LinkedIn's newest jobs' date (`listdate--new`) is read too. The same filters at save; the daily limits are shared by both sources. A key
+title alone. LinkedIn's newest jobs' date (`listdate--new`) is read too.
+
+**LinkedIn postings (2026-11-17, Q106–Q115; replaces the first-open fetch of Q83–Q86).** BenchQ never fetches a
+LinkedIn posting and never scores a LinkedIn job (`match.store.UNSCORED_SOURCES`). The job pane shows LinkedIn's own
+page in a frame (`source-preview.tsx` `LinkedInFrame`); LinkedIn refuses framing, and the BenchQ Apply extension lifts
+that for frames BenchQ opens, with JobNavigator's two session rules (`extension/src/frame-rules.ts`: sub_frame,
+initiator BenchQ's host, BenchQ's own responses excluded, x-frame-options and CSP removed, sec-fetch-dest/site set; the
+panel's "Posting preview" switch, on by default). "Open on LinkedIn" stays beside it. To tailor a LinkedIn job, the
+tailor's 422 opens a paste pop-up: `PUT …/candidates/{id}/job-postings/{posting_id}/posting {text}` (the candidate's
+BDE, `can_manage_resume`; 50–100,000 characters; 409 when the job already has its text; 422 when the text names
+neither the job's title nor its company) puts the text on every copy of the job in the firm, with `_pasted`, and a
+ledger entry. The same filters at save; the daily limits are shared by both sources. A key
 (`FREEHIRE_API_KEY`) is sent when set: freehire.me's terms allow the API without one for non-commercial use only, so
 the licence is settled before production.
 

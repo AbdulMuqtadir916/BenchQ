@@ -19,7 +19,8 @@ describe("the extension's manifest", () => {
 
   it("keeps what the extension does: its permissions, panel, shortcuts and icons", () => {
     const manifest = buildManifest(STORE);
-    expect(manifest.permissions).toEqual(["sidePanel", "scripting", "storage", "webNavigation"]);
+    // declarativeNetRequest: LinkedIn postings inside BenchQ (frame-rules.ts, decided 2026-11-17).
+    expect(manifest.permissions).toEqual(["sidePanel", "scripting", "storage", "webNavigation", "declarativeNetRequest"]);
     expect(manifest.side_panel).toEqual({ default_path: "index.html" });
     expect(Object.keys(manifest.commands)).toEqual(["run-autofill", "mark-applied"]);
     expect(manifest.background.service_worker).toBe("background.js");

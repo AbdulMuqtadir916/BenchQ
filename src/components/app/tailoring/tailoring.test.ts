@@ -16,7 +16,7 @@ describe("why a tailoring failed (part 3 Q8)", () => {
 
   it("says why a start was refused, with a link to the résumés when there's no base", () => {
     const refusal = (status: number, message = "") => startRefusal(new ApiError(message, "X", status));
-    expect(refusal(422).message).toMatch(/no description/);
+    expect(refusal(422).message).toMatch(/no posting text yet: paste it/);
     expect(refusal(429).message).toMatch(/5 tailorings running/);
     expect(refusal(500).message).toMatch(/isn't set up/);
     expect(refusal(409, "This candidate has no active base résumé to tailor from.")).toEqual({ message: "This candidate has no active base résumé to tailor from.", needsBase: true });

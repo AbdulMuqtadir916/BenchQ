@@ -12,6 +12,8 @@ candidate's is the same 404 as a missing one.
                                    location?}`: 201, or 200 with the job the candidate already has (job search PR 2)
 - GET  …/job-postings?page=&size=  the candidate's jobs, newest first, in the common fields
 - GET  …/job-postings/{posting_id} one job, with its description
+- PUT  …/job-postings/{posting_id}/posting  the posting's text, pasted by the candidate's BDE for a job that came
+                                   without it (a LinkedIn job, decided 2026-11-17, Q107), so it can be tailored
 Firm level (job search PR 3, docs/02 §6.z), for the job screens:
 - GET  /firms/{firm_id}/job-postings?candidate_id=&sort=&min_score=&source=&remote=&q=&offset=&limit=
                                    the jobs of every candidate the principal sees (or of one), one item per job (the
@@ -39,7 +41,8 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
 from backend.api.routes_candidates import _candidate, _member_of, _visible
-from backend.auth.policy import can_search_jobs
+from backend.auth import ledger
+from backend.auth.policy import can_manage_resume, can_search_jobs
 from backend.auth.scoping import scoped
 from backend.auth.sessions import Principal
 from backend.job_monitor import JobAlreadyRunningError, launch_background
@@ -50,6 +53,7 @@ from backend.job_search.text import clean_json, safe_url, typed_text
 from backend.models.candidates import Candidate
 from backend.models.db import Application, get_db, utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
+from backend.models.tenancy import User
 
 # The firm in the prefix; a candidate's routes add CANDIDATE, the firm-level reads don't (job search PR 3).
 router = APIRouter(prefix="/firms/{firm_id}", tags=["job search"])
@@ -308,6 +312,56 @@ def get_posting(firm_id: uuid.UUID, candidate_id: uuid.UUID, posting_id: uuid.UU
                                       JobPosting.id == posting_id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Not found.")
+    return _posting_json(row, with_description=True)
+
+
+class PostingText(BaseModel):
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=50, max_length=100_000),
+                    AfterValidator(_lines)]
+
+
+_WORD = re.compile(r"[a-z0-9+#]+")
+
+
+def _mentions(text: str, *names: str) -> bool:
+    """Whether `text` names one of `names` (a job's title or company): all its words, in any case and order."""
+    words = set(_WORD.findall(text.lower()))
+    return any(name and set(_WORD.findall(name.lower())) <= words for name in names)
+
+
+@router.put(CANDIDATE + "/job-postings/{posting_id}/posting", summary="Paste the text of a job that came without it")
+def paste_posting(firm_id: uuid.UUID, candidate_id: uuid.UUID, posting_id: uuid.UUID, body: PostingText,
+                  principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    """A job that came without its text (a LinkedIn job: BenchQ never fetches it, Q114) gets the posting the BDE copied
+    from LinkedIn's page, so it can be tailored (decided 2026-11-17, Q107). The candidate's BDE only, like tailoring
+    (`can_manage_resume`); a support view never writes. Refused: a job that already has its text (409), and text that
+    names neither the job's title nor its company (422: probably another job, or a part of the page). The text goes on
+    every copy of the job in the firm. LinkedIn jobs stay unscored. One ledger entry."""
+    _member_of(firm_id, principal)
+    candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
+    if not can_manage_resume(principal, candidate):
+        raise HTTPException(status_code=403, detail="Only this candidate's BDE adds a job's posting.")
+    row = scoped(db, JobPosting, firm_id).filter(JobPosting.candidate_id == candidate.id,
+                                                 JobPosting.id == posting_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not found.")
+    reader = providers.reader_for(row.source)
+    fields = reader.read(row.content or {}) if reader else None
+    if fields is None or fields.description:
+        raise HTTPException(status_code=409, detail="This job already has its posting.")
+    if not _mentions(body.text, fields.title, fields.company):
+        raise HTTPException(status_code=422, detail="The text doesn't name this job's title or company. Copy the "
+                                                    "posting itself.")
+    text = clean_json(body.text)
+    copies = scoped(db, JobPosting, firm_id).filter(JobPosting.job_id == row.job_id,
+                                                    JobPosting.source == row.source).with_for_update().all()
+    for copy in copies:
+        copy.content = {**(copy.content or {}), "description": text, "_pasted": True}
+    ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="job_posting",
+                  entity_id=row.id, entity_label=f"{fields.title} at {fields.company}"[:200], firm_id=firm_id,
+                  candidate_id=candidate.id, summary="Added the job's posting by hand")
+    db.commit()
+    db.refresh(row)
     return _posting_json(row, with_description=True)
 
 

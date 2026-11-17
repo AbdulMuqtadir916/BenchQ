@@ -70,8 +70,14 @@ def scorer_for(db, candidate, version=None) -> Scorer:
         return Scorer(who=who)
 
 
+# Sources whose jobs are never scored (decided 2026-11-17: LinkedIn's, even once a posting is pasted for tailoring).
+UNSCORED_SOURCES = frozenset({"linkedin"})
+
+
 def fields_of(posting: JobPosting):
-    """The posting as its source reads it, or None when it can't be read."""
+    """The posting as its source reads it, or None when it can't be read or is never scored."""
+    if posting.source in UNSCORED_SOURCES:
+        return None
     reader = reader_for(posting.source)
     try:
         fields = reader.read(posting.content or {}) if reader else None

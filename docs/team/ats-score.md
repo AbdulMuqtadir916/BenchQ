@@ -61,10 +61,11 @@ Since 2026-11-16 (Q70), a search also leaves out a job held at 40 for the candid
 than the résumé covers, or a level two rungs away), counted on the result line ("N left out: level"); freehire.me is
 asked only for jobs within `score.most_years_asked` (Q74). A capture is never left out.
 
-## A job without its text
+## LinkedIn jobs: never scored
 
-A LinkedIn job comes without its posting (Q80): it has no Match ("—") and skips the text-based filters until its
-posting is fetched on the first open (Q83); it is scored then.
+A LinkedIn job comes without its posting, and BenchQ never fetches it (2026-11-17, Q114): it has no Match ("—"), even
+after a BDE pastes its posting to tailor (`store.UNSCORED_SOURCES`). It skips the text-based filters; the level check
+reads its title (Q97).
 
 ## Work authorization: left out, not held
 

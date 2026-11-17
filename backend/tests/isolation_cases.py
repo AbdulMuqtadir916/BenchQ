@@ -154,6 +154,10 @@ CASES: dict[str, Case] = {
         as_bde=True, body=lambda i: {"source": "manual", "title": "Java Developer", "company": "Example Corp",
                                      "description": f"Captured job {uuid.uuid4()}", "url": "https://jobs.example.test/c"}),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": Case(shows_rows=True),
+    # The BDE pastes a posting only for a job that came without its text (a LinkedIn job); the sweep's job has its
+    # text, so firm B's own call is refused with 409, and firm A's is the 404 of isolation.
+    "PUT /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}/posting": Case(
+        as_bde=True, refused=409, body=lambda i: {"text": "Java Developer at Example Corp. " + "Build services. " * 5}),
     "GET /api/firms/{firm_id}/job-postings": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/job-postings/{posting_id}": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),

@@ -109,6 +109,8 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": F,   # a capture (job search PR 2), the BDE's
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": F,
+    # A job's posting, pasted by the candidate's BDE for a job that came without it (LinkedIn, 2026-11-17, Q107).
+    "PUT /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}/posting": F,
     # The job screens' firm-level reads (job search PR 3): only the candidates the principal sees.
     "GET /api/firms/{firm_id}/job-postings": F,
     "GET /api/firms/{firm_id}/job-postings/{posting_id}": F,

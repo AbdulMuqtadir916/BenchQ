@@ -32,7 +32,7 @@ export function SourcePreview({ job, portal, onOpenSource = null }: { job: Job; 
             <PortalLogo portal="COMPANY" domain={job.company.domain} size={40} />
             <div><h3 className="text-h2 text-[var(--color-text)]">{job.title}</h3><p className="mt-0.5 text-sm text-[var(--color-text-2)]">{job.company.name} · {jobLocation(job)}</p><p className="mt-1 inline-flex items-center gap-1 text-caption text-[var(--color-text-3)]"><Clock3 size={12} />{job.postedAt ? `Posted ${formatRelative(job.postedAt)}` : "Posting date not given"}{job.applicantCount ? ` · ${job.applicantCount} applicants` : ""}</p></div>
           </div>
-          <Description job={job} portal={portal} />
+          {portal === "LINKEDIN" && sourceUrl ? <LinkedInFrame url={sourceUrl} title={job.title} /> : <Description job={job} portal={portal} />}
           {job.requirements.length > 0 ? (
             <div className="mt-6 flex flex-wrap gap-1.5 border-t border-[var(--color-border)] pt-4">
               {job.requirements.slice(0, 8).map((requirement) => <Tag key={requirement.id} tone={requirement.kind === "MANDATORY" ? "blue" : "neutral"}>{requirement.value}</Tag>)}
@@ -40,6 +40,23 @@ export function SourcePreview({ job, portal, onOpenSource = null }: { job: Job; 
           ) : null}
         </div>
       </article>
+    </div>
+  );
+}
+
+/**
+ * A LinkedIn job's own page, in a frame (decided 2026-11-17, Q106, Q115): LinkedIn refuses to be framed, and the BenchQ
+ * Apply extension lifts that for frames BenchQ opens ("Posting preview", on by default). Without the extension the
+ * frame stays blank, so "Open on LinkedIn" is always beside it. BenchQ never fetches LinkedIn postings (Q114).
+ */
+function LinkedInFrame({ url, title }: { url: string; title: string }) {
+  return (
+    <div className="space-y-2">
+      <iframe src={url} title={`LinkedIn posting: ${title}`} loading="lazy"
+        className="h-screen w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)]" />
+      <p className="text-caption text-[var(--color-text-3)]">
+        Shown by the BenchQ Apply extension (Posting preview). Blank? Turn it on in the extension, or open it on LinkedIn.
+      </p>
     </div>
   );
 }
@@ -65,12 +82,11 @@ function Description({ job, portal }: { job: Job; portal: PortalKey }) {
       </div>
     );
   }
-  // A LinkedIn job's posting arrives on its first open, in turn with every firm's LinkedIn requests (Q83, Q86).
+  // BenchQ never fetches a LinkedIn posting (Q114); the frame shows it when the job has its LinkedIn link.
   if (!description && portal === "LINKEDIN") {
     return (
       <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-2)]">
-        <span>LinkedIn didn&apos;t send the posting this time. Read it on LinkedIn, or try again.</span>
-        <Button variant="secondary" size="sm" onClick={() => void detail.refetch()}>Try again</Button>
+        <span>BenchQ doesn&apos;t fetch LinkedIn postings: read it on LinkedIn.</span>
       </div>
     );
   }

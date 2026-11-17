@@ -52,6 +52,20 @@ export function useJob(id: string, candidateId?: string) {
 }
 
 /** Capture a job for one candidate (docs/02 §6.z). The new job leads the lists; the usage and the ledger refresh. */
+/** The posting text a BDE pasted for a job that came without it (a LinkedIn job, decided 2026-11-17, Q107). */
+export function usePastePosting() {
+  const firmId = useFirmId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ candidateId, jobId, text }: { candidateId: string; jobId: string; text: string }) =>
+      jobsApi.pastePosting(firmId, candidateId, jobId, text),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all(firmId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
+    },
+  });
+}
+
 export function useCaptureJob() {
   const firmId = useFirmId();
   const queryClient = useQueryClient();

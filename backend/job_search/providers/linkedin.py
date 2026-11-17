@@ -13,9 +13,10 @@ One search (Q77), the same inputs as Indeed's:
   `cursor` (the next job number; LinkedIn goes no further than 1,000). A page that fails keeps what came before it,
   and the next search starts there; a search stops at `TIME_LIMIT_SECONDS` the same way.
 
-A job card has no description (live 2026-11-16: title, company, place, date and LinkedIn's job page). Its posting is
-fetched once, when someone first opens the job (Q83, Q86: `full_description`, through the same pace, ahead of
-searches), from LinkedIn's guest posting page; until then it has no Match and no text-based filter (Q80).
+A job card has no description (live 2026-11-16: title, company, place, date and LinkedIn's job page). BenchQ never
+fetches the posting (decided 2026-11-17, Q114): the job pane shows LinkedIn's own page in a frame, through the BenchQ
+Apply extension (Q106, Q115); to tailor, the BDE pastes the posting's text (Q107). LinkedIn jobs are never scored
+(no Match) and skip the text-based filters; the level check reads their title (Q97).
 
 LinkedIn's terms forbid scraping: this must be settled before production (docs/team/cross-area-changes.md, Q78).
 A stored job is jobspy's `JobPost` as JSON, plus `linkedin_id` and `searched_remote` (the search asked for remote
@@ -33,13 +34,11 @@ from backend.job_search.text import clean_str, html_to_text, safe_url
 logger = logging.getLogger("benchq.job_search")
 
 SEARCH_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-POSTING_URL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{id}"
 PAGE = 10                               # jobs a request returns
 AT_ONCE = 4                             # requests sent together (the queue allows 4 for every firm together)
 RADIUS_MILES = 50
 LAST_START = 1000                       # LinkedIn's search goes no further
 TIME_LIMIT_SECONDS = 240.0              # one search, every page and every wait included (Q76)
-OPEN_LIMIT_SECONDS = 60.0               # one job's posting, the wait in line included
 COUNTRIES = {"us": ("usa", "United States"), "ca": ("canada", "Canada"), "in": ("india", "India")}
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 _SPACES = re.compile(r"\s+")
@@ -183,40 +182,10 @@ def _search(query: str, country: str, limit: int, cursor: str | None, place: str
                         next_cursor=str(start) if more and start < LAST_START else None)
 
 
-def _posting(linkedin_id: str, firm_id, deadline: float) -> dict | None:
-    """One job's posting from LinkedIn's guest posting page: {description (HTML), job_url_direct?}, or None."""
-    from bs4 import BeautifulSoup
-
-    from backend.job_search import linkedin_queue
-
-    _, headers = _jobspy()
-    try:
-        status, body = linkedin_queue.get(POSTING_URL.format(id=linkedin_id), None, headers, kind="open",
-                                          firm_id=firm_id, deadline=deadline)
-    except linkedin_queue.Busy:
-        raise ProviderError("timeout") from None
-    except Exception:
-        raise ProviderError("provider_unavailable") from None
-    if status != 200:
-        raise ProviderError(_page_error(status))
-    soup = BeautifulSoup(body, "html.parser")
-    markup = soup.find("div", class_=lambda c: c and "show-more-less-html__markup" in c)
-    if markup is None:
-        raise ProviderError("bad_response")
-    out = {"description": str(markup)}
-    try:
-        direct = _scraper("us")._parse_job_url_direct(soup)      # the employer's own apply link, when LinkedIn has one
-    except Exception:
-        direct = None
-    if safe_url(direct):
-        out["job_url_direct"] = direct
-    return out
-
-
 class LinkedIn:
     name = "linkedin"
     label = "LinkedIn"
-    sends_descriptions = False          # a search's jobs have none; `full_description` fetches one on its first open
+    sends_descriptions = False          # a search's jobs have none: LinkedIn's page shows in a frame (Q106)
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
@@ -232,14 +201,6 @@ class LinkedIn:
                                           timeout=TIME_LIMIT_SECONDS + 60)
         except asyncio.TimeoutError:
             raise ProviderError("timeout") from None
-
-    async def full_description(self, content: dict, firm_id=None) -> dict | None:
-        """The job's posting, fetched once on its first open (Q83): {description, job_url_direct?}."""
-        linkedin_id = str(content.get("linkedin_id") or "")
-        if not _ID.match(linkedin_id):
-            return None
-        deadline = time.monotonic() + OPEN_LIMIT_SECONDS
-        return await asyncio.to_thread(_posting, linkedin_id, firm_id, deadline)
 
     def read(self, content: dict) -> JobFields:
         place = content.get("location") if isinstance(content.get("location"), dict) else {}

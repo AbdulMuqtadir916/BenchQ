@@ -82,6 +82,13 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 - **LinkedIn's newest jobs keep their date** (its `listdate--new` tag).
 - **No Banking or Insurance suggestions** in onboarding or the details tab (saved values stay).
 - **"Save details" goes back to Overview** with "Details saved".
+
+## Decisions (2026-11-17): LinkedIn in a frame, pasted to tailor (Q106–Q115)
+
+- **LinkedIn's page in the job pane**, through the BenchQ Apply extension (JobNavigator's frame rules, "Posting
+  preview" switch); "Open on LinkedIn" always beside it.
+- **No LinkedIn fetching, no LinkedIn scoring.** To tailor one, the BDE pastes the posting (a pop-up when the tailor
+  refuses a job without text); the paste must name the job's title or company.
 - **No Adzuna** (Q64): freehire.me's search asks for no jobs it took from Adzuna (`source_exclude=adzuna`), which it
   has only as a 500-character preview; one that comes back anyway is left out and counted ("N left out: Adzuna
   preview"). A live check (Dallas) went from 88 jobs, 18 of them previews, to 56 jobs, none.

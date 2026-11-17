@@ -25,6 +25,7 @@ import AddJobCard from "./autofill/AddJobCard";
 import { useTabConnection } from "./autofill/use-tab-connection";
 import type { AppliedForm } from "./autofill/types";
 import JobTabs, { JOB_PANEL, tabId, type JobTab } from "./JobTabs";
+import { PREVIEW_KEY } from "./frame-rules";
 import "./style.css";
 import {
   ALERT,
@@ -67,6 +68,16 @@ const isConnectable = (job: Application) =>
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
+  // "Posting preview": LinkedIn postings shown inside BenchQ (frame-rules.ts). On unless turned off.
+  const [isPreviewOn, setPreviewOn] = useState(true);
+  useEffect(() => {
+    void chrome.storage.sync.get([PREVIEW_KEY]).then((stored) => setPreviewOn(stored[PREVIEW_KEY] !== false));
+  }, []);
+  const togglePreview = () => {
+    const next = !isPreviewOn;
+    setPreviewOn(next);
+    void chrome.storage.sync.set({ [PREVIEW_KEY]: next });
+  };
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selectedCandidateId, setSelectedCandidateId] = useState(
     () => localStorage.getItem("benchq-selected-candidate") || "",
@@ -476,6 +487,14 @@ function App() {
                 <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
               </svg>
             )}
+          </button>
+          <button
+            className={button("secondary", "small")}
+            onClick={togglePreview}
+            aria-pressed={isPreviewOn}
+            title="Show LinkedIn postings inside BenchQ"
+          >
+            <span>Posting preview: {isPreviewOn ? "On" : "Off"}</span>
           </button>
           <button
             className={button("secondary", "small")}

@@ -59,6 +59,9 @@ const live = {
     return { jobs: items.map((item) => toFirmJob(item, firmId)), total: total ?? items.length, nextOffset: next_offset ?? null };
   },
   byId: async (firmId: string, id: string): Promise<Job> => toFirmJob(await http.get(`${firmPath(firmId)}/job-postings/${id}`, FirmJobDto), firmId),
+  /** The posting the BDE copied for a job that came without its text (a LinkedIn job, decided 2026-11-17, Q107). */
+  pastePosting: async (firmId: string, candidateId: string, id: string, text: string): Promise<Job> =>
+    toCandidateJob(await http.put(`${candidatePath(firmId, candidateId)}/job-postings/${id}/posting`, CandidatePostingDto, { body: { text } }), firmId),
   candidateJob: async (firmId: string, candidateId: string, id: string): Promise<Job> =>
     toCandidateJob(await http.get(`${candidatePath(firmId, candidateId)}/job-postings/${id}`, CandidatePostingDto), firmId),
   capture: async (firmId: string, body: CaptureJob): Promise<Job> => {
@@ -89,6 +92,9 @@ export const jobsApi = {
 
   /** One of the candidate's own jobs; another candidate's is not-found (Zuhair 2026-11-12: only their jobs). */
   candidateJob: (firmId: string, candidateId: string, id: string): Promise<Job> => live.candidateJob(firmId, candidateId, id),
+
+  /** Paste a LinkedIn job's posting so it can be tailored (BenchQ never fetches LinkedIn postings). */
+  pastePosting: (firmId: string, candidateId: string, id: string, text: string): Promise<Job> => live.pastePosting(firmId, candidateId, id, text),
 
   /** For one candidate (their BDE only); the same job again throws `DUPLICATE_JOB` naming the one they have. */
   capture: (firmId: string, body: CaptureJob): Promise<Job> => live.capture(firmId, body),

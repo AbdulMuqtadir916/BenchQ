@@ -9,9 +9,13 @@ type InjectionResult = { frameId: number; result?: unknown };
 type FrameDetails = { tabId: number; frameId: number };
 
 declare const chrome: {
+  declarativeNetRequest: {
+    updateSessionRules(options: { removeRuleIds?: number[]; addRules?: unknown[] }): Promise<void>;
+  };
   runtime: {
     id: string;
     onInstalled: ChromeEvent<() => void>;
+    onStartup: ChromeEvent<() => void>;
     onMessage: ChromeEvent<(
       message: unknown,
       sender: { id?: string; tab?: ChromeTab },
@@ -55,6 +59,10 @@ declare const chrome: {
       get(keys: string | null): Promise<Record<string, unknown>>;
       set(items: Record<string, unknown>): Promise<void>;
       remove(keys: string | string[]): Promise<void>;
+    };
+    sync: {
+      get(keys: string | string[] | null): Promise<Record<string, unknown>>;
+      set(items: Record<string, unknown>): Promise<void>;
     };
     onChanged: ChromeEvent<(changes: Record<string, unknown>, area: string) => void>;
   };
