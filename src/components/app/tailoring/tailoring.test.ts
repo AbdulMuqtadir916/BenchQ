@@ -18,7 +18,9 @@ describe("why a tailoring failed (part 3 Q8)", () => {
     const refusal = (status: number, message = "") => startRefusal(new ApiError(message, "X", status));
     expect(refusal(422).message).toMatch(/no posting text yet: paste it/);
     expect(refusal(429).message).toMatch(/5 tailorings running/);
-    expect(refusal(500).message).toMatch(/isn't set up/);
+    expect(refusal(500, "The résumé tailor isn't set up: no tailor model.").message).toMatch(/isn't set up yet/);
+    expect(refusal(500, "Internal Server Error").message).toBe("BenchQ didn't answer. Try again in a moment.");   // the proxy, mid-restart
+    expect(refusal(503).message).toBe("BenchQ didn't answer. Try again in a moment.");
     expect(refusal(409, "This candidate has no active base résumé to tailor from.")).toEqual({ message: "This candidate has no active base résumé to tailor from.", needsBase: true });
     expect(refusal(409, "This résumé is already being tailored for this job.").needsBase).toBe(false);
     expect(startRefusal(new Error("offline")).message).toBe("Tailoring didn't start. Try again.");

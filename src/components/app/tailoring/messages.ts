@@ -31,7 +31,10 @@ export function startRefusal(error: unknown): { message: string; needsBase: bool
   const said = error instanceof Error ? error.message : "";
   if (status === 422) return { message: "This job has no posting text yet: paste it to tailor.", needsBase: false };
   if (status === 429) return { message: "You have 5 tailorings running. Wait for one to finish.", needsBase: false };
-  if (status === 500) return { message: "Tailoring isn't set up yet. Tell your admin.", needsBase: false };
+  // "Not set up" only when the backend says so (its 500 names the missing setting): a 500 from the proxy while the
+  // backend restarts, or a 502/503, is BenchQ not answering, and trying again helps (found 2026-11-17).
+  if (status === 500 && /isn't set up/i.test(said)) return { message: "Tailoring isn't set up yet. Tell your admin.", needsBase: false };
+  if (status >= 500) return { message: "BenchQ didn't answer. Try again in a moment.", needsBase: false };
   if (status === 404) return { message: "This job or résumé isn't this candidate's.", needsBase: false };
   if (status === 409) return { message: said || "This résumé can't be tailored now.", needsBase: /no active base/i.test(said) };
   return { message: "Tailoring didn't start. Try again.", needsBase: false };

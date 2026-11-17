@@ -141,7 +141,9 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
           {isSearching ? "Searching…" : "Find jobs"}
         </Button>
       </div>
-      <p id={`find-jobs-${candidate.id}`} className="max-w-xs text-right text-caption text-[var(--color-text-3)] sm:max-w-none" aria-live="polite">
+      {/* Capped and wrapping: a click's line names every source and every reason a job was left out (2026-11-17), and
+          at full length it squeezed the candidate's name into a narrow column beside it. */}
+      <p id={`find-jobs-${candidate.id}`} className="max-w-xs text-right text-caption text-[var(--color-text-3)] sm:max-w-sm md:max-w-md" aria-live="polite">
         {isUnknown ? (
           <span className="inline-flex items-center gap-2">Today&apos;s searches didn&apos;t load.<button type="button" onClick={() => void searchesQuery.refetch()} className="underline">Retry</button></span>
         ) : blocked ? (
@@ -153,7 +155,7 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
         ) : last && searches ? (
           searchOutcome(last, searches.usage.jobsCap)
         ) : null}
-        {searches && !blocked ? <span className="block sm:whitespace-nowrap">{usageLine(searches)}</span> : null}
+        {searches && !blocked ? <span className="block">{usageLine(searches)}</span> : null}
       </p>
     </div>
   );
