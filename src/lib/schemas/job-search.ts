@@ -25,6 +25,10 @@ export const JobSearchSchema = z.object({
   leftOutAdzunaCount: z.number().int(),
   /** Left out because Match holds it at 40 for the candidate's level: far more years asked, or two rungs away (Q70). */
   leftOutLevelCount: z.number().int(),
+  /** New jobs by source, for a click that asked several (decided 2026-11-17, Q90): backend source name → count. */
+  newBySource: z.record(z.string(), z.number().int()),
+  /** Sources that failed in that click (Q93): backend source names. */
+  failedSources: z.array(z.string()),
   errorCode: JobSearchErrorCode.nullable(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime().nullable(),
@@ -48,17 +52,9 @@ export type JobSearchUsage = z.infer<typeof JobSearchUsageSchema>;
 export const JobSearchPlaceSchema = z.object({
   value: z.string(),
   label: z.string(),
-  kind: z.enum(["home", "preferred", "remote"]),
+  kind: z.enum(["home", "preferred", "hybrid", "remote"]),
 });
 export type JobSearchPlace = z.infer<typeof JobSearchPlaceSchema>;
-
-/** A job source a search can use (backend/job_search/providers `choices()`, decided 2026-11-16, Q53): `value` is what a
- * search sends ("indeed", "freehire"), `label` how the picker names it. */
-export const JobSearchSourceSchema = z.object({
-  value: z.string(),
-  label: z.string(),
-});
-export type JobSearchSource = z.infer<typeof JobSearchSourceSchema>;
 
 export const JobSearchesSchema = z.object({
   running: JobSearchSchema.nullable(),
@@ -69,7 +65,5 @@ export const JobSearchesSchema = z.object({
   role: z.string().nullable(),
   /** The places the BDE picks from, in order; empty when the candidate has none (no search then). */
   places: z.array(JobSearchPlaceSchema),
-  /** The sources the BDE picks from, Indeed first; the first is the default. */
-  sources: z.array(JobSearchSourceSchema),
 });
 export type JobSearches = z.infer<typeof JobSearchesSchema>;

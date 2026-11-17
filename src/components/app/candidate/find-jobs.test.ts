@@ -4,13 +4,13 @@ import { blockedReason, placeLabel, searchOutcome, searchRole, usageLine } from 
 
 const search = (over: Partial<JobSearch> = {}): JobSearch => ({
   id: "b1", kind: "SEARCH", state: "SUCCESS", query: "Java Developer", place: "Austin, TX", newCount: 12, seenAgainCount: 3, overLimitCount: 0,
-  leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0, leftOutAdzunaCount: 0, leftOutLevelCount: 0,
+  leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0, leftOutAdzunaCount: 0, leftOutLevelCount: 0, newBySource: {}, failedSources: [],
   errorCode: null, startedAt: "2026-11-11T14:00:00.000Z", finishedAt: "2026-11-11T14:00:09.000Z", ...over,
 });
 const searches = (over: Partial<JobSearches["usage"]> = {}, places: JobSearches["places"] = [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }]): JobSearches => ({
   running: null, searches: [],
   usage: { jobsToday: 47, jobsCap: 100, searchesToday: 3, searchesCap: 20, capturesToday: 2, capturesCap: 20, resetsAt: "2026-11-12T13:00:00.000Z", ...over },
-  role: "Backend Engineer", places, sources: [{ value: "indeed", label: "Indeed" }, { value: "freehire", label: "freehire.me" }],
+  role: "Backend Engineer", places
 });
 const candidate = { targetRoles: ["Backend Engineer"], country: "US" };
 
@@ -52,5 +52,18 @@ describe("Find jobs (docs/02 §6.z)", () => {
     expect(blockedReason({ ...candidate, country: null }, searches())).toBe("Add the candidate's country on their résumé");
     expect(blockedReason(candidate, searches({ searchesToday: 20 }))).toBe("20/20 searches today · resets 6:30 PM IST");
     expect(blockedReason(candidate, searches({ jobsToday: 100 }))).toBe("100/100 new jobs today · resets 6:30 PM IST");
+  });
+});
+
+describe("one click, several sources (decided 2026-11-17, Q90, Q93, Q122)", () => {
+  it("says each source's new jobs and any source that didn't answer", () => {
+    expect(searchOutcome(search({ newBySource: { linkedin: 58, indeed: 30, freehire: 12 }, seenAgainCount: 0 }), 200))
+      .toBe("LinkedIn 58 · Indeed 30 · freehire.me 12 new");
+    expect(searchOutcome(search({ newBySource: { indeed: 4 }, seenAgainCount: 0, failedSources: ["linkedin"] }), 200))
+      .toBe("Indeed 4 new · LinkedIn didn't answer");
+  });
+
+  it("names a hybrid place", () => {
+    expect(placeLabel("hybrid:Austin, TX")).toBe("Hybrid · Austin, TX");
   });
 });

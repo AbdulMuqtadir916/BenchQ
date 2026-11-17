@@ -93,13 +93,25 @@ def _ledger(db, *, firm_id, candidate_id, user_id, batch_id, query, country, sum
                   summary=f"{summary} ({COUNTRY_LABELS.get(country, country)})")
 
 
+ALL_SOURCES = "all"                     # a click that asks every source its place's mode names (fanout.py)
+
+
 def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider, place=None, titles=()) -> ScrapeJob:
     """The search's row, `running`, written when the BDE starts it (the caller holds the candidate row), with where
-    it continues from. Flushed."""
-    cursor, exhausted = _continue_from(db, firm_id, candidate_id, query, country, provider, place)
+    it continues from: one cursor for one source, or each leg's for `ALL_SOURCES` (decided 2026-11-17). Flushed."""
+    if provider == ALL_SOURCES:
+        from backend.job_search import fanout
+        rows = scoped(db, ScrapeJob, firm_id).filter(
+            ScrapeJob.candidate_id == candidate_id, ScrapeJob.kind == "search",
+            ScrapeJob.state.in_(("success", "empty")), ScrapeJob.created_at >= limits.day_start(),
+        ).order_by(ScrapeJob.created_at.desc()).all()
+        request = {**_request(query, country, provider, place, None, False, titles),
+                   "legs": fanout.continue_legs(rows, query, country, fanout.plan(place))}
+    else:
+        cursor, exhausted = _continue_from(db, firm_id, candidate_id, query, country, provider, place)
+        request = _request(query, country, provider, place, cursor, exhausted, titles)
     batch = ScrapeJob(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=uuid.uuid4(),
-                      kind="search", state="running",
-                      meta={"request": _request(query, country, provider, place, cursor, exhausted, titles)})
+                      kind="search", state="running", meta={"request": request})
     db.add(batch)
     db.flush()
     return batch
@@ -206,18 +218,19 @@ def _scorer(firm_id, candidate_id) -> match_store.Scorer | None:
         return match_store.scorer_for(db, row) if row is not None else None
 
 
-def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider, result: SearchResult,
-          place: str | None = None, scorer=False) -> dict | None:
-    counts = {"found": len(result.jobs), "saved": 0, "refreshed": 0, "skipped_closed": 0, "skipped_unreadable": 0,
-              "skipped_duplicate": 0, "skipped_over_cap": 0, "skipped_too_old": 0, "skipped_not_remote": 0,
-              "skipped_work_auth": 0, "skipped_level": 0,
-              # Left out by the source itself before the save (freehire.me's Adzuna previews, Q64).
-              "skipped_adzuna": int((result.metadata or {}).get("skipped_adzuna") or 0)}
-    if scorer is False:                 # not read by the caller
-        scorer = _scorer(firm_id, candidate_id)
+def new_counts(result: SearchResult) -> dict:
+    return {"found": len(result.jobs), "saved": 0, "refreshed": 0, "skipped_closed": 0, "skipped_unreadable": 0,
+            "skipped_duplicate": 0, "skipped_over_cap": 0, "skipped_too_old": 0, "skipped_not_remote": 0,
+            "skipped_work_auth": 0, "skipped_level": 0,
+            # Left out by the source itself before the save (freehire.me's Adzuna previews, Q64).
+            "skipped_adzuna": int((result.metadata or {}).get("skipped_adzuna") or 0)}
+
+
+def pick(provider, result: SearchResult, remote_only: bool, scorer, counts: dict) -> list[tuple[str, dict, JobFields]]:
+    """The jobs a search keeps, read and identified before any transaction (no lock is held while parsing HTML):
+    (job_id, content, fields), in the source's order; every one left out is counted."""
     today = utcnow().date()
-    # Read and identify every job before the transaction: no lock is held while parsing HTML.
-    picked: list[tuple[str, dict]] = []
+    picked: list[tuple[str, dict, JobFields]] = []
     seen: set[str] = set()
     for raw in result.jobs:
         fields = _read(provider, raw)
@@ -230,7 +243,7 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
         if _posted_too_long_ago(fields.posted_at, today):
             counts["skipped_too_old"] += 1
             continue
-        if place == REMOTE and not fields.is_remote:
+        if remote_only and not fields.is_remote:
             counts["skipped_not_remote"] += 1
             continue
         if scorer is not None and fields.description and match.ruled_out(fields, scorer.who):    # the posting rules them out (Q32)
@@ -247,7 +260,16 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
             counts["skipped_duplicate"] += 1
             continue
         seen.add(key)
-        picked.append((key, clean_json(raw)))
+        picked.append((key, clean_json(raw), fields))
+    return picked
+
+
+def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider, result: SearchResult,
+          place: str | None = None, scorer=False) -> dict | None:
+    counts = new_counts(result)
+    if scorer is False:                 # not read by the caller
+        scorer = _scorer(firm_id, candidate_id)
+    picked = [(key, content) for key, content, _ in pick(provider, result, place == REMOTE, scorer, counts)]
 
     with SessionLocal() as db:
         batch = _running_batch(db, firm_id, candidate_id, batch_id)
@@ -265,9 +287,10 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
         for key, content in picked:
             row = existing.get(key)
             if row is not None:
-                if (row.content or {}).get("_full_posting") and row.source == provider.name:
-                    # The whole posting fetched on its first open stays (CodeRabbit on #135): the search's is cut.
-                    content = {**content, "description": row.content.get("description"), "_full_posting": True}
+                from backend.job_search.fanout import _keep_pasted
+                # A posting fetched whole or pasted by the BDE stays (CodeRabbit on #135; Q107): the search's is
+                # shorter, or none.
+                content = _keep_pasted(row, content, provider.name)
                 row.batch_id, row.last_seen_at, row.content, row.source = batch_id, now, content, provider.name
                 counts["refreshed"] += 1
             elif counts["saved"] < room:
@@ -326,8 +349,9 @@ def capture(db, *, firm_id, candidate_id, user_id, source: str, job: dict, admit
 async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uuid.UUID, batch_id: uuid.UUID,
                      query: str, country: str, provider_name: str, place: str | None = None, titles=()) -> str:
     """The background task: finishes the `running` batch `batch_id`. Returns the run's summary; a failed search also
-    marks its `job_runs` row failed."""
-    provider = REGISTRY[provider_name]
+    marks its `job_runs` row failed. `provider_name` `ALL_SOURCES`: one click asks every source its place's mode names
+    (fanout.py, decided 2026-11-17); otherwise that one source."""
+    provider = REGISTRY[provider_name] if provider_name != ALL_SOURCES else REGISTRY["indeed"]
     started = time.monotonic()
     ids = dict(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id, query=query,
                country=country, place=place)
@@ -355,6 +379,24 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
         scorer = None                   # scored and filtered without it: the save reads it again
     years = match.most_years_asked(scorer.resume, scorer.who) if scorer is not None else None
     level = match.level_of(scorer.resume, scorer.who) if scorer is not None else None
+    if provider_name == ALL_SOURCES:
+        from backend.job_search import fanout
+        try:
+            summary = await fanout.run(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id,
+                                       query=query, country=country, place=place, titles=titles, request=request,
+                                       scorer=scorer, years=years, level=level)
+        except Exception as error:      # the save failed: the batch ends as an error, not `running` for 15 minutes
+            logger.error("job search batch=%s candidate=%s all sources failed %s", batch_id, candidate_id,
+                         type(error).__name__)
+            try:
+                await asyncio.to_thread(_save_error, provider=ALL_SOURCES, code="internal", **ids)
+            except Exception:
+                pass
+            mark_run_failed("internal")
+            return "failed: internal"
+        if summary.startswith("failed: "):
+            mark_run_failed(summary.removeprefix("failed: "))
+        return summary
     try:
         # The source had nothing more for this role today: finish empty without asking again.
         result = SearchResult(jobs=[], metadata={"exhausted": True}) if exhausted else \

@@ -222,4 +222,6 @@ class Indeed:
             posted_at=clean_str(content.get("date_posted")),
             employment_type=kinds[0] if kinds else None,
             is_remote=bool(labels & _REMOTE_LABELS) or (location or "").lower().startswith("remote"),
+            # Indeed's own labels (Q121): "Remote" and the like, or "Hybrid work".
+            work_mode="REMOTE" if labels & _REMOTE_LABELS else "HYBRID" if "hybrid work" in labels else None,
         )

@@ -54,6 +54,9 @@ def fake(monkeypatch, test_db):
     from backend.models.db import Setting
     provider = FakeProvider()
     monkeypatch.setitem(providers.REGISTRY, "fake", provider)
+    # A click asks the sources its place's mode names (fanout.py): in tests, only this fake one, never the network.
+    from backend.job_search import fanout
+    monkeypatch.setattr(fanout, "plan", lambda place: [fanout.Leg("fake", place, 100, place == providers.REMOTE)])
     test_db.merge(Setting(key=providers.SETTING_KEY, value="fake"))
     test_db.commit()
     return provider
@@ -119,7 +122,8 @@ def test_the_candidates_bde_starts_a_search_in_the_background(anonymous_client, 
     assert call["job_type"] == "job_search" and call["meta"] is None      # the run names nothing of the firm's
     assert call["kwargs"]["query"] == "Java Developer" and call["kwargs"]["country"] == "us"
     assert call["kwargs"]["place"] == "Austin, TX"                         # the first place: the picker's default
-    assert call["kwargs"]["provider_name"] == "fake" and call["kwargs"]["user_id"] == world["people"]["adnan"].id
+    # One click asks every source its place's mode names (decided 2026-11-17, Q90): no source picker.
+    assert call["kwargs"]["provider_name"] == "all" and call["kwargs"]["user_id"] == world["people"]["adnan"].id
     batch_id = uuid.UUID(r.json()["batch_id"])
     assert call["kwargs"]["batch_id"] == batch_id and call["scope_key"] == str(batch_id)
     row = test_db.query(ScrapeJob).filter(ScrapeJob.batch_id == batch_id).one()
@@ -173,9 +177,11 @@ def test_the_bde_picks_one_of_the_candidates_places(anonymous_client, world, fak
                 preferred_locations=["Austin, TX", "Remote"], work_settings=["HYBRID"]).json()
     body = anonymous_client.get(_url(world, c, "job-searches"), headers=world["as"]["adnan"]).json()
     assert body["role"] == "Java Developer"
+    # A hybrid candidate: each city on-site and hybrid (decided 2026-11-17, Q122), then remote.
     assert [(p["value"], p["kind"]) for p in body["places"]] == [
-        ("Plano, TX", "home"), ("Austin, TX", "preferred"), ("remote", "remote")]
-    assert body["places"][2]["label"] == "Remote (anywhere in the US)"
+        ("Plano, TX", "home"), ("hybrid:Plano, TX", "hybrid"), ("Austin, TX", "preferred"),
+        ("hybrid:Austin, TX", "hybrid"), ("remote", "remote")]
+    assert body["places"][4]["label"] == "Remote (anywhere in the US)"
     assert _post(anonymous_client, world, c, place="austin, tx").status_code == 202
     assert _post(anonymous_client, world, c, place="remote").status_code == 409      # one already runs
     assert launched[0]["kwargs"]["place"] == "Austin, TX"
@@ -318,7 +324,9 @@ def test_a_task_that_finishes_after_its_search_was_marked_lost_writes_nothing(an
     assert postings == []
 
 
-def test_a_candidate_with_100_new_jobs_today_is_refused_without_a_row(anonymous_client, world, adnans, fake, launched):
+def test_a_candidate_with_100_new_jobs_today_is_refused_without_a_row(anonymous_client, world, adnans, fake, launched,
+                                                                     monkeypatch):
+    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 100)      # the rule at a round number (200 since Q145)
     fake.jobs = [_job(n) for n in range(100)]
     _run(world, adnans)
     r = _post(anonymous_client, world, adnans)
@@ -393,7 +401,8 @@ def test_a_job_seen_again_is_refreshed_not_duplicated(world, adnans, fake, test_
     assert again.last_seen_at > discovered
 
 
-def test_the_cap_keeps_the_sources_order_and_still_refreshes(world, adnans, fake, test_db):
+def test_the_cap_keeps_the_sources_order_and_still_refreshes(world, adnans, fake, test_db, monkeypatch):
+    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 100)      # the rule at a round number (200 since Q145)
     fake.jobs = [_job(n) for n in range(90)]
     _run(world, adnans)
     fake.jobs = [_job(n) for n in range(85, 110)]          # 5 seen again, 20 new with room for 10
@@ -486,7 +495,7 @@ def test_the_history_shows_the_running_search_the_finished_ones_and_todays_usage
         ("Spring Developer", "error", "timeout"), ("Java Developer", "success", None)]
     usage = body["usage"]
     assert (usage["jobs_saved_today"], usage["jobs_cap"], usage["attempts_today"], usage["attempts_cap"]) == (
-        1, 100, 3, 20)
+        1, 200, 3, 20)                                                    # 200 new jobs a day since Q145
     assert usage["resets_at"]
 
 

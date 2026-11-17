@@ -27,6 +27,8 @@ export interface JobListParams {
   q?: string;
   /** One candidate's jobs they have an application for past Saved, left out. */
   excludeApplied?: boolean;
+  /** One of the candidate's searches (its id): the jobs it first found (decided 2026-11-17, Q109). */
+  batch?: string;
   offset?: number;
 }
 
@@ -36,6 +38,8 @@ export interface JobPage {
   total: number;
   /** Where the next page starts, or null at the end. */
   nextOffset: number | null;
+  /** The list's jobs by source before `source` narrows it, by backend source name (the source tabs, Q109). */
+  sourceCounts: Record<string, number>;
 }
 
 /** The capture found the job the candidate already has; `jobId` is that job, for "View job". */
@@ -54,9 +58,11 @@ const live = {
       candidate_id: params?.candidateId ? toBackendId(params.candidateId) : undefined,
       sort: params?.sort, min_score: params?.minScore || undefined, source: params?.source, remote: params?.remote,
       q: params?.q?.trim() || undefined, exclude_applied: params?.excludeApplied || undefined, offset: params?.offset || undefined,
+      batch: params?.batch || undefined,
     };
-    const { items, total, next_offset } = await http.get(`${firmPath(firmId)}/job-postings`, FirmJobListDto, { query });
-    return { jobs: items.map((item) => toFirmJob(item, firmId)), total: total ?? items.length, nextOffset: next_offset ?? null };
+    const { items, total, next_offset, source_counts } = await http.get(`${firmPath(firmId)}/job-postings`, FirmJobListDto, { query });
+    return { jobs: items.map((item) => toFirmJob(item, firmId)), total: total ?? items.length, nextOffset: next_offset ?? null,
+      sourceCounts: source_counts ?? {} };
   },
   byId: async (firmId: string, id: string): Promise<Job> => toFirmJob(await http.get(`${firmPath(firmId)}/job-postings/${id}`, FirmJobDto), firmId),
   /** The posting the BDE copied for a job that came without its text (a LinkedIn job, decided 2026-11-17, Q107). */
@@ -71,10 +77,10 @@ const live = {
   },
   searches: async (firmId: string, candidateId: string): Promise<JobSearches> =>
     toJobSearches(await http.get(`${candidatePath(firmId, candidateId)}/job-searches`, JobSearchesDto)),
-  /** Starts a search of the candidate's target role in `place`, one of their places (`JobSearches.places`), on
-   * `source`, one of `JobSearches.sources` (none: the platform's default). */
-  startSearch: async (firmId: string, candidateId: string, place: string, source?: string): Promise<string> =>
-    (await http.post(`${candidatePath(firmId, candidateId)}/job-searches`, z.object({ batch_id: z.string() }), { body: { place, source } })).batch_id,
+  /** Starts a search of the candidate's target role in `place`, one of their places (`JobSearches.places`): the
+   * place's mode says which sources one click asks (decided 2026-11-17, Q90, Q122). */
+  startSearch: async (firmId: string, candidateId: string, place: string): Promise<string> =>
+    (await http.post(`${candidatePath(firmId, candidateId)}/job-searches`, z.object({ batch_id: z.string() }), { body: { place } })).batch_id,
 };
 
 /**
@@ -103,7 +109,7 @@ export const jobsApi = {
   searches: (firmId: string, candidateId: string): Promise<JobSearches> => live.searches(firmId, candidateId),
 
   /** "Find jobs": start a search for a role (the candidate's BDE only); it runs in the background. Its batch id. */
-  startSearch: (firmId: string, candidateId: string, place: string, source?: string): Promise<string> => live.startSearch(firmId, candidateId, place, source),
+  startSearch: (firmId: string, candidateId: string, place: string): Promise<string> => live.startSearch(firmId, candidateId, place),
 };
 
 /** The capture was refused because the candidate already has this job; `jobId` is the existing job. */

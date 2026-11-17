@@ -67,10 +67,6 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const [pickedPlace, setPickedPlace] = useState<string | null>(null);
   const places = searchesQuery.data?.places;
   const place = places?.find((p) => p.value === pickedPlace)?.value ?? places?.[0]?.value ?? null;
-  // The source it searches: the one picked beside the place, else the first, Indeed (decided 2026-11-16, Q53).
-  const [pickedSource, setPickedSource] = useState<string | null>(null);
-  const sources = searchesQuery.data?.sources;
-  const source = sources?.find((s) => s.value === pickedSource)?.value ?? sources?.[0]?.value ?? null;
 
   // Esc goes back (docs/04 §1.3, BUG-004): to where the person came from, which keeps the list's page, search and sort in its
   // URL, or to the candidates list when this page was opened directly. A drawer, dialog or field keeps its own Esc.
@@ -137,11 +133,11 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     if (role && place && !searchBlocked && !isSearching && !isStartPending) {
       let run = 0;
       setMatchRun((n) => (run = n + 1));
-      startMutate({ place, source: source ?? undefined }, { onError: () => setMatchDone((done) => Math.max(done, run)) });
+      startMutate({ place }, { onError: () => setMatchDone((done) => Math.max(done, run)) });
     }
     setTab("jobs");
     requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
-  }, [role, place, source, searchBlocked, isSearching, isStartPending, startMutate, setTab, reduce]);
+  }, [role, place, searchBlocked, isSearching, isStartPending, startMutate, setTab, reduce]);
 
   const actions = useMemo<CandidateActions>(() => ({
     openTab: setTab,
@@ -155,7 +151,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     findJobs: canSearch ? findJobs : undefined,
   }), [setTab, moveApplication, canSearch, findJobs]);
   const search: FindJobsSearch | undefined = canSearch
-    ? { run: findJobs, isStarting: startSearch.isPending, refusal: startSearch.error instanceof Error ? startSearch.error.message : null, place, setPlace: setPickedPlace, source, setSource: setPickedSource }
+    ? { run: findJobs, isStarting: startSearch.isPending, refusal: startSearch.error instanceof Error ? startSearch.error.message : null, place, setPlace: setPickedPlace }
     : undefined;
 
   const closeDrawer = useCallback(() => setOpenApplicationId(null), []);

@@ -25,10 +25,15 @@ export function searchRole(candidate: Pick<Candidate, "targetRoles">): string | 
   return candidate.targetRoles.map((role) => role.trim().replace(/\s+/g, " ")).find(Boolean) ?? null;
 }
 
-/** How a search's place reads: "Austin, TX", "Remote", or nothing for a search from before places. */
+/** How a search's place reads: "Austin, TX", "Hybrid · Austin, TX", "Remote", or nothing for a search from before
+ * places. */
 export function placeLabel(place: string | null): string | null {
-  return place === "remote" ? "Remote" : place;
+  if (place === "remote") return "Remote";
+  return place?.startsWith("hybrid:") ? `Hybrid · ${place.slice("hybrid:".length)}` : place;
 }
+
+/** The sources' names as the result line says them (backend source names). */
+const SOURCE_NAMES: Record<string, string> = { linkedin: "LinkedIn", indeed: "Indeed", freehire: "freehire.me" };
 
 /** "12 new · 3 seen again · 5 over today's 100 · 4 left out: work authorization", "No new jobs for Java Developer in
  * Austin, TX", or why it failed. */
@@ -38,7 +43,9 @@ export function searchOutcome(search: JobSearch, jobsCap: number): string {
     const where = placeLabel(search.place);
     return `No new jobs for ${search.query ?? "this role"}${where ? ` in ${where}` : ""} right now.`;
   }
-  const parts = [`${search.newCount} new`];
+  // A click that asked several sources (decided 2026-11-17, Q90): "LinkedIn 58 · Indeed 30 · freehire.me 12 new".
+  const bySource = Object.entries(search.newBySource);
+  const parts = [bySource.length ? `${bySource.map(([name, count]) => `${SOURCE_NAMES[name] ?? name} ${count}`).join(" · ")} new` : `${search.newCount} new`];
   if (search.seenAgainCount) parts.push(`${search.seenAgainCount} seen again`);
   if (search.overLimitCount) parts.push(`${search.overLimitCount} over today's ${jobsCap}`);
   if (search.leftOutWorkAuthCount) parts.push(`${search.leftOutWorkAuthCount} left out: work authorization`);
@@ -46,6 +53,7 @@ export function searchOutcome(search: JobSearch, jobsCap: number): string {
   if (search.leftOutNotRemoteCount) parts.push(`${search.leftOutNotRemoteCount} left out: not remote`);
   if (search.leftOutLevelCount) parts.push(`${search.leftOutLevelCount} left out: level`);
   if (search.leftOutAdzunaCount) parts.push(`${search.leftOutAdzunaCount} left out: Adzuna preview`);
+  for (const name of search.failedSources) parts.push(`${SOURCE_NAMES[name] ?? name} didn't answer`);
   return parts.join(" · ");
 }
 
@@ -83,9 +91,6 @@ export interface FindJobsSearch {
   /** The place the next search uses (one of `JobSearches.places`), or null while none is known. */
   place: string | null;
   setPlace: (value: string) => void;
-  /** The source the next search uses (one of `JobSearches.sources`, Indeed first), or null while none is known. */
-  source: string | null;
-  setSource: (value: string) => void;
   isStarting: boolean;
   /** Why the backend refused the last start (409, 422, 429, 503), as it says it. */
   refusal: string | null;
@@ -100,8 +105,8 @@ interface FindJobsProps {
 
 /**
  * "Find jobs" for the candidate's BDE (docs/02 §6.z): starts a real search for the candidate's target role in the place
- * picked beside it, on the source picked beside that (Indeed or freehire.me, decided 2026-11-16, Q53), then shows its
- * outcome and today's usage under the button. Disabled, with the reason, when it
+ * picked beside it, asking every source that place's mode names in one click (decided 2026-11-17, Q90, Q122), then
+ * shows its outcome by source and today's usage under the button. Disabled, with the reason, when it
  * can't start.
  */
 export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
@@ -115,7 +120,6 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   // Today's searches didn't load: whether one runs, and the day's usage, are unknown, so no start (CodeRabbit on #135).
   const isUnknown = !searches && Boolean(searchesQuery.error);
   const places = searches?.places ?? [];
-  const sources = searches?.sources ?? [];
   // The résumé fixes a missing country, city or state; a preferred location can't be edited here yet.
   const linksToResume = Boolean(resumeHref && role && (!candidate.country?.trim() || (searches && places.length === 0)));
   const running = searches?.running ?? null;
@@ -128,10 +132,6 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {sources.length > 1 ? (
-          <Select value={search.source ?? sources[0].value} options={sources.map((s) => ({ value: s.value, label: s.label }))}
-            onValueChange={search.setSource} disabled={isSearching} aria-label="Where to look for jobs" className="w-auto min-w-28" />
-        ) : null}
         {places.length ? (
           <Select value={search.place ?? places[0].value} options={places.map((p) => ({ value: p.value, label: p.label }))}
             onValueChange={search.setPlace} disabled={isSearching} aria-label="Where to search" className="w-auto min-w-40" />

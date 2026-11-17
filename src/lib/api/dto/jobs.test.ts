@@ -54,22 +54,21 @@ describe("a candidate's searches", () => {
     const searches = toJobSearches(JobSearchesDto.parse({
       running: { batch_id: "b1", kind: "search", run_id: "r1", state: "running", error_code: null, query: "Java Developer", place: "remote", country: "us", provider: "indeed", counts: null, user_id: "u1", started_at: "2026-11-11T14:00:00+00:00", finished_at: null },
       searches: [
-        { batch_id: "b0", kind: "search", state: "success", error_code: null, query: "Java Developer", counts: { found: 20, saved: 12, refreshed: 3, skipped_over_cap: 5, skipped_work_auth: 4, skipped_too_old: 6, skipped_not_remote: 1, skipped_adzuna: 2, skipped_level: 5 }, started_at: "2026-11-11T13:00:00+00:00", finished_at: "2026-11-11T13:00:09+00:00" },
+        { batch_id: "b0", kind: "search", state: "success", error_code: null, query: "Java Developer", counts: { found: 20, saved: 12, refreshed: 3, skipped_over_cap: 5, skipped_work_auth: 4, skipped_too_old: 6, skipped_not_remote: 1, skipped_adzuna: 2, skipped_level: 5, by_source: { linkedin: { saved: 7 }, indeed: { saved: 5 } } }, errors: { "freehire|remote": "timeout" }, started_at: "2026-11-11T13:00:00+00:00", finished_at: "2026-11-11T13:00:09+00:00" },
         { batch_id: "bx", kind: "search", state: "error", error_code: "timeout", query: "QA", counts: null, started_at: "2026-11-11T12:00:00+00:00", finished_at: "2026-11-11T12:00:30+00:00" },
         { batch_id: "bc", kind: "capture", state: "success", error_code: null, query: null, counts: null, started_at: "2026-11-11T11:00:00+00:00", finished_at: "2026-11-11T11:00:00+00:00" },
       ],
       usage: { jobs_saved_today: 47, jobs_cap: 100, attempts_today: 3, attempts_cap: 20, captures_today: 2, captures_cap: 20, resets_at: "2026-11-12T13:00:00+00:00" },
       role: "Java Developer",
       places: [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }, { value: "remote", label: "Remote (anywhere in the US)", kind: "remote" }],
-      sources: [{ value: "indeed", label: "Indeed" }, { value: "freehire", label: "freehire.me" }],
     }));
     expect(searches.running).toMatchObject({ id: "b1", kind: "SEARCH", state: "RUNNING", newCount: 0, finishedAt: null, place: "remote" });
     expect(searches.searches[0].place).toBeNull();                    // a search from before places (2026-11-14)
     expect(searches.searches[0]).toMatchObject({ leftOutWorkAuthCount: 4, leftOutOldCount: 6, leftOutNotRemoteCount: 1, leftOutAdzunaCount: 2, leftOutLevelCount: 5 });
+    expect(searches.searches[0]).toMatchObject({ newBySource: { linkedin: 7, indeed: 5 }, failedSources: ["freehire"] });   // Q90, Q93
     expect(searches.searches[1]).toMatchObject({ leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0, leftOutAdzunaCount: 0 });
     expect(searches.role).toBe("Java Developer");
     expect(searches.places.map((p) => p.value)).toEqual(["Austin, TX", "remote"]);
-    expect(searches.sources.map((s) => s.value)).toEqual(["indeed", "freehire"]);     // Indeed first (Q53)
     expect(searches.searches.map((s) => [s.kind, s.state, s.newCount, s.seenAgainCount, s.overLimitCount, s.errorCode])).toEqual([
       ["SEARCH", "SUCCESS", 12, 3, 5, null], ["SEARCH", "ERROR", 0, 0, 0, "timeout"], ["CAPTURE", "SUCCESS", 0, 0, 0, null],
     ]);

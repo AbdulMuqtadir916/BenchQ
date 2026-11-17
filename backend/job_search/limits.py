@@ -25,7 +25,7 @@ from backend.job_search.providers.capture import CAPTURE_SOURCES
 from backend.models.db import utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
 
-JOBS_PER_CANDIDATE_PER_DAY = 100
+JOBS_PER_CANDIDATE_PER_DAY = 200       # 100 until 2026-11-17 (Q145)
 ATTEMPTS_PER_BDE_PER_DAY = 20
 CAPTURES_PER_BDE_PER_DAY = 20
 JOBS_PER_SEARCH = 100            # always asked for, even with less room left (Q28)

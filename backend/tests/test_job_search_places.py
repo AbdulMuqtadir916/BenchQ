@@ -10,7 +10,7 @@ from backend.job_search.providers import REMOTE
 
 def _candidate(**over):
     base = {"target_roles": ["Data Engineer"], "city": "Austin", "state": "TX", "preferred_locations": [],
-            "work_settings": []}
+            "work_settings": ["ONSITE"]}
     return SimpleNamespace(**{**base, **over})
 
 
@@ -31,9 +31,12 @@ def test_the_places_are_home_then_preferred_then_remote_once_each():
     c = _candidate(preferred_locations=["Dallas, TX", "austin,  tx", " ", "Remote", "Seattle, WA"],
                    work_settings=["HYBRID", "REMOTE"])
     got = places.places(c, "us")
-    # "austin,  tx" is the home place again; the blank one is nothing; "Remote" is the remote place.
-    assert [(p["value"], p["kind"]) for p in got] == [("Austin, TX", "home"), ("Dallas, TX", "preferred"),
-                                                      ("Seattle, WA", "preferred"), (REMOTE, "remote")]
+    # "austin,  tx" is the home place again; the blank one is nothing; "Remote" is the remote place. A hybrid
+    # candidate gets each city on-site and hybrid (decided 2026-11-17, Q122).
+    assert [(p["value"], p["kind"]) for p in got] == [
+        ("Austin, TX", "home"), ("hybrid:Austin, TX", "hybrid"), ("Dallas, TX", "preferred"),
+        ("hybrid:Dallas, TX", "hybrid"), ("Seattle, WA", "preferred"), ("hybrid:Seattle, WA", "hybrid"), (REMOTE, "remote")]
+    assert got[1]["label"] == "Hybrid · Austin, TX + remote" and got[0]["label"] == "On-site · Austin, TX"
 
 
 def test_the_same_place_twice_is_one():
@@ -62,3 +65,16 @@ def test_pick_finds_the_candidates_place_in_any_case_and_nothing_else():
 def test_a_place_reads_as_remote_or_its_text():
     assert (places.label(REMOTE), places.label("Austin, TX"), places.label(None)) == (
         "Remote", "Austin, TX", "the whole country")
+    assert places.label("hybrid:Austin, TX") == "Hybrid · Austin, TX"
+
+
+def test_a_place_says_its_mode():
+    """Q122: city = on-site, "hybrid:" + city = hybrid, remote = remote."""
+    assert places.mode_of("Austin, TX") == ("onsite", "Austin, TX")
+    assert places.mode_of("hybrid:Austin, TX") == ("hybrid", "Austin, TX")
+    assert places.mode_of(REMOTE) == ("remote", None)
+
+
+def test_hybrid_only_when_the_candidate_takes_it_or_says_nothing():
+    assert "hybrid:Austin, TX" not in [p["value"] for p in places.places(_candidate(work_settings=["ONSITE"]), "us")]
+    assert "hybrid:Austin, TX" in [p["value"] for p in places.places(_candidate(work_settings=[]), "us")]

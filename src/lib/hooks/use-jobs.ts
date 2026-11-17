@@ -133,7 +133,7 @@ export function useStartJobSearch(candidateId: string) {
   const firmId = useFirmId();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ place, source }: { place: string; source?: string }) => jobsApi.startSearch(firmId, candidateId, place, source),
+    mutationFn: ({ place }: { place: string }) => jobsApi.startSearch(firmId, candidateId, place),
     onSuccess: (batchId) => queryClient.setQueryData(queryKeys.jobs.startedSearch(firmId, candidateId), batchId),
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.jobs.searches(firmId, candidateId) }),
   });

@@ -135,21 +135,13 @@ def test_a_saved_agent_job_reads_as_plain_text_and_its_work_mode():
 
 # ── through the API ─────────────────────────────────────────────────────────
 
-def test_the_bde_picks_the_source_and_the_list_names_both_indeed_first(anonymous_client, world, adnans, launched):
+def test_every_click_asks_all_the_sources_and_no_source_is_picked(anonymous_client, world, adnans, launched):
+    """Q90, Q122: the BDE no longer picks a source; one click asks every source the place's mode names."""
     r = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["adnan"])
-    assert r.json()["sources"] == [{"value": "indeed", "label": "Indeed"}, {"value": "freehire", "label": "freehire.me"},
-                                   {"value": "linkedin", "label": "LinkedIn"}]
+    assert "sources" not in r.json()
     r = anonymous_client.post(_url(world, adnans, "job-searches"), json={"source": "freehire"},
                               headers=world["as"]["adnan"])
-    assert r.status_code == 202 and launched[-1]["kwargs"]["provider_name"] == "freehire"
-    r = anonymous_client.post(_url(world, adnans, "job-searches"), json={"source": "jobright"},
-                              headers=world["as"]["adnan"])
-    assert r.status_code == 422
-
-
-def test_no_source_uses_the_platform_setting(anonymous_client, world, adnans, fake, launched):
-    assert _post(anonymous_client, world, adnans).status_code == 202
-    assert launched[-1]["kwargs"]["provider_name"] == "fake"
+    assert r.status_code == 202 and launched[-1]["kwargs"]["provider_name"] == "all"
 
 
 def test_the_job_list_shows_only_jobs_posted_in_the_last_14_days(anonymous_client, world, adnans, fake):

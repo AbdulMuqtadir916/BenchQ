@@ -89,6 +89,16 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
   preview" switch); "Open on LinkedIn" always beside it.
 - **No LinkedIn fetching, no LinkedIn scoring.** To tailor one, the BDE pastes the posting (a pop-up when the tailor
   refuses a job without text); the paste must name the job's title or company.
+
+## Decisions (2026-11-17): one click, every source, by mode (Q90–Q93, Q109, Q113, Q121–Q124, Q145–Q146)
+
+- **No source picker.** The place says the mode: On-site (city: LinkedIn 100, Indeed 100, freehire.me 40), Hybrid
+  (city: LinkedIn 100, Indeed 50; remote: Indeed 50, freehire.me 40), Remote (Indeed 100, freehire.me 40).
+- **200 new jobs a day per candidate.** Fast sources show first; LinkedIn's share is kept for it; a small room goes to
+  LinkedIn first. Extra jobs that don't fit are dropped, and that source starts from the same place next click.
+- **Same job on two sources: saved once.** One source failing doesn't fail the click.
+- **Batches:** each click is a batch; the Jobs list opens at the newest, with All batches, and each source's count.
+  LinkedIn's jobs (no Match) come first in Top match and Newest. Each job's work mode is what its source says.
 - **No Adzuna** (Q64): freehire.me's search asks for no jobs it took from Adzuna (`source_exclude=adzuna`), which it
   has only as a 500-character preview; one that comes back anyway is left out and counted ("N left out: Adzuna
   preview"). A live check (Dallas) went from 88 jobs, 18 of them previews, to 56 jobs, none.

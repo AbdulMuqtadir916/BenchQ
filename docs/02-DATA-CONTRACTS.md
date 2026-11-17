@@ -1483,7 +1483,23 @@ panel's "Posting preview" switch, on by default). "Open on LinkedIn" stays besid
 tailor's 422 opens a paste pop-up: `PUT …/candidates/{id}/job-postings/{posting_id}/posting {text}` (the candidate's
 BDE, `can_manage_resume`; 50–100,000 characters; 409 when the job already has its text; 422 when the text names
 neither the job's title nor its company) puts the text on every copy of the job in the firm, with `_pasted`, and a
-ledger entry. The same filters at save; the daily limits are shared by both sources. A key
+ledger entry.
+
+**One click, several sources (2026-11-17, Q90–Q93, Q109, Q113, Q121–Q124, Q145–Q146; replaces the source picker of
+Q53).** `POST …/job-searches {place?}` asks every source the place's mode names (`job_search/fanout.py`); the batch's
+`request.provider` is `"all"`. A place's value says its mode: "City, ST" = on-site (LinkedIn 100, Indeed 100,
+freehire.me 40, all in the city); "hybrid:City, ST" = the city (LinkedIn 100, Indeed 50) plus remote in the country
+(Indeed 50, freehire.me 40), offered when the work settings include hybrid; `remote` = Indeed 100 and freehire.me 40,
+remote (LinkedIn's public search can't ask for remote). Indeed's two searches run one after the other; the fast sources
+save as they answer within today's room less LinkedIn's share; a small room goes to LinkedIn, then Indeed, then
+freehire.me; room left goes to the jobs over a source's share. The daily limit is **200** new jobs per candidate. The
+same job (company and title) from another source isn't saved again (`skipped_duplicate_source`); a source whose jobs
+didn't all fit is read again from the same place next click (`request.legs[provider|place]`: cursor, exhausted); one
+failing source doesn't fail the click (`errors`), all failing does. `counts.by_source` holds each source's counts;
+`GET …/job-searches` no longer lists sources. `JobFields.work_mode` is what the source says (Indeed's labels,
+freehire.me's `work_mode`) and is the list's work mode. `GET /firms/{f}/job-postings` adds `batch` (one of the
+candidate's searches: the jobs it first found, saved while it ran) and answers `source_counts` (the list by source
+before `source` narrows it); LinkedIn's jobs come first in `match` and `newest`. The same filters at save; the daily limits are shared by both sources. A key
 (`FREEHIRE_API_KEY`) is sent when set: freehire.me's terms allow the API without one for non-commercial use only, so
 the licence is settled before production.
 

@@ -7,7 +7,7 @@ import uuid
 
 import pytest
 
-from backend.job_search import pipeline
+from backend.job_search import limits, pipeline
 from backend.tests.test_candidates_api import _create, world  # noqa: F401  (the fixture)
 from backend.tests.test_job_search_api import (FakeProvider, _job, _open, _post, _rows, _run, _url,  # noqa: F401
                                                adnans, fake, launched)
@@ -201,8 +201,9 @@ def test_two_searches_for_different_candidates_run_side_by_side(anonymous_client
     assert [r.status_code for r in results] == [202, 202]
 
 
-def test_the_cap_holds_when_two_searches_finish_together(world, adnans, fake, test_db):
+def test_the_cap_holds_when_two_searches_finish_together(world, adnans, fake, test_db, monkeypatch):
     """Two batches of 60 new jobs each, finished at once: the candidate lock makes the second count the first's."""
+    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 100)      # the rule at a round number (200 since Q145)
     fake.jobs = [_job(n) for n in range(60)]
     first = _open(world, adnans, query="Java Developer")
     second = _open(world, adnans, query="Spring Developer")

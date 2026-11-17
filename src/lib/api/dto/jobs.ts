@@ -41,7 +41,7 @@ export const FirmJobDto = z.object({ ...posting, candidate_ids: z.array(z.string
 export type FirmJobDto = z.infer<typeof FirmJobDto>;
 /** A page of the list (decided 2026-11-14, Q29, Q47): sorted and filtered by the backend, with the whole list's total. */
 export const FirmJobListDto = z.object({ items: z.array(FirmJobDto), total: z.number().int().optional(),
-  next_offset: z.number().int().nullable().optional() });
+  next_offset: z.number().int().nullable().optional(), source_counts: z.record(z.string(), z.number().int()).optional() });
 
 /** `POST …/candidates/{id}/job-postings`: the candidate's posting, and whether this call created it. */
 export const CapturedPostingDto = z.object({ ...posting, candidate_id: z.string(), created: z.boolean(),
@@ -163,7 +163,11 @@ const SearchDto = z.object({
     saved: z.number().int(), refreshed: z.number().int(), skipped_over_cap: z.number().int(),
     skipped_work_auth: z.number().int(), skipped_too_old: z.number().int(), skipped_not_remote: z.number().int(),
     skipped_adzuna: z.number().int(), skipped_level: z.number().int(),
+    // Each source's counts, for a click that asked several (decided 2026-11-17, Q90): {linkedin: {saved, …}, …}.
+    by_source: z.record(z.string(), z.object({ saved: z.number().int() }).partial()),
   }).partial().nullable(),
+  // A source that failed in a click that asked several, by "provider|place" (Q93).
+  errors: z.record(z.string(), z.string()).nullable().optional(),
   started_at: z.string(),
   finished_at: z.string().nullable(),
 });
@@ -181,9 +185,7 @@ export const JobSearchesDto = z.object({
     resets_at: z.string(),
   }),
   role: z.string().nullable().optional(),
-  places: z.array(z.object({ value: z.string(), label: z.string(), kind: z.enum(["home", "preferred", "remote"]) })).optional(),
-  // The search sources, Indeed first (decided 2026-11-16, Q53).
-  sources: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
+  places: z.array(z.object({ value: z.string(), label: z.string(), kind: z.enum(["home", "preferred", "hybrid", "remote"]) })).optional(),
 });
 export type JobSearchesDto = z.infer<typeof JobSearchesDto>;
 
@@ -202,6 +204,8 @@ function toSearch(dto: z.infer<typeof SearchDto>): JobSearch {
     leftOutNotRemoteCount: dto.counts?.skipped_not_remote ?? 0,
     leftOutAdzunaCount: dto.counts?.skipped_adzuna ?? 0,
     leftOutLevelCount: dto.counts?.skipped_level ?? 0,
+    newBySource: Object.fromEntries(Object.entries(dto.counts?.by_source ?? {}).map(([name, counts]) => [name, counts.saved ?? 0])),
+    failedSources: [...new Set(Object.keys(dto.errors ?? {}).map((leg) => leg.split("|")[0]))],
     errorCode: dto.error_code,
     startedAt: toIso(dto.started_at),
     finishedAt: toIsoOrNull(dto.finished_at),
@@ -219,6 +223,5 @@ export function toJobSearches(dto: JobSearchesDto): JobSearches {
     },
     role: dto.role ?? null,
     places: dto.places ?? [],
-    sources: dto.sources ?? [],
   };
 }

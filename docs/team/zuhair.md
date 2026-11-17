@@ -38,8 +38,9 @@ by content hash, with everything about the job itself (title, description, locat
 `scrape_jobs` (same migration), a log of finished batches (`success`/`empty`/`error`, the error detail only on
 `error`), not a queue. A successful batch's row and its postings are written in one transaction, batch row first
 (`job_postings.batch_id` references it). `job_postings` has no status: saved/applied live in `applications`.
-Live sources right now: **Indeed**, **freehire.me** and **LinkedIn**, picked by the BDE per search (since 2026-11-16,
-Q53, Q75; Indeed alone 2026-11-14 to 16). LinkedIn runs at one pace for the whole backend (migration 0029). **Built so far:** both tables (0020), and the search pipeline
+Live sources right now: **Indeed**, **freehire.me** and **LinkedIn**, all asked in one click by the place's mode
+(since 2026-11-17, `job_search/fanout.py`; before, the BDE picked one). LinkedIn runs at one pace for the whole backend
+(migration 0029), is never fetched for its posting nor scored, and shows in a frame through the extension. **Built so far:** both tables (0020), and the search pipeline
 (`feat/job-search-pipeline`, migration 0022, docs/02 §6.y "The search pipeline"): `backend/job_search/` (providers
 behind one contract, freehire.me first; `content` is the provider's job as sent, read through its `read()`), the
 background search (`POST …/candidates/{id}/job-searches`, the candidate's BDE only; its `scrape_jobs` row is

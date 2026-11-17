@@ -72,6 +72,8 @@ class JobFields:
     # The source's own id for a job that comes without its text ("linkedin:<id>"): its identity (`job_id`) then, since
     # title and company alone don't tell two jobs apart. None for a source that sends the whole posting.
     source_id: str | None = None
+    # The work mode the source states: "REMOTE", "HYBRID" or "ONSITE"; None when it doesn't say (decided 2026-11-17, Q121).
+    work_mode: str | None = None
 
 
 @dataclass

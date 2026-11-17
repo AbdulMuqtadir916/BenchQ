@@ -1,13 +1,13 @@
 """A candidate's job searches and the jobs they found (job search PR 1; docs/02 §6.y; docs/integration/02-jobs.md).
 Under the candidate's URL: another firm, a candidate outside the principal's scope, or a posting that isn't the
 candidate's is the same 404 as a missing one.
-- POST …/job-searches              start a search `{place?, source?}`: the candidate's target role in one of their
-                                   places (none: the first), on the source the BDE picked (none: the platform
-                                   setting; decided 2026-11-16, Q53); its batch is written `running`, the search runs
-                                   in the background: 202 `{batch_id, run_id}`
+- POST …/job-searches              start a search `{place?}`: the candidate's target role in one of their places
+                                   (none: the first); the place's mode (on-site, hybrid, remote) says which sources it
+                                   asks, all of them in one click (job_search/fanout.py, decided 2026-11-17); its
+                                   batch is written `running`, the search runs in the background: 202
+                                   `{batch_id, run_id}`
 - GET  …/job-searches              the running search, the finished ones (newest first), today's usage and caps, the
-                                   role a search asks for, the candidate's places (decided 2026-11-14) and the sources
-                                   a search can use (Q53)
+                                   role a search asks for and the candidate's places (decided 2026-11-14)
 - POST …/job-postings              capture one job `{source: manual | extension, title, company, description, url,
                                    location?}`: 201, or 200 with the job the candidate already has (job search PR 2)
 - GET  …/job-postings?page=&size=  the candidate's jobs, newest first, in the common fields
@@ -74,8 +74,6 @@ class SearchBody(BaseModel):
     # isn't a request field (decided 2026-11-14: the candidate's target role).
     place: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
                      AfterValidator(typed_text)] | None = None
-    # The source the BDE picked (`providers.choices()`, decided 2026-11-16, Q53); none: the platform setting.
-    source: Literal["indeed", "freehire", "linkedin"] | None = None
 
 
 def _http_url(value: str) -> str:
@@ -112,8 +110,7 @@ def _resets(now) -> str:
     return f"resets {limits.next_reset(now).astimezone(limits.IST):%I:%M %p} IST".replace("resets 0", "resets ")
 
 
-def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: str | None, principal: Principal,
-           source: str | None = None) -> dict:
+def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: str | None, principal: Principal) -> dict:
     """The search's admission, in one transaction, committed: the checks, then its `running` batch row. Blocking (it
     waits for the candidate's row and the BDE's lock), so it runs in a worker thread, never on the event loop (Abdul's
     comment on PR 2: a wait there stalled every request on the worker until the lock's holder, whose release needs
@@ -145,16 +142,15 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: st
         raise _too_many(f"{limits.JOBS_PER_CANDIDATE_PER_DAY} jobs saved for this candidate today; {_resets(now)}.")
     if limits.attempts_today(db, firm_id, principal.user_id, now) >= limits.ATTEMPTS_PER_BDE_PER_DAY:
         raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today; {_resets(now)}.")
-    provider = providers.REGISTRY.get(source) if source else providers.active(db)
-    if provider is None:
-        raise HTTPException(status_code=422, detail="Pick one of the job sources.")
+    # One click asks every source the place's mode names (decided 2026-11-17, Q90, Q122): no source picker.
+    provider_name = pipeline.ALL_SOURCES
     # The role's titles, searched together (decided 2026-11-16, Q69): "A | B" is two, "GenAI / LLM Engineer" two more.
     titles = places.search_titles(candidate)
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
-                                query=query, country=country, provider=provider.name, place=chosen["value"],
+                                query=query, country=country, provider=provider_name, place=chosen["value"],
                                 titles=titles)
     task = {"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
-            "batch_id": batch.batch_id, "query": query, "country": country, "provider_name": provider.name,
+            "batch_id": batch.batch_id, "query": query, "country": country, "provider_name": provider_name,
             "place": chosen["value"], "titles": titles}
     # Committed before the search is launched, so a launched search always has its row (Abdul's review, P2); the task
     # also checks it is still `running` before asking the source. A crash between the two leaves the row `running`,
@@ -182,7 +178,7 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
     candidate take turns: the second sees the first one's `running` row and gets 409, on any worker. The BDE is locked
     too (a Postgres lock on their id, after the candidate's), so two searches of theirs for different candidates count
     their 20 attempts in turn (Abdul's review, P2)."""
-    task = await run_in_threadpool(_admit, db, firm_id, candidate_id, body.place, principal, body.source)
+    task = await run_in_threadpool(_admit, db, firm_id, candidate_id, body.place, principal)
     batch_id = task["batch_id"]
     try:
         # The run names nothing of the firm's (no meta; its scope is the opaque batch id): Super Admin's monitor lists
@@ -228,9 +224,7 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
             "usage": limits.usage(db, firm_id, candidate.id, candidate.bde_id, now),
             # What a search asks for (decided 2026-11-14): the target role, and the places the BDE picks from.
             "role": places.search_role(candidate),
-            "places": places.places(candidate, search_country(candidate.country)),
-            # The sources the BDE picks from, Indeed first (decided 2026-11-16, Q53).
-            "sources": providers.choices()}
+            "places": places.places(candidate, search_country(candidate.country))}
 
 
 @router.post(CANDIDATE + "/job-postings", status_code=201, summary="Capture one job for a candidate (by hand or the extension)")
@@ -260,7 +254,10 @@ def capture_job(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: CaptureBody, 
 
 
 def remote_mode(fields) -> str:
-    """REMOTE, HYBRID or ONSITE, from what the source says (Indeed's labels) or the location's words."""
+    """REMOTE, HYBRID or ONSITE: what the source says (`JobFields.work_mode`, Q121), else its remote mark or the
+    location's words."""
+    if fields is not None and fields.work_mode:
+        return fields.work_mode
     location = (fields.location or "") if fields else ""
     if fields is not None and (fields.is_remote or _REMOTE.search(location)):
         return "REMOTE"
@@ -486,7 +483,7 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
                    source: Literal["indeed", "freehire", "linkedin", "manual", "extension", "other"] | None = None,
                    remote: Literal["REMOTE", "HYBRID", "ONSITE"] | None = None,
                    q: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None,
-                   exclude_applied: bool = False,
+                   exclude_applied: bool = False, batch: str | None = None,
                    principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     """The owner and a viewer see the firm's, a manager their BDEs' candidates', a BDE their own (`_visible`, 07
     Q47); `candidate_id` narrows to one of those (another is 404). One item per `job_id`: a job found for two
@@ -498,8 +495,11 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
     company or location), `exclude_applied` (one candidate's jobs they have an application for past Saved). A closed
     job is never listed, nor one posted more than 14 days ago (decided 2026-11-16, Q56, any source; `_is_recent`): it
     stays in the database, and its job page, application and tailored résumés still open. `newest` is by the job's
-    posted date (Q87), and breaks the other orders' ties. Every visible job is read once per call without its description (job search PR 3 reads
-    stay a candidate's or a team's: a few thousand rows)."""
+    posted date (Q87), and breaks the other orders' ties; LinkedIn's jobs (never scored) come first in `match` and
+    `newest` (decided 2026-11-17, Q113). `batch` (one candidate's search, its `batch_id`) keeps the jobs that search
+    first found (Q109): saved while it ran. `source_counts` counts the list's jobs by source before `source` narrows it
+    (the source tabs). Every visible job is read once per call without its description (job search PR 3 reads stay
+    a candidate's or a team's: a few thousand rows)."""
     _member_of(firm_id, principal)
     one = None
     if candidate_id is not None:
@@ -511,6 +511,15 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
     light = postings.with_entities(JobPosting.id, JobPosting.job_id, JobPosting.source, JobPosting.match_score,
                                    JobPosting.discovered_at, JobPosting.last_seen_at,
                                    JobPosting.content.op("-")(literal("description"))).all()
+    window = None
+    if batch is not None:
+        if one is None:
+            raise HTTPException(status_code=422, detail="A batch is one candidate's: name the candidate.")
+        found = scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.candidate_id == one, ScrapeJob.kind == "search",
+                                                      ScrapeJob.batch_id == _id_or_404(batch)).first()
+        if found is None:
+            raise HTTPException(status_code=404, detail="Not found.")
+        window = (found.created_at, found.finished_at or utcnow())
     applied = set()
     if one is not None and exclude_applied:
         applied = {row[0] for row in scoped(db, Application, firm_id).filter(
@@ -532,7 +541,7 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
             continue
         if not _is_recent(fields.posted_at, max(row.discovered_at for row in rows), today):
             continue
-        if source is not None and _source_key(newest.source) != source:
+        if window is not None and not any(window[0] <= row.discovered_at <= window[1] for row in rows):
             continue
         if remote is not None and remote_mode(fields) != remote:
             continue
@@ -545,20 +554,30 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
         # Newest is by the job's posted date (decided 2026-11-16, Q87; a search saves its jobs at one moment), then
         # the latest saved; it also breaks the ties of the other two orders.
         newest_first = (-_posted_on(fields.posted_at, saved).toordinal(), -saved.timestamp())
-        kept.append((key, score, newest_first, (fields.company or "").lower()))
+        kept.append((key, score, newest_first, (fields.company or "").lower(), newest.source))
+    source_counts: dict[str, int] = {}
+    for item in kept:
+        source_counts[_source_key(item[4])] = source_counts.get(_source_key(item[4]), 0) + 1
+    if source is not None:
+        kept = [item for item in kept if _source_key(item[4]) == source]
+    # LinkedIn's jobs first in Top match and Newest (Q113): they have no Match to be ranked by.
+    linkedin_last = {"match": True, "newest": True}.get(sort, False)
+
+    def lead(item) -> bool:
+        return linkedin_last and item[4] != "linkedin"
     if sort == "match" and one is not None:
-        kept.sort(key=lambda item: (item[1] is None, -(item[1] or 0), item[2], item[0]))
+        kept.sort(key=lambda item: (lead(item), item[1] is None, -(item[1] or 0), item[2], item[0]))
     elif sort == "company":
         kept.sort(key=lambda item: (item[3], item[2], item[0]))
     else:
-        kept.sort(key=lambda item: (item[2], item[0]))
+        kept.sort(key=lambda item: (lead(item), item[2], item[0]))
     page = [item[0] for item in kept[offset:offset + limit]]
     by_job: dict[str, list[JobPosting]] = {key: [] for key in page}
     for row in postings.filter(JobPosting.job_id.in_(page)).all() if page else []:
         by_job[row.job_id].append(row)
     following = offset + limit
     return {"items": [_job_json(by_job[key], with_description=False) for key in page], "total": len(kept),
-            "next_offset": following if following < len(kept) else None}
+            "next_offset": following if following < len(kept) else None, "source_counts": source_counts}
 
 
 @router.get("/job-postings/{posting_id}", summary="One job a candidate the principal sees has, with its description")

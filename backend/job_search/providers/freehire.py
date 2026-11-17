@@ -181,4 +181,6 @@ class Freehire:
             # freehire.me tags employers it knows sponsor H-1B (`collections`; job search PR 3, decided 2026-11-11).
             h1b_sponsor="us-h1b-sponsor" in _strings(content.get("collections")),
             is_remote=work_mode == "remote" or (bool(location) and location.lower().startswith("remote")),
+            # freehire.me's own `work_mode` (Q121): its hybrid jobs showed as on-site before.
+            work_mode=work_mode.upper() if work_mode in ("remote", "hybrid", "onsite") else None,
         )

@@ -183,9 +183,10 @@ def test_a_tailored_resume_names_only_its_own_candidates_job_and_goes_with_it(an
 # ── Abdul's comments on PR 2 (#124) ──────────────────────────────────────────
 
 def test_a_captured_job_a_search_refreshes_stays_out_of_the_100(anonymous_client, world, adnans, fake, launched,
-                                                                test_db):
+                                                                test_db, monkeypatch):
     """99 jobs saved by search; a capture; a search whose page has the captured job and one new job: 100, not 101.
     The cap counts how a job was first saved (`first_source`), not its latest `source`."""
+    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 100)      # the rule at a round number (200 since Q145)
     fake.jobs = [_job(n) for n in range(100, 199)]
     assert _run(world, adnans) == "99 new, 0 seen again"
     captured = _capture(anonymous_client, world, adnans, title="Java Developer #1", company="Example 1",

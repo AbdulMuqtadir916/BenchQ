@@ -9,12 +9,19 @@
 
 A search sends one place, by its `value`: "City, ST" text, or `REMOTE`. The route accepts only one of the candidate's
 own places, never free text.
+
+The modes (decided 2026-11-17, Q122–Q124): a place's value says how one click searches:
+- "City, ST": **On-site** in that city (LinkedIn, Indeed and freehire.me, all in the city);
+- `HYBRID_PREFIX` + "City, ST": **Hybrid**, the city (LinkedIn, Indeed) plus remote jobs anywhere in the country
+  (Indeed, freehire.me); listed when the candidate's work settings include hybrid;
+- `REMOTE`: **Remote**, anywhere in the country (Indeed, freehire.me; LinkedIn's public search can't ask for remote).
 """
 import re
 
 from backend.job_search.providers.base import REMOTE
 
 COUNTRY_NAMES = {"us": "the US", "ca": "Canada", "in": "India"}
+HYBRID_PREFIX = "hybrid:"
 _SPACES = re.compile(r"\s+")
 _REMOTE_WORDS = re.compile(r"^(remote|anywhere|work from home|wfh)\b", re.I)
 
@@ -47,15 +54,24 @@ def places(candidate, country: str | None) -> list[dict]:
             seen.add(key)
             out.append({"value": value, "label": label, "kind": kind})
 
+    settings = set(candidate.work_settings or [])
+    # Hybrid: when the candidate takes it, or says nothing about how they work (Q122).
+    wants_hybrid = "HYBRID" in settings or not settings
+
+    def add_city(value: str, kind: str) -> None:
+        add(value, f"On-site · {value}", kind)
+        if wants_hybrid:
+            add(f"{HYBRID_PREFIX}{value}", f"Hybrid · {value} + remote", "hybrid")
+
     city, state = _line(candidate.city), _line(candidate.state)
     if city and state:
-        add(f"{city}, {state}", f"{city}, {state}", "home")
-    wants_remote = "REMOTE" in (candidate.work_settings or [])
+        add_city(f"{city}, {state}", "home")
+    wants_remote = "REMOTE" in settings
     for preferred in (_line(p) for p in candidate.preferred_locations or []):
         if _REMOTE_WORDS.match(preferred):
             wants_remote = True
         elif preferred:
-            add(preferred[:100], preferred[:100], "preferred")
+            add_city(preferred[:100], "preferred")
     if wants_remote:
         add(REMOTE, f"Remote (anywhere in {COUNTRY_NAMES.get(country or '', 'the country')})", "remote")
     return out
@@ -69,4 +85,16 @@ def pick(candidate, country: str | None, value: str) -> dict | None:
 
 def label(place: str | None) -> str:
     """How a stored place reads in the history and the Activity entry."""
-    return "Remote" if place == REMOTE else (place or "the whole country")
+    if place == REMOTE:
+        return "Remote"
+    mode, city = mode_of(place)
+    return f"Hybrid · {city}" if mode == "hybrid" else (place or "the whole country")
+
+
+def mode_of(place: str | None) -> tuple[str, str | None]:
+    """("remote", None), ("hybrid", "City, ST") or ("onsite", "City, ST" or None) for a stored place (Q122)."""
+    if place == REMOTE:
+        return "remote", None
+    if place and place.startswith(HYBRID_PREFIX):
+        return "hybrid", place[len(HYBRID_PREFIX):]
+    return "onsite", place

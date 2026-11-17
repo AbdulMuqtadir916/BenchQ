@@ -410,6 +410,11 @@ freehire.me. The job lists show only jobs posted in the last 14 days, and the so
 **Since 2026-11-16 (Q75–Q86):** LinkedIn is the third source in both lists. A LinkedIn job shows "—" for its Match until
 its posting arrives on the first open (a loading bar, then the text); "Open on LinkedIn" is there at once. The
 result line also counts "N left out: level".
+**Since 2026-11-17 (Q90–Q124):** no source picker: the place dropdown says the mode ("On-site · Austin, TX",
+"Hybrid · Austin, TX + remote", "Remote (anywhere in the US)") and one click asks every source it names; the result line
+says "LinkedIn 58 · Indeed 30 · freehire.me 12 new" and any source that didn't answer. The Jobs list has a **Batch**
+picker (newest first, "All batches") and the source filter shows each source's count; it opens at All sources.
+LinkedIn jobs show LinkedIn's own page in the pane (the extension), and tailoring one asks for its posting.
 
 #### Resumes
 This candidate's résumés as a collapsible tree (the same component as the Resume Builder library): each **base**
