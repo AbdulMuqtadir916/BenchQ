@@ -159,3 +159,19 @@ def test_a_job_without_its_text_is_saved_unscored(world, adnans, test_db):
     row = type("Row", (), {"match_basis": None, "match_score": None})()
     scorer = store.Scorer(who=None, resume_id=uuid.uuid4(), resume=object())
     assert store.apply(row, scorer, fields) is False and row.match_score is None
+
+
+# ── the candidate's level and LinkedIn's newest-job date (decided 2026-11-17, Q96, Q98) ──
+
+def test_other_levels_are_left_out_by_words():
+    assert li.keywords("x", ["AI Engineer", "LLM Engineer"], "entry") == (
+        '("AI Engineer" OR "LLM Engineer") NOT Senior NOT Lead NOT Principal NOT Staff NOT Manager NOT Director')
+    assert li.keywords("x", ["Java Developer"], "senior") == "(Java Developer) NOT Junior NOT Intern NOT Entry"
+    assert li.keywords("Java Developer", (), None) == "Java Developer"
+
+
+def test_a_newest_jobs_date_is_read_from_linkedins_new_tag(pages):
+    html = _card(1).replace('class="job-search-card__listdate" datetime="2026-11-15"',
+                            'class="job-search-card__listdate--new" datetime="2026-11-17"')
+    jobs, _ = li._cards(html, li._scraper("us"), False)
+    assert jobs[0]["date_posted"] == "2026-11-17"

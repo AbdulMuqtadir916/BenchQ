@@ -26,7 +26,8 @@ export function resumeFileProblem(file: { name: string; size: number; type: stri
 /** Step 4: common US hubs for preferred locations. */
 export const LOCATION_SUGGESTIONS = ["Dallas, TX", "Austin, TX", "Charlotte, NC", "New Jersey", "Chicago, IL", "Bay Area, CA"] as const;
 
-export const INDUSTRY_SUGGESTIONS = ["Banking", "Healthcare", "Insurance", "Retail", "Telecom", "Public sector"] as const;
+// Banking and Insurance were taken out on 2026-11-17 (Q100): not suggested anywhere. A candidate's saved values stay.
+export const INDUSTRY_SUGGESTIONS = ["Healthcare", "Retail", "Telecom", "Public sector"] as const;
 
 export const DEAL_BREAKER_SUGGESTIONS = ["No 100% onsite", "No contracts under 6 months", "No night shifts", "No relocation"] as const;
 

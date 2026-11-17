@@ -86,10 +86,11 @@ class Provider(Protocol):
     label: str          # how the search-source picker names it ("Indeed", "freehire.me", "LinkedIn")
 
     # `titles`: the role split into its titles (decided 2026-11-16, Q69: "A | B", "A / B Engineer"), searched together;
-    # `years`: the most years asked the candidate can take (Q74), for a source that filters on it; `firm_id`: whose
-    # search it is, for a source that paces requests across firms (LinkedIn, Q81).
+    # `years`: the most years asked the candidate can take (Q74), for a source that filters on it; `level`: "entry",
+    # "mid" or "senior" (2026-11-17, Q96, Q99), for a source that can leave other levels out; `firm_id`: whose search
+    # it is, for a source that paces requests across firms (LinkedIn, Q81).
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
-                     firm_id=None) -> SearchResult: ...
+                     level=None, firm_id=None) -> SearchResult: ...
 
     def read(self, content: dict) -> JobFields: ...

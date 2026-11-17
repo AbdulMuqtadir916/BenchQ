@@ -63,3 +63,27 @@ def test_a_job_at_the_wrong_level_is_left_out_and_counted(world, adnans, fake, t
     assert _run(world, adnans) == "1 new, 0 seen again"
     batch = test_db.query(ScrapeJob).filter(ScrapeJob.candidate_id == uuid.UUID(adnans["id"])).one()
     assert batch.meta["counts"]["skipped_level"] == 2
+
+
+def test_the_candidates_level_as_a_search_asks_for_it():
+    """Q96, Q99: Match's own reading of the candidate's level, in three buckets."""
+    def who(years, wanted=("Java Developer",)):
+        return match.Who(wanted=wanted, years=years, country="US", work_auth=None, needs_sponsorship=False,
+                         needs_transfer=False, employment_types=())
+    assert match.level_of(None, who(0.5)) == "entry"
+    assert match.level_of(None, who(3.0)) == "mid"
+    assert match.level_of(None, who(9.0)) == "senior"
+    assert match.level_of(None, who(9.0, wanted=("Junior Java Developer",))) == "entry"     # the title's word first
+    assert match.level_of(None, who(None, wanted=("Java Developer",))) is None
+
+
+def test_a_job_without_its_text_gets_the_level_check_from_its_title():
+    """Q97: a LinkedIn job has no posting text; "Senior" in its title is enough to leave it out for an entry-level
+    candidate."""
+    from backend.job_search.providers.base import JobFields
+    entry = match.Who(wanted=("AI Engineer",), years=0.0, country="US", work_auth=None, needs_sponsorship=False,
+                      needs_transfer=False, employment_types=())
+    resume = ResumeFacts(resume={}, years=0.0)
+    senior = JobFields(title="Senior AI Engineer", company="Example", description="", source_id="linkedin:1")
+    plain = JobFields(title="AI Engineer", company="Example", description="", source_id="linkedin:2")
+    assert match.score(resume, senior, entry).wrong_level and not match.score(resume, plain, entry).wrong_level

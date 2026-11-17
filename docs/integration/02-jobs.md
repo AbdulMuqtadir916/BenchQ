@@ -72,6 +72,16 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
   at once. No LinkedIn page in a frame (LinkedIn forbids framing). LinkedIn's terms forbid scraping: to settle before
   production.
 - **"Newest" is by the job's posted date** (Q87), else the day it was saved; one search saves its jobs at one moment.
+
+## Decisions (2026-11-17): the level per source, small fixes (Q96–Q101)
+
+- **The level per source:** LinkedIn gets NOT words for the other levels (entry: Senior, Lead, Principal, Staff,
+  Manager, Director; mid: Junior, Intern, Principal, Director; senior: Junior, Intern, Entry); freehire.me its
+  seniority filter; Indeed nothing (the level check at save reads its full posting). A job without its text is
+  checked by its title.
+- **LinkedIn's newest jobs keep their date** (its `listdate--new` tag).
+- **No Banking or Insurance suggestions** in onboarding or the details tab (saved values stay).
+- **"Save details" goes back to Overview** with "Details saved".
 - **No Adzuna** (Q64): freehire.me's search asks for no jobs it took from Adzuna (`source_exclude=adzuna`), which it
   has only as a 500-character preview; one that comes back anyway is left out and counted ("N left out: Adzuna
   preview"). A live check (Dallas) went from 88 jobs, 18 of them previews, to 56 jobs, none.

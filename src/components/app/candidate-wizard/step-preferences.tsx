@@ -63,7 +63,7 @@ export function StepPreferences({ wizard, errors, homeFrom = "basic" }: { wizard
 
       <div className="grid gap-4 sm:grid-cols-2">
         <WizardField id="cw-industries" label="Preferred industries">
-          <TagInput id="cw-industries" label="preferred industries" values={values.preferredIndustries} onChange={(next) => set("preferredIndustries", next)} suggestions={INDUSTRY_SUGGESTIONS} placeholder="Banking…" />
+          <TagInput id="cw-industries" label="preferred industries" values={values.preferredIndustries} onChange={(next) => set("preferredIndustries", next)} suggestions={INDUSTRY_SUGGESTIONS} placeholder="Healthcare…" />
         </WizardField>
         <WizardField id="cw-dealbreakers" label="Deal breakers">
           <TagInput id="cw-dealbreakers" label="deal breakers" values={values.dealBreakers} onChange={(next) => set("dealBreakers", next)} suggestions={DEAL_BREAKER_SUGGESTIONS} placeholder="No onsite…" />

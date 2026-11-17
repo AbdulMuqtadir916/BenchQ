@@ -47,6 +47,8 @@ METROS_KEPT_FOR_SECONDS = 6 * 3600      # how long a fetched list of metro names
 FACETS_TIMEOUT_SECONDS = 10.0           # the metro list's call; failing it searches the country instead
 TEXT = "text"                           # `_description_format` of a job saved by the agent search
 LEFT_OUT_ORIGINS = ("adzuna",)          # freehire.me's `source` values the search leaves out (Q64)
+# freehire.me's seniority values asked for each candidate level (decided 2026-11-17, Q99).
+SENIORITY = {"entry": ("intern", "junior"), "mid": ("junior", "middle"), "senior": ("middle", "senior", "lead")}
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 _SPACES = re.compile(r"\s+")
 
@@ -113,11 +115,16 @@ class Freehire:
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
-                     firm_id=None) -> SearchResult:
+                     level=None, firm_id=None) -> SearchResult:
         offset = int(cursor) if cursor and cursor.isdigit() else 0
         size = max(1, min(limit, MOST_PER_PAGE))
         params: dict = {"q": title_query(query, titles), "q_fields": "title", "limit": size, "offset": offset,
                         "description_format": TEXT, "source_exclude": list(LEFT_OUT_ORIGINS)}
+        if level in SENIORITY:
+            # Only the candidate's levels, and jobs that state none (decided 2026-11-17, Q99; live: 52 → 21 jobs, senior
+            # titles 26 → 1 for an entry-level candidate).
+            params["seniority"] = list(SENIORITY[level])
+            params["seniority_include_unspecified"] = "true"
         if years is not None:
             # Only jobs the candidate's years can take, and those that state none (decided 2026-11-16, Q74).
             params["experience_years_max"] = int(years)

@@ -28,11 +28,11 @@ class FakeProvider:
         self.metadata: dict = {}                    # more of the source's metadata (a count it left out itself)
 
     async def search(self, query, country, limit, cursor=None, *, place=None, posted_within_days=None, titles=(),
-                     years=None, firm_id=None):
+                     years=None, level=None, firm_id=None):
         self.calls.append((query, country, limit))
         self.cursors.append(cursor)
         self.asks.append({"place": place, "posted_within_days": posted_within_days, "titles": list(titles or ()),
-                          "years": years, "firm_id": firm_id})
+                          "years": years, "level": level, "firm_id": firm_id})
         if self.error:
             raise ProviderError(self.error)
         return SearchResult(jobs=list(self.jobs), metadata={"meta": {"total": len(self.jobs)}, **self.metadata},
@@ -362,7 +362,7 @@ def test_a_search_writes_its_batch_and_the_jobs_as_the_source_sent_them(world, a
     assert fake.calls == [("Java Developer", "us", 100)]
     # The last 14 days (2026-11-14, Q7); 9 years held: up to 12 asked (9 + 40%, Q74); the search's firm (Q81).
     assert fake.asks == [{"place": "Austin, TX", "posted_within_days": 14, "titles": [], "years": 12,
-                          "firm_id": world["firm"].id}]
+                          "level": "senior", "firm_id": world["firm"].id}]                 # 9 years: senior (Q96)
     (batch,), postings = _rows(test_db, adnans)
     assert (batch.state, batch.error, batch.user_id) == ("success", None, world["people"]["adnan"].id)
     assert batch.meta["counts"] == {"found": 5, "saved": 2, "refreshed": 0, "skipped_closed": 1,

@@ -38,7 +38,8 @@ def served(monkeypatch):
     def handle(request):
         if request.url.path.endswith("/facets"):
             return httpx.Response(page["facets"], json=METROS)
-        page["searches"].append({"params": dict(request.url.params), "headers": dict(request.headers)})
+        page["searches"].append({"params": dict(request.url.params), "headers": dict(request.headers),
+                                 "query": request.url.query.decode()})
         offset = int(request.url.params.get("offset", 0))
         return httpx.Response(200, json={"data": page["jobs"], "meta": {"total": page["total"], "offset": offset}})
     monkeypatch.setattr(http, "transport", httpx.MockTransport(handle))
@@ -188,3 +189,12 @@ def test_newest_is_by_the_posted_date_not_the_moment_a_search_saved_them(anonymo
     r = anonymous_client.get(f"/api/firms/{world['firm'].id}/job-postings",
                              params={"candidate_id": adnans["id"], "sort": "newest"}, headers=world["as"]["adnan"])
     assert [item["title"] for item in r.json()["items"]] == ["Java Developer #2", "Java Developer #3", "Java Developer #1"]
+
+
+def test_a_search_asks_only_for_the_candidates_seniority(served):
+    """Q99: an entry-level candidate's search asks for intern and junior jobs, and those that state none."""
+    asyncio.run(fh.Freehire().search("AI Engineer", "us", 100, None, place=REMOTE, posted_within_days=14,
+                                     level="entry"))
+    request = served["searches"][0]
+    assert request["params"]["seniority_include_unspecified"] == "true"
+    assert request["query"].count("seniority=") == 2 and "seniority=intern" in request["query"]

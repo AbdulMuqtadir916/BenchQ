@@ -1468,7 +1468,11 @@ freehire.me as title alternatives. The batch's `request` keeps `titles`.
 **The candidate's level (Q70, Q74).** A search leaves out a job Match holds at 40 for the candidate's level (far more
 years asked, or two rungs away), counted as `skipped_level`. freehire.me also asks only for jobs within the
 candidate's years (`experience_years_max`, the most Match accepts: their years + max(2, 40%)) and those that state
-none. The same filters at save; the daily limits are shared by both sources. A key
+none. Since 2026-11-17 (Q96–Q99) the search also gets the candidate's level (`score.level_of`: entry, mid or senior):
+LinkedIn leaves the other levels out with NOT words (its own level filter is ignored by its public search),
+freehire.me asks for those seniorities (`seniority`, with the unstated ones), Indeed takes nothing more (one filter
+type per search; excluded words apply to the whole posting); a job without its text gets the level check from its
+title alone. LinkedIn's newest jobs' date (`listdate--new`) is read too. The same filters at save; the daily limits are shared by both sources. A key
 (`FREEHIRE_API_KEY`) is sent when set: freehire.me's terms allow the API without one for non-commercial use only, so
 the licence is settled before production.
 

@@ -236,8 +236,10 @@ def _save(*, firm_id, candidate_id, user_id, batch_id, query, country, provider,
         if scorer is not None and fields.description and match.ruled_out(fields, scorer.who):    # the posting rules them out (Q32)
             counts["skipped_work_auth"] += 1
             continue
-        if scorer is not None and scorer.resume is not None and fields.description \
-                and match.score(scorer.resume, fields, scorer.who).wrong_level:      # not the candidate's level (Q70)
+        # Not the candidate's level (Q70): read from the posting, or from the title alone for a job without its text
+        # (LinkedIn's, Q97).
+        if scorer is not None and scorer.resume is not None \
+                and match.score(scorer.resume, fields, scorer.who).wrong_level:
             counts["skipped_level"] += 1
             continue
         key = job_id(fields)
@@ -352,12 +354,13 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
     except Exception:
         scorer = None                   # scored and filtered without it: the save reads it again
     years = match.most_years_asked(scorer.resume, scorer.who) if scorer is not None else None
+    level = match.level_of(scorer.resume, scorer.who) if scorer is not None else None
     try:
         # The source had nothing more for this role today: finish empty without asking again.
         result = SearchResult(jobs=[], metadata={"exhausted": True}) if exhausted else \
             await provider.search(query, country, limits.JOBS_PER_SEARCH, cursor, place=place,
                                   posted_within_days=limits.POSTED_WITHIN_DAYS, titles=titles, years=years,
-                                  firm_id=firm_id)
+                                  level=level, firm_id=firm_id)
     except ProviderError as error:
         code = error.code
     except Exception as error:          # the provider's own bug: its message may hold a URL, so only its type is logged

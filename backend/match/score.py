@@ -88,6 +88,17 @@ def score(resume: ResumeFacts, fields, candidate: Who) -> Match:
     return Match(score=found["score"], note=note, version=found["version"], wrong_level=bool(found.get("wrong_level")))
 
 
+def level_of(resume: ResumeFacts | None, candidate: Who) -> str | None:
+    """The candidate's level as a search asks for it (decided 2026-11-17, Q96, Q99): "entry", "mid" or "senior", from
+    Match's own reading (the target titles' level words, else the latest role's, else the years); None when unknown."""
+    from backend.match import seniority
+    years = candidate.years if candidate.years is not None else (resume.years if resume is not None else None)
+    level = seniority.of_candidate(candidate.wanted, resume.latest_role if resume is not None else "", years)
+    if level is None:
+        return None
+    return "entry" if level.lo <= seniority.ENTRY else "mid" if level.lo == seniority.MID else "senior"
+
+
 def most_years_asked(resume: ResumeFacts | None, candidate: Who) -> int | None:
     """The most years a job may ask before Match calls it far more than the candidate has (ats_match `_experience`:
     held + max(EXPERIENCE_GAP_YEARS, EXPERIENCE_GAP_SHARE × held)). The candidate's recorded years, else the résumé's;

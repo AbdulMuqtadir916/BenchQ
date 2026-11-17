@@ -50,9 +50,21 @@ def _line(value: str, most: int) -> str:
     return _SPACES.sub(" ", _CONTROL.sub(" ", value or "")).strip()[:most]
 
 
-def keywords(query: str, titles=()) -> str:
-    """The search's words: several titles in quotes joined by OR (`quoted_or`); one title as it is; none, the query."""
-    return quoted_or(titles) or _line(next(iter(titles or ()), query), 200)
+# The levels a search leaves out for each candidate level (decided 2026-11-17, Q96): LinkedIn's own level filter (f_E)
+# is ignored by its public search, but NOT words work (live: 0 senior titles in 20 for an entry-level candidate).
+LEVEL_WORDS_OUT = {
+    "entry": ("Senior", "Lead", "Principal", "Staff", "Manager", "Director"),
+    "mid": ("Junior", "Intern", "Principal", "Director"),
+    "senior": ("Junior", "Intern", "Entry"),
+}
+
+
+def keywords(query: str, titles=(), level: str | None = None) -> str:
+    """The search's words: several titles in quotes joined by OR (`quoted_or`); one title as it is; none, the query;
+    then the other levels' words left out (Q96)."""
+    words = quoted_or(titles) or _line(next(iter(titles or ()), query), 200)
+    out = LEVEL_WORDS_OUT.get(level or "")
+    return f"({words}) " + " ".join(f"NOT {w}" for w in out) if out else words
 
 
 @functools.cache
@@ -90,6 +102,12 @@ def _cards(html: str, scraper, searched_remote: bool) -> tuple[list[dict], int]:
             continue
         content = post.model_dump(mode="json", exclude_none=True)
         content.update({"linkedin_id": job_id, "searched_remote": searched_remote})
+        if not content.get("date_posted"):
+            # LinkedIn marks its newest jobs `job-search-card__listdate--new`, which jobspy doesn't read (Q98).
+            tag = card.find("time", class_=lambda c: c and "job-search-card__listdate" in c)
+            posted = (tag.get("datetime") or "").strip() if tag else ""
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", posted):
+                content["date_posted"] = posted
         jobs.append(content)
     return jobs, len(cards)
 
@@ -103,7 +121,7 @@ def _page_error(status) -> str:
 
 
 def _search(query: str, country: str, limit: int, cursor: str | None, place: str | None,
-            posted_within_days: int | None, titles, firm_id, deadline: float) -> SearchResult:
+            posted_within_days: int | None, titles, firm_id, deadline: float, level: str | None = None) -> SearchResult:
     """Pages of 10, `AT_ONCE` at a time through the queue, in a worker thread (jobspy and the queue are blocking)."""
     from concurrent.futures import ThreadPoolExecutor
 
@@ -112,7 +130,7 @@ def _search(query: str, country: str, limit: int, cursor: str | None, place: str
     _, headers = _jobspy()
     scraper = _scraper(country)
     remote = place == REMOTE
-    params = {"keywords": keywords(query, titles), "pageNum": 0,
+    params = {"keywords": keywords(query, titles, level), "pageNum": 0,
               "location": COUNTRIES[country][1] if remote or not place else _line(place, 100)}
     if remote:
         params["f_WT"] = 2
@@ -202,7 +220,7 @@ class LinkedIn:
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
-                     firm_id=None) -> SearchResult:
+                     level=None, firm_id=None) -> SearchResult:
         if country not in COUNTRIES:
             raise ProviderError("internal")     # the route admits us, ca and in only
         place = place if place == REMOTE else (_line(place, 100) or None)
@@ -210,7 +228,7 @@ class LinkedIn:
         try:
             # The thread keeps to the deadline itself; this is only the backstop (a thread can't be cancelled).
             return await asyncio.wait_for(asyncio.to_thread(_search, query, country, limit, cursor, place,
-                                                            posted_within_days, titles, firm_id, deadline),
+                                                            posted_within_days, titles, firm_id, deadline, level),
                                           timeout=TIME_LIMIT_SECONDS + 60)
         except asyncio.TimeoutError:
             raise ProviderError("timeout") from None
